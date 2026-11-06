@@ -92,10 +92,10 @@ To see which phone a player used, find their requests on the Logs page of the ad
 ## The game downloads data when it starts
 
 On its first start after a fresh install (not an update) the game explains why it needs storage, Android asks, and it
-then fetches its data from the server with a progress bar, about 42 MB with every song, without asking again. The data
-stays in `Android/data/<the app>/files`: later starts and updates over the app ask the server one question and fetch
-nothing. It fetches again when songs were imported, added or removed on the server, and after the app was uninstalled,
-which also takes the data with it.
+then fetches its data from the server with a progress bar, about 44 MB with every song's preview, without asking again.
+The data stays in `Android/data/<the app>/files`: later starts and updates over the app ask the server one question and
+fetch nothing. It fetches again when songs were imported, added or removed on the server, and after the app was
+uninstalled, which also takes the data with it.
 
 ## Setup cannot find the game files
 

@@ -93,7 +93,7 @@ stays in `data/` on your PC.
 | | Needs | Recommended |
 |---|---|---|
 | **The server's computer** | Windows 10 or 11 (64-bit), Debian 12, Ubuntu 24.04, macOS with Homebrew, or any computer with Docker; a 64-bit Intel or AMD processor; 2 GB of memory | 2 processor cores or more and 4 GB of memory. At rest the server takes about 170 MB; building the phones' app takes up to 1.6 GB for about half a minute |
-| **Its disk** | About 1 GB: OpenDMTQ, and the game's files without the songs (about 300 MB) | Room for the songs you import (all of the game's take about 4 GB more), the last 10 app builds (about 110 MB each) and broadcast recordings (20 GB at most by default) |
+| **Its disk** | About 1 GB: OpenDMTQ, and the game's files without the songs (about 60 MB) | Room for the songs you import (all of the game's take about 4.5 GB), the last 10 app builds (about 110 MB each) and broadcast recordings (20 GB at most by default) |
 | **Phones and tablets** | Android 5.0 or newer, on the same Wi-Fi as the server or [over the internet](docs/internet.md) | A phone from the last few years. Phones without 32-bit support run the game through OpenDMTQ's runtime, which needs more processor time: a Galaxy S26 Ultra keeps 120 frames a second with room to spare. Broadcasting needs Android 8 or newer |
 | **Phone storage** | About 110 MB for the app | Room for the songs the game downloads as they are played, up to the size of the server's songs |
 
