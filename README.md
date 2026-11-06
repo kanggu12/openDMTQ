@@ -90,15 +90,19 @@ stays in `data/` on your PC.
 
 ### What it runs on
 
-| | Needs | Recommended |
+| | Minimum | Recommended |
 |---|---|---|
-| **The server's computer** | Windows 10 or 11 (64-bit), Debian 12, Ubuntu 24.04, macOS with Homebrew, or any computer with Docker; a 64-bit Intel or AMD processor; 2 GB of memory | 2 processor cores or more and 4 GB of memory. At rest the server takes about 170 MB; building the phones' app takes up to 1.6 GB for about half a minute |
-| **Its disk** | About 1 GB: OpenDMTQ, and the game's files without the songs (about 60 MB) | Room for the songs you import (all of the game's take about 4.5 GB), the last 10 app builds (about 110 MB each) and broadcast recordings (20 GB at most by default) |
-| **Phones and tablets** | Android 5.0 or newer, on the same Wi-Fi as the server or [over the internet](docs/internet.md) | A phone from the last few years. Phones without 32-bit support run the game through OpenDMTQ's runtime, which needs more processor time: a Galaxy S26 Ultra keeps 120 frames a second with room to spare. Broadcasting needs Android 8 or newer |
-| **Phone storage** | About 110 MB for the app | Room for the songs the game downloads as they are played, up to the size of the server's songs |
+| **Server** | 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS with Homebrew, or Docker; 2 GB of memory | 2 processor cores, 4 GB of memory |
+| **Disk** | 1 GB, without the songs | 7 GB with every song, and up to 20 GB more for broadcast recordings |
+| **Phones** | Android 5.0 | A phone from the last few years; Android 8 to broadcast |
 
-Tested on: Windows Server 2022 and Wine (the Windows bundle), Debian 12 and Ubuntu 24.04 (the one command), Docker on
-Linux, a three-node Kubernetes cluster; phones: a Galaxy S26 Ultra (Android 17, no 32-bit support) and the Android 11
+At rest the server takes about 170 MB of memory, and up to 1.6 GB for half a minute while it builds the phones' app. The
+game's files take about 60 MB without the songs and 4.5 GB with all of them; each app build takes about 110 MB, and the
+last ten are kept. On a phone the app takes about 110 MB, plus the songs as they are played. Phones without 32-bit
+support run the game through OpenDMTQ's runtime: a Galaxy S26 Ultra keeps 120 frames a second with room to spare.
+
+Tested on Windows Server 2022 and Wine (the Windows bundle), Debian 12 and Ubuntu 24.04 (the one command), Docker on
+Linux and a three-node Kubernetes cluster, with a Galaxy S26 Ultra (Android 17, no 32-bit support) and the Android 11
 emulator.
 
 ### Windows
@@ -166,7 +170,6 @@ Each player needs an account to sign in and download the app. Make them in the s
 2. Sign in with the player's account, tap **Download app (.apk)** and install it. Allow installs from the browser when
    Android asks.
 3. Start the game. On its first start, allow storage access when it asks; it then downloads its data from the server.
-
 
 <details>
 <summary>Everyday use: starting, stopping, songs</summary>
