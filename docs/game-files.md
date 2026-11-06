@@ -30,12 +30,23 @@ These do not work:
 
 | File | Why |
 |---|---|
-| The iPhone app (`.ipa`) | The game on the phones here is the Android app |
+| The iPhone app (`.ipa`) | The game on the phones here is the Android app ([iPhones](#iphones)) |
 | An app OpenDMTQ built (`OpenDMTQ-<address>-v<date>.apk`) | It is set to one server already. Import the client it was built from |
 | Any other app | It is not the game |
 
 If the build cannot find a place it has to change in a client (a copy changed in more than its addresses), it stops
 before making anything and names the file of the client it could not change.
+
+### iPhones
+
+OpenDMTQ serves Android phones only. The iPhone app cannot be pointed at another server the way the Android app is:
+
+- An `.ipa` from the App Store has its code encrypted for the Apple account that downloaded it. Any change means
+  signing the app again, and an iPhone does not open a copy signed again while its code is still encrypted.
+- Signing needs an Apple account on a computer for each phone, and with a free account the app stops opening after
+  7 days. Players could not install it from the site.
+
+So the setup says what an `.ipa` is and does not import it.
 
 ### Several clients
 

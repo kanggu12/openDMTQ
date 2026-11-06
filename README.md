@@ -64,7 +64,7 @@ All four run the same server, on a PC on the same Wi-Fi as the phones, or one
 
 | File | What it is |
 |---|---|
-| **Your APK** | Your copy of the game's Android app, an `.apk` under any file name: the original, or a copy changed for another server, which is pointed at yours. On its own, in an archive, or in an `.xapk` or `.apks`. Every phone's app is built from it. The iPhone app does not work. |
+| **Your APK** | Your copy of the game's Android app, an `.apk` under any file name: the original, or a copy changed for another server, which is pointed at yours. On its own, in an archive, or in an `.xapk` or `.apks`. Every phone's app is built from it. Phones play on Android; [iPhones cannot](docs/game-files.md#iphones). |
 | **Your server files** | Your copy of the game's server files: a folder or an archive (`.zip`, `.7z`, `.rar`, also one in parts) with the game's `patch/phone_new` folder somewhere in it. They hold what the game needs to start (its data tables, the images of its screens, its fonts), which is always imported, and the songs, imported if you want them. A song list is optional. |
 
 [The game's files](docs/game-files.md) has every form the import takes, and how to check your files before you import
@@ -99,7 +99,8 @@ stays in `data/` on your PC.
 4. When Windows asks whether Apache may use the network, allow it on private networks. If your Wi-Fi is set as a public
    network, phones cannot connect: in Settings, Network & internet, open your Wi-Fi and choose **Private**.
 
-The server runs while its window is open. Nothing else to install.
+The server runs while its window is open. To stop it, close the window, or on the admin pages open **Maintenance**
+and press **Stop the server**.
 
 To check the download: each release has `OpenDMTQ-windows.zip.sha256` beside the zip. In PowerShell, compare
 `Get-FileHash OpenDMTQ-windows.zip` with the number in it; on Linux, run `sha256sum -c OpenDMTQ-windows.zip.sha256` in
@@ -139,7 +140,7 @@ helm install opendmtq oci://ghcr.io/kanggu12/charts/opendmtq --set publicHost=ga
 
 The game files go on the chart's volume first. See [docs/kubernetes.md](docs/kubernetes.md).
 
-### On each phone
+### On each Android phone
 
 The players' site and the app download open to accounts you make, in the setup or later on the admin pages' **Accounts**
 page. Then, on each phone:

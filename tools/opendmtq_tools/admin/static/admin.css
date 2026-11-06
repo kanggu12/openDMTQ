@@ -707,8 +707,9 @@ th.r.can-sort::after, th.rank.can-sort::after { position: absolute; margin-left:
 .setup-path-form .grow { flex: 1 1 320px; }
 .setup-path-form .input { font-family: var(--mono); font-size: 14px; }
 /* Where the picker is: each folder on the way a link back to it. */
-.setup-crumbs { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; min-width: 0; font: 600 13.5px/1.5 var(--mono); }
-.setup-crumbs a { color: var(--chalk); text-decoration: none; overflow-wrap: anywhere; }
+.setup-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; min-width: 0; font: 600 13.5px/1.5 var(--mono); }
+/* Each step a target big enough to press, even a one-letter one (the root, /). */
+.setup-crumbs a { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; min-height: 28px; padding: 0 4px; color: var(--chalk); text-decoration: none; overflow-wrap: anywhere; }
 .setup-crumbs a:hover { color: #fff; text-decoration: underline; }
 .setup-crumbs .sep { color: #5a6571; }
 .setup-crumbs b { color: #fff; overflow-wrap: anywhere; }

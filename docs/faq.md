@@ -21,7 +21,7 @@ command starts the same setup.
 
 **Does the computer have to stay on?**
 Only while people play. The server runs while its window is open on Windows, and you can have it start with the computer
-([everyday use, in the README](../README.md#on-each-phone)).
+([everyday use, in the README](../README.md#on-each-android-phone)).
 
 **How big a computer does it need?**
 About 170 MB of memory at rest, and the disk the songs take. Two processor cores serve hundreds of requests a second
