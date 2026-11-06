@@ -1,0 +1,35 @@
+OpenDMTQ {{ .Chart.AppVersion }} is starting in namespace {{ .Release.Namespace }}.
+
+Phones on the same network reach it at:  http://{{ .Values.publicHost }}/
+That address must be where the "{{ include "opendmtq.fullname" . }}" Service answers on port {{ .Values.router.service.port }}.
+
+The builder job makes the app for that address; follow it with:
+  kubectl -n {{ .Release.Namespace }} logs -f job/{{ include "opendmtq.fullname" . }}-builder
+
+Health:  kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+{{- if .Values.admin.enabled }}
+
+Admin pages, ID {{ .Values.admin.user | default "admin" }}; the password:
+  kubectl -n {{ .Release.Namespace }} get secret {{ default (printf "%s-admin" (include "opendmtq.fullname" .)) .Values.admin.existingSecret }} -o jsonpath='{.data.ADMIN_PASSWORD}' | base64 -d
+{{- if and (eq (include "opendmtq.adminOnPublicPort" .) "yes") .Values.router.tls.secretName }}
+  https://{{ .Values.publicHost }}{{ if not (contains ":" .Values.publicHost) }}:80{{ end }}/opendmtq/admin/
+{{- else if eq (include "opendmtq.adminOnPublicPort" .) "yes" }}
+  http://{{ .Values.publicHost }}/opendmtq/admin/
+  This is plain HTTP: the password crosses the network in clear. router.tls.secretName adds HTTPS;
+  admin.onPublicPort=no keeps the pages off the router; the way below always works.
+{{- else }}
+  Not through the router (admin.onPublicPort; router.tls.secretName adds HTTPS).
+{{- end }}
+  On the machine with kubectl:
+  kubectl -n {{ .Release.Namespace }} port-forward deploy/{{ include "opendmtq.fullname" . }}-api 8791:8000
+  then open http://localhost:8791/opendmtq/admin/
+{{- end }}
+{{- if not .Values.litestream.enabled }}
+
+WARNING: litestream.enabled=false. The game database lives in an emptyDir and is lost
+whenever the api pod is replaced.
+{{- else if .Values.objectStore.enabled }}
+
+NOTE: the bundled object store is a single pod for evaluation. Point litestream.s3 at durable
+object storage for production.
+{{- end }}

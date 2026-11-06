@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block title %}{{ t('nf.title') }}{% endblock %}
+{% block body %}
+{# An admin address that leads nowhere (a mistyped link, a file that was deleted meanwhile): the
+   site's own page with the way back, instead of the bare default one. #}
+<section class="card">
+  <h2>{{ t('nf.title') }}</h2>
+  <p>{{ t('nf.text') }}</p>
+  <div class="btn-line"><a class="btn" href="{{ url_for('dashboard') }}">{{ t('nf.back') }}</a></div>
+</section>
+{% endblock %}

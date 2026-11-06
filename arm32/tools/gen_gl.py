@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+"""Generates the OpenGL ES bridge from the NDK headers.
+
+Writes two files into the output folder:
+  gl_stubs.S    32-bit ARM stubs, one per GL function, each trapping with its host number;
+                assembled into the guest's libGLESv2.so and libGLESv3.so.
+  gl_thunks.cpp host functions: read the guest arguments, translate pointers, call the host's
+                GL function, and a table of names for eglGetProcAddress.
+
+Functions that need more than argument conversion (strings returned, buffers mapped, sync
+objects, arrays of pointers, debug callbacks) are only declared here; gl_special.cpp has them.
+
+  gen_gl.py <NDK sysroot include folder> <output folder>
+"""
+import os
+import re
+import sys
+
+# Host numbers: kHostBase + GL_BASE + index, or kReentrantBase + GL_DETACHED_BASE + index for the
+# functions in DETACHED.
+GL_BASE = 0x1000
+GL_DETACHED_BASE = 0x2000
+
+# Implemented by hand in gl_special.cpp.
+SPECIAL = {
+    "glGetString", "glGetStringi", "glMapBufferRange", "glMapBufferRangeEXT", "glMapBufferOES",
+    "glUnmapBuffer", "glUnmapBufferOES", "glFlushMappedBufferRange", "glFlushMappedBufferRangeEXT",
+    "glGetBufferPointerv", "glGetBufferPointervOES", "glGetPointerv", "glGetPointervKHR",
+    "glGetVertexAttribPointerv", "glShaderSource", "glTransformFeedbackVaryings",
+    "glGetUniformIndices", "glCreateShaderProgramv", "glCreateShaderProgramvEXT",
+    "glFenceSync", "glFenceSyncAPPLE", "glDeleteSync", "glDeleteSyncAPPLE", "glIsSync", "glIsSyncAPPLE",
+    "glClientWaitSync", "glClientWaitSyncAPPLE", "glWaitSync", "glWaitSyncAPPLE",
+    "glGetSynciv", "glGetSyncivAPPLE", "glDebugMessageCallback", "glDebugMessageCallbackKHR",
+    "glEGLImageTargetTexture2DOES", "glEGLImageTargetRenderbufferStorageOES", "glDeleteBuffers",
+}
+
+# Calls that wait for the GPU: run detached from the guest (as reentrant host functions, after
+# the JIT has returned), so that a signal for the waiting thread, the garbage collector's
+# stop-the-world among them, is handled while it waits instead of after.
+DETACHED = {"glClientWaitSync", "glClientWaitSyncAPPLE", "glFinish"}
+
+# Types passed as 64-bit values (an aligned register pair or 8 stack bytes in the guest).
+U64 = {"GLint64", "GLuint64", "GLint64EXT", "GLuint64EXT"}
+# Pointer-sized integers: 32-bit in the guest, sign-extended for the host.
+INTPTR = {"GLintptr", "GLsizeiptr", "GLintptrEXT", "GLsizeiptrEXT"}
+FLOAT = {"GLfloat", "GLclampf"}
+
+PROTO = re.compile(r"GL_APICALL\s+(.+?)\s*GL_APIENTRY\s+(\w+)\s*\((.*?)\)\s*;")
+
+
+def parse(paths):
+    seen, funcs = set(), []
+    for path in paths:
+        for line in open(path):
+            m = PROTO.search(line)
+            if not m:
+                continue
+            ret, name, params = m.group(1).strip(), m.group(2), m.group(3).strip()
+            if name in seen:
+                continue
+            seen.add(name)
+            args = [] if params in ("", "void") else [split_param(p) for p in params.split(",")]
+            funcs.append((name, ret, args))
+    return funcs
+
+
+def split_param(p):
+    """'const GLchar *const*string' -> ('const GLchar *const*', 'string')."""
+    p = p.strip()
+    # An array parameter ('GLuint baseAndCount[2]') is a pointer.
+    array = re.match(r"(.*\w)\s*\[\w*\]$", p)
+    if array:
+        p = array.group(1)
+        m = re.match(r"(.*?)(\w+)$", p)
+        return m.group(1).strip() + " *", m.group(2)
+    m = re.match(r"(.*?)(\w+)$", p)
+    ctype, pname = m.group(1).strip(), m.group(2)
+    if not ctype:  # a bare type such as 'GLenum' without a name
+        ctype, pname = pname, "arg"
+    return ctype, pname
+
+
+def base_type(ctype):
+    return ctype.replace("const", "").replace("*", "").strip()
+
+
+def reader(ctype):
+    """C++ expression reading one guest argument of this type from Words w."""
+    if "*" in ctype:
+        return f"reinterpret_cast<{ctype}>(gl_ptr(w.u32()))"
+    b = base_type(ctype)
+    if b in U64:
+        return f"static_cast<{ctype}>(w.u64())"
+    if b in INTPTR:
+        return f"static_cast<{ctype}>(static_cast<std::int32_t>(w.u32()))"
+    if b in FLOAT:
+        return "as_float(w.u32())"
+    if b in ("GLsync", "GLeglImageOES", "GLDEBUGPROC", "GLDEBUGPROCKHR", "GLeglClientBufferEXT", "GLVULKANPROCNV"):
+        return None  # special
+    return f"static_cast<{ctype}>(w.u32())"
+
+
+def result(ret, call):
+    b = base_type(ret)
+    if ret == "void":
+        return f"    {call};\n    return 0;\n"
+    if "*" in ret or b in ("GLsync", "GLVULKANPROCNV", "GLeglClientBufferEXT"):
+        return None
+    if b in U64:
+        return f"    return static_cast<std::uint64_t>({call});\n"
+    if b in FLOAT:
+        return f"    return float_bits({call});\n"
+    return f"    return static_cast<std::uint32_t>({call});\n"
+
+
+def main():
+    inc, out = sys.argv[1], sys.argv[2]
+    os.makedirs(out, exist_ok=True)
+    funcs = parse([os.path.join(inc, "GLES3/gl32.h"), os.path.join(inc, "GLES2/gl2ext.h")])
+
+    stubs = [
+        "// Generated by arm32/tools/gen_gl.py from the NDK GLES headers. Do not edit.",
+        "    .syntax unified", "    .arm", "    .text",
+        ".macro trap name, number",
+        "    .global \\name", "    .type \\name, %function", "    .balign 4", "\\name:",
+        "    push {r7, lr}", "    movw r7, #(\\number & 0xffff)", "    movt r7, #(\\number >> 16)",
+        "    svc #0", "    pop {r7, pc}", "    .size \\name, . - \\name", ".endm",
+    ]
+    thunks = [
+        "// Generated by arm32/tools/gen_gl.py from the NDK GLES headers. Do not edit.",
+        '#include "gl_bridge.h"',
+        "",
+        "#define GL_GLEXT_PROTOTYPES 1",
+        "#include <GLES3/gl32.h>",
+        "#include <GLES2/gl2ext.h>",
+        "",
+        "namespace arm32 {",
+        "namespace {",
+    ]
+    names, registrations = [], []
+    for index, (name, ret, args) in enumerate(funcs):
+        if name in DETACHED:
+            base, offset = "kReentrantBase", GL_DETACHED_BASE + index
+            number = 0x00200000 + offset
+        else:
+            base, offset = "kHostBase", GL_BASE + index
+            number = 0x00100000 + offset
+        stubs.append(f"    trap {name}, {number:#x}")
+        names.append(name)
+        if name in SPECIAL:
+            registrations.append(f"    register_host_fn({base} + {offset:#x}, &gl_special_{name});")
+            continue
+        readers = [reader(ctype) for ctype, _ in args]
+        sig = ", ".join(ctype for ctype, _ in args) or ""
+        call = "fn(" + ", ".join(f"a{i}" for i in range(len(args))) + ")"
+        body = result(ret, call)
+        if body is None or any(r is None for r in readers):
+            # Rare extensions with types the bridge does not convert: the guest learns they are
+            # missing (eglGetProcAddress returns null for them anyway).
+            print(f"gen_gl: {name}: unsupported prototype, reported as missing", file=sys.stderr)
+            thunks.append(f'std::uint64_t gl_{name}(Thread&) {{ return gl_missing("{name}"); }}')
+            registrations.append(f"    register_host_fn({base} + {offset:#x}, &gl_{name});")
+            continue
+        lines = [f"std::uint64_t gl_{name}(Thread& t) {{",
+                 f'    static auto fn = reinterpret_cast<{ret} (*)({sig})>(gl_proc("{name}"));',
+                 f'    if (!fn) return gl_missing("{name}");',
+                 "    Words w{t};" if args else "    (void)t;"]
+        for i, r in enumerate(readers):
+            lines.append(f"    auto a{i} = {r};")
+        thunks.extend(lines)
+        thunks.append(body + "}")
+        registrations.append(f"    register_host_fn({base} + {offset:#x}, &gl_{name});")
+
+    thunks.append("}  // namespace")
+    thunks.append("")
+    thunks.append(f"const char* const kGlNames[{len(names)}] = {{")
+    thunks.extend(f'    "{n}",' for n in names)
+    thunks.append("};")
+    thunks.append(f"const std::size_t kGlCount = {len(names)};")
+    thunks.append("")
+    thunks.append("void gl_register() {")
+    thunks.extend(registrations)
+    thunks.append("}")
+    thunks.append("")
+    thunks.append("}  // namespace arm32")
+    stubs.append("    .section .note.GNU-stack, \"\", %progbits")
+
+    open(os.path.join(out, "gl_stubs.S"), "w").write("\n".join(stubs) + "\n")
+    open(os.path.join(out, "gl_thunks.cpp"), "w").write("\n".join(thunks) + "\n")
+    print(f"gen_gl: {len(funcs)} functions")
+
+
+if __name__ == "__main__":
+    main()

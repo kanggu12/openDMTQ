@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 676" width="956" height="676" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="The map of the code. A phone's app sends the game's requests to server/edge, the one public port, then server/apache's site.conf sends each path on: the game's requests to server/game (index.php, then src/rpc.php, and src/platform.php for the platform's login), the live view's uploads to server/game/live, the site's pages to server/portal. Players, scores and accounts are in data/state/dmtq.db3. tools/opendmtq_tools holds the admin pages with the setup, the import, the app builder and the song list; opendmtq with cli/ runs them with Docker, host/ without containers">
+<rect x="-28" y="-28" width="956" height="676" rx="16" fill="#11151a"/>
+<rect x="0" y="0" width="200" height="300" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="14" y="22" font-size="13" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,186">On a phone</text>
+<path d="M14,36 H174 L186,48 V136 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="28" y="63.75" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,172">The patched app</text>
+<text x="28" y="82.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,172">your APK, with the</text>
+<text x="28" y="100.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,172">server's address</text>
+<text x="28" y="117.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,172">(builder.py)</text>
+<path d="M14,156 H174 L186,168 V284 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="28" y="189" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,172">arm32/</text>
+<text x="28" y="208" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,172">the runtime for</text>
+<text x="28" y="225.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,172">64-bit-only phones,</text>
+<text x="28" y="243" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,172">and the live view's</text>
+<text x="28" y="260.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,172">capture</text>
+<path d="M270,36 H458 L470,48 V136 H270 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="284" y="72.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="284,456">server/edge</text>
+<text x="284" y="91.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="284,456">the one public port</text>
+<text x="284" y="109" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="284,456">(nginx, with Docker)</text>
+<path d="M270,184 H458 L470,196 V284 H270 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="284" y="220.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="284,456">server/apache</text>
+<text x="284" y="239.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="284,456">site.conf: which path</text>
+<text x="284" y="257" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="284,456">goes where</text>
+<path d="M186.5,86 L262,86" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M269,86 L260.0,90.5 L260.0,81.5 Z" fill="#7b8794" data-tip="269,86"/>
+<text x="228" y="64" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="194,262">the game's</text>
+<text x="228" y="77" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="194,262">requests</text>
+<path d="M370,136.5 L370,176" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M370,183 L365.5,174.0 L374.5,174.0 Z" fill="#7b8794" data-tip="370,183"/>
+<path d="M580,0 H888 L900,12 V136 H580 Z" fill="#1a1f25" stroke="#8cf23d" stroke-width="2" stroke-linejoin="round"/>
+<text x="594" y="37" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="594,886">server/game</text>
+<text x="594" y="56" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="594,886">index.php, src/rpc.php and the</text>
+<text x="594" y="73.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="594,886">replies in src/: the game's requests</text>
+<text x="594" y="91" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="594,886">src/platform.php: the platform's</text>
+<text x="594" y="108.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="594,886">login</text>
+<path d="M580,156 H888 L900,168 V216 H580 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="594" y="181.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="594,886">server/game/live</text>
+<text x="594" y="200.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="594,886">the live view's uploads</text>
+<path d="M580,236 H888 L900,248 V300 H580 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="594" y="263.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="594,886">server/portal</text>
+<text x="594" y="282.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="594,886">the players' site</text>
+<path d="M470.5,204 L490,204 L490,68 L572,68" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M579,68 L570.0,72.5 L570.0,63.5 Z" fill="#7b8794" data-tip="579,68"/>
+<text x="535" y="58" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="496,576">/DMQ, /api</text>
+<path d="M470.5,234 L510,234 L510,186 L572,186" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M579,186 L570.0,190.5 L570.0,181.5 Z" fill="#7b8794" data-tip="579,186"/>
+<text x="545" y="178" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="514,576">/live</text>
+<path d="M470.5,268 L572,268" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M579,268 L570.0,272.5 L570.0,263.5 Z" fill="#7b8794" data-tip="579,268"/>
+<text x="530" y="260" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="476,576">/opendmtq</text>
+<path d="M580,340 H888 L900,352 V432 H580 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="594" y="363.75" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="594,886">data/state/dmtq.db3</text>
+<text x="594" y="382.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="594,886">SQLite: players, scores, accounts,</text>
+<text x="594" y="400.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="594,886">written by server/game and the</text>
+<text x="594" y="417.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="594,886">admin pages</text>
+<rect x="0" y="340" width="520" height="202" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="14" y="362" font-size="13" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,506">tools/opendmtq_tools: Python</text>
+<path d="M14,374 H242 L254,386 V446 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="28" y="405.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,240">importer.py</text>
+<text x="28" y="424.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,240">your files into data/content</text>
+<path d="M266,374 H494 L506,386 V446 H266 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="280" y="396.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="280,492">admin/</text>
+<text x="280" y="415.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="280,492">the admin pages, a module</text>
+<text x="280" y="433" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="280,492">per page, and the setup</text>
+<path d="M14,456 H242 L254,468 V528 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="28" y="487.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,240">songs.py</text>
+<text x="28" y="506.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,240">the song list, the tables</text>
+<path d="M266,456 H494 L506,468 V528 H266 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="280" y="478.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="280,492">builder.py</text>
+<text x="280" y="497.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="280,492">and patch_apk.py:</text>
+<text x="280" y="515" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="280,492">the phone app</text>
+<path d="M506.5,410 L572,410" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M579,410 L570.0,414.5 L570.0,405.5 Z" fill="#7b8794" data-tip="579,410"/>
+<path d="M0,562 H888 L900,574 V620 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="586.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,886">opendmtq, cli/ and host/</text>
+<text x="14" y="605.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,886">the command line runs these tools, with Docker (cli/) or without containers (host/, and OpenDMTQ.exe on Windows)</text>
+</svg>

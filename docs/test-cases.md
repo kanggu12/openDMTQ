@@ -1,0 +1,251 @@
+# Test cases
+
+One table per test suite. **Checked by** points at what checks the case, as `` `file#text` ``: the text is the test's name or the
+line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage** says where it runs ([testing.md](testing.md)):
+
+- `ui`: CI's `ui` job, on every push: the game server's contract and the pages, on stand-in files (`tests/game/protocol.sh`,
+  `tests/ui/run.sh`)
+- `unit`: another CI job, on every push, without the game's files (`test`, `images`, `arm32` or `host`)
+- `qa`: on a machine with the game's files (`tests/qa.sh`)
+- `hand`: by a person, on a device
+
+## TS-PAGE: the public pages
+
+| ID | Scenario | Expected | Checked by | Stage |
+|---|---|---|---|---|
+| PAGE-01 | A browser set to Korean opens the site for the first time | English: the language follows the visitor's choice only | `tests/ui/audit.js#a browser set to Korean first sees English` | ui |
+| PAGE-02 | The visitor picks a language | The page changes, and the choice stays | `tests/ui/audit.js#the language switch changes the page` | ui |
+| PAGE-03 | Every page, at 360, 744, 1024, 1280 and 1920 wide, in both languages | No text cut off, past its box, on other text or under a box; rows and columns in line; nothing past the screen | `tests/ui/audit.js#const FULL` | ui |
+| PAGE-04 | Long names: 20 wide letters, long Korean, a song title of several lines | They wrap; the score next to them stays on the screen | `tests/ui/audit.js#player-long-name` | ui |
+| PAGE-05 | A server with nothing on it | Every page says what is coming and what to do, with no holes | `tests/ui/audit.js#const EMPTY` | ui |
+| PAGE-06 | The home page | The logo as one mark, the server's version beside it | `tests/ui/audit.js#the home page shows the version beside the logo` | ui |
+| PAGE-07 | A wrong password at the download's sign-in | Says so, keeps the form, on a phone too | `tests/ui/audit.js#a wrong password says so` | ui |
+| PAGE-08 | Searching the songs | Narrows the list; says when nothing is left | `tests/ui/audit.js#the song search narrows the list` | ui |
+| PAGE-09 | Maintenance on, with a long message | The notice whole on every page; the hero does not cover it; gone when off | `tests/ui/audit.js#the public site shows the notice` | ui |
+| PAGE-10 | An address that does not exist, an unknown player or song | A page in the site's look, with a way out, and a 404 | `tests/ui/audit.js#not-found` | ui |
+| PAGE-11 | A song with no jacket | The page goes on without it | `tests/ui/audit.js#song-no-jacket` | ui |
+| PAGE-17 | A song's charts | By the names, in the order and in the colours of the game's chart screen: Easy, Normal, Hard, Expert | `tests/ui/audit.js#a song names its charts as the game does` | ui |
+| PAGE-12 | Every class in the markup | Has a rule in a stylesheet, or is a script's handle on the short list | `cli/tests/test_repo.py#test_every_class_in_the_markup_has_a_style` | unit |
+| PAGE-13 | The layout checker itself | Finds one planted fault of each kind | `tests/ui/audit.js#the checker sees` | ui |
+| PAGE-14 | The downloads behind a sign-in; a shared link goes to the sign-in and back | As described | `tests/live/smoke.py#none on the sign-in page itself` | qa |
+| PAGE-15 | An iPhone or iPad | Says the game is for Android, can still sign in to watch | `tests/live/smoke.py#an iPhone can sign in to watch` | qa |
+| PAGE-18 | Any page of the site, signed out | The sign-in page first, with nothing of what is inside (no menu, no count of who is on air, no notice); back on the page asked for after signing in | `tests/ui/audit.js#a stranger gets the sign-in page first` | ui |
+| PAGE-19 | The site's addresses, signed out | Every page sends to the sign-in and back; the pages' own looks and the QR code answer 403; the sign-in page, the licenses and the health check stay open | `tests/live/smoke.py#signed out: the pages' own looks and the QR code answer nothing` | qa |
+| PAGE-20 | The front page | The app one press away, with its size and date and the way to the steps; the way to the broadcasts, lit with the count while someone is on air; nobody on air: the newest recordings, or OFF AIR before there are any | `tests/ui/audit.js#the front page offers the app and the broadcasts first` | ui |
+| PAGE-21 | The download page's steps | Each with the screen it meets on the phone: the file, the switch to allow the browser to install, the app's own icon; the icon kept beside every new build | `tools/tests/test_patch_apk.py#class AppIconTest` | unit |
+| PAGE-22 | The sign-in in the game's own window (its score viewer), a phone held sideways | The form and its button on the screen without scrolling, at 915x412 and 640x320 | `tests/ui/audit.js#the sign-in fits the game's window sideways` | ui |
+| PAGE-23 | The rankings' This month tab | This month's players as the game ranks them, when it starts anew, and the first three of each month before | `tests/ui/audit.js#the month's tab ranks this month and keeps the months before` | ui |
+| PAGE-24 | The site with a linked account | The top shows the player's own name, leading to their page; the rankings mark their place | `tests/ui/audit.js#a linked account shows its player and marks their place` | ui |
+| PAGE-25 | The site's pages with a linked account | Home, rankings, this month and a player's page at 412 and 1280 px in both languages: no layout findings (the name in the bar is a key a finger can hit; the marked rows and podium card carry their ring) | `tests/ui/audit.js#Measured while linked too` | ui |
+| PAGE-16 | The site's look on a real phone's browser | Nothing out of place; fonts, glass and the bottom menu as on the emulated phone | | hand |
+
+## TS-LIVE: broadcasts and replays
+
+| ID | Scenario | Expected | Checked by | Stage |
+|---|---|---|---|---|
+| LIVE-01 | A player the owner has not switched on | No upload key, no notice | `tests/live/smoke.py#off by default: no token, no notice` | qa |
+| LIVE-02 | Two players on air | The video runs, marked LIVE; both listed; pages show who is on | `tests/ui/audit.js#the broadcast plays` | ui |
+| LIVE-03 | The pages while players are on air | No layout findings, at a phone's and a laptop's width | `tests/ui/audit.js#const AIR` | ui |
+| LIVE-04 | A recording | Plays, marked REPLAY, with its timeline | `tests/ui/audit.js#a recording plays` | ui |
+| LIVE-05 | The replay's controls: 10 seconds on, speed by button and key, connection details | Each does what it says | `tests/ui/audit.js#the connection details` | ui |
+| LIVE-06 | A recording with songs in it | The timeline in a part per song, chapters that jump, each with its song's jacket | `tests/ui/audit.js#the songs are marked on the timeline` | ui |
+| LIVE-07 | Coming back to a recording left half-way | Goes on from there, says so, offers to start over | `tests/ui/audit.js#coming back continues where it was left` | ui |
+| LIVE-08 | The end of a recording | What next: watch again, the next one | `tests/ui/audit.js#the end screen` | ui |
+| LIVE-09 | Another recording from the list | Plays without the page loading again; back returns | `tests/ui/audit.js#another recording from the list, without a reload` | ui |
+| LIVE-10 | The replay on a phone, with its controls in view | No layout findings | `tests/ui/audit.js#the replay on a phone` | ui |
+| LIVE-11 | Real H.264 from the phone's encoder settings, in Chromium, on the portal and in the admin | Plays; the box has the video's shape | `tests/live/browser.js#the box has the video's shape` | qa |
+| LIVE-12 | Uploads: size limit, unknown ids, a bad key | Refused; nothing stored | `tests/live/smoke.py#unknown ids with a good token` | qa |
+| LIVE-13 | A phone that vanishes mid-broadcast; a recording past the age limit | Closed by the sweep; removed | `tests/live/run.sh#the health check's sweep closes` | qa |
+| LIVE-14 | A recording at its maximum length, an hour | Rolls over: the next video starts a new recording | `tests/live/run.sh#a recording at its maximum length rolls over` | qa |
+| LIVE-15 | Over the recordings' size limit | The oldest go first; one in progress is never cut | `tests/live/smoke.py#two running over the limit together: one closes, the largest` | qa |
+| LIVE-19 | Seeking back in a replay | The browser keeps the pieces it has; the playlist is asked for anew | `tests/live/smoke.py#a recording's pieces are kept by the browser` | qa |
+| LIVE-20 | The live page's look every few seconds | Stays light: the recordings only when asked for | `tests/live/smoke.py#the page's quick look leaves the recordings out` | qa |
+| LIVE-16 | The transport stream writer | Valid packets, timestamps, resets | `arm32/tests/host/live_ts_test.cpp#int main` | unit |
+| LIVE-17 | The sound from the phone to the browser | Nothing skipped or repeated; with the sound starting after the picture as a phone's does, the gap filled with AAC-LC silence (HE-AAC silence garbles Chrome's sound after it) | `tests/live/sound/run.sh#compare.py`, `tests/live/sound/play.js#a gap in the sound is filled with silence of its own kind` | hand |
+| LIVE-18 | Broadcast from a real phone, heard in a real browser | By ear: no breaks | | hand |
+| LIVE-22 | Two quick taps at the side of a recording on a phone, with the controls away | Ten seconds further, still playing, on either half of the picture | `tests/ui/audit.js#a double tap on the` | ui |
+| LIVE-23 | Back from a recording to the page of who is on | It stops; the heading says LIVE again | `tests/ui/audit.js#back from a recording to the list stops it` | ui |
+| LIVE-24 | The page's heading and tab on a recording | REPLAY, and whose | `tests/ui/audit.js#the heading says replay, not live` | ui |
+
+## TS-ADMIN: the owner's pages
+
+| ID | Scenario | Expected | Checked by | Stage |
+|---|---|---|---|---|
+| ADM-01 | A wrong password | Says so, in the page's look, on a phone too | `tests/ui/audit.js#a wrong admin password says so` | ui |
+| ADM-02 | Renaming a player | A message says so; the name stays | `tests/ui/audit.js#renaming says so` | ui |
+| ADM-03 | The players list | Its search, sort and spreadsheet download work | `tests/ui/audit.js#the players download` | ui |
+| ADM-04 | A name that starts like a formula, or holds a quote, in the spreadsheet | Never read as a formula; stays in its field | `tools/tests/test_admin.py#test_a_name_is_never_read_as_a_formula` | unit |
+| ADM-05 | The log of changes | In words, in the page's language, under the player's name | `tests/ui/audit.js#the change log says what was done, in words` | ui |
+| ADM-06 | Every form a page has | Has its words in the log of changes | `tools/tests/test_admin.py#test_every_change_a_page_can_note_has_its_words` | unit |
+| ADM-07 | The log of changes after years | A few hundred kilobytes at most | `tools/tests/test_insights.py#test_the_record_stays_small_however_long_it_runs` | unit |
+| ADM-08 | A backup by the button | Made, listed, known to the status page | `tests/ui/audit.js#a backup is made and listed` | ui |
+| ADM-09 | The daily backup | Once a day, only after a change | `tools/tests/test_admin.py#test_due_once_a_day_and_only_after_a_change` | unit |
+| ADM-10 | A file that is no song package | Refused in words | `tests/ui/audit.js#a bad song package is refused in words` | ui |
+| ADM-11 | Hiding a recording | Gone from the public list; back when shown | `tests/ui/audit.js#and is gone from the public list` | ui |
+| ADM-12 | The charts over time | Their text is never stretched with the drawing | `tools/tests/test_charts.py#test_the_stretched_drawing_holds_no_text` | unit |
+| ADM-13 | The share printed on a coloured block | Readable on every colour used | `tools/tests/test_charts.py#test_every_block_colour_gets_words_that_can_be_read` | unit |
+| ADM-14 | A player's name in a chart | Cannot break out of its place | `tools/tests/test_charts.py#test_a_name_cannot_break_out` | unit |
+| ADM-15 | The request log's chart | Scripts looking for files do not count as the server failing | `tools/tests/test_insights.py#test_a_script_looking_for_files_is_not_a_failure_of_the_server` | unit |
+| ADM-16 | The request log, rotated | The newest two files, health checks left out, other formats still shown | `tools/tests/test_insights.py#test_the_newest_two_log_files_are_read_and_health_checks_left_out` | unit |
+| ADM-17 | Forms sent twice; forms without the session's token | Change nothing | `tools/tests/test_admin.py#test_a_form_sent_twice_changes_nothing` | unit |
+| ADM-18 | Restoring a backup: a bad one, one of another layout | Refused; nothing changes | `tools/tests/test_admin.py#test_an_archive_with_the_wrong_columns_changes_nothing` | unit |
+| ADM-19 | The pages while the game server is down | They keep their look | `tools/tests/test_admin.py#test_the_last_copy_serves_while_the_server_is_down` | unit |
+| ADM-23 | The message to invite a friend, with the page opened on the server PC | Has the address phones use, not the PC's own | `tools/tests/test_admin.py#test_the_message_has_the_address_friends_use_wherever_the_page_was_opened` | unit |
+| ADM-22 | Every page with the game server stopped | Keeps its look, says what is wrong, no layout findings | `tests/ui/audit.js#the status page says the game server is not answering` | ui |
+| ADM-20 | Language | English whatever the browser says | `tests/live/smoke.py#the admin starts in English whatever the browser says` | qa |
+| ADM-21 | Every text in both languages, with the same values | No key missing or unused | `tools/tests/test_strings.py#test_both_languages_have_the_same_keys` | unit |
+
+| ADM-30 | What cannot be undone | Asks in the site's own look, not the browser's; says a backup comes first; Cancel leaves everything as it was | `tests/ui/audit.js#a reset asks first, and says a backup comes first` | ui |
+| ADM-31 | The log of changes | Holds what happened, not what was tried: a stale form, a refused file, the same name again are not in it. Names as they were then, both names of a rename | `tools/tests/test_admin.py#test_what_did_not_happen_is_not_noted` | unit |
+| ADM-32 | A damaged database | Does not become a backup, and pushes no good one out | `tools/tests/test_admin.py#test_a_damaged_database_does_not_become_a_backup` | unit |
+| ADM-33 | The daily backup | Runs from the service's start, without anyone opening a page | `tools/tests/test_admin.py#test_the_daily_backup_does_not_wait_for_a_visitor` | unit |
+| ADM-34 | A reset or a deleted player | A backup first | `tools/tests/test_admin.py#test_a_reset_makes_a_backup_first` | unit |
+| ADM-35 | Every page's tab | Its name, no markup | `tools/tests/test_admin.py#test_every_pages_title_is_only_a_name` | unit |
+| ADM-36 | Signing out | Said as what went well | `tools/tests/test_admin.py#test_signing_out_is_said_as_what_went_well` | unit |
+| ADM-37 | The plays, narrowed by a word, a player and days | A day counts whole on both ends; days the wrong way round are taken as meant; what cannot be read counts as not given; the other pages and the file keep the filter | `tools/tests/test_admin.py#class PlaysTabTest`, `tests/ui/audit.js#the plays narrow to one player` | unit |
+| ADM-39 | An account, made on the Accounts page | Its password kept as PBKDF2 that the site checks, shown once with the message to send; an ID taken (in any letter case, the owner's too) or malformed is refused | `tools/tests/test_admin.py#class AccountsTest` | unit |
+| ADM-40 | Signing in with an account | ID and password on the site; a wrong one, a switched-off or deleted account, an old password after a new one: out, and their sign-ins end | `tests/live/smoke.py#a new password ends the old sign-ins and replaces the old password` | qa |
+| ADM-41 | The admin pages' sign-in | ID and password: the owner's from .env (works with the database damaged) or an account with admin rights; a site account cannot | `tools/tests/test_admin.py#test_admin_rights_open_these_pages_and_a_site_account_does_not` | unit |
+| ADM-42 | An account for a friend in a browser | Made, shown once, signs in to the site; switched off, signed out | `tests/ui/audit.js#an account is made with a password shown once` | ui |
+| ADM-43 | The status page's resources | Processors, memory, swap, disk and load now; the last day's processors and memory as lines with gaps where nothing was known; the game server's answers as a strip with its key | `tools/tests/test_charts.py#class ResourcesTest` | unit |
+| ADM-44 | The Plays tab's summary | Everything the filter found, not one page: plays, new records, average accuracy, players; a column a day, a week over three months; the same with a word to search for | `tools/tests/test_admin.py#test_the_summary_counts_all_that_the_filter_found` | unit |
+| ADM-45 | The songs page's plays | A song's charts together over 30 days, the bar against the most played, when last played; a dash for one never played | `tools/tests/test_admin.py#test_plays_count_by_song_and_an_unplayed_one_has_a_dash` | unit |
+| ADM-46 | An account linked to its game player | Picked when made, changed and taken away later; no player that is not there; a table from before gets its column | `tools/tests/test_admin.py#class AccountLinkTest` | unit |
+| ADM-47 | The App page | The app players get at the top: its file, size, build date and whether it is right for this server, its icon when the builder kept one; every other build with why it is not offered | `tools/tests/test_admin.py#class AppPageTest` | unit |
+| ADM-48 | A password typed for an account | Typed twice; refused when the two differ | `tools/tests/test_admin.py#test_a_typed_password_has_to_be_typed_the_same_twice` | unit |
+| ADM-49 | A reset or a deleted player's achievements | Their stored achievements go with their records, and nobody else's | `tools/tests/test_admin.py#test_a_reset_or_a_deletion_takes_the_players_achievements` | unit |
+| ADM-50 | The admin pages' old address | `/admin/...` (their address until 2026-11) leads to the same page at `/opendmtq/admin/...`, with its query, before any sign-in; a form's POST stays a POST (308) | `tools/tests/test_admin.py#test_the_old_address_leads_to_the_new_one` | unit |
+| ADM-51 | The admin pages' old address, through the server | A plain visit to `/admin/...` goes to HTTPS at `/opendmtq/admin/...`; on the admin's own port the same page answers by a 308 | `tests/live/run.sh#the old admin address leads to the new one through the server` | qa |
+| ADM-52 | The accounts at 744 to 1280 wide, in both languages, with an admin, a player and a switched-off account | Every row's buttons in the same columns (a button whose word depends on the account is as wide as its other word); up to 1240 px they are on a line under the row, and the player's list shows its whole word | `tests/ui/audit.js#the buttons of every account stand in the same columns` | ui |
+| ADM-53 | The setup's one-time sign-in | The host program opens the setup with a key it put in its run folder: it signs in once, from the server PC, within an hour; a wrong, old or used key, another PC, or an install in containers signs in nothing | `tools/tests/test_setup.py#class OneTimeSignInTest` | unit |
+| ADM-54 | The setup's steps | The first step not done opens; the status page asks for the setup until every step is done, and the alerts the setup covers wait (no account, a build failed for want of a client) | `tools/tests/test_setup.py#class StepsTest`, `tools/tests/test_setup.py#test_a_build_that_failed_for_want_of_a_client_is_the_setups_line_not_an_alarm` | unit |
+| ADM-55 | The game's files on the server PC | Found in Downloads, on the Desktop and in Documents, the most complete folder first; the folder picker lists folders and the game's files only; the Songs page leads there; in containers the pages name the command instead | `tools/tests/test_setup.py#class FilesOnThisPcTest` | unit |
+| ADM-56 | The setup's import | A folder or one file, with the songs or without, then the song list; one import at a time, followed on the page | `tools/tests/test_setup.py#class ImportTest` | unit |
+| ADM-57 | Another address in the setup | Only a private address of this PC; saved to .env with its port; every program started again for it; the page comes back signed in, at the players' step | `tools/tests/test_setup.py#class AddressTest`, `tests/host/run.sh#the page comes back signed in, at the players' step` | unit |
+| ADM-58 | The setup's players and app | An account made with its password shown once; the app built for this address, one build at a time (the server's own build at its start is followed); the phone's steps, with the QR code when the build made one | `tools/tests/test_setup.py#class PlayersTest`, `tools/tests/test_setup.py#class AppStepTest` | unit |
+| ADM-59 | The setup's pages at every width, in both languages | The files found, the folder picker, the address, the players and the app without layout findings | `tests/ui/audit.js#const SETUP` | ui |
+| ADM-60 | A folder the setup's picker cannot open | Says so, with the way up; the top of a drive or a share has no way up | `tools/tests/test_setup.py#test_a_folder_that_cannot_be_opened_says_so_with_the_way_up` | unit |
+| ADM-61 | One job at a time in the setup | While an import runs the address and the app wait, with why; the address in use needs no restart | `tools/tests/test_setup.py#test_nothing_else_starts_while_an_import_runs` | unit |
+| ADM-62 | A build that failed before the client came in | No longer said once the client is imported; one that fails after it is, with why, and promises no app when none is on offer | `tools/tests/test_setup.py#test_a_build_that_failed_for_want_of_a_client_is_the_setups_line_not_an_alarm` | unit |
+| ADM-63 | The setup from another computer | The one-time link says it works on the server PC only and stays usable there; after a restart the sign-in leads back | `tools/tests/test_setup.py#test_from_another_pc_the_restart_leads_back_through_the_sign_in` | unit |
+| ADM-64 | The setup's files step | Says what the two kinds of file are and the forms each comes in; every file found or listed says what it is (the app and its version, a changed client and its server, server files and their songs, the iPhone app, a part, a damaged archive), and one of no use cannot be imported; the client in place is named, or what is there instead | `tools/tests/test_setup.py#test_each_file_is_said_for_what_it_is`, `tools/tests/test_setup.py#test_the_client_in_place_is_said_for_what_it_is` | unit |
+| ADM-65 | The forms the setup finds | An APK bundle, an archive in parts by its first part with how many more, the iPhone app beside them, the server files under another name or two folders down (said once); this project's own downloads left out | `tools/tests/test_setup.py#test_the_forms_people_have_them_in_are_found` | unit |
+| ADM-38 | The plays as a file | Everything the filter leaves, not one page; a spreadsheet reads it as UTF-8; nothing in it is read as a formula | `tools/tests/test_admin.py#test_the_file_is_everything_the_filter_leaves_not_one_page`, `tools/tests/test_admin.py#test_nothing_in_the_file_is_read_as_a_formula`, `tests/ui/audit.js#the plays download holds what the page found` | unit |
+
+## TS-GAME: the patched client
+
+| ID | Scenario | Expected | Checked by | Stage |
+|---|---|---|---|---|
+| GAME-01 | Every code edit on the real client | Finds its bytes | `tools/tests/test_real_client.py#test_every_code_edit_finds_its_bytes` | qa |
+| GAME-02 | Every screen edit on the real client | Finds its object, which was not hidden already | `tools/tests/test_real_client.py#test_every_screen_edit_finds_its_object` | qa |
+| GAME-03 | The screen edit tool | Changes only the bytes it must; refuses another format, a cut file, a name used twice | `tools/tests/test_unity_assets.py#test_hide_and_move_change_only_their_bytes` | unit |
+| GAME-04 | Installing from nothing | The game explains the storage permission and Android asks for it; then it downloads with its progress bar, asking nothing else, and a new player picks a name | `tests/game/tour.sh#first start` | hand |
+| GAME-05 | The second start | Downloads nothing again: the data stays on the device | `tests/game/tour.sh#second start` | hand |
+| GAME-06 | The lobby, the menu, the options, the shop | No entry that leads nowhere: free music, music shop, packages, quests, more games, messages, accounts, social links, the Q tab | `tests/game/tour.sh#08-shop` | hand |
+| GAME-07 | A song on an emulator | Downloads, plays, pauses, shows the result; the score is on the server | `tests/closed/game.sh#the song's score reaches the server` | hand |
+| GAME-08 | Things paid with Q in the shop | Still work | `tests/closed/game.sh#the shop's purchase reaches the server` | hand |
+| GAME-09 | The price list the game asks for at every sign-in | One item, not half a megabyte | `tests/live/smoke.py#the price list the game waits for is one item, not half a megabyte` | qa |
+| GAME-10 | A save that does not carry the game's signature | Refused, also with the method in another letter case | `tests/live/smoke.py#the method's letter case does not get around the signature` | qa |
+| GAME-11 | The app's manifest, its label, its name on the device | As this server's | `tools/tests/test_axml.py#test_label_text_replaces_the_reference` | unit |
+| GAME-12 | The server's address in the game's code | Replaced whatever its length; refused when ambiguous | `tools/tests/test_il2cpp.py#test_missing_or_duplicate_literal_is_refused` | unit |
+| GAME-13 | Building the app: a lost key, a failed copy, two builds at once | Keeps what is offered; says what went wrong | `tools/tests/test_patch_apk.py#test_a_copy_that_fails_half_way_keeps_the_offered_app` | unit |
+| GAME-20 | The manifest's edits for the app's target | The number, a library asked for, a plain flag in the network security config | `tools/tests/test_axml.py#test_a_plain_flag_goes_on_the_element` | unit |
+| GAME-24 | The app's target on the real client | Android 9, so that Android 14 and later show no older-version notice at its start, with plain HTTP allowed where the game's config decides it and the Apache classes asked for | `tools/tests/test_real_client.py#test_the_app_says_it_is_for_android_9_with_all_it_then_needs` | qa |
+| GAME-21 | The game's graphics | The panel's own resolution, a 32-bit screen, textures at full size: the bytes are where the patcher expects them in the real client | `tools/tests/test_real_client.py#test_every_setting_edit_finds_its_byte` | qa |
+| GAME-22 | A device that does not keep its frame rate | The low resolution from the next start, the frame rate giving way until then; `debug.arm32.slowframe` makes a fast phone act so | | hand |
+| GAME-23 | A menu left alone on a real phone | Stays at the frame rate, with nothing late | | hand |
+| GAME-25 | MY PAGE's achievements | Every player has the level and MAX POINT ones; ALL COMBO, PERFECT PLAY and the TOTAL SCORE steps follow their records; the game's count is 34 and 1,288 points | `tests/live/smoke.py#a player's achievements follow their records` | qa |
+| GAME-26 | The in-game rankings, month by month | A play from before the first of the month (00:00 UTC, when the game's countdown ends) is not ranked, one of this month is; the player's own best keeps both | `tests/live/run.sh#the in-game ranking counts this month's plays only` | qa |
+| GAME-27 | An achievement earned by a play | Named in the save's reply as the game's own (its nine fields), once: the same play again earns nothing | `tests/live/smoke.py#a play that earns achievements says so` | qa |
+| GAME-28 | The dates on MY PAGE's achievements | Each keeps the date it was earned on: a later play moves none, and the save's reply gives the date the list gives | `tests/live/smoke.py#a player's achievements keep the dates they were earned on` | qa |
+| GAME-29 | ALL COMBO on a chart played before without one | Dated by the play that made it, in the save's reply and on MY PAGE alike | `tests/live/smoke.py#ALL COMBO is dated by the play that made it` | qa |
+| GAME-30 | An achievement the records no longer give | Stays listed with its stored date (the play log keeps a year), and a later save does not name it as new | `tests/live/run.sh#a stored achievement stays listed with its date` | qa |
+| GAME-14 | The arm32 runtime in the app | With its licenses, once, not in a 64-bit-only app | `tools/tests/test_pack_arm64.py#test_packing_again_keeps_one_of_each` | unit |
+| GAME-15 | Real phones (64-bit only, 32-bit) | Installs, plays a song, broadcasts | | hand |
+| GAME-31 | A phone's first start: platform login, game login, the start batch | An account per phone, the same one at the next start; the player id as text and the signing key; every reply of the batch without an error | `tests/game/protocol.py#the start batch comes back whole, in order, without errors` | ui |
+| GAME-32 | The lists the client turns into arrays of entries | Never empty where the client needs an entry (news): an empty one closes the game | `tests/game/protocol.py#one news entry at least: the client closes on an empty news list` | ui |
+| GAME-33 | A play saved signed, a worse one, one without notes, one unsigned | Score, accuracy, grade, bonuses and new record as the official server worked them out; the best kept; no notes handled without a popup; unsigned refused whole | `tests/game/protocol.py#a perfect first play: 100 notes at 100 %, the ALL COMBO and PERFECT PLAY bonuses, S, a new record` | ui |
+| GAME-34 | The month's rankings after a play | The player in the total and the song's line ranking, with the name they picked; no row on a line they did not play | `tests/game/protocol.py#the month's total ranking has the player, with the name they picked` | ui |
+| GAME-35 | A method or body the server does not know | SVC.05008, which the client handles without a popup; never SVC.001 | `tests/game/protocol.py#a method this server does not have is handled without a popup (SVC.05008)` | ui |
+| GAME-36 | The platform SDK's calls | A one-product price list (the SDK waits for one), OK to its reports, the push choice echoed, no maintenance unless set | `tests/game/protocol.py#the price list the SDK waits for has one product, not on sale` | ui |
+| GAME-37 | The game server's own files | Never served, whatever the address | `tests/game/protocol.py#the game server's code is never served` | ui |
+| GAME-38 | A server with the game data and no songs | The game starts with an empty song list; songs imported later reach installed apps at their next start | `tests/closed/game.sh#the game starts with no songs`, `tests/closed/game.sh#the installed app fetches what changed` | hand |
+| GAME-39 | A save that earns achievements while another writer holds the database | One wait for the lock, not one per achievement; nothing stored and nothing in PHP's log; stored at the next save | `tests/game/lock.php#with the lock taken, the store gives up after one wait` | ui |
+| GAME-40 | Everything the game server did in the contract's run | Not one PHP warning, notice or error in the server's log | `tests/game/protocol.sh#PHP said nothing in the server's log` | ui |
+| GAME-41 | A client changed for another server | Every address of that server, in the game's code and in the SDK's, points at this one whatever host it was given; the edits it has made by hand already count; a package name of its own is replaced | `tools/tests/test_clients.py#test_the_literals_of_the_other_server_all_point_here`, `tools/tests/test_clients.py#test_the_sdk_strings_on_that_host_point_here_and_nothing_else` | unit |
+| GAME-42 | What an APK is | The original, one changed for another server, an app OpenDMTQ built, anything else: from its contents, never its name, with its version | `tools/tests/test_clients.py#test_one_changed_for_another_server` | unit |
+| GAME-43 | A client of another version | The code edits that do not fit it are left out, with the screen edits that go with them (the shop keeps its Q tab while it still opens on it); a button only that version has, and turns on itself, goes off the screen | `tools/tests/test_clients.py#test_the_shop_tab_stays_when_the_shop_still_opens_on_it`, `tools/tests/test_unity_assets.py#test_an_object_only_some_versions_have_is_hidden_when_it_is_there` | unit |
+| GAME-44 | Client 1.3.5 changed for another server, on an emulator on a closed network | Built, installed and signed in; a song downloaded, played to its result and saved on the server; the lobby without PLAY FOR FREE, the shop opening on the tab it shows | `tests/closed/game.sh#CLIENT=<apk> builds from that client` | hand |
+| GAME-45 | The real client, as the patcher sees it | The original, version 1.3.4, the client the code edits were made for | `tools/tests/test_real_client.py#test_it_is_taken_for_the_original_the_code_edits_were_made_for` | qa |
+
+## TS-SERVER: the server and its songs
+
+| ID | Scenario | Expected | Checked by | Stage |
+|---|---|---|---|---|
+| SRV-01 | Starting by the real script on stand-in game files | The server comes up and its pages answer | `tests/ui/run.sh#the real start script starts on the stand-in game files` | ui |
+| SRV-02 | Starting without the game's files | Starts, says what to do, and reports itself unhealthy until the game data is there | `.github/workflows/ci.yml#Without game files the server starts, says what to do` | unit |
+| SRV-03 | The PHP of the game server, the portal and the test helpers | Valid on PHP 8.3 | `.github/workflows/ci.yml#PHP syntax (game server, portal and the test helpers, PHP 8.3)` | unit |
+| SRV-04 | The game's whole path on a running server | Every step answers as the game expects | `cli/opendmtq_cli/checks.py#def end_to_end` | qa |
+| SRV-05 | The real tree, every request the game makes | As `tests/live/smoke.py` lists them (170 checks) | `tests/live/run.sh#smoke.py` | qa |
+| SRV-06 | Adding a song | Its tables stay valid; it is listed; it has a jacket; removing takes all of it | `tools/tests/test_songs.py#test_unchanged_rows_stay_byte_identical` | unit |
+| SRV-07 | A song's tile in the game | The picture the client computes the name of | `tools/tests/test_jacket_atlas.py#test_names_follow_what_the_client_computes` | unit |
+| SRV-08 | Importing the game's files | Killed half-way, it starts over cleanly | `tools/tests/test_importer.py#test_what_a_killed_run_left_goes` | unit |
+| SRV-09 | The own certificate | Valid for this server only; renewed in time | `tools/tests/test_tls.py#test_constrained_authority_cannot_sign_other_names` | unit |
+| SRV-10 | The edge proxy with a broken certificate | Stays open on plain HTTP and says so | `.github/workflows/ci.yml#plain HTTP only` | unit |
+| SRV-11 | The folder of the built apps a deployment names | The site looks where OPENDMTQ_APK_OUT (or an older chart's APK_DIR) says, not at the image's default; the chart names the folder it mounts | `tests/game/protocol.sh#the site finds the apps where` | ui |
+| SRV-12 | A damaged archive among the game's files | Said so; the client beside it still comes in, and the next archive is tried | `tools/tests/test_importer.py#test_a_damaged_archive_does_not_keep_the_client_out` | unit |
+| SRV-13 | Different clients in `data/apk/base` | The one the phones' app was built from while it is there; before the first build the original before a changed one, the client the code edits fit before another version, then the newest; named, and `BASE_APK` chooses another | `tools/tests/test_clients.py#test_the_one_the_phones_app_came_from_while_it_is_there`, `tools/tests/test_clients.py#test_the_original_before_one_changed_for_another_server` | unit |
+| SRV-14 | The runtime for newer phones, ready-made | One zip with the translator, the shim, Android's libraries and every license, handed out only whole; it comes with the program, or by hand, without asking anyone, else from the latest release; a damaged one replaces nothing, a failed swap leaves the old one, two runs at once leave a whole one; a runtime built here stays; without any, the app is built all the same and the owner is told why | `tools/tests/test_runtime.py#test_a_copy_put_there_by_hand_needs_no_network_and_is_taken` | unit |
+| SRV-15 | The server files without the old server's song list | The list is made from the game's own tables, for the songs whose music is there, with the charts whose files are | `tools/tests/test_importer.py#test_without_a_song_list_it_is_made_from_the_game_tables_for_the_songs_there` | unit |
+| SRV-16 | The server files in other forms | The game host's folder under another name, an OpenDMTQ server's content with its list; another program's patch folder is not taken | `tools/tests/test_importer.py#test_the_game_host_folder_under_another_name`, `tools/tests/test_importer.py#test_an_opendmtq_servers_content_with_its_song_list` | unit |
+| SRV-17 | Archives as people have them | One in parts through its first part (one with a part missing is said and skipped), one inside another, the client in an APK bundle | `tools/tests/test_importer.py#test_an_archive_in_parts_through_its_first_part`, `tools/tests/test_importer.py#test_an_archive_inside_another` | unit |
+| SRV-18 | The clients an import takes | The original and one changed for another server, each said for what it is; an app OpenDMTQ built and other apps named and left; a bundle's split parts left without a word | `tools/tests/test_importer.py#test_a_client_changed_for_another_server_is_kept_and_said_so` | unit |
+
+## TS-CLI: the command line
+
+| ID | Scenario | Expected | Checked by | Stage |
+|---|---|---|---|---|
+| CLI-01 | A backup on a full disk | No half archive left | `cli/tests/test_backup.py#test_a_disk_that_fills_up_leaves_no_half_archive` | unit |
+| CLI-02 | Restoring | A bad one changes nothing; the current state is saved first | `cli/tests/test_backup.py#test_a_refused_archive_changes_nothing` | unit |
+| CLI-03 | A second copy of the server on one machine | Takes its own name and port | `cli/tests/test_two_copies.py#test_a_running_other_copy_means_the_next_name` | unit |
+| CLI-04 | The address in `.env` | Forms compose accepts; LAN and internet told apart | `cli/tests/test_env.py#test_check_host` | unit |
+| CLI-05 | `./opendmtq doctor` and `check` | Find what is wrong, with the fix | `cli/tests/test_checks.py#test_a_complete_install_passes` | unit |
+| CLI-06 | The Windows side, from WSL | Output in any code page; temp paths with spaces | `cli/tests/test_system.py#test_output_in_a_windows_code_page_is_read` | unit |
+| CLI-07 | A deploy of a commit that passed | Backup first, then up, then the check | `cli/tests/test_commands.py#test_a_commit_that_passed_goes_live_with_a_backup_first_and_a_check_after` | unit |
+| CLI-08 | A deploy of what has not passed, or is not committed | Refused before anything is touched | `cli/tests/test_commands.py#test_ci_that_failed_stops_it` | unit |
+| CLI-09 | A deploy while someone is in a song | Refused; `--now` goes ahead | `cli/tests/test_commands.py#test_someone_in_a_song_stops_it_before_anything_is_touched` | unit |
+| CLI-10 | A new clone | Runs on Python 3.9; its scripts keep LF; its secrets are ignored by git | `cli/tests/test_repo.py#test_the_command_line_parses_as_python_3_9` | unit |
+| CLI-11 | `setup` finding the game's files by itself | The server files (an archive named like the game's, whole or by the first of its parts, or an unpacked folder of any name, with or without its song list) and any client beside them (an APK or a bundle), the folder with both first; this server's own apps and other archives are left alone | `cli/tests/test_discover.py#test_the_server_files_and_any_client_beside_them`, `cli/tests/test_discover.py#test_the_forms_people_have_them_in` | unit |
+| CLI-12 | A closed network with no default route | The server finds its own address from the machine itself, on the interfaces phones can be on, the usual home and office ranges first | `cli/tests/test_env.py#test_with_no_way_out_the_address_comes_from_the_machine_itself` | unit |
+| CLI-13 | The guide for a closed network | Names every package, program and image the code asks for, at the versions it asks for | `cli/tests/test_repo.py#test_it_names_all_a_server_fetches` | unit |
+| CLI-14 | Images a release publishes, named in `.env` | They are run and never built; one that is not here stops with what to do | `cli/tests/test_system.py#test_named_images_are_not_built` | unit |
+| CLI-15 | `import --check` | Says of each file there what it is and whether it can be used, and imports nothing | `tools/tests/test_importer.py#test_each_file_is_said_for_what_it_is_and_nothing_comes_in` | unit |
+
+## TS-DEPLOY: packaging and releases
+
+| ID | Scenario | Expected | Checked by | Stage |
+|---|---|---|---|---|
+| DEP-01 | The arm32 runtime and shim, from source | Build as a release's job does | `.github/workflows/ci.yml#Build the runtime and the shim` | unit |
+| DEP-02 | The Helm chart, three ways | Valid against Kubernetes' schemas | `.github/workflows/ci.yml#Schema-check every rendered object` | unit |
+| DEP-03 | Kubernetes: a pod killed, a node stopped | Assets keep serving; the api comes back with its data | `tests/ha/failover.sh#Kill the api pod` | hand |
+| DEP-04 | A tag | Publishes only after CI passed and `qa/local` is there | `.github/workflows/release.yml#qa/local` | unit |
+| DEP-06 | A rehearsal of a release, on a commit | Runs all the gates and publishes nothing | `.github/workflows/release.yml#workflow_dispatch` | hand |
+| DEP-05 | The local gate on a tree with changes | Does not mark the commit | `tests/qa.sh#the tree has changes that are not committed` | qa |
+| DEP-07 | A host install on a clean Ubuntu 24.04 and Debian 12 | The README's one command (`host/get.sh`, then `host/install.sh`) installs everything; `./opendmtq` runs the host install | `tests/host/run.sh#the one command downloads OpenDMTQ and installs everything on` | unit |
+| DEP-08 | A host install set up in the browser, on stand-in game files in Downloads | `setup` starts the server and prints the setup's one-time link; the setup finds the files and imports the game data and the songs; the game is answered as on the image; an account made in the setup signs in to the site | `tests/host/run.sh#the import ends well`, `tests/host/run.sh#the game server's contract on a host install` | unit |
+| DEP-09 | A host install's phone app, from the game's client | Built in the setup by the host install's Java and tools; offered to a signed-in player | `tests/host/run.sh#the build ends well` | qa |
+| DEP-10 | A host install stopped and started again | Nothing answers when stopped; healthy again on the same data | `tests/host/run.sh#started again, healthy` | unit |
+| DEP-11 | The Windows bundle, built on Linux | From its pinned downloads only; every program finds its DLLs in the bundle or in Windows | `host/windows/build.sh#Every program finds its DLLs` | unit |
+| DEP-12 | The Windows bundle under Wine | OpenDMTQ.exe, started as a double-click starts it, runs the server; the contract passes; the setup signs in with the window's one-time key, imports the folder, and the window starts everything again for another address | `tests/windows/wine.sh#the game server's contract on the Windows bundle`, `tests/windows/wine.sh#the window starts the server again by itself` | unit |
+| DEP-15 | A first start slower than the wait for its first answer, as with an antivirus looking at every new program | The window says it is still waiting; once the server answers, the setup opens, signed in | `tests/windows/wine.sh#the window says it is still waiting` | unit |
+| DEP-16 | Another program on the server's port | A start says why within a minute, with what usually causes it, and leaves nothing running; with the port free, the server starts | `tests/host/run.sh#with the port taken, opendmtq start says why` | unit |
+| DEP-13 | The Windows bundle on Windows, in a folder with a space | Imports, runs, passes the contract; nothing keeps running once its window's processes are gone | `tests/windows/run.ps1#no program of the bundle is left running` | unit |
+| DEP-14 | A first start of the Windows bundle by a person | The browser opens the setup, which finds the files or lets them open their folder; the firewall asks once | | hand |
+| DEP-17 | Docker Compose on a network with no way out | From a release's images and source, carried in: the setup, the contract, the app with the runtime from the image | `tests/closed/run.sh#with the files carried in and nothing fetched` | hand |
+| DEP-18 | A host install on a network with no way out | From the packages, programs and runtime carried in: the install, the setup, the contract, the app | `tests/closed/run.sh#with the packages and programs carried in` | hand |
+| DEP-19 | Kubernetes on a network with no way out | From a release's images, by the guide's values: nothing pulled, the contract, the builder job's app with the runtime from its image | `tests/closed/run.sh#with nothing pulled` | hand |
+| DEP-21 | The game on a network with no way out | On an emulator that reaches the server and nothing else: install, first start and its data, the lobby, a song downloaded, played to its result, the score saved on the server. Its tries at outside names fail and hold nothing up | `tests/closed/game.sh#the phone has no way out` | hand |
+| DEP-20 | The Windows bundle on a network with no way out | Everything in DEP-12; the runtime comes out of the bundle, with nothing fetched | `tests/windows/wine.sh#nothing was fetched for it` | hand |
+| DEP-22 | The Windows bundle's first start, with no settings yet | OpenDMTQ.exe writes `.env` (this PC's address, a free port, a password) and the server answers on that port, with nothing gone wrong in its window; Windows' Python has no `os.fchmod` | `tests/windows/wine.sh#a first start with no .env writes one`, `cli/tests/test_env.py#test_a_first_start_on_windows_writes_it_too` | unit |
+| DEP-23 | The phone app built by the Windows bundle (APK=) | The client imported in the setup and said to be the original; the setup's build with the bundle's Java, Apktool and signer ends with a signed app that has the runtime and every code edit | `tests/windows/wine.sh#the app's build ends well` | qa |
+| DEP-24 | What the setup says of each file, on Windows | The folder and the archive of the server files (the archive read by Windows' 7-Zip) are server files, the iPhone app is of no use | `tests/windows/wine.sh#the setup says the folder holds the server files` | unit |

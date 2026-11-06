@@ -1,0 +1,119 @@
+{{- $host := include "opendmtq.publicHost" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "opendmtq.fullname" . }}-assets
+  labels: {{- include "opendmtq.labels" (dict "ctx" $ "component" "assets") | nindent 4 }}
+spec:
+  {{- if not .Values.assets.autoscaling.enabled }}
+  replicas: {{ .Values.assets.replicas }}
+  {{- end }}
+  strategy:
+    # Never drop below the current number of replicas during an update.
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  selector:
+    matchLabels: {{- include "opendmtq.selector" (dict "ctx" $ "component" "assets") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "opendmtq.selector" (dict "ctx" $ "component" "assets") | nindent 8 }}
+    spec:
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      automountServiceAccountToken: false
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          # Hard spread: two replicas on one node would make that node a single point of failure.
+          whenUnsatisfiable: DoNotSchedule
+          # Only nodes these pods may run on count (a tainted control plane would block rollouts).
+          nodeTaintsPolicy: Honor
+          # Count only pods of the same revision, so a rolling update spreads the new pods too.
+          matchLabelKeys: [pod-template-hash]
+          labelSelector:
+            matchLabels: {{- include "opendmtq.selector" (dict "ctx" $ "component" "assets") | nindent 14 }}
+      containers:
+        - name: server
+          image: {{ include "opendmtq.image" (dict "img" .Values.image.server "ctx" $) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - {name: PUBLIC_HOST, value: {{ $host | quote }}}
+            - {name: OPENDMTQ_APK_OUT, value: /srv/apk-all/out}
+            - {name: ROLE, value: assets}
+            # No edge proxy here: only the 8080 door, which the router uses (opendmtq.conf).
+            - {name: EDGE_DOORS, value: "no"}
+            {{- with .Values.timeZone }}
+            - {name: TZ, value: {{ . | quote }}}
+            {{- end }}
+          ports: [{name: http, containerPort: 8080}]
+          readinessProbe:
+            httpGet: {path: /opendmtq/health.php, port: http}
+            timeoutSeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /opendmtq/health.php, port: http}
+            timeoutSeconds: 3
+            periodSeconds: 10
+            failureThreshold: 6
+          resources: {{- toYaml .Values.assets.resources | nindent 12 }}
+          {{- include "opendmtq.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - {name: data, mountPath: /srv/content, subPath: content, readOnly: true}
+            # The whole apk/ folder: mounting apk/out directly would make the kubelet create it as root
+            # on a fresh volume, before the builder (uid 33) could.
+            - {name: data, mountPath: /srv/apk-all, subPath: apk, readOnly: true}
+            - {name: data, mountPath: /srv/custom, subPath: custom, readOnly: true}
+            - {name: state, mountPath: /data}
+            - {name: scratch, mountPath: /var/opendmtq}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        {{- include "opendmtq.dataVolume" . | nindent 8 }}
+        - name: state
+          # Holds the server's access log copy (rotated at 3 x 10 MB), so room for that.
+          emptyDir: {sizeLimit: 48Mi}
+        - name: scratch
+          emptyDir: {sizeLimit: 512Mi}
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "opendmtq.fullname" . }}-assets
+  labels: {{- include "opendmtq.labels" (dict "ctx" $ "component" "assets") | nindent 4 }}
+spec:
+  selector: {{- include "opendmtq.selector" (dict "ctx" $ "component" "assets") | nindent 4 }}
+  ports: [{name: http, port: 8080, targetPort: http}]
+{{- if or .Values.assets.autoscaling.enabled (gt (int .Values.assets.replicas) 1) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "opendmtq.fullname" . }}-assets
+  labels: {{- include "opendmtq.labels" (dict "ctx" $ "component" "assets") | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {{- include "opendmtq.selector" (dict "ctx" $ "component" "assets") | nindent 6 }}
+{{- end }}
+{{- if .Values.assets.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "opendmtq.fullname" . }}-assets
+  labels: {{- include "opendmtq.labels" (dict "ctx" $ "component" "assets") | nindent 4 }}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: {{ include "opendmtq.fullname" . }}-assets}
+  minReplicas: {{ .Values.assets.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.assets.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: {{ .Values.assets.autoscaling.targetCPUUtilizationPercentage }}}
+{{- end }}

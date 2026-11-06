@@ -1,0 +1,186 @@
+{{- define "opendmtq.routerLocations" -}}
+client_max_body_size 2m;
+proxy_http_version 1.1;
+proxy_set_header Connection "";
+# As the visitor sent it, port included: a redirect to HTTPS stays on the port they came to.
+proxy_set_header Host $http_host;
+# The address this router saw, replacing whatever the visitor sent: the server believes
+# this header from cluster addresses (opendmtq.conf), so an appended one let a visitor on a
+# private address, or anyone behind a NodePort's address translation, name any address
+# (sign-in throttles, logs).
+proxy_set_header X-Forwarded-For $remote_addr;
+# How the visit came: this router alone says so, whatever the visitor sent.
+proxy_set_header X-Forwarded-Proto $visit;
+# Inside the cluster a healthy pod answers in milliseconds; give up on a dead one fast.
+proxy_connect_timeout 1s;
+
+location = /router-health { access_log off; return 200 "ok\n"; }
+
+# For the start-up probe: answers once this router can reach the asset tier through cluster
+# DNS. nginx is up well before it can resolve its upstreams on a node that just came back,
+# and until then it answers 502 ("no live upstreams").
+location = /router-started {
+  access_log off;
+  proxy_pass http://assets/opendmtq/health.php;
+}
+
+# Songs, patterns, patch files, jackets: any healthy asset pod; retry another on failure.
+location ~ ^/(?:DMQ/(?:Songs|Patterns)|patch|viewImg)/ {
+  proxy_pass http://assets;
+  proxy_buffering off;
+  proxy_next_upstream error timeout http_502 http_503 http_504;
+  proxy_next_upstream_tries 3;
+}
+
+# Admin pages (/opendmtq/admin, and /admin, their address until 2026-11, which leads there): song packages (up to 300 MB) and backups (up to 1 GB) go up, backups come
+# down, and an upload is checked before the answer comes: the limits are the admin's own
+# (it refuses more per page) and the time is the server's (ProxyPass timeout=900). Streamed
+# both ways: buffered, they would go to temporary files on the node's disk.
+location ~ ^/(?:opendmtq/)?admin(?:/|$) {
+  proxy_pass http://api;
+  client_max_body_size 1100m;
+  proxy_request_buffering off;
+  proxy_buffering off;
+  proxy_read_timeout 900s;
+  proxy_send_timeout 900s;
+}
+
+# Live view (docs/live.md): the api's, on the same terms as "/" below, and out of this access
+# log as out of the server's: a phone polls and uploads constantly, with its device ids in the
+# address, which is also why only critical errors are logged here (a failed request's error line
+# prints it). An upload is one video segment, up to 4 MiB (the server refuses more).
+location = /live/upload {
+  access_log off;
+  error_log /dev/stderr crit;
+  proxy_pass http://api;
+  client_max_body_size 4m;
+  proxy_buffering off;
+  # Passed on as it comes, as compose's edge does: spooled here, each segment would print its
+  # address in nginx's error log.
+  proxy_request_buffering off;
+  # The server's answer to a chunked upload, which nginx may turn into a sized one first.
+  if ($http_transfer_encoding) { return 411; }
+  proxy_read_timeout 30s;
+}
+location ^~ /live/ {
+  access_log off;
+  error_log /dev/stderr crit;
+  proxy_pass http://api;
+  proxy_buffering off;
+  proxy_read_timeout 30s;
+}
+location ^~ /opendmtq/live-media.php/ {
+  access_log off;
+  proxy_pass http://api;
+  proxy_buffering off;
+  proxy_read_timeout 30s;
+}
+
+# Everything else (game RPC, logins, portal, app download) goes to the api. Streamed, not
+# buffered: the app (about 100 MB) for a slow phone would otherwise be spooled to /tmp. nginx
+# unlinks its temporary files at once, so /tmp's sizeLimit never sees them: the kubelet read
+# 0 MB while four downloads held 296 MB on one router's node (measured on kind).
+location / {
+  proxy_pass http://api;
+  proxy_buffering off;
+  proxy_read_timeout 30s;
+}
+{{- end -}}
+{{- $full := include "opendmtq.fullname" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $full }}-router
+  labels: {{- include "opendmtq.labels" (dict "ctx" $ "component" "router") | nindent 4 }}
+data:
+  nginx.conf: |
+    worker_processes auto;
+    pid /tmp/nginx.pid;
+    events { worker_connections 2048; }
+    {{- if .Values.router.tls.secretName }}
+    # One port for the game (plain HTTP) and for browsers over HTTPS, as compose's edge does it: only the first bytes of
+    # a connection are looked at. Each hop inside the pod carries the visitor's address in a PROXY protocol header.
+    stream {
+      map $ssl_preread_protocol $first_hop {
+        "" 127.0.0.1:8081;
+        default 127.0.0.1:8443;
+      }
+      server {
+        listen 8080;
+        ssl_preread on;
+        # A client that connects and says nothing is dropped after this long.
+        preread_timeout 15s;
+        proxy_pass $first_hop;
+        proxy_protocol on;
+        proxy_connect_timeout 5s;
+        # Idle time allowed on a connection; app downloads and admin uploads keep data flowing.
+        proxy_timeout 15m;
+      }
+      server {
+        listen 127.0.0.1:8443 ssl proxy_protocol;
+        set_real_ip_from 127.0.0.1;
+        ssl_certificate /etc/nginx-tls/tls.crt;
+        ssl_certificate_key /etc/nginx-tls/tls.key;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_session_cache shared:tls:1m;
+        ssl_session_timeout 1h;
+        proxy_pass 127.0.0.1:8082;
+        proxy_protocol on;
+        proxy_connect_timeout 5s;
+        proxy_timeout 15m;
+      }
+    }
+    {{- end }}
+    http {
+      # Writable paths only under /tmp: the root filesystem is read-only.
+      client_body_temp_path /tmp/client;
+      proxy_temp_path /tmp/proxy;
+      fastcgi_temp_path /tmp/fastcgi;
+      uwsgi_temp_path /tmp/uwsgi;
+      scgi_temp_path /tmp/scgi;
+      server_tokens off;
+      sendfile on;
+      tcp_nopush on;
+      keepalive_timeout 65;
+      access_log /dev/stdout;
+      error_log /dev/stderr warn;
+      resolver __RESOLVER__ valid=5s ipv6=off;
+
+      # The single writer. Resolved at run time ("resolve") like the assets, so the router starts
+      # and recovers even while cluster DNS is briefly unavailable.
+      upstream api {
+        zone api 64k;
+        server {{ $full }}-api.{{ .Release.Namespace }}.svc.cluster.local:8080 resolve;
+        keepalive 16;
+      }
+      # Every asset pod individually (headless Service), re-resolved as pods change.
+      upstream assets {
+        zone assets 64k;
+        server {{ $full }}-assets-pods.{{ .Release.Namespace }}.svc.cluster.local:8080 resolve;
+        keepalive 32;
+      }
+
+      {{- if .Values.router.tls.secretName }}
+      # Behind the stream servers above: the visitor's address comes in the PROXY header.
+      server {
+        listen 127.0.0.1:8081 proxy_protocol;
+        set_real_ip_from 127.0.0.1;
+        real_ip_header proxy_protocol;
+        set $visit http;
+        {{- include "opendmtq.routerLocations" . | nindent 8 }}
+      }
+      server {
+        listen 127.0.0.1:8082 proxy_protocol;
+        set_real_ip_from 127.0.0.1;
+        real_ip_header proxy_protocol;
+        set $visit https;
+        {{- include "opendmtq.routerLocations" . | nindent 8 }}
+      }
+      {{- else }}
+      server {
+        listen 8080;
+        set $visit http;
+        {{- include "opendmtq.routerLocations" . | nindent 8 }}
+      }
+      {{- end }}
+    }

@@ -1,0 +1,9 @@
+# A blank issue stays possible: a rights holder's request (docs/notice.md) needs no form.
+blank_issues_enabled: true
+contact_links:
+  - name: A security problem
+    url: https://github.com/kanggu12/openDMTQ/security
+    about: Report it privately on the Security tab (SECURITY.md).
+  - name: Setting up a server
+    url: https://github.com/kanggu12/openDMTQ/blob/main/docs/troubleshooting.md
+    about: Most problems with a first setup are answered here.

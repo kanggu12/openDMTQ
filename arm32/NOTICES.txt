@@ -1,0 +1,10 @@
+What OpenDMTQ adds to the game in this app, and the licenses of those parts. None of this covers the game itself.
+
+OpenDMTQ's runtime and shim (https://github.com/kanggu12/openDMTQ) are under the MIT License, below.
+
+Android's 32-bit linker and system libraries (libc, libm, libdl, libstdc++, libc++, libz, liblog) come from the Android
+Open Source Project, unchanged, by way of Google's Android 6.0 ARM system image. They are under the Apache License 2.0 and
+BSD, MIT, ISC, zlib and NCSA licenses. Their notices are in android-NOTICE.html.gz, next to this file, which names each of
+them but libc++: its license follows below.
+
+Dynarmic and the libraries built into the runtime with it follow too, each with its license.

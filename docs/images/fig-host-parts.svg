@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 456" width="956" height="456" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="Without containers: ./opendmtq after host/install.sh, or OpenDMTQ.exe on Windows, passes the command to host/opendmtq_host, which prepares the start (the database, the song list, the live window, the download key, Apache's configuration), starts Apache with PHP's module, the admin pages on waitress, the PHP keeper and, once, the app builder, and starts again one that stops; on Windows a job object ends them all with the window">
+<rect x="-28" y="-28" width="956" height="456" rx="16" fill="#11151a"/>
+<path d="M0,0 H348 L360,12 V64 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="27.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,346">./opendmtq after host/install.sh</text>
+<text x="14" y="46.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,346">or OpenDMTQ.exe on Windows</text>
+<path d="M0,120 H348 L360,132 V212 H0 Z" fill="#1a1f25" stroke="#8cf23d" stroke-width="2" stroke-linejoin="round"/>
+<text x="14" y="152.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,346">host/opendmtq_host run</text>
+<text x="14" y="171.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,346">starts them, starts again one that stops,</text>
+<text x="14" y="189" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,346">restarts them on restart.request</text>
+<path d="M180,64.5 L180,112" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M180,119 L175.5,110.0 L184.5,110.0 Z" fill="#7b8794" data-tip="180,119"/>
+<text x="188" y="96" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="186,420">passes the command on</text>
+<path d="M420,0 H888 L900,12 V92 H420 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="434" y="32.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="434,886">Before the start</text>
+<text x="434" y="51.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="434,886">setup-db.php, the song list, the live window,</text>
+<text x="434" y="69" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="434,886">the download key, .host/run/httpd.conf</text>
+<path d="M360.5,150 L390,150 L390,46 L412,46" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M419,46 L410.0,50.5 L410.0,41.5 Z" fill="#7b8794" data-tip="419,46"/>
+<path d="M420,140 H888 L900,152 V212 H420 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="434" y="171.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="434,886">Windows: a job object</text>
+<text x="434" y="190.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="434,886">ends them all with the window</text>
+<path d="M360.5,186 L419.5,186" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M0,300 H188 L200,312 V400 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="327.75" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,186">Apache</text>
+<text x="14" y="346.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,186">PHP's module, site.conf</text>
+<text x="14" y="364.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,186">on LISTEN_PORT; passes</text>
+<text x="14" y="381.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,186">/opendmtq/admin on</text>
+<path d="M234,300 H422 L434,312 V400 H234 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="248" y="327.75" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="248,420">Admin pages</text>
+<text x="248" y="346.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="248,420">Flask on waitress,</text>
+<text x="248" y="364.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="248,420">127.0.0.1:ADMIN_PORT,</text>
+<text x="248" y="381.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="248,420">with the setup</text>
+<path d="M468,300 H656 L668,312 V400 H468 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="482" y="336.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="482,654">PHP keeper</text>
+<text x="482" y="355.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="482,654">one database handle</text>
+<text x="482" y="373" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="482,654">open</text>
+<path d="M702,300 H888 L900,312 V400 H702 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="716" y="345.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="716,886">App builder</text>
+<text x="716" y="364.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="716,886">once, beside them</text>
+<path d="M180,212.5 L180,250" fill="none" stroke="#7b8794" stroke-width="1.6"/>
+<path d="M100,250 L801,250" fill="none" stroke="#7b8794" stroke-width="1.6"/>
+<path d="M100,250 L100,292" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M100,299 L95.5,290.0 L104.5,290.0 Z" fill="#7b8794" data-tip="100,299"/>
+<path d="M334,250 L334,292" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M334,299 L329.5,290.0 L338.5,290.0 Z" fill="#7b8794" data-tip="334,299"/>
+<path d="M568,250 L568,292" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M568,299 L563.5,290.0 L572.5,290.0 Z" fill="#7b8794" data-tip="568,299"/>
+<path d="M801,250 L801,292" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M801,299 L796.5,290.0 L805.5,290.0 Z" fill="#7b8794" data-tip="801,299"/>
+</svg>

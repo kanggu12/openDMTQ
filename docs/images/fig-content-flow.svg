@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 616" width="956" height="616" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="The content. The import takes your APK into data/apk/base, and the game data and, with --songs, the songs from your server files into data/content, read only. A song package added on the admin pages goes to data/custom with the hidden flags. songs.py rebuilds the song list and the client's tables into data/custom before every start; phones download what changed, from data/custom first, otherwise from data/content">
+<rect x="-28" y="-28" width="956" height="616" rx="16" fill="#11151a"/>
+<rect x="0" y="0" width="230" height="250" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="14" y="22" font-size="13" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,216">Your own files</text>
+<path d="M14,36 H204 L216,48 V96 H14 Z" fill="#1a1f25" stroke="#ffb13d" stroke-width="2" stroke-linejoin="round"/>
+<text x="28" y="70.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,202">The game's APK</text>
+<path d="M14,120 H204 L216,132 V230 H14 Z" fill="#1a1f25" stroke="#ffb13d" stroke-width="2" stroke-linejoin="round"/>
+<text x="28" y="161.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,202">The game's server</text>
+<text x="28" y="180.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,202">files: a folder or an</text>
+<text x="28" y="198" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,202">archive</text>
+<path d="M290,36 H608 L620,48 V96 H290 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="304" y="70.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="304,606">data/apk/base</text>
+<path d="M216.5,66 L282,66" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M289,66 L280.0,70.5 L280.0,61.5 Z" fill="#7b8794" data-tip="289,66"/>
+<text x="253" y="58" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="220,286">import</text>
+<rect x="290" y="120" width="330" height="240" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="304" y="142" font-size="13" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="304,606">data/content, read only</text>
+<path d="M304,156 H594 L606,168 V226 H304 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="318" y="186.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="318,592">Game data</text>
+<text x="318" y="205.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="318,592">tables, screen images, fonts</text>
+<path d="M304,242 H594 L606,254 V346 H304 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="318" y="280.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="318,592">Songs</text>
+<text x="318" y="299.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="318,592">music, charts, previews,</text>
+<text x="318" y="317" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="318,592">tiles, jackets, songs.json</text>
+<path d="M216.5,166 L296.275,189.056" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M303,191 L293.1,192.8 L295.6,184.2 Z" fill="#7b8794" data-tip="303,191"/>
+<text x="258" y="166" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="220,286">import</text>
+<path d="M216.5,206 L297.978,285.123" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M303,290 L293.4,287.0 L299.7,280.5 Z" fill="#7b8794" data-tip="303,290"/>
+<text x="228" y="304" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="226,300">--songs</text>
+<path d="M680,156 H888 L900,168 V248 H680 Z" fill="#1a1f25" stroke="#8cf23d" stroke-width="2" stroke-linejoin="round"/>
+<text x="694" y="197.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="694,886">songs.py rebuild</text>
+<text x="694" y="216.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="694,886">before every start</text>
+<path d="M606.5,191 L672,191" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M679,191 L670.0,195.5 L670.0,186.5 Z" fill="#7b8794" data-tip="679,191"/>
+<path d="M606.5,290 L640,290 L640,228 L672,228" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M679,228 L670.0,232.5 L670.0,223.5 Z" fill="#7b8794" data-tip="679,228"/>
+<path d="M0,400 H218 L230,412 V470 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="430.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,216">A song package</text>
+<text x="14" y="449.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,216">on the admin pages</text>
+<path d="M290,400 H608 L620,412 V470 H290 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="304" y="430.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="304,606">data/custom</text>
+<text x="304" y="449.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="304,606">added songs, hidden flags</text>
+<path d="M230.5,435 L282,435" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M289,435 L280.0,439.5 L280.0,430.5 Z" fill="#7b8794" data-tip="289,435"/>
+<path d="M620.5,435 L660,435 L660,240 L672,240" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M679,240 L670.0,244.5 L670.0,235.5 Z" fill="#7b8794" data-tip="679,240"/>
+<path d="M680,290 H888 L900,302 V400 H680 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="694" y="322.75" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="694,886">data/custom</text>
+<text x="694" y="341.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="694,886">songList.json, catalog,</text>
+<text x="694" y="359.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="694,886">web/: tables, tiles,</text>
+<text x="694" y="376.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="694,886">manifest</text>
+<path d="M790,248.5 L790,282" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M790,289 L785.5,280.0 L794.5,280.0 Z" fill="#7b8794" data-tip="790,289"/>
+<path d="M290,500 H888 L900,512 V560 H290 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="304" y="525.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="304,886">Phones download what changed</text>
+<text x="304" y="544.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="304,886">data/custom first, otherwise data/content</text>
+<path d="M790,400.5 L790,492" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M790,499 L785.5,490.0 L794.5,490.0 Z" fill="#7b8794" data-tip="790,499"/>
+</svg>

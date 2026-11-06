@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 482" width="956" height="482" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="What tuning gained, before and after, on the same machine: In-game ranking of one song: 190.3 to 6.3 milliseconds; Logs page, looking for new lines: 459.5 to 21.4 milliseconds; A backup with 200 MB of added songs: 8033.8 to 528.5 milliseconds; Four threads on one counter (runtime): 2900 to 250 milliseconds; Setup, searching a full home folder: 143.1 to 20.1 milliseconds; Songs page: 322.4 to 68.4 milliseconds; Status page: 293.7 to 151.5 milliseconds; Players page: 278.1 to 174.3 milliseconds">
+<rect x="-28" y="-28" width="956" height="482" rx="16" fill="#11151a"/>
+<text x="0" y="18" font-size="19" font-weight="700" fill="#eef2f6" text-anchor="start" data-box="0,900">Tuned where people wait</text>
+<text x="0" y="42" font-size="13" fill="#aeb8c3" text-anchor="start" data-box="0,900">The same made-up server and the same two processor cores, before and after. Closer to the left is better.</text>
+<path d="M300.0,76 V380" stroke="#2a3138" stroke-width="1"/>
+<text x="300" y="396" font-size="11.5" fill="#8b96a2" text-anchor="middle" data-box="260,340">1 ms</text>
+<path d="M425.0,76 V380" stroke="#2a3138" stroke-width="1"/>
+<text x="425" y="396" font-size="11.5" fill="#8b96a2" text-anchor="middle" data-box="385,465">10 ms</text>
+<path d="M550.0,76 V380" stroke="#2a3138" stroke-width="1"/>
+<text x="550" y="396" font-size="11.5" fill="#8b96a2" text-anchor="middle" data-box="510,590">100 ms</text>
+<path d="M675.0,76 V380" stroke="#2a3138" stroke-width="1"/>
+<text x="675" y="396" font-size="11.5" fill="#8b96a2" text-anchor="middle" data-box="635,715">1 s</text>
+<path d="M800.0,76 V380" stroke="#2a3138" stroke-width="1"/>
+<text x="800" y="396" font-size="11.5" fill="#8b96a2" text-anchor="middle" data-box="760,840">10 s</text>
+<text x="900" y="70" font-size="11.5" fill="#8b96a2" text-anchor="end" data-box="820,900">faster</text>
+<text x="0" y="99.5" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,294">In-game ranking of one song</text>
+<path d="M399.9,95 H584.9" stroke="#55606c" stroke-width="2"/>
+<circle cx="584.9" cy="95.0" r="5.5" fill="#8b96a2" stroke="#11151a" stroke-width="2"/>
+<circle cx="399.9" cy="95.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
+<text x="388.918" y="99.5" font-size="12" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="296,399.918">6.3 ms</text>
+<text x="595.93" y="99.5" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="584.93,860">190 ms</text>
+<text x="900" y="99.5" font-size="13.5" font-weight="700" fill="#eef2f6" text-anchor="end" data-box="830,901">30x</text>
+<text x="0" y="137.5" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,294">Logs page, looking for new lines</text>
+<path d="M466.3,133 H632.8" stroke="#55606c" stroke-width="2"/>
+<circle cx="632.8" cy="133.0" r="5.5" fill="#8b96a2" stroke="#11151a" stroke-width="2"/>
+<circle cx="466.3" cy="133.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
+<text x="455.302" y="137.5" font-size="12" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="296,466.302">21.4 ms</text>
+<text x="643.786" y="137.5" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="632.786,860">460 ms</text>
+<text x="900" y="137.5" font-size="13.5" font-weight="700" fill="#eef2f6" text-anchor="end" data-box="830,901">21x</text>
+<text x="0" y="175.5" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,294">A backup with 200 MB of added songs</text>
+<path d="M640.4,171 H788.1" stroke="#55606c" stroke-width="2"/>
+<circle cx="788.1" cy="171.0" r="5.5" fill="#8b96a2" stroke="#11151a" stroke-width="2"/>
+<circle cx="640.4" cy="171.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
+<text x="629.381" y="175.5" font-size="12" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="296,640.381">528 ms</text>
+<text x="799.115" y="175.5" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="788.115,860">8.0 s</text>
+<text x="900" y="175.5" font-size="13.5" font-weight="700" fill="#eef2f6" text-anchor="end" data-box="830,901">15x</text>
+<text x="0" y="213.5" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,294">Four threads on one counter (runtime)</text>
+<path d="M599.7,209 H732.8" stroke="#55606c" stroke-width="2"/>
+<circle cx="732.8" cy="209.0" r="5.5" fill="#8b96a2" stroke="#11151a" stroke-width="2"/>
+<circle cx="599.7" cy="209.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
+<text x="588.743" y="213.5" font-size="12" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="296,599.743">250 ms</text>
+<text x="743.8" y="213.5" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="732.8,860">2.9 s</text>
+<text x="900" y="213.5" font-size="13.5" font-weight="700" fill="#eef2f6" text-anchor="end" data-box="830,901">12x</text>
+<text x="0" y="251.5" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,294">Setup, searching a full home folder</text>
+<path d="M462.9,247 H569.5" stroke="#55606c" stroke-width="2"/>
+<circle cx="569.5" cy="247.0" r="5.5" fill="#8b96a2" stroke="#11151a" stroke-width="2"/>
+<circle cx="462.9" cy="247.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
+<text x="451.9" y="251.5" font-size="12" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="296,462.9">20.1 ms</text>
+<text x="580.455" y="251.5" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="569.455,860">143 ms</text>
+<text x="900" y="251.5" font-size="13.5" font-weight="700" fill="#eef2f6" text-anchor="end" data-box="830,901">7x</text>
+<text x="0" y="289.5" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,294">Songs page</text>
+<path d="M529.4,285 H613.5" stroke="#55606c" stroke-width="2"/>
+<circle cx="613.5" cy="285.0" r="5.5" fill="#8b96a2" stroke="#11151a" stroke-width="2"/>
+<circle cx="529.4" cy="285.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
+<text x="518.382" y="289.5" font-size="12" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="296,529.382">68.4 ms</text>
+<text x="624.549" y="289.5" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="613.549,860">322 ms</text>
+<text x="900" y="289.5" font-size="13.5" font-weight="700" fill="#eef2f6" text-anchor="end" data-box="830,901">5x</text>
+<text x="0" y="327.5" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,294">Status page</text>
+<path d="M572.6,323 H608.5" stroke="#55606c" stroke-width="2"/>
+<circle cx="608.5" cy="323.0" r="5.5" fill="#8b96a2" stroke="#11151a" stroke-width="2"/>
+<circle cx="572.6" cy="323.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
+<text x="561.552" y="327.5" font-size="12" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="296,572.552">152 ms</text>
+<text x="619.488" y="327.5" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="608.488,860">294 ms</text>
+<text x="900" y="327.5" font-size="13.5" font-weight="700" fill="#eef2f6" text-anchor="end" data-box="830,901">1.9x</text>
+<text x="0" y="365.5" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,294">Players page</text>
+<path d="M580.2,361 H605.5" stroke="#55606c" stroke-width="2"/>
+<circle cx="605.5" cy="361.0" r="5.5" fill="#8b96a2" stroke="#11151a" stroke-width="2"/>
+<circle cx="580.2" cy="361.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
+<text x="569.162" y="365.5" font-size="12" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="296,580.162">174 ms</text>
+<text x="616.525" y="365.5" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="605.525,860">278 ms</text>
+<text x="900" y="365.5" font-size="13.5" font-weight="700" fill="#eef2f6" text-anchor="end" data-box="830,901">1.6x</text>
+<circle cx="6.0" cy="416.0" r="5" fill="#8b96a2" stroke="#11151a" stroke-width="2"/>
+<text x="18" y="420" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="18,80">before</text>
+<circle cx="86.0" cy="416.0" r="5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
+<text x="98" y="420" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="98,150">after</text>
+<text x="900" y="420" font-size="11.5" fill="#8b96a2" text-anchor="end" data-box="150,900">A million saved plays, 300 players, 200 MB of added songs, a full log. The counter ran on an Android emulator.</text>
+</svg>

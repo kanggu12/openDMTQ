@@ -1,0 +1,146 @@
+{% extends "base.html" %}{% block title %}{{ t('rec.title') }}{% endblock %}
+{% block body %}
+{% if watch %}
+<section class="card">
+  <h2>{{ names.get(watch.guid) or t('player.fallback', id=watch.guid) }} <span class="meta-inline">{{ watch.started|rec_date }}</span></h2>
+  <video class="rec-video" id="rec-video" controls playsinline></video>
+  <p class="meta">{{ watch.duration_ms|rec_length }} · {{ watch.size|human }}{% if watch.songs %} · {{ watch.songs|map(attribute='title')|unique|join(', ') }}{% endif %}</p>
+  <div class="btn-line"><a class="btn btn-sm" href="{{ url_for('recordings_page') }}#rec-{{ watch.guid }}-{{ watch.id }}">{{ t('rec.close') }}</a></div>
+</section>
+{# The portal's own copy of hls.js: through the game server it is the server's file, on this service's own
+   port public_hls() brings it. No internet needed either way. #}
+<script src="/opendmtq/hls/hls-1.5.17.min.js"></script>
+<script>
+  // hls.js where it works; Safari plays HLS itself.
+  const video = document.getElementById('rec-video');
+  const url = {{ url_for('recording_media', guid=watch.guid, rid=watch.id, name='index.m3u8')|tojson }};
+  // The box takes the recording's shape (admin.css has the usual phone stream's).
+  video.addEventListener('resize', () => {
+    if (video.videoWidth && video.videoHeight) video.style.setProperty('--ar', video.videoWidth / video.videoHeight);
+  });
+  if (window.Hls && Hls.isSupported()) {
+    // Ten seconds fetched ahead, as on the portal: left alone hls.js fetches half a minute at once, right as the sound starts.
+    const ahead = 10;
+    // The sound is AAC-LC, as phones encode it. Unnamed, hls.js takes it for HE-AAC in Chrome and fills the gap where a
+    // recording's sound starts after its picture with HE-AAC silence, which garbles all the sound after it (as on the portal).
+    const hls = new Hls({ defaultAudioCodec: 'mp4a.40.2', maxBufferLength: ahead, maxMaxBufferLength: ahead * 2 });
+    hls.loadSource(url);
+    hls.attachMedia(video);
+    // Watch was just clicked: straight on, if the browser lets it, once that stretch is in. If that takes a while, the
+    // network paces the fetching: a few seconds in hand are enough then (or after a while what there is: a very short
+    // recording). From where the media starts, which can be a little after 0: hls.js would stall there and seek over it.
+    const clicked = performance.now();
+    let started = false;
+    const begin = () => {
+      if (started) return;
+      started = true;
+      if (video.buffered.length && video.currentTime < video.buffered.start(0)) video.currentTime = video.buffered.start(0);
+      video.play().catch(() => {});
+    };
+    setTimeout(begin, 6000);
+    hls.on(Hls.Events.FRAG_BUFFERED, () => {
+      if (!video.buffered.length) return;
+      const left = video.buffered.end(video.buffered.length - 1) - video.currentTime;
+      if (left >= 3 && (left >= ahead - 2 || performance.now() - clicked > 1500)) begin();
+    });
+  } else {
+    video.src = url;
+  }
+</script>
+{% endif %}
+
+<section class="card">
+  <h2>{{ t('rec.disk') }}</h2>
+  <p>{{ t('rec.use', used=used|human, cap=cap|human, free=free|human) }}</p>
+  {# Full by the share used; anything at all shows as a sliver, not as nothing. #}
+  <div class="rec-meter" role="img" aria-label="{{ t('rec.use_label', used=used|human, cap=cap|human) }}"><span{% if used %} class="some"{% endif %} style="width: {{ [100 * used / cap, 100]|min }}%"></span></div>
+  {# How long the room left lasts: up to the limit, or the disk's free space if that is less (it counts as a limit too). #}
+  {% set room = [cap - used, free]|min %}
+  <p class="meta">{{ t('rec.room', h=(room / per_hour)|int) if room >= per_hour else t('rec.room_short') }} {{ t('rec.about') }}</p>
+  <form method="post" class="rec-limits">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="limits">
+    <label class="field">{{ t('rec.total') }} <input class="input" name="cap_gb" type="number" min="0.001" step="any" value="{{ '%g'|format(pending.cap_gb if pending else limits.cap_gb) }}" required></label>
+    <label class="field">{{ t('rec.days') }} <input class="input" name="days" type="number" min="1" step="1" value="{{ pending.days if pending else limits.days }}" required></label>
+    <button class="btn">{{ t('rec.save') }}</button>
+  </form>
+  {# Lower limits delete recordings at once and for good: what they would delete, and the yes for it. #}
+  {% if pending %}
+  <form method="post" class="rec-confirm" role="alert">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="limits"><input type="hidden" name="confirmed" value="1">
+    <input type="hidden" name="cap_gb" value="{{ '%g'|format(pending.cap_gb) }}"><input type="hidden" name="days" value="{{ pending.days }}">
+    <p class="warn">{{ t('rec.limits_confirm', n=pending.n, size=pending.size|human) }}</p>
+    <div class="btn-line"><button class="btn btn-danger">{{ t('rec.limits_apply') }}</button><a class="btn" href="{{ url_for('recordings_page') }}">{{ t('btn.cancel') }}</a></div>
+  </form>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>{{ t('rec.title') }} <span class="meta-inline">{{ groups.values()|map('length')|sum }}</span></h2>
+  {% if not groups %}<p class="empty">{{ t('rec.none') }}</p>{% else %}
+  <p class="meta">{{ t('rec.players_see') }}</p>
+  <form method="post">
+    {# Enter in a check box presses a form's first button, here a player's "delete all". This one comes first and
+       is disabled, which turns that off. #}
+    <button type="submit" disabled hidden aria-hidden="true" tabindex="-1"></button>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% for guid, recs in groups.items() %}
+    {% set who = names.get(guid) or tp('player.fallback', id=guid) %}
+    <div class="rec-group">
+      <h3>{{ who }}</h3>
+      <button class="btn btn-sm btn-danger" name="action" value="delete-player {{ guid }}" data-ask="{{ tp('rec.confirm_all', who=who) }}" data-yes="{{ tp('btn.delete') }}">{{ t('rec.delete_all') }}</button>
+    </div>
+    <div class="table-scroll"><table class="data recordings">
+      <thead><tr><th class="rec-pick"></th><th class="rec-date">{{ t('rec.th_date') }}</th><th class="r rec-num">{{ t('rec.th_length') }}</th><th class="r rec-num">{{ t('th.size') }}</th><th>{{ t('rec.th_songs') }}</th><th class="rec-acts"></th></tr></thead>
+      <tbody>
+      {% for r in recs %}
+      {% set name = r.guid ~ '/' ~ r.id %}
+      <tr id="rec-{{ r.guid }}-{{ r.id }}">
+        <td class="rank rec-sel{% if r.open %} rec-none{% endif %}">{% if not r.open %}<input type="checkbox" name="sel" value="{{ name }}" aria-label="{{ t('rec.select', date=r.started|rec_date) }}">{% endif %}</td>
+        <td class="primary date">{{ r.started|rec_date }}{% if r.open %}<span class="runtime">{{ t('rec.now') }}</span>{% elif r.hidden %}<span class="runtime">{{ t('rec.hidden') }}</span>{% endif %}</td>
+        <td data-label="{{ t('rec.th_length') }}" class="r">{{ r.duration_ms|rec_length }}</td>
+        <td data-label="{{ t('th.size') }}" class="r">{{ r.size|human }}</td>
+        {# Four songs at most: a long broadcast would make its row the tallest thing on the page. All of them under the pointer. #}
+        {% set titles = r.songs|map(attribute='title')|unique|list %}
+        <td data-label="{{ t('rec.th_songs') }}" class="rec-songs" title="{{ titles|join(', ') }}">{{ titles[:4]|join(', ') or '–' }}{% if titles|length > 4 %} +{{ titles|length - 4 }}{% endif %}</td>
+        <td class="actions"><div class="btns">
+          {% if not r.open %}
+          <a class="btn btn-sm" href="{{ url_for('recordings_page', watch=name) }}">{{ t('btn.watch') }}</a>
+          <a class="btn btn-sm" href="{{ url_for('recording_download', guid=r.guid, rid=r.id) }}">{{ t('btn.download') }}</a>
+          {% endif %}
+          {% if r.hidden %}
+          <button class="btn btn-sm" name="action" value="show {{ name }}">{{ t('rec.show') }}</button>
+          {% else %}
+          <button class="btn btn-sm" name="action" value="hide {{ name }}">{{ t('rec.hide') }}</button>
+          {% endif %}
+          {% if not r.open %}
+          <button class="btn btn-sm btn-danger" name="action" value="delete {{ name }}" data-ask="{{ tp('rec.confirm_one', who=who, date=r.started|rec_date) }}" data-yes="{{ tp('btn.delete') }}">{{ t('btn.delete') }}</button>
+          {% else %}
+          {# Hide stays in its column while the rest wait for the recording to end. #}
+          <span class="btn btn-sm rec-slot" aria-hidden="true"></span>
+          {% endif %}
+        </div></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% endfor %}
+    <p class="rec-bulk"><button class="btn btn-danger" id="rec-bulk" name="action" value="delete" data-ask="{{ tp('rec.confirm_n', n='{n}') }}" data-yes="{{ tp('btn.delete') }}">{{ t('rec.delete_selected') }}</button></p>
+  </form>
+  <script>
+    // The button says how many it would delete, and waits until there is at least one.
+    (() => {
+      const bulk = document.getElementById('rec-bulk');
+      const count = () => {
+        const n = bulk.form.querySelectorAll('input[name=sel]:checked').length;
+        bulk.disabled = n === 0;
+        // It stays at the screen's foot once something is ticked, with the list as long as it is.
+        bulk.parentElement.classList.toggle('on', n > 0);
+        bulk.textContent = n ? {{ tp('rec.delete_n', n='{n}')|tojson }}.replace('{n}', n) : {{ tp('rec.delete_selected')|tojson }};
+      };
+      bulk.form.addEventListener('change', count);
+      count();
+    })();
+  </script>
+  {% endif %}
+</section>
+{% endblock %}

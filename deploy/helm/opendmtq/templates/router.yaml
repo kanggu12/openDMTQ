@@ -1,0 +1,152 @@
+{{- $full := include "opendmtq.fullname" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $full }}-router
+  labels: {{- include "opendmtq.labels" (dict "ctx" $ "component" "router") | nindent 4 }}
+spec:
+  replicas: {{ .Values.router.replicas }}
+  strategy:
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  selector:
+    matchLabels: {{- include "opendmtq.selector" (dict "ctx" $ "component" "router") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "opendmtq.selector" (dict "ctx" $ "component" "router") | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/router-config.yaml") . | sha256sum }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        # So the mounted certificate's key (0440) is readable.
+        fsGroup: 101
+        seccompProfile: {type: RuntimeDefault}
+      automountServiceAccountToken: false
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          # Hard spread: two replicas on one node would make that node a single point of failure.
+          whenUnsatisfiable: DoNotSchedule
+          # Only nodes these pods may run on count (a tainted control plane would block rollouts).
+          nodeTaintsPolicy: Honor
+          # Count only pods of the same revision, so a rolling update spreads the new pods too.
+          matchLabelKeys: [pod-template-hash]
+          labelSelector:
+            matchLabels: {{- include "opendmtq.selector" (dict "ctx" $ "component" "router") | nindent 14 }}
+      containers:
+        - name: nginx
+          image: {{ include "opendmtq.image" (dict "img" .Values.image.router "ctx" $) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.timeZone }}
+          # Its access log follows the same zone as the server's.
+          env: [{name: TZ, value: {{ . | quote }}}]
+          {{- end }}
+          # Fill in the DNS server, then run nginx in the foreground with the rendered file.
+          command:
+            - sh
+            - -c
+            - |
+              r={{ .Values.router.resolver | quote }}
+              [ -n "$r" ] || r=$(awk '/^nameserver/ {print $2; exit}' /etc/resolv.conf)
+              sed "s/__RESOLVER__/$r/" /etc/nginx-src/nginx.conf > /tmp/nginx.conf
+              {{- if .Values.router.tls.secretName }}
+              # A renewed certificate reaches the mounted Secret by itself; nginx only reads it when told to.
+              (
+                seen=$(cat /etc/nginx-tls/tls.crt)
+                while sleep 300; do
+                  now=$(cat /etc/nginx-tls/tls.crt)
+                  [ "$now" = "$seen" ] && continue
+                  seen=$now
+                  nginx -c /tmp/nginx.conf -t -q && nginx -c /tmp/nginx.conf -s reload
+                done
+              ) &
+              {{- end }}
+              exec nginx -c /tmp/nginx.conf -g 'daemon off;'
+          ports: [{name: http, containerPort: 8080}]
+          # No traffic until the router can reach its upstreams: measured on kind, about half of all
+          # requests got an instant 502 for up to 21 s after a stopped node returned. Only at start,
+          # on the asset tier: the readiness probe below stays local, so routers keep serving
+          # downloads while the api is down, and the api being down does not hold a router back.
+          startupProbe:
+            httpGet: {path: /router-started, port: http}
+            periodSeconds: 2
+            failureThreshold: 90
+          # Three passes after that start: the api's address resolves a few seconds after the assets'.
+          readinessProbe:
+            httpGet: {path: /router-health, port: http}
+            periodSeconds: 5
+            successThreshold: 3
+          livenessProbe:
+            httpGet: {path: /router-health, port: http}
+            periodSeconds: 10
+          resources: {{- toYaml .Values.router.resources | nindent 12 }}
+          {{- include "opendmtq.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - {name: config, mountPath: /etc/nginx-src, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+            {{- if .Values.router.tls.secretName }}
+            - {name: tls, mountPath: /etc/nginx-tls, readOnly: true}
+            {{- end }}
+      volumes:
+        - name: config
+          configMap: {name: {{ $full }}-router}
+        {{- if .Values.router.tls.secretName }}
+        - name: tls
+          secret: {secretName: {{ .Values.router.tls.secretName }}, defaultMode: 0440}
+        {{- end }}
+        - name: tmp
+          emptyDir: {sizeLimit: 128Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $full }}
+  labels: {{- include "opendmtq.labels" (dict "ctx" $ "component" "router") | nindent 4 }}
+spec:
+  type: {{ .Values.router.service.type }}
+  {{- with .Values.router.service.loadBalancerIP }}
+  loadBalancerIP: {{ . }}
+  {{- end }}
+  {{- if eq .Values.router.service.type "LoadBalancer" }}
+  # Keep the phone's address visible in logs and avoid an extra hop.
+  externalTrafficPolicy: Local
+  {{- end }}
+  selector: {{- include "opendmtq.selector" (dict "ctx" $ "component" "router") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.router.service.port }}
+      targetPort: http
+      {{- if .Values.router.service.nodePort }}
+      nodePort: {{ .Values.router.service.nodePort }}
+      {{- end }}
+---
+# Headless: one DNS record per ready asset pod, for the router's per-pod balancing and retries.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $full }}-assets-pods
+  labels: {{- include "opendmtq.labels" (dict "ctx" $ "component" "assets") | nindent 4 }}
+spec:
+  clusterIP: None
+  selector: {{- include "opendmtq.selector" (dict "ctx" $ "component" "assets") | nindent 4 }}
+  ports: [{name: http, port: 8080, targetPort: http}]
+{{- if gt (int .Values.router.replicas) 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $full }}-router
+  labels: {{- include "opendmtq.labels" (dict "ctx" $ "component" "router") | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {{- include "opendmtq.selector" (dict "ctx" $ "component" "router") | nindent 6 }}
+{{- end }}

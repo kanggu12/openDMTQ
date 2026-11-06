@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 290" width="956" height="290" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="How long the server takes to answer again on Kubernetes: 4.5 to 6.9 seconds after its pod is force-deleted, with no failed downloads, and 42.6 to 48.4 seconds after the worker node it ran on is stopped, with 0 to 3 of about 47 downloads failing. Players' data stayed intact in all ten runs">
+<rect x="-28" y="-28" width="956" height="290" rx="16" fill="#11151a"/>
+<text x="0" y="18" font-size="19" font-weight="700" fill="#eef2f6" text-anchor="start" data-box="0,900">Kubernetes: a lost server is back by itself, with every player's data</text>
+<text x="0" y="42" font-size="13" fill="#aeb8c3" text-anchor="start" data-box="0,900">Ten drills on a three-node cluster. Bars run from the fastest recovery to the slowest.</text>
+<path d="M250.0,80 V186" stroke="#2a3138" stroke-width="1"/>
+<text x="250" y="202" font-size="11.5" fill="#8b96a2" text-anchor="middle" data-box="210,290">0 s</text>
+<path d="M353.3,80 V186" stroke="#2a3138" stroke-width="1"/>
+<text x="353.333" y="202" font-size="11.5" fill="#8b96a2" text-anchor="middle" data-box="313.333,393.333">10 s</text>
+<path d="M456.7,80 V186" stroke="#2a3138" stroke-width="1"/>
+<text x="456.667" y="202" font-size="11.5" fill="#8b96a2" text-anchor="middle" data-box="416.667,496.667">20 s</text>
+<path d="M560.0,80 V186" stroke="#2a3138" stroke-width="1"/>
+<text x="560" y="202" font-size="11.5" fill="#8b96a2" text-anchor="middle" data-box="520,600">30 s</text>
+<path d="M663.3,80 V186" stroke="#2a3138" stroke-width="1"/>
+<text x="663.333" y="202" font-size="11.5" fill="#8b96a2" text-anchor="middle" data-box="623.333,703.333">40 s</text>
+<path d="M766.7,80 V186" stroke="#2a3138" stroke-width="1"/>
+<text x="766.667" y="202" font-size="11.5" fill="#8b96a2" text-anchor="middle" data-box="726.667,806.667">50 s</text>
+<path d="M870.0,80 V186" stroke="#2a3138" stroke-width="1"/>
+<text x="870" y="202" font-size="11.5" fill="#8b96a2" text-anchor="middle" data-box="830,910">60 s</text>
+<text x="0" y="99" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="0,244">Server pod force-deleted</text>
+<text x="0" y="117" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="0,244">No download failed</text>
+<rect x="296.5" y="92" width="24.8" height="18" rx="4" fill="#8cf23d"/>
+<text x="331.3" y="106" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="321.3,900">4.5 to 6.9 s</text>
+<text x="0" y="149" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="0,244">Its whole node stopped</text>
+<text x="0" y="167" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="0,244">0 to 3 of about 47 downloads failed</text>
+<rect x="690.2" y="142" width="59.9" height="18" rx="4" fill="#8cf23d"/>
+<text x="760.133" y="156" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="750.133,900">42.6 to 48.4 s</text>
+<text x="0" y="228" font-size="11.5" fill="#8b96a2" text-anchor="start" data-box="0,900">tests/ha/failover.sh on the kind cluster in deploy/kind, node detection at 10 seconds. A player's data is checked after each drill.</text>
+</svg>

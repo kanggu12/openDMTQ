@@ -1,0 +1,19 @@
+{{- $p := .Values.live.recordings.persistence }}
+{{- if and $p.enabled (not $p.existingClaim) }}
+# Recordings of live broadcasts (live.recordings.persistence). Kept by helm uninstall, like any
+# recording the owner has not deleted.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "opendmtq.fullname" . }}-recordings
+  labels: {{- include "opendmtq.labels" (dict "ctx" $ "component" "api") | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: {{- toYaml $p.accessModes | nindent 4 }}
+  {{- with $p.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests: {storage: {{ $p.size }}}
+{{- end }}

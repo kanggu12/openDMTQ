@@ -1,0 +1,617 @@
+"""Import the game files an operator has, from the folder or files they choose.
+
+Accepts a folder (or files) holding any mix of:
+  * the game's Android client (APK): loose, inside an archive, or in an APK bundle (.xapk, .apks). Kept in
+    data/apk/base, the base every phone app of this server is built from: the original, or one changed for another
+    server (its build points it at this one). An app OpenDMTQ built is not a base, nor is any other app.
+  * the game's server files: the game host's folder (dmqglb.mb.pmang.com, or the same files in a folder of another
+    name, such as the web folder of an OpenDMTQ server's content), loose or in an archive, at any depth, with or
+    without the song list kept beside it (_info/songList.json, or songs.json; without one the list is made from the
+    game's own tables). Copied into data/content in two parts, each on its own:
+      game data   the client's tables, the images of its screens and its fonts: what the game cannot start without
+      songs       the music, charts, jackets, previews and song tiles, and the song list
+    Nothing else of it: no program code, no database, no notes.
+  * archives as people have them: .zip, .7z, .rar, one split in parts (.7z.001, .part1.rar and the like, all parts in
+    one folder), and one archive inside another.
+
+OpenDMTQ itself ships none of these files. With the game data and no songs the server runs with an empty song list.
+IMPORT_SONGS=yes imports the songs too (the CLI's --songs); IMPORT_GAME=no leaves the game data as it is. Archives
+are opened with 7-Zip inside this container, never on the host.
+
+Usage (inside the tools container): python3 -m opendmtq_tools.importer
+  /in    the user's folder or file, read-only
+  /data  the repository's data/ folder
+"""
+
+import csv
+import glob
+import io
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+from .patch_apk import describe, inspect, sha256
+
+# What to read and where data/ is: compose's mount points, or a host install's own folders.
+IN = os.environ.get("OPENDMTQ_IMPORT_IN", "/in")
+DATA = os.environ.get("OPENDMTQ_DATA", "/data")
+# The game's server files: the game host's folder, with the client's patch folder in it. An old server kept a song list
+# beside that folder; the list is optional (made from the game's own tables without it).
+HOST = "dmqglb.mb.pmang.com"
+GAME_DIR = HOST + "/patch/phone_new"
+PATCH_DIR = "patch/phone_new"
+SONG_LIST = "_info/songList.json"
+# An OpenDMTQ server's content folder holds the same files in web/, and the song list beside it.
+CONTENT_SONGS = "songs.json"
+# Archive types 7-Zip opens here, and the 7-Zip program: the image's 7zz, or the one a host install names (the
+# official build, as the distributions' leave out RAR). APK bundles are zip files with the app inside.
+ARCHIVES = (".rar", ".zip", ".7z")
+APK_BUNDLES = (".xapk", ".apks")
+# Words the game's files are usually named with: archives with one in the name are opened first, so that a folder full
+# of other archives is not listed through before the game's.
+GAME_WORDS = ("dmtq", "djmax", "technika")
+SEVENZIP = os.environ.get("OPENDMTQ_7ZIP") or "7zz"
+# What is taken from the game host's folder: (path in it, path in data/content, the file names kept there). Only the
+# game's data files: music (.fpk), videos (.webm), charts (a number, or a number and _EARPHONE), images, the client's
+# tables and their packed forms. Anything else (scripts, pages, databases, notes) stays where it was.
+TAKE = [
+    ("DMQ/Songs/", "web/DMQ/Songs/", re.compile(r"\d+/\d+\.(?:fpk|webm)")),
+    ("DMQ/Patterns/", "web/DMQ/Patterns/", re.compile(r"\d+(?:_EARPHONE)?")),
+    ("viewImg/", "web/viewImg/", re.compile(r"[\w.-]+/[\w .()-]+\.(?:png|jpg)", re.I)),
+    (PATCH_DIR + "/", "web/patch/phone_new/", re.compile(r"[\d.]+/(?:android|ios)/[\w./ -]+\.(?:lz4|csv)")),
+    ("static/", "web/static/", re.compile(r"[\w./-]+\.(?:png|jpg)", re.I)),
+]
+# The song list's fields, all in the client's song table too, and those of them that are numbers.
+SONG_FIELDS = ("song_id", "name", "full_name", "genre", "artist_name", "original_bga_yn", "loop_bga_yn", "composed_by",
+               "singer", "feat_by", "arranged_by", "visualized_by", "cost_game_point", "cost_game_cash", "flag", "status",
+               "free_yn", "hidden_yn")
+SONG_NUMBERS = ("song_id", "cost_game_point", "cost_game_cash", "flag")
+# A song's own files in the client's patch folder: its preview and the song list tiles (d3_e<n>, d_e<n>).
+SONG_PATCH = re.compile(r"web/patch/phone_new/[^/]+/[^/]+/(?:preview/.*|dlc/d3?_e\d+\.unity3d\.lz4)")
+
+
+def part_of(rel):
+    """Which part a file of data/content belongs to (rel: its path there): "songs" or "game"."""
+    if rel == "songs.json" or rel.startswith("web/DMQ/") or rel.startswith("web/viewImg/eye/") or SONG_PATCH.fullmatch(rel):
+        return "songs"
+    return "game"
+
+
+def log(msg):
+    """Progress line, flushed so docker shows it immediately."""
+    print(msg, flush=True)
+
+
+def host_folder(path):
+    """The game host's folder in or at path, or None: path/dmqglb.mb.pmang.com, or path itself when it holds the same
+    files under another name (the client's patch folder, and the songs' or the images' folder beside it), or path/web
+    in an OpenDMTQ server's content folder."""
+    if os.path.isdir(os.path.join(path, GAME_DIR)):
+        return os.path.join(path, HOST)
+    for here in (path, os.path.join(path, "web")):
+        if os.path.isdir(os.path.join(here, PATCH_DIR)) and (os.path.isdir(os.path.join(here, "DMQ"))
+                                                            or os.path.isdir(os.path.join(here, "viewImg"))):
+            return here
+    return None
+
+
+def song_list_beside(host):
+    """The song list kept beside the game host's folder, or None: an old server's (_info/songList.json), or the one
+    beside the web folder of an OpenDMTQ server's content (songs.json)."""
+    parent = os.path.dirname(os.path.normpath(host))
+    for path in (os.path.join(parent, SONG_LIST),
+                 os.path.join(parent, CONTENT_SONGS) if os.path.basename(os.path.normpath(host)) == "web" else ""):
+        if path and os.path.isfile(path):
+            return path
+    return None
+
+
+def is_game_folder(path):
+    """True when path is a folder of the game's server files, whatever its name."""
+    return host_folder(path) is not None
+
+
+def archive_role(path):
+    """What a file is to the import: "first" for an archive to open (a whole one, or the first part of one split in
+    parts), "part" for a later part (7-Zip reads it through the first), None for anything else."""
+    low = os.path.basename(path).lower()
+    m = re.search(r"\.part(\d+)\.rar$", low) or re.search(r"\.(?:7z|zip|rar)\.(\d{3})$", low)
+    if m:
+        return "first" if int(m.group(1)) == 1 else "part"
+    if re.search(r"\.[rz]\d\d$", low):
+        return "part"
+    return "first" if low.endswith(ARCHIVES + APK_BUNDLES) else None
+
+
+def split_stem(name):
+    """The name the parts of an archive in parts share (lower case), or None for an archive in one piece."""
+    low = name.lower()
+    m = (re.fullmatch(r"(.+)\.part\d+\.rar", low) or re.fullmatch(r"(.+\.(?:7z|zip|rar))\.\d{3}", low)
+         or re.fullmatch(r"(.+)\.[rz]\d\d", low))
+    return m.group(1) if m else None
+
+
+def parts_with(first, names):
+    """The later parts, among names, of the archive whose first part (or whole file, for x.rar with x.r00 beside it) is
+    first."""
+    stem = split_stem(first) or os.path.splitext(first.lower())[0]
+    return [n for n in names if archive_role(n) == "part" and split_stem(n) == stem]
+
+
+def walk(root, depth=4):
+    """Files and folders under root, a few levels deep (downloads are shallow: a folder or two around the game's)."""
+    if os.path.isfile(root):
+        yield root
+        return
+    # How deep a folder is, by its separators (both kinds: Windows paths may carry either).
+    def depth_of(path):
+        return path.replace("\\", "/").rstrip("/").count("/")
+    base = depth_of(root)
+    for d, dirs, files in os.walk(root):
+        # Do not descend into a game files folder: thousands of song files, nothing else to find there.
+        if is_game_folder(d):
+            dirs[:] = []
+        if depth_of(d) - base >= depth:
+            dirs[:] = []
+        yield d
+        for f in files:
+            yield os.path.join(d, f)
+
+
+# Each archive's listing, read once per run: the APKs and the game's files are both looked for in the same archives.
+_listed = {}
+
+
+def archive_paths(archive, say=True):
+    """Every member path of an archive, as 7-Zip lists them. say: log an archive it cannot list (check() says so in its
+    own words)."""
+    if archive not in _listed:
+        # In UTF-8 whatever the system's code page (-sccUTF-8), as this program reads it: names in Korean come through.
+        r = subprocess.run([SEVENZIP, "l", "-ba", "-slt", "-sccUTF-8", archive], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if r.returncode != 0:
+            if say:
+                log(f"  skip {os.path.basename(archive)}: 7-Zip cannot list it")
+            _listed[archive] = []
+        else:
+            # Windows' 7-Zip lists its paths with backslashes; it takes forward ones back.
+            _listed[archive] = [line[7:].replace("\\", "/") for line in r.stdout.splitlines() if line.startswith("Path = ")]
+    return _listed[archive]
+
+
+def named_like_the_game(path):
+    """True when a file's name carries one of the game's words, in any letter case."""
+    name = os.path.basename(path).lower()
+    return any(word in name for word in GAME_WORDS)
+
+
+def tree_in(paths):
+    """Where the game's server files are inside an archive: (the game host's folder, the song list or None), or None.
+    The folder is the game host's (dmqglb.mb.pmang.com), or one of another name with the same files; nearest the top
+    when there are several."""
+    names = set(paths)
+    hosts = set()
+    for p in paths:
+        at = ("/" + p).find("/" + PATCH_DIR + "/")
+        if at < 0:
+            continue
+        host = p[:at]
+        # A patch folder of another program does not count: the game host's name, or the songs or images beside it.
+        if (host.rstrip("/").endswith(HOST) or host == HOST + "/"
+                or any(n.startswith(host + "DMQ/") or n.startswith(host + "viewImg/") for n in names)):
+            hosts.add(host)
+    if not hosts:
+        return None
+    host = min(hosts, key=lambda h: (h.count("/"), h))
+    parent = host[: -len(HOST) - 1] if host.rstrip("/").endswith(HOST) else "/".join(host.rstrip("/").split("/")[:-1])
+    parent = parent + "/" if parent and not parent.endswith("/") else parent
+    # The old server's list, or the one beside an OpenDMTQ content folder's web/.
+    for listed in (parent + SONG_LIST, parent + CONTENT_SONGS if host.rstrip("/").split("/")[-1] == "web" else None):
+        if listed and listed in names:
+            return host, listed
+    return host, None
+
+
+def game_prefix(paths):
+    """The folder inside an archive that holds the game's files, or None (the folder around the game host's)."""
+    found = tree_in(paths)
+    if found is None:
+        return None
+    host = found[0]
+    return host[: -len(HOST) - 1] if host.rstrip("/").endswith(HOST) else host
+
+
+def _put(src, dest):
+    """One file into the content: a hard link where the system allows one (the same disk: no second copy of
+    gigabytes, and the files never change), else a copy."""
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    try:
+        os.link(src, dest)
+    except OSError:
+        shutil.copyfile(src, dest)
+
+
+def keep_others(dest, parts):
+    """Start the content folder being built with the current content's files of the parts not imported now (linked,
+    not copied), so that importing the songs keeps the game data and the other way round."""
+    current = os.path.join(DATA, "content")
+    if not os.path.isdir(current):
+        return
+    for d, _, files in os.walk(current):
+        for f in files:
+            rel = os.path.relpath(os.path.join(d, f), current).replace(os.sep, "/")
+            if part_of(rel) not in parts:
+                _put(os.path.join(d, f), os.path.join(dest, rel))
+
+
+def _table(path_plain):
+    """A client table's rows as dicts, from the plain .csv or its .lz4 form beside it; [] when there is neither."""
+    from . import songs
+    for path in (path_plain, path_plain + ".lz4"):
+        if os.path.isfile(path):
+            with open(path, "rb") as f:
+                raw = f.read()
+            text = (songs.lz4_decode(raw) if path.endswith(".lz4") else raw).decode("utf-8-sig", errors="replace")
+            rows = list(csv.reader(io.StringIO(text)))
+            return [dict(zip(rows[0], r)) for r in rows[1:] if r] if rows else []
+    return []
+
+
+def made_song_list(host):
+    """The song list, from the game's own tables, for the songs whose files the game host's folder has: what an old
+    server kept as _info/songList.json holds the same fields. A chart is listed when its file is there."""
+    tables = sorted(glob.glob(os.path.join(host, PATCH_DIR, "*", "android", "table", "*", "song_song.csv*")))
+    if not tables:
+        return []
+    # The newest patch folder, and English where it has it (every language's table lists the same songs).
+    newest = max({os.path.dirname(os.path.dirname(os.path.dirname(t))) for t in tables}, key=lambda d: [
+        int(x) if x.isdigit() else 0 for x in os.path.basename(os.path.dirname(d)).split(".")])
+    langs = sorted(os.listdir(os.path.join(newest, "table")), key=lambda lang: lang != "us")
+    table = os.path.join(newest, "table", langs[0])
+    charts = {}
+    for p in _table(os.path.join(table, "song_songPattern.csv")):
+        if p.get("pattern_id", "").isdigit() and os.path.isfile(os.path.join(host, "DMQ", "Patterns", p["pattern_id"])):
+            charts.setdefault(p["song_id"], []).append({k: int(p[k]) for k in ("pattern_id", "line", "difficulty", "signature")})
+    out = []
+    for r in _table(os.path.join(table, "song_song.csv")):
+        sid = r.get("song_id", "")
+        if not sid.isdigit() or not os.path.isfile(os.path.join(host, "DMQ", "Songs", sid, sid + ".fpk")):
+            continue
+        song = {k: (int(r[k]) if k in SONG_NUMBERS and r.get(k, "").lstrip("-").isdigit() else r.get(k, "")) for k in SONG_FIELDS}
+        song["song_patterns"] = sorted(charts.get(sid, []), key=lambda c: c["pattern_id"])
+        out.append(song)
+    return out
+
+
+def collect(root, dest, parts, song_list=None):
+    """Copy the files of the given parts ("game", "songs") that TAKE names from the game host's folder root into the
+    content folder being built, with the song list (the old server's, at song_list, else made from the game's tables).
+    Returns how many songs, charts and other files came."""
+    counts = {"songs": 0, "charts": 0, "files": 0}
+    for there, here, keep in TAKE:
+        base = os.path.join(root, there)
+        if not os.path.isdir(base):
+            continue
+        for d, _, files in os.walk(base):
+            for f in files:
+                rel = os.path.relpath(os.path.join(d, f), base).replace(os.sep, "/")
+                if not keep.fullmatch(rel) or part_of(here + rel) not in parts:
+                    continue
+                _put(os.path.join(d, f), os.path.join(dest, here, rel))
+                if here == "web/DMQ/Songs/" and rel.endswith(".fpk"):
+                    counts["songs"] += 1
+                elif here == "web/DMQ/Patterns/" and not rel.endswith("_EARPHONE"):
+                    counts["charts"] += 1
+                else:
+                    counts["files"] += 1
+    if "songs" not in parts:
+        return counts
+    # The song list, as the server reads it (a Windows editor's byte-order mark taken off), or made from the tables.
+    if song_list:
+        with open(song_list, encoding="utf-8-sig") as f:
+            songs = json.load(f)
+    else:
+        songs = made_song_list(root)
+        log(f"  song list: made from the game's own tables ({len(songs)} songs with their files)")
+    with open(os.path.join(dest, "songs.json"), "w", encoding="utf-8") as f:
+        json.dump(songs, f, ensure_ascii=False, indent=1)
+    # Windows ignored letter case and Linux does not: the game asks for <name>.png with the name from the song list,
+    # so a jacket whose file is named in another case gets the asked name too (Song.png for song.png).
+    eye = os.path.join(dest, "web", "viewImg", "eye")
+    have = {f.lower(): f for f in os.listdir(eye)} if os.path.isdir(eye) else {}
+    for s in songs:
+        want = f"{s.get('name', '')}.png"
+        found = have.get(want.lower())
+        if found and found != want and not os.path.exists(os.path.join(eye, want)):
+            _put(os.path.join(eye, found), os.path.join(eye, want))
+            log(f"  jacket {want} -> {found}")
+    return counts
+
+
+def report(parts, counts):
+    """One line for what came in."""
+    what = []
+    if "game" in parts:
+        what.append("game data")
+    if "songs" in parts:
+        what.append(f"{counts['songs']} songs, {counts['charts']} charts")
+    log(f"  {' and '.join(what)} ({counts['files']} other files) -> data/content")
+
+
+def install_content(built):
+    """Move a complete content folder into data/content, entry by entry inside it: a running server has data/content
+    mounted, and keeps seeing the folder itself (a folder swapped whole would leave it the deleted old one). Each
+    entry is renamed into place, the old one kept until the new one is there."""
+    dest = os.path.join(DATA, "content")
+    os.makedirs(dest, exist_ok=True)
+    for name in ("web", "songs.json"):
+        new, cur, old = os.path.join(built, name), os.path.join(dest, name), os.path.join(dest, name + ".old")
+        shutil.rmtree(old, ignore_errors=True) if os.path.isdir(old) else (os.path.exists(old) and os.remove(old))
+        if os.path.exists(cur):
+            os.rename(cur, old)
+        if os.path.exists(new):
+            os.rename(new, cur)
+        shutil.rmtree(old, ignore_errors=True) if os.path.isdir(old) else (os.path.exists(old) and os.remove(old))
+    shutil.rmtree(built, ignore_errors=True)
+
+
+def import_game_files(candidates, parts, inner=True):
+    """Import the given parts of the first game files folder or archive found: a folder wins over an archive. inner: an
+    archive inside one of the archives may hold them too (one level: deeper is no download anyone makes)."""
+    # What an earlier run left when it was killed: gigabytes each, and nothing else ever removes them.
+    if inner:
+        for old in glob.glob(os.path.join(DATA, ".extract-*")) + glob.glob(os.path.join(DATA, "content.new")):
+            shutil.rmtree(old, ignore_errors=True)
+    built = os.path.join(DATA, "content.new")
+    names = " and ".join(("game data" if p == "game" else "songs") for p in sorted(parts))
+    for path in candidates:
+        host = host_folder(path) if os.path.isdir(path) else None
+        if host:
+            where = path[len(IN):] if path.startswith(IN) else path[len(DATA):] if path.startswith(DATA) else path
+            log(f"{names}: folder {where or '/'}")
+            keep_others(built, parts)
+            counts = collect(host, built, parts, song_list_beside(host))
+            install_content(built)
+            report(parts, counts)
+            return True
+    # The archives, those named like the game's first: the first that holds the game's files is the one imported. A
+    # split one through its first part; APK bundles hold an app, not these.
+    archives = sorted((p for p in candidates if os.path.isfile(p) and archive_role(p) == "first"
+                       and not p.lower().endswith(APK_BUNDLES)), key=lambda p: not named_like_the_game(p))
+    for path in archives:
+        found = tree_in(archive_paths(path))
+        if found is None:
+            continue
+        host, listed = found
+        log(f"{names}: {os.path.basename(path)} ({host or 'root'}), extracting")
+        tmp = tempfile.mkdtemp(dir=DATA, prefix=".extract-")
+        try:
+            # Only the game's files and the list: an archive may carry other programs beside them.
+            wanted = [f"{host}{there}*" for there, _, _ in TAKE] + ([listed] if listed else [])
+            try:
+                subprocess.run([SEVENZIP, "x", "-y", "-bso0", "-bsp0", f"-o{tmp}", path] + wanted, check=True)
+            except subprocess.CalledProcessError as e:
+                # A damaged archive, or one split in parts with a part missing: said so, and the next one is tried.
+                log(f"  skip {os.path.basename(path)}: 7-Zip could not unpack it (exit {e.returncode}); "
+                    "an archive in parts needs all of them in one folder")
+                continue
+            # Extracted on the same disk as the content: linked across, then the extraction goes.
+            keep_others(built, parts)
+            counts = collect(os.path.join(tmp, host) if host else tmp, built, parts,
+                             os.path.join(tmp, listed) if listed else None)
+            install_content(built)
+            report(parts, counts)
+        finally:
+            # Never leave gigabytes of half-extracted files behind.
+            shutil.rmtree(tmp, ignore_errors=True)
+            shutil.rmtree(built, ignore_errors=True)
+        return True
+    if not inner:
+        return False
+    # One level down: an archive inside one of these (a .zip made of the .rar, say), with its parts if it has any.
+    for path in archives:
+        inside = [m for m in archive_paths(path) if archive_role(m) and not m.lower().endswith(APK_BUNDLES)]
+        if not any(archive_role(m) == "first" for m in inside):
+            continue
+        log(f"  looking inside {os.path.basename(path)}: {', '.join(os.path.basename(m) for m in inside[:3])}")
+        tmp = tempfile.mkdtemp(dir=DATA, prefix=".extract-")
+        try:
+            try:
+                subprocess.run([SEVENZIP, "x", "-y", "-bso0", "-bsp0", f"-o{tmp}", path] + inside, check=True)
+            except subprocess.CalledProcessError as e:
+                log(f"  skip {os.path.basename(path)}: 7-Zip could not unpack it (exit {e.returncode})")
+                continue
+            if import_game_files([os.path.join(tmp, m) for m in inside], parts, inner=False):
+                return True
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    return False
+
+
+def import_apks(candidates):
+    """Copy every game client found (loose, or one level inside an archive or an APK bundle) into data/apk/base: the
+    original, or one changed for another server (the build points it at this one). Returns how many."""
+    base = os.path.join(DATA, "apk", "base")
+    os.makedirs(base, exist_ok=True)
+    kept = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        apks = []
+        for path in candidates:
+            low = path.lower()
+            if os.path.isfile(path) and low.endswith(".apk"):
+                apks.append(path)
+            elif os.path.isfile(path) and archive_role(path) == "first":
+                # A client may come inside an archive, with or without a folder around it, or in an APK bundle (which
+                # holds the app and its split parts: those are no client, and the check below leaves them out).
+                members = [p for p in archive_paths(path) if p.lower().endswith(".apk")]
+                if members:
+                    out = tempfile.mkdtemp(dir=tmp)
+                    try:
+                        subprocess.run([SEVENZIP, "e", "-y", "-bso0", "-bsp0", f"-o{out}", path] + members, check=True)
+                    except subprocess.CalledProcessError as e:
+                        # A damaged archive: said so; the other files still come in.
+                        log(f"  skip {os.path.basename(path)}: 7-Zip could not unpack it (exit {e.returncode})")
+                        continue
+                    apks += [os.path.join(out, f) for f in os.listdir(out)]
+        # Clients already in base/, by content, so a second copy of the same file is not added.
+        have = {sha256(os.path.join(base, f)) for f in os.listdir(base) if f.lower().endswith(".apk")}
+        for apk in apks:
+            name = os.path.basename(apk)
+            info = inspect(apk)
+            if info["kind"] in ("original", "other server"):
+                digest = sha256(apk)
+                if digest in have:
+                    log(f"base APK: {name} (already imported)")
+                else:
+                    shutil.copyfile(apk, os.path.join(base, name))
+                    have.add(digest)
+                    log(f"base APK: {name} ({describe(info)})")
+                kept += 1
+            elif re.fullmatch(r"(?:split_)?config\..+\.apk", name, re.I):
+                # A split part of an app bundle (its languages, screen sizes or processor): nothing to say about it.
+                continue
+            else:
+                log(f"  skip {name}: {describe(info)}")
+    return kept
+
+
+def song_count(paths, host=""):
+    """How many songs (their music files) a listing of the game host's folder holds."""
+    music = re.compile(re.escape(host) + r"DMQ/Songs/(\d+)/\1\.fpk")
+    return sum(1 for p in paths if music.fullmatch(p))
+
+
+def what_is(path):
+    """What one file or folder is to the import, without importing anything: {"kind", "ok", ...}.
+      kind  "app"           an Android app (.apk, or one in an .xapk or .apks bundle): "client" has inspect()'s answer
+            "iphone app"    the game's iPhone app (.ipa): of no use here
+            "server files"  a folder or an archive with the game's server files: "songs", "song_list" (True when one
+                            comes with them), and "apps" for the clients in the same archive
+            "part"          a later part of an archive split in parts: read through its first part
+            "archive"       an archive with neither (it may hold another archive, which the import opens)
+            "unreadable"    an archive 7-Zip cannot read: damaged, or split with a part missing
+            "other"         anything else"""
+    low = os.path.basename(path).lower()
+    if os.path.isdir(path):
+        host = host_folder(path)
+        if host is None:
+            return {"kind": "other", "ok": False}
+        songs = os.path.join(host, "DMQ", "Songs")
+        count = sum(1 for d in os.listdir(songs) if os.path.isfile(os.path.join(songs, d, d + ".fpk"))) if os.path.isdir(songs) else 0
+        return {"kind": "server files", "ok": True, "songs": count, "song_list": song_list_beside(host) is not None,
+                "apps": []}
+    if low.endswith(".ipa"):
+        return {"kind": "iphone app", "ok": False}
+    if low.endswith(".apk"):
+        info = inspect(path)
+        return {"kind": "app", "ok": info["kind"] in ("original", "other server"), "client": info}
+    role = archive_role(path)
+    if role == "part":
+        return {"kind": "part", "ok": True}
+    if role != "first":
+        return {"kind": "other", "ok": False}
+    paths = archive_paths(path, say=False)
+    if not paths:
+        return {"kind": "unreadable", "ok": False}
+    apps = [p for p in paths if p.lower().endswith(".apk") and not re.fullmatch(r"(?:split_)?config\..+\.apk",
+                                                                             os.path.basename(p), re.I)]
+    found = tree_in(paths)
+    if found:
+        return {"kind": "server files", "ok": True, "songs": song_count(paths, found[0]), "song_list": found[1] is not None,
+                "apps": apps}
+    if apps:
+        # A client in an archive or a bundle: looked at as the import would, from a copy taken out.
+        with tempfile.TemporaryDirectory() as tmp:
+            r = subprocess.run([SEVENZIP, "e", "-y", "-bso0", "-bsp0", f"-o{tmp}", path, apps[0]], capture_output=True)
+            out = os.path.join(tmp, os.path.basename(apps[0]))
+            info = inspect(out) if r.returncode == 0 and os.path.isfile(out) else {"kind": "not the game", "version": None,
+                                                                                    "hosts": [], "known": False}
+        return {"kind": "app", "ok": info["kind"] in ("original", "other server"), "client": info}
+    return {"kind": "archive", "ok": any(archive_role(p) == "first" for p in paths)}
+
+
+def check(paths):
+    """Print what each file or folder is, one line each, and import nothing (the CLI's import --check)."""
+    seen = set()
+    for path in paths:
+        # A folder and the game host's folder in it are the same files: said once.
+        host = host_folder(path) if os.path.isdir(path) else None
+        if host is not None:
+            if host in seen:
+                continue
+            seen.add(host)
+        w = what_is(path)
+        name = os.path.basename(os.path.normpath(path)) or path
+        if w["kind"] == "app":
+            line = describe(w["client"])
+        elif w["kind"] == "server files":
+            line = (f"the game's server files, {w['songs']} songs" + ("" if w["song_list"] else
+                    ", no song list (made from the game's own tables)") +
+                    (f", with {len(w['apps'])} app(s)" if w["apps"] else ""))
+        else:
+            line = {"iphone app": "the iPhone app: of no use here, the Android app (.apk) is needed",
+                    "part": "a part of an archive in parts: read through its first part, all parts in one folder",
+                    "archive": "an archive with neither the game's app nor its server files" + (
+                        " (it holds another archive, which the import opens)" if w["ok"] else ""),
+                    "unreadable": "7-Zip cannot read it: damaged, or split in parts with one missing",
+                    "other": "not one of the game's files"}[w["kind"]]
+        log(f"{'ok  ' if w['ok'] else 'no  '} {name}: {line}")
+
+
+def main():
+    # Single files: compose mounts their folder and names them, "/" between several (no file name holds one). setup
+    # passes the files its search matched, and nothing else in that folder.
+    only = [n for n in os.environ.get("IMPORT_ONLY", "").split("/") if n]
+    # A folder inside data/ (data/server, from an earlier OpenDMTQ) is read where it is, on the content's own disk.
+    inside = os.environ.get("IMPORT_DATA", "")
+    if inside:
+        targets = [os.path.join(DATA, inside)]
+    else:
+        targets = [os.path.join(IN, n) for n in only] or [IN]
+    # The tools run unprivileged: a folder only its owner can read looks empty, so say so instead.
+    for target in targets:
+        if not os.access(target, os.R_OK) or (os.path.isdir(target) and not os.access(target, os.X_OK)):
+            who = f"uid {os.getuid()}" if hasattr(os, "getuid") else "this user"
+            print(f"import error: cannot read {target} as {who}; "
+                  "make it readable (chmod a+rX) or copy the files somewhere readable", file=sys.stderr, flush=True)
+            sys.exit(2)
+    candidates = targets if (only or inside) else list(walk(IN))
+    if os.environ.get("IMPORT_CHECK") == "yes":
+        # Only say what each one is: the files and folders that matter, not every folder walked through.
+        found = [c for c in candidates if what_is(c)["kind"] != "other"] or targets
+        # Folders first, then the files by name.
+        check(sorted(found, key=lambda c: (not os.path.isdir(c), os.path.basename(c).lower())))
+        sys.exit(0)
+    # The game data unless told otherwise; the songs only when asked for.
+    parts = set()
+    if os.environ.get("IMPORT_GAME", "yes") != "no":
+        parts.add("game")
+    if os.environ.get("IMPORT_SONGS", "no") == "yes":
+        parts.add("songs")
+    # The clients first: they are quick, and a damaged archive among the game's files cannot keep them out.
+    apks = import_apks(candidates)
+    if not apks:
+        log("base APK: none found (need the game's Android app, an .apk, under any file name)")
+        # The iPhone app is often beside it: it cannot be used, and saying so saves looking for what is wrong with it.
+        for target in targets:
+            names = os.listdir(target) if os.path.isdir(target) else [os.path.basename(target)]
+            for name in sorted(n for n in names if n.lower().endswith(".ipa")):
+                log(f"  {name}: the iPhone app, which cannot be used: the Android app (.apk) is needed")
+    found = bool(parts) and import_game_files(candidates, parts)
+    if parts and not found:
+        log("game files: none found (looked for a folder or archive with the game host's folder, dmqglb.mb.pmang.com, "
+            "and its patch/phone_new folder)")
+    # Non-zero only when nothing at all was imported, so a partial import still reports cleanly.
+    sys.exit(0 if found or apks else 1)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, ValueError, subprocess.CalledProcessError) as e:
+        # Exit 2 tells the CLI "something broke", as opposed to 1, "nothing found".
+        print(f"import error: {e}", file=sys.stderr, flush=True)
+        sys.exit(2)

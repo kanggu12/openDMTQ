@@ -1,0 +1,138 @@
+{% extends "base.html" %}{% block title %}{{ t('dash.title') }}{% endblock %}
+{% block body %}
+{% if not counts %}<p class="flash bad" role="status">{{ t('dash.db_failed') }}</p>{% endif %}
+{# What the owner may want to look at, in plain words, each with the way to it. Said only when there is something. #}
+{% if attention %}
+<section class="attention" aria-label="{{ t('alert.title') }}">
+  {% for level, text, link, words in attention %}
+  {# With no backup at all the line's button makes one, as it says: one press, not a walk to another page first. #}
+  <div class="alert {{ level }}"><i></i><span>{{ text }}</span>{% if link == 'backup-now' %}<form method="post" action="{{ url_for('backups_page') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="create"><button class="btn btn-sm" data-busy="{{ t('bak.working') }}">{{ words }}</button></form>{% else %}<a class="btn btn-sm" href="{{ link }}">{{ words }}</a>{% endif %}</div>
+  {% endfor %}
+</section>
+{% endif %}
+{# The server at a glance: each tile leads to the page where it can be changed, and its colour says whether
+   it needs attention. The page looks again by itself (see the end of this page). #}
+<section class="stats stats-4 tiles" id="tiles">
+  <a class="stat" href="{{ url_for('logs_page') }}"><span class="lbl">{{ t('dash.game_server') }}</span><span class="num {{ 'okc' if health and health.ok else ('warnc' if server_waiting else 'badc') }}">{{ t('dash.online') if health and health.ok else (t('dash.no_files') if server_waiting else t('dash.no_answer')) }}</span><span class="tile-sub">{% if health %}{{ t('dash.patch_songs', patch=health.patch, n=health.songs) }}{% endif %}</span></a>
+  <a class="stat" href="{{ url_for('players_page') }}"><span class="lbl">{{ t('dash.players') }}</span><span class="num">{{ counts.players if counts else '?' }}</span><span class="tile-sub">{{ t('dash.records_n', n=counts.records) if counts else t('dash.db_short') }}{% if counts %}<br>{{ t('dash.active_week', n=counts.active_week) }}{% endif %}</span></a>
+  <a class="stat" href="{{ url_for('logs_page', tab='plays') }}"><span class="lbl">{{ t('dash.plays') }}</span><span class="num">{{ counts.plays_today if counts else '?' }}</span><span class="tile-row">{{ chart.spark }}<span class="tile-sub">{{ t('dash.plays_week', n=counts.plays_week) if counts else '' }}</span></span></a>
+  <a class="stat" href="{{ url_for('recordings_page') }}"><span class="lbl">{{ t('dash.live') }}</span><span class="num{% if counts and counts.live %} livec{% endif %}">{{ counts.live if counts else '?' }}</span><span class="tile-sub">{{ t('dash.recordings_n', n=recordings) }}</span></a>
+  {% set used = 100 * (usage.total - usage.free) / usage.total %}
+  <a class="stat" href="{{ url_for('recordings_page') }}"><span class="lbl">{{ t('dash.disk') }}</span><span class="num{% if used > 90 %} badc{% endif %}">{{ usage.free|human }}</span><span class="tile-meter{% if used > 90 %} over{% endif %}"><span style="width: {{ used }}%"></span></span><span class="tile-sub">{{ t('dash.of_total', total=usage.total|human) }}</span></a>
+  <a class="stat" href="{{ url_for('backups_page') }}"><span class="lbl">{{ t('dash.backups') }}</span><span class="num{% if not last_backup or backup_old %} warnc{% endif %}">{{ backup_ago or t('dash.never') }}</span><span class="tile-sub file-name">{{ last_backup or t('dash.no_backup') }}</span></a>
+  <a class="stat" href="{{ url_for('app_page') }}"><span class="lbl">{{ t('dash.app') }}</span><span class="num{% if build_failed or app_other_host %} badc{% elif not build %} warnc{% endif %}">{{ build.built_at[:10] if build else t('dash.never') }}</span><span class="tile-sub">{% if app_other_host %}{{ t('dash.app_other_short') }}{% elif build %}{{ build.size|human }}{% if build.runtime %} · arm32{% endif %}{% else %}{{ t('dash.no_app') }}{% endif %}</span></a>
+  <a class="stat" href="{{ url_for('maintenance_page') }}"><span class="lbl">{{ t('dash.maintenance') }}</span><span class="num{% if maintenance %} warnc{% endif %}">{{ t('mark.on') if maintenance else t('state.off') }}</span><span class="tile-sub">{{ t('dash.maint_on') if maintenance else t('dash.maint_off') if server_ok else t('dash.maint_down') }}</span></a>
+</section>
+
+<div class="dash-grid">
+  {# The machine the server runs on: what it has in use now, and the last day of its processors, its memory and the game
+     server's answers. Looked at again with the tiles. #}
+  <section class="card resources span-12" id="resources">
+    <h2>{{ t('m.title') }} <span class="meta-inline">{{ t('m.meta', cores=machine.cores, up=machine.up) if machine.up else t('m.meta_cores', cores=machine.cores) }}</span></h2>
+    <div class="res-grid">
+      <dl class="res-rows">
+        {% for name, meter, words in machine.meters %}<div><dt>{{ name }}</dt><dd>{{ meter }}<span class="res-val">{{ words }}</span></dd></div>{% endfor %}
+      </dl>
+      <div class="res-chart"><h3>{{ t('m.c_cpu') }}</h3>{{ machine.cpu_chart }}</div>
+      <div class="res-chart"><h3>{{ t('m.c_mem') }}</h3>{{ machine.mem_chart }}</div>
+    </div>
+    <h3>{{ t('m.c_game') }}{% if machine.answered is not none %} <span class="meta-inline">{{ t('m.answered', p=machine.answered) }}</span>{% endif %}</h3>
+    {{ machine.game_strip }}
+    {# Said once: in the charts in the first hour, here after it. #}
+    {% if machine.collecting and not machine.early %}<p class="meta">{{ t('m.collecting', time=machine.collecting) }}</p>{% endif %}
+  </section>
+
+  {# Getting players in: an account each, made on the Accounts page, which gives the message to send. #}
+  <section class="card invite">
+    <h2>{{ t('invite.title') }}</h2>
+    <div class="invite-in">
+      <div>
+        <p class="meta">{{ t('invite.lead') }}</p>
+        <div class="btn-line"><a class="btn btn-primary" href="{{ url_for('accounts_page') }}">{{ t('invite.make') }}</a>{% if server_ok and build and not app_other_host %}<a class="btn" href="{{ invite_url }}">{{ t('invite.open') }}</a>{% endif %}</div>
+      </div>
+      {% if qr %}<figure class="invite-qr"><img src="{{ url_for('invite_qr') }}" alt="{{ t('invite.qr') }}" width="124" height="124"><figcaption>{{ t('invite.qr_caption') }}</figcaption></figure>{% endif %}
+    </div>
+  </section>
+
+  {% if counts %}
+  <section class="card chart-card">
+    <h2>{{ t('dash.c_days') }} <span class="meta-inline">{{ t('dash.c_days_total', n=chart.days_total) if counts else '' }}</span></h2>
+    {% if counts and chart.days_total %}{{ chart.days }}{% else %}<p class="empty">{{ t('dash.recent_none') }}</p>{% endif %}
+  </section>
+
+  <section class="card chart-card span-12">
+    <h2>{{ t('dash.c_when') }}</h2>
+    {% if counts and chart.days_total %}{{ chart.heat }}{% else %}<p class="empty">{{ t('dash.recent_none') }}</p>{% endif %}
+  </section>
+
+  <section class="card chart-card">
+    <h2>{{ t('dash.c_who') }}</h2>
+    {% if counts and chart.days_total %}{{ chart.who }}{% else %}<p class="empty">{{ t('dash.recent_none') }}</p>{% endif %}
+  </section>
+
+  <section class="card chart-card">
+    <h2>{{ t('dash.c_songs') }}</h2>
+    {% if counts and chart.days_total %}{{ chart.songs }}{% else %}<p class="empty">{{ t('dash.recent_none') }}</p>{% endif %}
+  </section>
+  {% endif %}
+
+  {# The disk: the whole, then OpenDMTQ's part at its own scale. #}
+  <section class="card chart-card">
+    <h2>{{ t('dash.c_disk') }}</h2>
+    {{ disk_chart }}
+    {% if disk_own %}<h3>{{ t('dash.c_disk_own', size=disk_own_total) }}</h3>{{ disk_own }}{% endif %}
+  </section>
+
+  {% if counts %}
+  <section class="card chart-card">
+    <h2>{{ t('dash.c_grades') }}</h2>
+    {% if counts.records %}{{ chart.grades }}{% else %}<p class="empty">{{ t('dash.recent_none') }}</p>{% endif %}
+  </section>
+  {% endif %}
+
+  <section class="card wide-card">
+    <h2>{{ t('dash.recent') }} <a class="more" href="{{ url_for('logs_page', tab='plays') }}">{{ t('dash.all_plays') }}</a></h2>
+    {% if not counts %}<p class="empty">{{ t('dash.db_short') }}</p>{% elif not recent %}<p class="empty">{{ t('dash.recent_none') }}</p>{% else %}
+    <table class="compact recent"><tbody>
+      {% for r in recent %}
+      <tr><td class="who"><a href="{{ public_url }}/opendmtq/player.php?id={{ r.id }}">{{ r.who }}</a></td><td class="what">{{ r.song }}<span class="chart-name">{{ r.chart }}<span class="when-sub">{{ r.ago }}</span></span></td><td class="r">{{ '{:,}'.format(r.score) }}</td><td class="flag"><span class="flag-in"><span class="grade g{{ r.grade }}">{{ r.grade }}</span>{% if r.new %}<span class="mark new">{{ t('dash.new') }}</span>{% endif %}</span></td><td class="when">{{ r.ago }}</td></tr>
+      {% endfor %}
+    </tbody></table>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>{{ t('dash.app') }}</h2>
+    {% if build_failed %}<p class="warn">{{ t('dash.build_failed', reason=build_failed) }}</p>{% endif %}
+    {% if app_other_host %}<p class="warn">{{ t('dash.app_other') }}</p>{% endif %}
+    <table class="compact kv"><tbody>
+      <tr><td>{{ t('dash.addr') }}</td><td><code>{{ site_scheme }}://{{ public_host }}/</code></td></tr>
+      <tr><td>{{ t('app.name_label') }}</td><td>{{ app_name_html() }}</td></tr>
+      {% if build %}
+      <tr><td>{{ t('th.file') }}</td><td class="file-name">{{ build.file }}</td></tr>
+      <tr><td>{{ t('app.built') }}</td><td>{{ build.built_at[:16].replace('T', ' ') }}</td></tr>
+      <tr><td>{{ t('dash.runtime') }}</td><td>{{ build.runtime or t('app.no_runtime') }}</td></tr>
+      {% endif %}
+      {% if version %}<tr><td>{{ t('dash.version') }}</td><td><code>{{ version }}</code></td></tr>{% endif %}
+    </tbody></table>
+    {% if not build %}<p class="empty">{{ t('dash.no_app') }}</p>{% endif %}
+    <div class="btn-line">
+      {% if build %}<a class="btn btn-primary" href="{{ url_for('app_download', name=build.file) }}">{{ t('btn.download') }}</a><a class="btn" href="{{ url_for('app_page') }}">{{ t('dash.manage_app') }}</a>{% else %}<a class="btn btn-primary" href="{{ url_for('app_page') }}">{{ t('dash.build_app') }}</a>{% endif %}
+    </div>
+  </section>
+</div>
+<script>
+  // The tiles look again by themselves: an owner may keep this page open on the side.
+  setInterval(async () => {
+    if (document.hidden) return;
+    try {
+      const page = new DOMParser().parseFromString(await (await fetch(location.href, { headers: { 'X-Requested-With': 'fetch' } })).text(), 'text/html');
+      const fresh = page.getElementById('tiles');
+      if (fresh) document.getElementById('tiles').replaceChildren(...fresh.children);
+      // The resources too: what is in use now, and a new point every five minutes.
+      const res = page.getElementById('resources');
+      if (res) document.getElementById('resources').replaceChildren(...res.children);
+    } catch (_) { /* The next look. */ }
+  }, 30000);
+</script>
+{% endblock %}

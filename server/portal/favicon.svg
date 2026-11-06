@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- The wordmark's green Q, slanted like the header's type, on the header's dark ground. -->
+  <rect width="32" height="32" rx="4" fill="#15171b"/>
+  <g transform="translate(3.5 0) skewX(-12)" fill="none" stroke="#7dff4f" stroke-width="4.2">
+    <rect x="8.5" y="5" width="13" height="21" rx="4.5"/>
+    <path d="M17.5 21.5 23 29"/>
+  </g>
+</svg>

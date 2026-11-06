@@ -1,0 +1,77 @@
+{% extends "base.html" %}{% block title %}{{ t('songs.title') }}{% endblock %}
+{% block body %}
+{% if no_game_data %}<p class="flash bad" role="status">{{ t('songs.no_game_data_host' if host_install else 'songs.no_game_data') }}</p>
+{% elif not songs %}<p class="flash note" role="status">{{ t('songs.none_yet_host' if host_install else 'songs.none_yet') }}</p>{% endif %}
+{% if host_install %}
+{# On the server PC itself: the server files as they were downloaded, imported through the setup's first step. #}
+<section class="card">
+  <h2>{{ t('songs.from_folder') }}</h2>
+  <p class="lead">{{ t('songs.from_folder_lead') }}</p>
+  <div class="btn-line"><a class="btn btn-primary" href="{{ url_for('setup_page', step='files') }}">{{ t('songs.from_folder_button') }}</a></div>
+</section>
+{% endif %}
+<section class="card">
+  <h2>{{ t('songs.add') }}</h2>
+  <p class="lead">{{ t('songs.lead') }}</p>
+  <form method="post" enctype="multipart/form-data" class="upload">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="upload">
+    {# As on the backup page: the whole box opens the file picker, the button in it shows where, and
+       the form's own button sends the file. #}
+    <label class="drop" data-max="{{ max_upload }}">
+      <input type="file" name="package" accept=".zip" required>
+      <span class="drop-text"><span class="drop-title">{{ t('songs.package') }}</span><span class="drop-hint">{{ t('drop.upto', size=max_upload|human) }}<span class="drop-only">{{ t('drop.or') }}</span></span></span>
+      <span class="btn btn-sm drop-pick" aria-hidden="true">{{ t('drop.choose') }}</span>
+    </label>
+    <button class="btn btn-primary" data-busy="{{ t('songs.adding') }}">{{ t('songs.add_button') }}</button>
+  </form>
+</section>
+<section class="card">
+  <h2>{{ t('songs.title') }} <span class="meta-inline" id="song-count">{{ songs|length }}</span></h2>
+  {# Nothing to search or to line up under a header: the title alone, under what the page says about the missing files. #}
+  {% if songs %}
+  <input class="search" type="search" placeholder="{{ t('songs.search') }}" aria-label="{{ t('songs.search_label') }}" oninput="filterSongs(this.value)">
+  <p class="empty" id="no-match" role="status" hidden>{{ t('search.nomatch') }}</p>
+  {# On phones, Hide or Show sits at the end of each title row (admin.css). #}
+  <div class="table-scroll"><table class="data side-actions sortable">
+    <thead><tr><th class="rank" data-sort="num">#</th><th data-sort="text">{{ t('songs.th_title') }}</th><th data-sort="text">{{ t('songs.th_artist') }}</th><th class="song-plays" data-sort="num">{{ t('songs.th_plays') }}</th><th class="r opt" data-sort="num">{{ t('songs.th_charts') }}</th><th></th></tr></thead>
+    <tbody id="songs">
+    {% for s in songs %}
+      <tr data-k="{{ (s.title ~ ' ' ~ s.artist ~ ' ' ~ s.name)|lower }}"{% if s.hidden %} class="dim"{% endif %}>
+        <td data-label="#" class="rank">{{ s.song_id }}</td>
+        <td class="primary"><a href="{{ public_url }}/opendmtq/song.php?id={{ s.song_id }}">{{ s.title }}</a>{% if s.added %} <span class="mark new">{{ t('songs.added') }}</span>{% endif %}{% if s.hidden %} <span class="mark off">{{ t('songs.hidden') }}</span>{% endif %}</td>
+        <td class="sub">{{ s.artist }}</td>
+        {# The last 30 days' plays with a bar against the most played song's, and when it was last played at all. #}
+        <td data-label="{{ t('songs.th_plays') }}" class="song-plays" data-v="{{ s.plays }}">{% if s.plays or s.last %}<span class="plays-cell"><span class="plays-n">{{ s.plays }}</span><span class="plays-bar"><i style="width: {{ '%.1f'|format(100 * s.share) }}%"></i></span>{% if s.last %}<span class="runtime">{{ t('songs.last', ago=s.last) }}</span>{% endif %}</span>{% else %}<span class="plays-none">–</span>{% endif %}</td>
+        <td data-label="{{ t('songs.th_charts') }}" class="r opt">{{ s.charts }}</td>
+        {# Hide or Show last, so it sits at the row's end in every row, as the last button of
+           every other admin list does; an added song's Remove comes before it. #}
+        <td class="actions"><div class="btns">
+          {% if s.added %}
+            <form method="post" data-ask="{{ tp('songs.confirm_remove', title=s.title) }}" data-yes="{{ tp('songs.remove') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="song_id" value="{{ s.song_id }}"><input type="hidden" name="action" value="remove"><button class="btn btn-sm btn-danger">{{ t('songs.remove') }}</button></form>
+          {% endif %}
+          <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="song_id" value="{{ s.song_id }}"><input type="hidden" name="action" value="{{ 'show' if s.hidden else 'hide' }}"><button class="btn btn-sm">{{ t('songs.show') if s.hidden else t('songs.hide') }}</button></form>
+        </div></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+</section>
+<script>
+  // As on the public song list: the count follows the search, and a search that finds nothing says so.
+  function filterSongs(q) {
+    q = q.trim().toLowerCase();
+    const rows = document.querySelectorAll('#songs tr');
+    let shown = 0;
+    for (const r of rows) {
+      const hit = !q || r.dataset.k.includes(q);
+      r.style.display = hit ? '' : 'none';
+      shown += hit;
+    }
+    document.getElementById('song-count').textContent = q ? {{ tp('songs.of', shown='{shown}', all='{all}')|tojson }}.replace('{shown}', shown).replace('{all}', rows.length) : rows.length;
+    document.getElementById('no-match').hidden = shown > 0;
+    // No empty table under the message.
+    document.getElementById('songs').closest('.table-scroll').hidden = !shown;
+  }
+</script>
+{% endblock %}

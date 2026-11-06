@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 408" width="956" height="408" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="1238 automated checks: Tools and admin pages (unit) 382; The server on the real game files 301; Command line and repository (unit) 186; All pages in a real browser 136; Host install on a clean system 104; Windows bundle under Wine 73; The game server's contract 56">
+<rect x="-28" y="-28" width="956" height="408" rx="16" fill="#11151a"/>
+<text x="0" y="18" font-size="19" font-weight="700" fill="#eef2f6" text-anchor="start" data-box="0,900">1,238 automated checks before a change reaches a server</text>
+<text x="0" y="42" font-size="13" fill="#aeb8c3" text-anchor="start" data-box="0,900">Run on every change: most on stand-in files, so that nobody needs the game's files to work on the code.</text>
+<text x="0" y="85" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">Tools and admin pages (unit)</text>
+<path d="M330.0,70.0 H836.0 Q840.0,70.0 840.0,74.0 V86.0 Q840.0,90.0 836.0,90.0 H330.0 Z" fill="#8cf23d"/>
+<text x="848" y="85" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">382</text>
+<text x="0" y="119" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">The server on the real game files</text>
+<path d="M330.0,104.0 H727.9 Q731.9,104.0 731.9,108.0 V120.0 Q731.9,124.0 727.9,124.0 H330.0 Z" fill="#8cf23d"/>
+<text x="739.859" y="119" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">301</text>
+<text x="0" y="153" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">Command line and repository (unit)</text>
+<path d="M330.0,138.0 H574.3 Q578.3,138.0 578.3,142.0 V154.0 Q578.3,158.0 574.3,158.0 H330.0 Z" fill="#8cf23d"/>
+<text x="586.325" y="153" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">186</text>
+<text x="0" y="187" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">All pages in a real browser</text>
+<path d="M330.0,172.0 H507.6 Q511.6,172.0 511.6,176.0 V188.0 Q511.6,192.0 507.6,192.0 H330.0 Z" fill="#8cf23d"/>
+<text x="519.571" y="187" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">136</text>
+<text x="0" y="221" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">Host install on a clean system</text>
+<path d="M330.0,206.0 H464.8 Q468.8,206.0 468.8,210.0 V222.0 Q468.8,226.0 464.8,226.0 H330.0 Z" fill="#8cf23d"/>
+<text x="476.848" y="221" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">104</text>
+<text x="0" y="255" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">Windows bundle under Wine</text>
+<path d="M330.0,240.0 H423.5 Q427.5,240.0 427.5,244.0 V256.0 Q427.5,260.0 423.5,260.0 H330.0 Z" fill="#8cf23d"/>
+<text x="435.461" y="255" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">73</text>
+<text x="0" y="289" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">The game server's contract</text>
+<path d="M330.0,274.0 H400.8 Q404.8,274.0 404.8,278.0 V290.0 Q404.8,294.0 400.8,294.0 H330.0 Z" fill="#8cf23d"/>
+<text x="412.764" y="289" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">56</text>
+</svg>

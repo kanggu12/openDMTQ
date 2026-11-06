@@ -1,0 +1,49 @@
+diff --git a/src/dynarmic/backend/arm64/a32_address_space.cpp b/src/dynarmic/backend/arm64/a32_address_space.cpp
+index bbdf925f..271d6e01 100644
+--- a/src/dynarmic/backend/arm64/a32_address_space.cpp
++++ b/src/dynarmic/backend/arm64/a32_address_space.cpp
+@@ -71,6 +71,18 @@ static void* EmitWrappedReadCallTrampoline(oaknut::CodeGenerator& code, T* this_
+     return target;
+ }
+ 
++// Unsafe_IgnoreGlobalMonitor: exclusive accesses without the process-wide monitor lock, as
++// QEMU's user-mode emulation does them. The exclusive read remembers its address and value on
++// the calling host thread; the exclusive write is a compare-and-swap against that value (the
++// UserCallbacks' MemoryWriteExclusive). The JIT state's exclusive_state flag still says whether
++// a reservation is open. Every exclusive access otherwise takes one spin lock shared by all
++// threads, and a thread preempted while holding it stalls every other thread's atomics.
++struct LocalReservation {
++    A32::VAddr vaddr = 0;
++    u64 value = 0;
++};
++static thread_local LocalReservation local_reservation;
++
+ template<auto callback, typename T>
+ static void* EmitExclusiveReadCallTrampoline(oaknut::CodeGenerator& code, const A32::UserConfig& conf) {
+     using namespace oaknut::util;
+@@ -78,6 +90,11 @@ static void* EmitExclusiveReadCallTrampoline(oaknut::CodeGenerator& code, const
+     oaknut::Label l_addr, l_this;
+ 
+     auto fn = [](const A32::UserConfig& conf, A32::VAddr vaddr) -> T {
++        if (conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
++            const T value = (conf.callbacks->*callback)(vaddr);
++            local_reservation = LocalReservation{vaddr, static_cast<u64>(value)};
++            return value;
++        }
+         return conf.global_monitor->ReadAndMark<T>(conf.processor_id, vaddr, [&]() -> T {
+             return (conf.callbacks->*callback)(vaddr);
+         });
+@@ -133,6 +150,13 @@ static void* EmitExclusiveWriteCallTrampoline(oaknut::CodeGenerator& code, const
+     oaknut::Label l_addr, l_this;
+ 
+     auto fn = [](const A32::UserConfig& conf, A32::VAddr vaddr, T value) -> u32 {
++        if (conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreGlobalMonitor)) {
++            // The JIT only calls this with a reservation open (exclusive_state set).
++            if (local_reservation.vaddr != vaddr) {
++                return 1;
++            }
++            return (conf.callbacks->*callback)(vaddr, value, static_cast<T>(local_reservation.value)) ? 0 : 1;
++        }
+         return conf.global_monitor->DoExclusiveOperation<T>(conf.processor_id, vaddr,
+                                                             [&](T expected) -> bool {
+                                                                 return (conf.callbacks->*callback)(vaddr, value, expected);

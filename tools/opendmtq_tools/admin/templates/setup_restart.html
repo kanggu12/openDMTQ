@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% block title %}{{ t('setup.title') }}{% endblock %}
+{% block body %}
+{# The server starts again with the new address. These pages restart with it, so this one asks which process answers
+   until it is a new one, then goes on signed in (the one-time key it carries). #}
+<section class="card">
+  <h2>{{ t('setup.restart_title') }}</h2>
+  <p class="lead">{{ t('setup.restart_lead') }}</p>
+  <p class="meta" id="slow" hidden>{{ t('setup.restart_slow') }}</p>
+</section>
+<script>
+  const before = {{ instance|tojson }}, back = {{ back|tojson }}, started = Date.now();
+  (async function wait() {
+    try {
+      const r = await fetch("{{ url_for('setup_ping') }}", { cache: 'no-store' });
+      if (r.ok && (await r.json()).instance !== before) return location.replace(back);
+    } catch (e) {
+      // Not answering yet: it is starting.
+    }
+    if (Date.now() - started > 60000) document.getElementById('slow').hidden = false;
+    setTimeout(wait, 1500);
+  })();
+</script>
+{% endblock %}

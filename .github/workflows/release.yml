@@ -1,0 +1,124 @@
+name: release
+
+# Push a tag like v1.2.3 to publish images to GHCR, the Helm chart as an OCI artifact, and a
+# GitHub release.
+on:
+  push:
+    tags: ["v*"]
+  # A rehearsal, on any commit: all the gates, and nothing published (gh workflow run release.yml).
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+  # To read the local gate's status on the commit: naming any permission here takes away those not named.
+  statuses: read
+
+jobs:
+  # All of CI, again, on the tag's commit.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  # What CI cannot run, as it needs the game's files: tests/qa.sh on a machine that has them, which leaves this status on the
+  # commit when everything passed.
+  qa:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: The local quality gate passed on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          state=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/status" --jq '[.statuses[] | select(.context == "qa/local")][0].state')
+          echo "qa/local: ${state:-none}"
+          if [ "$state" != success ]; then
+            echo "::error::tests/qa.sh has not passed on this commit; run it on a machine with the game's files, then tag again"
+            exit 1
+          fi
+
+  publish:
+    needs: [ci, qa]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Names
+        id: names
+        run: |
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "registry=ghcr.io/$owner" >> "$GITHUB_OUTPUT"
+          echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The runtime for newer phones, whole, licenses included: with the release, for a server that fetches it; in the tools
+      # image, beside the code that looks for it, and so in the builder that adds it to the app, on a cluster or a server
+      # without internet too; and in the Windows bundle below (tools/opendmtq_tools/runtime.py).
+      # The NDK CI tests with, not the runner's own, which moves with the runner's image: the zip's hash would move too, and every
+      # server would build its app again for nothing.
+      - name: The runtime for newer phones
+        env:
+          ANDROID_NDK: ""
+          ANDROID_HOME: /nonexistent
+        run: |
+          arm32/bundle.sh data/apk/arm32
+          mkdir -p dist
+          python3 tools/opendmtq_tools/runtime.py --pack data/apk/arm32 dist/opendmtq-arm32-runtime.zip
+          cp dist/opendmtq-arm32-runtime.zip tools/opendmtq_tools/
+
+      # The Windows bundle for this version, and its SHA-256, with the release. Before anything is pushed: its downloads are the
+      # likeliest thing to fail (some sites drop old files), and a failure here must not leave half a release published.
+      - name: Windows bundle
+        env:
+          VERSION: ${{ steps.names.outputs.version }}
+        run: |
+          host/windows/build.sh _work/windows
+          cp _work/windows/OpenDMTQ-windows.zip _work/windows/OpenDMTQ-windows.zip.sha256 dist/
+
+      - name: Server image (amd64, arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: server
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ steps.names.outputs.registry }}/opendmtq-server:${{ steps.names.outputs.version }}
+            ${{ steps.names.outputs.registry }}/opendmtq-server:latest
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,mode=max,scope=server
+
+      - name: Tools image (amd64; the bundled 7-Zip build is x86-64)
+        uses: docker/build-push-action@v6
+        with:
+          context: tools
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.names.outputs.registry }}/opendmtq-tools:${{ steps.names.outputs.version }}
+            ${{ steps.names.outputs.registry }}/opendmtq-tools:latest
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=tools
+          cache-to: type=gha,mode=max,scope=tools
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Helm chart
+        run: |
+          helm package deploy/helm/opendmtq --version "${{ steps.names.outputs.version }}" \
+            --app-version "${{ steps.names.outputs.version }}" -d dist
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          helm push dist/opendmtq-*.tgz "oci://${{ steps.names.outputs.registry }}/charts"
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" dist/opendmtq-*.tgz dist/opendmtq-arm32-runtime.zip dist/OpenDMTQ-windows.zip dist/OpenDMTQ-windows.zip.sha256 --generate-notes --verify-tag

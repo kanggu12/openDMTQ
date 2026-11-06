@@ -1,0 +1,256 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # A release runs this whole workflow on its tag first (release.yml).
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  arm32:
+    runs-on: ubuntu-24.04
+    # The runner's own NDK differs from the one the releases are made with: the build fetches that one.
+    env:
+      ANDROID_NDK: ""
+      ANDROID_HOME: /nonexistent
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Build the runtime and the shim, as a release's job does
+        run: arm32/bundle.sh _work/arm32/bundle-ci
+
+      - name: The bundle holds what the app builder needs
+        run: |
+          test -f _work/arm32/bundle-ci/bundle.json
+          test -f _work/arm32/bundle-ci/arm64-v8a/libarm32.so
+          test -f _work/arm32/bundle-ci/armeabi-v7a/libopendmtq.so
+
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Unit tests (CLI; the tools' tests run in their image below)
+        run: (cd cli && python3 -m unittest discover -s tests -t . -v)
+
+      - name: Unit tests (CLI) on Python 3.9, the oldest README and install.sh accept
+        run: docker run --rm -e PYTHONDONTWRITEBYTECODE=1 -v "$PWD:/r:ro" -w /r/cli python:3.9-slim python -m unittest discover -s tests -t .
+
+      - name: Live view's transport stream writer
+        run: c++ -std=c++20 -Wall -Wextra -Iarm32/src arm32/tests/host/live_ts_test.cpp arm32/src/live_ts.cpp -o /tmp/live_ts_test && /tmp/live_ts_test
+
+      - name: Shell scripts
+        run: |
+          shellcheck --severity=warning server/entrypoint.sh server/edge/start.sh cli/install.sh host/get.sh host/install.sh host/windows/build.sh tests/closed/run.sh tests/closed/game.sh tests/ha/failover.sh tests/qa.sh tests/ui/run.sh tests/game/tour.sh tests/game/protocol.sh tests/host/run.sh tests/windows/wine.sh tests/live/run.sh tests/live/sound/run.sh tests/live/sound/card.sh deploy/kind/up.sh
+          # The runtime's build scripts: warnings and errors (they keep two style notes).
+          shellcheck --severity=warning -x -P arm32 arm32/build.sh arm32/bundle.sh arm32/test.sh arm32/ndk.sh
+
+      - name: PHP syntax (game server, portal and the test helpers, PHP 8.3)
+        run: docker run --rm -v "$PWD/server:/s:ro" -v "$PWD/tests/ui:/ui:ro" -v "$PWD/tests/game:/gametest:ro" php:8.3-cli sh -c 'for f in /s/portal/*.php /ui/*.php /gametest/*.php $(find /s/game -name "*.php"); do php -l "$f" || exit 1; done'
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Helm chart
+        run: |
+          helm lint deploy/helm/opendmtq -f deploy/kind/values.yaml --set publicHost=10.0.0.5
+          helm template t deploy/helm/opendmtq -f deploy/kind/values.yaml --set publicHost=10.0.0.5 > /tmp/kind.yaml
+          helm template t deploy/helm/opendmtq --set publicHost=10.0.0.5 --set data.existingClaim=game \
+            --set litestream.s3.endpoint=https://s3.example.com --set litestream.s3.existingSecret=s3 \
+            --set assets.autoscaling.enabled=true > /tmp/prod.yaml
+          helm template t deploy/helm/opendmtq --set publicHost=game.example.com:8790 --set data.existingClaim=game \
+            --set litestream.s3.endpoint=https://s3.example.com --set litestream.s3.existingSecret=s3 \
+            --set router.tls.secretName=game-tls > /tmp/tls.yaml
+          # The server containers are told where the chart mounts the built apps (the image's own default is elsewhere).
+          test "$(grep -c 'OPENDMTQ_APK_OUT, value: /srv/apk-all/out' /tmp/kind.yaml)" = 2
+          grep -q 'mountPath: /srv/apk-all, subPath: apk' /tmp/kind.yaml
+          # An unquoted on in a values file arrives as a boolean: broadcasts must still be on.
+          printf 'live: {default: on}\n' > /tmp/on.yaml
+          helm template t deploy/helm/opendmtq -f deploy/kind/values.yaml --set publicHost=10.0.0.5 -f /tmp/on.yaml | grep -q 'LIVE_DEFAULT, value: "on"'
+          # Schema-check every rendered object against Kubernetes 1.30.
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+          ./kubeconform -strict -summary -kubernetes-version 1.30.0 /tmp/kind.yaml /tmp/prod.yaml /tmp/tls.yaml
+
+  # The pages in a real browser: every page at five widths in both languages, a server empty and full, players on air, under
+  # maintenance, and what people do on them. On stand-in game files, by the real start script (tests/ui/run.sh). Before
+  # them, the game server's contract with the game on the same stand-in files (tests/game/protocol.sh).
+  ui:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+
+      # From the same cache as the images job below: quicker, and nothing to fetch from other sites unless a layer changed.
+      - name: Build server image
+        uses: docker/build-push-action@v6
+        with:
+          context: server
+          load: true
+          tags: opendmtq-server:uitest
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,mode=max,scope=server
+
+      - name: Build tools image
+        uses: docker/build-push-action@v6
+        with:
+          context: tools
+          load: true
+          tags: opendmtq-tools:uitest
+          cache-from: type=gha,scope=tools
+          cache-to: type=gha,mode=max,scope=tools
+
+      - name: The game server's contract
+        run: tests/game/protocol.sh
+
+      - name: The pages' tests
+        env:
+          NO_BUILD: "1"
+        run: tests/ui/run.sh "$PWD/_work/ui-report"
+
+      # What the browser saw, for looking through: also when it passed.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-report
+          path: _work/ui-report
+          retention-days: 14
+
+  # Without containers: host/install.sh on a clean system (a container stands in for the computer), the server run by
+  # ./opendmtq on stand-in game files, the game server's contract, the pages, a stop and a start (tests/host/run.sh).
+  host:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: ["ubuntu:24.04", "debian:12"]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Host install on ${{ matrix.distro }}
+        env:
+          DISTRO: ${{ matrix.distro }}
+        run: tests/host/run.sh
+
+  # The Windows bundle: built on Linux from pinned downloads (host/windows/build.sh), every program's DLLs checked, run under
+  # Wine as a first smoke test (tests/windows/wine.sh), and handed to the next job.
+  windows-bundle:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      # The pinned downloads (about 150 MB), kept between runs until a pin changes.
+      - uses: actions/cache@v4
+        with:
+          path: _work/windows/downloads
+          key: windows-downloads-${{ hashFiles('host/windows/build.sh', 'host/windows/requirements.txt') }}
+
+      - name: Build the Windows bundle
+        run: host/windows/build.sh _work/windows
+
+      - name: The bundle under Wine
+        env:
+          NO_BUILD: "1"
+        run: tests/windows/wine.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-bundle
+          path: _work/windows/OpenDMTQ-windows.zip
+          retention-days: 14
+
+  # The bundle on Windows itself: unpacked into a folder with a space, the stand-in game files imported, the server run, the
+  # game server's contract, and nothing left running once its window's processes are gone (tests/windows/run.ps1).
+  windows:
+    needs: windows-bundle
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-bundle
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: The bundle on Windows
+        shell: pwsh
+        run: tests/windows/run.ps1 -Zip OpenDMTQ-windows.zip
+
+  images:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build server image
+        uses: docker/build-push-action@v6
+        with:
+          context: server
+          load: true
+          tags: opendmtq-server:ci
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,mode=max,scope=server
+
+      - name: Build tools image
+        uses: docker/build-push-action@v6
+        with:
+          context: tools
+          load: true
+          tags: opendmtq-tools:ci
+          cache-from: type=gha,scope=tools
+          cache-to: type=gha,mode=max,scope=tools
+
+      - name: Tools unit tests (inside the image, which has lz4, Flask and Pillow)
+        # server/portal and the runtime's build beside tools/, as in the repository: the tests read them too.
+        run: docker run --rm -v "$PWD/tools:/t:ro" -v "$PWD/server/portal:/server/portal:ro" -v "$PWD/arm32:/arm32:ro" --entrypoint sh opendmtq-tools:ci -c 'cd /t && python3 -m unittest discover -s tests -t . -v'
+
+      - name: Edge proxy (its two configurations, and plain HTTP when the certificate cannot be used)
+        run: |
+          mkdir -p /tmp/https
+          # Certificates as ./opendmtq up makes them, owned by the user the edge runs as.
+          docker run --rm -u "$(id -u):$(id -g)" -v /tmp/https:/https --entrypoint python3 opendmtq-tools:ci \
+            -I -m opendmtq_tools.tls --host 10.0.0.5
+          # Started as compose starts it: read-only, with a scratch /tmp, as that user.
+          edge() {
+            docker run --read-only --tmpfs /tmp -u "$(id -u):$(id -g)" -v "$PWD/server/edge:/etc/opendmtq/edge:ro" \
+              -v /tmp/https/serve:/etc/opendmtq/https:ro "$@"
+          }
+          for conf in nginx.conf plain.conf; do
+            edge --rm --entrypoint nginx nginxinc/nginx-unprivileged:1.27.5-alpine -t -c /etc/opendmtq/edge/$conf
+          done
+          # A key that is not the certificate's (a renewal cut off half-way): the port stays open.
+          openssl ecparam -name prime256v1 -genkey -noout -out /tmp/https/serve/server.key
+          edge -d --name edge-fallback --entrypoint /bin/sh nginxinc/nginx-unprivileged:1.27.5-alpine /etc/opendmtq/edge/start.sh
+          sleep 3
+          docker logs edge-fallback 2>&1 | tee /tmp/edge.log
+          test "$(docker inspect -f '{{.State.Running}}' edge-fallback)" = true
+          grep -q "plain HTTP only" /tmp/edge.log
+          docker rm -f edge-fallback
+
+      - name: Smoke test
+        run: |
+          # Without game files the server starts, says what to do, and reports itself unhealthy until the game data is there.
+          docker run -d --name bare -e PUBLIC_HOST=10.0.0.5 -p 127.0.0.1:18080:8080 opendmtq-server:ci >/dev/null
+          for _ in $(seq 1 30); do code=$(curl -s -o /tmp/health.json -w '%{http_code}' http://127.0.0.1:18080/opendmtq/health.php || true); [ "$code" = 000 ] || break; sleep 1; done
+          docker logs bare 2>&1 | tee /tmp/bare.log
+          test "$code" = 503
+          grep -q '"game_data": false' /tmp/health.json
+          grep -q "opendmtq import" /tmp/bare.log
+          docker rm -f bare >/dev/null
+          # Runs unprivileged.
+          test "$(docker run --rm --entrypoint id opendmtq-server:ci -u)" = 33
+          # The patcher's metadata editor runs inside the image.
+          docker run --rm --entrypoint python3 opendmtq-tools:ci -I -c \
+            "from opendmtq_tools import il2cpp; m = il2cpp.Metadata(il2cpp.build(['http://pmangplus.com'])); m.replace('http://pmangplus.com', 'http://192.168.219.100'); print(il2cpp.Metadata(m.tobytes()).literal(0))"
+          # The admin app imports and answers its sign-in page.
+          docker run --rm --entrypoint python3 -e ADMIN_PASSWORD=x opendmtq-tools:ci -I -c \
+            "from opendmtq_tools.admin import app; c = app.test_client(); r = c.get('/opendmtq/admin/login'); assert r.status_code == 200, r.status_code; assert c.get('/opendmtq/admin/').status_code == 302; print('admin ok')"

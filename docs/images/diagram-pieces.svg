@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 456" width="956" height="456" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="Your APK and server files are imported by the setup into the OpenDMTQ server on your PC. The server answers the game, builds the app from your APK, and serves the players' site, live broadcasts and the admin pages. Phones get the app from the site and play; browsers see rankings and broadcasts; you set it up and run it on the admin pages">
+<rect x="-28" y="-28" width="956" height="456" rx="16" fill="#11151a"/>
+<path d="M0,75 H184 L196,87 V159 H0 Z" fill="#1a1f25" stroke="#ffb13d" stroke-width="2" stroke-linejoin="round"/>
+<text x="14" y="103.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,182">Your APK</text>
+<text x="14" y="122.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,182">the game's Android app:</text>
+<text x="14" y="140" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,182">original or changed</text>
+<path d="M0,201 H184 L196,213 V285 H0 Z" fill="#1a1f25" stroke="#ffb13d" stroke-width="2" stroke-linejoin="round"/>
+<text x="14" y="229.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,182">Your server files</text>
+<text x="14" y="248.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,182">game data and songs:</text>
+<text x="14" y="266" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,182">a folder or an archive</text>
+<path d="M310,8 H548 L560,20 V352 H310 Z" fill="#1a1f25" stroke="#8cf23d" stroke-width="2" stroke-linejoin="round"/>
+<text x="324" y="140.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="324,546">OpenDMTQ server</text>
+<text x="324" y="159.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="324,546">answers the game: logins, scores,</text>
+<text x="324" y="176.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="324,546">rankings, achievements</text>
+<text x="324" y="194.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="324,546">builds the app from your APK</text>
+<text x="324" y="211.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="324,546">the players' site, live broadcasts</text>
+<text x="324" y="229.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="324,546">the admin pages, the setup</text>
+<path d="M700,8 H888 L900,20 V92 H700 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="714" y="36.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="714,886">Android phones</text>
+<text x="714" y="55.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="714,886">the app from the site,</text>
+<text x="714" y="73" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="714,886">no settings to change</text>
+<path d="M700,138 H888 L900,150 V222 H700 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="714" y="166.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="714,886">Browsers</text>
+<text x="714" y="185.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="714,886">rankings, songs,</text>
+<text x="714" y="203" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="714,886">live broadcasts</text>
+<path d="M700,268 H888 L900,280 V352 H700 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="714" y="296.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="714,886">You</text>
+<text x="714" y="315.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="714,886">the admin pages:</text>
+<text x="714" y="333" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="714,886">setup, accounts, backups</text>
+<path d="M196.5,117 L302,117" fill="none" stroke="#ffb13d" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M309,117 L300.0,121.5 L300.0,112.5 Z" fill="#ffb13d" data-tip="309,117"/>
+<path d="M196.5,243 L302,243" fill="none" stroke="#ffb13d" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M309,243 L300.0,247.5 L300.0,238.5 Z" fill="#ffb13d" data-tip="309,243"/>
+<text x="253" y="175" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="204,302">the setup</text>
+<text x="253" y="189" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="204,302">imports them</text>
+<path d="M560.5,40 L692,40" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M699,40 L690.0,44.5 L690.0,35.5 Z" fill="#7b8794" data-tip="699,40"/>
+<text x="630" y="17" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="568,692">the app, patched</text>
+<text x="630" y="31" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="568,692">for this address</text>
+<path d="M699.5,62 L568,62" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M561,62 L570.0,57.5 L570.0,66.5 Z" fill="#7b8794" data-tip="561,62"/>
+<text x="630" y="79" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="568,692">the game's</text>
+<text x="630" y="93" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="568,692">requests</text>
+<path d="M560.5,180 L692,180" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M699,180 L690.0,184.5 L690.0,175.5 Z" fill="#7b8794" data-tip="699,180"/>
+<text x="630" y="172" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="568,692">the site</text>
+<path d="M699.5,310 L568,310" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M561,310 L570.0,305.5 L570.0,314.5 Z" fill="#7b8794" data-tip="561,310"/>
+<text x="630" y="288" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="568,692">the setup,</text>
+<text x="630" y="302" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="568,692">accounts</text>
+<path d="M0,377 H18 L22,381 V387 H0 Z" fill="#1a1f25" stroke="#ffb13d" stroke-width="2"/>
+<text x="30" y="386" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="30,900">your own copy of the game's files: not in this repository</text>
+</svg>

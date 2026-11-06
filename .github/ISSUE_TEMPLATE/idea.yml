@@ -1,0 +1,23 @@
+name: An idea
+description: Something OpenDMTQ could do, or do better.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you want to do
+      description: The situation, and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How it could work
+      description: Optional. A sketch of the pages or the commands is welcome.
+  - type: checkboxes
+    id: files
+    attributes:
+      label: Game files
+      options:
+        - label: This idea needs no game files in the repository, and this issue holds none.
+          required: true

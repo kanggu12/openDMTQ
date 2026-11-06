@@ -1,0 +1,18 @@
+{# The list of requests alone, for the page's own look at new lines. #}
+{% if not rows %}<p class="empty">{{ t('logs.none_filter') if q or status or kind else t('logs.none') }}</p>{% else %}
+<div class="table-scroll"><table class="data logtable">
+  <thead><tr><th>{{ t('logs.th_time') }}</th><th>{{ t('logs.th_status') }}</th><th>{{ t('logs.th_what') }}</th><th>{{ t('logs.th_kind') }}</th><th class="r">{{ t('th.size') }}</th><th>{{ t('logs.th_who') }}</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr class="{{ 'row-bad' if r.status >= 500 else 'row-warn' if r.status >= 400 else '' }}" title="{{ r.ua }}">
+      <td data-label="{{ t('logs.th_time') }}" class="date">{{ r.time }}</td>
+      <td data-label="{{ t('logs.th_status') }}">{% if r.status %}<span class="code s{{ r.status // 100 }}">{{ r.status }}</span>{% endif %}</td>
+      <td class="primary log-path"><span class="log-method">{{ r.method }}</span> {{ r.path }}</td>
+      <td data-label="{{ t('logs.th_kind') }}" class="sub-kind">{{ t(kinds[r.kind]) }}</td>
+      <td data-label="{{ t('th.size') }}" class="r">{{ r.size|human if r.size else '–' }}</td>
+      <td data-label="{{ t('logs.th_who') }}" class="log-who"><button type="button" class="link-btn" data-filter="{{ r.ip }}">{{ r.ip }}</button><span class="runtime">{{ device_words(r.device) }}</span></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}

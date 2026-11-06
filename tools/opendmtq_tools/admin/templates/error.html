@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block title %}{{ title }}{% endblock %}
+{% block body %}
+{# Something failed on the way to a page: the admin's own page, in the page's language, with the way back. The details
+   are in the log. #}
+<section class="card">
+  <h2>{{ title }}</h2>
+  <p>{{ text }}</p>
+  <div class="btn-line"><a class="btn" href="{{ url_for('dashboard') }}">{{ t('nf.back') }}</a><a class="btn" href="{{ url_for('backups_page') }}">{{ t('nav.backups') }}</a></div>
+</section>
+{% endblock %}

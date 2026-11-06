@@ -1,0 +1,87 @@
+diff --git a/src/dynarmic/backend/arm64/emit_arm64.cpp b/src/dynarmic/backend/arm64/emit_arm64.cpp
+index 1ecb5424..509fb8f9 100644
+--- a/src/dynarmic/backend/arm64/emit_arm64.cpp
++++ b/src/dynarmic/backend/arm64/emit_arm64.cpp
+@@ -198,7 +198,7 @@ EmittedBlockInfo EmitArm64(oaknut::CodeGenerator& code, IR::Block block, const E
+ 
+     EmittedBlockInfo ebi;
+ 
+-    FpsrManager fpsr_manager{code, conf.state_fpsr_offset};
++    FpsrManager fpsr_manager{code, conf.state_fpsr_offset, !conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreFPSR)};
+     RegAlloc reg_alloc{code, fpsr_manager, GPR_ORDER, FPR_ORDER};
+     EmitContext ctx{block, reg_alloc, conf, ebi, fpsr_manager, fastmem_manager, {}};
+ 
+diff --git a/src/dynarmic/backend/arm64/fpsr_manager.cpp b/src/dynarmic/backend/arm64/fpsr_manager.cpp
+index 1c614745..60766f5a 100644
+--- a/src/dynarmic/backend/arm64/fpsr_manager.cpp
++++ b/src/dynarmic/backend/arm64/fpsr_manager.cpp
+@@ -13,11 +13,11 @@ namespace Dynarmic::Backend::Arm64 {
+ 
+ using namespace oaknut::util;
+ 
+-FpsrManager::FpsrManager(oaknut::CodeGenerator& code, size_t state_fpsr_offset)
+-        : code{code}, state_fpsr_offset{state_fpsr_offset} {}
++FpsrManager::FpsrManager(oaknut::CodeGenerator& code, size_t state_fpsr_offset, bool track)
++        : code{code}, state_fpsr_offset{state_fpsr_offset}, track{track} {}
+ 
+ void FpsrManager::Spill() {
+-    if (!fpsr_loaded)
++    if (!fpsr_loaded || !track)
+         return;
+ 
+     code.LDR(Wscratch0, Xstate, state_fpsr_offset);
+@@ -31,6 +31,10 @@ void FpsrManager::Spill() {
+ void FpsrManager::Load() {
+     if (fpsr_loaded)
+         return;
++    if (!track) {
++        fpsr_loaded = true;
++        return;
++    }
+ 
+     code.MSR(oaknut::SystemReg::FPSR, XZR);
+ 
+@@ -40,7 +44,7 @@ void FpsrManager::Load() {
+ void FpsrManager::GetFpsr(oaknut::WReg dest) {
+     code.LDR(dest, Xstate, state_fpsr_offset);
+ 
+-    if (fpsr_loaded) {
++    if (fpsr_loaded && track) {
+         code.MRS(Xscratch1, oaknut::SystemReg::FPSR);
+         code.ORR(dest, dest, Wscratch1);
+     }
+diff --git a/src/dynarmic/backend/arm64/fpsr_manager.h b/src/dynarmic/backend/arm64/fpsr_manager.h
+index 9e5d68bf..b67a7be6 100644
+--- a/src/dynarmic/backend/arm64/fpsr_manager.h
++++ b/src/dynarmic/backend/arm64/fpsr_manager.h
+@@ -16,7 +16,7 @@ namespace Dynarmic::Backend::Arm64 {
+ 
+ class FpsrManager {
+ public:
+-    explicit FpsrManager(oaknut::CodeGenerator& code, size_t state_fpsr_offset);
++    explicit FpsrManager(oaknut::CodeGenerator& code, size_t state_fpsr_offset, bool track = true);
+ 
+     void Spill();
+     void Load();
+@@ -28,6 +28,7 @@ private:
+     oaknut::CodeGenerator& code;
+     size_t state_fpsr_offset;
+     bool fpsr_loaded = false;
++    bool track;
+ };
+ 
+ }  // namespace Dynarmic::Backend::Arm64
+diff --git a/src/dynarmic/interface/optimization_flags.h b/src/dynarmic/interface/optimization_flags.h
+index 2f65f0bf..a059f0a9 100644
+--- a/src/dynarmic/interface/optimization_flags.h
++++ b/src/dynarmic/interface/optimization_flags.h
+@@ -49,6 +49,9 @@ enum class OptimizationFlag : std::uint32_t {
+     /// result in unexpected behaviour in multithreaded scenarios, including but not limited
+     /// to data races and deadlocks.
+     Unsafe_IgnoreGlobalMonitor = 0x00100000,
++    /// This optimization does not track floating-point exception flags (FPSR/FPSCR cumulative
++    /// bits and QC). Reading the host FPSR around every block is expensive on some CPUs.
++    Unsafe_IgnoreFPSR = 0x00200000,
+ };
+ 
+ constexpr OptimizationFlag no_optimizations = static_cast<OptimizationFlag>(0);

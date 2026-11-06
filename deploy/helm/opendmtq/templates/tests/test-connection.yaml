@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "opendmtq.fullname" . }}-test
+  labels: {{- include "opendmtq.labels" (dict "ctx" $ "component" "test") | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  securityContext: {runAsNonRoot: true, runAsUser: 33, seccompProfile: {type: RuntimeDefault}}
+  containers:
+    - name: rpc
+      image: {{ include "opendmtq.image" (dict "img" .Values.image.server "ctx" $) }}
+      # Through the router: the boot RPC every client makes, and one song file from the assets tier.
+      command: ["php", "-r", "$c = stream_context_create(['http' => ['method' => 'POST', 'header' => 'Content-Type: application/json', 'content' => '[{\"id\":0,\"method\":\"service.getInfo\",\"params\":[\"1.3.5\",\"ANDROID\"]}]']]); $r = file_get_contents('http://{{ include "opendmtq.fullname" . }}:{{ .Values.router.service.port }}/DMQ/rpc', false, $c); if (strpos($r, 'api_url') === false) { fwrite(STDERR, \"rpc: $r\\n\"); exit(1); } if (@file_get_contents('http://{{ include "opendmtq.fullname" . }}:{{ .Values.router.service.port }}/DMQ/Patterns/1') === false) { fwrite(STDERR, \"pattern download failed\\n\"); exit(1); } echo \"ok\\n\";"]
+      securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}

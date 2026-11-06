@@ -1,0 +1,218 @@
+{{- $host := include "opendmtq.publicHost" . }}
+{{- $adminPublic := include "opendmtq.adminOnPublicPort" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "opendmtq.fullname" . }}-api
+  labels: {{- include "opendmtq.labels" (dict "ctx" $ "component" "api") | nindent 4 }}
+spec:
+  # SQLite has one writer: never more than one api pod, and never two during a rollout. The live view
+  # relies on it too: its window and open recordings are this pod's files, not shared with any other.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {{- include "opendmtq.selector" (dict "ctx" $ "component" "api") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "opendmtq.selector" (dict "ctx" $ "component" "api") | nindent 8 }}
+      annotations:
+        checksum/litestream: {{ include (print $.Template.BasePath "/configmap-litestream.yaml") . | sha256sum }}
+    spec:
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      automountServiceAccountToken: false
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      tolerations:
+        # Leave a dead node quickly instead of after the default five minutes.
+        - {key: node.kubernetes.io/not-ready, operator: Exists, effect: NoExecute, tolerationSeconds: {{ .Values.api.failoverSeconds }}}
+        - {key: node.kubernetes.io/unreachable, operator: Exists, effect: NoExecute, tolerationSeconds: {{ .Values.api.failoverSeconds }}}
+        {{- with .Values.tolerations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      initContainers:
+        # Folders the containers mount by subPath must exist and belong to uid 33 before they start;
+        # left to the kubelet they would be created as root.
+        - name: prepare
+          image: {{ include "opendmtq.image" (dict "img" .Values.image.server "ctx" $) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sh", "-c", "mkdir -p /d/custom /d/backups /d/apk/out"]
+          {{- include "opendmtq.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - {name: data, mountPath: /d}
+        # The song list the server reads (imported songs plus those added on the admin pages, with
+        # their hidden flags), the client's tables and the overlay, made fresh before the server
+        # starts, as ./opendmtq up does for compose. Off (songs.rebuildOnStart) where something else
+        # owns that folder.
+        {{- if .Values.songs.rebuildOnStart }}
+        - name: songs
+          image: {{ include "opendmtq.image" (dict "img" .Values.image.tools "ctx" $) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["opendmtq_tools.songs"]
+          env:
+            - {name: HOME, value: /tmp}
+            {{- with .Values.timeZone }}
+            - {name: TZ, value: {{ . | quote }}}
+            {{- end }}
+          {{- include "opendmtq.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - {name: data, mountPath: /srv/content, subPath: content, readOnly: true}
+            - {name: data, mountPath: /custom, subPath: custom}
+            - {name: tmp, mountPath: /tmp}
+        {{- end }}
+      {{- if .Values.litestream.enabled }}
+        # Bring back the newest replicated database before the server starts. Fails (and retries)
+        # when the store is unreachable, so the api never starts on an empty database by mistake.
+        - name: restore
+          image: {{ include "opendmtq.image" (dict "img" .Values.image.litestream "ctx" $) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["restore", "-if-db-not-exists", "-if-replica-exists", "-config", "/etc/litestream.yml", "/data/dmtq.db3"]
+          envFrom: [{secretRef: {name: {{ include "opendmtq.s3Secret" . }}}}]
+          {{- include "opendmtq.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - {name: state, mountPath: /data}
+            - {name: litestream, mountPath: /etc/litestream.yml, subPath: litestream.yml}
+      {{- end }}
+      containers:
+        - name: server
+          image: {{ include "opendmtq.image" (dict "img" .Values.image.server "ctx" $) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - {name: PUBLIC_HOST, value: {{ $host | quote }}}
+            - {name: OPENDMTQ_VERSION, value: {{ .Chart.AppVersion | quote }}}
+            - {name: SERVER_NAME, value: {{ .Values.serverName | quote }}}
+            - {name: OPENDMTQ_APK_OUT, value: /srv/apk-all/out}
+            - {name: ROLE, value: api}
+            # No edge proxy here: only the 8080 door, which the router uses (opendmtq.conf).
+            - {name: EDGE_DOORS, value: "no"}
+            {{- if .Values.router.tls.secretName }}
+            # The router ends HTTPS and says how each visit came (opendmtq.conf).
+            - {name: ROUTER_TLS, value: "yes"}
+            {{- end }}
+            {{- with .Values.timeZone }}
+            - {name: TZ, value: {{ . | quote }}}
+            {{- end }}
+            {{- if .Values.admin.enabled }}
+            - {name: ADMIN_URL, value: "http://127.0.0.1:8000"}
+            # The admin pages through the router or not (admin.onPublicPort; see _helpers.tpl).
+            - {name: ADMIN_ON_PUBLIC_PORT, value: {{ $adminPublic | quote }}}
+            {{- end }}
+            # on: broadcasts on for every player until turned off (docs/live.md).
+            - {name: LIVE_DEFAULT, value: {{ include "opendmtq.liveDefault" . | quote }}}
+          ports: [{name: http, containerPort: 8080}]
+          startupProbe:
+            httpGet: {path: /opendmtq/health.php, port: http}
+            timeoutSeconds: 3
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /opendmtq/health.php, port: http}
+            timeoutSeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /opendmtq/health.php, port: http}
+            timeoutSeconds: 3
+            periodSeconds: 10
+            failureThreshold: 6
+          resources: {{- toYaml .Values.api.resources | nindent 12 }}
+          {{- include "opendmtq.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - {name: data, mountPath: /srv/content, subPath: content, readOnly: true}
+            # The whole apk/ folder: mounting apk/out directly would make the kubelet create it as root
+            # on a fresh volume, before the builder (uid 33) could.
+            - {name: data, mountPath: /srv/apk-all, subPath: apk, readOnly: true}
+            - {name: data, mountPath: /srv/custom, subPath: custom, readOnly: true}
+            - {name: state, mountPath: /data}
+            {{- if .Values.live.recordings.persistence.enabled }}
+            # Over /data's folder of that name: the server then copies segments rather than linking.
+            - {name: recordings, mountPath: /data/live-rec}
+            {{- end }}
+            - {name: scratch, mountPath: /var/opendmtq}
+            - {name: tmp, mountPath: /tmp}
+        {{- if .Values.admin.enabled }}
+        # Admin pages; reached through the server container at /opendmtq/admin.
+        - name: admin
+          image: {{ include "opendmtq.image" (dict "img" .Values.image.tools "ctx" $) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["gunicorn", "-w", "1", "--threads", "8", "-b", "127.0.0.1:8000", "--timeout", "120",
+                    "--access-logfile", "-", "opendmtq_tools.admin:app"]
+          env:
+            - {name: PUBLIC_HOST, value: {{ $host | quote }}}
+            - {name: OPENDMTQ_VERSION, value: {{ .Chart.AppVersion | quote }}}
+            - {name: SERVER_NAME, value: {{ .Values.serverName | quote }}}
+            - {name: SERVER_URL, value: "http://127.0.0.1:8080"}
+            - {name: HOME, value: /tmp}
+            {{- with .Values.baseApk }}
+            - {name: BASE_APK, value: {{ . | quote }}}
+            {{- end }}
+            {{- with .Values.timeZone }}
+            - {name: TZ, value: {{ . | quote }}}
+            {{- end }}
+            - {name: ADMIN_USER, value: {{ .Values.admin.user | default "admin" | quote }}}
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: {{ default (printf "%s-admin" (include "opendmtq.fullname" .)) .Values.admin.existingSecret }}, key: ADMIN_PASSWORD}
+          resources: {{- toYaml .Values.admin.resources | nindent 12 }}
+          {{- include "opendmtq.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - {name: state, mountPath: /data}
+            {{- if .Values.live.recordings.persistence.enabled }}
+            # The Recordings page reads, hides and deletes them, and sets their limits here.
+            - {name: recordings, mountPath: /data/live-rec}
+            {{- end }}
+            - {name: data, mountPath: /apk, subPath: apk}
+            - {name: data, mountPath: /custom, subPath: custom}
+            - {name: data, mountPath: /backups, subPath: backups}
+            - {name: data, mountPath: /srv/content, subPath: content, readOnly: true}
+            - {name: admin-tmp, mountPath: /tmp}
+        {{- end }}
+        {{- if .Values.litestream.enabled }}
+        # Streams every committed change to the object store.
+        - name: litestream
+          image: {{ include "opendmtq.image" (dict "img" .Values.image.litestream "ctx" $) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["replicate", "-config", "/etc/litestream.yml"]
+          envFrom: [{secretRef: {name: {{ include "opendmtq.s3Secret" . }}}}]
+          resources:
+            requests: {cpu: 20m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          {{- include "opendmtq.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - {name: state, mountPath: /data}
+            - {name: litestream, mountPath: /etc/litestream.yml, subPath: litestream.yml}
+        {{- end }}
+      volumes:
+        {{- include "opendmtq.dataVolume" . | nindent 8 }}
+        # Node-local working copy of the database; the object store is the durable copy. Also the live
+        # view's window and, without live.recordings.persistence, its recordings (no sizeLimit: they
+        # may reach the recording cap, 20 GB by default).
+        - name: state
+          emptyDir: {}
+        {{- if .Values.live.recordings.persistence.enabled }}
+        - name: recordings
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-recordings" (include "opendmtq.fullname" .)) .Values.live.recordings.persistence.existingClaim }}
+        {{- end }}
+        - name: scratch
+          emptyDir: {sizeLimit: 512Mi}
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}
+        {{- if .Values.admin.enabled }}
+        # App builds unpack the client here.
+        - name: admin-tmp
+          emptyDir: {sizeLimit: 2Gi}
+        {{- end }}
+        {{- if .Values.litestream.enabled }}
+        - name: litestream
+          configMap: {name: {{ include "opendmtq.fullname" . }}-litestream}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "opendmtq.fullname" . }}-api
+  labels: {{- include "opendmtq.labels" (dict "ctx" $ "component" "api") | nindent 4 }}
+spec:
+  selector: {{- include "opendmtq.selector" (dict "ctx" $ "component" "api") | nindent 4 }}
+  ports: [{name: http, port: 8080, targetPort: http}]

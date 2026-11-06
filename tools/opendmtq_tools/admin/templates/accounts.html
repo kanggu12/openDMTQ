@@ -1,0 +1,66 @@
+{% extends "base.html" %}{% block title %}{{ t('acc.title') }}{% endblock %}
+{% block body %}
+{# Just made, or a new password: what to send, once. The page after this one no longer has it. #}
+{% if shown %}
+<section class="card account-made">
+  <h2>{{ t(shown.word, name=shown.name) }}</h2>
+  <p class="meta">{{ t('acc.once') }}{% if shown.word == 'acc.new_done' %} {{ t('acc.ended') }}{% endif %}</p>
+  <dl class="account-keys">
+    <div><dt>{{ t('acc.id') }}</dt><dd>{{ shown.name }}</dd></div>
+    <div><dt>{{ t('acc.password') }}</dt><dd><code>{{ shown.password }}</code></dd></div>
+  </dl>
+  <textarea class="input invite-box" id="account-message" rows="5" readonly aria-label="{{ t('acc.message') }}">{{ message }}</textarea>
+  <div class="btn-line"><button type="button" class="btn btn-primary" data-copy="#account-message" data-done="{{ t('copy.done') }}" data-fail="{{ t('copy.failed') }}">{{ t('invite.copy') }}</button></div>
+</section>
+{% endif %}
+<section class="card">
+  <h2>{{ t('acc.make') }}</h2>
+  <p class="lead">{{ t('acc.lead', owner=owner) }}</p>
+  <form method="post" class="account-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="create">
+    {# The ID as people type it on a phone: Latin letters, no capitals or corrections. #}
+    <label class="field">{{ t('acc.id') }} <input class="input" name="name" required pattern="[A-Za-z0-9._\-]{3,20}" maxlength="20" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" lang="en" placeholder="{{ t('acc.id_hint') }}"></label>
+    {# A typed password twice, so that a slip of the finger is caught here; both empty: one is made and shown once. #}
+    <label class="field">{{ t('acc.password') }} <input class="input" name="password" type="password" minlength="6" maxlength="64" autocomplete="new-password" placeholder="{{ t('acc.password_hint') }}"></label>
+    <label class="field">{{ t('acc.password2') }} <input class="input" name="password2" type="password" minlength="6" maxlength="64" autocomplete="new-password"></label>
+    <label class="field">{{ t('acc.note') }} <input class="input" name="note" maxlength="40" placeholder="{{ t('acc.note_hint') }}"></label>
+    {# The game player the account is, when known: the site then shows their own name and marks their rows. #}
+    <label class="field">{{ t('acc.player') }} <select class="input" name="player"><option value="">{{ t('acc.player_none') }}</option>{% for id, name in players %}<option value="{{ id }}">{{ name }}</option>{% endfor %}</select></label>
+    {# The rights and the button together, in the last place of the grid. #}
+    <div class="account-go"><label class="check"><input type="checkbox" name="admin" value="1"> {{ t('acc.admin') }}</label>
+    <button class="btn btn-primary">{{ t('acc.create') }}</button></div>
+  </form>
+</section>
+<section class="card">
+  <h2>{{ t('acc.title') }} <span class="meta-inline">{{ accounts|length }}</span></h2>
+  {% if broken %}<p class="empty">{{ t('dash.db_short') }}</p>
+  {% elif not accounts %}<p class="empty">{{ t('acc.none') }}</p>
+  {% else %}
+  <div class="table-scroll"><table class="data accounts">
+    <thead><tr><th>{{ t('acc.id') }}</th><th>{{ t('acc.player') }}</th><th>{{ t('acc.th_rights') }}</th><th>{{ t('acc.th_last') }}</th><th>{{ t('acc.th_state') }}</th><th></th></tr></thead>
+    <tbody>
+    {% for a in accounts %}
+      <tr>
+        {# The ID never split; whom it is for under it, and when it was made under the pointer. #}
+        <td class="primary" title="{{ t('acc.made_on', when=a.created_at|rec_date) }}"><span class="account-id">{{ a.name }}</span>{% if a.note %}<span class="runtime">{{ a.note }}</span>{% endif %}</td>
+        {# The player it is, changed here at any time. #}
+        <td data-label="{{ t('acc.player') }}" class="account-player"><form method="post" class="account-link"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="link"><input type="hidden" name="name" value="{{ a.name }}"><select class="input" name="player" aria-label="{{ t('acc.player') }}: {{ a.name }}"><option value="">{{ t('acc.player_none') }}</option>{% for id, name in players %}<option value="{{ id }}"{% if a.guid == id %} selected{% endif %}>{{ name }}</option>{% endfor %}</select><button class="btn btn-sm">{{ t('acc.link') }}</button></form></td>
+        <td data-label="{{ t('acc.th_rights') }}" class="account-rights">{{ t('acc.rights_admin') if a.admin else t('acc.rights_site') }}</td>
+        <td data-label="{{ t('acc.th_last') }}" class="date">{% if a.signed_in_at %}<span title="{{ a.signed_in_at|rec_date }}">{{ a.last }}</span>{% else %}{{ t('acc.never') }}{% endif %}</td>
+        <td data-label="{{ t('acc.th_state') }}"><span class="account-state"><span class="lamp {{ 'off' if a.off else 'on' }}"></span>{{ t('acc.state_off') if a.off else t('acc.state_on') }}</span></td>
+        <td class="actions"><div class="btns">
+          {# A new password ends the old one and every sign-in with it; switched off, the account cannot sign in until
+             switched on again; deleted, it is gone. A button whose word depends on the account carries its other word
+             too (data-twin), so that it is as wide in every row and the rows' buttons stand in columns. #}
+          <form method="post" data-ask="{{ tp('acc.ask_password', name=a.name) }}" data-yes="{{ tp('acc.new') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="password"><input type="hidden" name="name" value="{{ a.name }}"><button class="btn btn-sm">{{ t('acc.new') }}</button></form>
+          <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="{{ 'on' if a.off else 'off' }}"><input type="hidden" name="name" value="{{ a.name }}"><button class="btn btn-sm twin" data-twin="{{ t('acc.turn_off') if a.off else t('acc.turn_on') }}">{{ t('acc.turn_on') if a.off else t('acc.turn_off') }}</button></form>
+          <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="{{ 'player' if a.admin else 'admin' }}"><input type="hidden" name="name" value="{{ a.name }}"><button class="btn btn-sm twin" data-twin="{{ t('acc.make_admin') if a.admin else t('acc.drop_admin') }}">{{ t('acc.drop_admin') if a.admin else t('acc.make_admin') }}</button></form>
+          <form method="post" data-ask="{{ tp('acc.ask_delete', name=a.name) }}" data-yes="{{ tp('btn.delete') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="delete"><input type="hidden" name="name" value="{{ a.name }}"><button class="btn btn-sm btn-danger">{{ t('btn.delete') }}</button></form>
+        </div></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,9 @@
+# Text files keep LF line endings on every checkout, Git for Windows included: with CRLF the
+# shebang line of ./opendmtq and the shell scripts (server/entrypoint.sh runs in the server image)
+# no longer works.
+* text=auto eol=lf
+
+# Never converted.
+*.png binary
+*.jpg binary
+*.woff2 binary

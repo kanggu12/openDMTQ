@@ -1,0 +1,17 @@
+# Game content, APKs, keystore and the live database. Gigabytes, and none of it is ours.
+/data/
+
+# Scratch area: downloaded tutorial videos and their frames.
+/_work/
+
+# Local settings (LAN address).
+.env
+
+__pycache__/
+*.pyc
+
+# The runtime for newer phones as a release job or a Windows build leaves it beside its code: a release's, not the source's.
+/tools/opendmtq_tools/opendmtq-arm32-runtime.zip
+
+# A host install's own programs and run files (host/install.sh).
+/.host/

@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+"""OpenDMTQ command line. Run ./opendmtq for the list of commands."""
+import os
+import signal
+import sys
+
+# Piping into `head` and the like ends quietly instead of with a BrokenPipeError traceback.
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
+# This clone's folder; symlinks resolved, so a link on PATH works too.
+ROOT = os.path.dirname(os.path.realpath(__file__))
+
+# A host install (host/install.sh: no containers) answers the same commands with its own program, in its own Python.
+HOST_PYTHON = os.path.join(ROOT, ".host", "venv", "bin", "python")
+if os.path.isfile(os.path.join(ROOT, ".host", "installed")) and os.path.isfile(HOST_PYTHON):
+    os.execv(HOST_PYTHON, [HOST_PYTHON, os.path.join(ROOT, "host", "opendmtq_host")] + sys.argv[1:])
+
+# The package lives in cli/ next to this file.
+sys.path.insert(0, os.path.join(ROOT, "cli"))
+
+from opendmtq_cli.app import main  # noqa: E402
+
+sys.exit(main())

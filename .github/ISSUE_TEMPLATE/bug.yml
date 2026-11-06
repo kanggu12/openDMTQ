@@ -1,0 +1,58 @@
+name: Something does not work
+description: The server, the app, the site or the admin pages do something wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please attach no game files (APK, songs, charts, images) and no links to them.
+        A security problem goes to the Security tab instead (SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How the server runs
+      options:
+        - Docker Compose (./opendmtq setup)
+        - Host install (host/install.sh)
+        - Windows bundle (OpenDMTQ.exe)
+        - Kubernetes (Helm)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: OpenDMTQ version
+      description: Beside the logo on the site's home page (SERVER v...; hold the mouse over it for the commit).
+      placeholder: 2026.11.04
+  - type: input
+    id: phone
+    attributes:
+      label: Phone or tablet, and Android version
+      description: Only when the game or the app is involved.
+      placeholder: Galaxy S24, Android 15
+  - type: textarea
+    id: doctor
+    attributes:
+      label: What ./opendmtq doctor and ./opendmtq check say
+      description: On Docker Compose. On a host install, ./opendmtq status and ./opendmtq check.
+      render: text
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The lines around the problem (./opendmtq logs, or data/state/logs). Remove addresses and names you do not want to share.
+      render: text
+  - type: checkboxes
+    id: files
+    attributes:
+      label: Game files
+      options:
+        - label: This report holds none of the game's files and no links to them.
+          required: true

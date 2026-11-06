@@ -1,0 +1,52 @@
+# libEGL.so for the guest: every function the NDK's libEGL exports.
+# eglGetProcAddress looks up guest stubs with the guest linker, so it is reentrant. eglSwapBuffers
+# (paced, it may wait for most of a frame) and eglClientWaitSyncKHR (it waits for the GPU) run
+# detached, as reentrant functions, so a signal for the waiting thread, the garbage collector's
+# stop-the-world among them, is handled while it waits instead of after.
+eglBindAPI
+eglBindTexImage
+eglChooseConfig
+!eglClientWaitSyncKHR
+eglCopyBuffers
+eglCreateContext
+eglCreateImageKHR
+eglCreatePbufferFromClientBuffer
+eglCreatePbufferSurface
+eglCreatePixmapSurface
+eglCreateSyncKHR
+eglCreateWindowSurface
+eglDestroyContext
+eglDestroyImageKHR
+eglDestroySurface
+eglDestroySyncKHR
+eglGetConfigAttrib
+eglGetConfigs
+eglGetCurrentContext
+eglGetCurrentDisplay
+eglGetCurrentSurface
+eglGetDisplay
+eglGetError
+!eglGetProcAddress
+eglGetSyncAttribKHR
+eglGetSystemTimeFrequencyNV
+eglGetSystemTimeNV
+eglInitialize
+eglLockSurfaceKHR
+eglMakeCurrent
+eglPresentationTimeANDROID
+eglQueryAPI
+eglQueryContext
+eglQueryString
+eglQuerySurface
+eglReleaseTexImage
+eglReleaseThread
+eglSignalSyncKHR
+eglSurfaceAttrib
+!eglSwapBuffers
+eglSwapInterval
+eglTerminate
+eglUnlockSurfaceKHR
+eglWaitClient
+eglWaitGL
+eglWaitNative
+eglWaitSyncKHR

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Planted layout defects</title>
+<style>
+  /* A dark page, so that a control left in the browser's own colours stands out as on the real site. */
+  body { margin: 0; color: #eee; background: #11151a; font: 14px/1.4 sans-serif; }
+  .card { margin: 8px; padding: 8px; background: #222; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+  .feed { list-style: none; margin: 0; padding: 0; }
+</style>
+</head>
+<body>
+<!-- One of each thing layout.js looks for: audit.js fails when any of them goes unnoticed, so a checker that stopped seeing
+     something cannot pass as a page without the fault. -->
+<main>
+  <div class="card" style="width: 100px; overflow: hidden; white-space: nowrap" id="clipped">A very long text that cannot fit in here at all</div>
+  <div class="card" style="width: 100px"><span style="display: inline-block; white-space: nowrap" id="sticks">A very long text that cannot fit either</span></div>
+  <div class="card" style="position: relative; height: 40px"><span style="position: absolute; left: 0; top: 0">Text on text here</span><span style="position: absolute; left: 0; top: 0">Text on text there</span></div>
+  <div class="two"><div style="height: 40px">Short</div><div style="height: 80px">Tall</div></div>
+  <ul class="feed">
+    <li><span class="x" style="margin-left: 0">a</span></li>
+    <li><span class="x" style="margin-left: 30px">b</span></li>
+    <li><span class="x" style="margin-left: 60px">c</span></li>
+  </ul>
+  <div class="card" style="position: relative; height: 40px"><span>Text under a box</span><div style="position: absolute; inset: 0; background: #333"></div></div>
+  <div class="card"><span style="color: #2a2a2a">Dark text on a dark panel</span></div>
+  <button>Default button</button>
+  <div class="class-no-sheet-mentions">Unstyled class</div>
+  <a href="#" style="display: inline-block; width: 10px; height: 10px; background: #555"></a>
+  <img src="data:image/png;base64,AAAA" alt="" style="width: 20px; height: 20px">
+  <div style="overflow-x: auto; width: 100px"><div style="width: 400px">Wider than its scrolling box</div></div>
+  <div style="width: 30px; overflow-wrap: anywhere">Answering</div>
+  <input id="planted-placeholder" placeholder="A placeholder far too long for this box" style="width: 60px; color: #eee; background: #333">
+  <p style="display: flex; flex-direction: column">Open <b>the file</b> and play.</p>
+  <div style="margin-left: 2000px; width: 100px">Past the screen</div>
+</main>
+</body>
+</html>

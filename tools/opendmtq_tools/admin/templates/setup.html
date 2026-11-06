@@ -1,0 +1,245 @@
+{% extends "base.html" %}{% block title %}{{ t('setup.title') }}{% endblock %}
+{% block body %}
+{# The setup's four steps: where the owner is, which are done. Each can be opened again later (more songs, another
+   address, another player). #}
+<section class="card setup-head">
+  <h2>{{ t('setup.title') }}</h2>
+  <p class="lead">{{ t('setup.lead') }}</p>
+  <ol class="setup-steps">
+    {# A step done shows a tick for its number; a screen reader hears it in the link's name. #}
+    {% for s in steps %}<li class="{{ 'setup-on' if s == step else '' }}{{ ' setup-done' if done[s] else '' }}"><a href="{{ url_for('setup_page', step=s) }}"{% if s == step %} aria-current="step"{% endif %}{% if done[s] %} aria-label="{{ words[s] }} ({{ t('setup.done_word') }})"{% endif %}><span class="setup-n" aria-hidden="true">{% if done[s] %}&#10003;{% else %}{{ loop.index }}{% endif %}</span><span class="setup-w">{{ words[s] }}</span></a></li>{% endfor %}
+  </ol>
+</section>
+
+{# A job the step started (the import, the app's build): its output until it ends, then the page again. #}
+{% macro follow(job, step) %}
+<pre class="log" id="log">{{ t('app.starting') }}</pre>
+<script>
+  (async function poll() {
+    const r = await fetch("{{ url_for('job_status', job_id=job) }}");
+    // Gone with a restart of these pages: the step as it is now.
+    if (r.status === 404) return location.replace("{{ url_for('setup_page', step=step) }}");
+    if (!r.ok) return setTimeout(poll, 3000);
+    const j = await r.json();
+    const el = document.getElementById('log');
+    el.textContent = j.log.join('\n') || '…';
+    el.scrollTop = el.scrollHeight;
+    if (j.state === 'running') return setTimeout(poll, 1000);
+    el.classList.add(j.state);
+    // Done: the step again, which now says what came in. Failed: the log stays, the forms are there for another try.
+    if (j.state === 'done') return setTimeout(() => location.replace("{{ url_for('setup_page', step=step) }}"), 800);
+    // The buttons work again, with their own words back (a build's said "Building…").
+    for (const b of document.querySelectorAll('button[disabled][data-again]')) {
+      b.disabled = false;
+      if (b.dataset.label) b.textContent = b.dataset.label;
+    }
+    document.getElementById('job-failed').hidden = false;
+  })();
+</script>
+<p class="flash bad" id="job-failed" role="status" hidden>{{ t('setup.import_failed') if step == 'files' else t('alert.build_failed') }}</p>
+{% endmacro %}
+
+{# The import form for one folder or file: its path, the songs or not, and the button. #}
+{% macro import_form(path, label) %}
+<form method="post" action="{{ url_for('setup_import') }}" class="setup-import">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="path" value="{{ path }}">
+  <label class="check"><input type="checkbox" name="songs" value="yes" checked> {{ t('setup.songs_too') }}</label>
+  <button class="btn btn-primary" data-again {% if job %}disabled{% endif %}>{{ label }}</button>
+</form>
+{% endmacro %}
+
+{# One file or folder, with what it is: filled in after the page shows (setup_what asks 7-Zip about an archive). #}
+{% macro what(path, first=None) %}<span class="setup-what" data-what="{{ path }}">{{ first or t('setup.what_checking') }}</span>{% endmacro %}
+
+{% if step == 'files' %}
+<section class="card">
+  <h2>{{ t('setup.files_title') }}</h2>
+  <p class="lead">{{ t('setup.files_lead') }}</p>
+  {# The two kinds of file and the forms each comes in: what the import takes. #}
+  <div class="setup-need">
+    <div><h3>{{ t('setup.need_app_title') }}</h3><p>{{ t('setup.need_app') }}</p></div>
+    <div><h3>{{ t('setup.need_files_title') }}</h3><p>{{ t('setup.need_files') }}</p></div>
+  </div>
+  <dl class="setup-have">
+    <div><dt>{{ t('setup.have_apk') }}</dt><dd>{% if has_apk %}<span class="lamp on"></span>{{ client_words }}{% elif client %}<span class="lamp bad"></span>{{ t('setup.client_unusable', names=client.unusable|map('first')|join(', ')) }}{% else %}<span class="lamp wait"></span>{{ t('setup.not_yet') }}{% endif %}</dd></div>
+    <div><dt>{{ t('setup.have_data') }}</dt><dd>{% if data_missing %}<span class="lamp bad"></span>{{ t('setup.data_missing', n=data_missing|length, first=data_missing[0]) }}{% else %}<span class="lamp {{ 'on' if has_data else 'wait' }}"></span>{{ t('setup.in_place') if has_data else t('setup.not_yet') }}{% endif %}</dd></div>
+    <div><dt>{{ t('setup.have_songs') }}</dt><dd><span class="lamp {{ 'on' if song_count else 'wait' }}"></span>{{ t('setup.song_count', n=song_count) if song_count else t('setup.not_yet') }}</dd></div>
+  </dl>
+  {% if job %}<p class="meta">{{ t('setup.import_running') }}</p>{{ follow(job, 'files') }}{% endif %}
+  {% if host_install %}
+    <h3>{{ t('setup.found') }}</h3>
+    {% if found %}
+    <ul class="setup-found">
+      {% for f in found %}
+      <li>
+        <div class="setup-found-what">
+          <b class="setup-path">{{ f.path }}</b>
+          {# Each file it holds, with what it is. #}
+          <ul class="setup-files">
+            {% for n in f.apks + f.archives + f.iphone %}<li><span class="setup-file">{{ n }}</span>{% if f.parts[n] %} <span class="meta-inline">{{ t('setup.parts', n=f.parts[n]) }}</span>{% endif %} {{ what(f.path ~ sep ~ n) }}</li>{% endfor %}
+            {% if f.tree %}<li><span class="setup-file">{{ t('setup.found_tree', path=f.tree) }}</span> {{ what(f.tree) }}</li>{% endif %}
+          </ul>
+        </div>
+        {{ import_form(f.path, t('setup.import')) }}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty">{{ t('setup.found_none') }}</p>
+    {% endif %}
+    <h3 id="picker">{{ t('setup.pick') }}</h3>
+    <p class="meta">{{ t('setup.pick_lead') }}</p>
+    <div class="setup-places" aria-label="{{ t('setup.places') }}">
+      {% for p in homes + drives %}<a class="btn btn-sm" href="{{ p|setup_url }}">{{ p }}</a>{% endfor %}
+    </div>
+    {% if listing %}
+    <div class="setup-picker">
+      <div class="setup-where"><code class="setup-path">{{ listing.path }}</code>{% if listing.parent %}<a class="btn btn-sm" href="{{ listing.parent|setup_url }}">{{ t('setup.up') }}</a>{% endif %}</div>
+      {% if listing.tree %}<p class="flash ok" role="status">{{ what(listing.tree, t('setup.is_tree')) }}</p>{% endif %}
+      {% if listing.folders or listing.files %}
+      <ul class="setup-list">
+        {% for name, full in listing.folders %}<li class="folder"><a href="{{ full|setup_url }}">{{ name }}</a></li>{% endfor %}
+        {% for name, size, full in listing.files %}<li class="file"><span class="setup-file-line"><span class="setup-file">{{ name }} <span class="meta-inline">{{ size|short_size }}{% if listing.parts[name] %}, {{ t('setup.parts', n=listing.parts[name]) }}{% endif %}</span></span> {{ what(full) }}</span>{{ import_form(full, t('setup.import_file')) }}</li>{% endfor %}
+      </ul>
+      {% if listing.more %}<p class="meta">{{ t('setup.more', n=400) }}</p>{% endif %}
+      {% else %}
+      <p class="empty">{{ t('setup.empty_folder') }}</p>
+      {% endif %}
+      <div class="btn-line">{{ import_form(listing.path, t('setup.import_here')) }}</div>
+    </div>
+    {% elif cannot_open %}
+    {# A folder that cannot be opened: said so, with the way back up. #}
+    <div class="setup-picker">
+      <div class="setup-where"><code class="setup-path">{{ cannot_open }}</code>{% if cannot_up %}<a class="btn btn-sm" href="{{ cannot_up|setup_url }}">{{ t('setup.up') }}</a>{% endif %}</div>
+      <p class="flash bad" role="status">{{ t('setup.cannot_open') }}</p>
+    </div>
+    {% endif %}
+  {% else %}
+    <p>{{ t('setup.files_k8s') if kubernetes else t('setup.files_docker') }}</p>
+    <pre class="log">./opendmtq import --songs &lt;folder&gt;</pre>
+  {% endif %}
+  {% if done.files %}<div class="btn-line"><a class="btn btn-primary" href="{{ url_for('setup_page', step='address') }}">{{ t('setup.next') }}</a></div>{% endif %}
+</section>
+{% if host_install %}
+<script>
+  // What each file is, two at a time: an archive's look takes 7-Zip a moment, and the page is usable meanwhile.
+  (function () {
+    const queue = Array.from(document.querySelectorAll('[data-what]'));
+    async function next() {
+      const el = queue.shift();
+      if (!el) return;
+      try {
+        const r = await fetch("{{ url_for('setup_what') }}?path=" + encodeURIComponent(el.dataset.what));
+        const j = await r.json();
+        el.textContent = j.text;
+        el.classList.add(j.ok ? 'ok' : 'bad');
+        // A file of no use here: its own import button goes (the import would find nothing in it).
+        const own = el.closest('li.file');
+        if (!j.ok && own) for (const b of own.querySelectorAll('button')) b.disabled = true;
+      } catch (e) {
+        el.textContent = '';
+      }
+      next();
+    }
+    next();
+    next();
+  })();
+</script>
+{% endif %}
+
+{% elif step == 'address' %}
+<section class="card">
+  <h2>{{ t('setup.address_title') }}</h2>
+  <p class="lead">{{ t('setup.address_lead') }}</p>
+  <p class="setup-address"><code>http://{{ public_host }}/</code></p>
+  {% if host_install %}
+    {% set others = addresses | reject('equalto', current) | list %}
+    {% if others %}
+    <form method="post" action="{{ url_for('setup_address') }}" class="form-row">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      {# The first is the one towards the internet: the one phones on the same Wi-Fi reach in most homes. #}
+      <label class="field grow">{{ t('setup.address_pick') }} <select class="input" name="host">{% for a in addresses %}<option value="{{ a }}"{% if a == current %} selected{% endif %}>{{ t('setup.address_best', a=a) if loop.first else a }}</option>{% endfor %}</select></label>
+      <button class="btn">{{ t('setup.address_use') }}</button>
+    </form>
+    <p class="meta">{{ t('setup.address_restart') }}</p>
+    {% elif addresses %}
+    <p class="meta">{{ t('setup.address_only') }}</p>
+    {% else %}
+    <p class="flash bad" role="status">{{ t('setup.address_none') }}</p>
+    {% endif %}
+  {% elif kubernetes %}
+    <p class="meta">{{ t('setup.address_k8s') }}</p>
+    <pre class="log">helm upgrade opendmtq oci://ghcr.io/kanggu12/charts/opendmtq --reuse-values --set publicHost=&lt;address&gt;</pre>
+  {% else %}
+    <p class="meta">{{ t('setup.address_docker') }}</p>
+    <pre class="log">./opendmtq host &lt;address&gt;</pre>
+  {% endif %}
+  <div class="btn-line"><a class="btn btn-primary" href="{{ url_for('setup_page', step='players') }}">{{ t('setup.next') }}</a></div>
+</section>
+
+{% elif step == 'players' %}
+{% if made %}
+<section class="card account-made">
+  <h2>{{ t('setup.made_title', name=made.name) }}</h2>
+  <p class="meta">{{ t('acc.once') }}</p>
+  <dl class="account-keys">
+    <div><dt>{{ t('acc.id') }}</dt><dd>{{ made.name }}</dd></div>
+    <div><dt>{{ t('acc.password') }}</dt><dd><code>{{ made.password }}</code></dd></div>
+  </dl>
+  <textarea class="input invite-box" id="account-message" rows="5" readonly aria-label="{{ t('acc.message') }}">{{ message }}</textarea>
+  <div class="btn-line"><button type="button" class="btn btn-primary" data-copy="#account-message" data-done="{{ t('copy.done') }}" data-fail="{{ t('copy.failed') }}">{{ t('invite.copy') }}</button></div>
+</section>
+{% endif %}
+<section class="card">
+  <h2>{{ t('setup.players_title') }}</h2>
+  <p class="lead">{{ t('setup.players_lead') }}</p>
+  <form method="post" action="{{ url_for('setup_player') }}" class="form-row">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="field grow">{{ t('acc.id') }} <input class="input" name="name" required pattern="[A-Za-z0-9._\-]{3,20}" maxlength="20" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" lang="en" placeholder="{{ t('acc.id_hint') }}"></label>
+    <button class="btn btn-primary">{{ t('setup.make') }}</button>
+  </form>
+  <p class="meta">{{ t('setup.players_count', n=accounts) }} <a href="{{ url_for('accounts_page') }}">{{ t('nav.accounts') }}</a></p>
+  {% if accounts %}<div class="btn-line"><a class="btn btn-primary" href="{{ url_for('setup_page', step='app') }}">{{ t('setup.next') }}</a></div>{% endif %}
+</section>
+
+{% else %}
+<section class="card">
+  <h2>{{ t('setup.app_title') }}</h2>
+  <p class="lead">{{ t('setup.app_lead') }}</p>
+  {# No client to build from: on this PC the first step imports it; in containers the command line does. #}
+  {% if not has_apk %}<p class="flash bad" role="status">{{ t('setup.no_apk', url=url_for('setup_page', step='files')) if host_install else t('app.no_base') }}</p>{% endif %}
+  {% if done.app %}<p class="setup-state"><span class="lamp on"></span>{{ t('setup.app_ready', host=public_host) }}</p>
+  {# A failed build: players still get the app on offer when there is one; otherwise only why it failed. #}
+  {% elif failed and has_apk %}<p class="setup-state"><span class="lamp bad"></span>{{ t('app.offer_failed', why=failed) if offer else t('setup.build_failed', why=failed) }}</p>{% endif %}
+  {# The builder adds the runtime for newer phones by itself: the owner hears of it only when it could not. #}
+  {% if runtime %}<p class="setup-state"><span class="lamp on"></span>{{ t('setup.runtime_on') }}</p>
+  {% elif runtime_failed %}<p class="flash bad" role="status">{{ t('setup.runtime_failed', why=runtime_failed) }}</p>{% endif %}
+  <form method="post" action="{{ url_for('setup_build') }}" class="setup-build">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn {{ '' if done.app else 'btn-primary' }}" data-again data-label="{{ build_word }}" {% if running or not has_apk %}disabled{% endif %}>{{ t('app.building') if running else build_word }}</button>
+  </form>
+  {% if job %}<p class="meta">{{ t('setup.app_running') }}</p>{{ follow(job, 'app') }}
+  {% elif running %}
+  {# The server's own build (at its start): no output to follow here, so the page looks again until it is done. #}
+  <p class="meta">{{ t('setup.app_running') }}</p>
+  <script>setTimeout(() => location.reload(), 5000)</script>
+  {% endif %}
+  {% if done.app %}
+  <h3>{{ t('setup.phone_title') }}</h3>
+  <div class="setup-phone">
+    {% if qr %}<img src="{{ url_for('invite_qr') }}" alt="{{ t('setup.qr_alt') }}" width="168" height="168">{% endif %}
+    <ol>
+      <li>{{ t('setup.phone_open' if qr else 'setup.phone_open_url', url='http://' ~ public_host ~ '/') }}</li>
+      <li>{{ t('setup.phone_signin') }}</li>
+      <li>{{ t('setup.phone_install') }}</li>
+      <li>{{ t('setup.phone_play') }}</li>
+    </ol>
+  </div>
+  {% endif %}
+  {% if done.files and done.players and done.app %}
+  <p class="flash ok" role="status">{{ t('setup.all_done') }}</p>
+  <div class="btn-line"><a class="btn btn-primary" href="{{ url_for('dashboard') }}">{{ t('setup.to_status') }}</a></div>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

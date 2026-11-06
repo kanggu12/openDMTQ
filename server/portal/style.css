@@ -1,0 +1,1647 @@
+/* OpenDMTQ's look, taken from the game's own screens: gunmetal panels with cut corners on a perforated dark
+   field, a wide leaning face for section names, trapezoid tabs on a lit rule, the song jackets as the page's colour,
+   and Technika's timeline (a bright bar with a blue trail) sweeping across the front page. One accent per section,
+   as the game colours its scene titles. The admin pages use this sheet too, with admin.css on top. */
+
+/* Cut down from Saira and Pretendard, and named after this project as their licenses ask of a modified font
+   (fonts/README.md). Condensed: numbers and marks. Wide: section names and the wordmark. Text: every weight in one
+   file, KS X 1001's syllables, Latin and punctuation, so that a page reads the same on every device; a rarer syllable
+   in a name falls back to the device's font. */
+@font-face { font-family: "DMTQ Condensed"; font-weight: 500; font-display: swap; src: url(fonts/dmtq-condensed-500.woff2) format("woff2"); }
+@font-face { font-family: "DMTQ Condensed"; font-weight: 700; font-display: swap; src: url(fonts/dmtq-condensed-700.woff2) format("woff2"); }
+@font-face { font-family: "DMTQ Condensed"; font-weight: 800; font-display: swap; src: url(fonts/dmtq-condensed-800.woff2) format("woff2"); }
+@font-face { font-family: "DMTQ Wide"; font-weight: 700; font-display: swap; src: url(fonts/dmtq-wide-700.woff2) format("woff2"); }
+@font-face { font-family: "DMTQ Wide"; font-weight: 800; font-display: swap; src: url(fonts/dmtq-wide-800.woff2) format("woff2"); }
+@font-face { font-family: "DMTQ Wide"; font-weight: 800; font-style: italic; font-display: swap; src: url(fonts/dmtq-wide-italic-800.woff2) format("woff2"); }
+@font-face { font-family: "DMTQ Text"; font-weight: 45 930; font-display: swap; src: url(fonts/dmtq-text-1.woff2) format("woff2"); }
+
+:root {
+  color-scheme: dark;
+  /* The page's four surfaces, from the field up, and the seam between them. */
+  --field: #11151a;
+  --deck: #1a1f25;
+  --deck-top: #21272e;
+  --rail: #272e36;
+  --rail-up: #323a44;
+  --seam: #3a434d;
+  /* Text: nothing that has to be read is dimmer than --ash (7:1 and more on the deck). */
+  --chalk: #eef2f6;
+  --ash: #aeb8c3;
+  /* What the game's own screens say with colour. */
+  --ok: #8cf23d;
+  --warn: #ffcf3d;
+  --bad: #ff5f72;
+  --cyan: #6fd6ff;
+  /* Frosted glass: nearly opaque, a little of what lies behind coming through, a bright rim along its top. */
+  --glass: rgba(27, 33, 40, 0.86);
+  --glass-up: rgba(36, 43, 51, 0.88);
+  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.035);
+  --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.055) 0, rgba(255, 255, 255, 0.012) 110px, transparent 240px);
+  --glass-blur: none;
+  /* The game's LIFE gauge, on what is the very best. */
+  --life: linear-gradient(90deg, #ff3b96 0%, #a65cff 24%, #4d86ff 44%, #2fdcff 62%, #5dff86 80%, #ffe84d 100%);
+  /* The section's colour (set below for the others) and the ink that reads on it. */
+  --accent: #8cf23d;
+  /* Easy, Normal, Hard and Expert in the game's colours for them: the song page's charts, a recording's songs. */
+  --sig0: #9df25a;
+  --sig1: #ffd24d;
+  --sig2: #6ec1ff;
+  --sig3: #ff7183;
+  --accent-ink: #0d1c04;
+  /* Faces. Condensed: numbers. Wide: section names and the wordmark. Text: everything to read. */
+  --display: "DMTQ Condensed", "Bahnschrift", "Arial Narrow", "Noto Sans KR", sans-serif;
+  --wide: "DMTQ Wide", "Eurostile", "Bahnschrift", "Arial", sans-serif;
+  --text-face: "DMTQ Text", -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  /* One inner spacing for every box, one gap between boxes, two control heights, one corner cut. */
+  --pad: 24px;
+  --gap: 20px;
+  --ctl: 42px;
+  --ctl-sm: 34px;
+  --cut: 16px;
+  /* The type scale: everything small on the site is one of these. */
+  --t-xs: 12px;
+  --t-sm: 13px;
+  --t-md: 15px;
+  --t-lg: 18px;
+  /* How quickly anything that answers the pointer moves. */
+  --quick: 0.14s;
+  /* The sweep's time across the front page; its notes count on the same. */
+  --sweep: 6.4s;
+}
+@media (max-width: 520px) { :root { --pad: 18px; --gap: 14px; } }
+/* Notes and leads do not leave one word alone on their last line (where the browser can). */
+:is(.lead, .meta, .note, .for-android) { text-wrap: pretty; }
+/* The blur itself where there is power and a mouse: on phones the glass keeps its look without the cost of redrawing. */
+@media (hover: hover) and (min-width: 721px) { :root { --glass-blur: blur(14px) saturate(1.35); } }
+/* The game's scene titles: rankings violet, songs in the timeline's blue, live in red, the console in amber. */
+body[data-section="ranking"] { --accent: #c491ff; --accent-ink: #1b0a34; }
+body[data-section="songs"] { --accent: #6fd6ff; --accent-ink: #04202e; }
+body[data-section="live"] { --accent: #ff5f72; --accent-ink: #2b0409; }
+body[data-section="admin"] { --accent: #ffb13d; --accent-ink: #2a1700; }
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  position: relative;
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  color: var(--chalk);
+  background-color: var(--field);
+  /* The game's perforated metal, faint, all over; it stays while the page scrolls. */
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.045) 1px, transparent 1.3px);
+  background-size: 6px 6px;
+  background-attachment: fixed;
+  font: var(--t-md)/1.6 var(--text-face);
+  letter-spacing: -0.006em;
+}
+/* Behind everything at the top of each page, as on the game's menus: two big dark panes meeting, with the section's light
+   coming down between them. A fixed height, so it scrolls away with the page and paints once. */
+body::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  inset: 0 0 auto;
+  height: 620px;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.055) 0 22%, transparent 22.1%),
+    linear-gradient(245deg, rgba(255, 255, 255, 0.04) 0 16%, transparent 16.1%),
+    radial-gradient(ellipse 70% 100% at 50% -20%, color-mix(in srgb, var(--accent) 17%, transparent), transparent 70%);
+  -webkit-mask-image: linear-gradient(180deg, #000 45%, transparent);
+  mask-image: linear-gradient(180deg, #000 45%, transparent);
+}
+/* The Technika shards at both edges of the page, in the section's colour: what the frosted panels pick up a little of.
+   One element: the colour is its background, the shapes (each with its own strength, all fading downwards) its mask. */
+.facets {
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 auto;
+  /* No taller than the page: 900px on a window 800px tall made a short page scroll 100px of bare field past its
+     footer. The masks keep their 900px, so on a short page the shards are cut off at its foot, not squeezed. */
+  height: min(900px, 100%);
+  pointer-events: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff), color-mix(in srgb, var(--accent) 70%, #000));
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='f' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23fff' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='url(%23f)'%3E%3Cpath opacity='.75' d='M1440 60 1330 0h110z'/%3E%3Cpath opacity='.62' d='M1290 70 1440 250v170l-95-120z'/%3E%3Cpath opacity='.34' d='M1345 300 1440 420v250l-40-190z'/%3E%3Cpath opacity='.72' d='M0 250 112 470 0 425z'/%3E%3Cpath opacity='.3' d='M0 425 112 470 176 900H0z'/%3E%3Cpath opacity='.16' d='M1400 480 1440 670v230h-96z'/%3E%3C/g%3E%3C/svg%3E") top / 100% 900px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='f' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23fff' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='url(%23f)'%3E%3Cpath opacity='.75' d='M1440 60 1330 0h110z'/%3E%3Cpath opacity='.62' d='M1290 70 1440 250v170l-95-120z'/%3E%3Cpath opacity='.34' d='M1345 300 1440 420v250l-40-190z'/%3E%3Cpath opacity='.72' d='M0 250 112 470 0 425z'/%3E%3Cpath opacity='.3' d='M0 425 112 470 176 900H0z'/%3E%3Cpath opacity='.16' d='M1400 480 1440 670v230h-96z'/%3E%3C/g%3E%3C/svg%3E") top / 100% 900px no-repeat;
+}
+
+/* The front page's stage covers that part of the page, and the shards' lower ends would start from nothing under it. */
+body:has(.stage) .facets { display: none; }
+
+/* Korean breaks between words, not inside one, on every page (an English page has Korean song titles too); Latin text is
+   not touched by this. A long unbroken word still may not push out of its box. */
+html { word-break: keep-all; overflow-wrap: break-word; }
+.wrap { width: 100%; max-width: 1240px; margin-inline: auto; padding-inline: 24px; }
+@media (max-width: 720px) { .wrap { padding-inline: 14px; } }
+a { color: inherit; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+/* The page's name for screen readers and outlines; what shows is the masthead, or the front page's stage. */
+.page-title { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* The keyboard's place, seen on every surface. */
+:where(a, button, summary, input, select, textarea):focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+/* ------------------------------------------------------------------ the top bar */
+
+/* At the page's top the bar has no surface of its own: it melts into what is behind it. Once the page has moved it
+   is glass, with a line and a shadow under it. */
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid transparent;
+  transition: background-color var(--quick), border-color var(--quick), box-shadow var(--quick);
+}
+.bar.under {
+  background: rgba(21, 26, 32, 0.86);
+  border-bottom-color: rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 26px -14px rgba(0, 0, 0, 0.75);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+.bar-in { display: flex; align-items: stretch; gap: 26px; min-height: 60px; }
+
+/* The wordmark, one piece at any size (--mark sets it): wide chrome letters leaning forward with the Q lit in the section's
+   colour, and over them OPEN in the same lean and face, its line running on to the Q's end as the piece's top edge. */
+.logo { --mark: 25px; display: inline-grid; grid-template-columns: auto auto; justify-content: start; align-content: center; align-items: end; column-gap: 8px; flex: none; color: var(--chalk); text-decoration: none; font-size: var(--mark); }
+.logo .o {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.42em;
+  /* The letters lean: their top starts further right than their foot. Same at the right end, for the line. */
+  margin: 0 0.5em 0.28em 0.72em;
+  font: italic 800 0.34em/1 var(--wide);
+  letter-spacing: 0.2em;
+  color: #f4f6f8;
+}
+.logo .o::after { content: ""; flex: 1; min-width: 1em; height: 0.34em; background: linear-gradient(90deg, #8f99a4, var(--accent)); transform: skewX(-14deg); }
+.logo .m {
+  grid-column: 1;
+  /* Room on the right for the last letter's lean: a gradient clipped to the text paints only inside the box. */
+  padding-right: 0.14em;
+  font: italic 800 1em/0.94 var(--wide);
+  letter-spacing: -0.01em;
+  background: linear-gradient(180deg, #fff 0%, #e4e9ee 46%, #76808b 54%, #b3bbc4 72%, #f4f6f8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.logo .m b {
+  padding-right: 0.14em;
+  margin-right: -0.14em;
+  font-weight: 800;
+  background: linear-gradient(180deg, #fff 0%, var(--accent) 60%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.logo .s { grid-column: 2; grid-row: 2; margin-bottom: 0.06em; font: italic 800 0.52em/1 var(--wide); letter-spacing: 0.02em; color: var(--accent); }
+
+/* The sections, in the display face's English as the game's menus are. The one in use is lit, with the section's
+   rule along the bar's foot. */
+.nav { display: flex; align-items: stretch; gap: 4px; flex: 1; min-width: 0; }
+.nav > a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 13px;
+  font: 800 13.5px/1 var(--wide);
+  letter-spacing: 0.015em;
+  white-space: nowrap;
+  color: var(--ash);
+  text-decoration: none;
+  transition: color var(--quick);
+}
+.nav > a:hover { color: #fff; }
+.nav > a.on { color: var(--accent); }
+.nav > a.on::after { content: ""; position: absolute; inset: auto 8px -1px; height: 3px; background: var(--accent); }
+/* Who is on air: a small red count on LIVE, everywhere. */
+.onair { display: inline-flex; align-items: center; gap: 3px; font: 700 11.5px/1 var(--display); color: var(--bad); }
+.onair::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 6px var(--bad); }
+
+/* The bar's right end: how the server is, the language, signing in. */
+.bar-end { display: flex; align-items: center; gap: 14px; flex: none; margin-left: auto; }
+.state { display: inline-flex; align-items: center; gap: 6px; font: 700 10.5px/1 var(--wide); letter-spacing: 0.08em; color: var(--ash); white-space: nowrap; }
+.state i { width: 7px; height: 7px; border-radius: 50%; }
+.state.ok i { background: var(--ok); box-shadow: 0 0 7px var(--ok); }
+.state.maint i { background: var(--warn); box-shadow: 0 0 7px var(--warn); }
+.state.down i { background: var(--bad); box-shadow: 0 0 7px var(--bad); }
+
+/* Two short keys for the language, each with the language's own name for those who cannot read the other. */
+.lang-switch { display: flex; background: var(--rail); }
+.lang-switch a { position: relative; padding: 0 8px; font: 700 10.5px/30px var(--wide); letter-spacing: 0.04em; color: var(--ash); text-decoration: none; }
+.lang-switch a:hover { color: #fff; }
+/* Which one it is now, in metal: the bar's one lit key is the one that signs in. */
+.lang-switch a.on { color: #fff; background: var(--rail-up); }
+/* The finger's area, taller than the key. */
+.lang-switch a::after { content: ""; position: absolute; inset: -9px 0; }
+.auth-form { display: flex; margin: 0; }
+.auth {
+  position: relative;
+  display: block;
+  height: 30px;
+  padding: 0 13px;
+  border: 0;
+  cursor: pointer;
+  font: 700 13px/30px var(--text-face);
+  color: var(--chalk);
+  text-decoration: none;
+  white-space: nowrap;
+  background: var(--rail);
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  transition: background-color var(--quick), color var(--quick);
+}
+.auth:hover { background: var(--rail-up); }
+/* To sign in it is lit: the way in to downloading and watching. */
+.auth.sign-in { color: var(--accent-ink); background: var(--accent); }
+.auth.sign-in:hover { background: color-mix(in srgb, var(--accent) 85%, #fff); }
+/* The cut would clip a ring outside it. */
+.auth:focus-visible { outline-offset: -3px; }
+
+/* Phones and tablets held upright (up to 900 px): the sections go to a bar at the thumb, and the top keeps the wordmark
+   and the keys; the five sections, the languages, the profile and Sign out do not fit across one row below that. A
+   screen on its side keeps them in the top bar, as the bottom one would cover what little height there is, with the
+   sections in a smaller face up to 1000 px so that they fit there. (The admin pages keep their own menu: .nav.pages.) */
+.tabbar { display: none; }
+@media (max-width: 900px) { .state { font-size: 0; gap: 0; } }
+@media (max-width: 1000px) { .nav > a { padding: 0 8px; font-size: 12px; } }
+/* Up to 900 px the wordmark smaller and the bar's gaps tighter: a phone on its side (740 px) then keeps every section
+   in its one row (they were 39 px too wide there). The bar is lower only on a phone held upright. */
+@media (max-width: 900px) {
+  .bar-in, .bar-end { gap: 10px; }
+  .logo { --mark: 22px; }
+}
+@media (max-width: 720px) { .bar-in { min-height: 52px; } }
+@media (max-width: 900px) and (orientation: portrait) {
+  .bar .nav:not(.pages) { display: none; }
+  .tabbar {
+    position: fixed;
+    z-index: 20;
+    inset: auto 0 0;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, auto));
+    justify-content: space-between;
+    padding: 0 6px env(safe-area-inset-bottom);
+    background: rgba(21, 26, 32, 0.95);
+    border-top: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  .tabbar a {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 54px;
+    padding-inline: 5px;
+    font: 800 clamp(10px, 2.95vw, 11.5px)/1 var(--wide);
+    letter-spacing: 0;
+    color: var(--ash);
+    text-decoration: none;
+  }
+  .tabbar a.on { color: var(--accent); }
+  .tabbar a.on::before { content: ""; position: absolute; inset: -1px 5px auto; height: 3px; background: var(--accent); }
+  body { padding-bottom: calc(54px + env(safe-area-inset-bottom)); }
+  /* Signed out there is no menu at the thumb to keep clear of. */
+  body.signed-out { padding-bottom: 0; }
+}
+
+/* Said across the page while something is wrong: maintenance in amber, trouble in red. */
+.site-alert { background: color-mix(in srgb, var(--warn) 14%, var(--field)); color: #ffe6a0; border-bottom: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); font-size: var(--t-sm); }
+.site-alert.down { background: color-mix(in srgb, var(--bad) 16%, var(--field)); color: #ffc4cb; border-bottom-color: color-mix(in srgb, var(--bad) 50%, transparent); }
+.site-alert p { margin-block: 0; padding-block: 10px; }
+main > .site-alert { border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); padding: 0 14px; }
+main > .site-alert.down { border-color: color-mix(in srgb, var(--bad) 50%, transparent); }
+
+/* ------------------------------------------------------------------ the page */
+
+main.wrap { display: grid; gap: var(--gap); padding-block: 26px 40px; flex: 1 0 auto; align-content: start; }
+@media (max-width: 720px) { main.wrap { padding-block: 16px 26px; } }
+main > * { min-width: 0; }
+
+/* A section's name at the head of its page, as the game's scenes have it: wide, leaning, in the section's colour, with
+   one plain sentence beside it. */
+.masthead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 18px; padding-block: 6px 2px; }
+.masthead .word {
+  margin: 0;
+  padding-right: 0.12em;
+  font: italic 800 clamp(30px, 5.2vw, 50px)/1.08 var(--wide);
+  letter-spacing: -0.012em;
+  background: linear-gradient(180deg, #fff 8%, var(--accent) 72%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.masthead p { margin: 0; color: var(--ash); font-size: 14px; text-wrap: balance; }
+
+/* A panel: the game's gunmetal, a shade lighter at its head, one corner cut. */
+.card {
+  min-width: 0;
+  padding: var(--pad);
+  background: var(--glass-sheen), var(--glass);
+  box-shadow: var(--glass-rim);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+}
+.card > :first-child { margin-top: 0; }
+.card > :last-child { margin-bottom: 0; }
+h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  margin: 0 0 14px;
+  font: 800 18px/1.25 var(--text-face);
+  letter-spacing: -0.012em;
+  color: #fff;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+h3 { margin: 18px 0 8px; font-size: 15px; font-weight: 700; color: #fff; }
+/* At the title line's end. The padding makes it big enough to tap; the negative margin keeps the line as it was. */
+h2 .more {
+  margin: -11px 0 -11px auto;
+  padding: 11px 0 11px 12px;
+  font: 500 var(--t-sm)/1.55 var(--text-face);
+  letter-spacing: 0;
+  color: var(--ash);
+  text-decoration: none;
+  white-space: nowrap;
+}
+h2 .more:hover { color: var(--accent); }
+.meta-inline { color: var(--ash); font: 400 var(--t-sm) var(--text-face); letter-spacing: 0; }
+
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap); }
+.stack { display: grid; gap: var(--gap); }
+.stack > * { min-width: 0; }
+@media (max-width: 860px) { .two { grid-template-columns: minmax(0, 1fr); } }
+/* The front page's last box: who leads and the newest records side by side with a line between, each list as long as it is
+   (a server of two players does not stretch them to the height of the records). One above the other on a phone. */
+.home-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.home-list { min-width: 0; }
+.home-list:first-child { padding-right: var(--pad); }
+.home-list + .home-list { padding-left: var(--pad); border-left: 1px solid rgba(255, 255, 255, 0.075); }
+/* Side by side, a leader's row is as tall as a record's, so that the lines between rows meet across the divider. */
+@media (min-width: 861px) { .home-lists .feed.ranks li { min-height: 82px; } }
+@media (max-width: 860px) {
+  .home-lists { grid-template-columns: minmax(0, 1fr); }
+  .home-list:first-child { padding-right: 0; }
+  .home-list + .home-list { margin-top: 18px; padding: 18px 0 0; border-left: 0; border-top: 1px solid rgba(255, 255, 255, 0.075); }
+}
+
+/* Counters, like the game's point boxes. */
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); }
+.stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.num { font: 800 32px/1.1 var(--display); letter-spacing: 0.005em; color: #fff; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.lbl { color: var(--ash); font-size: 12.5px; }
+.stats-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 520px) {
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stats > .stat:last-child:nth-child(odd) { grid-column: span 2; }
+}
+
+/* ------------------------------------------------------------------ text */
+
+p { margin: 0 0 10px; }
+.lead { margin: 0 0 12px; color: var(--ash); font-size: 14px; max-width: 74ch; }
+.meta { color: var(--ash); font-size: var(--t-sm); margin: 8px 0 0; overflow-wrap: anywhere; }
+.note { color: var(--ash); font-size: var(--t-sm); margin: 12px 0 0; max-width: 74ch; }
+/* Nothing to show yet: said once, in the middle of the space the list would fill. */
+.empty { margin: 0; padding: 26px 12px; text-align: center; color: var(--ash); font-size: 14px; }
+.empty p { margin: 0; }
+.empty .btn-line { justify-content: center; }
+/* Messages: one spacing, tinted by what they mean. Amber a notice, red a failure, the section's colour a success. */
+.warn, .error, .done { margin: 12px 0; padding: 11px 14px; font-size: 14px; }
+.warn { background: color-mix(in srgb, var(--warn) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 42%, transparent); color: #ffe6a0; }
+.error { background: color-mix(in srgb, var(--bad) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 46%, transparent); color: #ffc4cb; }
+.done { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 42%, transparent); color: color-mix(in srgb, var(--accent) 55%, #fff); }
+.ios-note { margin-bottom: 0; }
+/* The game's abbreviations in table headings explain themselves on hover and in a line under the table. */
+th abbr[title] { text-decoration: none; cursor: help; }
+.legend { margin-top: 12px; }
+/* Literal things in running text, one look each:
+   .ui for what the reader finds on screen and taps: weight, no quotes or box;
+   code for a file name, a command or an address: the mono face on a faint ground;
+   .app-name for the app's name: all of it as one piece of code, the title and the server together. */
+code { font-family: var(--mono); font-size: 0.86em; background: rgba(255, 255, 255, 0.09); padding: 0.08em 0.3em; overflow-wrap: anywhere; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.ui { font-weight: 700; color: #fff; }
+.app-name { font-family: var(--mono); font-size: 0.86em; font-weight: 600; color: #fff; background: rgba(255, 255, 255, 0.09); padding: 0.08em 0.36em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+/* Each piece of the address stays whole; lines break only between them (<wbr>). */
+.app-name .addr span { white-space: nowrap; }
+
+/* Text links: the section's colour, a thin underline on the pointer. Buttons, tabs, tiles and rows are their own thing. */
+:where(.lead, .meta, .note, .warn, .done, .error, .empty, .steps, .notes, .help, .lost) a:not(.btn, .button) { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+/* ------------------------------------------------------------------ controls */
+
+/* The big call to action: lit, the game's green or the section's colour, two corners cut. */
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 54px;
+  padding: 10px 26px;
+  margin: 0;
+  border: 0;
+  font: 800 19px/1.15 var(--text-face);
+  letter-spacing: -0.01em;
+  text-align: center;
+  text-decoration: none;
+  color: var(--accent-ink);
+  cursor: pointer;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 72%, #fff) 0%, var(--accent) 55%, color-mix(in srgb, var(--accent) 84%, #000) 100%);
+  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  transition: filter var(--quick), transform var(--quick);
+}
+.button:hover { filter: brightness(1.09); }
+.button:active { transform: translateY(1px); filter: brightness(0.97); }
+/* Sent, the answer on its way. */
+.button[aria-busy="true"], .btn[aria-busy="true"] { filter: saturate(0.5) brightness(0.85); cursor: progress; }
+/* The cut clips anything outside the box, so the ring sits inside it. */
+.button:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: -6px; }
+
+/* Everything else one can press: quiet metal that lights up at the pointer. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--ctl);
+  min-width: 96px;
+  padding: 0 16px;
+  margin: 0;
+  border: 0;
+  font: 700 14px/1 var(--text-face);
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  white-space: nowrap;
+  color: var(--chalk);
+  cursor: pointer;
+  background: var(--rail-up);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  transition: background-color var(--quick), color var(--quick), filter var(--quick), transform var(--quick);
+}
+.btn:hover { background: #414b57; color: #fff; }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: -3px; }
+.btn-primary { color: var(--accent-ink); background: var(--accent); }
+.btn-primary:hover { color: var(--accent-ink); background: var(--accent); filter: brightness(1.1); }
+.btn-primary:focus-visible { outline-color: var(--accent-ink); }
+.btn-danger { color: #ffb3bc; background: color-mix(in srgb, var(--bad) 18%, var(--rail)); }
+.btn-danger:hover { color: #2b0409; background: var(--bad); }
+/* In lists, where many stand together. */
+.btn-sm { height: var(--ctl-sm); min-width: 76px; padding: 0 11px; font-size: 13px; }
+/* Touch screens get the full height everywhere: a small button is small for a finger. */
+@media (pointer: coarse) { .btn-sm { height: var(--ctl); } }
+/* Not available yet (an upload without a file, a build running): plain, so it reads as waiting. */
+.btn[disabled], .btn[disabled]:hover { color: #8d97a2; background: var(--rail); filter: none; cursor: not-allowed; }
+
+.field { display: grid; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--ash); }
+.input, .field input, .field textarea, input.search {
+  width: 100%;
+  height: var(--ctl);
+  margin: 0;
+  padding: 0 13px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--chalk);
+  background: #0e1216;
+  border: 1px solid var(--seam);
+  border-radius: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: border-color var(--quick);
+}
+.field textarea { height: auto; min-height: 96px; padding: 10px 13px; line-height: 1.5; resize: vertical; }
+.input:hover, .field input:hover, .field textarea:hover, input.search:hover { border-color: #55606c; }
+.input:focus, .field input:focus, .field textarea:focus, input.search:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.input::placeholder, .field input::placeholder, input.search::placeholder { color: #8d97a2; }
+.input-sm { height: var(--ctl-sm); padding: 0 10px; font-size: 14px; }
+@media (pointer: coarse) { .input-sm { height: var(--ctl); } }
+/* A list to pick from: one arrow on every system. */
+select.input {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23aab3bd' stroke-width='1.8'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px 8px;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+/* A tick box in the site's own look, big enough to press. */
+input[type=checkbox] {
+  appearance: none;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  vertical-align: middle;
+  background: var(--rail) center / 16px no-repeat;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  cursor: pointer;
+}
+input[type=checkbox]:hover { border-color: var(--accent); }
+input[type=checkbox]:checked {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2.5 8.5l3.6 3.6 7.4-8' fill='none' stroke='%230d1014' stroke-width='2.4'/%3E%3C/svg%3E");
+}
+input[type=checkbox]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* A field and its button on one line, stacked on phones. */
+.form-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 14px 0 0; }
+.form-row > .grow { flex: 1 1 260px; }
+/* A row of buttons under text or a form. */
+.btn-line { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 0; }
+.btn-line > form { display: flex; margin: 0; }
+@media (max-width: 600px) {
+  .form-row { flex-direction: column; align-items: stretch; }
+  .form-row > *, .form-row > .grow { flex: none; }
+  .btn-line > *, .btn-line .btn { flex: 1 1 100%; }
+}
+
+/* File upload: a box with a visible Choose button (the whole box opens the file picker; on a computer a file can also
+   be dropped on it), which then names the chosen file. */
+.upload { display: grid; gap: 12px; justify-items: start; margin: 14px 0 0; }
+.drop {
+  position: relative;
+  justify-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px dashed #5a6571;
+  background: #14181d;
+  cursor: pointer;
+  transition: border-color var(--quick), background-color var(--quick);
+}
+.drop:hover, .drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, #14181d); }
+.drop:has(input:focus-visible) { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.drop.has-file { border-style: solid; border-color: var(--accent); }
+.drop.too-big { border-color: var(--bad); }
+.drop.too-big .drop-hint { color: var(--bad); }
+.drop input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.drop-text { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.drop-title { font-weight: 600; overflow-wrap: anywhere; }
+.drop-hint { color: var(--ash); font-size: 13px; overflow-wrap: anywhere; }
+/* The button only shows where to tap; taps land on the file field over the whole box. */
+.drop-pick { flex: none; pointer-events: none; }
+/* Dropping a file needs a mouse: phones and tablets do not mention it. */
+@media (hover: none) { .drop-only { display: none; } }
+@media (max-width: 600px) { .upload { justify-items: stretch; } }
+
+/* Tabs as in the game's shop and song screens: trapezoids standing on a lit rule, the one in use filled. */
+.tabs { display: flex; flex-wrap: wrap; gap: 3px; margin: 0 0 16px; border-bottom: 2px solid var(--accent); }
+.tabs a {
+  padding: 9px 22px 8px;
+  font: 700 14px/1.3 var(--text-face);
+  text-align: center;
+  text-decoration: none;
+  color: var(--ash);
+  background: var(--rail);
+  clip-path: polygon(11px 0, calc(100% - 11px) 0, 100% 100%, 0 100%);
+  transition: background-color var(--quick), color var(--quick);
+}
+.tabs a:hover { background: var(--rail-up); color: #fff; }
+.tabs a.on, .tabs a.on:hover { color: var(--accent-ink); background: var(--accent); }
+.tabs a:focus-visible { outline: 2px solid currentColor; outline-offset: -5px; }
+/* Tabs straight in the page: the page's own gap parts them from what follows, as it parts every other block. */
+main > .tabs { margin-bottom: 0; }
+@media (max-width: 600px) {
+  .tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; border-bottom: 0; }
+  .tabs:has(> a:nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  /* An odd number of tabs in two columns (five on the rankings) would leave a hole after the last: it takes the row. */
+  .tabs:not(:has(> a:nth-child(3):last-child)) > a:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .tabs a { padding: 11px 6px 10px; clip-path: none; }
+}
+
+/* A song's charts: one row per LINE mode, its label first, then the four difficulties each in its own column (a chart
+   the song lacks leaves its cell empty) and in the game's colour for it. */
+.tabs.charts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; margin-bottom: 18px; border: 0; }
+.chart-row { display: grid; grid-template-columns: 4.2em repeat(4, minmax(0, 1fr)); gap: 7px; align-items: center; }
+/* Space for the count at the tab's right end where it fits; elsewhere the tab's tooltip says it. */
+.chart-line { grid-column: 1; grid-row: 1; font: italic 800 13.5px/1 var(--wide); letter-spacing: 0.01em; color: var(--ash); }
+.tabs.charts a {
+  --d: var(--accent);
+  grid-row: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 12px;
+  font: 700 15px/1.2 var(--display);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--d);
+  background: color-mix(in srgb, var(--d) 11%, var(--rail));
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+.tabs.charts a:hover { color: #fff; background: color-mix(in srgb, var(--d) 28%, var(--rail)); }
+.tabs.charts a.on, .tabs.charts a.on:hover { color: #0b0e11; background: var(--d); }
+.tabs.charts .n { font: 500 12.5px/1.2 var(--text-face); letter-spacing: 0; opacity: 0.9; }
+@media (max-width: 1000px) { .tabs.charts .n { display: none; } }
+/* Easy, Normal, Hard and Expert in the game's colours for them. A song with no Easy chart, as most are, has no hole where it
+   would go. */
+.tabs.charts .sig0 { --d: var(--sig0); grid-column: 2; }
+.tabs.charts .sig1 { --d: var(--sig1); grid-column: 2; }
+.tabs.charts .sig2 { --d: var(--sig2); grid-column: 3; }
+.tabs.charts .sig3 { --d: var(--sig3); grid-column: 4; }
+.tabs.charts:has(.sig0) .sig1 { grid-column: 3; }
+.tabs.charts:has(.sig0) .sig2 { grid-column: 4; }
+.tabs.charts:has(.sig0) .sig3 { grid-column: 5; }
+/* A phone: the mode's name over its row, so that the four charts have the whole width and the board stays in the first
+   screen. Each chart keeps its column; a song with no Easy chart leaves that first column to Normal. */
+@media (max-width: 700px) {
+  .chart-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px 5px; }
+  .tabs.charts:has(.sig0) .chart-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .chart-line { grid-column: 1 / -1; grid-row: 1; font-size: 12px; }
+  .tabs.charts a { grid-row: 2; justify-content: center; padding: 10px 2px; font-size: 13.5px; letter-spacing: 0; }
+  .tabs.charts .sig1 { grid-column: 1; }
+  .tabs.charts .sig2 { grid-column: 2; }
+  .tabs.charts .sig3 { grid-column: 3; }
+  .tabs.charts:has(.sig0) .sig0 { grid-column: 1; }
+  .tabs.charts:has(.sig0) .sig1 { grid-column: 2; }
+  .tabs.charts:has(.sig0) .sig2 { grid-column: 3; }
+  .tabs.charts:has(.sig0) .sig3 { grid-column: 4; }
+}
+
+/* ------------------------------------------------------------------ tables */
+
+.table-scroll { overflow-x: auto; }
+table { --cell: 10px; width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 11px var(--cell); border-bottom: 1px solid rgba(255, 255, 255, 0.075); text-align: left; white-space: nowrap; vertical-align: middle; }
+th { color: var(--ash); font-weight: 600; font-size: 12.5px; border-bottom-color: var(--seam); }
+tbody tr:last-child td { border-bottom: 0; }
+/* The row under the pointer. Touch screens have no such thing, so nothing stays lit after a tap. */
+@media (hover: hover) { tbody tr { transition: background-color var(--quick); } tbody tr:hover { background: rgba(255, 255, 255, 0.045); } }
+td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+td.r { font-family: var(--display); font-weight: 700; font-size: 16px; letter-spacing: 0.01em; }
+/* The name takes the room the numbers do not need: the number columns stay together on the right. */
+table.board th.name, table.board td.name { width: 100%; }
+/* The column a ranking is sorted by. */
+th.sorted { color: var(--accent); font-weight: 700; }
+td.sorted { color: var(--accent); font-weight: 800; font-size: 17px; }
+/* A name that links (player, song) takes its whole cell as the tap target. */
+td { position: relative; }
+td > a:not(.btn) { text-decoration: none; }
+td > a:not(.btn)::after { content: ""; position: absolute; inset: 0; }
+td > a:not(.btn):hover { color: var(--accent); }
+/* Right-aligned, so the digits stay in one column. */
+td.rank, th.rank { text-align: right; }
+td.rank { width: 2.4em; color: var(--ash); font: italic 800 18px/1 var(--display); }
+/* Player names wrap, anywhere if they must: a long nickname may not push the other columns off a phone. */
+td.name { white-space: normal; overflow-wrap: anywhere; font-weight: 600; }
+table.compact td { padding-block: 9px; }
+table.compact td:first-child { white-space: normal; padding-left: 0; }
+table.compact td:last-child { padding-right: 0; }
+td.flag { width: 1%; }
+@media (max-width: 420px) {
+  table { --cell: 6px; font-size: 13.5px; }
+  th, td { padding-block: 10px; }
+  /* A long name wraps rather than push the score out of the screen. */
+  table.board td.name { min-width: 92px; overflow-wrap: anywhere; }
+  table.board .acc { display: none; }
+}
+/* Optional columns leave narrow screens (also in the admin's stacked rows). */
+@media (max-width: 600px) { .opt, table.data td.opt { display: none; } }
+
+/* Data tables (the admin's lists): long names wrap; buttons sit in fixed places at the end. */
+table.data td { white-space: normal; overflow-wrap: anywhere; }
+table.data td.r, table.data td.rank, table.data td.actions { white-space: nowrap; }
+td.actions { width: 1%; text-align: right; }
+.btns { display: inline-flex; gap: 6px; justify-content: flex-end; vertical-align: middle; }
+.btns form { display: contents; }
+.inline-form { display: flex; gap: 6px; align-items: center; margin: 0; }
+.inline-form .input { flex: 1 1 140px; min-width: 0; }
+/* Phones: each row becomes a block. Number and name on the first line, other values as labelled lines, buttons in
+   equal columns at the bottom. */
+@media (max-width: 700px) {
+  table.data, table.data tbody { display: block; }
+  table.data thead { display: none; }
+  table.data tr { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 7px 10px; padding: 12px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.075); }
+  table.data td { grid-column: 1 / -1; display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; align-items: center; width: auto; padding: 0; border: 0; text-align: left; white-space: normal; }
+  table.data td::before { content: attr(data-label); color: var(--ash); font: 500 12.5px/1.35 var(--text-face); letter-spacing: 0; }
+  /* A value of several parts stays in the value's column, each at its own width. */
+  table.data td > * { grid-column: 2; justify-self: start; }
+  table.data td.rank, table.data td.primary, table.data td.sub, table.data td.actions { display: block; }
+  table.data td.rank::before, table.data td.primary::before, table.data td.sub::before, table.data td.actions::before { content: none; }
+  table.data td.rank { grid-column: 1; grid-row: 1; width: auto; min-width: 1.4em; }
+  table.data td.primary { grid-column: 2; grid-row: 1; font-weight: 600; }
+  table.data td.primary:first-child { grid-column: 1 / -1; }
+  table.data td.sub { grid-column: 2; color: var(--ash); font-size: 13.5px; }
+  table.data td.actions { padding-top: 8px; }
+  table.data .btns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+  table.data .btn, table.data .input-sm { height: var(--ctl); font-size: 14px; }
+  table.data .btns .btn { width: 100%; min-width: 0; }
+}
+
+/* ------------------------------------------------------------------ the front page's stage */
+
+/* A wall of the song jackets, tilted, under Technika's playfield: its judgment line across, a few of its notes, and its
+   timeline sweeping over them. The one thing on the site that moves by itself: a transform on one layer. */
+.stage { --bar-h: 61px; position: relative; overflow: hidden; isolation: isolate; margin-top: calc(-1 * var(--bar-h)); padding-top: var(--bar-h); background: #0b0e12; }
+@media (max-width: 720px) { .stage { --bar-h: 53px; } }
+/* With an alert under the bar, the hero starts below it. */
+.site-alert ~ .stage { --bar-h: 0px; }
+.stage-in { position: relative; z-index: 3; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 24px 40px; min-height: clamp(420px, 56vh, 560px); padding-block: 54px 44px; }
+/* The jackets. Dimmed whole, so that the light moving over them is what stands out. */
+.wall {
+  position: absolute;
+  z-index: 0;
+  inset: -18% -12%;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+  align-content: center;
+  transform: rotate(-7deg);
+  filter: brightness(0.6) saturate(1.1);
+}
+.wall img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #1a1f25; }
+/* Dark at the left, where the words are, and into the page at the foot. */
+.stage::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, transparent 58%, var(--field) 100%),
+    linear-gradient(90deg, rgba(11, 14, 18, 0.93) 0%, rgba(11, 14, 18, 0.82) 34%, rgba(11, 14, 18, 0.28) 72%, rgba(11, 14, 18, 0.5) 100%);
+}
+/* The game's judgment line, across the field and over the words: a fixed height under the bar, so that it never runs through
+   the wordmark or the version. Where they fill the width the stage is one column, and they start lower. */
+.stage::after { content: ""; position: absolute; z-index: 2; left: 0; right: 0; top: calc(var(--bar-h) + 26px); height: 2px; background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.62) 55%, rgba(255, 255, 255, 0.2)); }
+/* The timeline: a bright bar with its blue trail behind it, as in a song. A wide box slid across, so the transform is all
+   that changes. It starts under the menu and runs under the shade that keeps the words readable, so that it never takes a
+   letter away as it passes: faint behind the words, bright where there are none. */
+.sweep { position: absolute; z-index: 0; inset: var(--bar-h) 0 0; pointer-events: none; animation: sweep var(--sweep) linear infinite; will-change: transform; }
+.sweep::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 4px; background: #e9faff; box-shadow: 0 0 14px 2px rgba(111, 214, 255, 0.95), 0 0 42px 6px rgba(111, 214, 255, 0.45); }
+.sweep::after { content: ""; position: absolute; top: 0; bottom: 0; right: 100%; width: min(26vw, 340px); background: linear-gradient(90deg, transparent, rgba(40, 110, 255, 0.28)); }
+@keyframes sweep { from { transform: translateX(0); } to { transform: translateX(100%); } }
+@media (max-width: 720px) { .sweep { opacity: 0.5; } }
+/* The notes: the game's round note with its bar, on the judgment line's side of the field. Each bursts as the timeline
+   crosses it (its own place in the sweep, --x, sets when), and comes back before the next crossing. */
+.note-on {
+  position: absolute;
+  z-index: 2;
+  left: calc(var(--x) * 100%);
+  top: calc(var(--bar-h) + 40px + var(--y) * 0.82);
+  width: 54px;
+  height: 54px;
+  margin: -27px 0 0 -27px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ff4f96 0 58%, #ffc2dc 60% 70%, #fff 72% 100%);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  animation: note-hit var(--sweep) linear infinite;
+  animation-delay: calc(var(--x) * var(--sweep) - var(--sweep));
+  will-change: transform, opacity;
+}
+.note-on::before { content: ""; position: absolute; left: 50%; top: 22%; bottom: 22%; width: 22%; margin-left: -11%; border-radius: 9px; background: #fff; }
+@keyframes note-hit {
+  0% { transform: scale(1); opacity: 1; }
+  5% { transform: scale(1.8); opacity: 0; }
+  58% { transform: scale(0.7); opacity: 0; }
+  66%, 100% { transform: scale(1); opacity: 1; }
+}
+/* The words, at the left. The wordmark is the page's one big thing. */
+.stage-copy { min-width: 0; max-width: 640px; }
+/* Big, the wordmark has the server's version at its side, on the same lean, standing on the same line. */
+.stage-mark { display: flex; align-items: flex-end; gap: clamp(10px, 2.2vw, 26px); margin: 0 0 18px; }
+.stage-mark .logo { --mark: clamp(52px, 12vw, 136px); }
+.stage-mark .logo .m { filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.55)); }
+.stage-mark .logo .m b { background: linear-gradient(180deg, #f1ffe4 0%, var(--accent) 58%, #58c31b 100%); -webkit-background-clip: text; background-clip: text; }
+.server-ver { flex: none; display: grid; gap: 3px; padding: 0 0 clamp(4px, 1vw, 14px) clamp(10px, 1.6vw, 16px); position: relative; color: #fff; }
+.server-ver::before { content: ""; position: absolute; left: 0; top: 2px; bottom: clamp(4px, 1vw, 14px); width: 2px; background: var(--accent); transform: skewX(-14deg); }
+.server-ver span { font: italic 800 11px/1 var(--wide); letter-spacing: 0.08em; color: #d7dde4; }
+.server-ver b { font: 800 clamp(17px, 2.3vw, 26px)/1.05 var(--display); letter-spacing: 0.01em; font-variant-numeric: tabular-nums; }
+.stage h2 { display: block; margin: 0 0 6px; font-size: clamp(19px, 2.4vw, 25px); letter-spacing: -0.02em; }
+.stage .lead { margin: 0 0 18px; color: #d7dde4; font-size: 15px; }
+.stage-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.stage-acts .button { width: auto; min-width: 230px; }
+/* The way to the broadcasts, beside the download and as big: the live section's red, dark while nobody is on air so that the
+   download stays the first thing to press, lit with a beating light and the count while someone is. */
+.watch-live {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 200px;
+  min-height: 54px;
+  padding: 10px 24px;
+  font: 800 19px/1.15 var(--text-face);
+  letter-spacing: -0.01em;
+  color: #fff;
+  text-decoration: none;
+  background: linear-gradient(180deg, #4c2129 0%, #36171e 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 95, 114, 0.4);
+  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  transition: filter var(--quick), transform var(--quick);
+}
+/* The ring follows the cut corners: the inset ring alone stops where a cut begins, so a stroke is laid across each cut
+   corner's square, just inside the cut (as on the podium's own card). Not when lit, which has no ring. */
+.watch-live:not(.on) {
+  background:
+    linear-gradient(to top left, transparent calc(50% - 1px), rgba(255, 95, 114, 0.4) calc(50% - 1px) 50%, transparent 50%) top left / 14px 14px no-repeat,
+    linear-gradient(to bottom right, transparent calc(50% - 1px), rgba(255, 95, 114, 0.4) calc(50% - 1px) 50%, transparent 50%) bottom right / 14px 14px no-repeat,
+    linear-gradient(180deg, #4c2129 0%, #36171e 100%);
+}
+.watch-live:hover { filter: brightness(1.2); }
+.watch-live:active { transform: translateY(1px); }
+.watch-live:focus-visible { outline: 2px solid #fff; outline-offset: -6px; }
+.watch-live i { width: 10px; height: 10px; border-radius: 50%; background: #ff5f72; opacity: 0.55; }
+.watch-live.on { color: #2b0409; background: linear-gradient(180deg, #ffa3ae 0%, #ff5f72 55%, #d9384d 100%); box-shadow: none; }
+.watch-live.on i { background: #2b0409; opacity: 1; animation: live-pulse 1.4s ease-in-out infinite; }
+.watch-count { min-width: 1.7em; padding: 3px 6px; font: 800 14px/1 var(--display); font-variant-numeric: tabular-nums; text-align: center; color: #fff; background: #2b0409; }
+/* The app's size and date under the buttons, and the way to the steps; or why there is no app yet. */
+.stage-meta { margin: 12px 0 0; color: #d7dde4; }
+/* The way to the broadcasts says what is there: live while someone is on air, the broadcasts otherwise. */
+.watch-live .when-on { display: none; }
+.watch-live.on .when-on { display: inline; }
+.watch-live.on .when-off { display: none; }
+/* While someone is on air the section above has the way to all broadcasts: the one under it does not repeat it. */
+/* The home page's box of broadcasts: the cards of who is on air, then the recordings, apart by a line's height. */
+.broadcasts #live:not([hidden]) + #replays:not([hidden]) { margin-top: 18px; }
+/* As wide as the code, whatever its words: the code's right edge stands on the page's. */
+.qr { width: 132px; margin: 0; text-align: center; }
+.qr img { display: block; width: 132px; height: 132px; padding: 7px; background: #fff; }
+.qr figcaption { margin-top: 7px; color: #d7dde4; font-size: var(--t-xs); line-height: 1.35; }
+@media (max-width: 860px) {
+  .stage-in { grid-template-columns: minmax(0, 1fr); min-height: 0; padding-block: 40px 34px; }
+  .stage .qr { display: none; }
+  .stage::before { background: linear-gradient(180deg, rgba(11, 14, 18, 0.55) 0%, rgba(11, 14, 18, 0.7) 55%, var(--field) 100%); }
+  .wall { grid-template-columns: repeat(5, minmax(0, 1fr)); inset: -14% -22%; }
+  .wall img:nth-child(n+16) { display: none; }
+  /* The words take the whole width here, so the notes stay on the empty band over them. */
+  .note-on { top: calc(var(--bar-h) + 6px + var(--y) * 0.1); width: 30px; height: 30px; margin: 0 0 0 -15px; }
+  .stage-in { padding-top: 62px; }
+}
+@media (max-width: 520px) {
+  .stage-acts .button, .stage-acts .watch-live { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* The timeline stands still in the field, and so do the notes. */
+  .sweep { animation: none; transform: translateX(62%); }
+  .note-on { animation: none; }
+}
+
+/* ------------------------------------------------------------------ lists on the front page and in profiles */
+
+.feed { list-style: none; margin: 0; padding: 0; }
+.feed li { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0 14px; min-height: 66px; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.075); }
+.feed li:last-child { border-bottom: 0; }
+/* The song's jacket, small. */
+.feed-jacket, .row-jacket { display: block; width: 64px; height: 48px; object-fit: cover; background: linear-gradient(160deg, #2a3138, #14181d); }
+.feed-text { display: grid; min-width: 0; }
+.feed .who { min-width: 0; overflow-wrap: anywhere; font-weight: 700; color: #fff; }
+.feed .who a { text-decoration: none; }
+.feed .who a:hover { color: var(--accent); }
+/* The title whole, and the chart on a line of its own in the section's colour, so that it does not read as part of the title. */
+.feed .what { display: grid; gap: 1px; color: var(--ash); font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+.feed .what a { text-decoration: none; color: var(--chalk); }
+.feed .what a:hover { color: var(--accent); }
+.what-chart { font-size: 12px; font-weight: 600; color: var(--accent); }
+.feed-end { display: grid; justify-items: end; gap: 1px; }
+.feed-score { font: 700 17px/1.2 var(--display); letter-spacing: 0.01em; font-variant-numeric: tabular-nums; color: #fff; }
+.feed-when { font-size: 12px; color: var(--ash); white-space: nowrap; }
+/* A new record's grade before its score, and how far it went over the player's best before. */
+.feed-score:has(.feed-grade) { display: inline-flex; justify-content: space-between; align-items: baseline; gap: 6px; min-width: 6.2em; }
+.feed-grade { font-size: 15px; }
+.feed-gain { font: 700 12.5px/1.2 var(--display); font-variant-numeric: tabular-nums; color: var(--accent); }
+/* Top players: the place in a leaning number, the whole row leading to the player. */
+.feed.ranks li { grid-template-columns: 2.2em minmax(0, 1fr) auto; }
+.feed.ranks .who a::after { content: ""; position: absolute; inset: 0; }
+.feed-rank { justify-self: end; font: italic 800 25px/1 var(--display); color: var(--ash); }
+.feed.ranks .feed-score { font-size: 19px; }
+/* First place in the LIFE gauge's colours, second and third in silver and bronze: the game's own top three. */
+.place-1 { padding-right: 0.08em; background: var(--life); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.place-2 { color: #dfe6ed; }
+.place-3 { color: #e7a56a; }
+@media (hover: hover) { .feed li { transition: background-color var(--quick); } .feed li:hover { background: rgba(255, 255, 255, 0.03); } }
+
+/* The top three of a ranking, side by side, first place in the middle and raised; as many columns as there are places. Each
+   is the place at the left and the name and score beside it, so that the box is full whatever its width. Phones: first
+   across the width. */
+/* The hall of fame: a box per month before, newest first, each with its first three in the podium's numbers. */
+.past-months { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 14px; }
+.past-month { padding: 14px 16px 12px; background: var(--rail); }
+.past-month h3 { margin: 0 0 10px; font-size: 14px; color: var(--chalk); }
+.past-top { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.past-top li { display: grid; grid-template-columns: 1.6em minmax(0, 1fr) auto; align-items: baseline; gap: 8px; }
+.past-top a { min-width: 0; overflow-wrap: anywhere; color: #fff; font-weight: 600; text-decoration: none; }
+.past-top a:hover { color: var(--accent); }
+.past-top b { font: 700 15px/1 var(--display); font-variant-numeric: tabular-nums; color: #fff; }
+.past-place { font: italic 800 20px/1 var(--display); color: var(--ash); }
+/* The signed-in player's own place, wherever it shows: a wash of the section's colour inside a thin rim of it, the
+   ring the podium gives their card. No stripe at one end: the whole row is theirs. */
+.board tr.me td, .feed li.me, .past-top li.me { --me-rim: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 13%, transparent); }
+/* A table row draws its rim in pieces: the top and the bottom on every cell, each end on the cell at that end. */
+.board tr.me td { box-shadow: inset 0 1px 0 var(--me-rim), inset 0 -1px 0 var(--me-rim); }
+.board tr.me td:first-child { box-shadow: inset 1px 0 0 var(--me-rim), inset 0 1px 0 var(--me-rim), inset 0 -1px 0 var(--me-rim); }
+.board tr.me td:last-child { box-shadow: inset -1px 0 0 var(--me-rim), inset 0 1px 0 var(--me-rim), inset 0 -1px 0 var(--me-rim); }
+.feed li.me, .past-top li.me { box-shadow: inset 0 0 0 1px var(--me-rim); }
+/* In a list (unlike a table, whose cells have padding) the words run to the row's ends: the row reaches 10px past
+   them on each side, so that the wash and its rim do not touch them. The words stay where they were. */
+.feed li.me, .past-top li.me { margin-inline: -10px; padding-inline: 10px; }
+/* The podium's card is cut at its top right, which clips a ring drawn inside it: a stroke laid across that corner's
+   square, from its top left to its bottom right (where the cut runs), just inside the cut, closes the ring. */
+.pod.me {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  background: linear-gradient(to top right, transparent calc(50% - 2px), var(--accent) calc(50% - 2px) 50%, transparent 50%) top right / var(--cut) var(--cut) no-repeat,
+              var(--glass-sheen), var(--glass-up);
+}
+.podium { display: grid; grid-template-columns: repeat(var(--places, 3), minmax(0, 1fr)); gap: var(--gap); align-items: end; }
+.pod {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 18px;
+  align-items: center;
+  min-width: 0;
+  padding: 18px var(--pad) 20px;
+  text-decoration: none;
+  background: var(--glass-sheen), var(--glass-up);
+  box-shadow: var(--glass-rim);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+  transition: filter var(--quick);
+}
+.pod:hover { filter: brightness(1.13); }
+.pod-place { grid-row: 1 / span 3; justify-self: start; font: italic 800 58px/1 var(--display); }
+.pod-who, .pod-score, .pod-sub { grid-column: 2; }
+.pod-who { overflow-wrap: anywhere; }
+.pod-name { font-size: 18px; font-weight: 700; color: #fff; text-decoration: none; }
+.pod-name::after { content: ""; position: absolute; inset: 0; }
+.pod-name:focus-visible { outline: none; }
+.pod-name:focus-visible::after { outline: 2px solid var(--cyan); outline-offset: -3px; }
+.pod .live-mark { z-index: 1; }
+.pod-score { font: 800 26px/1.1 var(--display); letter-spacing: 0.01em; font-variant-numeric: tabular-nums; color: var(--accent); }
+.pod-sub { font-size: 12.5px; color: var(--ash); }
+.pod.first { order: 2; padding-block: 28px 26px; }
+.pod.first .pod-place { font-size: 84px; }
+.pod.first .pod-name { font-size: 22px; }
+.pod.first .pod-score { font-size: 34px; }
+.pod.second { order: 1; }
+.pod.third { order: 3; }
+/* Two places: first, then second, not the other way round. */
+.pod.second:last-child { order: 3; }
+@media (max-width: 640px) {
+  .podium { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* One width for the numeral (the first place's is bigger), so that the cards' names and scores start on one line. */
+  .pod { grid-template-columns: var(--ctl-sm) minmax(0, 1fr); column-gap: 10px; padding-inline: 14px; }
+  .pod.first { order: 0; grid-column: 1 / -1; }
+  /* Two places: the second across the width too, not half a row with nothing beside it. */
+  .pod.second:last-child { grid-column: 1 / -1; }
+  .pod.first .pod-place { font-size: 64px; }
+  .pod-place { font-size: 44px; }
+  .pod-score { font-size: 22px; }
+  .pod.first .pod-score { font-size: 30px; }
+}
+
+/* The song catalog: the jacket on top, the words whole under it. Rows of tiles keep one line for each part (subgrid), so
+   titles and artists start on the same line across a row, however long any of them is. */
+.songs-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.songs-tools input.search { flex: 1 1 280px; height: 46px; margin: 0; font-size: 16px; }
+.songs { display: grid; grid-template-columns: repeat(auto-fill, minmax(186px, 1fr)); gap: 14px 12px; }
+.song { position: relative; display: grid; grid-row: span 4; grid-template-rows: subgrid; grid-template-columns: minmax(0, 1fr); row-gap: 0; min-width: 0; padding-bottom: 10px; color: #fff; text-decoration: none; background: var(--glass-sheen), var(--glass); box-shadow: var(--glass-rim); }
+/* The jacket's own box: it can grow under the pointer without moving anything. */
+/* With no picture to show, the site's name faintly: a tile that has no jacket, not one that failed to load. */
+.song-pic { position: relative; display: block; aspect-ratio: 4 / 3; overflow: hidden; background: linear-gradient(160deg, #2a3138, #14181d); }
+.song-pic::before { content: "DMTQ"; position: absolute; inset: 0; display: grid; place-items: center; font: italic 800 26px/1 var(--wide); color: rgba(255, 255, 255, 0.1); }
+.song-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.25s; }
+/* The timeline crosses the jacket under the pointer. */
+.song-pic::after { content: ""; position: absolute; z-index: 2; top: 0; bottom: 0; left: -8px; width: 3px; background: #e9faff; box-shadow: 0 0 10px 1px var(--cyan); opacity: 0; }
+@media (hover: hover) {
+  .song:hover .song-pic img { transform: scale(1.05); }
+  .song:hover .song-pic::after { opacity: 1; animation: tile-sweep 0.7s linear; }
+  .song:hover .t { color: var(--accent); }
+}
+@keyframes tile-sweep { from { left: 0; } to { left: 100%; } }
+.song .t { padding: 8px 10px 2px; font-weight: 700; font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; transition: color var(--quick); }
+.song .a { padding: 0 10px; color: var(--ash); font-size: var(--t-xs); line-height: 1.4; overflow-wrap: anywhere; }
+.song .p { padding: 3px 10px 0; color: var(--accent); font-size: 12px; font-weight: 700; line-height: 1.4; }
+.song:focus-visible { outline-offset: -3px; }
+@media (max-width: 520px) {
+  .songs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 8px; }
+}
+
+/* One song: its jacket on the blurred jacket, as the game's song screen. */
+.songhead { position: relative; display: flex; gap: 26px; align-items: flex-end; padding: var(--pad); overflow: hidden; isolation: isolate; background: var(--deck); clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%); }
+.songhead-back { position: absolute; z-index: -1; inset: -40px; width: calc(100% + 80px); max-width: none; height: calc(100% + 80px); object-fit: cover; filter: blur(32px) brightness(0.45) saturate(1.35); }
+.songhead-pic { flex: none; width: 240px; height: 180px; object-fit: cover; background: linear-gradient(160deg, #2a3138, #14181d); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16), 0 10px 34px rgba(0, 0, 0, 0.6); }
+.songhead-text { flex: 1; min-width: 0; }
+.songhead h2 { display: block; margin: 0 0 8px; font: 800 clamp(26px, 4.2vw, 44px)/1.2 var(--display); letter-spacing: 0.01em; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); }
+.songhead dl { display: flex; flex-wrap: wrap; gap: 4px 22px; margin: 0; font-size: 14px; }
+.songhead dl div { display: flex; gap: 7px; min-width: 0; }
+.songhead dt { color: #c5ced7; }
+.songhead dd { margin: 0; font-weight: 600; color: #fff; overflow-wrap: anywhere; }
+@media (max-width: 620px) {
+  .songhead { flex-direction: column; align-items: flex-start; gap: 16px; padding: var(--pad); }
+  .songhead-pic { width: 176px; height: 132px; }
+}
+
+/* One player: the place, the name, the figures, and their grades as a gauge. */
+.playerhead { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 22px; align-items: center; }
+.playerhead-place { grid-row: 1 / span 2; justify-self: start; white-space: nowrap; font: italic 800 clamp(50px, 7.5vw, 88px)/1 var(--display); color: var(--ash); }
+/* No place yet (no record): the same stack of name and figures, from the left. */
+.playerhead:not(:has(.playerhead-place)) { grid-template-columns: minmax(0, 1fr); }
+.playerhead h2 { margin: 0; font-size: clamp(24px, 3.4vw, 36px); line-height: 1.15; letter-spacing: -0.02em; }
+.playerhead .stats { align-self: start; margin-top: 8px; grid-template-columns: repeat(3, max-content); gap: 8px 38px; }
+.playerhead .num { font-size: clamp(26px, 3.4vw, 38px); }
+.playerhead .stat:first-child .num { color: var(--accent); }
+@media (max-width: 520px) {
+  .playerhead { grid-template-columns: minmax(0, 1fr); }
+  .playerhead-place { grid-row: auto; }
+  .playerhead .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* How many charts at each grade: one bar in the grades' colours, long by their counts, and the counts under it. */
+.grade-bar { display: flex; height: 8px; margin: 18px 0 8px; background: var(--rail); }
+.grade-bar i { display: block; min-width: 2px; background: var(--g); }
+.grades { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; }
+.g-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font: 700 15px/1.5 var(--display); font-variant-numeric: tabular-nums; color: #fff; }
+
+/* Grades in the game's way: a heavy leaning letter that needs no box. S is the best, and lit. */
+.grade { --g: #9aa5b1; display: inline-block; min-width: 1.05em; padding-right: 0.08em; text-align: center; font: italic 800 19px/1 var(--wide); color: var(--g); }
+.gS { --g: #a4f55f; text-shadow: 0 0 10px rgba(140, 242, 61, 0.55); }
+.gA { --g: #6fd6ff; }
+.gB { --g: #c491ff; }
+.gC { --g: #ffd24d; }
+.gD { --g: #ff9a5c; }
+.gE, .gF { --g: #9aa5b1; }
+.mark { display: inline-block; padding: 1px 6px; font: 800 12px/1.5 var(--display); letter-spacing: 0.04em; }
+/* Beside a grade's tall letter the mark sits on its middle, not on its foot. */
+.grade + .mark { vertical-align: 0.2em; }
+.mark.ac { background: #1d5fc9; color: #fff; }
+.mark.pp { background: linear-gradient(90deg, #ff3b96, #a65cff, #2fb4ff); color: #fff; }
+.mark.new { background: var(--accent); color: var(--accent-ink); }
+
+/* A player's twelve weeks: a column per week, one colour, stronger with more plays that day. A fixed height: the grid is as
+   wide as its box, and no taller on a wide screen. Over it where each month begins, under it what the colours mean. */
+.card:has(> .activity) { display: flex; flex-direction: column; }
+/* Beside the levels card the activity card is as tall as it: the days' rows share that height (each at least 15px),
+   so that no empty band is left at its foot. Alone (a phone) the rows stay 15px. */
+.card:has(> .activity) > .activity { flex: 1 1 auto; }
+.activity { display: grid; grid-template-rows: repeat(7, minmax(15px, 1fr)); grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; }
+.activity i, .activity-steps i { display: block; background: var(--rail); }
+.activity i.none { background: none; }
+.activity i.c1, .activity-steps i.c1 { background: color-mix(in srgb, var(--accent) 24%, var(--rail)); }
+.activity i.c2, .activity-steps i.c2 { background: color-mix(in srgb, var(--accent) 45%, var(--rail)); }
+.activity i.c3, .activity-steps i.c3 { background: color-mix(in srgb, var(--accent) 68%, var(--rail)); }
+.activity i.c4, .activity-steps i.c4 { background: color-mix(in srgb, var(--accent) 85%, var(--rail)); }
+.activity i.c5, .activity-steps i.c5 { background: var(--accent); }
+.activity i[data-tip]:hover { box-shadow: 0 0 0 1px #fff; }
+.activity-months { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; margin-bottom: 4px; font: 500 12px/1.2 var(--display); font-variant-numeric: tabular-nums; color: var(--ash); }
+.activity-months span { white-space: nowrap; }
+.activity-key { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--ash); }
+.activity-steps { display: flex; gap: 2px; }
+.activity-steps i { width: 13px; height: 13px; }
+/* Records by LINE mode: a name, a bar, its number. The bars share out the height of the box beside them. */
+/* Records by level: as tall as the card beside it, the rows spread over it; each the level, the bar and how many. */
+.card:has(> .levels) { align-self: stretch; display: flex; flex-direction: column; }
+.levels { flex: 1; display: grid; gap: 6px; align-content: space-evenly; }
+.level { display: grid; grid-template-columns: 3.4em minmax(0, 1fr) 4.6em; align-items: center; gap: 12px; }
+.level-name { font: italic 800 12.5px/1 var(--wide); color: var(--ash); white-space: nowrap; }
+.level-bar { display: flex; gap: 2px; height: 10px; background: var(--rail); }
+.level-bar i { display: block; height: 100%; background: var(--g); text-shadow: none; }
+.level b { font: 700 15px/1 var(--display); font-variant-numeric: tabular-nums; text-align: right; color: #fff; }
+.level b small { display: inline-block; min-width: 2.4em; text-align: left; font-size: 12.5px; color: var(--ash); }
+/* The one tooltip of a page's charts. */
+.chart-tip { position: fixed; z-index: 40; max-width: 320px; padding: 5px 9px; font-size: 12.5px; font-weight: 600; color: #fff; background: rgba(21, 26, 32, 0.96); box-shadow: var(--glass-rim), 0 6px 18px rgba(0, 0, 0, 0.5); pointer-events: none; }
+/* A player's lists: jacket, song and chart, score, mark, time. */
+table.plays { table-layout: fixed; }
+table.plays td { overflow-wrap: anywhere; padding-block: 8px; }
+table.plays td.jk { width: 76px; padding-right: 0; }
+table.plays td.song-cell { font-weight: 600; white-space: normal; }
+table.plays td.chart { width: 10.5em; color: var(--ash); font-size: 13px; }
+table.plays td.r { width: 6.5em; }
+table.plays td.flag { width: 5em; }
+table.plays td.when { width: 6.5em; color: var(--ash); font-size: 13px; }
+.chart-sub { display: none; }
+@media (max-width: 620px) {
+  td.when, td.chart { display: none; }
+  .row-jacket { width: 52px; height: 39px; }
+  /* Two lines beside the jacket: the title and its score, then the chart with its time and the marks. */
+  table.plays, table.plays tbody { display: block; }
+  table.plays tr { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 2px 10px; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.075); }
+  table.plays td { display: block; width: auto; padding: 0; border: 0; }
+  table.plays td.when, table.plays td.chart { display: none; }
+  table.plays td.jk { grid-column: 1; grid-row: 1 / span 2; width: auto; padding: 0; }
+  table.plays td.song-cell { display: contents; }
+  table.plays td.song-cell > a { grid-column: 2; grid-row: 1; font-weight: 600; overflow-wrap: anywhere; }
+  .chart-sub { display: block; grid-column: 2; grid-row: 2; color: var(--ash); font-size: 12.5px; font-weight: 400; overflow-wrap: anywhere; }
+  table.plays td.r { grid-column: 3; grid-row: 1; justify-self: end; width: auto; font-size: 15px; }
+  /* At the score's right edge: the grade (or NEW) last, a mark before it, so that grades and scores end on one line. */
+  table.plays td.flag { grid-column: 3; grid-row: 2; justify-self: end; display: flex; flex-direction: row-reverse; align-items: center; gap: 6px; width: auto; padding: 0; }
+}
+
+/* ------------------------------------------------------------------ the download page */
+
+.install-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 32px; align-items: start; }
+.install-main { min-width: 0; }
+.install .button { max-width: 460px; min-height: 60px; font-size: 21px; }
+/* Android only, said as plainly as the button is. */
+.for-android { margin: 12px 0 0; font-size: 14px; color: var(--chalk); }
+/* Three steps in order, big numbers: this one really is a sequence. Grouped by the space between them, with no box each. */
+.steps { list-style: none; counter-reset: step; margin: 28px 0 0; padding: 24px 0 0; border-top: 1px solid rgba(255, 255, 255, 0.12); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 36px; font-size: 14px; line-height: 1.6; color: #dfe5eb; }
+.steps li { position: relative; counter-increment: step; min-width: 0; padding-left: 48px; overflow-wrap: break-word; }
+.steps li::before { content: counter(step); position: absolute; left: 0; top: -6px; font: italic 800 44px/1 var(--display); color: var(--accent); }
+/* A step's words, one paragraph; its name first, on a line of its own. */
+.step-text { margin: 0; }
+.step-text > b:first-child { display: block; margin-bottom: 4px; font-size: 16px; font-weight: 800; color: #fff; }
+.notes { margin: 16px 0 0; padding: 0; list-style: none; color: var(--ash); font-size: var(--t-sm); }
+.notes li { margin: 4px 0; }
+.notes b { font-weight: 700; color: #fff; }
+@media (max-width: 860px) { .steps { grid-template-columns: minmax(0, 1fr); gap: 14px; } }
+/* The screen each step meets on the phone, drawn small and dark like Android's, the part to press ringed in the section's
+   colour; at the foot of its step, so that the three line up. */
+.steps li { display: flex; flex-direction: column; }
+.screen { display: grid; align-content: center; gap: 8px; min-height: 104px; margin-top: auto; padding: 12px 14px; background: #0c0f13; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; font: 400 13px/1.35 var(--text-face); color: #e8edf2; }
+.steps li > .screen { margin-top: 14px; }
+/* Side by side, the three steps share two rows (subgrid): their words in the first, their screens in the second. A
+   screen that needs more room (the app's icon over its name) makes the row taller for all three, so that the screens
+   start and end on the same lines; each keeps its content in its middle. */
+@media (min-width: 861px) {
+  .steps { grid-template-rows: auto auto; row-gap: 14px; }
+  .steps li { display: grid; grid-row: span 2; grid-template-rows: subgrid; }
+  .steps li > .screen { margin-top: 0; }
+}
+.screen-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.screen-file { flex: none; display: grid; place-items: center; width: 38px; height: 46px; font: 800 11px/1 var(--wide); color: #0c0f13; background: var(--accent); clip-path: polygon(0 0, 70% 0, 100% 22%, 100% 100%, 0 100%); }
+.screen-text { display: grid; gap: 2px; min-width: 0; }
+.screen-text b { font-weight: 600; color: #fff; overflow-wrap: anywhere; }
+.screen-text small { color: #aab4be; font-size: 12px; }
+.screen-title { font-size: 15px; font-weight: 700; color: #fff; }
+.screen-switch { position: relative; flex: none; width: 40px; height: 22px; margin-left: auto; border-radius: 11px; background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+.screen-switch::after { content: ""; position: absolute; right: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #0c0f13; }
+.screen-home { justify-items: center; text-align: center; }
+.screen-icon { display: block; width: 56px; height: 56px; border-radius: 14px; overflow: hidden; background: #1c2229; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent); }
+.screen-icon img { display: block; width: 100%; height: 100%; }
+.screen-home .app-name { font-size: 12.5px; color: #fff; }
+/* A phone: the number beside the step's name and the words under both, which leaves the app's name room for one line. */
+@media (max-width: 520px) {
+  .steps li { padding-left: 0; }
+  .steps li::before { top: -5px; font-size: 30px; }
+  .step-text > b:first-child { padding-left: 28px; margin-bottom: 6px; }
+}
+@media (max-width: 720px) { .install-head { grid-template-columns: minmax(0, 1fr); } .install-head .qr { display: none; } }
+/* Install troubleshooting, folded away until needed. */
+.help { margin-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.12); }
+.help summary { cursor: pointer; color: var(--accent); font-weight: 600; padding: 11px 0; }
+.help[open] summary { color: #fff; }
+/* Closed and last in its card: the summary's tap padding (11px) is not added to the card's at the foot. */
+.help:last-child:not([open]) { margin-bottom: -11px; }
+.help ul { margin: 1px 0 0; padding: 0; list-style: none; color: #dfe5eb; font-size: 14px; }
+.help b { color: #fff; }
+.help li { margin: 6px 0; }
+
+/* Sign-in pages: one narrow panel in the middle of the page. */
+.signin { width: 100%; max-width: 440px; justify-self: center; margin-top: clamp(0px, 5vh, 56px); }
+/* The sign-in as the site's front door: the wordmark big and what this is, the form under them. The bar's own small mark
+   steps aside for the big one. */
+.door { display: grid; justify-items: center; gap: 14px; margin-top: clamp(8px, 7vh, 72px); text-align: center; }
+.door-mark { --mark: clamp(44px, 9vw, 92px); justify-content: center; }
+.door-mark .m { filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.55)); }
+.door-line { margin: 0; font-size: clamp(15px, 1.8vw, 18px); font-weight: 700; color: #fff; text-wrap: balance; }
+.door + .signin { margin-top: 4px; }
+body.signed-out:has(.door) .bar .logo { visibility: hidden; }
+/* Whose account is signed in, in the bar beside the way out: a player as the game's lobby shows one, a round badge with
+   the first letter of the name by the name, and small under it the place in the rankings and the account's ID (on the
+   admin pages: whether it is the owner's). Not a key, with no fill and no cut corners: Sign out beside it is the bar's only
+   key, so the two cannot be taken for each other. */
+.auth-form { align-items: center; gap: 14px; }
+.auth-who { display: inline-flex; align-items: center; gap: 9px; min-width: 0; color: #fff; text-decoration: none; }
+.who-badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font: 800 15px/1 var(--display);
+  color: var(--accent-ink);
+  /* The section's colour lit from the top left, like the game's badges, inside a thin ring of it apart from the bar. */
+  background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--accent) 55%, #fff), var(--accent) 58%, color-mix(in srgb, var(--accent) 72%, #000));
+  box-shadow: 0 0 0 2px var(--field), 0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+/* At most 12em wide: a long name wraps there instead of pushing the sections out of the bar. */
+.who-text { display: grid; gap: 1px; min-width: 0; max-width: 12em; line-height: 1.2; }
+.who-name { font-size: 13.5px; font-weight: 700; color: #fff; overflow-wrap: anywhere; transition: color var(--quick); }
+.who-sub { font-size: 11.5px; font-weight: 500; color: var(--ash); overflow-wrap: anywhere; }
+/* Leading to the player's own page (an account linked to its game player): the name takes the section's colour under the
+   pointer and the badge brightens. */
+a.auth-who:hover .who-name { color: var(--accent); }
+a.auth-who:hover .who-badge { filter: brightness(1.08) saturate(1.1); }
+a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; border-radius: 6px; }
+/* Below 1100 px the badge alone, which still leads to the page (the name is its label for screen readers, and its title
+   under the pointer): the sections need the room there. */
+@media (max-width: 1099px) { .who-text { display: none; } }
+@media (max-width: 720px) { .auth-form { gap: 10px; } }
+.signin h2 { font-size: 22px; }
+.signin-form { display: grid; gap: 14px; margin: 16px 0 0; }
+.signin-form .field input { height: 46px; font-size: 16px; }
+.signin-form .button { margin-top: 4px; }
+/* A phone held sideways, as the game's own web view shows this page (its score viewer is behind the sign-in): the wordmark
+   beside the form, smaller, so that the form is on the screen without scrolling. What else the page says (a notice) goes
+   across both. */
+@media (orientation: landscape) and (max-height: 520px) {
+  main.wrap:has(> .door) { grid-template-columns: minmax(0, 1fr) minmax(0, 400px); align-items: center; column-gap: 32px; padding-block: 12px 16px; }
+  main.wrap:has(> .door) > :not(.door, .signin) { grid-column: 1 / -1; }
+  .door { margin-top: 0; gap: 8px; }
+  .door-mark { --mark: clamp(34px, 6.5vw, 60px); }
+  .door + .signin { margin-top: 0; }
+  .signin { padding-block: 16px; }
+  .signin h2 { font-size: 19px; }
+  .signin-form { gap: 10px; margin-top: 10px; }
+  .signin-form .field input { height: 40px; }
+}
+/* Smaller still (a small phone's web view): the form closer together, so that its button is on the screen as well. */
+@media (orientation: landscape) and (max-height: 360px) {
+  main.wrap:has(> .door) { padding-block: 8px 12px; }
+  .signin { padding-block: 12px; }
+  .signin-form { gap: 6px; margin-top: 6px; }
+  .signin-form .field input { height: 36px; }
+}
+
+/* The footer: what this site is, in two short lines, and the ways on. */
+.foot { flex: none; color: var(--ash); font-size: 12.5px; line-height: 1.6; background: #0d1014; border-top: 1px solid var(--seam); }
+.foot-in { display: flex; justify-content: space-between; align-items: center; gap: 14px 32px; padding-block: 16px 18px; }
+.foot-note { min-width: 0; }
+.foot-note p { margin: 0; }
+.foot-keys { flex: none; display: flex; align-items: center; gap: 4px 14px; flex-wrap: wrap; }
+.foot-tag { color: var(--ash); white-space: nowrap; }
+/* A small link by its name, in the menus' face. */
+.key { position: relative; display: block; padding: 6px 0; font: 700 11px/1 var(--wide); letter-spacing: 0.05em; color: var(--chalk); text-decoration: none; white-space: nowrap; }
+.key::after { content: ""; position: absolute; inset: -8px -6px; }
+.key:hover { color: var(--accent); }
+@media (max-width: 720px) {
+  .foot-in { flex-direction: column; align-items: flex-start; padding-block: 14px 18px; }
+  .foot-keys { order: -1; }
+}
+
+/* ------------------------------------------------------------------ live view */
+
+/* A LIVE link next to a player's name. Text, with a larger invisible area for a finger. */
+.live-mark { position: relative; margin-left: 6px; font: 800 12px/1 var(--display); letter-spacing: 0.06em; color: var(--bad); text-decoration: none; white-space: nowrap; }
+.live-mark:hover { text-decoration: underline; }
+.live-mark::after { content: ""; position: absolute; inset: -12px -6px; }
+
+/* The watch page: the picture with what belongs to it, and beside it who else is on and the past broadcasts; under it on
+   smaller screens, or in the wide view. With nothing playing the list has the whole width. */
+.watch { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap); align-items: start; }
+.watch > * { min-width: 0; }
+.live-page { display: grid; gap: 14px; min-width: 0; }
+.live-page > * { min-width: 0; }
+.watch-side { display: grid; gap: var(--gap); min-width: 0; }
+@media (min-width: 1040px) {
+  .watch.has-player:not(.wide) { grid-template-columns: minmax(0, 1fr) 348px; }
+  /* The list scrolls beside the picture, which stays in place. */
+  .watch.has-player:not(.wide) .watch-side { position: sticky; top: 74px; }
+  .watch.has-player:not(.wide) .past-list { max-height: calc(100vh - 220px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--seam) transparent; }
+}
+/* A phone held upright: the picture from edge to edge, its size is what matters most. */
+@media (max-width: 720px) and (orientation: portrait) {
+  .watch.has-player .live-stage { width: calc(100vw); margin-inline: calc((100% - 100vw) / 2); }
+}
+/* Past broadcasts: cards with the song's jacket. Beside the picture, one per row with the words at its side. */
+.past-tools { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 11em); gap: 8px; margin-bottom: 14px; }
+@media (max-width: 520px) { .past-tools { grid-template-columns: minmax(0, 1fr); } }
+@media (min-width: 1040px) { .watch.has-player:not(.wide) .past-tools { grid-template-columns: minmax(0, 1fr); } }
+.past-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 16px 14px; }
+.past { display: grid; gap: 8px; min-width: 0; color: inherit; text-decoration: none; }
+.past-pic { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; background: linear-gradient(160deg, #2a3138, #14181d); }
+.past-pic::before { content: "DMTQ"; position: absolute; inset: 0; display: grid; place-items: center; font: italic 800 26px/1 var(--wide); color: rgba(255, 255, 255, 0.1); }
+.past-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }
+.past:hover .past-pic img { transform: scale(1.04); }
+.past-len { position: absolute; right: 6px; bottom: 6px; padding: 1px 6px; font: 700 12px/1.45 var(--display); font-variant-numeric: tabular-nums; color: #fff; background: rgba(8, 10, 13, 0.82); }
+/* How far this viewer got. */
+.past-seen { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--accent); }
+.past-text { display: grid; gap: 1px; min-width: 0; }
+.past .who { font-weight: 700; color: #fff; overflow-wrap: anywhere; transition: color var(--quick); }
+.past:hover .who, .past.on .who { color: var(--accent); }
+/* The recording playing now: a ring inside its picture (drawn outside it, the side list's scroll box cut it off on
+   two sides). Over the picture, and never in the pointer's way. */
+.past.on .past-pic::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 0 2px var(--accent); pointer-events: none; }
+.past .doing { color: var(--chalk); font-size: 13px; overflow-wrap: anywhere; }
+.past-when { color: var(--ash); font-size: 12.5px; }
+@media (min-width: 1040px) {
+  .watch.has-player:not(.wide) .past-list { grid-template-columns: minmax(0, 1fr); gap: 10px; padding-right: 4px; }
+  .watch.has-player:not(.wide) .past { grid-template-columns: 128px minmax(0, 1fr); gap: 10px; align-items: start; }
+}
+#live-muted { margin: 0; }
+/* The songs of a recording: each a jump to where it begins. */
+.live-chapters h3 { margin: 0 0 8px; }
+.chapters { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 2px 14px; }
+.chapters button { display: grid; grid-template-columns: 3.4em 36px minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; padding: 8px; border: 0; font: inherit; text-align: left; color: inherit; background: none; cursor: pointer; transition: background-color var(--quick); }
+.chapters button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); }
+.chapters button:disabled { cursor: default; }
+.chapters button.on { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.chapters button.on b { color: var(--accent); }
+.ch-time { justify-self: end; font: 700 14px/1.3 var(--display); font-variant-numeric: tabular-nums; color: var(--accent); }
+.chapters b { font-weight: 600; font-size: 14px; color: #fff; overflow-wrap: anywhere; }
+.ch-chart { font-size: 12.5px; color: var(--ash); white-space: nowrap; }
+.ch-chart.sig0 { color: var(--sig0); }
+.ch-chart.sig1 { color: var(--sig1); }
+.ch-chart.sig2 { color: var(--sig2); }
+.ch-chart.sig3 { color: var(--sig3); }
+/* The song playing: a line along its foot as far as it has come. */
+.chapters button { position: relative; }
+.chapters button.on::after { content: ""; position: absolute; left: 0; bottom: 0; width: var(--done, 0%); height: 2px; background: var(--accent); }
+/* The song's jacket, small and square, on the dark of a missing one. */
+.ch-jacket { display: block; width: 36px; height: 36px; object-fit: cover; background: #0c0f13; }
+/* A phone: the chart under the name, which keeps the name its room; the time and the jacket beside both lines. */
+@media (max-width: 520px) {
+  .chapters button { grid-template-columns: 3.4em 36px minmax(0, 1fr); row-gap: 0; }
+  .chapters .ch-time, .chapters .ch-jacket { grid-row: span 2; }
+  .chapters .ch-chart { grid-column: 3; }
+}
+/* Picking up where this viewer left off, for a few seconds on the picture, and the way back to the start. */
+.live-resume { position: absolute; left: 12px; bottom: 82px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; max-width: calc(100% - 24px); padding: 6px 12px; font-size: 13px; color: #fff; background: rgba(12, 15, 19, 0.82); box-shadow: var(--glass-rim); }
+.live-resume[hidden] { display: none; }
+/* The network is gone and what was in hand has played. */
+.live-lost { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #fff; background: rgba(12, 15, 19, 0.82); box-shadow: var(--glass-rim); white-space: nowrap; }
+.live-lost[hidden] { display: none; }
+/* A press that brought the controls back is not over yet: a second one must reach the picture, not what appeared under it. */
+.live-stage.just-woke .live-ctl { pointer-events: none; }
+/* Paused: the light rests while the picture does. */
+.live-stage.paused .live-pill i { animation: none; opacity: 0.5; }
+.past-more { justify-content: center; }
+.link-btn { padding: 2px 0; border: 0; font: inherit; font-weight: 700; color: inherit; background: none; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.live-empty { margin: 0; }
+/* Nobody on air: a screen with OFF AIR across it, faint, and what to expect in its middle. */
+/* When someone last was on air, and the last two weeks a cell a day, stronger with more minutes on air. */
+.last-air { margin: 2px 0 10px; color: var(--chalk); }
+.air-days { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 3px; width: min(100%, 520px); }
+/* An empty day is a light wash and a day on air the section's colour, stronger for more: both over whatever the card is. */
+.air-days i { display: block; height: 22px; background: rgba(255, 255, 255, 0.09); }
+.air-days i.c1 { background: color-mix(in srgb, var(--accent) 32%, transparent); }
+.air-days i.c2 { background: color-mix(in srgb, var(--accent) 50%, transparent); }
+.air-days i.c3 { background: color-mix(in srgb, var(--accent) 68%, transparent); }
+.air-days i.c4 { background: color-mix(in srgb, var(--accent) 85%, transparent); }
+.air-days i.c5 { background: var(--accent); }
+.air-days i:hover { box-shadow: 0 0 0 1px #fff; }
+.air-days-ends { display: flex; justify-content: space-between; width: min(100%, 520px); margin: 4px 0 12px; color: var(--ash); font-size: 11.5px; }
+.off-air { position: relative; display: grid; align-content: center; justify-items: center; gap: 4px; min-height: clamp(190px, 30vh, 320px); text-align: center; overflow: hidden; }
+.off-air > :not(.off-air-word) { position: relative; max-width: 56ch; }
+/* The days and their two ends as wide as each other: a width in letters would differ, their letters being of two sizes. */
+.off-air > .air-days, .off-air > .air-days-ends { max-width: 100%; }
+.off-air-word { position: absolute; inset: 0; display: grid; place-items: center; font: italic 800 clamp(48px, 11vw, 132px)/1 var(--wide); letter-spacing: 0.02em; color: rgba(255, 255, 255, 0.05); white-space: nowrap; pointer-events: none; user-select: none; }
+/* REPLAY in metal: a section's red is for what is live. */
+#mast.is-replay .word { background: linear-gradient(180deg, #fff 8%, #8d97a2 72%); -webkit-background-clip: text; background-clip: text; }
+.live-empty-head { font-size: var(--t-lg); font-weight: 700; color: #fff; }
+.live-empty p { margin: 0 0 6px; }
+.live-empty p:last-child { margin-bottom: 0; }
+
+/* The usual phone stream's shape until the video says its own (--ar, set by the page), and never taller than 75% of the
+   screen: narrower then, in the middle, not a wide box with bars at its sides. The frame is a shadow outside the edge, so
+   it takes nothing from that shape. */
+.live-stage { --ar: calc(1488 / 720); position: relative; aspect-ratio: var(--ar); width: min(100%, calc(75vh * var(--ar))); margin-inline: auto; background: #000; box-shadow: 0 0 0 1px var(--seam), 0 12px 34px rgba(0, 0, 0, 0.55); }
+.live-video { display: block; width: 100%; height: 100%; background: #000; }
+/* In fullscreen the box is the screen, and the picture keeps its shape inside it. */
+.live-stage:fullscreen { width: 100%; height: 100%; aspect-ratio: auto; box-shadow: none; }
+.live-stage:fullscreen .live-video { object-fit: contain; }
+/* The player's own bar along the picture's foot, the same for a broadcast and a recording: a recording's timeline across
+   the whole width, the buttons under it. No glass here: a blur over moving video would be redrawn with every frame. */
+.live-ctl { position: absolute; inset: auto 0 0; display: grid; padding: 30px 8px 4px; color: #fff; background: linear-gradient(0deg, rgba(0, 0, 0, 0.84) 0%, rgba(0, 0, 0, 0.55) 52%, transparent 100%); transition: opacity 0.25s; }
+.ctl-row { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.live-stage.idle { cursor: none; }
+.live-stage.idle .live-ctl { opacity: 0; pointer-events: none; }
+.ctl-gap { flex: 1; }
+.ctl-time { flex: none; margin: 0 8px; font: 700 13.5px/1 var(--display); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; text-shadow: 0 1px 2px #000; }
+.ctl-word { font: 700 13.5px/1 var(--display) !important; font-variant-numeric: tabular-nums; }
+/* The timeline: played in the section's colour, loaded lighter, the rest faint; marks where songs begin. */
+.ctl-track { position: relative; height: 22px; margin: 0 6px 2px; }
+.live-ctl input.ctl-seek { position: absolute; inset: 0; width: 100%; height: 22px; margin: 0; padding: 0; background: none; cursor: pointer; -webkit-appearance: none; appearance: none; --p: 0%; --b: 0%; }
+.ctl-seek::-webkit-slider-runnable-track { height: 4px; background: linear-gradient(90deg, var(--accent) 0 var(--p), rgba(255, 255, 255, 0.5) var(--p) var(--b), rgba(255, 255, 255, 0.24) var(--b)); transition: height 0.1s; }
+.ctl-seek::-moz-range-track { height: 4px; background: linear-gradient(90deg, var(--accent) 0 var(--p), rgba(255, 255, 255, 0.5) var(--p) var(--b), rgba(255, 255, 255, 0.24) var(--b)); }
+.ctl-seek::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: #fff; box-shadow: 0 0 7px var(--accent), 0 1px 2px rgba(0, 0, 0, 0.7); }
+.ctl-seek::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 0 7px var(--accent), 0 1px 2px rgba(0, 0, 0, 0.7); }
+.ctl-marks { position: absolute; left: 7px; right: 7px; top: 8px; height: 6px; pointer-events: none; }
+/* A song's part of the timeline: a thin dark cut where it begins; the part under the pointer a little higher and lit. */
+.ctl-marks i { position: absolute; top: 0; height: 6px; transition: top 0.1s, height 0.1s, background-color 0.1s; }
+.ctl-marks i.cut { border-left: 2px solid rgba(8, 10, 13, 0.92); }
+.ctl-marks i.hot { top: -2px; height: 10px; background: rgba(255, 255, 255, 0.22); }
+.ctl-bubble { position: absolute; bottom: 24px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; max-width: 70%; padding: 3px 8px; font-size: 12.5px; font-weight: 600; color: #fff; background: rgba(21, 26, 32, 0.94); box-shadow: var(--glass-rim); pointer-events: none; }
+/* The song's jacket at the bubble's start, and the time and the name beside it, cut short with dots when long. */
+.bubble-pic { flex: none; display: block; width: 36px; height: 36px; margin: 2px 0 2px -5px; object-fit: cover; background: #0c0f13; }
+.bubble-text { min-width: 0; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+/* A recording's mark: the same shape, in metal, with no light. */
+.live-pill.replay { background: #47505b; }
+.live-pill.replay i { display: none; }
+/* Connection details, over the picture's corner. */
+.live-stats { position: absolute; right: 10px; top: 10px; display: grid; grid-template-columns: auto auto; gap: 1px 12px; margin: 0; padding: 8px 11px; font-size: 12px; line-height: 1.5; color: #fff; background: rgba(12, 15, 19, 0.82); box-shadow: var(--glass-rim); }
+.live-stats dt { color: #c5ced7; }
+.live-stats dd { margin: 0; font: 700 13px/1.4 var(--display); font-variant-numeric: tabular-nums; text-align: right; }
+/* A short word in the picture's middle: where a tap went, the speed now. */
+.live-flash { position: absolute; left: 50%; top: 50%; padding: 8px 16px; font: 800 22px/1 var(--display); color: #fff; background: rgba(12, 15, 19, 0.72); opacity: 0; transform: translate(-50%, -50%); transition: opacity 0.18s; pointer-events: none; }
+.live-flash.on { opacity: 1; }
+/* A recording that came to its end. */
+.live-end { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; background: rgba(8, 10, 13, 0.6); }
+/* Behind a broadcast on a slow connection: the way to now. */
+.go-live { height: 24px; padding: 0 10px; border: 0; font: 700 12.5px/1 var(--text-face); color: #2b0409; background: #ff8d9e; cursor: pointer; pointer-events: auto; }
+
+/* Live, and plain to see: a solid red mark that stays on the picture, with its pulsing light; beside it how long the
+   broadcast has run, and who and what while the controls are there, over a shade of their own (the game's colours can
+   be anything). The frame around the picture is lit too. */
+.live-stage.is-live { box-shadow: 0 0 0 2px #ff3148, 0 0 34px rgba(255, 49, 72, 0.42); }
+.live-pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px 5px 10px; font: 800 13px/1 var(--wide); letter-spacing: 0.08em; color: #fff; background: #e4122c; }
+.live-pill i { width: 8px; height: 8px; border-radius: 50%; background: #fff; box-shadow: 0 0 6px #fff; animation: live-pulse 1.4s ease-in-out infinite; }
+@keyframes live-pulse { 50% { opacity: 0.3; } }
+/* A recording's mark: the same shape, in metal, with no light. */
+.live-pill.replay { background: #47505b; }
+.live-pill.replay i { display: none; }
+.live-top { position: absolute; inset: 0 0 auto; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 12px 14px 30px; background: linear-gradient(180deg, rgba(0, 0, 0, 0.6) 0%, transparent 100%); pointer-events: none; }
+.live-clock { padding: 4px 8px; font: 700 13px/1 var(--display); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; color: #fff; background: rgba(0, 0, 0, 0.6); }
+.live-clock:empty { display: none; }
+.live-title { display: none; align-items: baseline; gap: 8px; min-width: 0; color: #fff; text-shadow: 0 1px 3px #000; white-space: nowrap; overflow: hidden; }
+.live-stage:fullscreen .live-title { display: flex; }
+.live-title b { flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; font-size: 16px; font-weight: 700; }
+.live-title span { font-size: 13px; color: #e3e6ea; overflow: hidden; text-overflow: ellipsis; transition: opacity 0.25s; }
+.live-stage.idle .live-title span { opacity: 0; }
+@media (max-width: 520px) { .live-resume { bottom: 62px; left: 8px; } .live-top { padding: 8px 10px 14px; gap: 7px; } .live-pill { font-size: 11px; padding: 4px 8px; } .live-clock { font-size: 12px; padding: 3px 6px; } .live-title b { font-size: 14px; } .live-title span { font-size: 12px; } }
+
+/* Who it is, under the picture. On a phone the song has the whole width under the name, the key after it. */
+.live-info { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px 12px; margin-top: 16px; min-width: 0; }
+.live-info[hidden] { display: none; }
+/* The two buttons stay together, however long the song's name is. */
+.live-acts { display: flex; gap: 8px; }
+.live-facts { min-width: 0; display: grid; gap: 1px; }
+@media (max-width: 620px) {
+  .live-info { grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .live-acts { grid-column: 1 / -1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+}
+.live-name { justify-self: start; font-size: 18px; font-weight: 700; line-height: 1.4; color: #fff; text-decoration: none; overflow-wrap: anywhere; }
+.live-name:hover { color: var(--accent); }
+.live-doing { font-size: 13px; color: var(--ash); overflow-wrap: anywhere; }
+
+/* Cards of those on air, like a video site's: the picture with its marks, the name, what they play. */
+.thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 14px; }
+.thumb { display: block; min-width: 0; color: inherit; text-decoration: none; }
+.thumb-pic { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; background: radial-gradient(ellipse at 50% 0%, rgba(232, 17, 45, 0.45), transparent 70%), linear-gradient(160deg, #2a2e34, #14171b); }
+/* No picture yet, or none for a visitor who has not signed in: the name of the site, faintly. */
+.thumb-pic::before { content: "DMTQ"; position: absolute; inset: 0; display: grid; place-items: center; font: italic 800 34px/1 var(--wide); color: rgba(255, 255, 255, 0.13); }
+.thumb-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }
+.thumb:hover .thumb-pic img { transform: scale(1.04); }
+.thumb-pic .live-pill { position: absolute; left: 8px; top: 8px; padding: 4px 8px; font-size: 11px; gap: 5px; }
+.thumb-pic .live-pill i { width: 6px; height: 6px; }
+.thumb-time { position: absolute; right: 8px; bottom: 8px; padding: 2px 6px; font: 700 12px/1.3 var(--display); font-variant-numeric: tabular-nums; color: #fff; background: rgba(0, 0, 0, 0.72); }
+.thumb-who { display: block; margin-top: 8px; font-weight: 700; color: #fff; overflow-wrap: anywhere; }
+.thumb:hover .thumb-who { color: var(--bad); }
+.thumb-what { display: block; font-size: 13px; color: var(--ash); overflow-wrap: anywhere; }
+/* The section heading's light. */
+.on-air-dot { display: inline-block; width: 10px; height: 10px; margin-right: 8px; vertical-align: 1px; border-radius: 50%; background: #ff3148; box-shadow: 0 0 8px #ff3148; animation: live-pulse 1.4s ease-in-out infinite; }
+/* Video is late: the browser's own controls would show this, and they are off while live. */
+.live-stage.waiting::after { content: ""; position: absolute; left: 50%; top: 50%; width: 36px; height: 36px; margin: -18px 0 0 -18px; border: 3px solid rgba(255, 255, 255, 0.25); border-top-color: #fff; border-radius: 50%; animation: live-wait 0.9s linear infinite; }
+@keyframes live-wait { to { transform: rotate(360deg); } }
+.live-ctl button { display: flex; flex: none; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; color: #fff; background: none; border: 0; cursor: pointer; }
+.live-ctl button:hover, .live-ctl button.on, .live-ctl button[aria-pressed="true"] { color: var(--accent); }
+.live-ctl button:focus-visible, .live-ctl input:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+/* The volume in the timeline's look: a thin line with a white knob, the same in one bar. */
+.live-ctl input#ctl-vol { width: 84px; height: 22px; margin: 0 8px 0 2px; padding: 0; background: none; cursor: pointer; -webkit-appearance: none; appearance: none; --p: 100%; }
+#ctl-vol::-webkit-slider-runnable-track { height: 4px; background: linear-gradient(90deg, #fff 0 var(--p), rgba(255, 255, 255, 0.24) var(--p)); }
+#ctl-vol::-moz-range-track { height: 4px; background: linear-gradient(90deg, #fff 0 var(--p), rgba(255, 255, 255, 0.24) var(--p)); }
+#ctl-vol::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); }
+#ctl-vol::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); }
+/* A touch screen's volume is on the device's own buttons; the mute button stays. */
+@media (pointer: coarse), (max-width: 520px) { #ctl-vol { display: none; } }
+/* The column is a grid: its gap alone parts the picture from a note above it. (A margin here also landed on the picture
+   when the note before it was hidden, pushing it 14px below the list beside it.) */
+.live-page .warn { margin-bottom: 0; }
+/* A phone: the timeline on a row of its own above the buttons, wide enough to aim at. */
+@media (max-width: 720px) {
+  /* The buttons that are least needed on a small picture: the fingers have two taps at its sides, the phone its own full view. */
+  #ctl-back, #ctl-fwd, #ctl-wide, #ctl-pip { display: none; }
+  .ctl-time { margin: 0 auto 0 4px; }
+  /* Less over the picture: on a phone it is small, and the controls are for the moment they are needed. */
+  .live-ctl { padding: 12px 4px 0; background: linear-gradient(0deg, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.4) 60%, transparent 100%); }
+  .live-ctl button { width: 34px; height: 34px; }
+  .ctl-track { height: 18px; margin-bottom: 0; }
+  .live-ctl input.ctl-seek { height: 18px; }
+  .ctl-marks { top: 6px; }
+  /* Who else is on is not bigger than what one is watching: a small picture, with who and what beside it. */
+  .watch-side .thumbs { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .watch-side .thumb { display: grid; grid-template-columns: 128px minmax(0, 1fr); column-gap: 10px; align-content: start; }
+  .watch-side .thumb-pic { grid-row: 1 / span 2; }
+  .watch-side .thumb-who { margin-top: 0; }
+  /* The past broadcasts the same way: on a phone a full-width picture each would be a long walk to the fifth. */
+  .past-list { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .past { grid-template-columns: 128px minmax(0, 1fr); gap: 10px; align-items: start; }
+}
+/* The wide view makes sense only with room to the side. */
+@media (max-width: 1039px) { #ctl-wide { display: none; } }
+/* A phone on its side: all of the picture and its controls on the screen. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .live-stage { width: min(100%, calc(100svh * var(--ar))); }
+  /* The picture takes the whole height: the bar goes with the page, not over the picture's LIVE mark. */
+  body[data-section="live"] .bar { position: static; }
+}
+
+/* The licenses page: three columns of words, and a license's own text folded away. */
+table.board.parts { table-layout: fixed; }
+/* Its words start and end where the card's do: the outer cells give up their side padding (as table.compact). */
+table.board.parts :is(th, td):first-child { padding-left: 0; }
+table.board.parts :is(th, td):last-child { padding-right: 0; }
+.table-scroll + p { margin-top: var(--gap); }
+table.board.parts th:nth-child(1) { width: 34%; }
+table.board.parts th:nth-child(2) { width: 38%; }
+table.board.parts th.name, table.board.parts td.name { width: auto; min-width: 0; vertical-align: top; overflow-wrap: break-word; font-weight: 400; }
+table.board.parts td.name a { color: var(--accent); text-decoration: underline; }
+table.board.parts td.name a::after { content: none; }
+/* A phone: a row is a block, its part's name first and the rest under it. Three columns would be a few words a line. */
+@media (max-width: 620px) {
+  table.board.parts, table.board.parts tbody, table.board.parts tr, table.board.parts td { display: block; width: auto; }
+  table.board.parts thead { display: none; }
+  table.board.parts tr { padding: 10px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.075); }
+  table.board.parts tr:last-child { border-bottom: 0; }
+  table.board.parts td { padding: 1px 0; border: 0; }
+  table.board.parts td.name:first-child { font-weight: 700; color: #fff; }
+  table.board.parts td.name:not(:first-child) { color: var(--ash); font-size: 13.5px; }
+}
+.license-fold { margin-top: 10px; }
+.license-fold summary { cursor: pointer; padding: 8px 0; color: var(--accent); font-weight: 600; }
+.license-fold:last-child:not([open]) { margin-bottom: -8px; }
+.license-text { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--ash); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* A page that leads nowhere: the number big, the way back under it. */
+.lost { display: grid; gap: 4px; justify-items: start; padding-block: 18px; }
+.lost-code { font: italic 800 clamp(70px, 14vw, 140px)/1 var(--wide); letter-spacing: -0.02em; color: var(--rail-up); }
+
+/* Everything that moves is a small help, not a necessity. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; }
+  .live-pill i, .on-air-dot { animation: none; }
+  .song:hover::before { animation: none; opacity: 0; }
+  .live-stage.waiting::after { animation-duration: 3s; }
+}
+
+/* ------------------------------------------------------------------------------------------------------------ motion
+   Motion answers the hand, or marks a page arriving once; it is never a show. From page to page the new one rises a
+   little into place while the bar stays put; a key gives a little under the finger; a fold opens instead of jumping;
+   what a page measures (the grade line, the level bars) fills from its start as the page arrives; the player's own
+   place in a list glows once, so that the eye finds it. "Arriving" is a class the page's head sets on <html> and takes
+   away after 1.6 s (page_header() in lib.php, base.html in the admin pages), so that what a page redraws later (the
+   admin's status tiles every 30 s) does not move again. With less motion asked for, none of this: it is all inside
+   prefers-reduced-motion: no-preference. */
+@media (prefers-reduced-motion: no-preference) {
+  /* From one page of this site to the next (Chrome and Edge 126, Safari 18.2 and later; elsewhere the page simply
+     changes): the old page fades quickly and the new one rises 8px into place. The bar at the top and the tab bar at
+     the foot are layers of their own, so they hold still instead of fading with the page. */
+  @view-transition { navigation: auto; }
+  .bar { view-transition-name: bar; }
+  .tabbar { view-transition-name: tabbar; }
+  ::view-transition-old(root) { animation: 110ms ease-in both page-out; }
+  ::view-transition-new(root) { animation: 230ms cubic-bezier(0.2, 0.7, 0.2, 1) both page-in; }
+
+  /* The section links in the bar: under the one the pointer is on, a dimmer line slides out from its middle; the lit
+     one keeps its full line. */
+  .nav > a:not(.on)::after {
+    content: "";
+    position: absolute;
+    inset: auto 8px -1px;
+    height: 3px;
+    background: color-mix(in srgb, var(--accent) 45%, transparent);
+    transform: scaleX(0);
+    transition: transform 0.18s ease-out;
+  }
+  .nav > a:not(.on):hover::after { transform: scaleX(1); }
+
+  /* Keys give a pixel under the finger, as the site's buttons already do. */
+  .auth:active, .lang-switch a:active, .tabs a:active { transform: translateY(1px); }
+  .tabbar a:active { transform: scale(0.96); }
+
+  /* A fold (the download page's help, the licences' full texts) opens and closes over a fifth of a second instead of
+     jumping: the browser may now animate a height to and from auto (Chrome 131 and later; elsewhere it jumps). */
+  :root { interpolate-size: allow-keywords; }
+  :is(.help, .license-fold)::details-content { block-size: 0; overflow-y: clip; transition: block-size 0.22s ease, content-visibility 0.22s allow-discrete; }
+  :is(.help, .license-fold)[open]::details-content { block-size: auto; }
+
+  /* As a page arrives: the grade line and the level bars fill from their start, a beat apart (the level bars one row
+     after another, by their place among their siblings). */
+  .arriving :is(.grade-bar, .level-bar) { animation: 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both reveal-x; }
+  .arriving .level:nth-child(2) .level-bar { animation-delay: 30ms; }
+  .arriving .level:nth-child(3) .level-bar { animation-delay: 60ms; }
+  .arriving .level:nth-child(4) .level-bar { animation-delay: 90ms; }
+  .arriving .level:nth-child(5) .level-bar { animation-delay: 120ms; }
+  .arriving .level:nth-child(n+6) .level-bar { animation-delay: 150ms; }
+
+  /* The player's own place in a ranking or a list: a brighter wash of the section's colour that settles into the
+     usual one over a second and a half. */
+  .arriving :is(.board tr.me td, .feed li.me, .past-top li.me) { animation: 1.5s ease-out both me-arrive; }
+}
+@keyframes page-out { to { opacity: 0; } }
+@keyframes page-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes reveal-x { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes me-arrive { from { background-color: color-mix(in srgb, var(--accent) 36%, transparent); } }

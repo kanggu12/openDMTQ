@@ -1,0 +1,15 @@
+diff --git a/src/dynarmic/backend/arm64/emit_arm64_vector_floating_point.cpp b/src/dynarmic/backend/arm64/emit_arm64_vector_floating_point.cpp
+index e0a53bf9..6e2d1723 100644
+--- a/src/dynarmic/backend/arm64/emit_arm64_vector_floating_point.cpp
++++ b/src/dynarmic/backend/arm64/emit_arm64_vector_floating_point.cpp
+@@ -48,7 +48,9 @@ using VectorArray = std::array<T, A64FullVectorWidth::value / mcl::bitsizeof<T>>
+ 
+ template<typename EmitFn>
+ static void MaybeStandardFPSCRValue(oaknut::CodeGenerator& code, EmitContext& ctx, bool fpcr_controlled, EmitFn emit) {
+-    if (ctx.FPCR(fpcr_controlled) != ctx.FPCR()) {
++    // Two FPCR writes per instruction are expensive; the unsafe option keeps the current FPCR
++    // (denormals and NaN payloads then follow the FPSCR instead of the ASIMD standard value).
++    if (ctx.FPCR(fpcr_controlled) != ctx.FPCR() && !ctx.conf.HasOptimization(OptimizationFlag::Unsafe_IgnoreStandardFPCRValue)) {
+         code.MOV(Wscratch0, ctx.FPCR(fpcr_controlled).Value());
+         code.MSR(oaknut::SystemReg::FPCR, Xscratch0);
+         emit();

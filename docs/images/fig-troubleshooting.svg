@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 567" width="956" height="567" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="When the game does not start or shows no songs: if the app does not install, see The app does not install; if the phone cannot open the server's page, see that section; without game data imported, The game stops at its start; if it does not get past its start, The app installs but cannot connect; with no songs in its list, The song list is empty; otherwise the server works">
+<rect x="-28" y="-28" width="956" height="567" rx="16" fill="#11151a"/>
+<path d="M0,0 H248 L260,12 V60 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="25.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,246">The game does not start,</text>
+<text x="14" y="44.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,246">or shows no songs</text>
+<path d="M130,60.5 L130,82" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M130,89 L125.5,80.0 L134.5,80.0 Z" fill="#7b8794" data-tip="130,89"/>
+<path d="M0,90 H318 L330,102 V140 H0 Z" fill="#1a1f25" stroke="#7b8794" stroke-width="1.2" stroke-dasharray="4 3"/>
+<text x="12" y="119" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="12,320">The app installs?</text>
+<path d="M470,92 H888 L900,104 V138 H470 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="484" y="119.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="484,886">The app does not install</text>
+<path d="M330.5,115 L462,115" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M469,115 L460.0,119.5 L460.0,110.5 Z" fill="#7b8794" data-tip="469,115"/>
+<text x="400" y="108" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="334,466">no</text>
+<path d="M130,140.5 L130,157" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M130,164 L125.5,155.0 L134.5,155.0 Z" fill="#7b8794" data-tip="130,164"/>
+<text x="138" y="156" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="136,330">yes</text>
+<path d="M0,165 H318 L330,177 V215 H0 Z" fill="#1a1f25" stroke="#7b8794" stroke-width="1.2" stroke-dasharray="4 3"/>
+<text x="12" y="194" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="12,320">The phone opens the server's page?</text>
+<path d="M470,167 H888 L900,179 V213 H470 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="484" y="194.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="484,886">The phone cannot open the server page</text>
+<path d="M330.5,190 L462,190" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M469,190 L460.0,194.5 L460.0,185.5 Z" fill="#7b8794" data-tip="469,190"/>
+<text x="400" y="183" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="334,466">no</text>
+<path d="M130,215.5 L130,232" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M130,239 L125.5,230.0 L134.5,230.0 Z" fill="#7b8794" data-tip="130,239"/>
+<text x="138" y="231" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="136,330">yes</text>
+<path d="M0,240 H318 L330,252 V290 H0 Z" fill="#1a1f25" stroke="#7b8794" stroke-width="1.2" stroke-dasharray="4 3"/>
+<text x="12" y="269" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="12,320">Game data imported?</text>
+<path d="M470,242 H888 L900,254 V288 H470 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="484" y="269.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="484,886">The game stops at its start: no game data</text>
+<path d="M330.5,265 L462,265" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M469,265 L460.0,269.5 L460.0,260.5 Z" fill="#7b8794" data-tip="469,265"/>
+<text x="400" y="258" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="334,466">no</text>
+<path d="M130,290.5 L130,307" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M130,314 L125.5,305.0 L134.5,305.0 Z" fill="#7b8794" data-tip="130,314"/>
+<text x="138" y="306" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="136,330">yes</text>
+<path d="M0,315 H318 L330,327 V365 H0 Z" fill="#1a1f25" stroke="#7b8794" stroke-width="1.2" stroke-dasharray="4 3"/>
+<text x="12" y="344" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="12,320">Past the game's start?</text>
+<path d="M470,317 H888 L900,329 V363 H470 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="484" y="344.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="484,886">The app installs but cannot connect</text>
+<path d="M330.5,340 L462,340" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M469,340 L460.0,344.5 L460.0,335.5 Z" fill="#7b8794" data-tip="469,340"/>
+<text x="400" y="333" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="334,466">no</text>
+<path d="M130,365.5 L130,382" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M130,389 L125.5,380.0 L134.5,380.0 Z" fill="#7b8794" data-tip="130,389"/>
+<text x="138" y="381" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="136,330">yes</text>
+<path d="M0,390 H318 L330,402 V440 H0 Z" fill="#1a1f25" stroke="#7b8794" stroke-width="1.2" stroke-dasharray="4 3"/>
+<text x="12" y="419" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="12,320">Songs in its list?</text>
+<path d="M470,392 H888 L900,404 V438 H470 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="484" y="419.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="484,886">The song list is empty: no songs</text>
+<path d="M330.5,415 L462,415" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M469,415 L460.0,419.5 L460.0,410.5 Z" fill="#7b8794" data-tip="469,415"/>
+<text x="400" y="408" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="334,466">no</text>
+<path d="M0,465 H318 L330,477 V511 H0 Z" fill="#1a1f25" stroke="#8cf23d" stroke-width="2" stroke-linejoin="round"/>
+<text x="14" y="492.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,316">The server works</text>
+<path d="M130,440.5 L130,457" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M130,464 L125.5,455.0 L134.5,455.0 Z" fill="#7b8794" data-tip="130,464"/>
+<text x="138" y="456" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="136,330">yes</text>
+</svg>

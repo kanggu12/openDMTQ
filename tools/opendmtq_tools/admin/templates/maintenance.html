@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% block title %}{{ t('maint.title') }}{% endblock %}
+{% block body %}
+<section class="card">
+  <h2>{{ t('maint.heading') }}</h2>
+  <p class="lead">{{ t('maint.lead') }}</p>
+  <p class="auto-line big"><span class="lamp {{ 'wait' if on else 'off' }}"></span><b>{{ t('maint.is_on') if on else t('maint.is_off') }}</b></p>
+  <form method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="field">{{ t('maint.message') }} <textarea name="message" rows="3" placeholder="{{ t('maint.placeholder') }}">{{ message }}</textarea></label>
+    <p class="presets"><span class="presets-label">{{ t('maint.presets') }}</span>
+      {% for name, key in (('maint.p_short_name', 'maint.p_short'), ('maint.p_update_name', 'maint.p_update'), ('maint.p_tonight_name', 'maint.p_tonight')) %}<button type="button" class="btn btn-sm" data-text="{{ tp(key) }}">{{ t(name) }}</button>{% endfor %}
+    </p>
+    {# While it is on, ending it is what one came for. Starting it keeps players out, so it asks. #}
+    <div class="btn-line">
+      {% if on %}
+      <button class="btn btn-primary" name="action" value="off">{{ t('maint.end') }}</button>
+      <button class="btn" name="action" value="on">{{ t('maint.update') }}</button>
+      {% else %}
+      <button class="btn btn-primary" name="action" value="on" data-ask="{{ tp('maint.confirm') }}" data-yes="{{ tp('maint.start') }}">{{ t('maint.start') }}</button>
+      {% endif %}
+    </div>
+  </form>
+</section>
+<script>
+  // A ready-made message in the field, to change or send as it is.
+  for (const b of document.querySelectorAll('.presets button')) {
+    b.addEventListener('click', () => { const f = document.querySelector('textarea[name=message]'); f.value = b.dataset.text; f.focus(); });
+  }
+</script>
+{% endblock %}

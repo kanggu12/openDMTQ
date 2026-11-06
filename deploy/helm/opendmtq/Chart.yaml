@@ -1,0 +1,9 @@
+apiVersion: v2
+name: opendmtq
+description: Self-hosted DJMAX Technika Q server with replicated assets and a continuously backed-up game database.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords: [djmax, technika, rhythm-game, game-server]
+home: https://github.com/kanggu12/openDMTQ
+sources: [https://github.com/kanggu12/openDMTQ]

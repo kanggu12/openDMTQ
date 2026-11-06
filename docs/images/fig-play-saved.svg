@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 850" width="956" height="850" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="A play is saved: at the start the phone asks for the items' effects and the chart; at the end it sends the result with a signature; a wrong signature gets a 403 and nothing is kept; otherwise the game server works out the score and grade and keeps the best, the play and what it earned in one transaction, or answers SVC.05099 and the client offers to retry">
+<rect x="-28" y="-28" width="956" height="850" rx="16" fill="#11151a"/>
+<path d="M787.5,44.5 V790" stroke="#3a434d" stroke-width="1.2" stroke-dasharray="3 5"/>
+<path d="M562.5,44.5 V790" stroke="#3a434d" stroke-width="1.2" stroke-dasharray="3 5"/>
+<path d="M337.5,44.5 V790" stroke="#3a434d" stroke-width="1.2" stroke-dasharray="3 5"/>
+<path d="M112.5,44.5 V790" stroke="#3a434d" stroke-width="1.2" stroke-dasharray="3 5"/>
+<rect x="4" y="300" width="892" height="484" rx="8" fill="#1a1f25" fill-opacity="0.55" stroke="#3a434d" stroke-width="1"/>
+<rect x="4" y="538" width="892" height="152" rx="8" fill="#1a1f25" fill-opacity="0.55" stroke="#3a434d" stroke-width="1"/>
+<path d="M8,0 H205 L217,12 V44 H8 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="22" y="26.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="22,203">Phone</text>
+<path d="M233,0 H430 L442,12 V44 H233 Z" fill="#1a1f25" stroke="#8cf23d" stroke-width="2" stroke-linejoin="round"/>
+<text x="247" y="26.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="247,428">rpc.php</text>
+<path d="M458,0 H655 L667,12 V44 H458 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="472" y="26.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="472,653">game.php</text>
+<path d="M683,0 H880 L892,12 V44 H683 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="697" y="26.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="697,878">Database</text>
+<path d="M112.5,80 L329.5,80" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M336.5,80 L327.5,84.5 L327.5,75.5 Z" fill="#7b8794" data-tip="336.5,80"/>
+<text x="225" y="73" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="118.5,331.5">getPreviewPlayInfo, getPatternUrl</text>
+<path d="M337.5,130 L120.5,130" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M113.5,130 L122.5,125.5 L122.5,134.5 Z" fill="#7b8794" data-tip="113.5,130"/>
+<text x="225" y="109" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="118.5,331.5">the items' effects, a play</text>
+<text x="225" y="123" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="118.5,331.5">token, the chart's address</text>
+<rect x="126.5" y="152" width="197" height="46" rx="6" fill="#11151a" stroke="#3a434d" stroke-width="1"/>
+<text x="136.5" y="169" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="136.5,315.5">the song is played,</text>
+<text x="136.5" y="186" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="136.5,315.5">no requests until its end</text>
+<path d="M112.5,226 L329.5,226" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M336.5,226 L327.5,230.5 L327.5,221.5 Z" fill="#7b8794" data-tip="336.5,226"/>
+<text x="225" y="219" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="118.5,331.5">savePlayResult, with the Fp header</text>
+<rect x="351.5" y="248" width="197" height="46" rx="6" fill="#11151a" stroke="#3a434d" stroke-width="1"/>
+<text x="361.5" y="265" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="361.5,540.5">Fp must be the MD5 of</text>
+<text x="361.5" y="282" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="361.5,540.5">the key and the body</text>
+<text x="14" y="318" font-size="12" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,886">The signature does not match</text>
+<path d="M337.5,364 L120.5,364" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M113.5,364 L122.5,359.5 L122.5,368.5 Z" fill="#7b8794" data-tip="113.5,364"/>
+<text x="225" y="343" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="118.5,331.5">403 and an empty list:</text>
+<text x="225" y="357" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="118.5,331.5">nothing is kept</text>
+<path d="M10,384 H890" stroke="#3a434d" stroke-width="1" stroke-dasharray="4 4"/>
+<text x="14" y="398" font-size="12" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,886">Signed</text>
+<path d="M337.5,428 L554.5,428" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M561.5,428 L552.5,432.5 L552.5,423.5 Z" fill="#7b8794" data-tip="561.5,428"/>
+<text x="450" y="421" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="343.5,556.5">odq_game_save_play</text>
+<rect x="576.5" y="450" width="197" height="46" rx="6" fill="#11151a" stroke="#3a434d" stroke-width="1"/>
+<text x="586.5" y="467" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="586.5,765.5">score, accuracy and grade</text>
+<text x="586.5" y="484" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="586.5,765.5">from the judgement counts</text>
+<path d="M562.5,524 L779.5,524" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M786.5,524 L777.5,528.5 L777.5,519.5 Z" fill="#7b8794" data-tip="786.5,524"/>
+<text x="675" y="517" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="568.5,781.5">BEGIN IMMEDIATE, up to 5 s</text>
+<text x="14" y="556" font-size="12" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,886">Committed</text>
+<path d="M562.5,602 L779.5,602" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M786.5,602 L777.5,606.5 L777.5,597.5 Z" fill="#7b8794" data-tip="786.5,602"/>
+<text x="675" y="581" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="568.5,781.5">Play keeps the best,</text>
+<text x="675" y="595" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="568.5,781.5">PlayLog gets the play</text>
+<path d="M562.5,638 L779.5,638" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M786.5,638 L777.5,642.5 L777.5,633.5 Z" fill="#7b8794" data-tip="786.5,638"/>
+<text x="675" y="631" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="568.5,781.5">AchievementDate: what it earned</text>
+<path d="M10,658 H890" stroke="#3a434d" stroke-width="1" stroke-dasharray="4 4"/>
+<text x="14" y="672" font-size="12" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,886">Locked, or failed: nothing is kept</text>
+<path d="M562.5,710 L345.5,710" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M338.5,710 L347.5,705.5 L347.5,714.5 Z" fill="#7b8794" data-tip="338.5,710"/>
+<text x="450" y="703" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="343.5,556.5">the result, or SVC.05099</text>
+<path d="M337.5,760 L120.5,760" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M113.5,760 L122.5,755.5 L122.5,764.5 Z" fill="#7b8794" data-tip="113.5,760"/>
+<text x="225" y="739" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="118.5,331.5">the reply; SVC.05099 opens</text>
+<text x="225" y="753" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="118.5,331.5">the client's retry popup</text>
+</svg>

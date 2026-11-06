@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 564" width="956" height="564" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="What each admin page works on: the setup imports into data/content and data/apk/base and writes the address to .env; the status page reads the server's health page; the App page builds, downloads and deletes in data/apk/out; the Songs page adds, removes and hides in data/custom; the Players and Accounts pages change the database; the Recordings page works on data/state/live-rec; Backups on data/backups; Maintenance turns the notice in data/custom/web/inspection on or off; Logs reads the request log">
+<rect x="-28" y="-28" width="956" height="564" rx="16" fill="#11151a"/>
+<path d="M0,0 H158 L170,12 V40 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="24.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,156">Setup</text>
+<path d="M560,0 H888 L900,12 V40 H560 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="574" y="24.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="574,886">data/content, apk/base, .env</text>
+<path d="M170.5,20 L552,20" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M559,20 L550.0,24.5 L550.0,15.5 Z" fill="#7b8794" data-tip="559,20"/>
+<text x="365" y="13" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="180,550">imports, the address</text>
+<path d="M0,52 H158 L170,64 V92 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="76.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,156">Status</text>
+<path d="M560,52 H888 L900,64 V92 H560 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="574" y="76.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="574,886">the server's health page</text>
+<path d="M170.5,72 L552,72" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M559,72 L550.0,76.5 L550.0,67.5 Z" fill="#7b8794" data-tip="559,72"/>
+<text x="365" y="65" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="180,550">reads</text>
+<path d="M0,104 H158 L170,116 V144 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="128.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,156">App</text>
+<path d="M560,104 H888 L900,116 V144 H560 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="574" y="128.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="574,886">data/apk/out</text>
+<path d="M170.5,124 L552,124" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M559,124 L550.0,128.5 L550.0,119.5 Z" fill="#7b8794" data-tip="559,124"/>
+<text x="365" y="117" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="180,550">builds, downloads, deletes</text>
+<path d="M0,156 H158 L170,168 V196 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="180.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,156">Songs</text>
+<path d="M560,156 H888 L900,168 V196 H560 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="574" y="180.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="574,886">data/custom, then the song list</text>
+<path d="M170.5,176 L552,176" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M559,176 L550.0,180.5 L550.0,171.5 Z" fill="#7b8794" data-tip="559,176"/>
+<text x="365" y="169" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="180,550">adds, removes, hides</text>
+<path d="M0,208 H158 L170,220 V248 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="232.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,156">Players</text>
+<path d="M0,260 H158 L170,272 V300 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="284.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,156">Accounts</text>
+<path d="M0,312 H158 L170,324 V352 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="336.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,156">Recordings</text>
+<path d="M560,312 H888 L900,324 V352 H560 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="574" y="336.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="574,886">data/state/live-rec</text>
+<path d="M170.5,332 L552,332" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M559,332 L550.0,336.5 L550.0,327.5 Z" fill="#7b8794" data-tip="559,332"/>
+<text x="365" y="325" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="180,550">watch, hide, delete, limits</text>
+<path d="M0,364 H158 L170,376 V404 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="388.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,156">Backups</text>
+<path d="M560,364 H888 L900,376 V404 H560 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="574" y="388.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="574,886">data/backups</text>
+<path d="M170.5,384 L552,384" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M559,384 L550.0,388.5 L550.0,379.5 Z" fill="#7b8794" data-tip="559,384"/>
+<text x="365" y="377" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="180,550">back up, restore</text>
+<path d="M0,416 H158 L170,428 V456 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="440.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,156">Maintenance</text>
+<path d="M560,416 H888 L900,428 V456 H560 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="574" y="440.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="574,886">data/custom/web/inspection</text>
+<path d="M170.5,436 L552,436" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M559,436 L550.0,440.5 L550.0,431.5 Z" fill="#7b8794" data-tip="559,436"/>
+<text x="365" y="429" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="180,550">the notice on or off</text>
+<path d="M0,468 H158 L170,480 V508 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="492.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,156">Logs</text>
+<path d="M560,468 H888 L900,480 V508 H560 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="574" y="492.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="574,886">data/state/logs/access.log</text>
+<path d="M170.5,488 L552,488" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M559,488 L550.0,492.5 L550.0,483.5 Z" fill="#7b8794" data-tip="559,488"/>
+<text x="365" y="481" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="180,550">reads</text>
+<path d="M560,208 H888 L900,220 V300 H560 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="574" y="249.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="574,886">data/state/dmtq.db3</text>
+<text x="574" y="268.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="574,886">players, scores, accounts</text>
+<path d="M170.5,228 L552,228" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M559,228 L550.0,232.5 L550.0,223.5 Z" fill="#7b8794" data-tip="559,228"/>
+<text x="365" y="221" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="180,550">rename, reset, delete, the broadcast switch</text>
+<path d="M170.5,280 L552,280" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M559,280 L550.0,284.5 L550.0,275.5 Z" fill="#7b8794" data-tip="559,280"/>
+<text x="365" y="273" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="180,550">make, switch off, delete</text>
+</svg>

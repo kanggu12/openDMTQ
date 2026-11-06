@@ -1,0 +1,168 @@
+# Address phones use to reach the router Service: an IPv4 address or host name, with ":port" when
+# the Service port is not 80. It is written into every URL the server hands out and into the
+# patched app. Required.
+publicHost: ""
+# The name after the game's title on phones: TECHNIKA Q (name). Empty: publicHost, port included.
+serverName: ""
+
+# Time zone for the server's logs, the in-game ranking's day, backup and app file names (an IANA
+# name such as Asia/Seoul). Empty: UTC.
+timeZone: ""
+
+# Which base APK to patch when the apk/base folder holds several different clients (its file name;
+# the builder and the admin pages' app builds use it). Empty: the only one there.
+baseApk: ""
+
+image:
+  server:
+    repository: ghcr.io/kanggu12/opendmtq-server
+    # Defaults to the chart's appVersion.
+    tag: ""
+  tools:
+    repository: ghcr.io/kanggu12/opendmtq-tools
+    tag: ""
+  router:
+    repository: nginxinc/nginx-unprivileged
+    # Pinned like compose's edge; 1.27.3 or later is needed for "resolve" in upstream blocks.
+    tag: "1.27.5-alpine"
+  litestream:
+    repository: litestream/litestream
+    tag: "0.3.13"
+  pullPolicy: IfNotPresent
+
+# Game files, laid out like the repository's data/ folder: content/ (the game data and songs that
+# ./opendmtq import brings from the operator's own files) and apk/ (base/, out/, keystore/).
+# Read-only for the servers; the builder job writes apk/.
+# Use a ReadWriteMany claim, or a host path that exists on every node.
+data:
+  existingClaim: ""
+  hostPath: ""
+
+# Rebuild custom/songList.json and its overlay in an init container each time the api pod starts,
+# as ./opendmtq up does for compose. Turn it off only where something else keeps that folder current
+# (the kind cluster shares the Compose stack's data/).
+songs:
+  rebuildOnStart: true
+
+# Live view (docs/live.md). Recordings live in the api pod's emptyDir, and die with the pod, unless
+# they get a claim of their own. It must follow the api to any node: use ReadWriteMany (or storage
+# that reattaches quickly); a claim tied to one node also ties the api to it, and failover ends there.
+# With a claim the size limit is the smaller of the Recordings page's cap (20 GB by default) and
+# what fits on the claim, so keep it above the cap.
+live:
+  # "on": every player broadcasts until the owner turns them off; "off": until turned on.
+  default: "off"
+  recordings:
+    persistence:
+      enabled: false
+      # An existing claim; empty makes "<release>-opendmtq-recordings" (kept by helm uninstall).
+      existingClaim: ""
+      size: 25Gi
+      accessModes: [ReadWriteMany]
+      storageClass: ""
+
+# Router: the only entry point. Splits requests by path between the api and the assets tier.
+router:
+  replicas: 2
+  service:
+    # LoadBalancer on bare metal needs MetalLB, k3s servicelb or similar.
+    type: LoadBalancer
+    port: 80
+    nodePort: null
+    loadBalancerIP: ""
+  # HTTPS on the router's own port, next to the game's plain HTTP: the name of a kubernetes.io/tls Secret in this
+  # namespace (cert-manager's, or kubectl create secret tls). A renewed certificate is picked up within minutes.
+  # With it, browsers are sent to HTTPS and the admin pages are served there. Empty: plain HTTP only.
+  tls:
+    secretName: ""
+  # DNS server the router uses to follow asset pods as they come and go. Empty: the pod's own
+  # nameserver from /etc/resolv.conf (an IP, so start-up never depends on resolving a name).
+  resolver: ""
+  resources:
+    requests: {cpu: 50m, memory: 32Mi}
+    limits: {memory: 128Mi}
+
+# Static files (songs, patterns, patch, jackets): stateless, scaled out across nodes.
+assets:
+  replicas: 2
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {memory: 256Mi}
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+# Game API: SQLite allows one writer, so exactly one replica. The database lives in an emptyDir
+# and is restored from the object store on start, so the pod can come up on any node.
+api:
+  # Seconds before the pod is moved off a node that stopped responding (Kubernetes default: 300).
+  failoverSeconds: 20
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {memory: 512Mi}
+
+# Continuous replication of the database to S3-compatible storage (RPO about one second).
+litestream:
+  enabled: true
+  syncInterval: 1s
+  s3:
+    endpoint: ""
+    bucket: opendmtq
+    path: dmtq.db3
+    region: us-east-1
+    forcePathStyle: true
+    # Secret with keys LITESTREAM_ACCESS_KEY_ID and LITESTREAM_SECRET_ACCESS_KEY.
+    existingSecret: ""
+    accessKeyId: ""
+    secretAccessKey: ""
+
+# Single-node SeaweedFS S3 for trying the chart out. Not highly available; use real object
+# storage (or an HA SeaweedFS) in production.
+objectStore:
+  enabled: false
+  image:
+    repository: chrislusf/seaweedfs
+    tag: "3.97"
+  accessKeyId: opendmtq
+  secretAccessKey: ""
+  persistence:
+    size: 2Gi
+    storageClass: ""
+  nodeSelector: {}
+  tolerations: []
+
+# Admin pages at /opendmtq/admin (app builds, songs, players, backups, maintenance), as a sidecar of the api
+# pod because they work on its database. Password from a Secret with key ADMIN_PASSWORD, or one is
+# generated and kept in "<release>-opendmtq-admin".
+admin:
+  enabled: true
+  # The owner's admin account: this ID (ADMIN_USER) and the password in the Secret. Every other account is made on the
+  # Accounts page.
+  user: admin
+  existingSecret: ""
+  # The admin pages through the router: "yes", "no", or empty for automatic: yes with router.tls (over HTTPS), or when publicHost
+  # is a private IPv4 address (the pages and their password then travel in plain HTTP on the local network), no
+  # otherwise. Without it, use kubectl port-forward (NOTES.txt).
+  onPublicPort: ""
+  resources:
+    requests: {cpu: 20m, memory: 96Mi}
+    limits: {memory: 1536Mi}
+
+# Builds the patched app for publicHost after every install or upgrade.
+builder:
+  enabled: true
+  resources:
+    requests: {cpu: 500m, memory: 512Mi}
+    limits: {memory: 1536Mi}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 33
+  runAsGroup: 33
+  fsGroup: 33
+  seccompProfile: {type: RuntimeDefault}
+
+nodeSelector: {}
+tolerations: []

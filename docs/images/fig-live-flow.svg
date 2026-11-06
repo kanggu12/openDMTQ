@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 821" width="956" height="821" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="A live broadcast: once the owner turns a player's broadcast on, the phone asks about every 15 seconds and uploads a two-second MPEG-TS segment every two seconds; a browser plays it with hls.js about ten seconds behind; switched off, the next upload gets a 403; ended on the phone, the playlist ends and the recording is closed, and a past broadcast plays as a recording with its songs as chapters">
+<rect x="-28" y="-28" width="956" height="821" rx="16" fill="#11151a"/>
+<path d="M750,44.5 V761" stroke="#3a434d" stroke-width="1.2" stroke-dasharray="3 5"/>
+<path d="M450,44.5 V761" stroke="#3a434d" stroke-width="1.2" stroke-dasharray="3 5"/>
+<path d="M150,44.5 V761" stroke="#3a434d" stroke-width="1.2" stroke-dasharray="3 5"/>
+<rect x="4" y="449" width="892" height="234" rx="8" fill="#1a1f25" fill-opacity="0.55" stroke="#3a434d" stroke-width="1"/>
+<rect x="4" y="209" width="892" height="170" rx="8" fill="#1a1f25" fill-opacity="0.55" stroke="#3a434d" stroke-width="1"/>
+<rect x="4" y="101" width="892" height="110" rx="8" fill="#1a1f25" fill-opacity="0.55" stroke="#3a434d" stroke-width="1"/>
+<path d="M8,0 H280 L292,12 V44 H8 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="22" y="26.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="22,278">Phone, the app's runtime</text>
+<path d="M308,0 H580 L592,12 V44 H308 Z" fill="#1a1f25" stroke="#8cf23d" stroke-width="2" stroke-linejoin="round"/>
+<text x="322" y="26.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="322,578">Server</text>
+<path d="M608,0 H880 L892,12 V44 H608 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="622" y="26.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="622,878">Browser</text>
+<rect x="14" y="66" width="572" height="29" rx="6" fill="#11151a" stroke="#3a434d" stroke-width="1"/>
+<text x="24" y="83" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="24,578">The owner turns the player's broadcast on, on the Players page.</text>
+<text x="14" y="119" font-size="12" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,886">About every 15 s, while the game is on screen</text>
+<path d="M150,151 L442,151" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M449,151 L440.0,155.5 L440.0,146.5 Z" fill="#7b8794" data-tip="449,151"/>
+<text x="300" y="144" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="156,444">GET /live/state</text>
+<path d="M450,187 L158,187" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M151,187 L160.0,182.5 L160.0,191.5 Z" fill="#7b8794" data-tip="151,187"/>
+<text x="300" y="180" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="156,444">on, an upload token, size and rate</text>
+<text x="14" y="227" font-size="12" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,886">Every 2 s, while it is on</text>
+<path d="M150,259 L442,259" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M449,259 L440.0,263.5 L440.0,254.5 Z" fill="#7b8794" data-tip="449,259"/>
+<text x="300" y="252" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="156,444">POST /live/upload, one segment</text>
+<rect x="464" y="281" width="272" height="46" rx="6" fill="#11151a" stroke="#3a434d" stroke-width="1"/>
+<text x="474" y="298" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="474,728">kept in the live window</text>
+<text x="474" y="315" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="474,728">and in the recording</text>
+<path d="M450,355 L158,355" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M151,355 L160.0,350.5 L160.0,359.5 Z" fill="#7b8794" data-tip="151,355"/>
+<text x="300" y="348" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="156,444">204</text>
+<path d="M750,399 L458,399" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M451,399 L460.0,394.5 L460.0,403.5 Z" fill="#7b8794" data-tip="451,399"/>
+<text x="600" y="392" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="456,744">live.php plays it with hls.js</text>
+<path d="M450,435 L742,435" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M749,435 L740.0,439.5 L740.0,430.5 Z" fill="#7b8794" data-tip="749,435"/>
+<text x="600" y="428" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="456,744">the playlist and segments, ~10 s behind</text>
+<text x="14" y="467" font-size="12" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,886">Switched off</text>
+<path d="M150,499 L442,499" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M449,499 L440.0,503.5 L440.0,494.5 Z" fill="#7b8794" data-tip="449,499"/>
+<text x="300" y="492" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="156,444">the next upload</text>
+<path d="M450,535 L158,535" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M151,535 L160.0,530.5 L160.0,539.5 Z" fill="#7b8794" data-tip="151,535"/>
+<text x="300" y="528" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="156,444">403, and the phone stops</text>
+<path d="M10,555 H890" stroke="#3a434d" stroke-width="1" stroke-dasharray="4 4"/>
+<text x="14" y="569" font-size="12" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,886">Ended on the phone</text>
+<path d="M150,599 L442,599" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M449,599 L440.0,603.5 L440.0,594.5 Z" fill="#7b8794" data-tip="449,599"/>
+<text x="300" y="592" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="156,444">POST /live/end</text>
+<rect x="464" y="621" width="272" height="46" rx="6" fill="#11151a" stroke="#3a434d" stroke-width="1"/>
+<text x="474" y="638" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="474,728">the playlist ends, the</text>
+<text x="474" y="655" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="474,728">recording is closed</text>
+<path d="M750,703 L458,703" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M451,703 L460.0,698.5 L460.0,707.5 Z" fill="#7b8794" data-tip="451,703"/>
+<text x="600" y="696" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="456,744">a past broadcast</text>
+<path d="M450,739 L742,739" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M749,739 L740.0,743.5 L740.0,734.5 Z" fill="#7b8794" data-tip="749,739"/>
+<text x="600" y="732" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="456,744">the recording, its songs as chapters</text>
+</svg>

@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% block title %}{{ t('login.title') }}{% endblock %}
+{% block body %}
+<section class="card signin">
+  <h2>{{ t('login.heading') }}</h2>
+  {% if disabled %}
+    <p class="warn">{{ t('login.off') }}</p>
+  {% else %}
+    {# A failed sign-in in red like the other pages' errors; having signed out is no error. #}
+    {% for cat, msg in get_flashed_messages(with_categories=true) %}
+      <p class="{{ 'done' if cat == 'ok' else 'error' }}" role="{{ 'status' if cat == 'ok' else 'alert' }}">{{ msg }}</p>
+    {% endfor %}
+    <form method="post" class="signin-form">
+      {# The ID in Latin letters: the keyboard that has them, no capitals or corrections. Back after a wrong password. #}
+      <label class="field">{{ t('login.id') }} <input name="name" value="{{ name or '' }}" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" lang="en" required{% if not name %} autofocus{% endif %}></label>
+      <label class="field">{{ t('login.password') }} <input type="password" name="password"{% if name %} autofocus{% endif %} autocomplete="current-password" required></label>
+      <button class="button" type="submit">{{ t('login.button') }}</button>
+    </form>
+  {% endif %}
+</section>
+{% endblock %}

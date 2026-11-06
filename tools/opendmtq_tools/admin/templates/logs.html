@@ -1,0 +1,135 @@
+{% extends "base.html" %}{% block title %}{{ t('logs.title') }}{% endblock %}
+{% block body %}
+<p class="tabs">
+  <a href="{{ url_for('logs_page') }}"{% if tab == 'requests' %} class="on" aria-current="true"{% endif %}>{{ t('logs.heading') }}</a>
+  <a href="{{ url_for('logs_page', tab='plays') }}"{% if tab == 'plays' %} class="on" aria-current="true"{% endif %}>{{ t('logs.plays') }}</a>
+  <a href="{{ url_for('logs_page', tab='changes') }}"{% if tab == 'changes' %} class="on" aria-current="true"{% endif %}>{{ t('logs.changes') }}</a>
+</p>
+{% if tab == 'requests' %}
+<section class="card chart-card">
+  <h2>{{ t('logs.c_title') }} <span class="meta-inline">{{ t('logs.c_sum', ok=fine_total, bad=failed_total) }}{% if covered_from %} · {{ t('logs.c_from', when=covered_from) }}{% endif %}</span></h2>
+  {{ timeline }}
+</section>
+<div class="three">
+  <section class="card chart-card"><h2>{{ t('logs.top_paths') }}</h2>{{ top_paths }}</section>
+  <section class="card chart-card"><h2>{{ t('logs.top_devices') }}</h2>{{ top_devices }}</section>
+  <section class="card chart-card"><h2>{{ t('logs.top_ips') }}</h2>{{ top_ips }}</section>
+</div>
+<section class="card">
+  <h2>{{ t('logs.heading') }} <span class="meta-inline" id="log-count">{{ t('logs.count', shown=rows|length, all=matched) }}</span><a class="more" href="{{ url_for('logs_download') }}">{{ t('logs.download') }}</a></h2>
+  <p class="meta log-help">{{ t('logs.help') }}</p>
+  <form class="log-filters" id="log-form">
+    <input class="input" name="q" value="{{ q }}" placeholder="{{ t('logs.placeholder') }}" type="search" aria-label="{{ t('logs.filter') }}">
+    <select class="input" name="status" aria-label="{{ t('logs.th_status') }}">
+      <option value="">{{ t('logs.any_status') }}</option>
+      {% for value, key in [('err', 'logs.s_err'), ('2xx', 'logs.s_2'), ('3xx', 'logs.s_3'), ('4xx', 'logs.s_4'), ('5xx', 'logs.s_5')] %}<option value="{{ value }}"{% if status == value %} selected{% endif %}>{{ t(key) }}</option>{% endfor %}
+    </select>
+    <select class="input" name="kind" aria-label="{{ t('logs.th_kind') }}">
+      <option value="">{{ t('logs.any_kind') }}</option>
+      {% for k in kinds %}<option value="{{ k }}"{% if kind == k %} selected{% endif %}>{{ t(kinds[k]) }}</option>{% endfor %}
+    </select>
+    <button class="btn">{{ t('logs.find') }}</button>
+    {% if q or status or kind %}<a class="btn" href="{{ url_for('logs_page') }}">{{ t('logs.clear') }}</a>{% endif %}
+    <label class="check"><input type="checkbox" id="log-follow"> {{ t('logs.follow') }}</label>
+  </form>
+  <div id="log-rows">{% include "log_rows.html" %}</div>
+</section>
+<script>
+  // New requests come in by themselves while this is ticked; a tap on an address filters by it.
+  (() => {
+    const box = document.getElementById('log-rows'), follow = document.getElementById('log-follow');
+    const url = () => { const u = new URL(location.href); u.searchParams.set('rows', '1'); return u; };
+    try { follow.checked = !!localStorage.getItem('opendmtq.follow'); } catch (_) { /* No storage here. */ }
+    follow.addEventListener('change', () => { try { localStorage.setItem('opendmtq.follow', follow.checked ? '1' : ''); } catch (_) { /* No storage here. */ } });
+    setInterval(async () => {
+      if (!follow.checked || document.hidden) return;
+      try {
+        const r = await fetch(url());
+        // Signed out meanwhile, or the page failed: the whole page finds out, not a sign-in form in the middle of the list.
+        if (r.redirected || !r.ok) { location.reload(); return; }
+        box.innerHTML = await r.text();
+      } catch (_) { /* The next look. */ }
+    }, 4000);
+    box.addEventListener('click', e => {
+      const ip = e.target.dataset && e.target.dataset.filter;
+      if (!ip) return;
+      document.querySelector('#log-form [name=q]').value = ip;
+      document.getElementById('log-form').submit();
+    });
+  })();
+</script>
+{% elif tab == 'plays' %}
+<section class="card">
+  <h2>{{ t('logs.plays') }} <span class="meta-inline">{{ total }}</span>{% if total %}<a class="more" href="{{ url_for('logs_page', tab='plays', csv=1, **shown) }}">{{ t('players.csv') }}</a>{% endif %}</h2>
+  {# With no plays at all there is nothing to narrow. #}
+  {# Whose plays these are, in words: a long name may not fit the list's own box on a phone. #}
+  {% if whose %}<p class="meta plays-of">{{ t('logs.plays_of', name=whose) }}</p>{% endif %}
+  {% if people or filtered %}
+  <form class="log-filters plays-filters" method="get">
+    <input type="hidden" name="tab" value="plays">
+    <input class="input" name="q" value="{{ shown.q or '' }}" placeholder="{{ t('logs.plays_search') }}" type="search" aria-label="{{ t('logs.plays_search') }}">
+    <select class="input" name="player" aria-label="{{ t('logs.plays_player') }}">
+      <option value="">{{ t('logs.any_player') }}</option>
+      {% for id, name in people %}<option value="{{ id }}"{% if shown.player == id %} selected{% endif %}>{{ name }}</option>{% endfor %}
+    </select>
+    <label class="log-day">{{ t('logs.plays_from') }}<input class="input" type="date" name="from" value="{{ shown['from'] or '' }}"></label>
+    <label class="log-day">{{ t('logs.plays_to') }}<input class="input" type="date" name="to" value="{{ shown['to'] or '' }}"></label>
+    <button class="btn">{{ t('logs.find') }}</button>
+    {% if filtered %}<a class="btn" href="{{ url_for('logs_page', tab='plays') }}">{{ t('logs.clear') }}</a>{% endif %}
+  </form>
+  {% endif %}
+  {# What everything the filter found adds up to, not only this page: the figures, the plays over the days, the grades. #}
+  {% if summary %}
+  <div class="plays-sum">
+    <dl class="sum-figs">
+      <div><dt>{{ t('sum.plays') }}</dt><dd>{{ '{:,}'.format(summary.n) }}</dd></div>
+      <div><dt>{{ t('sum.records') }}</dt><dd>{{ '{:,}'.format(summary.records) }}</dd></div>
+      <div><dt>{{ t('sum.accuracy') }}</dt><dd>{{ summary.accuracy }}%</dd></div>
+      {% if summary.people > 1 %}<div><dt>{{ t('sum.people') }}</dt><dd>{{ summary.people }}</dd></div>{% endif %}
+    </dl>
+    <div class="sum-charts">
+      <div class="sum-days"><h3>{{ t('sum.c_weeks') if summary.weekly else t('sum.c_days') }}</h3>{{ summary.days }}</div>
+      <div class="sum-grades"><h3>{{ t('sum.c_grades') }}</h3>{{ summary.grades }}</div>
+    </div>
+  </div>
+  {% endif %}
+  {% if not plays %}<p class="empty">{{ t('dash.db_short') if broken else (t('logs.none_filter') if filtered else t('dash.recent_none')) }}</p>{% else %}
+  {# One player's plays: their name is over the list once, not in every row. #}
+  {% set one = shown.player is not none %}
+  <div class="table-scroll"><table class="data playlog{% if one %} of-one{% endif %}">
+    <thead><tr><th>{{ t('logs.th_time') }}</th>{% if not one %}<th>{{ t('logs.th_player') }}</th>{% endif %}<th>{{ t('logs.th_song') }}</th><th class="r">{{ t('logs.th_score') }}</th><th>{{ t('logs.th_grade') }}</th></tr></thead>
+    <tbody>
+    {% for p in plays %}
+      <tr>
+        <td data-label="{{ t('logs.th_time') }}" class="date">{{ p.at }}</td>
+        {# A name narrows the list to that player's plays. #}
+        {% if not one %}<td class="primary"><a href="{{ url_for('logs_page', tab='plays', player=p.id) }}">{{ p.who }}</a></td>{% endif %}
+        <td data-label="{{ t('logs.th_song') }}" class="play-song"><span>{{ p.song }}</span><span class="runtime">{{ p.chart }}</span></td>
+        <td data-label="{{ t('logs.th_score') }}" class="r">{{ '{:,}'.format(p.score) }}</td>
+        <td data-label="{{ t('logs.th_grade') }}" class="play-grade"><span><span class="grade g{{ p.grade }}">{{ p.grade }}</span>{% if p.new %}<span class="mark new">{{ t('dash.new') }}</span>{% endif %}</span></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {# A long history a page at a time. #}
+  {% if last_page > 1 %}
+  <p class="pager">
+    {% if page > 1 %}<a class="btn btn-sm" href="{{ url_for('logs_page', tab='plays', page=page - 1, **shown) }}">{{ t('logs.newer') }}</a>{% endif %}
+    <span class="meta-inline">{{ page }} / {{ last_page }}</span>
+    {% if page < last_page %}<a class="btn btn-sm" href="{{ url_for('logs_page', tab='plays', page=page + 1, **shown) }}">{{ t('logs.older') }}</a>{% endif %}
+  </p>
+  {% endif %}
+  {% endif %}
+</section>
+{% else %}
+<section class="card">
+  <h2>{{ t('logs.changes') }}</h2>
+  <p class="meta log-help">{{ t('logs.changes_help') }}</p>
+  {% if not changes %}<p class="empty">{{ t('logs.changes_none') }}</p>{% else %}
+  <ol class="changes">
+    {% for c in changes %}<li><span class="ch-when" title="{{ c.ago }}">{{ c.at|rec_date }}</span><span class="ch-what">{{ c.words }}</span><span class="ch-target">{{ c.target }}</span><span class="ch-who">{{ c.who }}</span></li>{% endfor %}
+  </ol>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

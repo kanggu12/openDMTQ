@@ -1,0 +1,241 @@
+# OpenDMTQ: a self-hosted DJMAX Technika Q server. Drive it with ./opendmtq, not by hand.
+# Each copy of this repository on a machine is one server. A second copy gets its own name in .env
+# (./opendmtq picks one), so the two never touch each other's containers or images.
+name: ${COMPOSE_PROJECT_NAME:-opendmtq}
+
+services:
+  server:
+    # Built from server/; a release can point this at a published image instead.
+    build: ./server
+    image: ${OPENDMTQ_SERVER_IMAGE:-${COMPOSE_PROJECT_NAME:-opendmtq}-server:local}
+    container_name: ${COMPOSE_PROJECT_NAME:-opendmtq}-server
+    # Unprivileged, as the invoking user so files in data/state stay theirs; no capabilities;
+    # read-only root filesystem with one writable scratch area.
+    user: "${OPENDMTQ_UID:-33}:${OPENDMTQ_GID:-33}"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs:
+      - /var/opendmtq:mode=1777,size=256m
+      - /tmp:mode=1777,size=64m
+    # Off by default: the server runs when you start it. Set RESTART=unless-stopped to keep it up.
+    restart: ${RESTART:-no}
+    environment:
+      # Address the game is sent to; written by ./opendmtq setup.
+      PUBLIC_HOST: ${PUBLIC_HOST:?run ./opendmtq setup first}
+      # The version the pages show (the CLI passes it on; see system.code_version()).
+      OPENDMTQ_VERSION: ${OPENDMTQ_VERSION:-}
+      # The name after the game's title on phones: TECHNIKA Q (name). Empty: the whole address, port included.
+      SERVER_NAME: ${SERVER_NAME:-}
+      # on: every player's broadcast is on until turned off in the admin pages. Default: off until turned on.
+      LIVE_DEFAULT: ${LIVE_DEFAULT:-off}
+      # Whole backend in one container (the Helm chart also runs separate "assets" replicas).
+      ROLE: api
+      # The admin pages (/opendmtq/admin, and /admin, their old address) are passed to the admin service (unless
+      # ADMIN_ON_PUBLIC_PORT=no, set when exposed).
+      ADMIN_URL: http://admin:8000
+      ADMIN_ON_PUBLIC_PORT: ${ADMIN_ON_PUBLIC_PORT:-yes}
+      TZ: ${TZ:-UTC}
+    # No published port: phones and browsers come in through the edge service below.
+    volumes:
+      # The game data and songs from `opendmtq import` (the operator's own files), read-only.
+      - ./data/content:/srv/content:ro
+      # The only state: accounts and scores.
+      - ./data/state:/data
+      # Patched APKs, offered to phones at /apk.
+      - ./data/apk/out:/srv/apk:ro
+      # Songs and notices added on the admin page, preferred over the imported content.
+      - ./data/custom:/srv/custom:ro
+      # The certificate authority's certificate, offered at /ca.crt (./opendmtq up makes it). No
+      # key: HTTPS ends in the edge.
+      - ./data/https/public:/srv/https:ro
+    logging:
+      # Apache logs go to stdout; cap what Docker keeps.
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  edge:
+    # The one public port, for the game (plain HTTP) and browsers over HTTPS: HTTPS ends here and
+    # goes on to the server's HTTPS door, anything else to its plain one (server/edge/nginx.conf).
+    image: nginxinc/nginx-unprivileged:1.27.5-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-opendmtq}-edge
+    restart: ${RESTART:-no}
+    # The user that owns data/https, so it can read the certificate's key (0600).
+    user: "${OPENDMTQ_UID:-33}:${OPENDMTQ_GID:-33}"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=16m
+    # Open files for many visitors (worker_rlimit_nofile in server/edge/nginx.conf).
+    ulimits:
+      nofile: {soft: 16384, hard: 16384}
+    # Not the image's start scripts (they rewrite its own configuration): ours picks the HTTPS or
+    # the plain-only configuration.
+    entrypoint: ["/bin/sh", "/etc/opendmtq/edge/start.sh"]
+    volumes:
+      - ./server/edge:/etc/opendmtq/edge:ro
+      # Where the edge says it runs without HTTPS (edge-plain); the server reads it as /srv/https/edge-plain.
+      - ./data/https/public:/etc/opendmtq/state
+      # The server certificate and its key (./opendmtq up makes them).
+      - ./data/https/serve:/etc/opendmtq/https:ro
+    ports:
+      # On every interface so phones can reach it: port 80 on the LAN, or the forwarded port when
+      # exposed to the internet (./opendmtq expose). On Linux, Docker-published ports bypass ufw;
+      # set BIND_ADDRESS to one address to narrow it.
+      - "${BIND_ADDRESS:-0.0.0.0}:${LISTEN_PORT:-80}:8790"
+    depends_on: [server]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  admin:
+    # Admin pages at /opendmtq/admin (through the server): app builds, songs, players, backups, notices.
+    # x86-64 only (7-Zip, and the aapt2 and zipalign that apktool and the signer carry): emulated on an ARM machine.
+    platform: linux/amd64
+    build: ./tools
+    image: ${OPENDMTQ_TOOLS_IMAGE:-${COMPOSE_PROJECT_NAME:-opendmtq}-tools:local}
+    container_name: ${COMPOSE_PROJECT_NAME:-opendmtq}-admin
+    restart: ${RESTART:-no}
+    user: "${OPENDMTQ_UID:-33}:${OPENDMTQ_GID:-33}"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs:
+      # App builds unpack the client here (a few hundred MB while they run); the signer runs a
+      # zipalign binary it extracts here, so this tmpfs must allow execution.
+      - /tmp:mode=1777,size=1536m,exec
+    ports:
+      # Always reachable on this machine at http://localhost:8791/opendmtq/admin/ (loopback only by default).
+      - "${ADMIN_BIND:-127.0.0.1}:${ADMIN_PORT:-8791}:8000"
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?run ./opendmtq setup first}
+      # The version the pages show (the CLI passes it on; see system.code_version()).
+      OPENDMTQ_VERSION: ${OPENDMTQ_VERSION:-}
+      # The name after the game's title on phones: TECHNIKA Q (name). Empty: the whole address, port included.
+      SERVER_NAME: ${SERVER_NAME:-}
+      # The owner's admin account: ADMIN_USER ("admin" unless set) and ADMIN_PASSWORD. Other accounts, the site's and
+      # admins', are made on the Accounts page.
+      ADMIN_USER: ${ADMIN_USER:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SERVER_URL: http://server:8080
+      BASE_APK: ${BASE_APK:-}
+      HOME: /tmp
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ./data/state:/data
+      - ./data/apk:/apk
+      - ./data/custom:/custom
+      - ./data/backups:/backups
+      - ./data/content:/srv/content:ro
+    entrypoint: ["gunicorn"]
+    command: ["-w", "1", "--threads", "8", "-b", "0.0.0.0:8000", "--timeout", "120", "--access-logfile", "-",
+              "opendmtq_tools.admin:app"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  builder:
+    # Builds the phone app for the current address whenever the stack starts; exits when done.
+    # A rebuild happens only when the address, the base APK or the patcher changed.
+    # x86-64 only (7-Zip, and the aapt2 and zipalign that apktool and the signer carry): emulated on an ARM machine.
+    platform: linux/amd64
+    build: ./tools
+    image: ${OPENDMTQ_TOOLS_IMAGE:-${COMPOSE_PROJECT_NAME:-opendmtq}-tools:local}
+    container_name: ${COMPOSE_PROJECT_NAME:-opendmtq}-builder
+    restart: "no"
+    user: "${OPENDMTQ_UID:-33}:${OPENDMTQ_GID:-33}"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?run ./opendmtq setup first}
+      # The name after the game's title on phones: TECHNIKA Q (name). Empty: the whole address, port included.
+      SERVER_NAME: ${SERVER_NAME:-}
+      # Which base APK to patch when data/apk/base holds several different ones.
+      BASE_APK: ${BASE_APK:-}
+      HOME: /tmp
+      # Dates in file names follow the host's zone (the CLI passes it).
+      TZ: ${TZ:-UTC}
+    volumes:
+      # Base APK in, patched APK, manifest and QR out; the signing key lives here too.
+      - ./data/apk:/apk
+    command: ["opendmtq_tools.builder"]
+
+  tools:
+    # One-shot jobs: patch the APK, make the HTTPS certificates, rebuild the song list, draw QR codes,
+    # copy a restored database. Run through ./opendmtq. (The import has a service of its own below.)
+    # x86-64 only (7-Zip, and the aapt2 and zipalign that apktool and the signer carry): emulated on an ARM machine.
+    platform: linux/amd64
+    build: ./tools
+    image: ${OPENDMTQ_TOOLS_IMAGE:-${COMPOSE_PROJECT_NAME:-opendmtq}-tools:local}
+    profiles: ["tools"]
+    restart: "no"
+    # Files it writes belong to the user who ran ./opendmtq, not to root.
+    user: "${OPENDMTQ_UID:-33}:${OPENDMTQ_GID:-33}"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:-}
+      # The app's title, as in the builder: an app built from here carries the same name.
+      SERVER_NAME: ${SERVER_NAME:-}
+      BASE_APK: ${BASE_APK:-}
+      # apktool and keytool keep caches under HOME; give them a writable one.
+      HOME: /tmp
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ./data:/data
+      - ./data/apk:/apk
+      - ./data/custom:/custom
+      - ./data/content:/srv/content:ro
+      # The database to restore, read-only (set by `opendmtq restore`).
+      - ${IMPORT_FROM:-./data}:/in:ro
+
+  importer:
+    # `opendmtq import`: opens the owner's archives with 7-Zip, so it gets no more than the job needs.
+    # It reads the folder it imports from and writes data/content (built next to it and moved in, hence all
+    # of data/ mounted) and data/apk/base. data/'s other folders are each covered by an empty one: the
+    # HTTPS keys, the signing key, the backups (which hold the key and .env's passwords), the
+    # database, and what phones download (apps, runtime bundle, added songs), which an archive
+    # crafted to break 7-Zip could otherwise read or replace. ./opendmtq creates these folders before
+    # any container starts, so Docker never makes one of them as root.
+    # x86-64 only (7-Zip, and the aapt2 and zipalign that apktool and the signer carry): emulated on an ARM machine.
+    platform: linux/amd64
+    build: ./tools
+    image: ${OPENDMTQ_TOOLS_IMAGE:-${COMPOSE_PROJECT_NAME:-opendmtq}-tools:local}
+    profiles: ["tools"]
+    restart: "no"
+    # The invoking user (the CLI passes its uid): only that user may be able to read the folder.
+    user: "${OPENDMTQ_UID:-33}:${OPENDMTQ_GID:-33}"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      # Which files of the folder to take (setup passes the files its search matched).
+      IMPORT_ONLY: ${IMPORT_ONLY:-}
+      # The game data (yes unless told), the songs (only when asked: ./opendmtq import --songs).
+      IMPORT_GAME: ${IMPORT_GAME:-yes}
+      IMPORT_SONGS: ${IMPORT_SONGS:-no}
+      # A folder inside data/ read where it is (data/server of an earlier OpenDMTQ), so its files are linked, not copied.
+      IMPORT_DATA: ${IMPORT_DATA:-}
+      # Only say what each file is (./opendmtq import --check).
+      IMPORT_CHECK: ${IMPORT_CHECK:-}
+      HOME: /tmp
+      TZ: ${TZ:-UTC}
+    tmpfs:
+      # Laid over data/'s own folders (deeper mounts go on top of /data). Small: nothing belongs there.
+      - /data/https:size=1m
+      - /data/backups:size=1m
+      - /data/state:size=1m
+      - /data/custom:size=1m
+      # All of data/apk; base/ comes back through the mount below.
+      - /data/apk:size=1m
+    volumes:
+      - ./data:/data
+      - ./data/apk/base:/data/apk/base
+      # The folder being imported, read-only (set by `opendmtq import`).
+      - ${IMPORT_FROM:-./data}:/in:ro

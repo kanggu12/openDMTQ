@@ -1,0 +1,27 @@
+# Values for the local kind cluster (deploy/kind/cluster.yaml). deploy/kind/up.sh passes
+# publicHost from .env, so the cluster serves the same address the Compose stack built the app for.
+data:
+  hostPath: /opendmtq-data
+router:
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30080
+objectStore:
+  enabled: true
+  # Stands in for external object storage: kept off the workers the failover test stops.
+  nodeSelector: {node-role.kubernetes.io/control-plane: ""}
+  tolerations: [{key: node-role.kubernetes.io/control-plane, operator: Exists, effect: NoSchedule}]
+image:
+  server: {repository: opendmtq-server, tag: local}
+  tools: {repository: opendmtq-tools, tag: local}
+  pullPolicy: IfNotPresent
+# kind mounts this checkout's data/, so the app the Compose stack built is already there; a second
+# builder would overwrite it.
+builder:
+  enabled: false
+# The same goes for data/custom: ./opendmtq up keeps it current, and a rebuild from these images
+# would rewrite the song list and overlay the Compose stack is serving. (Songs and backups changed on
+# this cluster's admin pages still land in data/.)
+songs:
+  rebuildOnStart: false

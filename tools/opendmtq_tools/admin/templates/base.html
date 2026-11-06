@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ t('site.admin') }}{% endblock %} · {{ t('site.admin') }}</title>
+<link rel="icon" href="/opendmtq/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/opendmtq/style.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+{# A page just arriving: its meters and charts fill in once (admin.css and style.css, "motion"). The class goes after
+   1.6 s, so that what the page redraws later (the status tiles every 30 s) stays still. #}
+<script>document.documentElement.classList.add("arriving");setTimeout(()=>document.documentElement.classList.remove("arriving"),1600)</script>
+</head>
+<body data-section="admin">
+<div class="facets" aria-hidden="true"></div>
+{% set ep = request.endpoint %}
+{% set pages = [('dashboard', 'nav.status'), ('app_page', 'nav.app'), ('songs_page', 'nav.songs'), ('players_page', 'nav.players'), ('accounts_page', 'nav.accounts'), ('recordings_page', 'nav.recordings'),
+                ('backups_page', 'nav.backups'), ('maintenance_page', 'nav.maintenance'), ('logs_page', 'nav.logs')] %}
+<header class="bar">
+  <div class="wrap bar-in">
+    {# One name, DMTQ and ADMIN together, and at the bar's right end, only when the game server is not answering, one word
+       with a light. A sentence stands above the page too then. #}
+    <a class="logo" href="{{ url_for('dashboard') }}"><span class="o">OPEN</span><span class="m">DMT<b>Q</b></span><span class="s">ADMIN</span></a>
+    {# The console's pages in one row, in the page's language. #}
+    <nav class="nav pages" aria-label="{{ t('nav.aria') }}">
+      {% if is_signed_in %}{% for e, label in pages %}<a href="{{ url_for(e) }}"{% if ep == e %} class="on" aria-current="true"{% endif %}>{{ t(label) }}</a>{% endfor %}{% endif %}
+    </nav>
+    {# Both languages always in their own words; the same cookie as the public site's switch. #}
+    <div class="bar-end">{% if not server_ok and not server_waiting and is_signed_in %}<span class="state down" role="img" aria-label="{{ t('dash.down') }}" title="{{ t('dash.down') }}"><i></i>OFFLINE</span>{% endif %}<nav class="lang-switch" aria-label="{{ t('lang.label') }}">{% for code, key, word in [('ko', 'KOR', '한국어'), ('en', 'ENG', 'English')] %}<a lang="{{ code }}" title="{{ word }}" aria-label="{{ word }}" href="{{ url_for('set_lang', to=code, next=request.full_path.rstrip('?')) }}"{% if lang == code %} class="on" aria-current="true"{% endif %}>{{ key }}</a>{% endfor %}</nav>{% if is_signed_in %}<form class="auth-form" method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><span class="auth-who" title="{{ who }} · {{ t('who.owner') if who_owner else t('who.admin') }}"><span class="who-badge" aria-hidden="true">{{ (who or '?')[:1]|upper }}</span><span class="who-text"><span class="who-name">{{ who }}</span><span class="who-sub">{{ t('who.owner') if who_owner else t('who.admin') }}</span></span></span><button class="auth">{{ t('nav.signout') }}</button></form>{% endif %}</div>
+  </div>
+</header>
+<main class="wrap">
+  {# The page's name for screen readers and outlines; the cards carry the visible headings. #}
+  <h1 class="page-title">{{ self.title() }}</h1>
+  {# The sign-in page shows its message in its box, like the public site's. #}
+  {% if ep != 'login' %}
+  {% for cat, msg in get_flashed_messages(with_categories=true) %}
+    <p class="flash {{ cat }}" role="status">{{ msg }}</p>
+  {% endfor %}
+  {% endif %}
+  {# The game server is not answering: what that means here, on every page. A server being set up, with only the game's
+     files missing, is pointed to the setup instead (whose first step says it there). #}
+  {% if is_signed_in and not server_ok and ep != 'login' %}
+    {% if server_waiting %}
+      {% if not (ep or '').startswith('setup') %}<div class="site-alert" role="status"><p>{{ t('down.waiting', url=url_for('setup_page', step='files')) }}</p></div>{% endif %}
+    {% else %}
+    <div class="site-alert down" role="status"><p>{% if server_problem %}{{ t('down.problem', why=server_problem) }}{% else %}{{ t('down.note') }}{% endif %}</p></div>
+    {% endif %}
+  {% endif %}
+  {% block body %}{% endblock %}
+</main>
+<script>
+  // Upload boxes: name the chosen or dropped file, refuse one over the size limit, and enable the
+  // form's button only when there is something to send.
+  const tooLarge = {{ tp('drop.too_big', size='{size}', max='{max}')|tojson }}, changeLabel = {{ tp('drop.change')|tojson }};
+  for (const box of document.querySelectorAll('.drop')) {
+    const input = box.querySelector('input[type=file]');
+    const title = box.querySelector('.drop-title'), hint = box.querySelector('.drop-hint');
+    // The box's own texts, markup included (the hint's drop-only part hides on touch screens).
+    const blank = [title.innerHTML, hint.innerHTML];
+    // The visible "Choose file" button: "Change" once a file is there.
+    const pick = box.querySelector('.drop-pick'), pickLabel = pick ? pick.textContent : '';
+    const button = box.closest('form').querySelector('button');
+    const max = Number(box.dataset.max) || Infinity;
+    const size = n => n < 1048576 ? Math.max(1, Math.round(n / 1024)) + ' KB'
+      : n < 1073741824 ? (n / 1048576).toFixed(1).replace(/\.0$/, '') + ' MB' : (n / 1073741824).toFixed(1).replace(/\.0$/, '') + ' GB';
+    const show = () => {
+      const f = input.files[0];
+      const tooBig = !!f && f.size > max;
+      box.classList.toggle('has-file', !!f && !tooBig);
+      box.classList.toggle('too-big', tooBig);
+      button.disabled = !f || tooBig;
+      // A file's name and size go in as text; only the box's own markup is put back as HTML.
+      if (f) {
+        title.textContent = f.name;
+        hint.textContent = tooBig ? tooLarge.replace('{size}', size(f.size)).replace('{max}', size(max)) : size(f.size);
+      } else {
+        title.innerHTML = blank[0];
+        hint.innerHTML = blank[1];
+      }
+      if (pick) pick.textContent = f ? changeLabel : pickLabel;
+    };
+    input.addEventListener('change', show);
+    box.addEventListener('dragover', e => { e.preventDefault(); box.classList.add('over'); });
+    box.addEventListener('dragleave', () => box.classList.remove('over'));
+    box.addEventListener('drop', e => {
+      e.preventDefault();
+      box.classList.remove('over');
+      if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; show(); }
+    });
+    // Also right after a reload, when the browser may have kept the file. At once: the button's colours ease from one
+    // state to the other, and it would show in the main colour first and fade to grey on every load.
+    button.style.transition = 'none';
+    show();
+    // (Reading its size makes the browser lay it out as it now is, before the easing comes back.)
+    void button.offsetWidth;
+    button.style.transition = '';
+  }
+
+  // What cannot be undone asks first, in the site's own look: data-ask on the button or its form says what is lost, data-yes
+  // names the button that goes ahead. A form that was asked about comes back through here with its answer.
+  document.addEventListener('submit', e => {
+    const form = e.target, button = e.submitter, ask = document.getElementById('ask');
+    if (form.method === 'dialog') return;
+    const question = (button && button.dataset.ask) || form.dataset.ask;
+    if (!question || form.dataset.answered) { delete form.dataset.answered; return; }
+    e.preventDefault();
+    ask.querySelector('p').textContent = question.replace('{n}', form.querySelectorAll('input[name=sel]:checked').length);
+    const yes = ask.querySelector('[value=yes]');
+    yes.textContent = (button && button.dataset.yes) || form.dataset.yes || yes.dataset.word;
+    ask.returnValue = '';
+    ask.onclose = () => {
+      if (ask.returnValue !== 'yes') return;
+      form.dataset.answered = '1';
+      form.requestSubmit(button || undefined);
+    };
+    ask.showModal();
+  });
+
+  // Forms: a button that was pressed shows that it is working (a backup or an upload takes a while; its
+  // data-busy says what is happening), and a second press sends nothing.
+  document.addEventListener('submit', e => {
+    const form = e.target, button = e.submitter;
+    if (e.defaultPrevented || form.method === 'dialog') return;
+    if (form.dataset.sent) { e.preventDefault(); return; }
+    form.dataset.sent = '1';
+    if (button) {
+      button.setAttribute('aria-busy', 'true');
+      if (button.dataset.busy) button.textContent = button.dataset.busy;
+    }
+    // After a change the page comes back as it was: same place in the list, same search.
+    if (form.method === 'post') {
+      const search = document.querySelector('input[type=search]');
+      sessionStorage.setItem('odq-back', JSON.stringify({ path: location.pathname, y: scrollY, q: search ? search.value : '' }));
+    }
+  });
+  // Back to a page whose form was sent: it may be shown again as it was, and works again.
+  addEventListener('pageshow', e => {
+    if (!e.persisted) return;
+    for (const f of document.forms) delete f.dataset.sent;
+    for (const b of document.querySelectorAll('[aria-busy]')) b.removeAttribute('aria-busy');
+  });
+  (() => {
+    const back = JSON.parse(sessionStorage.getItem('odq-back') || 'null');
+    sessionStorage.removeItem('odq-back');
+    if (!back || back.path !== location.pathname) return;
+    const search = document.querySelector('input[type=search]');
+    if (search && back.q) { search.value = back.q; search.dispatchEvent(new Event('input')); }
+    scrollTo(0, back.y);
+    // Further down the page, the message about what was done comes to the screen's foot: it would
+    // be out of sight at the top. A good one leaves by itself.
+    if (scrollY > 0) {
+      for (const m of document.querySelectorAll('.flash')) {
+        m.classList.add('float');
+        // It lies over the page: a click takes it away, and it leaves by itself, a good one sooner.
+        m.addEventListener('click', () => m.remove());
+        setTimeout(() => m.remove(), m.classList.contains('ok') ? 5000 : 15000);
+      }
+    }
+  })();
+</script>
+{# The one question the page asks before what cannot be undone (see above). #}
+<dialog id="ask" class="ask">
+  <p></p>
+  <form method="dialog" class="btn-line"><button class="btn" value="no">{{ t('btn.cancel') }}</button><button class="btn btn-danger" value="yes" data-word="{{ t('btn.continue') }}">{{ t('btn.continue') }}</button></form>
+</dialog>
+{# The footer: what this software is, in two short lines, then the same three as the players' site's footer in the same
+   order: the server's patch, the license, the way to the other side (here the players' site). In English like the menus. #}
+<footer class="foot"><div class="wrap foot-in">
+  <div class="foot-note"><p>{{ t('foot.line1') }}</p><p>{{ t('foot.line2') }}</p></div>
+  <nav class="foot-keys" aria-label="{{ t('foot.links') }}">
+    {% if patch %}<span class="foot-tag">{{ t('foot.patch', v=patch) }}</span>{% endif %}
+    <a class="key" aria-label="{{ t('foot.license') }}" href="{{ public_url }}/opendmtq/licenses.php">LICENSE</a>
+    <a class="key" aria-label="{{ t('foot.public') }}" href="{{ public_url }}/opendmtq/">PLAYERS' SITE</a>
+  </nav>
+</div></footer>
+<script>(()=>{const b=document.querySelector('.bar'),f=()=>b.classList.toggle('under',scrollY>2);addEventListener('scroll',f,{passive:true});f()})()</script>
+<script src="{{ url_for('static', filename='admin.js') }}" defer></script>
+</body>
+</html>

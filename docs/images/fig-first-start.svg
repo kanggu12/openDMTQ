@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 759" width="956" height="759" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="A phone's first start: the app asks for the server's information and the patch manifest, downloads the client's files it lacks, logs in on the platform and in the game, gets the start batch, and registers for push; a song's files come when a player first picks it">
+<rect x="-28" y="-28" width="956" height="759" rx="16" fill="#11151a"/>
+<path d="M675,44.5 V699" stroke="#3a434d" stroke-width="1.2" stroke-dasharray="3 5"/>
+<path d="M225,44.5 V699" stroke="#3a434d" stroke-width="1.2" stroke-dasharray="3 5"/>
+<rect x="4" y="202" width="892" height="117" rx="8" fill="#1a1f25" fill-opacity="0.55" stroke="#3a434d" stroke-width="1"/>
+<path d="M8,0 H430 L442,12 V44 H8 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="22" y="26.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="22,428">Phone, the patched app</text>
+<path d="M458,0 H880 L892,12 V44 H458 Z" fill="#1a1f25" stroke="#8cf23d" stroke-width="2" stroke-linejoin="round"/>
+<text x="472" y="26.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="472,878">Server</text>
+<path d="M225,80 L667,80" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M674,80 L665.0,84.5 L665.0,75.5 Z" fill="#7b8794" data-tip="674,80"/>
+<text x="450" y="73" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">service.getInfo</text>
+<path d="M675,116 L233,116" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M226,116 L235.0,111.5 L235.0,120.5 Z" fill="#7b8794" data-tip="226,116"/>
+<text x="450" y="109" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">the RPC address, the patch folder and its version</text>
+<path d="M225,152 L667,152" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M674,152 L665.0,156.5 L665.0,147.5 Z" fill="#7b8794" data-tip="674,152"/>
+<text x="450" y="145" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">patch_new.csv.lz4, the patch manifest</text>
+<path d="M675,188 L233,188" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M226,188 L235.0,183.5 L235.0,192.5 Z" fill="#7b8794" data-tip="226,188"/>
+<text x="450" y="181" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">the client's data files, with sizes and checksums</text>
+<text x="14" y="220" font-size="12" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,886">The files the phone lacks, or whose checksum changed</text>
+<path d="M225,252 L667,252" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M674,252 L665.0,256.5 L665.0,247.5 Z" fill="#7b8794" data-tip="674,252"/>
+<text x="450" y="245" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">image bundles, fonts, previews and tables</text>
+<rect x="239" y="274" width="422" height="29" rx="6" fill="#11151a" stroke="#3a434d" stroke-width="1"/>
+<text x="249" y="291" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="249,653">from data/custom/web, else from data/content/web</text>
+<path d="M225,339 L667,339" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M674,339 L665.0,343.5 L665.0,334.5 Z" fill="#7b8794" data-tip="674,339"/>
+<text x="450" y="332" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">platform login, with the device id</text>
+<path d="M675,375 L233,375" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M226,375 L235.0,370.5 L235.0,379.5 Z" fill="#7b8794" data-tip="226,375"/>
+<text x="450" y="368" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">an access token for the phone's account</text>
+<path d="M225,411 L667,411" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M674,411 L665.0,415.5 L665.0,406.5 Z" fill="#7b8794" data-tip="674,411"/>
+<text x="450" y="404" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">the SDK's report and its price list</text>
+<path d="M225,447 L667,447" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M674,447 L665.0,451.5 L665.0,442.5 Z" fill="#7b8794" data-tip="674,447"/>
+<text x="450" y="440" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">user.loginV2 with the token</text>
+<path d="M675,483 L233,483" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M226,483 L235.0,478.5 L235.0,487.5 Z" fill="#7b8794" data-tip="226,483"/>
+<text x="450" y="476" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">the player id and the key that signs requests</text>
+<path d="M225,519 L667,519" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M674,519 L665.0,523.5 L665.0,514.5 Z" fill="#7b8794" data-tip="674,519"/>
+<text x="450" y="512" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">the start batch: news, assets, songs, items, achievements, scores</text>
+<path d="M675,555 L233,555" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M226,555 L235.0,550.5 L235.0,559.5 Z" fill="#7b8794" data-tip="226,555"/>
+<text x="450" y="548" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">one result per call, in order</text>
+<rect x="239" y="577" width="422" height="29" rx="6" fill="#11151a" stroke="#3a434d" stroke-width="1"/>
+<text x="249" y="594" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="249,653">an empty news list would close the game</text>
+<path d="M225,634 L667,634" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M674,634 L665.0,638.5 L665.0,629.5 Z" fill="#7b8794" data-tip="674,634"/>
+<text x="450" y="627" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">push registration</text>
+<rect x="14" y="656" width="872" height="29" rx="6" fill="#11151a" stroke="#3a434d" stroke-width="1"/>
+<text x="24" y="673" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="24,878">A song's music, video, jacket and chart come when a player first picks it.</text>
+</svg>

@@ -1,0 +1,85 @@
+{% extends "base.html" %}{% block title %}{{ t('players.title') }}{% endblock %}
+{% block body %}
+<section class="card">
+  <h2>{{ t('players.title') }} <span class="meta-inline" id="player-count">{{ players|length }}</span><a class="more" href="{{ url_for('players_page', csv=1) }}">{{ t('players.csv') }}</a></h2>
+  {# Said once, above the switches it is about. #}
+  <p class="lead">{{ t('players.devices') }}</p>
+  {% if not players %}<p class="empty">{{ t('players.none') }}</p>{% else %}
+  <input class="search list-search" id="player-search" type="search" placeholder="{{ t('players.search') }}" aria-label="{{ t('players.search') }}">
+  <p class="empty" id="player-none" role="status" hidden>{{ t('players.nomatch') }}</p>
+  <table class="data players sortable">
+    <thead><tr><th class="rank" data-sort="num">ID</th><th data-sort="text">{{ t('players.th_name') }}</th><th data-sort="num">{{ t('players.th_last') }}</th><th class="r wide-only" data-sort="num">{{ t('players.th_charts') }}</th><th class="r wide-only" data-sort="num">{{ t('players.th_total') }}</th><th>{{ t('players.th_broadcast') }}</th><th></th></tr></thead>
+    <tbody>
+    {% for p in players %}
+      {% set who = p.nickname.strip() or tp('player.fallback', id=p.id) %}
+      <tr data-k="{{ who|lower }}">
+        <td data-label="ID" class="rank" data-v="{{ p.id }}">{{ p.id }}</td>
+        {# The name leads to the player's public profile. Changing it, and what cannot be undone, wait under More. #}
+        <td class="primary" data-v="{{ who|lower }}"><a href="{{ public_url }}/opendmtq/player.php?id={{ p.id }}">{{ who }}</a></td>
+        {# When they last played, and how the last two weeks went. #}
+        <td data-label="{{ t('players.th_last') }}" class="player-last" data-v="{{ played[p.id].last or 0 }}">{{ played[p.id].spark }}<span>{{ played[p.id].ago or t('players.never') }}</span></td>
+        <td data-label="{{ t('players.th_charts') }}" class="r wide-only" data-v="{{ p.charts }}">{{ p.charts }}</td>
+        <td data-label="{{ t('players.th_total') }}" class="r wide-only" data-v="{{ p.total }}">{{ '{:,}'.format(p.total) }}</td>
+        {# How it is first: off, on and waiting for their next song, or on air. Then the switch, and the way to watch. #}
+        {% set state = 'on' if live.get(p.id) else 'wait' if p.id in live else 'off' %}
+        <td data-label="{{ t('players.th_broadcast') }}" class="live-cell"><div class="live-row">
+          <span class="live-state {{ state }}"><span class="lamp {{ state }}"></span>{{ t('players.broadcasting') if state == 'on' else t('players.waiting') if state == 'wait' else t('state.off_word') }}</span>
+          <div class="btns">
+            <form method="post" action="{{ url_for('player_action', pid=p.id) }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="seen" value="{{ seen[p.id] }}"><input type="hidden" name="action" value="{{ 'live-off' if p.id in live else 'live-on' }}"><button class="btn btn-sm">{{ t('btn.turn_off') if p.id in live else t('btn.turn_on') }}</button></form>
+            {% if state == 'on' %}<a class="btn btn-sm" href="{{ public_url }}/opendmtq/live.php?p={{ p.id }}">{{ t('btn.watch') }}</a>{% endif %}
+          </div>
+        </div></td>
+        <td class="actions"><details class="row-more">
+          <summary class="btn btn-sm">{{ t('players.more') }}</summary>
+          <div class="row-more-in">
+            <form method="post" action="{{ url_for('player_action', pid=p.id) }}" class="inline-form rename">
+              <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="seen" value="{{ seen[p.id] }}"><input type="hidden" name="action" value="rename">
+              <input class="input input-sm" name="name" value="{{ p.nickname.strip() }}" placeholder="{{ t('player.fallback', id=p.id) }}" maxlength="20" aria-label="{{ t('players.name_of', id=p.id) }}">
+              <button class="btn btn-sm">{{ t('players.rename') }}</button>
+            </form>
+            <div class="btns">
+              <form method="post" action="{{ url_for('player_action', pid=p.id) }}" data-ask="{{ tp('players.confirm_reset', who=who) }}" data-yes="{{ tp('players.reset') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="seen" value="{{ seen[p.id] }}"><input type="hidden" name="action" value="reset"><button class="btn btn-sm btn-danger">{{ t('players.reset') }}</button></form>
+              <form method="post" action="{{ url_for('player_action', pid=p.id) }}" data-ask="{{ tp('players.confirm_delete', who=who) }}" data-yes="{{ tp('btn.delete') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="seen" value="{{ seen[p.id] }}"><input type="hidden" name="action" value="delete"><button class="btn btn-sm btn-danger">{{ t('btn.delete') }}</button></form>
+            </div>
+          </div>
+        </details></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+<script>
+  // More: one open at a time, and it closes by a press anywhere else. Rename does nothing until the name has changed.
+  for (const more of document.querySelectorAll('.row-more')) {
+    more.addEventListener('toggle', () => {
+      if (!more.open) return;
+      for (const other of document.querySelectorAll('.row-more[open]')) if (other !== more) other.open = false;
+    });
+    const field = more.querySelector('input[name=name]'), rename = more.querySelector('.rename button'), was = field.value;
+    const check = () => { rename.disabled = field.value.trim() === was; };
+    field.addEventListener('input', check);
+    check();
+  }
+  document.addEventListener('pointerdown', e => {
+    if (e.target.closest('.row-more') || document.getElementById('ask').open) return;
+    for (const open of document.querySelectorAll('.row-more[open]')) open.open = false;
+  });
+  // The list narrows to a word as it is typed.
+  (() => {
+    const box = document.getElementById('player-search');
+    if (!box) return;
+    box.addEventListener('input', () => {
+      const q = box.value.trim().toLowerCase(), rows = document.querySelectorAll('table.players tbody tr');
+      let shown = 0;
+      for (const r of rows) {
+        const hit = !q || r.dataset.k.includes(q);
+        r.style.display = hit ? '' : 'none';
+        shown += hit;
+      }
+      document.getElementById('player-count').textContent = q ? `${shown} / ${rows.length}` : rows.length;
+      document.getElementById('player-none').hidden = shown > 0;
+    });
+  })();
+</script>
+{% endblock %}

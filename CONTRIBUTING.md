@@ -1,0 +1,175 @@
+# Contributing to OpenDMTQ
+
+Bug reports, fixes, translations and new features are all welcome. This guide shows where the code is, how to run it
+and its tests on your PC, and how a change goes in. **You do not need the game's files for most of it:** the tests make
+stand-in files of their own.
+
+| You know | A good place to start |
+|---|---|
+| The game, or running a server | [Report what did not work](https://github.com/kanggu12/openDMTQ/issues/new/choose), improve a [guide](docs/README.md) |
+| Another language | The site's and the admin pages' words: [Changing the pages](#changing-the-pages) |
+| HTML, CSS, PHP | The players' site, `server/portal/` |
+| Python | The admin pages and the tools, `tools/opendmtq_tools/` |
+| Kubernetes or Docker | `deploy/helm/`, `compose.yaml` |
+| C++ and Android | The runtime for newer phones, `arm32/` |
+
+## Before you start
+
+- **No game files, anywhere.** Do not attach or commit the game's APK, songs, charts, images or tables, and do not
+  link to where they can be downloaded. Logs and screenshots of OpenDMTQ's own pages are fine. The tests run on
+  stand-in files made by `tests/ui/make_content.php`, so most work needs none of the game's files.
+- **Security problems** go to [SECURITY.md](.github/SECURITY.md), not to an issue.
+- Be kind: see the [code of conduct](.github/CODE_OF_CONDUCT.md).
+
+## Where the code is
+
+<p align="center">
+  <img src="docs/images/code-map.svg" alt="The map of the code. A phone's app sends the game's requests to server/edge, the one public port, then server/apache's site.conf sends each path on: the game's requests to server/game (index.php, then src/rpc.php, and src/platform.php for the platform's login), the live view's uploads to server/game/live, the site's pages to server/portal. Players, scores and accounts are in data/state/dmtq.db3. tools/opendmtq_tools holds the admin pages with the setup, the import, the app builder and the song list; opendmtq with cli/ runs them with Docker, host/ without containers" width="100%">
+</p>
+
+| Path | What it is | Start reading at |
+|---|---|---|
+| `server/game/` | The game server: every request of the game and of its platform SDK | `index.php`, then `src/rpc.php` (`odq_methods`) |
+| `server/portal/` | The players' site: rankings, songs, players, the app download, the live broadcasts | `lib.php`, then the page you change |
+| `server/apache/` | Apache's configuration: its listeners, and which path goes to which file or program | `site.conf` |
+| `server/edge/` | The edge proxy (nginx) with Docker Compose: one public port for plain HTTP and HTTPS | `nginx.conf` |
+| `server/entrypoint.sh` | The server image's start: the database, the settings, then Apache | the file, top to bottom |
+| `tools/opendmtq_tools/` | The tools, plain Python: the import (`importer.py`), the app builder and patcher (`builder.py`, `patch_apk.py`), the song list (`songs.py`), the ready-made runtime for newer phones (`runtime.py`) | the tool you change |
+| `tools/opendmtq_tools/admin/` | The admin pages, a module per page: `status.py`, `apps.py`, `song_pages.py`, `players.py`, `accounts.py`, `recordings.py`, `backups.py`, `logs.py`, `setup.py`. What they share is in `core.py` (settings, language, database) and `auth.py` (sign-in) | the page you change, then `core.py` |
+| `opendmtq`, `cli/` | `./opendmtq` with Docker Compose: setup, import, deploy, checks, backups. `install.sh` puts it on the PATH and, with `--service`, starts the server at boot; `firewall.ps1` lets phones reach a server in WSL | `opendmtq_cli/app.py` (`main`) |
+| `host/` | The same server without containers: `get.sh` and `install.sh` for Linux and macOS, `windows/` for the Windows bundle, and the program itself, a package in layers (`paths`, `settings`, `apache`, `server`, `commands`, `setup`) | `opendmtq_host/server.py` (`Server`) |
+| `arm32/` | The runtime that runs the 32-bit game on 64-bit-only phones, and the live broadcast's capture | [arm32/README.md](arm32/README.md) |
+| `deploy/helm/` | The Helm chart for Kubernetes | `values.yaml` |
+| `tests/` | The tests beyond unit tests: the contract, the pages, the live server, the host install, the Windows bundle | [docs/testing.md](docs/testing.md) |
+
+A request finds its way like this:
+
+<p align="center">
+  <img src="docs/images/fig-request-routing.svg" alt="How a request is answered. A file of the game (/DMQ/Songs, /DMQ/Patterns, /viewImg, /patch, /static) is served from the admin pages' overlay in data/custom/web, else from the imported content, else gets Apache's short 404. Other paths: the game's RPC, SDK and window go to server/game/index.php, /inspection/status.json to the overlay's notice while one is on, /live/ to server/game/live; OpenDMTQ's own: /opendmtq/admin to the admin pages, /opendmtq/, /apk, /thumbs and /ca.crt to server/portal, / to a redirect to /opendmtq/, anything else to the site's 404 page" width="100%">
+</p>
+
+[docs/architecture.md](docs/architecture.md) explains how the parts work together, and the quirks of the client the
+replies depend on. Apache takes requests on more than one port: the guides call each a door (the public one, and with
+Docker Compose two that only the edge proxy reaches).
+
+## Your first change
+
+```sh
+git clone https://github.com/kanggu12/openDMTQ.git && cd openDMTQ
+KEEP=1 ONLY=full tests/ui/run.sh       # a whole server on stand-in files, with made-up players: some minutes
+```
+
+Open http://127.0.0.1:18801/ (site account `dmtq`, password `smoke-pass`). Change a word in `server/portal/strings.php`, in
+both languages, and run the line again: the images are built from your tree, and the page shows it. Before you send it:
+
+```sh
+(cd cli && python3 -m unittest discover -s tests -t .)      # the repository's own checks, in a second or two
+tests/ui/run.sh                                             # every page, at five widths, in both languages: about 15 minutes
+```
+
+## Run it on your PC
+
+With Docker, from a clone: `./opendmtq setup --from <folder with your game files>`. Without the game's files, run the
+server on stand-in files and keep it running to look at:
+
+```sh
+KEEP=1 tests/ui/run.sh         # the site at http://127.0.0.1:18801/ (site account dmtq), the admin pages at
+                               # http://127.0.0.1:18802/opendmtq/admin/ (admin), both with the password smoke-pass
+KEEP=1 tests/game/protocol.sh  # the game server alone, at http://127.0.0.1:18701/
+```
+
+They need Docker on Linux (or Docker Engine in WSL 2), Python 3, `curl` and GNU coreutils (on a Mac: `brew install
+coreutils`). The first run builds both images and pulls a headless Chromium and ffmpeg: some minutes.
+
+## Run the tests
+
+<p align="center">
+  <img src="docs/images/chart-checks.svg" alt="1238 automated checks: Tools and admin pages (unit) 382; The server on the real game files 301; Command line and repository (unit) 186; All pages in a real browser 136; Host install on a clean system 104; Windows bundle under Wine 73; The game server's contract 56" width="100%">
+</p>
+
+You do not have to run them all: pick the line for what you changed, and CI runs the rest on your pull request.
+
+| You changed | Run | Needs |
+|---|---|---|
+| anything | `(cd cli && python3 -m unittest discover -s tests -t .)`: the command line's tests, and the repository's own checks (every test is in docs/test-cases.md and every pointer there still finds its text, every CSS class has a style, line endings) | Python 3.9 |
+| `server/game/` | `tests/game/protocol.sh`, and PHP's syntax: `docker run --rm -v "$PWD/server:/s:ro" php:8.3-cli sh -c 'for f in $(find /s -name "*.php"); do php -l "$f" >/dev/null \|\| exit 1; done'` | Docker |
+| `server/portal/`, `server/game/pages/`, `tools/opendmtq_tools/admin/` | `tests/ui/run.sh` | Docker on Linux |
+| `tools/` | `docker build -t opendmtq-tools:local tools`, then `docker run --rm -v "$PWD/tools:/t:ro" --entrypoint sh opendmtq-tools:local -c 'cd /t && python3 -m unittest discover -s tests -t .'` | Docker |
+| `host/`, `tools/opendmtq_tools/admin/setup.py` | `tests/host/run.sh` (`DISTRO=debian:12` for Debian; it goes through the setup in the browser) | Docker on Linux (it uses the host's network) |
+| `host/windows/` | `tests/windows/wine.sh` (builds the bundle and runs it under Wine) | Docker |
+| how a server gets its programs | `tests/closed/run.sh` does [Without internet](docs/closed-network.md) step by step on a network with no way out | Docker on Linux; kind, Helm and root for Kubernetes |
+| `arm32/` | `arm32/build.sh arm64-v8a`, then `arm32/test.sh` on a device (see [arm32/README.md](arm32/README.md)) | Docker, git, adb and a phone or an emulator of the same ABI |
+| `deploy/helm/` | `helm lint deploy/helm/opendmtq -f deploy/kind/values.yaml --set publicHost=10.0.0.5` | Helm |
+| a shell script | `shellcheck <the script>`; for `arm32/*.sh`, `shellcheck --severity=warning -x -P arm32 <the script>` | ShellCheck |
+
+CI runs all of these on every pull request, without the game's files, except `arm32/test.sh` (for the runtime, CI
+builds it). What needs the game's files runs in `tests/qa.sh` on a maintainer's machine: the server on the real songs,
+the app built from the real client, and the patcher's tests on it. A change to the patcher (`patch_apk.py`,
+`il2cpp.py`, `axml.py`) passes CI without ever meeting the real client, so say in the pull request that it needs that
+run. [docs/testing.md](docs/testing.md) has the whole picture, and [docs/test-cases.md](docs/test-cases.md) every case
+with the check that covers it.
+
+<p align="center">
+  <img src="docs/images/fig-testing-gates.svg" alt="Testing. A push or a pull request runs ci.yml on GitHub, without the game's files: the arm32 build, the unit tests and checks, a host install on Ubuntu and Debian, the images, and the contract and pages. tests/qa.sh runs on a machine with the game's files: tools, cli, game, live, ui and host, and the tour on an emulator with EMULATOR=1; it sets the commit status qa/local. With both passed, a tag v* runs release.yml, and ./opendmtq deploy updates a server" width="100%">
+</p>
+
+## Changing the game server
+
+A request from the game reaches `game/index.php`, which hands the batch to `src/rpc.php`. To answer a new method:
+
+1. Add it to `odq_methods()` in `src/rpc.php`, by its lowercase name, with the function that answers it.
+2. Write that function in the file for its kind (`game.php`, `shop.php`, `user.php`, `ranking.php`,
+   `achievement.php`). Answer with exactly the shape client 1.3.4 reads: a field it expects and does not find, or an
+   empty list where it wants an entry, can close the game.
+3. Add a check to `tests/game/protocol.py` that names the client behaviour it protects, and a row to
+   `docs/test-cases.md` (the CLI tests fail until the row is there).
+
+A method the server does not know gets the error SVC.05008, which the client handles without a popup. A batch with a
+`shop.` method or `game.saveplayresult` must carry the game's signature (the `Fp` header), or the whole batch is
+refused with 403: `protocol.py` signs its requests the way the client does.
+
+## Changing the pages
+
+The site and the admin pages come in English and Korean. The site's text is in the `STRINGS` table of
+`server/portal/strings.php`, the admin pages' in `tools/opendmtq_tools/strings.py`: a new text goes into both languages
+of its table, and `tools/tests/test_strings.py` checks them (and the spacing of Korean particles). A few Korean texts
+live elsewhere: the in-game notices in `server/game/live/state.php`, the help page in `server/game/pages/help.php`,
+and one word each in `server/portal/player.php`, `tools/opendmtq_tools/admin/static/admin.css` and
+`admin/templates/base.html`. `tests/ui/run.sh` checks every page at five widths in both languages, empty and full,
+and fails on text that is cut off or runs over another box.
+
+## Adding an admin page
+
+1. A module of its own in `tools/opendmtq_tools/admin/`, with `from .core import BASE, app, t` and its address under
+   `@app.route(BASE + "/name")`. Add the module to the import in `admin/__init__.py`.
+2. A template in `admin/templates/` that extends `base.html`, and a link in the menu there.
+3. Its words in both languages of `tools/opendmtq_tools/strings.py`.
+4. A test in `tools/tests/` through the test client (`Install` in `test_admin.py` gives a signed-in one on a temporary
+   server), the page in `tests/ui/audit.js` so that its layout is checked at every width, and a row in
+   `docs/test-cases.md`.
+
+## Adding a tool to the server
+
+The tools are plain Python, run the same way in the tools image, on a host install and in the Windows bundle
+(`python -m opendmtq_tools.<name>`). They read their folders from the environment (`OPENDMTQ_APK`, `OPENDMTQ_DB`...), never
+from a fixed path, and print one line per step: the admin pages show those lines as they come (`admin/jobs.py`).
+
+## Style
+
+- Comments in English, on most lines, saying why the line is there.
+- Text on the pages: short and plain, one fact and what to do about it.
+- `cli/` uses Python's standard library only (Python 3.9 and newer); the server code runs on PHP 8.1 and newer.
+- Shell scripts pass ShellCheck.
+- Nothing secret in logs or error messages: no passwords, keys or tokens.
+
+## Commits and pull requests
+
+- One change per pull request, with its tests and the docs it changes.
+- The first line of a commit message says what changed; the lines below say why, when that is not plain.
+- CI has to pass. A maintainer runs `tests/qa.sh` on the real game files before a release.
+
+## Releases
+
+A maintainer pushes a tag like `v1.2.3`. `.github/workflows/release.yml` runs CI again, waits for `tests/qa.sh`'s mark on
+the commit, and then publishes the images, the Helm chart, the Windows bundle and a GitHub release. On the first release the
+packages start private: make the two images and the chart public in each package's settings on GitHub, or nobody can pull them.

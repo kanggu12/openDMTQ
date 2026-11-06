@@ -1,0 +1,28 @@
+# Three-node local cluster for trying the chart and exercising failover (see docs/kubernetes.md).
+# The repository's data/ folder is mounted on every node at /opendmtq-data (chart: data.hostPath).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: opendmtq
+# Notice a dead node in about 10 s instead of 50 s (the default), so pods move sooner.
+kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    controllerManager:
+      extraArgs:
+        node-monitor-grace-period: 10s
+  - |
+    kind: KubeletConfiguration
+    nodeStatusUpdateFrequency: 2s
+nodes:
+  - role: control-plane
+    extraMounts:
+      - {hostPath: ./data, containerPath: /opendmtq-data}
+    extraPortMappings:
+      # Router NodePort, reachable from this machine at http://127.0.0.1:18080/.
+      - {containerPort: 30080, hostPort: 18080, listenAddress: "127.0.0.1"}
+  - role: worker
+    extraMounts:
+      - {hostPath: ./data, containerPath: /opendmtq-data}
+  - role: worker
+    extraMounts:
+      - {hostPath: ./data, containerPath: /opendmtq-data}

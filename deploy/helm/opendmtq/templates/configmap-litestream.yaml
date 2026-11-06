@@ -1,0 +1,19 @@
+{{- if .Values.litestream.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "opendmtq.fullname" . }}-litestream
+  labels: {{- include "opendmtq.labels" (dict "ctx" $ "component" "api") | nindent 4 }}
+data:
+  litestream.yml: |
+    dbs:
+      - path: /data/dmtq.db3
+        replicas:
+          - type: s3
+            endpoint: {{ include "opendmtq.s3Endpoint" . }}
+            bucket: {{ .Values.litestream.s3.bucket }}
+            path: {{ .Values.litestream.s3.path }}
+            region: {{ .Values.litestream.s3.region }}
+            force-path-style: {{ .Values.litestream.s3.forcePathStyle }}
+            sync-interval: {{ .Values.litestream.syncInterval }}
+{{- end }}

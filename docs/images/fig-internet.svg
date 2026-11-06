@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 526" width="956" height="526" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="Playing from outside: a phone on mobile data and a browser look up the DDNS name, which follows your public IP, and connect to your router, which forwards TCP 8790 to the server PC. There the edge, the one public port, reads each connection's first bytes: plain HTTP goes to the plain door (the game, /apk, /ca.crt), TLS is ended and goes to the HTTPS door (the site and the download). The admin pages answer there only after expose --admin-public">
+<rect x="-28" y="-28" width="956" height="526" rx="16" fill="#11151a"/>
+<path d="M0,30 H224 L236,42 V110 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="56.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,222">Phone outside</text>
+<text x="14" y="75.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,222">on mobile data, the app</text>
+<text x="14" y="93" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,222">for myhome.example.com:8790</text>
+<path d="M0,150 H224 L236,162 V230 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="176.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,222">Browser outside</text>
+<text x="14" y="195.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,222">https://myhome</text>
+<text x="14" y="213" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,222">.example.com:8790/</text>
+<path d="M0,330 H224 L236,342 V410 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="365.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,222">DDNS name</text>
+<text x="14" y="384.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,222">follows your public IP</text>
+<path d="M118,230.5 L118,322" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M118,329 L113.5,320.0 L122.5,320.0 Z" fill="#7b8794" data-tip="118,329"/>
+<text x="126" y="284" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="124,232">both look it up</text>
+<path d="M276,90 H414 L426,102 V170 H276 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="290" y="116.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="290,412">Router</text>
+<text x="290" y="135.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="290,412">forwards TCP 8790</text>
+<text x="290" y="153" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="290,412">to the server PC</text>
+<path d="M236.5,70 L256,70 L256,120 L268,120" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M275,120 L266.0,124.5 L266.0,115.5 Z" fill="#7b8794" data-tip="275,120"/>
+<text x="242" y="60" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="240,340">plain HTTP</text>
+<path d="M236.5,190 L256,190 L256,140 L268,140" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M275,140 L266.0,144.5 L266.0,135.5 Z" fill="#7b8794" data-tip="275,140"/>
+<text x="242" y="208" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="240,340">HTTPS</text>
+<rect x="440" y="0" width="460" height="470" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="454" y="22" font-size="13" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="454,886">Server PC, after ./opendmtq expose</text>
+<path d="M454,40 H874 L886,52 V110 H454 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="468" y="70.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="468,872">edge, the one public port</text>
+<text x="468" y="89.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="468,872">reads each connection's first bytes</text>
+<path d="M426.5,130 L437,130 L437,75 L446,75" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M453,75 L444.0,79.5 L444.0,70.5 Z" fill="#7b8794" data-tip="453,75"/>
+<path d="M454,160 H642 L654,172 V240 H454 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="468" y="186.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="468,640">plain door</text>
+<text x="468" y="205.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="468,640">the game, /apk,</text>
+<text x="468" y="223" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="468,640">/ca.crt</text>
+<path d="M686,160 H874 L886,172 V240 H686 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="700" y="186.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="700,872">HTTPS door</text>
+<text x="700" y="205.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="700,872">the site and</text>
+<text x="700" y="223" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="700,872">the download</text>
+<path d="M554,110.5 L554,152" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M554,159 L549.5,150.0 L558.5,150.0 Z" fill="#7b8794" data-tip="554,159"/>
+<text x="562" y="140" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="558,680">not TLS</text>
+<path d="M786,110.5 L786,152" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M786,159 L781.5,150.0 L790.5,150.0 Z" fill="#7b8794" data-tip="786,159"/>
+<text x="794" y="140" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="790,896">TLS, ended here</text>
+<path d="M454,290 H758 L770,302 V354 H454 Z" fill="#1a1f25" stroke="#8cf23d" stroke-width="2" stroke-linejoin="round"/>
+<text x="468" y="326.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="468,756">Game server and site</text>
+<path d="M554,240.5 L554,282" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M554,289 L549.5,280.0 L558.5,280.0 Z" fill="#7b8794" data-tip="554,289"/>
+<path d="M730,240.5 L730,282" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M730,289 L725.5,280.0 L734.5,280.0 Z" fill="#7b8794" data-tip="730,289"/>
+<path d="M686,380 H874 L886,392 V456 H686 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="700" y="404.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="700,872">Admin pages</text>
+<text x="700" y="423.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="700,872">only with --admin-public,</text>
+<text x="700" y="441" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="700,872">over HTTPS</text>
+<path d="M840,240.5 L840,372" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M840,379 L835.5,370.0 L844.5,370.0 Z" fill="#7b8794" data-tip="840,379"/>
+</svg>

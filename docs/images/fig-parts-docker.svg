@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 538" width="956" height="538" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="The parts with Docker Compose. Phones (plain HTTP) and browsers (HTTPS) reach the edge, nginx on the one public port, which ends HTTPS and passes each connection to one of Apache's two doors; site.conf sends it to the game server, the players' site or, for /opendmtq/admin, the admin pages, which the owner also opens at localhost:8791. The game server, the site and the admin pages work on data/; the builder puts the app in data/apk/out at every start">
+<rect x="-28" y="-28" width="956" height="538" rx="16" fill="#11151a"/>
+<path d="M0,30 H144 L156,42 V94 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="57.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,142">Phone</text>
+<text x="14" y="76.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,142">the app, plain HTTP</text>
+<path d="M0,120 H144 L156,132 V184 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="147.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,142">Browser</text>
+<text x="14" y="166.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,142">the site, HTTPS</text>
+<path d="M0,330 H144 L156,342 V394 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="357.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,142">Owner</text>
+<text x="14" y="376.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,142">on the server PC</text>
+<path d="M200,60 H348 L360,72 V154 H200 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="214" y="84.75" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="214,346">edge</text>
+<text x="214" y="103.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="214,346">nginx on the</text>
+<text x="214" y="121.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="214,346">public port,</text>
+<text x="214" y="138.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="214,346">ends HTTPS</text>
+<path d="M156.5,62 L178,62 L178,90 L192,90" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M199,90 L190.0,94.5 L190.0,85.5 Z" fill="#7b8794" data-tip="199,90"/>
+<path d="M156.5,152 L178,152 L178,124 L192,124" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M199,124 L190.0,128.5 L190.0,119.5 Z" fill="#7b8794" data-tip="199,124"/>
+<rect x="400" y="0" width="500" height="250" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="414" y="22" font-size="13" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="414,886">server: Apache with PHP</text>
+<path d="M414,36 H552 L564,48 V96 H414 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="428" y="61.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="428,550">door 8081</text>
+<text x="428" y="80.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="428,550">plain HTTP</text>
+<path d="M414,116 H552 L564,128 V176 H414 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="428" y="141.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="428,550">door 8443</text>
+<text x="428" y="160.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="428,550">HTTPS, decrypted</text>
+<path d="M360.5,80 L406.236,67.8036" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M413,66 L405.5,72.7 L403.1,64.0 Z" fill="#7b8794" data-tip="413,66"/>
+<text x="386" y="58" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="362,412">not TLS</text>
+<path d="M360.5,130 L406.304,143.959" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M413,146 L403.1,147.7 L405.7,139.1 Z" fill="#7b8794" data-tip="413,146"/>
+<text x="386" y="156" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="362,412">TLS</text>
+<path d="M600,76 H698 L710,88 V136 H600 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="614" y="110.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="614,696">site.conf</text>
+<path d="M564.5,66 L582,66 L582,96 L592,96" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M599,96 L590.0,100.5 L590.0,91.5 Z" fill="#7b8794" data-tip="599,96"/>
+<path d="M564.5,146 L582,146 L582,116 L592,116" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M599,116 L590.0,120.5 L590.0,111.5 Z" fill="#7b8794" data-tip="599,116"/>
+<path d="M746,36 H874 L886,48 V96 H746 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="760" y="61.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="760,872">Game server</text>
+<text x="760" y="80.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="760,872">server/game</text>
+<path d="M746,116 H874 L886,128 V176 H746 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="760" y="141.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="760,872">Players' site</text>
+<text x="760" y="160.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="760,872">server/portal</text>
+<path d="M710.5,96 L728,96 L728,66 L738,66" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M745,66 L736.0,70.5 L736.0,61.5 Z" fill="#7b8794" data-tip="745,66"/>
+<path d="M710.5,116 L728,116 L728,146 L738,146" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M745,146 L736.0,150.5 L736.0,141.5 Z" fill="#7b8794" data-tip="745,146"/>
+<path d="M560,300 H738 L750,312 V394 H560 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="574" y="333.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="574,736">admin</text>
+<text x="574" y="352.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="574,736">Flask on gunicorn,</text>
+<text x="574" y="370" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="574,736">127.0.0.1:8791</text>
+<path d="M655,136.5 L655,292" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M655,299 L650.5,290.0 L659.5,290.0 Z" fill="#7b8794" data-tip="655,299"/>
+<text x="662" y="222" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="662,790">/opendmtq/admin</text>
+<path d="M156.5,362 L552,362" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M559,362 L550.0,366.5 L550.0,357.5 Z" fill="#7b8794" data-tip="559,362"/>
+<text x="355" y="354" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="160,550">localhost:8791</text>
+<path d="M764,300 H888 L900,312 V394 H764 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="778" y="333.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="778,886">data/</text>
+<text x="778" y="352.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="778,886">content, custom,</text>
+<text x="778" y="370" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="778,886">state, apk</text>
+<path d="M832,250.5 L832,299.5" fill="none" stroke="#7b8794" stroke-width="1.6"/>
+<path d="M750.5,347 L763.5,347" fill="none" stroke="#7b8794" stroke-width="1.6"/>
+<path d="M764,420 H888 L900,432 V482 H764 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="778" y="437.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="778,886">builder</text>
+<text x="778" y="456.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="778,886">at every start:</text>
+<text x="778" y="474" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="778,886">data/apk/out</text>
+<path d="M832,419.5 L832,402" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M832,395 L836.5,404.0 L827.5,404.0 Z" fill="#7b8794" data-tip="832,395"/>
+</svg>

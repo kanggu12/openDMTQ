@@ -1,0 +1,54 @@
+{{- if .Values.builder.enabled }}
+{{- $host := include "opendmtq.publicHost" . }}
+# Builds the patched app for publicHost after every install or upgrade (a no-op when it is current).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "opendmtq.fullname" . }}-builder
+  labels: {{- include "opendmtq.labels" (dict "ctx" $ "component" "builder") | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels: {{- include "opendmtq.selector" (dict "ctx" $ "component" "builder") | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      automountServiceAccountToken: false
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: builder
+          image: {{ include "opendmtq.image" (dict "img" .Values.image.tools "ctx" $) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["opendmtq_tools.builder"]
+          env:
+            - {name: PUBLIC_HOST, value: {{ $host | quote }}}
+            - {name: SERVER_NAME, value: {{ .Values.serverName | quote }}}
+            - {name: HOME, value: /tmp}
+            # Which client in apk/base to patch when it holds several (the builder asks for it then).
+            {{- with .Values.baseApk }}
+            - {name: BASE_APK, value: {{ . | quote }}}
+            {{- end }}
+            # Dates in the app's file name follow this zone, as compose's builder does with the host's.
+            {{- with .Values.timeZone }}
+            - {name: TZ, value: {{ . | quote }}}
+            {{- end }}
+          resources: {{- toYaml .Values.builder.resources | nindent 12 }}
+          {{- include "opendmtq.containerSecurity" . | nindent 10 }}
+          volumeMounts:
+            - {name: data, mountPath: /apk, subPath: apk}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        {{- include "opendmtq.dataVolume" . | nindent 8 }}
+        - name: tmp
+          emptyDir: {sizeLimit: 1Gi}
+{{- end }}

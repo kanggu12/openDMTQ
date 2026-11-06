@@ -1,0 +1,4 @@
+# OpenDMTQ is a private game server for invited players: its pages (player names, the server's
+# address) and the game's files are not for search engines.
+User-agent: *
+Disallow: /
