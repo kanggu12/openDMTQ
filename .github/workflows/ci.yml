@@ -54,7 +54,7 @@ jobs:
       - name: PHP syntax (game server, portal and the test helpers, PHP 8.3)
         run: docker run --rm -v "$PWD/server:/s:ro" -v "$PWD/tests/ui:/ui:ro" -v "$PWD/tests/game:/gametest:ro" php:8.3-cli sh -c 'for f in /s/portal/*.php /ui/*.php /gametest/*.php $(find /s/game -name "*.php"); do php -l "$f" || exit 1; done'
 
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: v3.16.4
 
@@ -85,11 +85,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       # From the same cache as the images job below: quicker, and nothing to fetch from other sites unless a layer changed.
       - name: Build server image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: server
           load: true
@@ -98,7 +98,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=server
 
       - name: Build tools image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: tools
           load: true
@@ -115,7 +115,7 @@ jobs:
         run: tests/ui/run.sh "$PWD/_work/ui-report"
 
       # What the browser saw, for looking through: also when it passed.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ui-report
@@ -146,7 +146,7 @@ jobs:
       - uses: actions/checkout@v5
 
       # The pinned downloads (about 150 MB), kept between runs until a pin changes.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: _work/windows/downloads
           key: windows-downloads-${{ hashFiles('host/windows/build.sh', 'host/windows/requirements.txt') }}
@@ -159,7 +159,7 @@ jobs:
           NO_BUILD: "1"
         run: tests/windows/wine.sh
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-bundle
           path: _work/windows/OpenDMTQ-windows.zip
@@ -173,11 +173,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: windows-bundle
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -189,10 +189,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build server image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: server
           load: true
@@ -201,7 +201,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=server
 
       - name: Build tools image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: tools
           load: true
