@@ -6,8 +6,10 @@
 #
 # Usage: host/windows/build.sh [out folder]      (default _work/windows; VERSION=1.2.3 for a release, else date-commit)
 #
-# Apache Lounge keeps only its newest build for download: when its file is gone, take the new one, test the bundle, and
-# put its name and hash below.
+# Apache Lounge keeps only its newest build for download, and PHP moves older builds: each file is also kept in this
+# repository's release named build-inputs, where the build falls back to. To move to a newer one, test the bundle
+# with it, put its name and hash below, and add it there under the same name:
+# gh release upload build-inputs <file> --clobber
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -82,23 +84,27 @@ fetch() {
         mv "$DL/$name.part" "$DL/$name"
         return 0
       fi
-      echo "error: $url is not the tested file (its SHA-256 differs)" >&2
+      # A maker that keeps only its newest build answers an old address with a page of its own, or another file: the
+      # next address, at last this repository's own copy of the tested file.
+      echo "note: $url is not the tested file (its SHA-256 differs); trying the next address" >&2
       rm -f "$DL/$name.part"
-      exit 1
     fi
   done
-  echo "error: could not download $name ($*)" >&2
+  echo "error: could not download $name as tested ($*)" >&2
   exit 1
 }
 
+# This repository's copies of the tested files (the release named build-inputs), for when a maker has taken its own down.
+MIRROR=https://github.com/kanggu12/openDMTQ/releases/download/build-inputs
+
 step "Downloads"
-fetch httpd.zip "$APACHE_SHA" "$APACHE_URL"
-fetch php.zip "$PHP_SHA" "$PHP_URL" "$PHP_ARCHIVE_URL"
-fetch python.zip "$PYTHON_SHA" "$PYTHON_URL"
-fetch jre.zip "$JRE_SHA" "$JRE_URL"
-fetch 7zip.exe "$SEVENZIP_SHA" "$SEVENZIP_URL"
-fetch apktool.jar "$APKTOOL_SHA" "$APKTOOL_URL"
-fetch uber-apk-signer.jar "$SIGNER_SHA" "$SIGNER_URL"
+fetch httpd.zip "$APACHE_SHA" "$APACHE_URL" "$MIRROR/httpd.zip"
+fetch php.zip "$PHP_SHA" "$PHP_URL" "$PHP_ARCHIVE_URL" "$MIRROR/php.zip"
+fetch python.zip "$PYTHON_SHA" "$PYTHON_URL" "$MIRROR/python.zip"
+fetch jre.zip "$JRE_SHA" "$JRE_URL" "$MIRROR/jre.zip"
+fetch 7zip.exe "$SEVENZIP_SHA" "$SEVENZIP_URL" "$MIRROR/7zip.exe"
+fetch apktool.jar "$APKTOOL_SHA" "$APKTOOL_URL" "$MIRROR/apktool.jar"
+fetch uber-apk-signer.jar "$SIGNER_SHA" "$SIGNER_URL" "$MIRROR/uber-apk-signer.jar"
 echo "all checked against their SHA-256"
 
 # A fresh bundle folder, and a scratch one for what is unpacked.
