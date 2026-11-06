@@ -244,6 +244,59 @@ class LicenseTest(unittest.TestCase):
         self.assertEqual(self.read("LICENSE"), self.read("server/portal/LICENSE"))
 
 
+class ReleaseNotesTest(unittest.TestCase):
+    """.github/release_notes.py, which release.yml runs before it builds a release: one version, and notes for it."""
+
+    @classmethod
+    def setUpClass(cls):
+        # The script lives outside any package (in .github/), so it is loaded from its path.
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("release_notes", os.path.join(ROOT, ".github", "release_notes.py"))
+        cls.notes = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.notes)
+
+    def run_notes(self, tag):
+        """The script's exit code, what it printed (the notes) and what it complained of, for this tree."""
+        import contextlib
+        import io
+        out, err = io.StringIO(), io.StringIO()
+        # Captured as release.yml sees them: the notes on stdout go to a file, the problems on stderr to the log.
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = self.notes.main([tag, "--root", ROOT])
+        return code, out.getvalue(), err.getvalue()
+
+    def test_the_chart_in_the_tree_has_its_notes_in_the_changelog(self):
+        # Between releases the tree names the last one: tagging it again must pass, so the files never drift apart.
+        chart, app = self.notes.chart_versions(self.notes.ROOT)
+        self.assertEqual(chart, app)
+        code, out, err = self.run_notes("v" + chart)
+        self.assertEqual(code, 0, err)
+        # The notes are the section's body: its headings, not the version's own heading.
+        self.assertIn("### ", out)
+        self.assertNotIn(f"## [{chart}]", out)
+
+    def test_another_number_or_no_notes_stops_the_release_before_anything_is_built(self):
+        code, out, err = self.run_notes("v9.9.9")
+        self.assertEqual(code, 1)
+        # Nothing on stdout, so release.yml has no notes to publish by mistake.
+        self.assertEqual(out, "")
+        # Both problems at once, each with its fix, so one run says all there is to change.
+        self.assertIn("set both to 9.9.9", err)
+        self.assertIn("CHANGELOG.md has no notes for 9.9.9", err)
+        # A tag that is no version at all (a branch name pushed as a tag, say) stops too.
+        self.assertEqual(self.run_notes("latest")[0], 1)
+
+    def test_a_section_ends_at_the_next_version_or_the_links(self):
+        text = ("## [Unreleased]\n\n## [1.1.0] - 2026-01-02\n\n### Added\n\n- b\n\n"
+                "## [1.0.0] - 2026-01-01\n\n- a\n\n[1.1.0]: https://example.com/1.1.0\n")
+        # A middle section stops at the next heading; the last one stops before the link list.
+        self.assertEqual(self.notes.section(text, "1.1.0"), "### Added\n\n- b")
+        self.assertEqual(self.notes.section(text, "1.0.0"), "- a")
+        # An empty [Unreleased] has no notes, and a version that is not there has none either.
+        self.assertEqual(self.notes.section(text, "Unreleased"), "")
+        self.assertIsNone(self.notes.section(text, "0.9.0"))
+
+
 class LineEndingTest(unittest.TestCase):
     def test_scripts_keep_lf_on_every_checkout(self):
         # Git for Windows checks text out with CRLF unless told otherwise; a CRLF shebang line

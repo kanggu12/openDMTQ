@@ -170,6 +170,18 @@ from a fixed path, and print one line per step: the admin pages show those lines
 
 ## Releases
 
-A maintainer pushes a tag like `v1.2.3`. `.github/workflows/release.yml` runs CI again, waits for `tests/qa.sh`'s mark on
-the commit, and then publishes the images, the Helm chart, the Windows bundle and a GitHub release. On the first release the
-packages start private: make the two images and the chart public in each package's settings on GitHub, or nobody can pull them.
+Versions follow [Semantic Versioning](https://semver.org/): a release that adds something raises the minor number, one
+that only fixes raises the patch number. A change notes itself under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md)
+([Keep a Changelog](https://keepachangelog.com/en/1.1.0/): Added, Changed, Fixed, Removed).
+
+A release, by a maintainer:
+
+1. Move the `[Unreleased]` notes under `## [1.2.3] - YYYY-MM-DD`, and set `version` and `appVersion` in
+   `deploy/helm/opendmtq/Chart.yaml` to `1.2.3`.
+2. Run `tests/qa.sh` on that commit, on a machine with the game's files: it marks the commit when everything passes.
+3. Push the tag `v1.2.3`. `.github/workflows/release.yml` checks that the tag, the chart and the changelog name one
+   version (`.github/release_notes.py`), runs CI again, waits for the mark, and publishes the images, the Helm chart,
+   the Windows bundle and a GitHub release whose notes are that version's section of the changelog.
+
+Builds between releases name themselves by the date and commit of their code (`2026.11.07-62ce933`), which the site
+shows beside its logo and the admin pages on their Status page.

@@ -26,6 +26,11 @@ jobs:
     # A stalled download fails after 10 minutes, not GitHub's six hours: several times what this job takes.
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@v5
+      # One version in the tag, the chart and CHANGELOG.md, and notes for it: checked first, so that nothing is built
+      # or published under a number the chart does not carry, or without notes.
+      - name: The tag, the chart and CHANGELOG.md name one version
+        run: python3 .github/release_notes.py "$GITHUB_REF_NAME"
       - name: The local quality gate passed on this commit
         env:
           GH_TOKEN: ${{ github.token }}
@@ -125,4 +130,8 @@ jobs:
       - name: GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "$GITHUB_REF_NAME" dist/opendmtq-*.tgz dist/opendmtq-arm32-runtime.zip dist/OpenDMTQ-windows.zip dist/OpenDMTQ-windows.zip.sha256 --generate-notes --verify-tag
+        # The notes are this version's section of CHANGELOG.md; --generate-notes adds the compare link under them.
+        run: |
+          python3 .github/release_notes.py "$GITHUB_REF_NAME" > dist/release-notes.md
+          gh release create "$GITHUB_REF_NAME" dist/opendmtq-*.tgz dist/opendmtq-arm32-runtime.zip dist/OpenDMTQ-windows.zip dist/OpenDMTQ-windows.zip.sha256 \
+            --notes-file dist/release-notes.md --generate-notes --verify-tag
