@@ -33,7 +33,8 @@ run() {
     fi
 }
 
-# Dynarmic at a known commit.
+# Dynarmic at a known commit. A clone or fetch that stalls (under 1 KB/s for a minute) stops rather than waiting for ever.
+export GIT_HTTP_LOW_SPEED_LIMIT=1000 GIT_HTTP_LOW_SPEED_TIME=60
 [ -d "$work/dynarmic/.git" ] || git clone -q --recursive "$dynarmic_url" "$work/dynarmic"
 git -C "$work/dynarmic" checkout -q "$dynarmic_commit"
 git -C "$work/dynarmic" submodule update -q --init --recursive
@@ -47,7 +48,9 @@ if [ ! -f "$work/sysroot/lib/libc.so" ] || [ ! -f "$work/sysroot/NOTICE.html.gz"
     run "
       cd _work/arm32
       # Under its name only when whole; a damaged one goes, or every later run would stop here.
-      [ -f image.zip ] || { curl -fsSL -o image.zip.part $image_url && mv image.zip.part image.zip; }
+      # A stalled download (under 100 KB/s for a minute) is cut and tried again.
+      [ -f image.zip ] || { curl -fsSL --retry 3 --retry-delay 5 --connect-timeout 30 --speed-limit 100000 --speed-time 60 \
+        -o image.zip.part $image_url && mv image.zip.part image.zip; }
       echo '$image_sha1  image.zip' | sha1sum -c --quiet - || { rm -f image.zip; exit 1; }
       unzip -o -q image.zip armeabi-v7a/system.img
       mkdir -p sysroot/lib sysroot/bin

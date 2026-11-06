@@ -13,6 +13,8 @@ permissions:
 jobs:
   arm32:
     runs-on: ubuntu-24.04
+    # A stalled download fails after 20 minutes, not GitHub's six hours: several times what this job takes.
+    timeout-minutes: 20
     # The runner's own NDK differs from the one the releases are made with: the build fetches that one.
     env:
       ANDROID_NDK: ""
@@ -33,6 +35,8 @@ jobs:
 
   test:
     runs-on: ubuntu-24.04
+    # A stalled download fails after 15 minutes, not GitHub's six hours: several times what this job takes.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
 
@@ -83,6 +87,8 @@ jobs:
   # them, the game server's contract with the game on the same stand-in files (tests/game/protocol.sh).
   ui:
     runs-on: ubuntu-24.04
+    # A stalled download fails after 45 minutes, not GitHub's six hours: several times what this job takes.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
       - uses: docker/setup-buildx-action@v4
@@ -126,6 +132,8 @@ jobs:
   # ./opendmtq on stand-in game files, the game server's contract, the pages, a stop and a start (tests/host/run.sh).
   host:
     runs-on: ubuntu-24.04
+    # A stalled download fails after 20 minutes, not GitHub's six hours: several times what this job takes.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -142,6 +150,8 @@ jobs:
   # Wine as a first smoke test (tests/windows/wine.sh), and handed to the next job.
   windows-bundle:
     runs-on: ubuntu-24.04
+    # A stalled download fails after 30 minutes, not GitHub's six hours: several times what this job takes.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
@@ -170,6 +180,8 @@ jobs:
   windows:
     needs: windows-bundle
     runs-on: windows-2022
+    # A stalled download fails after 20 minutes, not GitHub's six hours: several times what this job takes.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
 
@@ -187,6 +199,8 @@ jobs:
 
   images:
     runs-on: ubuntu-24.04
+    # A stalled download fails after 45 minutes, not GitHub's six hours: several times what this job takes.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
       - uses: docker/setup-buildx-action@v4

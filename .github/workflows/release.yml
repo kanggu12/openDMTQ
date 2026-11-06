@@ -23,6 +23,8 @@ jobs:
   # commit when everything passed.
   qa:
     runs-on: ubuntu-24.04
+    # A stalled download fails after 10 minutes, not GitHub's six hours: several times what this job takes.
+    timeout-minutes: 10
     steps:
       - name: The local quality gate passed on this commit
         env:
@@ -39,6 +41,8 @@ jobs:
     needs: [ci, qa]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
+    # A stalled download fails after 60 minutes, not GitHub's six hours: several times what this job takes.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
       - uses: docker/setup-qemu-action@v4

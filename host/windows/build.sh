@@ -79,7 +79,9 @@ fetch() {
   local url
   for url in "$@"; do
     # Apache Lounge answers only browsers.
-    if curl -fsSL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -o "$DL/$name.part" "$url"; then
+    # A stalled download (under 100 KB/s for a minute) is cut and tried again, then the next address.
+    if curl -fsSL --retry 3 --retry-delay 5 --connect-timeout 30 --speed-limit 100000 --speed-time 60 \
+        -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -o "$DL/$name.part" "$url"; then
       if echo "$sha  $DL/$name.part" | sha256sum -c --quiet -; then
         mv "$DL/$name.part" "$DL/$name"
         return 0

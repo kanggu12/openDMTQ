@@ -15,7 +15,8 @@ find_ndk() {
       cd /n
       # Interrupted earlier: over again. Unpacked aside, so that only a whole NDK ever has the name looked for above.
       rm -rf part ndk.zip
-      curl -fsSL -o ndk.zip $ndk_url
+      # A download that stalls (under 100 KB/s for a minute) is cut and tried again, rather than waiting for ever.
+      curl -fsSL --retry 3 --retry-delay 5 --connect-timeout 30 --speed-limit 100000 --speed-time 60 -o ndk.zip $ndk_url
       echo '$ndk_sha1  ndk.zip' | sha1sum -c --quiet -
       mkdir part
       unzip -q ndk.zip -d part
