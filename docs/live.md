@@ -2,15 +2,14 @@
 
 ![The live page: a player's broadcast, who is on air, and past broadcasts](images/live.jpg)
 
-A player's play can be shown on the site as a live broadcast. It is off for everyone until the owner turns it on for
-a player on the admin pages. The game then shows that player a short message between songs, when it is turned on and
-when it is turned off. Playing is not affected: the phone encodes and uploads on its own threads, and drops video
-rather than hold the game up.
+A player's play can be shown on the site as a live broadcast. It is off by default. The owner turns it on for a player
+on the admin pages, or for everyone with `LIVE_DEFAULT=on`. The game then shows that player a short message between
+songs, when it is turned on and when it is turned off. Playing is not affected: the phone encodes and uploads on its own
+threads, and drops video rather than hold the game up.
 
-Broadcasting works on any phone or tablet with Android 8 or newer, whose video encoder it needs. The app must include
-the arm32 bundle, which the server's app builder adds by itself. The bundle also holds the shim used on phones that still run
-32-bit apps. On an older device a switched-on player's row stays at "Waiting for the
-device"; they can still play and watch.
+Broadcasting needs Android 8 or newer, for its video encoder, on a phone or a tablet. The app must include the arm32
+bundle, which the server's app builder adds by itself. The bundle also holds the shim used on phones that still run
+32-bit apps. On an older device a switched-on player's row stays at "Waiting"; they can still play and watch.
 
 <p align="center">
   <img src="images/fig-live-flow.svg" alt="A live broadcast: once the owner turns a player's broadcast on, the phone asks about every 15 seconds and uploads a two-second MPEG-TS segment every two seconds; a browser plays it with hls.js about ten seconds behind; switched off, the next upload gets a 403; ended on the phone, the playlist ends and the recording is closed, and a past broadcast plays as a recording with its songs as chapters" width="100%">
@@ -26,19 +25,18 @@ running time on the picture, and the player's name and profile under it.
 - **For everyone by default:** `LIVE_DEFAULT=on` in `.env` starts each player's switch on, with the same
   notice in the game. Players turned off in the admin pages stay off.
 
-- **Turn it on:** admin pages, Players, Turn on in the player's Broadcast column. The column then says
-  "Waiting for the device" until video arrives, and "Broadcasting now" with a Watch link while it does.
-  The Status page counts the players broadcasting now.
-- **Find it:** LIVE is in the site's main menu on every page, with a small count while someone is on
-  air. While someone is, the home page has a section listing them with nickname and song, and the rankings
-  and player pages show a small LIVE link next to their name. Those lists, like the rest of the site, are for those signed in.
-- **Watch:** `/opendmtq/live.php`, after signing in on the site with an account (made on the admin pages'
-  Accounts page; the same as for every page of the site). `live.php?p=<player>` links to one player: it plays them, or says it waits for them and starts
-  by itself when they go on air.
-- **Past broadcasts:** the same page lists recordings the owner has not hidden, and `live.php?r=<player>-<id>`
-  links to one.
-- **Turn it off:** Turn off in the same place. The next upload is refused, which stops the device. The live
-  window is deleted at once; the recording stays.
+- **Turn it on:** admin pages, Players, Turn on in the player's Broadcast column. The column then says "Waiting" until
+  video arrives, and "On air" with a Watch link while it does. The Status page counts the players broadcasting now.
+- **Find it:** LIVE is in the site's main menu on every page, with a small count while someone is on air. While someone
+  is, the home page has a section listing them with nickname and song, and the rankings and player pages show a small
+  LIVE link next to their name. Those lists, like the rest of the site, are for those signed in.
+- **Watch:** `/opendmtq/live.php`, after signing in on the site with an account (made on the admin pages' Accounts page;
+  the same as for every page of the site). `live.php?p=<player>` links to one player: it plays them, or says it waits
+  for them and starts by itself when they go on air.
+- **Past broadcasts:** the same page lists recordings the owner has not hidden, and `live.php?r=<player>-<id>` links to
+  one.
+- **Turn it off:** Turn off in the same place. The next upload is refused, which stops the device. The live window is
+  deleted at once; the recording stays.
 
 While a broadcast is live, the video player shows a LIVE mark and a few controls: play and pause, sound, connection
 details, picture in picture, a wider view, full screen. It has no timeline, because viewers see what is going out now. A
@@ -119,7 +117,7 @@ segment. `n` counts up for the life of the folder, independent of the phone's `s
 These requests stay out of the access logs: a phone polls and uploads constantly, and device ids are
 in the addresses.
 
-The cleanup runs at most once a minute, whenever anything asks: the health check does every 30 seconds.
+The cleanup runs at most once a minute, on any request. The health check makes one every 30 seconds.
 
 The switch is the `LiveSwitch` table in the game database, created by `server/game/bin/setup-db.php` at every
 start. A backup carries it. Restoring a backup from the admin pages keeps the switches as they are now, so that a

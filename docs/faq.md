@@ -8,11 +8,11 @@ files you have the right to use. OpenDMTQ does not come with any, and does not s
 [The game's files](game-files.md) says what each has to be.
 
 **My copy of the app was changed for another server. Does it work?**
-Yes. The app built from it reaches your server: every address of the other one is pointed at yours. A version other
-than 1.3.4 plays the same, with a few of the game's own screens left as they were.
+Yes. The build points every address of the other server at yours. A version other than 1.3.4 plays the same, with a few
+of the game's own screens left as they were.
 
 **Will my files work?**
-The setup says of each file it finds what it is and whether it can be used, before anything is imported. On the command
+For each file it finds, the setup says what it is and whether it can be used, before importing anything. On the command
 line, `./opendmtq import --check <folder>` says the same.
 
 **Do I need to know how to program, or use a command line?**
@@ -24,8 +24,9 @@ Only while people play. The server runs while its window is open on Windows, and
 ([everyday use, in the README](../README.md#on-each-android-phone)).
 
 **How big a computer does it need?**
-About 170 MB of memory at rest, and the disk the songs take. Two processor cores serve hundreds of requests a second
-([measured](../README.md#fast-on-little-hardware)).
+Two processor cores and 2 GB of memory; 4 GB leaves room for building the app. At rest the server takes about 170 MB,
+and two cores serve hundreds of requests a second ([measured](../README.md#fast-on-little-hardware)). Disk: about 1 GB,
+plus the songs. [What it runs on](../README.md#what-it-runs-on) has the details and the phones.
 
 **Can friends outside my home play?**
 Yes, with a host name and one forwarded port: [Playing from outside your home](internet.md).
@@ -47,13 +48,13 @@ Open the address you give them, sign in with the account you made for them, tap 
 Nothing else on the phone changes: no DNS, no proxy, no certificate.
 
 **Which phones work?**
-Android phones and tablets, newer ones without 32-bit support (Pixel 7 and later, Galaxy S24 and later) too: what they need
-goes into the app by itself. iPhones do not: the game is the Android app.
+Android 5.0 or newer, phones and tablets. Newer ones without 32-bit support (Pixel 7 and later, Galaxy S24 and later)
+work too: the server adds what they need to the app. iPhones do not ([why](game-files.md#iphones)).
 
 **Does it need the internet?**
-Only to get its programs onto the server, and the Windows zip already has them all. After that the setup, the app's build, the
-server and the game stay on your network. [Without internet](closed-network.md) says what to carry in for each way of running
-it, and the one that cannot do without.
+Only to get its programs onto the server. The Windows zip already has them all. After that the setup, the app's build,
+the server and the game stay on your network. [Without internet](closed-network.md) says what to carry in for each way
+of running it, and why the macOS install cannot run without it.
 
 **Is the app safe to install?**
 The app comes from your server, not from a store, so Android asks to allow installs from the browser and Play Protect may

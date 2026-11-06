@@ -19,7 +19,7 @@ With Docker Compose:
 | App builder | Patches the owner's APK for this server's address | `tools/opendmtq_tools/builder.py`, `patch_apk.py` | `builder`, at every start | run at every start |
 | Import | Takes the game's data files from the owner's folder or archive | `tools/opendmtq_tools/importer.py` | `importer`, one-shot | plain Python |
 | Song list | The song list and the client's tables, from what was imported and added | `tools/opendmtq_tools/songs.py` | `tools`, before every start | before every start |
-| arm32 runtime | Runs the 32-bit game on phones without 32-bit support | `arm32/`; handed out by `tools/opendmtq_tools/runtime.py` | ready-made from a release, added by the app builder to `data/apk/arm32` | the same |
+| arm32 runtime | Runs the 32-bit game on phones without 32-bit support | `arm32/`; handed out by `tools/opendmtq_tools/runtime.py` | ready-made from a release into `data/apk/arm32`, added to the app by the app builder | the same |
 | Command line | Setup, start and stop, checks, backups | `opendmtq`, `cli/opendmtq_cli`, `host/opendmtq_host` | `./opendmtq` | `./opendmtq`, passed on to `host/opendmtq_host`; `OpenDMTQ.exe` on Windows |
 
 The Helm chart runs the same images with a router in front ([kubernetes.md](kubernetes.md)).
@@ -97,14 +97,14 @@ What the replies rely on, as the client behaves:
   does not have gets `SVC.05008`.
 - **Lists.** The client reads a missing list as null and stops, and turns some lists into arrays of entries: an empty
   news list closes the game, so `board.getNoticeList` always has one plain entry.
-- **The signature.** The game signs every request: an `Fp` header with MD5 of the key its login reply gave and the
-  body. A batch with a save or a shop call needs it (`403` otherwise). That stops anything that merely posts to the
-  address, not someone who has read the app.
+- **The signature.** The game signs every request: an `Fp` header with MD5 of the key its login reply gave and the body.
+  A batch with a save or a shop call needs it (`403` otherwise). That stops anything that merely posts to the address.
+  Someone who has read the app can still sign requests.
 - **Saving a play.** The score, the accuracy and the grade are worked out from the counts of each judgement, as the
   official server did. The best row (`Play`) and the log row (`PlayLog`) go in one transaction; a save the database did
   not take answers `SVC.05099`. Scores are kept within what the client reads (32-bit) and accuracies within 100 %.
-- **Everyone has everything.** Level 99, 999,999 MAX POINT, every song from 1 to the highest id, every item. No
-  quests, no coupons (every code is invalid, in the client's own popup), no terms popup.
+- **Everyone has everything.** Level 99, 999,999 MAX POINT, every song from 1 to the highest id, every item. No quests,
+  no coupons (every code is invalid, in the client's own popup), no terms popup.
 
 The in-game rankings are this month's: each player's best score per chart since the first of the month at midnight UTC
 (09:00 in Korea), from the log of every play. The game's ranking screens count down to that moment, so the boards start
@@ -236,9 +236,9 @@ and `./opendmtq doctor` read.
   player's duplicate score rows on one chart (the best of each), caps scores a forged result left out of range, and
   deletes plays older than a year. It picks the journal mode the disk allows.
 - The live broadcasts' window (`data/state/live`) starts empty; the recordings stay.
-- The key that signs the site's download sign-in cookie (`data/state/download.key`) is made once.
-- A small process keeps one database handle open while the server runs, so that closing a request's handle does not
-  fold the write-ahead log back in each time.
+- The key that signs the site's sign-in cookie (`data/state/download.key`) is made once.
+- A small process keeps one database handle open while the server runs, so that closing a request's handle does not fold
+  the write-ahead log back in each time.
 
 The image's start script also writes Apache's door settings for this install: whether the edge's doors are there,
 the admin pages on the public port (proxied on a local network address, sent to HTTPS where it works, refused in
@@ -356,7 +356,7 @@ A host install (`host/install.sh`, then `./opendmtq setup`) and the Windows bund
 `.env` and `data/`:
 
 <p align="center">
-  <img src="images/fig-host-parts.svg" alt="Without containers: ./opendmtq after host/install.sh, or OpenDMTQ.exe on Windows, passes the command to host/opendmtq_host.py, which prepares the start (the database, the song list, the live window, the download key, Apache's configuration), starts Apache with PHP's module, the admin pages on waitress, the PHP keeper and, once, the app builder, and starts again one that stops; on Windows a job object ends them all with the window" width="100%">
+  <img src="images/fig-host-parts.svg" alt="Without containers: ./opendmtq after host/install.sh, or OpenDMTQ.exe on Windows, passes the command to host/opendmtq_host, which prepares the start (the database, the song list, the live window, the download key, Apache's configuration), starts Apache with PHP's module, the admin pages on waitress, the PHP keeper and, once, the app builder, and starts again one that stops; on Windows a job object ends them all with the window" width="100%">
 </p>
 
 - `host/install.sh` leaves a marker, `.host/installed`; from then on the repository's `./opendmtq` passes every command

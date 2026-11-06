@@ -239,8 +239,8 @@ at 44.1 kHz with a peak near full scale, FMOD at 24 kHz with a peak of 0, and H.
 - **Guest process:** started once with a small 32-bit program (the agent) as its main program.
   It hands over `dlopen`/`dlsym` and creates guest threads on request.
 - **Host threads become guest threads:** the first time a Java thread calls into guest code, the
-  agent creates a guest pthread whose clone is not run on a new host thread but handed to the
-  calling thread, which then owns that guest context for its lifetime. Guest code calling JNI
+  agent creates a guest pthread whose clone is handed to the calling thread instead of a new
+  host thread, which then owns that guest context for its lifetime. Guest code calling JNI
   therefore runs on the right Java thread with the right `JNIEnv`. Only the agent's own clone is
   handed over, so a guest thread created at the same moment elsewhere keeps its own host thread.
   When the host thread ends, the guest thread ends too: the guest's `pthread_exit` runs on it, so

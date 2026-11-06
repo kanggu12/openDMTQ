@@ -1,8 +1,8 @@
 # Troubleshooting
 
 With Docker Compose, start with `./opendmtq doctor`: it checks what the server needs and prints the fix for each
-problem. A host install has no `doctor`: there `./opendmtq status` and `./opendmtq check` tell what runs and whether
-the game's path works.
+problem. A host install has no `doctor`: there `./opendmtq status` and `./opendmtq check` show what is running and
+whether the game can reach the server.
 
 **On Windows (the bundle),** the commands in this guide are `OpenDMTQ.exe <command>`, typed in a terminal in the
 OpenDMTQ folder. To open one: in File Explorer, open the OpenDMTQ folder, type `cmd` in the address bar and press
@@ -45,15 +45,15 @@ When the game does not start or shows no songs, this chart leads to the right se
 
 ## The game stops at its start, or the song list is empty
 
-- **No game data.** The game cannot start without the client's tables and the images of its screens, which it
-  downloads from the server. The server reports itself unhealthy until they are imported (`./opendmtq doctor` says
-  so, and so does `/opendmtq/health.php`). They are in the server files (see the README, What you need). On Windows and
-  on a host install, import them on the admin pages: **Songs**, **Choose the folder**. With Docker Compose:
+- **No game data.** The game cannot start without the client's tables and the images of its screens, which it downloads
+  from the server. The server reports itself unhealthy until they are imported (`./opendmtq doctor` says so, and so does
+  `/opendmtq/health.php`). They are in the server files (see [What you need](../README.md#what-you-need)). On Windows
+  and on a host install, import them on the admin pages: **Songs**, **Choose the folder**. With Docker Compose:
   `./opendmtq import <folder with your game files>`.
-- **No songs.** With the game data and no songs, the game starts with an empty song list. Import them the same way
-  with **Import the songs too** ticked (with Docker Compose, `./opendmtq import --songs <folder>`), or add songs one by
-  one on the admin pages ([songs.md](songs.md)). The app does not need to be rebuilt: an installed app gets the songs
-  at its next start.
+- **No songs.** With the game data and no songs, the game starts with an empty song list. Import them the same way with
+  **Import the songs too** ticked (with Docker Compose, `./opendmtq import --songs <folder>`), or add songs one by one
+  on the admin pages ([songs.md](songs.md)). The app does not need to be rebuilt: an installed app gets the songs at its
+  next start.
 
 ## The app installs but cannot connect
 
@@ -91,11 +91,11 @@ To see which phone a player used, find their requests on the Logs page of the ad
 
 ## The game downloads data when it starts
 
-On its first start after a new install (not an update over the app) the game explains why it needs storage, Android
-asks, and it then fetches its data from the server with a progress bar, about 42 MB with every song, with no further
-question. The data stays in `Android/data/<the app>/files`: later starts and updates over the app ask the server one
-question and fetch nothing. It fetches again when songs were imported, added or removed on the server, and after the
-app was uninstalled, which also takes the data with it.
+On its first start after a fresh install (not an update) the game explains why it needs storage, Android asks, and it
+then fetches its data from the server with a progress bar, about 42 MB with every song, without asking again. The data
+stays in `Android/data/<the app>/files`: later starts and updates over the app ask the server one question and fetch
+nothing. It fetches again when songs were imported, added or removed on the server, and after the app was uninstalled,
+which also takes the data with it.
 
 ## Setup cannot find the game files
 
@@ -117,9 +117,10 @@ used, nor is an app OpenDMTQ built. [The game's files](game-files.md) has every 
 
 ## The setup's link does not sign in
 
-The link the server opens works once, from the server PC, within an hour. Sign in with the admin password instead:
-the window shows it (on Linux and macOS, `setup` prints it), and it is `ADMIN_PASSWORD` in `.env`. The status page then
-leads to the setup. From another computer, open `http://<server>/opendmtq/admin/setup` and sign in the same way.
+The link the server opens works once, from the server PC, within an hour. Sign in with the user `admin` and the admin
+password instead: the window shows it (on Linux and macOS, `setup` prints it), and it is `ADMIN_PASSWORD` in `.env`. The
+status page then leads to the setup. From another computer, open `http://<server>/opendmtq/admin/setup` and sign in the
+same way.
 
 ## Slow or failing under WSL
 
@@ -146,9 +147,9 @@ comes from an authority the server makes for itself, so browsers warn on the fir
 so phones that installed the old one install the new one.
 
 The edge proxy (`opendmtq-edge`, or `<name>-edge` with `COMPOSE_PROJECT_NAME` in `.env`) holds the port for both.
-`./opendmtq doctor` checks it and the HTTPS door; `./opendmtq logs edge` shows why it stopped or went to plain HTTP
-only. With a certificate it cannot use (after a renewal that was cut off, say), the edge keeps the port open with
-plain HTTP, so the game goes on working, and the next `./opendmtq up` makes a new certificate.
+`./opendmtq doctor` checks it and its HTTPS; `./opendmtq logs edge` shows why it stopped or went to plain HTTP only.
+With a certificate it cannot use (after a renewal that was cut off, say), the edge keeps the port open with plain HTTP,
+so the game goes on working, and the next `./opendmtq up` makes a new certificate.
 
 A host install and the Windows bundle have no HTTPS.
 

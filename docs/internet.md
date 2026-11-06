@@ -56,22 +56,21 @@ A test from inside your network does not prove the forward works.
 
 ## HTTPS
 
-A browser that asks for one of the site's pages over plain HTTP at a public address is sent to HTTPS, at the address
-it asked for. A player who only gets a link then sees the certificate warning (below), unless the phone trusts the
-server's authority. What stays on plain HTTP is what cannot go there: the game itself, `/apk` and `/ca.crt` (how a
-phone comes to trust HTTPS at all), the health check, a browser inside an app such as KakaoTalk (it may offer no way
-past the warning), and visits on a local network address, where HTTPS would bring nothing but that warning between a
-new player and the app (the admin pages still go to HTTPS there). `/apk` answers on plain HTTP, but a browser that
-has not signed in goes through the sign-in page, which is on HTTPS. While the edge proxy (below) runs without a
-certificate, nothing is redirected. `doctor` checks the HTTPS door on the server PC.
+A browser that asks for one of the site's pages over plain HTTP at a public address is sent to HTTPS, at the address it
+asked for. A player who only gets a link then sees the certificate warning (below), unless the phone trusts the server's
+authority. What stays on plain HTTP is what cannot go there: the game itself, `/apk` and `/ca.crt` (how a phone comes to
+trust HTTPS at all), the health check, a browser inside an app such as KakaoTalk (it may offer no way past the warning),
+and visits on a local network address, where HTTPS would only put the certificate warning in front of a new player (the
+admin pages still go to HTTPS there). `/apk` answers on plain HTTP, but a browser that has not signed in goes through
+the sign-in page, which is on HTTPS. While the edge proxy (below) runs without a certificate, nothing is redirected.
+`doctor` checks the HTTPS door on the server PC.
 
-The same port also answers HTTPS: `https://myhome.example.com:8790/` opens the site, the download
-and the admin pages encrypted, while the game keeps talking plain HTTP on that port (on the local
-network with port 80 that is `https://<address>:80/`). The edge proxy, a small program in front of the server
-that holds the public port (`server/edge/nginx.conf`), looks at the first bytes of each connection: a TLS handshake is
-decrypted there and passed on to the server's HTTPS door, everything else goes to its plain door,
-each with the visitor's address. Only the edge holds the certificate's key, never the server and
-its PHP code. Nothing else needs to be forwarded on the router.
+The same port also answers HTTPS: `https://myhome.example.com:8790/` opens the site and the download encrypted (the
+admin pages too, with `--admin-public`), while the game keeps talking plain HTTP on that port (on the local network with
+port 80 that is `https://<address>:80/`). The edge proxy, a small program in front of the server that holds the public
+port (`server/edge/nginx.conf`), looks at the first bytes of each connection: a TLS handshake is decrypted there and
+passed on to the server's HTTPS door, everything else goes to its plain door, each with the visitor's address. Only the
+edge holds the certificate's key, never the server and its PHP code. Nothing else needs to be forwarded on the router.
 
 The certificate comes from an authority the server makes for itself (`data/https`, made and renewed
 by `./opendmtq up`): public authorities such as Let's Encrypt only vouch for a server that answers on
@@ -91,7 +90,7 @@ the warning:
 The authority is limited to the server's own names (its host name, names under it, and
 localhost), may not sign e-mail or URI names and only vouches for web servers. Browsers that honour
 these limits trust it for this server and nothing else, even if its key ever leaked. Every change
-of address makes a new authority (`expose` with another name, `expose --off`, `opendmtq host` on
+of address makes a new authority (`expose` with another name, `expose --off`, `./opendmtq host` on
 the local network), which phones that installed the old one install again. `up` renews
 the server certificate before it runs out (it lasts 825 days) and restarts the edge to use it;
 `doctor` warns 30 days ahead.

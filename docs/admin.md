@@ -23,11 +23,11 @@ a `PlayLog` table (score, grade and accuracy of that play, and whether it beat t
 and "new records". A year is kept.
 
 The whole site is behind a sign-in with an account: an ID and a password made on the Accounts page of the admin pages,
-and nowhere else (nobody makes their own). Whatever page a visitor asks for, the sign-in page comes first, then the
-page asked for. Before sign-in, no page content shows: no menu, no count of who is on air, no notice. These pages
-stay open without sign-in: the sign-in page with its language switch, the licenses, the health check, and the game's
-own paths. A browser stays signed in for 30 days; a new password, or the account switched off or deleted, ends its sign-ins at the
-next page.
+and nowhere else (nobody makes their own). Whatever page a visitor asks for, the sign-in page comes first, then the page
+asked for. Before sign-in, no page content shows: no menu, no count of who is on air, no notice. These pages stay open
+without sign-in: the sign-in page with its language switch, the licenses, the health check, and the game's own paths. A
+browser stays signed in for 30 days; a new password, or the account disabled or deleted, ends its sign-ins at the next
+page.
 
 ## The setup
 
@@ -36,8 +36,8 @@ the browser the first time, signed in by a one-time link (it works once, from th
 is at `/opendmtq/admin/setup`, and the status page leads there until every step is done.
 
 1. **Game files.** The game's Android app and the server files, found in Downloads, on the Desktop and in Documents
-   (OneDrive's too), or picked in any folder of the PC by its path, typed or pasted, or through the folders: a folder or
-   an archive. Each file found or listed says what it is (the app and its version, a copy changed for another server,
+   (OneDrive's too), or anywhere else on the PC: type or paste the path of the folder, archive or file, or click your
+   way to it. Each file found or listed says what it is (the app and its version, a copy changed for another server,
    server files and their songs, the iPhone app, a part of an archive, one that cannot be read), and one of no use
    cannot be imported ([the forms each may come in](game-files.md)). The import takes the app and what the game needs to
    start, the songs too when their box is ticked, then makes the song list. Its output shows as it goes.
@@ -82,12 +82,13 @@ admin rights.
 
 Wrong passwords are slowed down. After five failures in ten minutes from one address, that address must wait. Visits
 through the server also count together, and after thirty failures in ten minutes they all wait. The admin pages' own
-address on the PC (`http://localhost:8791/opendmtq/admin/`) is never locked out that way. The address is the visitor's own, never a header the client sent. Forms
-carry a CSRF token, and the session cookie is HttpOnly, SameSite=Lax, and Secure when it comes over HTTPS. Signing out ends that sign-in on the server too, so a copied cookie stops working; restarting
-the admin pages signs everyone out. Until a visitor has signed in, the pages read at most 16 KB of any request. On the
-PC's own address the password travels without TLS, but only within this PC (unless `ADMIN_BIND` opens that address to
-the network). On a host install the address on the local network has no TLS either. Keep the password unique and
-change it if in doubt: edit `.env`, then restart the server.
+address on the PC (`http://localhost:8791/opendmtq/admin/`) is never locked out that way. The address counted is the
+connection's own, never a header the client sent. Forms carry a CSRF token, and the session cookie is HttpOnly,
+SameSite=Lax, and Secure when it comes over HTTPS. Signing out ends that sign-in on the server too, so a copied cookie
+stops working; restarting the admin pages signs everyone out. Until a visitor has signed in, the pages read at most 16
+KB of any request. On the PC's own address the password travels without TLS, but only within this PC (unless
+`ADMIN_BIND` opens that address to the network). On a host install the address on the local network has no TLS either.
+Keep the password unique and change it if in doubt: edit `.env`, then restart the server.
 
 | Page | What it does |
 |---|---|
@@ -96,10 +97,10 @@ change it if in doubt: edit `.env`, then restart the server.
 | App | The name players' devices show for the app, TECHNIKA Q (SERVER_NAME, or the server's address as set in PUBLIC_HOST). Build the app (about 20 seconds, output shown live), download any build, delete one, or all the old ones at once. A build for another address is kept for download and does not replace the one the site offers. |
 | Songs | Add a song package, remove added songs, hide or show any song. Each song's plays over the last 30 days, against the most played, and when it was last played. Says so when the server has no game data or no songs yet. See [songs.md](songs.md). |
 | Players | Search by name, sort by any column, when each last played, and a row of 14 small cells, one per day of the last two weeks, darker on days with more plays. A spreadsheet of them all. A name leads to the player's page on the site. On each row whether their broadcast is on, with its switch; under More: rename, reset scores, delete (those two ask first and make a backup first, and take the player's achievements with their scores) ([live.md](live.md)). |
-| Accounts | The site's accounts, the only way into it: make one (an ID, a password typed or made, whom it is for, the game player it is, admin rights to these pages too), and its password shows once with the message to send; a new password, switch off or on, delete. Each with when it was made and last signed in. |
+| Accounts | The site's accounts, the only way into it: make one (an ID, a password typed or made, whom it is for, the game player it is, admin rights to these pages too), and its password shows once with the message to send; a new password, disable or enable, delete. Each with when it was made and last signed in. |
 | Recordings | Every broadcast, kept (players see them as past broadcasts): watch, download as one file, hide from players, delete one, selected or all of a player's. Disk used against the two limits (20 GB and 30 days by default), which are set here, and about how many hours of broadcast still fit. See [live.md](live.md#recordings). |
 | Backups | Back up now, download, upload, restore (the server keeps running; the current state is saved first), delete, each with its date and kind. A daily backup when turned on: one a day while something has changed, the latest seven kept. The page shows those seven as seven slots, the newest on the right, and when the next one comes. |
-| Maintenance | Turn the in-game maintenance notice on or off, with a message, typed or one of a few ready ones. The site shows it too. On the server PC's own install (the Windows bundle, Linux, macOS), **Stop the server** stops every part of it. |
+| Maintenance | Turn the in-game maintenance notice on or off, with a message, typed or one of a few ready ones. The site shows it too. On the server PC's own install (the Windows bundle, Linux, macOS), **Stop the server** stops every part of it. With Docker Compose the page names the command instead, `./opendmtq down`, which also makes a backup. |
 | Logs | Three tabs. **Requests:** the last 24 hours as a chart, what was asked for most, by which devices and addresses, then the newest requests with filters by text, result and kind, a click on an address to filter by it, keep updating, and the log as a file. **Plays:** every play, a page at a time, narrowed by a word, a player and days, with what the filter leaves added up over it (plays, new records, average accuracy, plays per day or week, grades); it also comes as a CSV file. **Changes:** what was done on these pages, sign-ins and failed sign-ins too, when and on whom, in words (at most a few hundred kilobytes are kept). |
 
 The pages are in English until the visitor picks another language, whatever the browser prefers: the KOR / ENG buttons

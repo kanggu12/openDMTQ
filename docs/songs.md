@@ -47,7 +47,7 @@ the site; its scores stay.
 
 ## Adding a song
 
-On the admin pages, **Songs → Add** takes a song package: a `.zip` with
+On the admin pages, **Songs**, **Add a song** takes a song package: a `.zip` with
 
 ```
 song.json        description (below)
@@ -100,8 +100,8 @@ point, in categories 3 and 103.
 
 ### The tile in the song list
 
-The song list, the shop and the rankings draw a song from an image bundle, not from `viewImg/eye` (that one is the
-song screen's). The client resolves the name in `product_item.img_url_1` without any list of what exists: the text
+The song list, the shop and the rankings draw a song from an image bundle; `viewImg/eye` is for the
+song screen only. The client resolves the name in `product_item.img_url_1` without any list of what exists: the text
 before the first `_` picks the bundle, `e33_uad` is `dlc/d3_e33.unity3d` in the phone's patch folder, opened with
 `file://`, and the name then picks a sprite in the bundle's atlas. So an added song gets a bundle of its own,
 `dlc/d3_e<song id>.unity3d`, with one sprite, `e<song id>_<name>` (`tools/opendmtq_tools/jacket_atlas.py`). Song ids

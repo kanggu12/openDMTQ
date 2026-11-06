@@ -49,7 +49,7 @@ A request finds its way like this:
 </p>
 
 [docs/architecture.md](docs/architecture.md) explains how the parts work together, and the quirks of the client the
-replies depend on. Apache takes requests on more than one port: the guides call each a door (the public one, and with
+replies depend on. Apache listens on more than one port. The guides call each one a door (the public one, and with
 Docker Compose two that only the edge proxy reaches).
 
 ## Your first change
@@ -94,7 +94,7 @@ You do not have to run them all: pick the line for what you changed, and CI runs
 | anything | `(cd cli && python3 -m unittest discover -s tests -t .)`: the command line's tests, and the repository's own checks (every test is in docs/test-cases.md and every pointer there still finds its text, every CSS class has a style, line endings) | Python 3.9 |
 | `server/game/` | `tests/game/protocol.sh`, and PHP's syntax: `docker run --rm -v "$PWD/server:/s:ro" php:8.3-cli sh -c 'for f in $(find /s -name "*.php"); do php -l "$f" >/dev/null \|\| exit 1; done'` | Docker |
 | `server/portal/`, `server/game/pages/`, `tools/opendmtq_tools/admin/` | `tests/ui/run.sh` | Docker on Linux |
-| `tools/` | `docker build -t opendmtq-tools:local tools`, then `docker run --rm -v "$PWD/tools:/t:ro" --entrypoint sh opendmtq-tools:local -c 'cd /t && python3 -m unittest discover -s tests -t .'` | Docker |
+| `tools/` | `docker build -t opendmtq-tools:local tools`, then `docker run --rm -v "$PWD/tools:/t:ro" -v "$PWD/server/portal:/server/portal:ro" -v "$PWD/arm32:/arm32:ro" --entrypoint sh opendmtq-tools:local -c 'cd /t && python3 -m unittest discover -s tests -t .'` | Docker |
 | `host/`, `tools/opendmtq_tools/admin/setup.py` | `tests/host/run.sh` (`DISTRO=debian:12` for Debian; it goes through the setup in the browser) | Docker on Linux (it uses the host's network) |
 | `host/windows/` | `tests/windows/wine.sh` (builds the bundle and runs it under Wine) | Docker |
 | how a server gets its programs | `tests/closed/run.sh` does [Without internet](docs/closed-network.md) step by step on a network with no way out | Docker on Linux; kind, Helm and root for Kubernetes |

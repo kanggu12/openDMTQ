@@ -212,11 +212,13 @@
 <section class="card">
   <h2>{{ t('setup.app_title') }}</h2>
   <p class="lead">{{ t('setup.app_lead') }}</p>
-  {# No client to build from: on this PC the first step imports it; in containers the command line does. #}
-  {% if not has_apk %}<p class="flash bad" role="status">{{ t('setup.no_apk', url=url_for('setup_page', step='files')) if host_install else t('app.no_base') }}</p>{% endif %}
+  {# No client to build from (on this PC the first step imports it; in containers the command line does): before anything
+     was built it is the next thing to do; with an app built, that app still works and only a new build needs the client. #}
+  {% if not has_apk and not done.app %}<p class="flash bad" role="status">{{ t('setup.no_apk', url=url_for('setup_page', step='files')) if host_install else t('app.no_base') }}</p>{% endif %}
   {% if done.app %}<p class="setup-state"><span class="lamp on"></span>{{ t('setup.app_ready', host=public_host) }}</p>
   {# A failed build: players still get the app on offer when there is one; otherwise only why it failed. #}
   {% elif failed and has_apk %}<p class="setup-state"><span class="lamp bad"></span>{{ t('app.offer_failed', why=failed) if offer else t('setup.build_failed', why=failed) }}</p>{% endif %}
+  {% if done.app and not has_apk %}<p class="flash bad" role="status">{{ t('setup.no_apk_rebuild', url=url_for('setup_page', step='files')) if host_install else t('app.no_base') }}</p>{% endif %}
   {# The builder adds the runtime for newer phones by itself: the owner hears of it only when it could not. #}
   {% if runtime %}<p class="setup-state"><span class="lamp on"></span>{{ t('setup.runtime_on') }}</p>
   {% elif runtime_failed %}<p class="flash bad" role="status">{{ t('setup.runtime_failed', why=runtime_failed) }}</p>{% endif %}

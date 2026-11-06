@@ -14,10 +14,10 @@ Please use only files you have the right to use.
 
 The game's Android client as an APK, under any file name. These work:
 
-- **The original**, as it was released, also a copy signed again by someone else.
-- **A copy changed for another server.** The build points every address of that server at yours, in the game's code
-  and in its platform SDK, and keeps whatever else was changed for that server. The setup and the import name the server
-  it was changed for.
+- **The original**, as released, or a copy someone signed again.
+- **A copy changed for another server.** The build points every address of that server at yours, in the game's code and
+  in its platform SDK, and keeps whatever else was changed for that server. The setup and the import name the server it
+  was changed for.
 - **Inside something else**: a `.zip`, `.7z` or `.rar`, or an APK bundle (`.xapk`, `.apks`). The import takes the app
   out and leaves the bundle's split parts.
 
@@ -57,11 +57,11 @@ chooses another.
 
 ## The server files
 
-The game's files as its server kept them. What counts is the folder of the game's host, under its own name
-`dmqglb.mb.pmang.com` or any other:
+The game's files as its server kept them. What counts is the folder of the game's host, under its own name the game
+host's own name or any other:
 
 ```text
-dmqglb.mb.pmang.com/                any name: what counts is what is inside
+game host folder/                  any name: what counts is what is inside
     patch/phone_new/<version>/      what the game needs to start: its tables, screens and fonts
     DMQ/Songs/<id>/                 the songs' music and videos (optional)
     DMQ/Patterns/                   their charts (optional)
@@ -70,14 +70,14 @@ dmqglb.mb.pmang.com/                any name: what counts is what is inside
 _info/songList.json                 a song list beside the folder (optional)
 ```
 
-A folder of another name counts when it has `patch/phone_new` and `DMQ` or `viewImg` in it. Programs, databases and
-notes in the same folder or archive are left where they are: only the game's data files come in.
+A folder of another name counts when it has `patch/phone_new` and `DMQ` or `viewImg` in it. Only the game's data files
+are imported. Programs, databases and notes in the same folder or archive are left alone.
 
 The forms the import takes:
 
 | Form | Example |
 |---|---|
-| A folder, up to four folders below the one you choose | `Downloads/DMTQ/files/dmqglb.mb.pmang.com` |
+| A folder, up to four folders below the one you choose | `Downloads/DMTQ/files/<game host folder>` |
 | An archive | `server-files.zip`, `.7z`, `.rar` |
 | An archive in parts, every part in one folder | `files.7z.001`, `files.part1.rar`, `files.zip.001`, `files.rar` with `files.r00` |
 | An archive inside an archive | a `.zip` that holds a `.7z` (one level) |

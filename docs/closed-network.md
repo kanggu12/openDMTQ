@@ -105,8 +105,8 @@ docker run --rm -v "$PWD/kit/debs:/debs" ubuntu:24.04 sh -c 'apt-get update && \
   rm -rf /debs/partial /debs/lock && chmod -R a+rX /debs'
 ```
 
-If the closed network has a mirror of your distribution's packages, the system finds them itself: leave out `debs`. A mirror is
-also the way if the server refuses these, for depending on other versions of what it has.
+If the closed network has a mirror of your distribution's packages, the system finds them itself: leave out `debs`. Use
+a mirror too if the server refuses these packages because they depend on versions other than the ones it has.
 
 And these, into `kit` under these names:
 
@@ -166,11 +166,12 @@ and carry it in. Below, `<first install>` is that folder: `openDMTQ-` and the ve
 
 Phones reach the server by its address, so they only have to be on its network. Three things are different without internet:
 
-- **Android may say the Wi-Fi has no internet.** Choose to stay connected. If the game then cannot reach the server, turn
-  mobile data off: with it on, Android may keep sending everything there.
-- **Give the server a fixed address.** The app has it built in, and a closed network often has nothing that keeps it the same.
-  Set it on the computer or in the router's settings before the setup. A computer on several networks has to be told which one
-  the phones are on: on Windows in the setup's address step, elsewhere with `./opendmtq setup --host <address>`.
+- **Android may say the Wi-Fi has no internet.** Choose to stay connected. If the game then cannot reach the server,
+  turn mobile data off: with it on, Android may keep sending everything there.
+- **Give the server a fixed address.** The app has it built in, and a closed network often has nothing that keeps it the
+  same. Set it on the computer or in the router's settings before the setup. A computer on several networks has to be
+  told which one the phones are on: on Windows and on a host install in the setup's address step, with Docker Compose
+  with `./opendmtq setup --host <address>`.
 - **Play Protect may say it cannot check the app.** Install anyway, as with an app from anywhere but a store.
 
 ## What does not work

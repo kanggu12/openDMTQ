@@ -1001,6 +1001,16 @@ class AppStepTest(unittest.TestCase):
             inst.status(state="building", host="192.168.0.99")
             self.assertFalse(setup.builder_running())
 
+    def test_an_app_built_from_a_client_since_removed_still_counts_and_only_a_new_build_needs_it(self):
+        with HostInstall() as inst:
+            inst.app_for(HOST)
+            inst.sign_in()
+            page = inst.page(BASE + "/setup?step=app")
+            # Ready, said once: not "no app yet" beside it.
+            self.assertIn(f"The app for {HOST} is ready.", page)
+            self.assertNotIn("No Android app of the game yet", page)
+            self.assertIn("The app above still works", page)
+
     def test_with_the_app_ready_the_page_shows_the_phones_steps_and_the_code(self):
         with HostInstall() as inst:
             inst.write("apk/base/client.apk", "PK")

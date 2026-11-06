@@ -14,13 +14,13 @@ Start
 
 1. Keep this folder somewhere of your own, outside OneDrive and Program Files (for example C:\OpenDMTQ).
 2. Start OpenDMTQ.exe. The setup opens in your browser.
-3. The setup finds your files in Downloads, on the Desktop or in Documents, or you paste their path or open their
-   folder. Each file says what it is and whether it can be used. Then the setup takes you through the address phones
-   use, an account for each player, and the app.
-4. When Windows asks whether Apache may use the network, allow it on private networks. If your Wi-Fi is set as a
-   public network, phones cannot connect: in Settings, Network & internet, open your Wi-Fi and choose Private.
-5. On a phone on the same Wi-Fi, open the address the setup shows, sign in with the player's account, tap
-   "Download app (.apk)", and install it.
+3. The setup finds your files in Downloads, on the Desktop or in Documents, If they are elsewhere, paste their path or
+   open their folder. Each file says what it is and whether it can be used. Then the setup takes you through the address
+   phones use, an account for each player, and the app.
+4. When Windows asks whether Apache may use the network, allow it on private networks. If your Wi-Fi is set as a public
+   network, phones cannot connect: in Settings, Network & internet, open your Wi-Fi and choose Private.
+5. On a phone on the same Wi-Fi, open the address the setup shows, sign in with the player's account, tap "Download app
+   (.apk)", and install it.
 
 The server runs while the window is open. To stop it, close the window, or on the admin pages open Maintenance and
 press "Stop the server".
@@ -31,12 +31,13 @@ by a publisher Windows knows.
 Later
 -----
 
-- Songs: on the admin pages, Songs, then "Choose the folder". An import replaces the songs imported before; single
-  songs can be added on the same page and stay.
-- The admin pages: http://localhost:8791/opendmtq/admin/ (the window shows the address and the password).
+- Songs: on the admin pages, Songs, then "Choose the folder". An import replaces the songs imported before; single songs
+  can be added on the same page and stay.
+- The admin pages: the window shows their address (usually http://localhost:8791/opendmtq/admin/), the user (admin) and
+  the password.
 - Commands: open a terminal in this folder (type cmd in Explorer's address bar, then Enter), then for example
-  OpenDMTQ.exe status, OpenDMTQ.exe apk or OpenDMTQ.exe --help. OpenDMTQ.exe import --check <folder> says what each
-  file in a folder is, and imports nothing.
+  OpenDMTQ.exe status, OpenDMTQ.exe apk or OpenDMTQ.exe --help. OpenDMTQ.exe import --check <folder> says what each file
+  in a folder is, and imports nothing.
 - The admin password is in the file .env in this folder; open it with Notepad.
 - Your data (players, scores, recordings, the app's signing key) is in the data folder: back it up from the admin pages.
 

@@ -100,9 +100,9 @@ What happens when the api pod is replaced (measured on kind):
 | Switch and upload token (database) | Kept; the phone's uploads go on with no new sign-in | The same |
 | Recordings | **Lost** | Kept |
 
-Without a claim, recordings count against the node's disk, not any limit of the pod, so the 20 GB
-default cap is checked against the node's free space. The `state` volume has no `sizeLimit` for that
-reason; if you add one, keep it above the cap (Recordings page), or the kubelet may evict the pod.
+Without a claim, recordings count against the node's disk, and no limit of the pod applies, so the 20 GB default cap is
+checked against the node's free space. The `state` volume has no `sizeLimit` for that reason; if you add one, keep it
+above the cap (Recordings page), or the kubelet may evict the pod.
 
 With a claim, recordings stay when the pod goes, and the server copies segments into it rather than
 linking them. Make it ReadWriteMany (the default), or storage that reattaches quickly: a claim tied
@@ -110,8 +110,8 @@ to one node ties the api to that node, and failover stops working (see Measured)
 the cap, as the limit in force is the smaller of the two on storage that enforces its size. The
 claim survives `helm uninstall`; delete it yourself when you want the recordings gone.
 
-Requests under `/live/` are left out of the router's logs except for critical errors, as the device
-ids are in their addresses. So are the media requests from its access log.
+Requests under `/live/` are left out of the router's logs except for critical errors, as the device ids are in their
+addresses. The media requests are left out of its access log too.
 
 ## Install on a cluster
 
