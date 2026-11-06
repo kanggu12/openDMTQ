@@ -11,14 +11,12 @@ $ErrorActionPreference = "Stop"
 $failures = 0
 function Pass([string]$name) { Write-Output "PASS $name" }
 function Fail([string]$name) { Write-Output "FAIL $name"; $script:failures++ }
-# The HTTP status of an address (0 when nothing answers), without following redirects.
+# The HTTP status of an address (0 when nothing answers), without following redirects. Windows' own curl.exe, as the Wine test
+# asks curl: PowerShell's Invoke-WebRequest throws at a redirect it is told not to follow, and a 302 read as 0.
 function Status([string]$url) {
-    try {
-        $r = Invoke-WebRequest -Uri $url -MaximumRedirection 0 -SkipHttpErrorCheck -TimeoutSec 10 -ErrorAction Stop
-        return [int]$r.StatusCode
-    } catch {
-        return 0
-    }
+    $code = & curl.exe -s -o NUL -w "%{http_code}" -m 10 $url
+    if (-not $code) { return 0 }
+    return [int]$code
 }
 
 $repo = (Resolve-Path "$PSScriptRoot\..\..").Path
