@@ -9,7 +9,7 @@ build, the server and the game all stay on your network.
 | Windows bundle | Works as it is | The zip and your game files |
 | Docker Compose | Works | A release's images and source, and your game files. Docker has to be on the computer already |
 | Kubernetes | Works | A release's images in your registry, the chart, and your game files |
-| Linux host install (Debian, Ubuntu) | Works | The system's packages, three programs, the source, the runtime for newer phones, and your game files |
+| Linux host install (Debian, Ubuntu) | Works | The system's packages, three programs (apktool, uber-apk-signer, 7-Zip), the source, the runtime for newer phones, and your game files |
 | macOS host install | **Not possible**: Homebrew has no way to install from files carried in | Use Docker Compose instead |
 
 Below, `1.2.3` stands for the release you want. Everything is fetched on a computer with internet, carried over on a disk,
@@ -34,10 +34,11 @@ docker save ghcr.io/kanggu12/opendmtq-server:$V ghcr.io/kanggu12/opendmtq-tools:
 curl -fsSL -o opendmtq-source.tar.gz https://github.com/kanggu12/openDMTQ/archive/refs/tags/v$V.tar.gz
 ```
 
-That is for a server with an x86-64 processor. For an ARM one, pull the first and the third with `--platform linux/arm64`. The tools
-image exists for x86-64 only and runs emulated there: Docker Desktop does that by itself, and Docker Engine on Linux needs
-`tonistiigi/binfmt` carried in too, and `docker run --privileged --rm tonistiigi/binfmt --install amd64` once. An ARM server has
-not been tried on a closed network.
+That is for a server with an x86-64 processor. For an ARM one, pull the server image and nginx-unprivileged with
+`--platform linux/arm64`. The tools image exists for x86-64 only and runs emulated there: Docker Desktop does that by
+itself, and Docker Engine on Linux needs `tonistiigi/binfmt` carried in too, and
+`docker run --privileged --rm tonistiigi/binfmt --install amd64` once. An ARM server has not been tried on a closed
+network.
 
 On the closed computer, which needs [Docker](https://docs.docker.com/get-docker/) 23 or newer with the Compose plugin, and
 Python 3.9 or newer:
@@ -69,7 +70,7 @@ done
 helm pull oci://ghcr.io/kanggu12/charts/opendmtq --version $V
 ```
 
-A file of values says where they are now:
+A values file, `closed-network.yaml` here, says where they are now:
 
 ```yaml
 image:

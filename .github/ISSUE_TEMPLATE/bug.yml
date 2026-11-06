@@ -5,7 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting. Please attach no game files (APK, songs, charts, images) and no links to them.
+        Thanks for reporting. English or Korean are both fine. Please attach no game files (APK, songs, charts, images)
+        and no links to them.
         A security problem goes to the Security tab instead (SECURITY.md).
   - type: textarea
     id: what
@@ -19,9 +20,9 @@ body:
     attributes:
       label: How the server runs
       options:
+        - Windows (OpenDMTQ.exe)
+        - Linux or macOS (the one command, host/get.sh)
         - Docker Compose (./opendmtq setup)
-        - Host install (host/install.sh)
-        - Windows bundle (OpenDMTQ.exe)
         - Kubernetes (Helm)
     validations:
       required: true
@@ -30,7 +31,7 @@ body:
     attributes:
       label: OpenDMTQ version
       description: Beside the logo on the site's home page (SERVER v...; hold the mouse over it for the commit).
-      placeholder: 2026.11.04
+      placeholder: 0.1.2
   - type: input
     id: phone
     attributes:
@@ -40,14 +41,18 @@ body:
   - type: textarea
     id: doctor
     attributes:
-      label: What ./opendmtq doctor and ./opendmtq check say
-      description: On Docker Compose. On a host install, ./opendmtq status and ./opendmtq check.
+      label: What the server's own checks say
+      description: >-
+        Windows: OpenDMTQ.exe status and OpenDMTQ.exe check, in a terminal in the OpenDMTQ folder. Linux or macOS:
+        ./opendmtq status and ./opendmtq check. Docker Compose: ./opendmtq doctor and ./opendmtq check.
       render: text
   - type: textarea
     id: logs
     attributes:
       label: Logs
-      description: The lines around the problem (./opendmtq logs, or data/state/logs). Remove addresses and names you do not want to share.
+      description: >-
+        The lines around the problem: ./opendmtq logs, or the files in data/state/logs (on Windows, data\state\logs in
+        the OpenDMTQ folder). Remove addresses and names you do not want to share.
       render: text
   - type: checkboxes
     id: files

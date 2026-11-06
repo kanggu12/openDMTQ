@@ -28,7 +28,7 @@ The Helm chart in `deploy/helm/opendmtq` splits the server by what each part nee
   compose's edge does. Browsers are sent to HTTPS, and a renewed certificate is picked up within minutes.
 - **Admin pages.** A sidecar of the api pod (it works on that pod's database). The router serves `/opendmtq/admin/`
   only when `admin.onPublicPort` allows it: by default over HTTPS with `router.tls`, and otherwise only for
-  a private (LAN) `publicHost`, where the password crosses the LAN in clear. Otherwise use
+  a private IPv4 `publicHost`, where the password crosses the LAN in clear. Otherwise use
   `kubectl port-forward` (the release notes print the command). Password from
   `admin.existingSecret`, or generated into `<release>-opendmtq-admin`. An init container creates the
   shared folders as uid 33 first.
@@ -145,7 +145,7 @@ helm test opendmtq -n opendmtq
 Phones then open `http://192.168.0.50/` exactly as with Docker Compose. On a network with no way out, the images and the chart
 are carried in: [Without internet](closed-network.md#kubernetes).
 
-The chart and the two images it runs (`ghcr.io/kanggu12/opendmtq-server`, `opendmtq-tools`) are published with each
+The chart and its own two images (`ghcr.io/kanggu12/opendmtq-server`, `opendmtq-tools`) are published with each
 release. To run this checkout's code instead, build and push the images (`server/`, `tools/`), point
 `image.server.repository` and `image.tools.repository` (and their `tag`) at them, and install from
 `deploy/helm/opendmtq`.
@@ -198,7 +198,7 @@ The main ones; see `values.yaml` for all.
 | `litestream.s3.*` | | Endpoint, bucket, path, credentials secret. |
 | `objectStore.enabled` | false | Bundled single-pod SeaweedFS, for evaluation only. |
 | `builder.enabled` | true | Build the app after install and upgrade. |
-| `admin.onPublicPort` | (automatic) | The admin pages through the router: yes for a private `publicHost`, no otherwise. |
+| `admin.onPublicPort` | (automatic) | The admin pages through the router: yes with `router.tls` or for a private IPv4 `publicHost`, no otherwise. |
 | `songs.rebuildOnStart` | true | Rebuild the song list before the api starts; off only where something else keeps `custom/` current. |
 | `live.recordings.persistence.*` | off | A claim for recordings, see [Live broadcasts](#live-broadcasts). |
 | `timeZone` | UTC | IANA zone for logs, the in-game ranking's day and app file names. |

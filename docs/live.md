@@ -58,10 +58,10 @@ The video shows the game's picture and sound. Nothing else on the device is capt
 
 ## Limits
 
-Each stream is 720p at 30 frames per second and 2 Mbit/s, plus sound: about 1 GB an hour of upload
-for the player, and the same again for each viewer, through the server's own connection. Viewers
-are roughly 10 seconds behind the phone, as usual for HLS: two seconds a segment, and a player stays
-a couple of segments behind the newest.
+Each stream is 720p at 30 frames per second and 2 Mbit/s, plus sound: about 1 GB an hour of upload for the player, and
+the same again for each viewer, through the server's own connection. Viewers are roughly 10 seconds behind the phone, as
+usual for HLS: a segment is two seconds, the phone records and uploads one before it can be served, and the player stays
+two segments behind the newest.
 
 ## Endpoints
 

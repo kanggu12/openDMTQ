@@ -165,7 +165,8 @@ Each player needs an account to sign in and download the app. Make them in the s
    Internet, not inside a messenger app, or scan its QR code.
 2. Sign in with the player's account, tap **Download app (.apk)** and install it. Allow installs from the browser when
    Android asks.
-3. Start the game.
+3. Start the game. On its first start, allow storage access when it asks; it then downloads its data from the server.
+
 
 <details>
 <summary>Everyday use: starting, stopping, songs</summary>

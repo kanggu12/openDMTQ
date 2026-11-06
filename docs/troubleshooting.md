@@ -99,11 +99,10 @@ uninstalled, which also takes the data with it.
 
 ## Setup cannot find the game files
 
-`setup` looks in the current folder, `~/Downloads`, `~/Desktop` and, under WSL, every Windows user's Downloads and
-Desktop, plus one level of subfolders, and takes only an archive or a client with `dmtq`, `djmax` or `technika` in its
-name, an unpacked folder of the server files, and any client beside those.
-Otherwise pass the folder, which is then searched as a whole (an extracted copy of the server files included):
-`./opendmtq setup --from /path/to/folder`.
+`setup` looks in the current folder, `~/Downloads` and `~/Desktop` (under WSL, also every Windows user's Downloads and
+Desktop), one folder down in each. It takes archives and apps whose names contain `dmtq`, `djmax` or `technika`,
+unpacked folders of the server files, and any app next to those. Otherwise pass the folder, which is then searched as a
+whole (an extracted copy of the server files included): `./opendmtq setup --from /path/to/folder`.
 
 The setup in the browser (the Windows bundle and a host install) looks in Downloads, on the Desktop and in Documents
 (OneDrive's too), and one folder down in each. When it finds nothing, open the folder in the picker under the list:
@@ -130,14 +129,13 @@ and the owner of a file cannot be set. `setup` and `doctor` warn about it.
 ## The app build fails
 
 `./opendmtq up` stops with the reason, and `./opendmtq doctor`, `./opendmtq status` and the Status page of the admin
-pages show it until a build succeeds. `./opendmtq logs builder` has the whole output; on a host install and on
-Windows it is in `data/state/logs/programs.log`. Players then read "The app could not be built. Tell the server's
-admin." when there is no app for the address at all; when a rebuild failed (a new patcher, base APK, runtime bundle or
-signing key), phones keep getting the earlier app. A base APK that does not match the expected client stops the build
-with the edit that failed. If `data/apk/base` holds several different clients, the one the phones' app was built from is
-used, and before the first build the original before a changed copy, version 1.3.4 before another, then the newest
-([several clients](game-files.md#several-clients)); choose another with `BASE_APK=<file name>` in `.env`, or with
-Docker Compose with `./opendmtq apk --base <file name>`, which writes it there.
+pages show it until a build succeeds. `./opendmtq logs builder` has the whole output; on a host install and on Windows
+it is in `data/state/logs/programs.log`. Players then read "The app could not be built. Tell the server's admin." when
+there is no app for the address at all. When a rebuild fails (a new patcher, base APK, runtime bundle or signing key),
+phones keep getting the earlier app. A base APK that does not match the expected client stops the build with the edit
+that failed. If `data/apk/base` holds several different clients, see [several clients](game-files.md#several-clients).
+To choose one, set `BASE_APK=<file name>` in `.env`, or with Docker Compose run `./opendmtq apk --base <file name>`,
+which writes it there.
 
 ## The browser warns about the certificate, or HTTPS fails
 

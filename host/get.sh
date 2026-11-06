@@ -23,7 +23,7 @@ code_url() {
     printf '%s\n' "$OPENDMTQ_TARBALL"
     return
   fi
-  tag=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
+  tag=$(curl -fsSL --connect-timeout 15 --max-time 30 "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
     | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n 1) || tag=
   if [ -n "$tag" ]; then
     printf '%s\n' "https://github.com/$REPO/archive/refs/tags/$tag.tar.gz"
@@ -39,7 +39,10 @@ fetch_code() {
   say "Downloading OpenDMTQ into $DIR"
   mkdir -p "$(dirname "$DIR")"
   work=$(mktemp -d "$DIR.new.XXXXXX")
-  if ! curl -fsSL "$url" | tar -xz --strip-components=1 -C "$work"; then
+  # A stalled download (under 10 KB/s for a minute) stops with the message below. No retry: what curl already wrote has
+  # gone into tar, and a second try would add to it.
+  if ! curl -fsSL --connect-timeout 30 --speed-limit 10000 --speed-time 60 "$url" \
+      | tar -xz --strip-components=1 -C "$work"; then
     rm -rf "$work"
     die "the download did not work: $url"
   fi

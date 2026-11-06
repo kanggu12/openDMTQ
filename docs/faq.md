@@ -37,9 +37,9 @@ them and restores them.
 
 **What happens to the data if I update OpenDMTQ?**
 Everything of yours is in the `data` folder and the `.env` file, and an update leaves those alone. On Windows, close the
-server's window, then unpack the new zip where you unpacked the first, so that its `OpenDMTQ` folder lands on yours and
-replaces the program's files. With the one command on Linux or macOS, run the same command again. With Docker,
-`git pull`, then `./opendmtq up`; `./opendmtq runtime` also brings the newest runtime for newer phones.
+server's window, then unpack the new zip where you unpacked the first: its `OpenDMTQ` folder replaces the old one's
+program files and leaves `data` and `.env` alone. With the one command on Linux or macOS, run the same command again.
+With Docker, `git pull`, then `./opendmtq up`; `./opendmtq runtime` also brings the newest runtime for newer phones.
 
 ## Playing
 

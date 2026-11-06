@@ -23,8 +23,9 @@ The game's Android client as an APK, under any file name. These work:
 
 OpenDMTQ also tidies up a few of the game's screens: the notice at every start, the question before the first download,
 the shop opening on its real-money tab, the low resolution, the frame rate of a menu left alone. Those code fixes are
-made for client 1.3.4. A client of another version plays the same, with those screens as the game had them; a 1.3.5
-client changed for another server was installed, played a song to its end and saved its score on a closed network.
+made for client 1.3.4. A client of another version plays the same, with those screens as the game had them. A 1.3.5
+client changed for another server was tested on a closed network: it installed, played a song to the end and saved its
+score.
 
 These do not work:
 

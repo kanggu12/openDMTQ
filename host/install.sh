@@ -64,7 +64,10 @@ fetch() {
   if [[ -n $KIT ]]; then
     cp "$KIT/$(basename "$dest")" "$dest.part" || fail "$(basename "$dest") is not in $KIT (docs/closed-network.md)"
   else
-    curl -fsSL -o "$dest.part" "$url" || fail "could not download $url"
+    # A stalled download (under 100 KB/s for a minute) is cut and tried again rather than waited on for ever.
+    curl -fsSL --retry 3 --retry-delay 5 --connect-timeout 30 --speed-limit 100000 --speed-time 60 \
+      -o "$dest.part" "$url" \
+      || fail "could not download $url"
   fi
   echo "$sha  $dest.part" | sha_check || { rm -f "$dest.part"; fail "$url is not the tested file (its SHA-256 differs)"; }
   mv "$dest.part" "$dest"
