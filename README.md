@@ -12,12 +12,12 @@
 
 <p align="center">
   <a href="https://github.com/kanggu12/openDMTQ/actions/workflows/ci.yml"><img src="https://github.com/kanggu12/openDMTQ/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/kanggu12/openDMTQ/releases/latest"><img src="https://img.shields.io/github/v/release/kanggu12/openDMTQ?color=8cf23d" alt="Latest release"></a>
+  <a href="https://github.com/kanggu12/openDMTQ/releases/latest"><img src="https://img.shields.io/badge/download-latest%20release-8cf23d" alt="Download the latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8cf23d" alt="License: MIT"></a>
   <a href="#quick-start"><img src="https://img.shields.io/badge/runs%20on-Windows%20%7C%20Linux%20%7C%20macOS-2c343d" alt="Runs on Windows, Linux and macOS"></a>
   <a href="#with-docker"><img src="https://img.shields.io/badge/Docker-Compose-2c343d?logo=docker&logoColor=white" alt="Docker Compose"></a>
   <a href="docs/kubernetes.md"><img src="https://img.shields.io/badge/Kubernetes-Helm-2c343d?logo=helm&logoColor=white" alt="Kubernetes with Helm"></a>
-  <a href="#newer-phones-too"><img src="https://img.shields.io/badge/phones-32--bit%20and%2064--bit%20only-2c343d?logo=android&logoColor=white" alt="Phones: 32-bit, and 64-bit only"></a>
+  <a href="#newer-phones-too"><img src="https://img.shields.io/badge/phones-32--bit%20and%2064--bit%20only-2c343d?logo=android&logoColor=white" alt="Phones: 32-bit and 64-bit-only"></a>
 </p>
 
 <p align="center">
