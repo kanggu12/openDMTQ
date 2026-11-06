@@ -83,9 +83,10 @@ is() { [ "$(code "$2")" = "$1" ]; }
 if [ -n "${CLOSED:-}" ]; then
   expect "this container has no way out" sh -c '! curl -s -m 5 -o /dev/null https://github.com'
 fi
-# The bundle's copy, with the Wine changes above.
-cp -r /bundle /tmp/OpenDMTQ
-cd /tmp/OpenDMTQ
+# The bundle's copy, with the Wine changes above, in a folder with a space in its name, as under a user's own name: every
+# path the bundle writes, and every one its Apache reads, must survive it.
+cp -r /bundle "/tmp/Open DMTQ"
+cd "/tmp/Open DMTQ"
 rm -f runtime/python/_wmi.pyd
 export WINEDLLOVERRIDES="vcruntime140=n;vcruntime140_1=n"
 # Wine sets itself up on its first program, with a line or two about it: not part of what is checked.
