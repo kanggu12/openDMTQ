@@ -248,6 +248,8 @@ class Server:
         self.builder = None
         # The program that kept stopping when watch() gave up on it; cmd_run says so once everything has stopped.
         self.gave_up = None
+        # True when the admin pages asked for the stop (stop.request in the run folder).
+        self.stopped_by_page = False
         self.stopping = threading.Event()
         # Every program's output goes to one log beside the server's, kept to 3 files of 10 MB.
         os.makedirs(LOGS, exist_ok=True)
@@ -321,6 +323,17 @@ class Server:
         """Until asked to stop: a program that stopped by itself is started again, at most five times a minute."""
         restarts = []
         while not self.stopping.wait(2):
+            # Stop, asked on the admin pages (Maintenance): as Ctrl+C or the window's closing would.
+            stop = os.path.join(RUN, "stop.request")
+            if os.path.exists(stop):
+                try:
+                    os.remove(stop)
+                except OSError:
+                    pass
+                logging.info("stopping, as asked on the admin pages")
+                self.stopped_by_page = True
+                self.stopping.set()
+                break
             asked = os.path.join(RUN, "restart.request")
             if os.path.exists(asked):
                 os.remove(asked)
@@ -362,10 +375,13 @@ class Server:
     def stop(self):
         """Stop every program, Apache first (no new requests), the database keeper last."""
         self.stopping.set()
+        # On Windows Ctrl+C and the window's closing reach every program, as they reach this one; a stop asked on the
+        # admin pages reaches none of them, so they are ended at once rather than waited for.
+        asked = not self.stopped_by_page
         for name in ("apache", "admin", "keeper"):
-            stop_process(self.procs.get(name), name)
+            stop_process(self.procs.get(name), name, asked=asked)
         # A build part-way stops too (it says so in build.json), rather than run on without the server.
-        stop_process(self.builder, "app builder")
+        stop_process(self.builder, "app builder", asked=asked)
         self.log.close()
 
 
@@ -446,6 +462,13 @@ def cmd_run(args, values=None, found=None):
     # What an earlier run left, and this run's programs tied to it.
     end_leftovers()
     end_with_this_program()
+    # What the admin pages asked of an earlier run that ended before it read it (its window closed at once): not this
+    # run's to do, or a stop asked then would end this run as it starts.
+    for left in ("stop.request", "restart.request"):
+        try:
+            os.remove(os.path.join(RUN, left))
+        except OSError:
+            pass
     with open(pid_file(), "w", encoding="ascii") as f:
         f.write(str(os.getpid()))
     server = Server(values, found)
@@ -466,6 +489,9 @@ def cmd_run(args, values=None, found=None):
             os.remove(pid_file())
         except OSError:
             pass
+    if server.stopped_by_page:
+        say("Stopped from the admin pages. " + ("Start OpenDMTQ.exe to run it again." if WINDOWS else
+                                                 f"{CLI} start runs it again."))
     if server.gave_up:
         # Why the server is gone, and what usually causes it. die() keeps the Windows window open to read it, and the
         # command that started a background server shows this line from the log.

@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}{{ t('server.stopped_title') }}{% endblock %}
+{% block body %}
+{# Shown once, as the server stops: these pages stop with it, so nothing here can be pressed afterwards. #}
+<section class="card">
+  <h2>{{ t('server.stopped_title') }}</h2>
+  <p class="lead">{{ t('server.stopped_lead') }}</p>
+  <p class="setup-state"><span class="lamp off"></span>{{ t('server.start_again_windows') if windows else t('server.start_again') }}</p>
+</section>
+{% endblock %}

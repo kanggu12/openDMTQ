@@ -1,6 +1,6 @@
 # The Windows bundle on Windows (CI's windows job): the zip unpacked into a folder whose name has a space, the pages'
 # stand-in game files imported with OpenDMTQ.exe, the server run, the game server's contract (tests/game/protocol.py)
-# and the admin pages checked, and the server stopped with its window's process tree. Needs Python 3 for the checks.
+# and the admin pages checked, and the server stopped from the admin pages. Needs Python 3 for the checks.
 #
 # Usage (PowerShell 7, from the repository): tests/windows/run.ps1 -Zip <OpenDMTQ-windows.zip> [-Port 18731]
 param(
@@ -63,6 +63,9 @@ if ($written -and (Select-String -Path $envFile -Pattern "^PUBLIC_HOST=" -Quiet)
 # Its window closed: everything it started stops with it. The rest runs with this test's own ports and settings.
 taskkill /T /F /PID $first.Id 2>$null | Out-Null
 Start-Sleep -Seconds 5
+$left = Get-Process -Name httpd, php, python, pythonw, rotatelogs -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$bundle*" }
+if (-not $left) { Pass "its window closed, no program of the bundle is left running" }
+else { $left | Format-Table Id, Path; Fail "its window closed, no program of the bundle is left running" }
 Remove-Item -Force -ErrorAction SilentlyContinue $envFile
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $bundle ".host\run")
 
@@ -74,6 +77,9 @@ if ($LASTEXITCODE -eq 0 -and $import -match "game data and") { Pass "OpenDMTQ.ex
 else { Write-Output $import; Fail "OpenDMTQ.exe imports the game data and the songs from a folder" }
 
 # 3. The server, until it answers.
+# A stop the admin pages asked of an earlier run whose window closed before it read it: not this run's to do.
+New-Item -ItemType Directory -Force -Path (Join-Path $bundle ".host\run") | Out-Null
+Set-Content -Path (Join-Path $bundle ".host\run\stop.request") -Value "0"
 $log = Join-Path $env:RUNNER_TEMP "odq-run.log"
 $err = Join-Path $env:RUNNER_TEMP "odq-run.err"
 $server = Start-Process -FilePath $exe -ArgumentList "run" -WorkingDirectory $bundle -PassThru -NoNewWindow `
@@ -83,7 +89,13 @@ for ($i = 0; $i -lt 90; $i++) {
     if ((Status "http://127.0.0.1:$Port/opendmtq/health.php") -eq 200) { $up = $true; break }
     Start-Sleep -Seconds 2
 }
-if ($up) { Pass "the server answers on the bundle's Apache and PHP" }
+if ($up) {
+    Pass "the server answers on the bundle's Apache and PHP"
+    # Two of the watch's rounds later: the earlier run's stop did not end this one.
+    Start-Sleep -Seconds 5
+    if ((Status "http://127.0.0.1:$Port/opendmtq/health.php") -eq 200) { Pass "a stop asked of an earlier run is not this run's" }
+    else { Fail "a stop asked of an earlier run is not this run's" }
+}
 else {
     Get-Content $log, $err -ErrorAction SilentlyContinue | Select-Object -Last 40
     Get-Content (Join-Path $bundle "data\state\logs\server.log") -ErrorAction SilentlyContinue | Select-Object -Last 40
@@ -108,12 +120,36 @@ if ($up) {
     if ($phpLog) { $phpLog; Fail "PHP said nothing in the server's log" } else { Pass "PHP said nothing in the server's log" }
 }
 
-# 5. Stopped as closing the window stops it: the whole process tree, and nothing keeps the port.
-taskkill /T /F /PID $server.Id | Out-Null
-Start-Sleep -Seconds 5
-if ((Status "http://127.0.0.1:$Port/opendmtq/health.php") -eq 0) { Pass "with its window's processes gone, nothing answers" }
-else { Fail "with its window's processes gone, nothing answers" }
-$left = Get-Process -Name httpd, php, python -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$bundle*" }
+# 4b. No program of the server opens a window of its own. Each console on Windows has a conhost.exe for it, started by the
+# program the console is for: one whose parent is a program of the bundle is a window a person sees beside the server's
+# (rotatelogs.exe got one for each log, started by Apache's worker, which has no console).
+if ($up) {
+    $mine = @(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($bundle, [StringComparison]::OrdinalIgnoreCase) })
+    $ids = @($mine | ForEach-Object { $_.ProcessId })
+    $own = @(Get-CimInstance Win32_Process -Filter "Name='conhost.exe'" | Where-Object { $ids -contains $_.ParentProcessId })
+    $names = ($own | ForEach-Object { $p = $_.ParentProcessId; ($mine | Where-Object { $_.ProcessId -eq $p }).Name }) -join ", "
+    Write-Output "    the bundle's programs: $(($mine | ForEach-Object { $_.Name }) -join ', ')"
+    if ($own.Count -eq 0) { Pass "no program of the server opens a window of its own" }
+    else { Fail "no program of the server opens a window of its own (windows for: $names)" }
+}
+
+# 5. Stopped from the admin pages (Maintenance), signed in with the password in .env: the window's program ends every
+# part, then itself, and says so; nothing keeps the port.
+$jar = Join-Path $env:RUNNER_TEMP "odq-cookies.txt"
+$admin = "http://127.0.0.1:$($Port + 1)/opendmtq/admin"
+& curl.exe -s -o NUL -m 30 -c $jar -b $jar -d "name=admin&password=ci" "$admin/login"
+$maintenance = (& curl.exe -s -m 30 -c $jar -b $jar "$admin/maintenance") -join "`n"
+$csrf = if ($maintenance -match 'name="csrf" value="([^"]+)"') { $Matches[1] } else { "" }
+$stopped = & curl.exe -s -o NUL -m 30 -w "%{http_code}" -c $jar -b $jar --data-urlencode "csrf=$csrf" "$admin/server/stop"
+if ($stopped -eq "200") { Pass "the admin pages' Stop the server answers" } else { Fail "the admin pages' Stop the server answers ($stopped)" }
+if ($server.WaitForExit(60000)) { Pass "and the window's program ends by itself" }
+else { Fail "and the window's program ends by itself"; taskkill /T /F /PID $server.Id | Out-Null }
+Start-Sleep -Seconds 2
+if (Select-String -Path $log -Pattern "Stopped from the admin pages" -Quiet) { Pass "its window says it was stopped from the admin pages" }
+else { Get-Content $log, $err -ErrorAction SilentlyContinue | Select-Object -Last 20; Fail "its window says it was stopped from the admin pages" }
+if ((Status "http://127.0.0.1:$Port/opendmtq/health.php") -eq 0) { Pass "stopped, nothing answers" }
+else { Fail "stopped, nothing answers" }
+$left = Get-Process -Name httpd, php, python, pythonw, rotatelogs -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$bundle*" }
 if (-not $left) { Pass "no program of the bundle is left running" }
 else { $left | Format-Table Id, Path; Fail "no program of the bundle is left running" }
 

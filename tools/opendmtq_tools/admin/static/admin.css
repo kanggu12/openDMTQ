@@ -702,6 +702,20 @@ th.r.can-sort::after, th.rank.can-sort::after { position: absolute; margin-left:
 .setup-found-what { display: grid; gap: 3px; min-width: 0; flex: 1 1 280px; font-size: 13.5px; color: var(--ash); }
 .setup-path { color: #fff; font: 600 13.5px/1.4 var(--mono); overflow-wrap: anywhere; }
 .setup-import { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 0; }
+/* A path typed or pasted, opened in the picker below. */
+.setup-path-form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 10px; margin: 10px 0 0; }
+.setup-path-form .grow { flex: 1 1 320px; }
+.setup-path-form .input { font-family: var(--mono); font-size: 14px; }
+/* Where the picker is: each folder on the way a link back to it. */
+.setup-crumbs { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; min-width: 0; font: 600 13.5px/1.5 var(--mono); }
+.setup-crumbs a { color: var(--chalk); text-decoration: none; overflow-wrap: anywhere; }
+.setup-crumbs a:hover { color: #fff; text-decoration: underline; }
+.setup-crumbs .sep { color: #5a6571; }
+.setup-crumbs b { color: #fff; overflow-wrap: anywhere; }
+/* Why a typed path could not be opened, above the picker. */
+.setup-cannot { margin: 12px 0 0; }
+/* The file a typed path named, marked among the others. */
+.setup-list .file.picked { box-shadow: inset 3px 0 0 var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 /* The folder picker: places to start from, where it is, its folders and the game's files in it. */
 .setup-places { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
 .setup-places .btn { font-family: var(--mono); font-weight: 600; }

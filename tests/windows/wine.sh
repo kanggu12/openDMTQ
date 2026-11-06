@@ -129,6 +129,8 @@ rm -rf .env .host/run
 # The settings setup would write, with this test's ports.
 ADMIN=$((PORT + 1))
 printf 'PUBLIC_HOST=127.0.0.1:%s\r\nLISTEN_PORT=%s\r\nADMIN_PORT=%s\r\nADMIN_PASSWORD=winetest\r\n' "$PORT" "$PORT" "$ADMIN" > .env
+# A stop the admin pages asked of an earlier run whose window closed before it read it: not this run's to do.
+mkdir -p .host/run && echo 0 > .host/run/stop.request
 
 # OpenDMTQ.exe as a double-click starts it: setup, then the server in its window, the setup pages opened for what is
 # left. Its output goes through a pipe (see above). The wait for the first answer is cut to a few seconds, far less than
@@ -141,6 +143,9 @@ for _ in $(seq 1 150); do
 done
 if [ "$(code "http://127.0.0.1:$PORT/opendmtq/health.php")" = 503 ]; then
   pass "a double-click on OpenDMTQ.exe runs the server on the bundle's Apache and PHP, waiting for the game's files"
+  # Two of the watch's rounds later: the earlier run's stop did not end this one.
+  sleep 5
+  expect "a stop asked of an earlier run is not this run's" is 503 "http://127.0.0.1:$PORT/opendmtq/health.php"
 else
   tail -n 30 /tmp/run.log data/state/logs/server.log data/state/logs/programs.log 2>/dev/null || true
   fail "a double-click on OpenDMTQ.exe runs the server on the bundle's Apache and PHP, waiting for the game's files"
@@ -289,11 +294,44 @@ if [ -n "${CLIENT:-}" ]; then
   fi
 fi
 
+# Apache's logs through logpipe.py on pythonw.exe (no console window of their own): written, the requests above in them
+# (the health checks are left out of the access log on purpose).
+expect "Apache writes its logs through logpipe.py on pythonw.exe" grep -q 'pythonw\.exe.* -I .*logpipe\.py' .host/run/httpd.conf
+expect "Apache's error log is written" test -s data/state/logs/server.log
+expect "and its access log, with the requests above" grep -q "GET /viewImg/eye/fixture1.png" data/state/logs/access.log
 if grep -E "PHP (Warning|Notice|Deprecated|Fatal error|Parse error)" data/state/logs/server.log; then
   fail "PHP complained in the server's log (above)"
 else
   pass "PHP said nothing in the server's log"
 fi
+
+# Stopped from the admin pages (Maintenance): the window's program stops every part, says so, and ends.
+stopped=$(web -o /tmp/stopped.html -w '%{http_code}' --data-urlencode "csrf=$(web "$A/maintenance" | token)" "$A/server/stop")
+expect "the admin pages' Stop the server answers ($stopped)" test "$stopped" = 200
+expect "and says to start OpenDMTQ.exe to run it again" grep -q "start OpenDMTQ.exe" /tmp/stopped.html
+for _ in $(seq 1 60); do
+  [ "$(code "http://127.0.0.1:$PORT/opendmtq/health.php")" = 000 ] && break
+  sleep 1
+done
+expect "and the server stops" is 000 "http://127.0.0.1:$PORT/opendmtq/health.php"
+# Its last words come once every part has stopped: within seconds, not one wait for each program.
+for _ in $(seq 1 30); do
+  grep -q "Stopped from the admin pages" /tmp/run.log && break
+  sleep 1
+done
+expect "its window says it was stopped from the admin pages" grep -q "Stopped from the admin pages" /tmp/run.log
+# The bundle's programs still running, from /proc (the image has no ps): each pattern in brackets, so that the grep
+# does not find itself.
+left() {
+  for f in /proc/[0-9]*/cmdline; do tr '\0' ' ' < "$f" 2>/dev/null; echo; done |
+    grep -i -E '[o]pendmtq\.exe|[h]ttpd\.exe|[p]hp\.exe|[p]ython\.exe|[p]ythonw\.exe|[r]otatelogs\.exe' || true
+}
+for _ in $(seq 1 15); do
+  [ -z "$(left)" ] && break
+  sleep 1
+done
+left
+expect "and nothing of it is left running" test -z "$(left)"
 
 echo "$([ $failures = 0 ] && echo PASS || echo FAIL) the Windows bundle under Wine: $failures failure(s)"
 exit $((failures > 0))

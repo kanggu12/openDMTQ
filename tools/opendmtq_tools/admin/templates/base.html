@@ -39,8 +39,9 @@
   {% endfor %}
   {% endif %}
   {# The game server is not answering: what that means here, on every page. A server being set up, with only the game's
-     files missing, is pointed to the setup instead (whose first step says it there). #}
-  {% if is_signed_in and not server_ok and ep != 'login' %}
+     files missing, is pointed to the setup instead (whose first step says it there). Not on the page that says the
+     whole server is stopping. #}
+  {% if is_signed_in and not server_ok and ep not in ('login', 'server_stop') %}
     {% if server_waiting %}
       {% if not (ep or '').startswith('setup') %}<div class="site-alert" role="status"><p>{{ t('down.waiting', url=url_for('setup_page', step='files')) }}</p></div>{% endif %}
     {% else %}

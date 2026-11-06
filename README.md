@@ -94,8 +94,8 @@ stays in `data/` on your PC.
    into a folder of your own, outside OneDrive and Program Files (for example `C:\OpenDMTQ`).
 2. Start `OpenDMTQ.exe`. If Windows says it protected your PC, click **More info**, then **Run anyway**: the program is
    not signed by a publisher Windows knows.
-3. The setup opens in your browser. It finds your files in Downloads, on the Desktop or in Documents, or you open their
-   folder. Then it takes you through the address phones use, an account for each player, and the app.
+3. The setup opens in your browser. It finds your files in Downloads, on the Desktop or in Documents, or you paste their
+   path or open their folder. Then it takes you through the address phones use, an account for each player, and the app.
 4. When Windows asks whether Apache may use the network, allow it on private networks. If your Wi-Fi is set as a public
    network, phones cannot connect: in Settings, Network & internet, open your Wi-Fi and choose **Private**.
 
@@ -155,7 +155,7 @@ page. Then, on each phone:
 | To | Windows | One command's install | Docker |
 |---|---|---|---|
 | Start the server | start `OpenDMTQ.exe` | `./opendmtq start` | `./opendmtq up` |
-| Stop it | close its window | `./opendmtq stop` | `./opendmtq down` |
+| Stop it | close its window, or admin pages, **Maintenance**, **Stop the server** | `./opendmtq stop`, or admin pages, **Maintenance**, **Stop the server** | `./opendmtq down` |
 | See the address and the state | the window shows them | `./opendmtq status` | `./opendmtq status` |
 | Start it with the computer | a shortcut in `shell:startup` | `./opendmtq service` | `RESTART=unless-stopped` in `.env` |
 | Import songs | admin pages, **Songs**, **Choose the folder** | admin pages, **Songs**, **Choose the folder** | `./opendmtq import --songs <folder>` |

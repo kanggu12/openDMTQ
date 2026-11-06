@@ -14,15 +14,16 @@ Start
 
 1. Keep this folder somewhere of your own, outside OneDrive and Program Files (for example C:\OpenDMTQ).
 2. Start OpenDMTQ.exe. The setup opens in your browser.
-3. The setup finds your files in Downloads, on the Desktop or in Documents, or you open their folder. Each file says
-   what it is and whether it can be used. Then the setup takes you through the address phones use, an account for each
-   player, and the app.
+3. The setup finds your files in Downloads, on the Desktop or in Documents, or you paste their path or open their
+   folder. Each file says what it is and whether it can be used. Then the setup takes you through the address phones
+   use, an account for each player, and the app.
 4. When Windows asks whether Apache may use the network, allow it on private networks. If your Wi-Fi is set as a
    public network, phones cannot connect: in Settings, Network & internet, open your Wi-Fi and choose Private.
 5. On a phone on the same Wi-Fi, open the address the setup shows, sign in with the player's account, tap
    "Download app (.apk)", and install it.
 
-The server runs while the window is open. Closing the window stops it.
+The server runs while the window is open. To stop it, close the window, or on the admin pages open Maintenance and
+press "Stop the server".
 
 If Windows says it protected your PC from an unknown app: "More info", then "Run anyway". OpenDMTQ.exe is not signed
 by a publisher Windows knows.

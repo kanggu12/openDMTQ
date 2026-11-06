@@ -89,29 +89,32 @@
     {% endif %}
     <h3 id="picker">{{ t('setup.pick') }}</h3>
     <p class="meta">{{ t('setup.pick_lead') }}</p>
+    {# A path typed or pasted: a folder opens below, a file opens its folder with the file marked. #}
+    <form method="get" action="{{ url_for('setup_page') }}#picker" class="setup-path-form">
+      <input type="hidden" name="step" value="files">
+      <label class="field grow">{{ t('setup.path_label') }} <input class="input" name="dir" value="{{ asked or (listing.path if listing else '') }}" placeholder="{{ path_example }}" spellcheck="false" autocomplete="off" autocapitalize="none" lang="en"></label>
+      <button class="btn">{{ t('setup.path_open') }}</button>
+    </form>
     <div class="setup-places" aria-label="{{ t('setup.places') }}">
       {% for p in homes + drives %}<a class="btn btn-sm" href="{{ p|setup_url }}">{{ p }}</a>{% endfor %}
     </div>
+    {# A path that could not be opened: why, above the picker, which opened the nearest folder that can be. #}
+    {% if cannot_open %}<p class="flash bad setup-cannot" role="status">{{ t('setup.not_there', path=cannot_open) if not_there else t('setup.cannot_open_path', path=cannot_open) }}</p>{% endif %}
     {% if listing %}
     <div class="setup-picker">
-      <div class="setup-where"><code class="setup-path">{{ listing.path }}</code>{% if listing.parent %}<a class="btn btn-sm" href="{{ listing.parent|setup_url }}">{{ t('setup.up') }}</a>{% endif %}</div>
+      {# Where it is, each folder on the way a link back to it. #}
+      <div class="setup-where"><nav class="setup-crumbs" aria-label="{{ t('setup.where') }}">{% for name, full in crumbs %}{% if not loop.last %}<a href="{{ full|setup_url }}">{{ name }}</a><span class="sep" aria-hidden="true">›</span>{% else %}<b aria-current="location">{{ name }}</b>{% endif %}{% endfor %}</nav>{% if listing.parent %}<a class="btn btn-sm" href="{{ listing.parent|setup_url }}">{{ t('setup.up') }}</a>{% endif %}</div>
       {% if listing.tree %}<p class="flash ok" role="status">{{ what(listing.tree, t('setup.is_tree')) }}</p>{% endif %}
       {% if listing.folders or listing.files %}
       <ul class="setup-list">
         {% for name, full in listing.folders %}<li class="folder"><a href="{{ full|setup_url }}">{{ name }}</a></li>{% endfor %}
-        {% for name, size, full in listing.files %}<li class="file"><span class="setup-file-line"><span class="setup-file">{{ name }} <span class="meta-inline">{{ size|short_size }}{% if listing.parts[name] %}, {{ t('setup.parts', n=listing.parts[name]) }}{% endif %}</span></span> {{ what(full) }}</span>{{ import_form(full, t('setup.import_file')) }}</li>{% endfor %}
+        {% for name, size, full in listing.files %}<li class="file{% if name == picked %} picked{% endif %}"{% if name == picked %} id="picked"{% endif %}><span class="setup-file-line"><span class="setup-file">{{ name }} <span class="meta-inline">{{ size|short_size }}{% if listing.parts[name] %}, {{ t('setup.parts', n=listing.parts[name]) }}{% endif %}</span></span> {{ what(full) }}</span>{{ import_form(full, t('setup.import_file')) }}</li>{% endfor %}
       </ul>
       {% if listing.more %}<p class="meta">{{ t('setup.more', n=400) }}</p>{% endif %}
       {% else %}
       <p class="empty">{{ t('setup.empty_folder') }}</p>
       {% endif %}
       <div class="btn-line">{{ import_form(listing.path, t('setup.import_here')) }}</div>
-    </div>
-    {% elif cannot_open %}
-    {# A folder that cannot be opened: said so, with the way back up. #}
-    <div class="setup-picker">
-      <div class="setup-where"><code class="setup-path">{{ cannot_open }}</code>{% if cannot_up %}<a class="btn btn-sm" href="{{ cannot_up|setup_url }}">{{ t('setup.up') }}</a>{% endif %}</div>
-      <p class="flash bad" role="status">{{ t('setup.cannot_open') }}</p>
     </div>
     {% endif %}
   {% else %}
@@ -122,6 +125,9 @@
 </section>
 {% if host_install %}
 <script>
+  // A typed path that named a file: that file in sight in the list.
+  const picked = document.getElementById('picked');
+  if (picked) picked.scrollIntoView({ block: 'nearest' });
   // What each file is, two at a time: an archive's look takes 7-Zip a moment, and the page is usable meanwhile.
   (function () {
     const queue = Array.from(document.querySelectorAll('[data-what]'));

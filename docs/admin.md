@@ -36,11 +36,11 @@ the browser the first time, signed in by a one-time link (it works once, from th
 is at `/opendmtq/admin/setup`, and the status page leads there until every step is done.
 
 1. **Game files.** The game's Android app and the server files, found in Downloads, on the Desktop and in Documents
-   (OneDrive's too), or picked in any folder of the PC: a folder or an archive. Each file found or listed says what it
-   is (the app and its version, a copy changed for another server, server files and their songs, the iPhone app, a
-   part of an archive, one that cannot be read), and one of no use cannot be imported
-   ([the forms each may come in](game-files.md)). The import takes the app and what the game needs to start, the songs
-   too when their box is ticked, then makes the song list. Its output shows as it goes.
+   (OneDrive's too), or picked in any folder of the PC by its path, typed or pasted, or through the folders: a folder or
+   an archive. Each file found or listed says what it is (the app and its version, a copy changed for another server,
+   server files and their songs, the iPhone app, a part of an archive, one that cannot be read), and one of no use
+   cannot be imported ([the forms each may come in](game-files.md)). The import takes the app and what the game needs to
+   start, the songs too when their box is ticked, then makes the song list. Its output shows as it goes.
 2. **Address.** The address phones use, which goes into the app: this PC's address on its network. A PC with several
    (wired and Wi-Fi) offers each. A new one is written to `.env`, and the server starts again for it.
 3. **Players.** An account for each player, its password shown once with the message to send.
@@ -99,7 +99,7 @@ change it if in doubt: edit `.env`, then restart the server.
 | Accounts | The site's accounts, the only way into it: make one (an ID, a password typed or made, whom it is for, the game player it is, admin rights to these pages too), and its password shows once with the message to send; a new password, switch off or on, delete. Each with when it was made and last signed in. |
 | Recordings | Every broadcast, kept (players see them as past broadcasts): watch, download as one file, hide from players, delete one, selected or all of a player's. Disk used against the two limits (20 GB and 30 days by default), which are set here, and about how many hours of broadcast still fit. See [live.md](live.md#recordings). |
 | Backups | Back up now, download, upload, restore (the server keeps running; the current state is saved first), delete, each with its date and kind. A daily backup when turned on: one a day while something has changed, the latest seven kept. The page shows those seven as seven slots, the newest on the right, and when the next one comes. |
-| Maintenance | Turn the in-game maintenance notice on or off, with a message, typed or one of a few ready ones. The site shows it too. |
+| Maintenance | Turn the in-game maintenance notice on or off, with a message, typed or one of a few ready ones. The site shows it too. On the server PC's own install (the Windows bundle, Linux, macOS), **Stop the server** stops every part of it. |
 | Logs | Three tabs. **Requests:** the last 24 hours as a chart, what was asked for most, by which devices and addresses, then the newest requests with filters by text, result and kind, a click on an address to filter by it, keep updating, and the log as a file. **Plays:** every play, a page at a time, narrowed by a word, a player and days, with what the filter leaves added up over it (plays, new records, average accuracy, plays per day or week, grades); it also comes as a CSV file. **Changes:** what was done on these pages, sign-ins and failed sign-ins too, when and on whom, in words (at most a few hundred kilobytes are kept). |
 
 The pages are in English until the visitor picks another language, whatever the browser prefers: the KOR / ENG buttons

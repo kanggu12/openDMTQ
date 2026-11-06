@@ -255,6 +255,8 @@ def template_globals():
             # On the server PC itself (a host install, the Windows bundle): the pages can import from its folders, through
             # the setup's first step (admin/setup.py).
             "host_install": setup.HOST_INSTALL,
+            # On Kubernetes: nothing on these pages starts or stops the server's parts.
+            "kubernetes": setup.IN_KUBERNETES,
             "app_name_html": app_name_html, "device_words": logs.device_words}
 
 

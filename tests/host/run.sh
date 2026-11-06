@@ -208,11 +208,33 @@ else
   expect "without a client the files step says the APK is missing" test "$(have "Android app" <<<"$files" && echo yes)" = ""
 fi
 
-# 8. Stopped, then started again: the same data, answering again.
+# 8. Stopped, then started again: the same data, answering again. A stop the admin pages asked of the run before and that
+#    it never read is not this run's: two of the watch's rounds later the server still answers.
 inside "opendmtq stop" >/dev/null || true
 expect "opendmtq stop: nothing answers" is 000 "http://127.0.0.1:$PORT/opendmtq/health.php"
+inside "echo 0 > OpenDMTQ/.host/run/stop.request"
 inside "opendmtq start" >/dev/null || true
 expect "started again, healthy" is 200 "http://127.0.0.1:$PORT/opendmtq/health.php"
+sleep 5
+expect "a stop asked of an earlier run is not this run's" is 200 "http://127.0.0.1:$PORT/opendmtq/health.php"
+
+# 8b. Stopped from the admin pages (Maintenance): the program that runs the server stops every part and ends, its log
+#     says why, and a start brings it back. The owner signs in first (the stop above ended the sessions).
+# A server already gone (a fault above) fails the checks below, not the whole run.
+web "$admin" -o /dev/null -d "name=admin&password=hosttest" "$A/login" || true
+stopped=$(web "$admin" -o /tmp/odq-hosttest-stopped.html -w '%{http_code}' \
+  --data-urlencode "csrf=$(web "$admin" "$A/maintenance" | token)" "$A/server/stop" || true)
+expect "the admin pages' Stop the server answers ($stopped)" test "$stopped" = 200
+expect "and says the command that starts it again" grep -q "./opendmtq start" /tmp/odq-hosttest-stopped.html
+for _ in $(seq 30); do
+  inside "test ! -e OpenDMTQ/.host/run/host.pid" && break
+  sleep 1
+done
+expect "and the server stops: nothing answers" is 000 "http://127.0.0.1:$PORT/opendmtq/health.php"
+expect "and nothing of it stays running" inside "test ! -e OpenDMTQ/.host/run/host.pid"
+expect "its log says the admin pages asked for the stop" inside "grep -q 'as asked on the admin pages' OpenDMTQ/data/state/logs/host.log"
+inside "opendmtq start" >/dev/null || true
+expect "started again after that, healthy" is 200 "http://127.0.0.1:$PORT/opendmtq/health.php"
 inside "opendmtq status"
 
 # 9. Another address, chosen in the setup: saved to .env, the server started again for it, and the browser back,

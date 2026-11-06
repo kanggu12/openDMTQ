@@ -222,6 +222,8 @@ def cmd_service(args):
             ok("removed the launchd agent")
             return 0
         os.makedirs(os.path.dirname(plist), exist_ok=True)
+        # Started again when it fails, not when it was stopped (./opendmtq stop, the admin pages' Stop the server, both
+        # end it well): systemd's Restart=on-failure below.
         with open(plist, "w", encoding="utf-8") as f:
             f.write(f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -232,7 +234,7 @@ def cmd_service(args):
   </array>
   <key>WorkingDirectory</key><string>{ROOT}</string>
   <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
 </dict></plist>
 """)
         subprocess.run(["launchctl", "load", plist], check=False)

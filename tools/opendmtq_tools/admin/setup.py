@@ -22,6 +22,7 @@ import string
 import subprocess
 import threading
 import time
+import urllib.parse
 
 from flask import abort, flash, jsonify, redirect, render_template, request, session, url_for
 
@@ -197,13 +198,79 @@ def shown(entry):
     return True
 
 
+def printable(name):
+    """True for a name the page can show: a Linux file system may hold any bytes, which Python keeps as surrogates that
+    no page can carry."""
+    try:
+        name.encode("utf-8")
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
 def entries(path):
     """The entries of a folder that are shown, in name order, or None when it cannot be read."""
     try:
         with os.scandir(path) as it:
-            return sorted((e for e in it if shown(e)), key=lambda e: e.name.lower())
+            return sorted((e for e in it if printable(e.name) and shown(e)), key=lambda e: e.name.lower())
     except OSError:
         return None
+
+
+def clean_path(text):
+    """A path as people paste it, made one the system takes: spaces and quotes around it gone (Windows' Copy as path puts
+    it in quotes), a file:// address made a path, %USERPROFILE% or ~ worked out, a drive letter alone made its top folder,
+    and a path from no drive's top or root taken from the home folder (Downloads/DMTQ). Empty when nothing is left."""
+    # No system's paths hold a NUL, and the calls that read folders raise ValueError on one rather than OSError.
+    text = (text or "").replace("\0", "").strip()
+    while len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
+        text = text[1:-1].strip()
+    if not text:
+        return ""
+    # A file's address, as a browser's address bar shows it: file:///C:/Users/..., file://nas/share/..., file:///home/...
+    if text.lower().startswith("file:"):
+        url = urllib.parse.urlparse(text)
+        text = urllib.parse.unquote(url.path)
+        if os.name == "nt":
+            # The drive comes after the address's own slash; a host before the path is a network share.
+            if re.match(r"/[A-Za-z]:", text):
+                text = text[1:]
+            elif url.netloc and url.netloc.lower() != "localhost":
+                text = "//" + url.netloc + text
+    text = os.path.expanduser(os.path.expandvars(text))
+    if os.name == "nt" and len(text) == 2 and text[1] == ":":
+        text += "\\"
+    # Relative to the server program's own folder it would mean nothing to the person: their home is where they start.
+    if not os.path.isabs(text):
+        text = os.path.join(os.path.expanduser("~"), text)
+    return os.path.normpath(text)
+
+
+def too_wide(path):
+    """True for a folder too big to look through for the game's files: a drive's top or the home folder itself (the
+    import goes four folders down, and opens every archive on the way)."""
+    here = os.path.normcase(os.path.normpath(path))
+    home = os.path.normcase(os.path.normpath(os.path.expanduser("~")))
+    return parent_of(path) is None or here == home or here == os.path.normcase(os.path.dirname(home))
+
+
+def crumbs(path):
+    """The way to a folder from the top of its drive, each step with its own path: [(name, path)]."""
+    out = []
+    here = os.path.normpath(path)
+    while True:
+        up = parent_of(here)
+        out.append((os.path.basename(here) or here, here))
+        if up is None:
+            break
+        here = up
+    return list(reversed(out))
+
+
+def default_folder():
+    """Where the folder picker opens when nothing was asked for: Downloads, where most people's files are, else home."""
+    homes = home_folders()
+    return next((p for p in homes if os.path.basename(p).lower() == "downloads"), homes[0] if homes else os.path.expanduser("~"))
 
 
 def is_dir(entry):
@@ -607,13 +674,30 @@ def setup_page():
         view["song_count"] = len(songs.catalog()) if view["has_data"] else 0
         if HOST_INSTALL:
             view["found"] = found_on_this_pc()
-            browse = request.args.get("dir", "")
-            view["listing"] = listing(browse) if browse else None
-            # A folder that cannot be opened (no right to, or gone): said so, with the way back up.
-            if browse and view["listing"] is None:
+            asked = request.args.get("dir", "")
+            browse = clean_path(asked) or default_folder()
+            view["picked"] = None
+            # A file's path opens its folder, with the file marked to import.
+            if os.path.isfile(browse):
+                view["picked"], browse = os.path.basename(browse), os.path.dirname(browse)
+            view["listing"] = listing(browse)
+            view["asked"] = asked
+            # A folder that cannot be opened: said whether it is not there or not to be read, and the picker opens at the
+            # nearest folder above it that can be (a typo near the end leaves the person close to where they meant).
+            if view["listing"] is None:
                 view["cannot_open"], view["cannot_up"] = browse, parent_of(browse)
+                view["not_there"] = not os.path.exists(browse)
+                near = parent_of(browse)
+                while near and listing(near) is None:
+                    near = parent_of(near)
+                browse = near or default_folder()
+                view["listing"] = listing(browse)
+            if view["listing"] is not None:
+                view["crumbs"] = crumbs(browse)
             view["drives"] = drives()
             view["homes"] = home_folders()
+            view["path_example"] = ("C:\\Users\\you\\Downloads\\DMTQ" if os.name == "nt"
+                                    else os.path.join(os.path.expanduser("~"), "Downloads", "DMTQ"))
     elif step == "address":
         view["addresses"] = this_pcs_addresses() if HOST_INSTALL else []
         view["current"] = address_parts(core.PUBLIC_HOST)[0]
@@ -660,8 +744,12 @@ def setup_what():
     theirs, so that the page shows at once and fills in. On a host install only."""
     if not HOST_INSTALL:
         abort(404)
-    w = what_is(request.args.get("path", ""))
-    return jsonify(ok=bool(w and w["ok"]), text=what_words(w))
+    try:
+        w = what_is(clean_path(request.args.get("path", "")))
+        return jsonify(ok=bool(w and w["ok"]), text=what_words(w))
+    except Exception:  # noqa: BLE001 - a file nobody foresaw (7-Zip missing, a device, a name the system refuses)
+        app.logger.exception("setup/what")
+        return jsonify(ok=False, text=t("setup.what_error"))
 
 
 @app.route(BASE + "/setup/import", methods=["POST"])
@@ -670,10 +758,16 @@ def setup_import():
     songs when asked; then the song list. On a host install only."""
     if not HOST_INSTALL:
         abort(404)
-    path = request.form.get("path", "").strip()
+    path = clean_path(request.form.get("path", ""))
     if not path or not os.path.exists(path):
         flash(t("setup.no_path"), "bad")
         return redirect(url_for("setup_page", step="files"))
+    if not os.access(path, os.R_OK) or (os.path.isdir(path) and not os.access(path, os.X_OK)):
+        flash(t("setup.cannot_read", path=path), "bad")
+        return redirect(url_for("setup_page", step="files", dir=path))
+    if os.path.isdir(path) and too_wide(path):
+        flash(t("setup.too_wide", path=path), "bad")
+        return redirect(url_for("setup_page", step="files", dir=path))
     env = dict(os.environ)
     if os.path.isfile(path):
         # A single file: its folder, and only that file in it.
@@ -732,6 +826,23 @@ def setup_address():
             f.write(str(int(time.time())))
     changed("setup:address", host)
     return render_template("setup_restart.html", back=back, instance=STARTED)
+
+
+@app.route(BASE + "/server/stop", methods=["POST"])
+def server_stop():
+    """Stop the server (a host install: the Windows bundle, Linux, macOS): the program that runs it stops every part, as
+    closing its window or Ctrl+C would. These pages stop with it, so the answer comes first and says how to start again."""
+    if not (HOST_INSTALL and RUN_DIR):
+        abort(404)
+    try:
+        with open(os.path.join(RUN_DIR, "stop.request"), "w", encoding="ascii") as f:
+            f.write(str(int(time.time())))
+    except OSError as e:
+        flash(t("server.stop_failed", why=e.strerror or str(e)), "bad")
+        return redirect(url_for("maintenance_page"))
+    changed("server:stop", auth.client_ip())
+    # How to start it again: OpenDMTQ.exe on Windows, the command elsewhere.
+    return render_template("server_stopped.html", windows=os.name == "nt")
 
 
 @app.route(BASE + "/setup/player", methods=["POST"])

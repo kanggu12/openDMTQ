@@ -538,6 +538,34 @@ select.input {
   text-overflow: ellipsis;
   cursor: pointer;
 }
+/* Where the browser lets the open list be styled as well (Chrome and Edge 135 and later): the list in the site's look,
+   the item under the pointer or the keys lit, the chosen one ticked, the arrow turning as it opens. Elsewhere the list
+   is the system's own, under the field above. */
+@supports (appearance: base-select) {
+  select.input, select.input::picker(select) { appearance: base-select; }
+  select.input { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-right: 12px; background-image: none; }
+  select.input::picker-icon {
+    content: "";
+    flex: none;
+    width: 12px;
+    height: 8px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23aab3bd' stroke-width='1.8'/%3E%3C/svg%3E") no-repeat center / 12px 8px;
+    transition: rotate var(--quick);
+  }
+  select.input:open::picker-icon { rotate: 180deg; }
+  select.input::picker(select) {
+    margin-top: 4px;
+    padding: 4px;
+    color: var(--chalk);
+    background: #12171c;
+    border: 1px solid var(--seam);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.55);
+  }
+  select.input option { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 12px; color: var(--chalk); background: transparent; }
+  select.input option:hover, select.input option:focus-visible { color: #fff; background: color-mix(in srgb, var(--accent) 16%, transparent); outline: none; }
+  select.input option:checked { color: #fff; font-weight: 650; }
+  select.input option::checkmark { content: "\2713"; color: var(--accent); }
+}
 /* A tick box in the site's own look, big enough to press. */
 input[type=checkbox] {
   appearance: none;

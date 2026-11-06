@@ -359,6 +359,107 @@ class FilesOnThisPcTest(unittest.TestCase):
             self.assertIn(".xapk", page)
             self.assertIn("patch/phone_new", page)
 
+    def test_a_path_is_taken_as_people_paste_it(self):
+        with mock.patch.dict(os.environ, {"DMTQ_TEST_HOME": "/home/x"}):
+            self.assertEqual(setup.clean_path('  "/home/x/Downloads/DMTQ"  '), "/home/x/Downloads/DMTQ")
+            self.assertEqual(setup.clean_path("'/home/x/a b/'"), "/home/x/a b")
+            self.assertEqual(setup.clean_path("$DMTQ_TEST_HOME/Downloads"), "/home/x/Downloads")
+            self.assertEqual(setup.clean_path('""'), "")
+            self.assertEqual(setup.clean_path("   "), "")
+            # A browser's address for a file, its spaces written as %20.
+            self.assertEqual(setup.clean_path("file:///home/x/my%20files/DMTQ"), "/home/x/my files/DMTQ")
+        home = os.path.expanduser("~")
+        self.assertEqual(setup.clean_path("~/Downloads"), os.path.join(home, "Downloads"))
+        # From no top: from the home folder, not from wherever the server program runs.
+        self.assertEqual(setup.clean_path("Downloads/DMTQ"), os.path.join(home, "Downloads", "DMTQ"))
+        # Windows' own forms, as its paths work.
+        with mock.patch("os.path", ntpath), mock.patch.object(setup.os, "name", "nt"), \
+                mock.patch.dict(os.environ, {"USERPROFILE": "C:\\Users\\me"}):
+            self.assertEqual(setup.clean_path('"C:\\Users\\me\\Downloads\\"'), "C:\\Users\\me\\Downloads")
+            self.assertEqual(setup.clean_path("D:"), "D:\\")
+            self.assertEqual(setup.clean_path("Downloads\\DMTQ"), "C:\\Users\\me\\Downloads\\DMTQ")
+            self.assertEqual(setup.clean_path("file:///C:/Users/me/My%20Files"), "C:\\Users\\me\\My Files")
+            self.assertEqual(setup.clean_path("file://nas/share/DMTQ"), "\\\\nas\\share\\DMTQ")
+
+    def test_a_whole_drive_or_the_home_is_too_wide_to_import(self):
+        with HostInstall() as inst:
+            self.assertTrue(setup.too_wide("/"))
+            self.assertTrue(setup.too_wide(inst.path("home")))
+            self.assertFalse(setup.too_wide(inst.path("home/Downloads")))
+            inst.sign_in()
+            r = inst.client.post(BASE + "/setup/import", data={"csrf": inst.csrf(), "path": inst.path("home"), "songs": "yes"})
+            self.assertEqual(r.status_code, 302)
+            self.assertIn("whole drive or home folder", inst.page(r.headers["Location"]))
+            self.assertEqual(admin.jobs._jobs, {})
+
+    def test_a_folder_that_cannot_be_read_is_said_before_any_import(self):
+        with HostInstall() as inst:
+            inst.sign_in()
+            with mock.patch.object(setup.os, "access", lambda path, mode: False):
+                r = inst.client.post(BASE + "/setup/import", data={"csrf": inst.csrf(), "path": inst.path("home/Downloads")})
+            self.assertIn("cannot be read by this program", inst.page(r.headers["Location"]))
+
+    def test_the_picker_is_open_from_the_start_at_downloads_with_the_way_there(self):
+        with HostInstall() as inst:
+            os.makedirs(inst.path("home/Downloads/DMTQ"))
+            inst.sign_in()
+            page = inst.page(BASE + "/setup?step=files")
+            self.assertIn('class="setup-crumbs"', page)
+            self.assertIn('aria-current="location">Downloads</b>', page)
+            self.assertIn(">DMTQ</a>", page)
+            # The field holds where the picker is, to change or copy.
+            self.assertIn(f'name="dir" value="{inst.path("home/Downloads")}"', page)
+
+    def test_a_typed_file_opens_its_folder_with_the_file_marked(self):
+        with HostInstall() as inst:
+            os.makedirs(inst.path("home/Downloads/DMTQ"))
+            inst.write("home/Downloads/DMTQ/game.apk", "PK")
+            inst.sign_in()
+            page = inst.page(BASE + "/setup", query_string={"step": "files", "dir": f'"{inst.path("home/Downloads/DMTQ/game.apk")}"'})
+            self.assertIn('class="file picked" id="picked"', page)
+            self.assertIn('aria-current="location">DMTQ</b>', page)
+
+    def test_a_path_no_system_has_is_taken_without_an_error(self):
+        with HostInstall() as inst:
+            inst.sign_in()
+            # A NUL, as only a made-up address carries one: the page comes, as do the import's and the look's answers.
+            r = inst.client.get(BASE + "/setup", query_string={"step": "files", "dir": "/home\0/x"})
+            self.assertEqual(r.status_code, 200)
+            r = inst.client.post(BASE + "/setup/import", data={"csrf": inst.csrf(), "path": "\0"})
+            self.assertEqual(r.status_code, 302)
+            self.assertEqual(admin.jobs._jobs, {})
+            answer = inst.client.get(BASE + "/setup/what", query_string={"path": "\0"}).get_json()
+            self.assertFalse(answer["ok"])
+
+    def test_a_path_with_nothing_there_says_so(self):
+        with HostInstall() as inst:
+            inst.sign_in()
+            gone = inst.path("home/Downloads/nowhere/deeper")
+            page = inst.page(BASE + "/setup", query_string={"step": "files", "dir": gone})
+            self.assertIn(f"Nothing is at {gone}", page)
+            # The picker opens at the nearest folder above it that is there.
+            self.assertIn('aria-current="location">Downloads</b>', page)
+
+    def test_a_file_the_import_cannot_look_at_still_gets_an_answer(self):
+        with HostInstall() as inst:
+            inst.write("home/Downloads/odd.zip", "x")
+            inst.sign_in()
+            with mock.patch.object(setup.importer, "what_is", side_effect=FileNotFoundError("7zz")):
+                answer = inst.client.get(BASE + "/setup/what", query_string={"path": inst.path("home/Downloads/odd.zip")}).get_json()
+            self.assertEqual(answer, {"ok": False, "text": "Could not be checked"})
+
+    @unittest.skipIf(os.name == "nt", "a name of any bytes is a Linux file system's")
+    def test_a_name_no_page_can_show_is_left_out_and_the_page_still_comes(self):
+        with HostInstall() as inst:
+            folder = inst.path("home/Downloads")
+            with open(os.path.join(os.fsencode(folder), b"game-\xff.zip"), "wb") as f:
+                f.write(b"PK")
+            inst.write("home/Downloads/game.apk", "PK")
+            inst.sign_in()
+            r = inst.client.get(BASE + "/setup", query_string={"step": "files", "dir": folder})
+            self.assertEqual(r.status_code, 200)
+            self.assertIn("game.apk", r.get_data(as_text=True))
+
     def test_this_projects_own_download_is_not_taken_for_the_games_files(self):
         with HostInstall() as inst:
             inst.write("home/Downloads/OpenDMTQ-windows.zip", "PK")
@@ -395,9 +496,13 @@ class FilesOnThisPcTest(unittest.TestCase):
     def test_a_folder_that_cannot_be_opened_says_so_with_the_way_up(self):
         with HostInstall() as inst:
             inst.sign_in()
-            gone = inst.path("home/Downloads/gone")
-            page = inst.page(BASE + "/setup", query_string={"step": "files", "dir": gone})
-            self.assertIn("This folder cannot be opened", page)
+            locked = inst.path("home/Downloads/locked")
+            os.makedirs(locked)
+            # A folder there that this program may not read; the picker opens the folder above it.
+            real = setup.listing
+            with mock.patch.object(setup, "listing", side_effect=lambda path: None if path == locked else real(path)):
+                page = inst.page(BASE + "/setup", query_string={"step": "files", "dir": locked})
+            self.assertIn("cannot be opened: there is no permission for it", page)
             self.assertIn("Up one folder", page)
 
     def test_the_top_of_a_drive_has_no_way_up(self):
@@ -514,7 +619,7 @@ class ImportTest(unittest.TestCase):
             with admin.jobs._jobs_lock:
                 admin.jobs._jobs["busy"] = {"id": "busy", "kind": "import", "state": "running", "log": [], "started": 0}
             try:
-                r, job = self.run_import(inst, inst.path("home"))
+                r, job = self.run_import(inst, inst.path("home/Downloads"))
                 self.assertEqual(job, {})
                 self.assertIn("An import is running already", inst.page(r.headers["Location"]))
             finally:
@@ -672,6 +777,50 @@ class AddressTest(unittest.TestCase):
                 setup.save_env({"PUBLIC_HOST": "10.0.0.5", "NEW": "x"})
             with open(path, encoding="utf-8") as f:
                 self.assertEqual(f.read(), "A=1\n# note\nPUBLIC_HOST=10.0.0.5\nNEW=x\n")
+
+
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class StopTest(unittest.TestCase):
+    """Stopping the server from the admin pages (Maintenance)."""
+
+    def test_on_this_pc_the_page_asks_the_program_to_stop_and_says_how_to_start_again(self):
+        with HostInstall() as inst:
+            inst.sign_in()
+            page = inst.page(BASE + "/maintenance")
+            self.assertIn("Stop the server", page)
+            self.assertIn('data-ask="', page)
+            r = inst.client.post(BASE + "/server/stop", data={"csrf": inst.csrf()})
+            self.assertEqual(r.status_code, 200)
+            # Here, not Windows: the command starts it again (the Wine test reads the Windows words).
+            self.assertIn("./opendmtq start", r.get_data(as_text=True))
+            self.assertNotIn("OpenDMTQ.exe", r.get_data(as_text=True))
+            self.assertTrue(os.path.isfile(inst.path("run/stop.request")))
+
+    def test_a_stop_that_cannot_be_asked_says_why_and_what_to_do(self):
+        with HostInstall() as inst:
+            inst.sign_in()
+            # The run folder gone from under the pages: the request cannot be written.
+            with mock.patch.object(setup, "RUN_DIR", inst.path("gone/run")):
+                r = inst.client.post(BASE + "/server/stop", data={"csrf": inst.csrf()})
+            self.assertEqual(r.status_code, 302)
+            page = inst.page(r.headers["Location"])
+            self.assertIn("could not be asked to stop", page)
+            self.assertIn("Stop it on the server PC instead", page)
+
+    def test_without_the_form_token_nothing_stops(self):
+        with HostInstall() as inst:
+            inst.sign_in()
+            r = inst.client.post(BASE + "/server/stop", data={"csrf": "wrong"})
+            self.assertNotEqual(r.status_code, 200)
+            self.assertFalse(os.path.exists(inst.path("run/stop.request")))
+
+    def test_in_containers_the_page_names_the_command_instead(self):
+        with HostInstall(host_install=False) as inst:
+            inst.sign_in()
+            page = inst.page(BASE + "/maintenance")
+            self.assertIn("./opendmtq down", page)
+            self.assertNotIn("Stop the server", page)
+            self.assertEqual(inst.client.post(BASE + "/server/stop", data={"csrf": inst.csrf()}).status_code, 404)
 
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")

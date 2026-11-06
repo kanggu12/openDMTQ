@@ -1,6 +1,7 @@
 """Apache's configuration, written at every start from the settings and the repository's own."""
 
 import os
+import sys
 
 from opendmtq_cli import env
 from .paths import APP, LOGS, RUN, WINDOWS
@@ -31,12 +32,23 @@ def load_module(name, folder, file):
     return f"<IfModule !{name}>\n    LoadModule {name} {quoted(slashes(os.path.join(folder, file)))}\n</IfModule>"
 
 
+# How much of each log is kept: this many files of this size, written in a circle.
+LOG_FILES = 3
+LOG_BYTES = 10 * 1024 * 1024
+
+
 def log_pipe(found, name):
-    """A piped log through rotatelogs: three files of 10 MB at most, data/state/logs/<name> the newest."""
+    """A piped log: LOG_FILES files of LOG_BYTES at most, data/state/logs/<name> and <name>.1, .2. On Windows through
+    logpipe.py on pythonw.exe: rotatelogs.exe, a console program, opens an empty window of its own there when Apache's
+    worker starts it. Elsewhere through rotatelogs."""
     target = slashes(os.path.join(LOGS, name))
+    pythonw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+    if WINDOWS and os.path.isfile(pythonw):
+        script = slashes(os.path.join(os.path.dirname(os.path.abspath(__file__)), "logpipe.py"))
+        # Each path in quotes inside the quoted directive: any of them may hold spaces.
+        return quoted(f'|"{slashes(pythonw)}" -I "{script}" "{target}" {LOG_FILES} {LOG_BYTES}')
     program = slashes(found["rotatelogs"])
-    # The program and the file each in quotes inside the quoted directive: either may hold spaces.
-    return quoted(f'|"{program}" -n 3 "{target}" 10M')
+    return quoted(f'|"{program}" -n {LOG_FILES} "{target}" {LOG_BYTES // (1024 * 1024)}M')
 
 
 def httpd_conf(values, found):

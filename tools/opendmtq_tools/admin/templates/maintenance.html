@@ -21,6 +21,24 @@
     </div>
   </form>
 </section>
+{# Stopping the server: on the server PC's own install the pages can ask its program to stop; in containers the
+   command line does it. #}
+{% if host_install %}
+<section class="card" id="server">
+  <h2>{{ t('server.title') }}</h2>
+  <p class="lead">{{ t('server.lead') }}</p>
+  <form method="post" action="{{ url_for('server_stop') }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="btn-line"><button class="btn btn-danger" data-ask="{{ tp('server.confirm') }}" data-yes="{{ tp('server.stop') }}">{{ t('server.stop') }}</button></div>
+  </form>
+</section>
+{% elif not kubernetes %}
+<section class="card" id="server">
+  <h2>{{ t('server.title') }}</h2>
+  <p class="lead">{{ t('server.docker') }}</p>
+  <pre class="log">./opendmtq down</pre>
+</section>
+{% endif %}
 <script>
   // A ready-made message in the field, to change or send as it is.
   for (const b of document.querySelectorAll('.presets button')) {

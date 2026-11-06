@@ -147,6 +147,7 @@ def summary(values):
         say(f"The QR code for phones is on the site's home page: open http://{values['PUBLIC_HOST']}/ in a browser and "
             "sign in.")
         say("")
-        say("Leave this window open while people play. Closing it stops the server.")
+        say("Leave this window open while people play. To stop the server, close it, or press Stop the server on the "
+            "admin pages, under Maintenance.")
         say("Windows may ask whether Apache may use the network: allow it on private networks. If your Wi-Fi is set "
             "as a public network, phones cannot connect: in Settings, Network & internet, choose Private for it.")
