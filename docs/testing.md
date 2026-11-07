@@ -33,6 +33,13 @@ both.
 | Game | Install from nothing, first start, lobby, menu, options, shop, second start, on an emulator | `tests/game/tour.sh <folder>` (`EMULATOR=1 tests/qa.sh`) | by hand, with a change to the patcher | yes |
 | Device | Real phones, by ear and by hand | the `hand` rows of [test-cases.md](test-cases.md) | before saying it works there | yes |
 
+**The emulator on a busy machine.** The closed game test can stall at a song's loading screen when the computer is busy
+with other work, with client 1.3.4 and 1.3.5 alike: the game's own audio output (FMOD, writing to an `AudioTrack`)
+waits on the emulator's audio, and the game's threads wait on it. Measured on 11-07: 7 stalls in 17 song starts while
+the machine also built, tested or ran a second copy of the game, none in 12 on an otherwise idle machine, and none in
+OpenDMTQ's own code, which never waits there. The test then fails at "the song's score reaches the server": run it
+again with nothing else running.
+
 ## Tests without the game's files
 
 `tests/game/protocol.sh` and `tests/ui/run.sh` need nothing but Docker. They start the server by its **real start
