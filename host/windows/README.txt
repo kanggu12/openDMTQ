@@ -14,7 +14,7 @@ Start
 
 1. Keep this folder somewhere of your own, outside OneDrive and Program Files (for example C:\OpenDMTQ).
 2. Start OpenDMTQ.exe. The setup opens in your browser.
-3. The setup finds your files in Downloads, on the Desktop or in Documents, If they are elsewhere, paste their path or
+3. The setup finds your files in Downloads, on the Desktop or in Documents. If they are elsewhere, paste their path or
    open their folder. Each file says what it is and whether it can be used. Then the setup takes you through the address
    phones use, an account for each player, and the app.
 4. When Windows asks whether Apache may use the network, allow it on private networks. If your Wi-Fi is set as a public
@@ -44,4 +44,3 @@ Later
 Guides, and where to report a problem: https://github.com/kanggu12/openDMTQ
 
 The programs this bundle brings, and their licenses: THIRD-PARTY-NOTICES.txt. OpenDMTQ itself: LICENSE.txt (MIT).
-DJMAX and TECHNIKA Q are trademarks of NEOWIZ. OpenDMTQ is an unofficial project, not affiliated with NEOWIZ.

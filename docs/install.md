@@ -12,8 +12,8 @@ All four run the same server. Phones join over the same Wi-Fi, or over the inter
   `.xapk` or an `.apks`. Phones play on Android; [iPhones cannot](game-files.md#iphones).
 - **The game data**: the server files' `patch/phone_new` folder, in a folder or an archive (`.zip`, `.7z`, `.rar`,
   also in parts).
-- **The songs**, if you want them: the server files' `DMQ` folder, with `viewImg` for the jackets. With the game data,
-  as the server files come, or later on their own.
+- **The songs**, if you want them: the server files' `DMQ` folder, with `viewImg` for the jackets. They can come with
+  the game data or later on their own.
 
 The setup says what each file is before it imports anything. [The game's files](game-files.md) has every form it
 accepts.
@@ -57,7 +57,7 @@ OpenDMTQ-windows.zip` with it; on Linux, run `sha256sum -c OpenDMTQ-windows.zip.
 
 ## Linux or macOS
 
-Debian, Ubuntu, or a Mac with [Homebrew](https://brew.sh):
+Debian, Ubuntu, or a Mac with [Homebrew](https://brew.sh); on another Linux, use Docker:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/main/host/get.sh | sh
@@ -74,8 +74,6 @@ cd ~/openDMTQ
 ./opendmtq start
 ./opendmtq service    # start with the computer
 ```
-
-On another Linux, use Docker.
 
 ## Docker
 
@@ -99,11 +97,8 @@ update, `git pull`, then `./opendmtq up`.
 
 ## Kubernetes
 
-```sh
-helm install opendmtq oci://ghcr.io/kanggu12/charts/opendmtq --set publicHost=game.example.com:8790
-```
-
-The game files go on the chart's volume first: see [Kubernetes](kubernetes.md).
+The Helm chart needs a volume with the game files and S3-compatible storage for the database first:
+[install on a cluster](kubernetes.md#install-on-a-cluster) has the commands.
 
 ## On each Android phone
 

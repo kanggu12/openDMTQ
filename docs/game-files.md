@@ -104,8 +104,8 @@ Each part of the files replaces only what it has. The game data alone replaces t
 alone replace the songs, their list, and their jackets when they come with jackets. Files without the songs' folder
 (`DMQ`) leave the songs on the server as they are. Songs imported later reach the installed apps at their next start.
 
-If part of what the game needs to start is missing, the setup's lamp turns red and `./opendmtq doctor` names the files:
-import the game data again.
+If part of what the game needs to start is missing, the setup's lamp turns red (with Docker Compose, `./opendmtq doctor`
+names the files): import the game data again.
 
 ### The song list
 

@@ -26,6 +26,16 @@ one that only fixes raises the patch number. Each release's section here is its 
 - `./opendmtq import` of the `DMQ` folder itself takes the jackets and the song list beside it too.
 - A client table that cannot be read no longer stops the import: the song list made from it is empty, and the import
   says why.
+- A failed import says why in the page's language, not only in the importer's English lines. A folder of the songs
+  alone imports them whatever the songs box says, and an app file has no songs box. The **Songs** page lists songs
+  imported before the game data, under its warning.
+- The command line's search takes the game host's folder unpacked into Downloads as the whole files, not as its parts.
+- An archive with the patch folder alone and the songs alone imports both, and an archive inside an archive no longer
+  keeps the parts beside it out.
+- `./opendmtq` runs on Docker 23, whose Compose has no `--progress` flag.
+- Linux and macOS: the one command stops when it cannot ask GitHub for the latest release, instead of installing the
+  newest untested code, and says how to start the server again when an update's download fails. `./opendmtq service`
+  keeps a path with spaces, `%` or `&` in it whole.
 
 ## [0.2.1] - 2026-11-07
 

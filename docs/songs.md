@@ -34,9 +34,8 @@ none yet (`--songs` and `--no-songs` answer for it). The import takes the music 
 list's tiles come with the game data, in the client's patch folder. Nothing else of the server files is taken. Without
 a song list among them, the import makes one from the game's own tables, for the songs whose music is there.
 
-The server's song list then follows what came in: with Docker Compose `./opendmtq import` restarts a running server,
-and a host install's server reads the new list at once. A phone with the app installed gets the new songs at its next start, with the
-client's tables it downloads then.
+With Docker Compose, `./opendmtq import` restarts a running server; a host install reads the new list at once. Installed
+apps get the new songs at their next start.
 
 Phones only see the songs the server has. The client's tables list every song of the game; at every start the
 server rebuilds them (`data/custom/web`) with the rows of the imported and added songs only, and its patch manifest

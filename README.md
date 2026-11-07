@@ -50,7 +50,7 @@ tar.exe -xf OpenDMTQ-windows.zip
 start .\OpenDMTQ\OpenDMTQ.exe
 ```
 
-**Linux or macOS:**
+**Debian, Ubuntu or macOS (Homebrew):**
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/main/host/get.sh | sh
@@ -64,16 +64,14 @@ cd openDMTQ
 ./opendmtq setup
 ```
 
-**Kubernetes:**
+**Kubernetes:** the Helm chart, with a volume for the game files and S3 storage:
+[install on a cluster](docs/kubernetes.md#install-on-a-cluster).
 
-```sh
-helm install opendmtq oci://ghcr.io/kanggu12/charts/opendmtq --set publicHost=<address>:8790
-```
+The setup takes you through your files, the address, an account for each player and the app: in the browser on
+Windows, Linux and macOS, in the terminal with Docker. On each Android phone, open the address it shows, sign in and
+install the app.
 
-The setup opens in your browser and takes you through your files, the address, an account for each player and the
-app. On each Android phone, open the address it shows, sign in and install the app.
-
-[Installing, step by step](docs/install.md): each system, the phones, everyday use, and what it runs on.
+[Installing, step by step](docs/install.md).
 
 ## Features
 

@@ -18,12 +18,12 @@ For each file it finds, the setup says what it is and whether it can be used, be
 line, `./opendmtq import --check <folder>` says the same.
 
 **Do I need to know how to program, or use a command line?**
-No. On Windows you unzip a folder and double-click a program, and the rest happens in the browser. On Linux or macOS one
-command starts the same setup.
+No. On Windows you paste four lines into PowerShell, and the rest happens in the browser. On Linux or macOS one command
+starts the same setup.
 
 **Does the computer have to stay on?**
 Only while people play. The server runs while its window is open on Windows, and you can have it start with the computer
-([on each Android phone](install.md#on-each-android-phone)).
+([everyday use](install.md#everyday-use)).
 
 **How big a computer does it need?**
 Two processor cores and 2 GB of memory; 4 GB leaves room for building the app. At rest the server takes about 170 MB,
@@ -39,9 +39,8 @@ them and restores them.
 
 **What happens to the data if I update OpenDMTQ?**
 Everything of yours is in the `data` folder and the `.env` file, and an update leaves those alone. On Windows, close the
-server's window, then unpack the new zip where you unpacked the first: its `OpenDMTQ` folder replaces the old one's
-program files and leaves `data` and `.env` alone. With the one command on Linux or macOS, run the same command again.
-With Docker, `git pull`, then `./opendmtq up`; `./opendmtq runtime` also brings the newest runtime for newer phones.
+server's window and run the same four lines again; on Linux or macOS, the same command ([installing](install.md)). With
+Docker, `git pull`, then `./opendmtq up`; `./opendmtq runtime` also brings the newest runtime for newer phones.
 
 ## Playing
 
