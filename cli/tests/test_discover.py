@@ -3,6 +3,7 @@
 import os
 import tempfile
 import unittest
+from unittest import mock
 
 from opendmtq_cli import discover
 
@@ -114,6 +115,19 @@ class FindTest(unittest.TestCase):
                 os.environ.update(saved)
             self.assertEqual(found[0], (whole, ["game.apk", "files"]))
             self.assertIn((desktop, ["technika-1.apk", "technika-2.apk"]), found)
+
+    def test_whole_server_files_come_before_the_patch_folder_alone(self):
+        with tempfile.TemporaryDirectory() as d:
+            # A client and the patch folder copied out in Downloads; a client and the whole files' archive on the Desktop.
+            downloads = os.path.join(d, "Downloads")
+            desktop = os.path.join(d, "Desktop")
+            os.makedirs(os.path.join(downloads, "phone_new", "1.003.005", "android", "table"))
+            os.makedirs(desktop)
+            touch(downloads, "dmtq.apk")
+            touch(desktop, "dmtq.apk", "DMTQ_server.rar")
+            with mock.patch.object(discover, "candidate_dirs", lambda: [downloads, desktop]):
+                found = discover.find()
+            self.assertEqual([folder for folder, _ in found], [desktop, downloads])
 
 
 if __name__ == "__main__":

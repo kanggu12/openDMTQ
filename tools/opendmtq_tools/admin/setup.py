@@ -301,16 +301,15 @@ def game_folder_in(path, listed=None):
             return path
         alone = path
     subs = [e.path for e in (listed if listed is not None else entries(path) or []) if is_dir(e)]
-    games = set()
     for sub in subs:
         if is_game_folder(sub):
             if importer.whole_host_folder(sub):
                 return sub
             alone = alone or sub
-            games.add(sub)
-    # Two levels down, past the folders that are the game's already.
+    # Two levels down, past the patch folders themselves: a folder that holds one may hold the whole files beside it,
+    # as the import finds them.
     for sub in subs:
-        if sub in games:
+        if importer.patch_itself(sub):
             continue
         for e in entries(sub) or []:
             if is_dir(e) and is_game_folder(e.path):
@@ -318,6 +317,14 @@ def game_folder_in(path, listed=None):
                     return e.path
                 alone = alone or e.path
     return alone
+
+
+def same_files(tree):
+    """What a folder of the game's server files is, to tell two places of the same files apart from two of the same
+    kind: its patch folder (a folder and the patch folder copied into it share one); the folder itself when it is gone
+    or changed since it was found."""
+    host = importer.host_folder(tree)
+    return (importer.patch_of(host) if host else None) or os.path.normpath(tree)
 
 
 def look_in(folder, listed=None):
@@ -409,15 +416,15 @@ def found_on_this_pc():
         # The same server files folder seen from two places (Downloads, and the folder in it): said once, by the folder
         # with files of its own beside it, else the one nearest to it. The same by their patch folder, which a folder
         # and the patch folder copied into it share.
-        best = {}
+        best, same = {}, {}
         for h in found:
             if h["tree"]:
-                same = importer.patch_of(importer.host_folder(h["tree"]))
+                same[id(h)] = same_files(h["tree"])
                 score = (bool(h["apks"] or h["archives"] or h["iphone"]), len(h["path"]))
-                if same not in best or score > best[same][0]:
-                    best[same] = (score, h)
+                if same[id(h)] not in best or score > best[same[id(h)]][0]:
+                    best[same[id(h)]] = (score, h)
         for h in found:
-            if h["tree"] and best[importer.patch_of(importer.host_folder(h["tree"]))][1] is not h:
+            if h["tree"] and best[same[id(h)]][1] is not h:
                 h["tree"] = None
         found = [h for h in found if h["apks"] or h["archives"] or h["iphone"] or h["tree"]]
         # A folder with both the client and the server files first, then by how much it has; the iPhone app alone last.

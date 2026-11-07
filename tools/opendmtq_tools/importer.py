@@ -117,12 +117,14 @@ def patch_itself(path):
 def patch_of(host):
     """The client's patch folder of a game host's folder, or None: its patch/phone_new, else the game data alone (the
     phone_new in host, or host itself), by what is in it: asked only of folders found already, whatever their names."""
-    standard = os.path.join(host, PATCH_DIR)
+    # Each in one spelling (normpath): the same folder found from two places compares equal, on Windows too, where
+    # PATCH_DIR's slash would sit beside the system's backslashes.
+    standard = os.path.join(host, PATCH_PARENT, PATCH_NAME)
     if os.path.isdir(standard):
-        return standard
+        return os.path.normpath(standard)
     for path in (os.path.join(host, PATCH_NAME), host):
         if is_patch_folder(path):
-            return path
+            return os.path.normpath(path)
     return None
 
 
@@ -328,16 +330,18 @@ def _put(src, dest):
         shutil.copyfile(src, dest)
 
 
-def keep_others(dest, parts):
+def keep_others(dest, parts, patch_only=False):
     """Start the content folder being built with the current content's files of the parts not imported now (linked,
-    not copied), so that importing the songs keeps the game data and the other way round."""
+    not copied), so that importing the songs keeps the game data and the other way round. patch_only: the files come
+    from the client's patch folder alone, which replaces that folder only: the rest of the game data stays (the
+    pictures of HOW TO PLAY and of the news)."""
     current = os.path.join(DATA, "content")
     if not os.path.isdir(current):
         return
     for d, _, files in os.walk(current):
         for f in files:
             rel = os.path.relpath(os.path.join(d, f), current).replace(os.sep, "/")
-            if part_of(rel) not in parts:
+            if part_of(rel) not in parts or (patch_only and not rel.startswith("web/patch/")):
                 _put(os.path.join(d, f), os.path.join(dest, rel))
 
 
@@ -459,35 +463,38 @@ def named(parts):
     return " and ".join(("game data" if p == "game" else "songs") for p in sorted(parts))
 
 
-def with_songs_only(parts, songs):
-    """The parts to take from files with this many songs: from none, not the songs, so that the server keeps the ones it
-    has (the game data alone does not empty its song list)."""
-    if songs or "songs" not in parts:
+def with_songs_only(parts, songs_folder):
+    """The parts to take from files with or without the songs' folder (DMQ): without, not the songs, so that the server
+    keeps the ones it has. The patch folder alone, or whole files copied without DMQ, would otherwise leave a song
+    list with nothing to play, or none at all."""
+    if songs_folder or "songs" not in parts:
         return parts
     log("  songs: none there, the songs on the server stay as they are")
     return parts - {"songs"}
 
 
-def import_folder(path, host, parts):
-    """Import the given parts from the game host's folder host, found at path."""
+def import_folder(path, host, parts, alone=False):
+    """Import the given parts from the game host's folder host, found at path. alone: it is the game data alone (the
+    patch folder copied by itself), which replaces the patch folder only."""
     where = path[len(IN):] if path.startswith(IN) else path[len(DATA):] if path.startswith(DATA) else path
     log(f"{named(parts)}: folder {where or '/'}")
-    parts = with_songs_only(parts, songs_in(host))
+    parts = with_songs_only(parts, os.path.isdir(os.path.join(host, "DMQ")))
     if not parts:
         return
     built = os.path.join(DATA, "content.new")
-    keep_others(built, parts)
+    keep_others(built, parts, patch_only=alone)
     counts = collect(host, built, parts, song_list_of(host))
     install_content(built)
     report(parts, counts)
 
 
-def import_archive(path, found, parts):
-    """Import the given parts from an archive, found: tree_in's answer for it. False when 7-Zip could not unpack it."""
+def import_archive(path, found, parts, alone=False):
+    """Import the given parts from an archive, found: tree_in's answer for it. False when 7-Zip could not unpack it.
+    alone: as import_folder's."""
     host, listed = found
     listing = archive_paths(path)
     log(f"{named(parts)}: {os.path.basename(path)} ({host or 'root'}), extracting")
-    parts = with_songs_only(parts, song_count(listing, host))
+    parts = with_songs_only(parts, any(m == host + "DMQ" or m.startswith(host + "DMQ/") for m in listing))
     if not parts:
         return True
     built = os.path.join(DATA, "content.new")
@@ -508,7 +515,7 @@ def import_archive(path, found, parts):
                 "an archive in parts needs all of them in one folder")
             return False
         # Extracted on the same disk as the content: linked across, then the extraction goes.
-        keep_others(built, parts)
+        keep_others(built, parts, patch_only=alone)
         counts = collect(os.path.join(tmp, host) if host else tmp, built, parts,
                          os.path.join(tmp, listed) if listed else None)
         install_content(built)
@@ -521,10 +528,10 @@ def import_archive(path, found, parts):
 
 
 def import_game_files(candidates, parts, inner=True, chosen=()):
-    """Import the given parts of the first game files folder or archive found: a folder before an archive, and the
-    whole files of either before the game data alone (the patch folder copied by itself). inner: an archive inside one
-    of the archives may hold them too (one level: deeper is no download anyone makes). chosen: the folders chosen for
-    the import (host_folder's chosen)."""
+    """Import the given parts of the first game files folder or archive found: the whole files before the game data
+    alone (the patch folder copied by itself), a folder before an archive, and an archive inside one of the archives
+    (inner) before the game data alone too: one level, deeper is no download anyone makes. chosen: the folders chosen
+    for the import (host_folder's chosen)."""
     # What an earlier run left when it was killed: gigabytes each, and nothing else ever removes them.
     if inner:
         for old in glob.glob(os.path.join(DATA, ".extract-*")) + glob.glob(os.path.join(DATA, "content.new")):
@@ -545,22 +552,27 @@ def import_game_files(candidates, parts, inner=True, chosen=()):
     for path in archives:
         found = whole_tree_in(archive_paths(path))
         if found is None:
-            # The game data alone waits for the whole files in the archives after it.
+            # The game data alone waits for the whole files in the archives after it, and in those inside them.
             alone_in = patch_alone_in(archive_paths(path))
             if alone_in is not None:
                 later.append((path, (alone_in, None)))
             continue
         if import_archive(path, found, parts):
             return True
+    if inner and import_inside(archives, parts):
+        return True
     for path, host in alone[:1]:
-        import_folder(path, host, parts)
+        import_folder(path, host, parts, alone=True)
         return True
     for path, found in later:
-        if import_archive(path, found, parts):
+        if import_archive(path, found, parts, alone=True):
             return True
-    if not inner:
-        return False
-    # One level down: an archive inside one of these (a .zip made of the .rar, say), with its parts if it has any.
+    return False
+
+
+def import_inside(archives, parts):
+    """import_game_files one level down: in an archive inside one of these (a .zip made of the .rar, say), with its
+    parts if it has any. True when it imported something."""
     for path in archives:
         inside = [m for m in archive_paths(path) if archive_role(m) and not m.lower().endswith(APK_BUNDLES)]
         if not any(archive_role(m) == "first" for m in inside):

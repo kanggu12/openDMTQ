@@ -316,6 +316,13 @@ class FilesOnThisPcTest(unittest.TestCase):
             os.makedirs(os.path.join(www, "DMQ", "Songs", "7"))
             inst.write("home/Downloads/server/www/DMQ/Songs/7/7.fpk", "m")
             self.assertEqual(setup.game_folder_in(downloads), www)
+            # A folder that holds the patch folder is looked into: the whole files may be beside it there.
+            stuff = inst.path("home/Documents/stuff")
+            os.makedirs(os.path.join(stuff, "patch", "phone_new", "1.003.005", "android", "table"))
+            os.makedirs(os.path.join(stuff, "server", "dmqglb.mb.pmang.com", "patch", "phone_new"))
+            self.assertEqual(setup.game_folder_in(inst.path("home/Documents")), os.path.join(stuff, "server"))
+            # A folder gone since it was found is still told apart from the others, by its own path.
+            self.assertEqual(setup.same_files(inst.path("home/gone")), os.path.normpath(inst.path("home/gone")))
 
     def test_each_file_is_said_for_what_it_is(self):
         with HostInstall() as inst:

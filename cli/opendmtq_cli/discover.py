@@ -52,23 +52,31 @@ def is_patch_folder(path):
     return any(CLIENT_VERSION.fullmatch(n) and os.path.isdir(os.path.join(path, n, "android", "table")) for n in names)
 
 
-def is_game_folder(path):
-    """True when path is an unpacked folder of the game's server files, whatever its name: with the game host's folder in
-    it, the game host's folder itself under any name, or an OpenDMTQ server's content folder (its web/); or the game
-    data alone, the client's patch folder in it by itself (patch/phone_new, phone_new) or path that folder."""
+def game_folder_kind(path):
+    """What path is of the game's server files, whatever its name: "whole" with the game host's folder in it, the game
+    host's folder itself under any name, or an OpenDMTQ server's content folder (its web/); "alone" for the game data
+    alone, the client's patch folder in it by itself (patch/phone_new) or path that folder (patch, phone_new); else
+    None."""
     if os.path.isdir(os.path.join(path, GAME_DIR)):
-        return True
+        return "whole"
     # Each folder asked once: the search asks this of every folder it passes.
     patch = os.path.join(path, PATCH_DIR)
     has_patch = os.path.isdir(patch)
     for here, there in ((path, has_patch), (os.path.join(path, "web"), None)):
         if (there if there is not None else os.path.isdir(os.path.join(here, PATCH_DIR))) and (
                 os.path.isdir(os.path.join(here, "DMQ")) or os.path.isdir(os.path.join(here, "viewImg"))):
-            return True
+            return "whole"
     # The patch folder alone, by what is in it; path itself looked into only when named as the client names it.
     name = os.path.basename(os.path.normpath(path))
-    return ((has_patch and is_patch_folder(patch)) or (name == PATCH_NAME and is_patch_folder(path))
-            or (name == PATCH_PARENT and is_patch_folder(os.path.join(path, PATCH_NAME))))
+    if ((has_patch and is_patch_folder(patch)) or (name == PATCH_NAME and is_patch_folder(path))
+            or (name == PATCH_PARENT and is_patch_folder(os.path.join(path, PATCH_NAME)))):
+        return "alone"
+    return None
+
+
+def is_game_folder(path):
+    """True when path is an unpacked folder of the game's server files, whole or the game data alone (game_folder_kind)."""
+    return game_folder_kind(path) is not None
 
 
 def is_archive(name):
@@ -122,10 +130,18 @@ def find():
             if hits:
                 found.append((folder, hits))
 
-    def has_client_and_files(hits):
-        # A client, and the server files beside it (an archive or an unpacked folder: anything but an APK).
-        return any(h.lower().endswith(APPS) for h in hits) and any(not h.lower().endswith(APPS) for h in hits)
+    def has_client(hits):
+        return any(h.lower().endswith(APPS) for h in hits)
 
-    # A folder with both the client and the server files first, then the one with the most of them.
-    found.sort(key=lambda f: (not has_client_and_files(f[1]), -len(f[1])))
+    def files(hits):
+        # The server files beside it (an archive or an unpacked folder: anything but an APK).
+        return [h for h in hits if not h.lower().endswith(APPS)]
+
+    def whole(folder, hits):
+        # Of them, the whole files: an archive, or a folder with more than the patch folder alone.
+        return any(is_archive(h) or game_folder_kind(os.path.join(folder, h)) == "whole" for h in files(hits))
+
+    # A folder with both the client and the whole server files first, then with the client and the game data alone,
+    # then the one with the most of them.
+    found.sort(key=lambda f: (not (has_client(f[1]) and whole(*f)), not (has_client(f[1]) and files(f[1])), -len(f[1])))
     return found

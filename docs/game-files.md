@@ -72,8 +72,8 @@ _info/songList.json                 a song list beside the folder or in it (opti
 
 A folder of another name counts when it has `patch/phone_new` and `DMQ` or `viewImg` in it. The patch folder copied by
 itself counts too (`patch`, `phone_new`, or a folder that holds one of them): it is what the game needs to start,
-without the songs. Only the game's data files are imported. Programs, databases and notes in the same folder or
-archive are left alone.
+without the songs, and it replaces only the server's patch folder. Only the game's data files are imported.
+Programs, databases and notes in the same folder or archive are left alone.
 
 The forms the import takes:
 
@@ -99,8 +99,8 @@ folder or in it, or `songs.json` beside a content folder) is used as it is.
 
 What the game needs to start is always imported; the songs only when you ask (**Import the songs too** in the setup,
 `--songs` on the command line). Without them the game starts with an empty song list, and songs imported later reach
-the installed apps at their next start. Files without songs, such as the patch folder alone, leave the songs on the
-server as they are. If part of what the game needs to start is missing, the setup's lamp turns red
+the installed apps at their next start. Files without the songs' folder (`DMQ`), such as the patch folder alone, leave
+the songs on the server as they are. If part of what the game needs to start is missing, the setup's lamp turns red
 and `./opendmtq doctor` names the files: import the whole server files again.
 
 ## Check before you import

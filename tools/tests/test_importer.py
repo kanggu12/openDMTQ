@@ -241,7 +241,7 @@ class OnlyTest(unittest.TestCase):
 
             said = []
             listing = [importer.SONG_LIST, importer.GAME_DIR + "/a"]
-            with mock.patch.multiple(importer, DATA=data, IN=src, archive_paths=lambda p: listing, keep_others=lambda *a: None,
+            with mock.patch.multiple(importer, DATA=data, IN=src, archive_paths=lambda p: listing, keep_others=lambda *a, **kw: None,
                                      collect=lambda *a: {}, install_content=lambda *a: None, report=lambda *a: None,
                                      log=said.append), \
                     mock.patch.object(importer.subprocess, "run", run):
@@ -430,18 +430,47 @@ class GameDataAloneTest(unittest.TestCase):
         self.assertTrue(importer.import_game_files(list(importer.walk(chosen)), {"game"}))
         self.assertEqual(content_files(self.data), self.GAME_DATA)
 
-    def test_with_the_songs_asked_for_the_servers_songs_stay(self):
-        # The setup asks for the songs unless told not to: files without any must not empty the song list.
+    def test_over_a_whole_import_it_replaces_the_patch_folder_only(self):
+        # The setup asks for the songs unless told not to: files without any must not empty the song list. Nor does the
+        # patch folder take the game data's other pictures (HOW TO PLAY, the news) with it.
         importer.import_game_files([self.whole], {"game", "songs"})
-        songs = {f for f in content_files(self.data) if importer.part_of(f) == "songs"}
-        self.assertIn("web/DMQ/Songs/1/1.fpk", songs)
+        before = content_files(self.data)
+        self.assertIn("web/DMQ/Songs/1/1.fpk", before)
+        self.assertIn("web/static/dmq/banner/x/howtoplay_play.png", before)
         self.copy_patch("only/patch/phone_new")
+        # A newer patch folder: a table more, the screens' bundle gone.
+        write(os.path.join(self.tmp, "only"), {"patch/phone_new/1.003.005/android/table/us/song_new.csv.lz4": "table"})
+        os.remove(os.path.join(self.tmp, "only/patch/phone_new/1.003.005/android/dlc/d3_a0.unity3d.lz4"))
         self.assertTrue(importer.import_game_files([os.path.join(self.tmp, "only")], {"game", "songs"}))
-        self.assertEqual(content_files(self.data), songs | self.GAME_DATA)
+        self.assertEqual(content_files(self.data),
+                         before - {"web/patch/phone_new/1.003.005/android/dlc/d3_a0.unity3d.lz4"}
+                         | {"web/patch/phone_new/1.003.005/android/table/us/song_new.csv.lz4"})
         self.assertIn("  songs: none there, the songs on the server stay as they are", self.said)
         # Asked for the songs alone, it takes nothing at all.
+        after = content_files(self.data)
         self.assertTrue(importer.import_game_files([os.path.join(self.tmp, "only")], {"songs"}))
-        self.assertEqual(content_files(self.data), songs | self.GAME_DATA)
+        self.assertEqual(content_files(self.data), after)
+
+    def test_whole_files_without_the_songs_folder_keep_the_servers_songs_too(self):
+        # The host folder copied without DMQ (the songs are most of its size), its song list beside it.
+        importer.import_game_files([self.whole], {"game", "songs"})
+        songs = {f for f in content_files(self.data) if importer.part_of(f) == "songs"}
+        lean = os.path.join(self.tmp, "lean")
+        shutil.copytree(self.whole, lean, ignore=lambda d, names: ["DMQ"] if d.endswith(importer.HOST) else [])
+        self.assertTrue(importer.import_game_files([lean], {"game", "songs"}))
+        self.assertTrue(songs <= content_files(self.data))
+        with open(os.path.join(self.data, "content", "songs.json"), encoding="utf-8") as f:
+            self.assertEqual([s["song_id"] for s in json.load(f)], [1, 2])
+
+    def test_a_song_list_with_an_empty_songs_folder_comes_in(self):
+        # As the pages' stand-in files have it: the songs' folder there, empty, and the list beside the folder.
+        stand_in = os.path.join(self.tmp, "stand-in")
+        write(stand_in, {importer.SONG_LIST: json.dumps([{"song_id": 7, "name": "listed"}]),
+                         importer.HOST + "/patch/phone_new/1.003.005/android/patch_new.csv.lz4": "manifest"})
+        os.makedirs(os.path.join(stand_in, importer.HOST, "DMQ", "Songs"))
+        self.assertTrue(importer.import_game_files([stand_in], {"game", "songs"}))
+        with open(os.path.join(self.data, "content", "songs.json"), encoding="utf-8") as f:
+            self.assertEqual(json.load(f), [{"song_id": 7, "name": "listed"}])
 
     def test_whole_files_beside_it_come_first(self):
         # A patch folder copied out on its own, and the whole files unpacked further down.
@@ -607,6 +636,16 @@ class ArchiveFormsTest(unittest.TestCase):
     def test_whole_files_in_an_archive_before_a_patch_folder_alone_beside_it(self):
         tree = self.files()
         self.pack(os.path.join(self.src, "dmtq.7z"), tree)
+        shutil.copytree(os.path.join(tree, importer.GAME_DIR), os.path.join(self.src, "patch", "phone_new"))
+        self.assertTrue(importer.import_game_files(list(importer.walk(self.src)), {"game", "songs"}))
+        self.assertIn("web/DMQ/Songs/1/1.fpk", content_files(self.data))
+
+    def test_whole_files_in_an_archive_inside_an_archive_before_a_patch_folder_alone(self):
+        tree = self.files()
+        inner = os.path.join(self.tmp, "inner")
+        os.makedirs(inner)
+        self.pack(os.path.join(inner, "server-files.7z"), tree)
+        self.pack(os.path.join(self.src, "download.zip"), inner)
         shutil.copytree(os.path.join(tree, importer.GAME_DIR), os.path.join(self.src, "patch", "phone_new"))
         self.assertTrue(importer.import_game_files(list(importer.walk(self.src)), {"game", "songs"}))
         self.assertIn("web/DMQ/Songs/1/1.fpk", content_files(self.data))
