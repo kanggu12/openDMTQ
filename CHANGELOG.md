@@ -15,6 +15,8 @@ one that only fixes raises the patch number. Each release's section here is its 
   frame rate kept, a 32-bit screen and textures at full size. Like 1.3.4, it drew at the low resolution on every
   phone.
 - With both versions imported, a server's first app is built from 1.3.5, the newer one.
+- Every server builds its app again at its next start, as the patcher changed: one built from 1.3.5 gets these fixes,
+  one built from 1.3.4 the same app as before.
 - This changelog. Each release's notes are its section here, and a release whose tag, chart and changelog name
   different versions stops before anything is built.
 

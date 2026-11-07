@@ -29,7 +29,7 @@ import zipfile
 from . import axml, filelock, il2cpp, pack_arm64, qr, unity_assets
 
 # Tool version stamped into the manifest, so a portal can tell which patcher made an APK.
-VERSION = "1.10.0"
+VERSION = "1.11.0"
 # data/apk: base/ in, out/ and keystore/ written. The image mounts it at /apk; a host install names it.
 APK_DIR = os.environ.get("OPENDMTQ_APK", "/apk")
 # Pinned tools: baked into the image, fetched into .host/ by a host install (host/install.sh).
