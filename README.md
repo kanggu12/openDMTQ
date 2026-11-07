@@ -40,6 +40,12 @@ it, and your friends install that copy from the server's web page.
 ## Quick start
 
 You need your own copy of the game's Android app (`.apk`) and its server files: [what each has to be](docs/game-files.md).
+Phones play on Android, on the same Wi-Fi as the server or [over the internet](docs/internet.md);
+[iPhones cannot](docs/game-files.md#iphones). The setup says what each file is before it imports anything.
+
+<p align="center">
+  <img src="docs/images/setup.jpg" alt="The setup in the browser: the game's Android app and the server files found in Downloads, each labeled with what it is, with a button to import them" width="100%">
+</p>
 
 **Windows 10 or 11**, in Windows PowerShell:
 
@@ -49,6 +55,9 @@ curl.exe -LO https://github.com/kanggu12/openDMTQ/releases/latest/download/OpenD
 tar.exe -xf OpenDMTQ-windows.zip
 start .\OpenDMTQ\OpenDMTQ.exe
 ```
+
+The server runs while its window is open. When Windows Firewall asks, allow it on private networks, and set your Wi-Fi
+to Private if it is public.
 
 **Debian, Ubuntu or macOS (Homebrew):**
 
@@ -72,6 +81,14 @@ Windows, Linux and macOS, in the terminal with Docker. On each Android phone, op
 install the app.
 
 [Installing, step by step](docs/install.md).
+
+### What it runs on
+
+| | Minimum | Recommended |
+|---|---|---|
+| **Server** | 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker; 2 GB of memory | 2 cores, 4 GB |
+| **Disk** | 1 GB without the songs | 7 GB with every song |
+| **Phones** | Android 5.0 | Android 8 or newer to broadcast |
 
 ## Features
 
