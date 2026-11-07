@@ -149,7 +149,7 @@ expect "the setup starts the import" test -n "$job"
 state=$(follow "$job" | tail -n 1)
 expect "the import ends well ($state)" test "$state" = "done"
 files=$(web "$admin" "$A/setup?step=files")
-expect "the files step has what the game needs to start" have "What the game needs to start" <<<"$files"
+expect "the files step has the game data" have "Game data" <<<"$files"
 expect "the files step has the songs" have "Songs" <<<"$files"
 expect "with the game's files in, the server is healthy" is 200 "http://127.0.0.1:$PORT/opendmtq/health.php"
 expect "a song's jacket is served from the imported content" is 200 "http://127.0.0.1:$PORT/viewImg/eye/fixture1.png"
