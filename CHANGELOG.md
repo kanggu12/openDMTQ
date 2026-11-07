@@ -6,13 +6,15 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-07
+
 ### Added
 
 - Version 1.3.5 of the game gets every fix 1.3.4 gets, as released or changed for another server: no notice at every
   start, no question before the first download, the shop opening on its MAX tab, the panel's own resolution, a menu's
   frame rate kept, a 32-bit screen and textures at full size. Like 1.3.4, it drew at the low resolution on every
   phone.
-- With both versions imported, the app is built from 1.3.5, the newer, until it has been built from one of them.
+- With both versions imported, a server's first app is built from 1.3.5, the newer one.
 - This changelog. Each release's notes are its section here, and a release whose tag, chart and changelog name
   different versions stops before anything is built.
 
@@ -86,7 +88,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 - Four ways to run it: the Windows bundle, one command on Linux or macOS, Docker Compose, and a Helm chart for
   Kubernetes.
 
-[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kanggu12/openDMTQ/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/kanggu12/openDMTQ/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/kanggu12/openDMTQ/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/kanggu12/openDMTQ/compare/v0.1.0...v0.1.1
