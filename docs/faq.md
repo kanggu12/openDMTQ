@@ -23,12 +23,12 @@ command starts the same setup.
 
 **Does the computer have to stay on?**
 Only while people play. The server runs while its window is open on Windows, and you can have it start with the computer
-([everyday use, in the README](../README.md#on-each-android-phone)).
+([on each Android phone](install.md#on-each-android-phone)).
 
 **How big a computer does it need?**
 Two processor cores and 2 GB of memory; 4 GB leaves room for building the app. At rest the server takes about 170 MB,
 and two cores serve hundreds of requests a second ([measured](../README.md#fast-on-little-hardware)). Disk: about 1 GB,
-plus the songs. [What it runs on](../README.md#what-it-runs-on) has the details and the phones.
+plus the songs. [What it runs on](install.md#what-it-runs-on) has the details and the phones.
 
 **Can friends outside my home play?**
 Yes, with a host name and one forwarded port: [Playing from outside your home](internet.md).
@@ -64,8 +64,8 @@ warn about an app it does not know. It is the game's own app, with the server's 
 phones.
 
 **The game shows no songs.**
-The song list is empty until the songs are imported: on the admin pages, **Songs**, **Choose the folder**, with
-**Import the songs too** ticked.
+The song list is empty until the songs are imported: on the admin pages, **Songs**, **Choose the folder**, then the
+server files or their `DMQ` folder alone, with **Import the songs too** ticked.
 
 ## Privacy
 

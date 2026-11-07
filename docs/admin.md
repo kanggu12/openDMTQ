@@ -41,9 +41,10 @@ is at `/opendmtq/admin/setup`, and the status page leads there until every step 
 1. **Game files.** The game's Android app and the server files, found in Downloads, on the Desktop and in Documents
    (OneDrive's too), or anywhere else on the PC: type or paste the path of the folder, archive or file, or click your
    way to it. Each file found or listed says what it is (the app and its version, a copy changed for another server,
-   server files and their songs, the iPhone app, a part of an archive, one that cannot be read), and one of no use
-   cannot be imported ([the forms each may come in](game-files.md)). The import takes the app and what the game needs to
-   start, the songs too when their box is ticked, then makes the song list. Its output shows as it goes.
+   server files and their songs, the game data or the songs alone, the iPhone app, a part of an archive, one that
+   cannot be read), and one of no use cannot be imported ([the forms each may come in](game-files.md)). The import takes
+   the app and the game data, the songs too when their box is ticked, each from where it is, then makes the song list.
+   The songs can also come later, on their own. Its output shows as it goes.
 2. **Address.** The address phones use, which goes into the app: this PC's address on its network. A PC with several
    (wired and Wi-Fi) offers each. A new one is written to `.env`, and the server starts again for it.
 3. **Players.** An account for each player, its password shown once with the message to send.

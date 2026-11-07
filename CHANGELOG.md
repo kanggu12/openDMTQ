@@ -6,6 +6,27 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+### Added
+
+- The songs on their own: the server files' `DMQ` folder, with `viewImg` for the jackets and `_info` for the song list
+  or without them, imports as the songs onto the game data the server has, in the setup, on the **Songs** page and
+  with `./opendmtq import --songs`. The game data and the songs may also come from two places in one import.
+- The setup shows the game data and the songs as two things to import, and names each folder it finds for what it
+  holds: the server files, the game data, or the songs.
+- An install guide, `docs/install.md`, with each system step by step; the README's quick start is the commands alone,
+  and on Windows four lines for PowerShell.
+
+### Changed
+
+- The songs' previews and their tiles in the song list come with the game data, in the patch folder they are in, so
+  songs imported later have them. Without songs, a phone's first download is about 22 MB larger.
+
+### Fixed
+
+- `./opendmtq import` of the `DMQ` folder itself takes the jackets and the song list beside it too.
+- A client table that cannot be read no longer stops the import: the song list made from it is empty, and the import
+  says why.
+
 ## [0.2.1] - 2026-11-07
 
 ### Fixed

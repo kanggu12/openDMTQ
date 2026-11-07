@@ -47,13 +47,13 @@ When the game does not start or shows no songs, this chart leads to the right se
 
 - **No game data.** The game cannot start without the client's tables and the images of its screens, which it downloads
   from the server. The server reports itself unhealthy until they are imported (`./opendmtq doctor` says so, and so does
-  `/opendmtq/health.php`). They are in the server files (see [What you need](../README.md#what-you-need)). On Windows
-  and on a host install, import them on the admin pages: **Songs**, **Choose the folder**. With Docker Compose:
-  `./opendmtq import <folder with your game files>`.
+  `/opendmtq/health.php`). They are the server files' `patch/phone_new` folder
+  ([what you need](install.md#what-you-need)). On Windows and on a host install, import them on the admin pages:
+  **Songs**, **Choose the folder**. With Docker Compose: `./opendmtq import <folder with your game files>`.
 - **No songs.** With the game data and no songs, the game starts with an empty song list. Import them the same way with
-  **Import the songs too** ticked (with Docker Compose, `./opendmtq import --songs <folder>`), or add songs one by one
-  on the admin pages ([songs.md](songs.md)). The app does not need to be rebuilt: an installed app gets the songs at its
-  next start.
+  **Import the songs too** ticked, from the server files or their `DMQ` folder alone (with Docker Compose,
+  `./opendmtq import --songs <folder>`), or add songs one by one on the admin pages ([songs.md](songs.md)). The app
+  does not need to be rebuilt: an installed app gets the songs at its next start.
 
 ## The app installs but cannot connect
 
@@ -111,8 +111,9 @@ archive can be imported as it is, or unpacked first; one in parts needs every pa
 
 Each file the setup lists says what it is, and `./opendmtq import --check <folder>` does the same on the command line.
 The server files are found by what is in them: a folder with the game's `patch/phone_new` in it, under any name, with or
-without a song list. The Android app may be the original or a copy changed for another server; the iPhone app is not
-used, nor is an app OpenDMTQ built. [The game's files](game-files.md) has every form the import takes.
+without a song list, or the songs' `DMQ` folder alone. The Android app may be the original or a copy changed for
+another server; the iPhone app is not used, nor is an app OpenDMTQ built. [The game's files](game-files.md) has every
+form the import takes.
 
 ## The setup's link does not sign in
 

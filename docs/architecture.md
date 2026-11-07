@@ -137,12 +137,13 @@ logins and the start batch.
 OpenDMTQ ships none of the game's files. `./opendmtq import` takes them from the owner's
 folder or archive, a copy of the game's server files with the game host's `patch/phone_new` in it (under any folder
 name, with or without a song list: [the forms](game-files.md#the-server-files)), in two parts that can each come on
-their own:
+their own, from the same files or from two places (the patch folder alone, the `DMQ` folder alone). Each replaces only
+what it has:
 
 | Part | What | Into `data/content` |
 |---|---|---|
-| Game data | The client's tables, the image bundles of its screens, its fonts, the news images | `web/patch`, `web/static`, `web/viewImg` |
-| Songs (`--songs`) | Music, videos, charts, jackets, previews, the song list's tiles, the song list | `web/DMQ`, `web/viewImg/eye`, previews and tiles in `web/patch`, `songs.json` |
+| Game data | The client's patch folder (its tables, the image bundles of its screens, its fonts, every song's preview and tile), the news images, the pictures of HOW TO PLAY | `web/patch`, `web/static`, `web/viewImg` |
+| Songs (`--songs`) | Music, videos, charts, jackets, the song list | `web/DMQ`, `web/viewImg/eye`, `songs.json` |
 
 <p align="center">
   <img src="images/fig-content-flow.svg" alt="The content. The import takes your APK into data/apk/base, and the game data and, with --songs, the songs from your server files into data/content, read only. A song package added on the admin pages goes to data/custom with the hidden flags. songs.py rebuilds the song list and the client's tables into data/custom before every start; phones download what changed, from data/custom first, otherwise from data/content" width="100%">

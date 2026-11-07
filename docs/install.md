@@ -1,0 +1,143 @@
+# Installing
+
+Each way to run OpenDMTQ, step by step. The [quick start](../README.md#quick-start) has the short version of each.
+
+All four run the same server. Phones join over the same Wi-Fi, or over the internet once the server is
+[reachable from outside](internet.md).
+
+## What you need
+
+- **The game's Android app** (`.apk`, any file name). Version 1.3.5 or 1.3.4, original or changed for another server,
+  gets every fix; other versions play the same, with a few screens as the game had them. It may be in an archive, an
+  `.xapk` or an `.apks`. Phones play on Android; [iPhones cannot](game-files.md#iphones).
+- **The game data**: the server files' `patch/phone_new` folder, in a folder or an archive (`.zip`, `.7z`, `.rar`,
+  also in parts).
+- **The songs**, if you want them: the server files' `DMQ` folder, with `viewImg` for the jackets. With the game data,
+  as the server files come, or later on their own.
+
+The setup says what each file is before it imports anything. [The game's files](game-files.md) has every form it
+accepts.
+
+<p align="center">
+  <img src="images/setup.jpg" alt="The setup in the browser: the game's Android app and the server files found in Downloads, each labeled with what it is, with a button to import them" width="100%">
+</p>
+
+## Windows
+
+Windows 10 or 11. Paste into **Windows PowerShell**:
+
+```powershell
+cd ~
+curl.exe -LO https://github.com/kanggu12/openDMTQ/releases/latest/download/OpenDMTQ-windows.zip
+tar.exe -xf OpenDMTQ-windows.zip
+start .\OpenDMTQ\OpenDMTQ.exe
+```
+
+It unpacks to `C:\Users\<you>\OpenDMTQ` and starts the server, and the setup opens in your browser. It finds your
+files in Downloads, on the Desktop or in Documents, or takes the path you paste. It then asks for the address phones
+use and an account for each player, and builds the app.
+
+- **Windows Firewall** asks about Apache: allow it on private networks. If your Wi-Fi is a public network, set it to
+  **Private** in Settings, or phones cannot connect.
+- **The server runs while its window is open.** To stop it, close the window, or press **Stop the server** under
+  **Maintenance** on the admin pages. To start it again, `start ~\OpenDMTQ\OpenDMTQ.exe`, or double-click it.
+- **To update**, close its window and run the same four lines again. The new files replace the program's; your `data`
+  folder and `.env` stay.
+
+<details>
+<summary>Without PowerShell</summary>
+
+Download `OpenDMTQ-windows.zip` from [Releases](https://github.com/kanggu12/openDMTQ/releases/latest) and unpack it
+outside OneDrive and Program Files, for example to `C:\OpenDMTQ`. Start `OpenDMTQ.exe`. If Windows says it protected
+your PC, click **More info**, then **Run anyway**: OpenDMTQ.exe is not signed by a publisher Windows knows.
+
+Each release has `OpenDMTQ-windows.zip.sha256` beside the zip. In PowerShell, compare `Get-FileHash
+OpenDMTQ-windows.zip` with it; on Linux, run `sha256sum -c OpenDMTQ-windows.zip.sha256`.
+</details>
+
+## Linux or macOS
+
+Debian, Ubuntu, or a Mac with [Homebrew](https://brew.sh):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/main/host/get.sh | sh
+```
+
+It downloads OpenDMTQ into `~/openDMTQ`, installs Apache, PHP, Java and Python from the system's packages, starts the
+server and opens the same setup in the browser. It asks for your password (sudo) to install packages; without a screen
+it prints the setup's address instead. Running it again updates OpenDMTQ.
+
+```sh
+cd ~/openDMTQ
+./opendmtq status     # the address and how the server is
+./opendmtq stop
+./opendmtq start
+./opendmtq service    # start with the computer
+```
+
+On another Linux, use Docker.
+
+## Docker
+
+Docker 23 or newer with Compose, and Python 3.9 or newer:
+
+```sh
+git clone https://github.com/kanggu12/openDMTQ.git
+cd openDMTQ
+./opendmtq setup
+```
+
+It finds the game files in Downloads or on the Desktop by a name with `dmtq`, `djmax` or `technika` in it, starts the
+server, builds the app, checks it all and ends with a QR code for phones. Files of another name or in another place:
+
+```sh
+./opendmtq setup --from ~/games/dmtq
+```
+
+Sign in to the admin pages as `admin` with `ADMIN_PASSWORD` from `.env`, and make an account for each player. To
+update, `git pull`, then `./opendmtq up`.
+
+## Kubernetes
+
+```sh
+helm install opendmtq oci://ghcr.io/kanggu12/charts/opendmtq --set publicHost=game.example.com:8790
+```
+
+The game files go on the chart's volume first: see [Kubernetes](kubernetes.md).
+
+## On each Android phone
+
+Each player needs an account: make them in the setup, or later on the admin pages' **Accounts** page.
+
+1. In Chrome or Samsung Internet, open the server's address exactly as the setup shows it, or scan its QR code. Not
+   inside a messenger app.
+2. Sign in with the player's account, tap **Download app (.apk)** and install it. Allow installs from the browser when
+   Android asks.
+3. Start the game and allow storage access. It downloads its data from the server on the first start.
+
+## Everyday use
+
+| To | Windows | Linux or macOS | Docker |
+|---|---|---|---|
+| Start | `OpenDMTQ.exe` | `./opendmtq start` | `./opendmtq up` |
+| Stop | close the window | `./opendmtq stop` | `./opendmtq down` |
+| See the address | the window shows it | `./opendmtq status` | `./opendmtq status` |
+| Start with the computer | a shortcut in `shell:startup` | `./opendmtq service` | `RESTART=unless-stopped` in `.env` |
+| Import songs | admin pages, **Songs** | admin pages, **Songs** | `./opendmtq import --songs <folder>` |
+
+Everything else is on the admin pages: the app, songs, players, accounts, recordings and backups.
+
+## What it runs on
+
+| | Minimum | Recommended |
+|---|---|---|
+| **Server** | 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker; 2 GB of memory | 2 cores, 4 GB |
+| **Disk** | 1 GB without the songs | 7 GB with every song |
+| **Phones** | Android 5.0 | Android 8 or newer to broadcast |
+
+At rest the server takes about 170 MB of memory, and up to 1.6 GB for half a minute while it builds the app. The game
+data takes about 120 MB and the songs 4.5 GB; each app build about 110 MB, the last ten kept. Broadcast recordings take
+up to 20 GB more.
+
+Tested on Windows Server 2022 and Wine, Debian 12, Ubuntu 24.04, Docker on Linux and a three-node Kubernetes cluster,
+with a Galaxy S26 Ultra (Android 17, no 32-bit support) and the Android 11 emulator.

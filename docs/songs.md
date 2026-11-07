@@ -10,27 +10,29 @@ song list.
 
 ## Importing the songs
 
-The songs are in the same server files as the game data: a folder or an archive with the game's `patch/phone_new`
-folder in it ([the forms it may come in](game-files.md#the-server-files)).
+The songs are the server files' `DMQ` folder, with their jackets in `viewImg` and the song list in `_info`: in the
+server files as they come, or on their own ([the forms they may come in](game-files.md#the-songs-on-their-own)). They
+need the game data on the server, imported with them or before.
 
-On Windows and on a host install, the admin pages import them: **Songs**, **Choose the folder**, then the folder or
-the archive, with **Import the songs too** ticked. The setup looks for them in Downloads, on the Desktop and in
-Documents first. An import replaces the songs imported before; songs added as packages stay, and files without the
-songs' folder (`DMQ`) change none.
+On Windows and on a host install, the admin pages import them: **Songs**, **Choose the folder**, then the `DMQ` folder,
+the folder that holds it, or the server files' folder or archive, with **Import the songs too** ticked. The setup looks
+for them in Downloads, on the Desktop and in Documents first. An import replaces the songs imported before; songs added
+as packages stay, and files without the songs' folder (`DMQ`) change none.
 
 On the command line they are imported on their own:
 
 ```sh
 ./opendmtq import --songs <folder or archive>
+./opendmtq import --songs ~/Downloads/DMQ                      # the songs' folder alone
 ./opendmtq import --songs --no-game-data <folder or archive>   # the songs only, the game data as it is
 ```
 
 The same commands work with Docker Compose and on a host install; on Windows they are `OpenDMTQ.exe import --songs
 <folder>` in a terminal. With Docker Compose, `./opendmtq setup` asks whether to import the songs when the server has
 none yet (`--songs` and `--no-songs` answer for it). The import takes the music and videos (`DMQ/Songs`), the charts
-(`DMQ/Patterns`), the jackets (`viewImg/eye`), the previews and the song list's tiles from the client's patch folder,
-and the song list itself, into `data/content`. Nothing else of the server files is taken. Without a song list among
-them, the import makes one from the game's own tables, for the songs whose music is there.
+(`DMQ/Patterns`), the jackets (`viewImg/eye`) and the song list itself into `data/content`; the previews and the song
+list's tiles come with the game data, in the client's patch folder. Nothing else of the server files is taken. Without
+a song list among them, the import makes one from the game's own tables, for the songs whose music is there.
 
 The server's song list then follows what came in: with Docker Compose `./opendmtq import` restarts a running server,
 and a host install's server reads the new list at once. A phone with the app installed gets the new songs at its next start, with the

@@ -7,8 +7,8 @@ Please use only files you have the right to use.
 | | Needed | What it gives |
 |---|---|---|
 | [The Android app](#the-android-app) | Yes | Every phone's app is built from it |
-| [The server files](#the-server-files): what the game needs to start | Yes | The game's tables, the images of its screens, its fonts (about 60 MB) |
-| [The server files](#the-server-files): the songs | No | Music, charts, jackets and previews; without them the song list is empty |
+| [The game data](#the-server-files): the server files' `patch/phone_new` | Yes | The game's tables, the images of its screens, its fonts, every song's preview and tile (about 120 MB) |
+| [The songs](#the-songs-on-their-own): the server files' `DMQ`, with `viewImg` | No | Music, charts and jackets (4.5 GB); without them the song list is empty |
 
 ## The Android app
 
@@ -57,23 +57,21 @@ then the copy imported last. `BASE_APK=<file name>` in `.env` chooses another.
 
 ## The server files
 
-The game's files as its server kept them. What counts is the folder of the game's host, under its own name the game
-host's own name or any other:
+The game's files as its server kept them. What counts is the folder of the game's host, under its own name or any
+other, and in it the game data and the songs, together or apart:
 
 ```text
 game host folder/                  any name: what counts is what is inside
-    patch/phone_new/<version>/      what the game needs to start: its tables, screens and fonts
-    DMQ/Songs/<id>/                 the songs' music and videos (optional)
-    DMQ/Patterns/                   their charts (optional)
-    viewImg/                        jackets and pictures
+    patch/phone_new/<version>/      the game data: its tables, screens and fonts, every song's preview and tile
+    DMQ/Songs/<id>/                 the songs: their music and videos
+    DMQ/Patterns/                   their charts
+    viewImg/                        their jackets (eye), and the pictures of the news
     static/                         the pictures of HOW TO PLAY
 _info/songList.json                 a song list beside the folder or in it (optional)
 ```
 
-A folder of another name counts when it has `patch/phone_new` and `DMQ` or `viewImg` in it. The patch folder copied by
-itself counts too (`patch`, `phone_new`, or a folder that holds one of them): it is what the game needs to start,
-without the songs, and it replaces only the server's patch folder. Only the game's data files are imported.
-Programs, databases and notes in the same folder or archive are left alone.
+A folder of another name counts when it has `patch/phone_new` and `DMQ` or `viewImg` in it. Only the game's data files
+are imported. Programs, databases and notes in the same folder or archive are left alone.
 
 The forms the import takes:
 
@@ -84,24 +82,37 @@ The forms the import takes:
 | An archive in parts, every part in one folder | `files.7z.001`, `files.part1.rar`, `files.zip.001`, `files.rar` with `files.r00` |
 | An archive inside an archive | a `.zip` that holds a `.7z` (one level) |
 | The content folder of another OpenDMTQ server | `content/web/...` with `content/songs.json` |
-| Only what the game needs to start | `patch/phone_new`, `phone_new`, or an archive of either |
+| The game data alone | `patch/phone_new`, `phone_new`, or an archive of either |
+| The songs alone | `DMQ` (with `viewImg` and `_info` beside it, or without), or an archive of them |
 
-For an archive in parts, choose its first part, or the folder that holds the parts. When a folder holds several of
-these, the whole server files come before the patch folder alone.
+For an archive in parts, choose its first part, or the folder that holds the parts. When a folder holds the whole
+server files and parts of them, the whole files come first. When it holds the game data alone and the songs alone in
+two places, each comes from its own.
+
+### The songs on their own
+
+The game data is all the game needs to start: with it alone, the song list is empty. The songs can come in the same
+import (**Import the songs too** in the setup, `--songs` on the command line), or later on their own: choose the `DMQ`
+folder, or the folder that holds it with `viewImg` for the jackets, in the setup or on the admin pages' **Songs** page.
+On the command line:
+
+```sh
+./opendmtq import --songs ~/Downloads/DMQ
+```
+
+Each part of the files replaces only what it has. The game data alone replaces the server's patch folder; the songs
+alone replace the songs, their list, and their jackets when they come with jackets. Files without the songs' folder
+(`DMQ`) leave the songs on the server as they are. Songs imported later reach the installed apps at their next start.
+
+If part of what the game needs to start is missing, the setup's lamp turns red and `./opendmtq doctor` names the files:
+import the game data again.
 
 ### The song list
 
 The list is optional. Without one, the import makes it from the game's own tables, for the songs whose music is there,
-with the charts whose files are there. A list that comes with the files (`_info/songList.json` beside the game host's
-folder or in it, or `songs.json` beside a content folder) is used as it is.
-
-### Without the songs
-
-What the game needs to start is always imported; the songs only when you ask (**Import the songs too** in the setup,
-`--songs` on the command line). Without them the game starts with an empty song list, and songs imported later reach
-the installed apps at their next start. Files without the songs' folder (`DMQ`), such as the patch folder alone, leave
-the songs on the server as they are. If part of what the game needs to start is missing, the setup's lamp turns red
-and `./opendmtq doctor` names the files: import the whole server files again.
+with the charts whose files are there: the tables of the files given, or for the songs alone those of the game data on
+the server. A list that comes with the files (`_info/songList.json` beside the game host's folder or in it, or
+`songs.json` beside a content folder) is used as it is.
 
 ## Check before you import
 
@@ -126,7 +137,8 @@ no   old.zip: 7-Zip cannot read it: damaged, or split in parts with one missing
 | It says | What to do |
 |---|---|
 | `base APK: none found` | No Android app of the game there. Check the file with `--check`; the iPhone app does not work |
-| `game files: none found` | No folder with `patch/phone_new` in it. Choose the folder or archive that has it, or a folder above |
+| `game files: none found` | No folder with `patch/phone_new` or `DMQ` in it. Choose the folder or archive that has it, or a folder above |
+| `the song list needs the game data's tables` | The songs alone came before the game data. Import the game data, then the songs again |
 | `7-Zip cannot list it` | The archive is damaged, or a part of it is missing. Put every part in one folder |
 | `an app OpenDMTQ built` | Import the client that app was built from |
 
