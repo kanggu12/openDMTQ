@@ -8,6 +8,11 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ### Added
 
+- Version 1.3.5 of the game gets every fix 1.3.4 gets, as released or changed for another server: no notice at every
+  start, no question before the first download, the shop opening on its MAX tab, the panel's own resolution, a menu's
+  frame rate kept, a 32-bit screen and textures at full size. Like 1.3.4, it drew at the low resolution on every
+  phone.
+- With both versions imported, the app is built from 1.3.5, the newer, until it has been built from one of them.
 - This changelog. Each release's notes are its section here, and a release whose tag, chart and changelog name
   different versions stops before anything is built.
 

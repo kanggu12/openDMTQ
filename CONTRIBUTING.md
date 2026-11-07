@@ -179,6 +179,8 @@ A release, by a maintainer:
 1. Move the `[Unreleased]` notes under `## [1.2.3] - YYYY-MM-DD`, and set `version` and `appVersion` in
    `deploy/helm/opendmtq/Chart.yaml` to `1.2.3`.
 2. Run `tests/qa.sh` on that commit, on a machine with the game's files: it marks the commit when everything passes.
+   `CLIENTS=<folder>` checks the patcher against every APK in that folder too: the game's other version, a copy
+   changed for another server.
 3. Push the tag `v1.2.3`. `.github/workflows/release.yml` checks that the tag, the chart and the changelog name one
    version (`.github/release_notes.py`), runs CI again, waits for the mark, and publishes the images, the Helm chart,
    the Windows bundle and a GitHub release whose notes are that version's section of the changelog.

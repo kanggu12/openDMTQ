@@ -20,7 +20,10 @@ require_once __DIR__ . '/live.php';
 
 /*
  * Every method this server answers, by its name in lower case (the game sends them in camel case; the name is
- * matched whatever its case). Anything else gets SVC.05008: the client goes on without it.
+ * matched whatever its case). Anything else gets SVC.05008: the client goes on without it. So does what client 1.3.5
+ * adds for FREE PASS, a time pass sold for real money: game.getUserFreePass, asked at every sign-in, leaves the client
+ * with no pass, and every song is free here anyway; shop.buyFreePass and the purchase check shop.checkPurchasePayId
+ * follow a Google Play purchase, which never happens here.
  */
 function odq_methods(): array
 {

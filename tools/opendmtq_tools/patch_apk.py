@@ -48,9 +48,8 @@ RPC_LITERAL = re.compile(r"(https?://)([^/\s]+)/DMQ/rpc")
 OFFICIAL_RPC_HOSTS = ("dmqglb.mb.pmang.com", "dmqglb-dq.mb.pmang.com")
 # The class this patcher adds to the app (HOOK_SMALI): an app it built has it.
 HOOK_CLASS = b"Lcom/opendmtq/Hook;"
-# The client the code edits were made for (IL2CPP_EDITS: their offsets), by the CRC of its libil2cpp.so in the APK's
-# zip directory. A client changed only in its addresses has the same code.
-KNOWN_CODE = ("lib/armeabi-v7a/libil2cpp.so", 0xCE992EA5)
+# The game's code, where the code edits go (IL2CPP_EDITS).
+CODE_FILE = "lib/armeabi-v7a/libil2cpp.so"
 # Longest address accepted ("host" or "host:port"); long literals are appended, see il2cpp.py.
 MAX_HOST_LEN = 80
 # IPv4 address or DNS name, optionally with a port.
@@ -210,7 +209,7 @@ def inspect(path):
                "built here"    an app OpenDMTQ built for a server: not a base, the client it was built from is
                "not the game"  another app, or not an APK at all
       version  the client's version ("1.3.4"), or None
-      known    True for the client the code edits were made for (KNOWN_CODE)"""
+      known    True when every code edit fits its code, in one of the versions they were made for (IL2CPP_EDITS)"""
     info = {"kind": "not the game", "version": None, "hosts": [], "known": False}
     try:
         with zipfile.ZipFile(path) as z:
@@ -225,8 +224,7 @@ def inspect(path):
             if METADATA not in names:
                 return info
             meta = il2cpp.Metadata(z.read(METADATA))
-            code, crc = KNOWN_CODE
-            info["known"] = code in names and z.getinfo(code).CRC == crc
+            info["known"] = CODE_FILE in names and len(code_versions(z.read(CODE_FILE))) == len(IL2CPP_EDITS)
     except (OSError, zipfile.BadZipFile, KeyError, ValueError, struct.error, il2cpp.MetadataError):
         return info
     if len(meta.find(MARKER)) == 1:
@@ -376,76 +374,122 @@ def arm_branch(at, to, link=False):
     return ((0xEB if link else 0xEA) << 24 | distance & 0xFFFFFF).to_bytes(4, "little")
 
 
-# Code edits in the game's libil2cpp.so: (what it does, [(offset, bytes there now, bytes to write)]).
-# All the parts of an edit apply together. The offsets are those of client 1.3.4; a client whose
-# bytes differ there keeps that screen as it was.
+# The menu frame rate's edit (IL2CPP_EDITS): the ARM code it runs in TopFrame.OnClickMoreGames from 0x10 on (the shop's edit
+# has the 16 bytes before), up to its branch back and its literal. The instruction it took the place of (the rate asked for,
+# r1, kept in r4); the class pointer through the slot VariableFrameController.InitFrameRate reads it from; stop if the class
+# is not set up yet; its static fields (at 0x50 in the runtime's class); stop if there are none; maxOutgameFpsVal (at 0x0c)
+# when that is higher.
+_KEEP_MENU_RATE = bytes.fromhex(
+    "0140a0e1 2c009fe5 00008fe0 000090e5 000090e5 000050e3 0500000a 500090e5 000050e3 0200000a"
+    "0c0090e5 000054e1 0040a0b1")
+
+
+def _menu_rate(room, back, slot):
+    """That code at room (TopFrame.OnClickMoreGames + 0x10), its branch back to back (SetTargetFrameRate + 0x10), and the
+    distance from its add (room + 8, which reads the program counter 8 ahead) to slot, the class's place in the GOT."""
+    return _KEEP_MENU_RATE + arm_branch(room + 0x34, back) + ((slot - (room + 8 + 8)) & 0xFFFFFFFF).to_bytes(4, "little")
+
+
+# Code edits in the game's libil2cpp.so: (what it does, {client version: [(offset, bytes there now, bytes to write)]}).
+# All the parts of an edit apply together, in the first version whose bytes are all there; a client whose bytes differ in
+# every version keeps that screen as it was. A client changed for another server has the code of its version: the address
+# it was changed to is in the metadata. The offsets of 1.3.5 were found by method name (the metadata's methods, the code
+# registration's method pointers and SymbolMap-ARMv7's functions), each edit's functions compared instruction by instruction
+# with those of 1.3.4: they are the same but where they reach other code and data, which is all moved, and where noted.
 IL2CPP_EDITS = [
     # The main menu opens the server's event page (NoticeWebViewPopup, "NOTICE") at every start, and
     # this server has nothing to announce there. In MainMenu2SceneConfig.OnStart the first
     # instruction after the ClientAuthInfo check becomes a branch past the notice popup, to the
     # nickname, how-to-play and start popups that follow; the notice's close callback
     # (<OnStart>m__0) is empty, and the code after it rewrites every register the skipped part set.
-    ("main menu skips the NOTICE popup",
-     [(0xEF40F0, bytes.fromhex("0010a0e3" "ac61f9eb"), arm_branch(0xEF40F0, 0xEF42D0) + bytes.fromhex("ac61f9eb"))]),
+    # 1.3.5: the same check and popup further on in a longer OnStart (+0x898, to +0xa78). Its close callback is <OnStart>m__2
+    # there, empty too; m__0 and m__1 are new and hold FREE PASS's clock while the popup track runs, set on the track itself.
+    ("main menu skips the NOTICE popup", {
+        "1.3.4": [(0xEF40F0, bytes.fromhex("0010a0e3" "ac61f9eb"), arm_branch(0xEF40F0, 0xEF42D0) + bytes.fromhex("ac61f9eb"))],
+        "1.3.5": [(0xF39D24, bytes.fromhex("0010a0e3" "815ef9eb"), arm_branch(0xF39D24, 0xF39F04) + bytes.fromhex("815ef9eb"))],
+    }),
     # A new install fetches about 42 MB of game data from this server, and the game first asks "Additional
     # files will be downloaded" with one button, OK. Login2SceneConfig.ShowStartPatchPopup keeps its
     # first part, which saves the callback in the small object behind the popup's button, and then
     # calls that button's own handler (<ShowStartPatchPopup>c__AnonStoreyA.<>m__0, which only
     # answers true and does not look at which button) instead of building the popup.
-    ("the game's data download starts without asking",
-     [(0xCF9250, bytes.fromhex("0500a0e1" "e98f0ceb" "0500a0e1"),
-       bytes.fromhex("0800a0e1") + arm_branch(0xCF9254, 0xCFD45C, link=True) + arm_branch(0xCF9258, 0xCF9618))]),
+    ("the game's data download starts without asking", {
+        "1.3.4": [(0xCF9250, bytes.fromhex("0500a0e1" "e98f0ceb" "0500a0e1"),
+                   bytes.fromhex("0800a0e1") + arm_branch(0xCF9254, 0xCFD45C, link=True) + arm_branch(0xCF9258, 0xCF9618))],
+        "1.3.5": [(0xCD9E50, bytes.fromhex("0500a0e1" "8a270eeb" "0500a0e1"),
+                   bytes.fromhex("0800a0e1") + arm_branch(0xCD9E54, 0xCDDF90, link=True) + arm_branch(0xCD9E58, 0xCDA218))],
+    }),
     # The shop's Q tab sells only for real money through Google Play, which reaches nothing here
     # (its tab is hidden in ASSET_EDITS), and the + by the points opens the shop on that tab.
     # Shop2SceneConfig.SetTabType turns Q into MAX in four instructions kept in the room left by
     # TopFrame.OnClickMoreGames, a handler whose button is hidden too: compare, swap, the first
-    # instruction it replaced, and back.
-    ("the shop opens on its MAX tab instead of the real-money one",
-     [(0xD2F4B4, bytes.fromhex("f0482de9"), arm_branch(0xD2F4B4, 0x9D735C)),
-      (0x9D735C, bytes.fromhex("f04d2de9" "18b08de2" "0080a0e1" "a0039fe5"),
-       bytes.fromhex("000051e3" "0110a003" "f0482de9") + arm_branch(0x9D7368, 0xD2F4B8))]),
+    # instruction it replaced, and back. (The tabs are numbered alike in both versions: Q 0, MAX 1.)
+    ("the shop opens on its MAX tab instead of the real-money one", {
+        "1.3.4": [(0xD2F4B4, bytes.fromhex("f0482de9"), arm_branch(0xD2F4B4, 0x9D735C)),
+                  (0x9D735C, bytes.fromhex("f04d2de9" "18b08de2" "0080a0e1" "a0039fe5"),
+                   bytes.fromhex("000051e3" "0110a003" "f0482de9") + arm_branch(0x9D7368, 0xD2F4B8))],
+        "1.3.5": [(0xC2C5EC, bytes.fromhex("f0482de9"), arm_branch(0xC2C5EC, 0xB4BF90)),
+                  (0xB4BF90, bytes.fromhex("f04d2de9" "18b08de2" "0080a0e1" "a0039fe5"),
+                   bytes.fromhex("000051e3" "0110a003" "f0482de9") + arm_branch(0xB4BF9C, 0xC2C5F0))],
+    }),
     # At every start the game turned its low resolution option on for good (Startup.Initialize writes OptionData's
     # LowResolutionGrap, whatever was saved, just before LowResolution.Apply reads it), so that on every phone it drew at two
     # thirds of the panel's height: 960 lines on a 1440 line panel, 720 on 1080. Written off, Apply takes the device's own
     # resolution. A device that then does not keep its frame rate goes back to the low one by itself (arm32/README.md, Resolution),
-    # so the option's row is gone from the screen (ASSET_EDITS).
-    ("the panel's own resolution", [(0x9C385C, bytes.fromhex("01 10 a0 e3"), bytes.fromhex("00 10 a0 e3"))]),
+    # so the option's row is gone from the screen (ASSET_EDITS). Each part ends in the write itself (strb at 0x1a).
+    # 1.3.5 writes it as not iPhoneXAnchorInsetUpdater.IsInsetRequired(), which on Android always answers false (its
+    # whole code: mov r0, #0; bx lr), so the option is on there too: the negation becomes a zero.
+    ("the panel's own resolution", {
+        "1.3.4": [(0x9C385C, bytes.fromhex("0110a0e3" "0040a0e3" "1a10c0e5"), bytes.fromhex("0010a0e3" "0040a0e3" "1a10c0e5"))],
+        "1.3.5": [(0xB38A04, bytes.fromhex("010020e2" "1a00c5e5"), bytes.fromhex("0000a0e3" "1a00c5e5"))],
+    }),
     # A menu left untouched drops step by step to 18 frames a second (VariableFrameController.AutoAdjustFrameRate, to save
     # battery on the phones of its day) and jumps back at the next touch, which shows. SetTargetFrameRate now never goes below
     # the game's cap for menus, maxOutgameFpsVal: 60 on a phone running the game's own libraries, the app's frame rate under
     # the runtime, so 120 on a 120 Hz phone (a limit of 60 there judders: a timer's frames stay for two refreshes or three,
-    # one frame in five measured on a Galaxy S26 Ultra). In the rest of the same dead handler: keep the rate asked for, load
-    # the class's static fields through the slot InitFrameRate uses, stop if the class is not set up yet, raise, and back.
+    # one frame in five measured on a Galaxy S26 Ultra). In the rest of the same dead handler: _KEEP_MENU_RATE.
     # The runtime's fallback to a lower rate lowers that cap too, so this follows it.
-    ("a menu left alone keeps its frame rate",
-     [(0x9AFE60, bytes.fromhex("0140a0e1"), arm_branch(0x9AFE60, 0x9D736C)),
-      (0x9D736C, bytes.fromhex(
-       "a0539fe5 00008fe0 000085e0 2c01d0e5 000050e3"
-       "0800001a 8c039fe5 8c139fe5 00608fe0 060091e7"
-       "000090e5 e04a19eb 060085e0 0110a0e3 2c11c0e5"),
-       bytes.fromhex(
-       "0140a0e1 2c009fe5 00008fe0 000090e5 000090e5"
-       "000050e3 0500000a 500090e5 000050e3 0200000a"
-       "0c0090e5 000054e1 0040a0b1 af62ffea dcaca700"))]),
+    ("a menu left alone keeps its frame rate", {
+        "1.3.4": [(0x9AFE60, bytes.fromhex("0140a0e1"), arm_branch(0x9AFE60, 0x9D736C)),
+                  (0x9D736C, bytes.fromhex(
+                   "a0539fe5 00008fe0 000085e0 2c01d0e5 000050e3"
+                   "0800001a 8c039fe5 8c139fe5 00608fe0 060091e7"
+                   "000090e5 e04a19eb 060085e0 0110a0e3 2c11c0e5"), _menu_rate(0x9D736C, 0x9AFE64, 0x1452058))],
+        "1.3.5": [(0x1047700, bytes.fromhex("0140a0e1"), arm_branch(0x1047700, 0xB4BFA0)),
+                  (0xB4BFA0, bytes.fromhex(
+                   "a0539fe5 00008fe0 000085e0 5201d0e5 000050e3"
+                   "0800001a 8c039fe5 8c139fe5 00608fe0 060091e7"
+                   "000090e5 749214eb 060085e0 0110a0e3 5211c0e5"), _menu_rate(0xB4BFA0, 0x1047704, 0x1461F70))],
+    }),
 ]
+
+
+def code_versions(code):
+    """{what: the client version whose bytes are all there} for each code edit that fits this libil2cpp.so."""
+    fits = {}
+    for what, versions in IL2CPP_EDITS:
+        for version, parts in versions.items():
+            if all(code[offset:offset + len(old)] == old for offset, old, _ in parts):
+                fits[what] = version
+                break
+    return fits
 
 
 def patch_il2cpp(path):
     """Apply the code edits whose bytes match; report the ones that do not. Returns what was applied (IL2CPP_EDITS' names)."""
     with open(path, "rb") as f:
         code = bytearray(f.read())
-    applied = set()
-    for what, parts in IL2CPP_EDITS:
-        if all(code[offset:offset + len(old)] == old for offset, old, _ in parts):
-            for offset, _, new in parts:
+    fits = code_versions(code)
+    for what, versions in IL2CPP_EDITS:
+        if what in fits:
+            for offset, _, new in versions[fits[what]]:
                 code[offset:offset + len(new)] = new
-            log(f"  code      {what}")
-            applied.add(what)
+            log(f"  code      {what} ({fits[what]})")
         else:
             log(f"  code      skipped ({what}): this client's code differs")
     with open(path, "wb") as f:
         f.write(code)
-    return applied
+    return set(fits)
 
 
 # Where the game keeps its screens inside the APK.
@@ -459,13 +503,17 @@ _MENU = "MainMenu2Scene/MenuPage/Contents"
 _OPTIONS = "Option2Scene/Contents/[RQ_3300]_Scroll_view/grid"
 _SHOP_TABS = "Shop2Scene/UI_Tab"
 # The game's project settings (globalgamemanagers, a file with no names in it: the places were found by reading it with the class
-# database for Unity 5.6.5 and are checked against the real client in tests/test_real_client.py): place, what is there, what goes
-# there. Its Android build asked for a 16-bit screen, which bands in every gradient of a jacket and a background, and for its
-# lowest quality level at half-size textures.
+# database for Unity 5.6.5, proven by changing the byte and reading the object again, and are checked against the real clients in
+# tests/test_real_client.py): the object by its Unity class number and its size, the place in it, what is there, what goes
+# there. 1.3.4 and 1.3.5 have both objects at those sizes, the settings at those places in them; the file of 1.3.5 has more
+# before its quality settings. Its Android build asked for a 16-bit screen, which bands in every gradient of a jacket and a
+# background, and for its lowest quality level at half-size textures.
 SETTINGS_FILE = "globalgamemanagers"
+CLASS_QUALITY_SETTINGS = 47
+CLASS_PLAYER_SETTINGS = 129
 SETTING_EDITS = {
-    "PlayerSettings.use32BitDisplayBuffer": (28334, 0, 1),
-    "QualitySettings[Fastest].textureQuality": (84516, 1, 0),
+    "PlayerSettings.use32BitDisplayBuffer": (CLASS_PLAYER_SETTINGS, 530, 302, 0, 1),
+    "QualitySettings[Fastest].textureQuality": (CLASS_QUALITY_SETTINGS, 612, 68, 1, 0),
 }
 
 # Screens taken apart for this server: file name -> edits. Each menu entry below leads nowhere here:
@@ -538,15 +586,32 @@ ASSET_NEEDS = {
 }
 
 
+def setting_places(data):
+    """{name: (place in the file, what goes there)} for each setting edit whose object is there once, at its size, with the
+    byte expected in it."""
+    try:
+        objects = unity_assets.SerializedFile(data).objects
+    except (unity_assets.AssetError, struct.error):
+        return {}
+    places = {}
+    for name, (class_id, size, at, old, new) in SETTING_EDITS.items():
+        found = [offset for _, offset, length, kind in objects if kind == class_id and length == size]
+        if len(found) == 1 and data[found[0] + at] == old:
+            places[name] = (found[0] + at, new)
+    return places
+
+
 def patch_settings(root):
-    """Make the edits to the game's project settings; a client whose bytes differ keeps its settings."""
+    """Make the edits to the game's project settings; a client whose settings differ keeps them."""
     path = os.path.join(root, ASSET_DIR, SETTINGS_FILE)
     with open(path, "rb") as f:
         data = bytearray(f.read())
-    if any(place >= len(data) or data[place] != old for place, old, _ in SETTING_EDITS.values()):
-        log(f"  settings  skipped: {SETTINGS_FILE} is not this client's")
-        return
-    for name, (place, _, new) in SETTING_EDITS.items():
+    places = setting_places(bytes(data))
+    for name in SETTING_EDITS:
+        if name not in places:
+            log(f"  settings  skipped ({name}): this client's settings differ")
+            continue
+        place, new = places[name]
         data[place] = new
         log(f"  settings  {name} = {new}")
     with open(path, "wb") as f:
@@ -784,13 +849,18 @@ def choose(base_dir, infos):
         return next(iter(distinct.values()), None), False
     # Different clients. The one the phones' app was built from, while it is there: an app from another version could
     # not be installed over it (a lower version number) and changes what the players have. Before the first build: the
-    # original before a client changed for another server, the client the code edits were made for before another
-    # version, then the newest (the last imported: the import writes each copy anew).
+    # game's newest version, then the original before a client changed for another server, then one every code edit fits,
+    # then the last imported (the import writes each copy anew).
     last = distinct.get(last_base(base_dir))
     if last:
         return last, True
-    return min(distinct.values(), key=lambda f: (infos[f]["kind"] != "original", not infos[f]["known"],
-                                                  -os.path.getmtime(f))), False
+    return max(distinct.values(), key=lambda f: (version_key(infos[f]["version"]), infos[f]["kind"] == "original",
+                                                  infos[f]["known"], os.path.getmtime(f))), False
+
+
+def version_key(version):
+    """A client's version ("1.3.5") as numbers that sort as versions do; () when it has none."""
+    return tuple(int(part) for part in re.findall(r"\d+", version or ""))
 
 
 def find_base(base_dir, name=None):

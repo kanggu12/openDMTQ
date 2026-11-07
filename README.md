@@ -39,7 +39,8 @@ the server's web page. Their phones need no settings.
 
 > [!IMPORTANT]
 > **No game files are included.** You need your own copy of the game's Android app (APK) and its server files.
-> Version 1.3.4 of the app gets every fix. Other versions play the same, with a few screens as the game had them. The
+> Versions 1.3.5 and 1.3.4 of the app get every fix, as released or changed for another server. Other versions play the
+> same, with a few screens as the game had them. The
 > songs are optional: without them the game starts with an empty song list. Please use only files you have the right
 > to use. OpenDMTQ is an unofficial, non-commercial project, not affiliated with or endorsed by NEOWIZ. If a rights
 > holder asks, the repository will be made private or taken down.

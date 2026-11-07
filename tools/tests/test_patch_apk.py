@@ -10,6 +10,7 @@ import json
 import os
 import shutil
 import signal
+import struct
 import subprocess
 import tempfile
 import zipfile
@@ -455,20 +456,111 @@ class CodeEditTest(unittest.TestCase):
         self.assertEqual(patch_apk.arm_branch(0xCF9254, 0xCFD45C, link=True).hex(), "801000eb")
 
     def test_an_edit_writes_as_many_bytes_as_it_checks(self):
-        for what, parts in patch_apk.IL2CPP_EDITS:
-            for _, old, new in parts:
-                self.assertEqual(len(old), len(new), what)
+        for what, versions in patch_apk.IL2CPP_EDITS:
+            for version, parts in versions.items():
+                for _, old, new in parts:
+                    self.assertEqual(len(old), len(new), f"{what} ({version})")
+
+    def test_every_edit_is_made_for_both_versions(self):
+        for what, versions in patch_apk.IL2CPP_EDITS:
+            self.assertEqual(sorted(versions), ["1.3.4", "1.3.5"], what)
+
+    def test_the_menu_rate_code_is_the_one_written_by_hand_for_1_3_4(self):
+        # Its branch back and its literal (the distance to the class's slot in the GOT), as the first version had them.
+        code = patch_apk._menu_rate(0x9D736C, 0x9AFE64, 0x1452058)
+        self.assertEqual(code[-8:].hex(), "af62ffeadcaca700")
+        self.assertEqual(len(code), 60)
 
     def test_a_client_with_other_bytes_keeps_that_edit_whole(self):
-        edits = [("both parts", [(0, b"AAAA", b"BBBB"), (8, b"CCCC", b"DDDD")]), ("one part", [(12, b"EEEE", b"FFFF")])]
+        edits = [("both parts", {"1": [(0, b"AAAA", b"BBBB"), (8, b"CCCC", b"DDDD")]}), ("one part", {"1": [(12, b"EEEE", b"FFFF")]})]
         with tempfile.TemporaryDirectory() as d, mock.patch.object(patch_apk, "IL2CPP_EDITS", edits), mock.patch.object(patch_apk, "log"):
             path = os.path.join(d, "lib.so")
             # The first edit's second part does not match: neither part is written.
             with open(path, "wb") as f:
                 f.write(b"AAAAxxxxZZZZEEEE")
-            patch_apk.patch_il2cpp(path)
+            self.assertEqual(patch_apk.patch_il2cpp(path), {"one part"})
             with open(path, "rb") as f:
                 self.assertEqual(f.read(), b"AAAAxxxxZZZZFFFF")
+
+    def test_each_client_takes_the_version_whose_bytes_it_has(self):
+        # The same edit at another place in each version; a client has the bytes of one of them.
+        edits = [("the edit", {"old": [(0, b"AAAA", b"BBBB")], "new": [(8, b"CCCC", b"DDDD")]})]
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(patch_apk, "IL2CPP_EDITS", edits), \
+                mock.patch.object(patch_apk, "log") as log:
+            for code, after, version in ((b"AAAAxxxxCCCC", b"BBBBxxxxCCCC", "old"), (b"xxxxyyyyCCCC", b"xxxxyyyyDDDD", "new")):
+                path = os.path.join(d, "lib.so")
+                with open(path, "wb") as f:
+                    f.write(code)
+                self.assertEqual(patch_apk.code_versions(code), {"the edit": version})
+                patch_apk.patch_il2cpp(path)
+                with open(path, "rb") as f:
+                    self.assertEqual(f.read(), after, version)
+                self.assertIn(f"the edit ({version})", log.call_args_list[-1].args[0])
+
+
+def settings_file(objects):
+    """A Unity 5.6 asset file holding objects of other kinds than screens: [(Unity class number, its bytes)]."""
+    meta = b"5.6.5f1\0" + struct.pack("<i", 13) + b"\0"
+    kinds = sorted({kind for kind, _ in objects})
+    meta += struct.pack("<i", len(kinds))
+    for kind in kinds:
+        meta += struct.pack("<i", kind) + b"\0" + struct.pack("<h", -1) + b"\0" * 16
+    meta += struct.pack("<i", len(objects))
+    body = b""
+    for n, (kind, blob) in enumerate(objects):
+        meta += b"\0" * (-(20 + len(meta)) % 4)
+        meta += struct.pack("<qIIi", n + 1, len(body), len(blob), kinds.index(kind))
+        body += blob + b"\0" * (-len(blob) % 8)
+    data_offset = 20 + len(meta)
+    data_offset += -data_offset % 16
+    header = struct.pack(">IIII", len(meta), data_offset + len(body), unity_assets.FORMAT, data_offset) + b"\0" * 4
+    return header + meta + b"\0" * (data_offset - 20 - len(meta)) + body
+
+
+class SettingEditTest(unittest.TestCase):
+    """The game's project settings: found by their object, wherever the file has it, and left alone when it differs."""
+
+    def setUp(self):
+        self.edits = {"Player.flag": (129, 16, 5, 0, 1), "Quality.level": (47, 8, 2, 1, 0)}
+        patcher = mock.patch.object(patch_apk, "SETTING_EDITS", self.edits)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_each_setting_is_found_in_its_object_wherever_that_is(self):
+        player, quality = bytes(16), b"\0\0\1" + bytes(5)
+        seen = set()
+        for objects in ([(129, player), (47, quality)], [(47, quality), (30, bytes(40)), (129, player)]):
+            data = settings_file(objects)
+            places = patch_apk.setting_places(data)
+            self.assertEqual(sorted(places), ["Player.flag", "Quality.level"])
+            # In the objects' bytes, after the file's header and tables, at the place in the object.
+            body = struct.unpack_from(">I", data, 12)[0]
+            place = places["Quality.level"][0]
+            self.assertGreaterEqual(place, body)
+            self.assertEqual(data[place - 2:place + 6], quality)
+            seen.add(place)
+        # The two files have it at two places.
+        self.assertEqual(len(seen), 2)
+
+    def test_an_object_of_another_size_or_byte_keeps_its_setting(self):
+        data = settings_file([(129, bytes(17)), (47, b"\0\0\7" + bytes(5))])
+        self.assertEqual(patch_apk.setting_places(data), {})
+        self.assertEqual(patch_apk.setting_places(b"not an asset file"), {})
+
+    def test_the_settings_land_and_the_rest_of_the_file_stays(self):
+        data = settings_file([(129, bytes(16)), (47, b"\0\0\1" + bytes(5))])
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(patch_apk, "log"):
+            folder = os.path.join(d, patch_apk.ASSET_DIR)
+            os.makedirs(folder)
+            path = os.path.join(folder, patch_apk.SETTINGS_FILE)
+            with open(path, "wb") as f:
+                f.write(data)
+            patch_apk.patch_settings(d)
+            with open(path, "rb") as f:
+                after = f.read()
+        changed = [i for i in range(len(data)) if data[i] != after[i]]
+        self.assertEqual(len(after), len(data))
+        self.assertEqual([(after[i], data[i]) for i in changed], [(1, 0), (0, 1)])
 
 
 class ScreenEditTest(unittest.TestCase):

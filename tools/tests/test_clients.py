@@ -10,7 +10,6 @@ import tempfile
 import time
 import unittest
 import zipfile
-import zlib
 from unittest import mock
 
 from opendmtq_tools import axml, il2cpp, patch_apk, unity_assets
@@ -71,7 +70,7 @@ def apk(path, literals=None, dex=b"dex\n035\0Lcom/pmangplus/core/PPCore;", game_
         z.writestr("classes.dex", dex)
         if literals is not None:
             z.writestr(patch_apk.METADATA, il2cpp.build(literals))
-        z.writestr(patch_apk.KNOWN_CODE[0], game_code)
+        z.writestr(patch_apk.CODE_FILE, game_code)
     return path
 
 
@@ -111,10 +110,13 @@ class InspectTest(unittest.TestCase):
             self.assertFalse(patch_apk.is_patchable(path))
 
     def test_the_client_the_code_edits_were_made_for(self):
-        path = apk(os.path.join(self.d, "a.apk"), COMMON + ORIGINAL, game_code=b"the code")
-        with mock.patch.object(patch_apk, "KNOWN_CODE", (patch_apk.KNOWN_CODE[0], zlib.crc32(b"the code"))):
+        # Every code edit fits, each in one of its versions; a client that one does not fit is not that client.
+        path = apk(os.path.join(self.d, "a.apk"), COMMON + ORIGINAL, game_code=b"the code, 1.3.5")
+        fits = [("one", {"1.3.4": [(0, b"xxx", b"yyy")], "1.3.5": [(4, b"code", b"CODE")]}), ("two", {"1.3.4": [(10, b"1.3.5", b"1.3.6")]})]
+        with mock.patch.object(patch_apk, "IL2CPP_EDITS", fits):
             self.assertTrue(patch_apk.inspect(path)["known"])
-        self.assertFalse(patch_apk.inspect(path)["known"])
+        with mock.patch.object(patch_apk, "IL2CPP_EDITS", fits + [("three", {"1.3.4": [(0, b"zzz", b"yyy")]})]):
+            self.assertFalse(patch_apk.inspect(path)["known"])
 
     def test_described_in_a_few_words(self):
         info = {"kind": "other server", "version": "1.3.5", "hosts": ["play.example.net"], "known": False}
@@ -241,18 +243,27 @@ class ChoiceTest(unittest.TestCase):
         with mock.patch("sys.stderr", new_callable=io.StringIO) as said:
             return os.path.basename(patch_apk.find_base(self.base)), said.getvalue()
 
-    def test_the_original_before_one_changed_for_another_server(self):
+    def test_the_newest_version_before_an_older_one(self):
+        # An original 1.3.4 and a 1.3.5 changed for another server: the game's last version, whatever it was changed for.
         self.client("original.apk", ORIGINAL, age=100)
         self.client("changed.apk", OTHER, version="1.3.5")
         name, said = self.chosen()
-        self.assertEqual(name, "original.apk")
-        self.assertIn("using original.apk", said)
+        self.assertEqual(name, "changed.apk")
+        self.assertIn("using changed.apk", said)
+        # Versions are numbers: 1.3.10 comes after 1.3.9.
+        self.assertGreater(patch_apk.version_key("1.3.10"), patch_apk.version_key("1.3.9"))
+        self.assertEqual(patch_apk.version_key(None), ())
 
-    def test_the_client_the_code_edits_fit_before_another_version(self):
-        self.client("old.apk", ORIGINAL, age=100, game_code=b"1.3.4 code")
-        self.client("new.apk", ORIGINAL, version="1.3.5", game_code=b"1.3.5 code")
-        with mock.patch.object(patch_apk, "KNOWN_CODE", (patch_apk.KNOWN_CODE[0], zlib.crc32(b"1.3.4 code"))):
-            self.assertEqual(self.chosen()[0], "old.apk")
+    def test_of_one_version_the_original_before_one_changed_for_another_server(self):
+        self.client("original.apk", ORIGINAL, age=100, version="1.3.5")
+        self.client("changed.apk", OTHER, version="1.3.5")
+        self.assertEqual(self.chosen()[0], "original.apk")
+
+    def test_of_one_version_the_client_the_code_edits_fit_first(self):
+        self.client("fits.apk", ORIGINAL, age=100, game_code=b"1.3.4 code")
+        self.client("other.apk", ORIGINAL, game_code=b"other code")
+        with mock.patch.object(patch_apk, "IL2CPP_EDITS", [("edit", {"1.3.4": [(0, b"1.3.4", b"1.3.x")]})]):
+            self.assertEqual(self.chosen()[0], "fits.apk")
 
     def test_of_two_alike_the_newest(self):
         self.client("older.apk", ORIGINAL, age=100, game_code=b"one")

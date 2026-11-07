@@ -65,8 +65,8 @@ wherever one is left in a served folder (`*.txt`, `*.bak`, `*.db3`, `*.log`, `*.
 
 ## The game server
 
-OpenDMTQ's own code, written from the requests client 1.3.4 makes and the replies it reads. It needs PHP 8.1 or newer
-with SQLite and mbstring.
+OpenDMTQ's own code, written from the requests client 1.3.4 makes and the replies it reads. Client 1.3.5 asks for one
+more, its FREE PASS, and goes on without it (`rpc.php`). It needs PHP 8.1 or newer with SQLite and mbstring.
 
 | File | What it answers |
 |---|---|
@@ -190,13 +190,14 @@ fetches the images of its screens from the server), so the server reports itself
   Games screens (`PPImpl$19`). It no longer asks Google Play for the local prices of the paid items at every start
   (`PPImpl`, `getPriceLocalization`). The clipboard is left alone (`ExternalSDK`, `GetClipboard` and `SetClipboard`):
   at every sign-in the game read it for a token the old Kakao edition left there, then emptied it.
-- **Game code** (`lib/armeabi-v7a/libil2cpp.so`, `IL2CPP_EDITS`; the bytes are those of client 1.3.4): the main menu
-  goes past the event notice popup. The question before the first start's data download answers itself. The shop
-  opens on its MAX tab, as its Q tab is gone. A menu left alone keeps its frame rate instead of stepping down to 18 fps.
-  The game draws at the panel's own resolution. In a client of another version an edit whose bytes differ is left
-  out whole, with the screen edits that go with it (`ASSET_NEEDS`: the shop keeps its Q tab while it opens on it).
+- **Game code** (`lib/armeabi-v7a/libil2cpp.so`, `IL2CPP_EDITS`, with the bytes of clients 1.3.5 and 1.3.4): the
+  main menu goes past the event notice popup. The question before the first start's data download answers itself. The
+  shop opens on its MAX tab, as its Q tab is gone. A menu left alone keeps its frame rate instead of stepping down to
+  18 fps. The game draws at the panel's own resolution. In a client of another version an edit whose bytes differ is
+  left out whole, with the screen edits that go with it (`ASSET_NEEDS`: the shop keeps its Q tab while it opens on it).
 - **Project settings** (`assets/bin/Data/globalgamemanagers`, `SETTING_EDITS`): a 32-bit screen in place of a 16-bit
-  one, and textures at full size in place of half.
+  one, and textures at full size in place of half, each found in its object (PlayerSettings, QualitySettings) wherever
+  the file has it.
 - **Screens** (Unity asset files under `assets/bin/Data`, `ASSET_EDITS`, by `unity_assets.py`): what leads nowhere on
   this server is taken off the screen by clearing its object's active flag, and what stays closes up by moving it.
   Neither changes a byte's position. Gone: More Games on every screen; Play for Free, Music Shop, Package and Quest in

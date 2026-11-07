@@ -8,8 +8,8 @@ files you have the right to use. OpenDMTQ does not come with any, and does not s
 [The game's files](game-files.md) says what each has to be.
 
 **My copy of the app was changed for another server. Does it work?**
-Yes. The build points every address of the other server at yours. A version other than 1.3.4 plays the same, with a few
-of the game's own screens left as they were.
+Yes. The build points every address of the other server at yours. A version other than 1.3.5 or 1.3.4 plays the same, with
+a few of the game's own screens left as they were.
 
 **Will my files work?**
 For each file it finds, the setup says what it is and whether it can be used, before importing anything. On the command

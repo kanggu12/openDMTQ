@@ -331,13 +331,19 @@ class FilesOnThisPcTest(unittest.TestCase):
 
     def test_a_client_changed_for_another_server_is_said_with_its_server(self):
         with HostInstall() as inst:
-            inst.write("home/Downloads/changed.apk", "PK")
             inst.sign_in()
-            changed = {"kind": "other server", "version": "1.3.5", "hosts": ["play.example.net"], "known": False}
-            with mock.patch.object(setup.importer, "inspect", lambda path: changed):
-                text = inst.client.get(BASE + "/setup/what", query_string={"path": inst.path("home/Downloads/changed.apk")}).get_json()
-            self.assertEqual(text, {"ok": True, "text": "Android app 1.3.5, changed for another server (play.example.net): "
-                                                        "pointed at this one. A few screen fixes are made for 1.3.4 only."})
+            changed = {"kind": "other server", "version": "1.3.5", "hosts": ["play.example.net"], "known": True}
+            for name, info, words in (
+                    ("changed.apk", changed, "Android app 1.3.5, changed for another server (play.example.net): pointed at this one"),
+                    # A version the screen fixes were not made for says so.
+                    ("older.apk", {**changed, "version": "1.3.2", "known": False},
+                     "Android app 1.3.2, changed for another server (play.example.net): pointed at this one. "
+                     "A few screen fixes are made for 1.3.5 and 1.3.4 only.")):
+                # A file each: the page keeps what it said of a path for a while.
+                inst.write(f"home/Downloads/{name}", "PK")
+                with mock.patch.object(setup.importer, "inspect", lambda path: info):
+                    text = inst.client.get(BASE + "/setup/what", query_string={"path": inst.path(f"home/Downloads/{name}")}).get_json()
+                self.assertEqual(text, {"ok": True, "text": words})
 
     def test_the_client_in_place_is_said_for_what_it_is(self):
         with HostInstall() as inst:

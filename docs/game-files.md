@@ -23,9 +23,9 @@ The game's Android client as an APK, under any file name. These work:
 
 OpenDMTQ also tidies up a few of the game's screens: the notice at every start, the question before the first download,
 the shop opening on its real-money tab, the low resolution, the frame rate of a menu left alone. Those code fixes are
-made for client 1.3.4. A client of another version plays the same, with those screens as the game had them. A 1.3.5
-client changed for another server was tested on a closed network: it installed, played a song to the end and saved its
-score.
+made for clients 1.3.5 and 1.3.4, as released or changed for another server. A client of another version plays the
+same, with those screens as the game had them. Both versions were tested on an emulator on a closed network: a song
+downloaded, played and saved, and the resolution and a menu's frame rate measured against builds without those fixes.
 
 These do not work:
 
@@ -53,8 +53,8 @@ So the setup says what an `.ipa` is and does not import it.
 
 The import keeps every usable client in `data/apk/base`. The app is built from the one the phones' app came from, as
 long as it is there: an app made from another version could not be installed over it. Before the first build it takes
-the original before a changed copy, version 1.3.4 before another, then the newest. `BASE_APK=<file name>` in `.env`
-chooses another.
+the newest version (1.3.5 before 1.3.4), of one version the original before a changed copy, then the copy imported
+last. `BASE_APK=<file name>` in `.env` chooses another.
 
 ## The server files
 

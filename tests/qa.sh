@@ -6,6 +6,8 @@
 # Usage: tests/qa.sh [--no-status]       --no-status: run everything, tell GitHub nothing (for a tree with changes in it)
 #        EMULATOR=1 APP_FOLDER=<a test server's data/apk/out> tests/qa.sh
 #                                        also the tour of the game on a running emulator (tests/game/tour.sh)
+#        CLIENTS=<folder> tests/qa.sh    also every edit of the patcher against each APK in that folder: the game's other
+#                                        version, a copy changed for another server (tools/tests/test_real_client.py)
 #
 # One report per commit under _work/qa, the newest five kept: each step's whole output and the list of results.
 set -uo pipefail
@@ -63,10 +65,16 @@ tools_tests() {
     echo "no game client in data/apk/base: run ./opendmtq import first"
     return 1
   fi
+  # More clients for the same edits, when a folder of them is named.
+  local more=()
+  if [ -n "${CLIENTS:-}" ]; then
+    [ -d "$CLIENTS" ] || { echo "CLIENTS is not a folder: $CLIENTS"; return 1; }
+    more=(-v "$(cd "$CLIENTS" && pwd):/clients:ro" -e OPENDMTQ_CLIENTS=/clients)
+  fi
   # server/portal and the runtime's build beside tools/, as in the repository: the tests read them too.
   docker run --rm -e PYTHONDONTWRITEBYTECODE=1 -v "$ROOT/tools:/t:ro" -v "$ROOT/server/portal:/server/portal:ro" \
     -v "$ROOT/arm32:/arm32:ro" \
-    -v "$ROOT/data/apk/base:/base:ro" \
+    -v "$ROOT/data/apk/base:/base:ro" "${more[@]}" \
     -e OPENDMTQ_BASE_APK="/base/$(basename "$base")" --entrypoint sh opendmtq-tools:qa \
     -c 'cd /t && python3 -m unittest discover -s tests -t . -v'
 }
