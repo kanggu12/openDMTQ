@@ -333,8 +333,10 @@ class HostVersionTest(unittest.TestCase):
                 f.write("0.2.0\n")
             self.assertEqual(self.version(d), "0.2.0")
 
-    @unittest.skipUnless(os.path.isdir(os.path.join(ROOT, ".git")), "needs a clone")
     def test_a_clone_by_the_date_and_commit_of_its_code(self):
+        # A clone that git can read: CI's Python 3.9 container mounts one and has no git, and gives an empty version.
+        if not shutil.which("git") or subprocess.run(["git", "-C", ROOT, "rev-parse"], capture_output=True).returncode:
+            self.skipTest("not a git checkout")
         self.assertRegex(self.version(ROOT), r"^\d{4}\.\d\d\.\d\d-[0-9a-f]{7,}$")
 
     def test_a_copy_with_neither_shows_none(self):
