@@ -23,6 +23,8 @@ PATCH_DIR = os.path.join("patch", "phone_new")
 GAME_DIR = os.path.join(HOST, PATCH_DIR)
 PATCH_NAME = "phone_new"
 PATCH_PARENT = "patch"
+# The songs alone: their own folder, with their music in Songs/<id>/<id>.fpk.
+SONGS_DIR = "DMQ"
 CLIENT_VERSION = re.compile(r"\d+(?:\.\d+)+")
 # This project's own downloads start with its name: the apps it builds, its Windows bundle. They are none of the game's.
 OWN_APPS = "opendmtq"
@@ -55,8 +57,8 @@ def is_patch_folder(path):
 def game_folder_kind(path):
     """What path is of the game's server files, whatever its name: "whole" with the game host's folder in it, the game
     host's folder itself under any name, or an OpenDMTQ server's content folder (its web/); "alone" for the game data
-    alone, the client's patch folder in it by itself (patch/phone_new) or path that folder (patch, phone_new); else
-    None."""
+    alone, the client's patch folder in it by itself (patch/phone_new) or path that folder (patch, phone_new); "songs"
+    for the songs alone, their DMQ folder with music in it, in path or path that folder; else None."""
     if os.path.isdir(os.path.join(path, GAME_DIR)):
         return "whole"
     # Each folder asked once: the search asks this of every folder it passes.
@@ -71,11 +73,23 @@ def game_folder_kind(path):
     if ((has_patch and is_patch_folder(patch)) or (name == PATCH_NAME and is_patch_folder(path))
             or (name == PATCH_PARENT and is_patch_folder(os.path.join(path, PATCH_NAME)))):
         return "alone"
+    if has_music(os.path.join(path, SONGS_DIR)) or (name == SONGS_DIR and has_music(path)):
+        return "songs"
     return None
 
 
+def has_music(dmq):
+    """True when a songs' folder (DMQ) holds the music of at least one song."""
+    folder = os.path.join(dmq, "Songs")
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return False
+    return any(os.path.isfile(os.path.join(folder, d, d + ".fpk")) for d in names)
+
+
 def is_game_folder(path):
-    """True when path is an unpacked folder of the game's server files, whole or the game data alone (game_folder_kind)."""
+    """True when path is an unpacked folder of the game's server files, whole or part of them (game_folder_kind)."""
     return game_folder_kind(path) is not None
 
 

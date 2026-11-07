@@ -84,6 +84,17 @@ class MatchesTest(unittest.TestCase):
             self.assertFalse(discover.is_game_folder(os.path.join(d, "app")))
             self.assertFalse(discover.is_game_folder(os.path.join(d, "app", "phone_new")))
 
+    def test_the_songs_alone(self):
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "songs", "DMQ", "Songs", "1"))
+            touch(os.path.join(d, "songs", "DMQ", "Songs", "1"), "1.fpk")
+            self.assertEqual(discover.game_folder_kind(os.path.join(d, "songs")), "songs")
+            self.assertEqual(discover.game_folder_kind(os.path.join(d, "songs", "DMQ")), "songs")
+            self.assertEqual(discover.matches(d), ["songs"])
+            # A DMQ folder without the songs' music is not the game's.
+            os.makedirs(os.path.join(d, "tool", "DMQ", "Songs"))
+            self.assertIsNone(discover.game_folder_kind(os.path.join(d, "tool")))
+
     def test_a_folder_that_cannot_be_read_holds_nothing(self):
         with tempfile.TemporaryDirectory() as d:
             self.assertEqual(discover.matches(os.path.join(d, "gone")), [])

@@ -418,9 +418,10 @@ def cmd_import(args):
         # A folder inside data/ (data/server of an earlier OpenDMTQ) is read where it is: its files are linked into
         # data/content instead of copied, on the same disk.
         extra["IMPORT_DATA"] = inside
-    elif os.path.isfile(src):
-        # A single file is imported by mounting its folder and naming the file.
-        extra.update({"IMPORT_FROM": os.path.dirname(src), "IMPORT_ONLY": os.path.basename(src)})
+    elif os.path.isfile(src) or os.path.basename(os.path.normpath(src)) == "DMQ":
+        # A single file is imported by mounting its folder and naming the file. So is the songs' folder itself (DMQ):
+        # the jackets (viewImg) and the song list (_info) are beside it, in the folder mounted.
+        extra.update({"IMPORT_FROM": os.path.dirname(os.path.normpath(src)), "IMPORT_ONLY": os.path.basename(os.path.normpath(src))})
     # In its own service: 7-Zip opens the owner's archives there, out of sight of the keys, the
     # backups, the database and what phones download (compose.yaml, service "importer").
     r = system.tool("importer", extra_env=extra, as_invoker=True, service="importer")

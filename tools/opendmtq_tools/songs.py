@@ -23,9 +23,9 @@ product_product and category_categoryproduct), which the client downloads when t
 
 What phones are told of is what the server has. The game data (the client's tables, the images of its screens and
 its fonts) comes from the operator's files; the songs are imported apart from it. Without imported songs the tables
-lose every song's row, item and product (the chart table keeps its rows: the client refuses an empty one), and the
-manifest every song file: the game then starts with an empty song list, and offers the songs added on the admin
-pages alone.
+lose every song's row, item and product (the chart table keeps its rows: the client refuses an empty one); the
+songs' previews and tiles stay with the patch folder they came in. The game then starts with an empty song list, and
+offers the songs added on the admin pages alone.
 """
 
 import csv
@@ -58,7 +58,8 @@ POINT_SONGS = {1, 5, 17, 26, 27, 31, 34, 36, 49, 52, 54, 63, 71, 72, 73, 77, 100
 NOT_OWNED = {39001, 39002, 39003, 39004, 39101, 90001, 90002, 90003, 90004, 90005, 90006, 90007, 90008, 90009,
              91001, 99101}
 # A song's own files in the client's patch folder, as the manifest names them: its preview and its tiles in the song list
-# (the import's SONG_PATCH). Those of songs that were not imported are missing, and go from the manifest.
+# (atlases of several songs each). They come with the patch folder, every song's; files given without some of them
+# leave those out, and they go from the manifest.
 SONG_FILE = re.compile(r"preview/.*|dlc/d3?_e\d+\.unity3d")
 # The game's own files the game starts without: the fonts it uses only in Chinese.
 OPTIONAL_GAME_FILES = ("Fonts/",)

@@ -289,42 +289,63 @@ def is_file(entry):
         return False
 
 
-def game_folder_in(path, listed=None):
-    """The folder of the game's server files in path itself or up to two levels down (an archive unpacked into a folder
-    of its own, with one more around the game's: a web server's htdocs, say), or None. The nearest, whole files before
-    the game data alone (the patch folder copied by itself), as the import takes them. listed: path's entries when the
-    caller has them already."""
-    # The first patch folder alone met: what is shown when no whole files come after it.
-    alone = None
-    if is_game_folder(path):
-        if importer.whole_host_folder(path) or importer.patch_itself(path):
-            return path
-        alone = path
-    subs = [e.path for e in (listed if listed is not None else entries(path) or []) if is_dir(e)]
+def game_files_in(path, listed=None):
+    """(the game's files, the songs alone) in path itself or up to two levels down (an archive unpacked into a folder
+    of its own, with one more around the game's: a web server's htdocs, say), as the import takes them, each the
+    nearest or None: the whole files before the game data alone (the patch folder copied by itself); the songs alone
+    (their DMQ folder) when the files found have no songs of their own. listed: path's entries when the caller has
+    them already. A folder is asked for the songs' folder by its name only, as its parent's listing has it."""
+    whole = alone = songs = None
+
+    def note(folder, names):
+        """Note what folder holds (names: its folders' names, when listed); True for the whole files with their songs,
+        after which there is nothing more to look for."""
+        nonlocal whole, alone, songs
+        if is_game_folder(folder):
+            if importer.whole_host_folder(folder):
+                whole = whole or folder
+                return importer.dmq_of(importer.host_folder(folder)) is not None
+            alone = alone or folder
+        elif (songs is None and names is not None and (importer.SONGS_DIR in names
+                                                       or os.path.basename(folder.rstrip("/\\")) == importer.SONGS_DIR)
+              and importer.songs_host(folder)):
+            songs = folder
+        return False
+
+    here = listed if listed is not None else entries(path) or []
+    if note(path, {e.name for e in here if is_dir(e)}) or importer.patch_itself(path):
+        return (whole or alone or None), None
+    subs = [e.path for e in here if is_dir(e)]
     for sub in subs:
-        if is_game_folder(sub):
-            if importer.whole_host_folder(sub):
-                return sub
-            alone = alone or sub
+        if note(sub, None):
+            return whole, None
     # Two levels down, past the patch folders themselves: a folder that holds one may hold the whole files beside it,
     # as the import finds them.
     for sub in subs:
-        if importer.patch_itself(sub):
+        if importer.patch_itself(sub) or is_game_folder(sub) and importer.whole_host_folder(sub):
             continue
-        for e in entries(sub) or []:
-            if is_dir(e) and is_game_folder(e.path):
-                if importer.whole_host_folder(e.path):
-                    return e.path
-                alone = alone or e.path
-    return alone
+        listed_sub = entries(sub) or []
+        note(sub, {e.name for e in listed_sub if is_dir(e)})
+        for e in listed_sub:
+            if is_dir(e) and note(e.path, None):
+                return whole, None
+    game = whole or alone
+    has_songs = game is not None and importer.dmq_of(importer.host_folder(game)) is not None
+    return game, (None if has_songs else songs)
+
+
+def game_folder_in(path, listed=None):
+    """The folder of the game's files game_files_in finds: the game's files, else the songs alone; or None."""
+    game, songs = game_files_in(path, listed)
+    return game or songs
 
 
 def same_files(tree):
-    """What a folder of the game's server files is, to tell two places of the same files apart from two of the same
-    kind: its patch folder (a folder and the patch folder copied into it share one); the folder itself when it is gone
-    or changed since it was found."""
+    """What a folder of the game's files is, to tell two places of the same files apart from two of the same kind: its
+    patch folder (a folder and the patch folder copied into it share one), or its songs' folder for the songs alone;
+    the folder itself when it is gone or changed since it was found."""
     host = importer.host_folder(tree)
-    return (importer.patch_of(host) if host else None) or os.path.normpath(tree)
+    return (importer.patch_of(host) if host else importer.dmq_of(tree)) or os.path.normpath(tree)
 
 
 def look_in(folder, listed=None):
@@ -344,11 +365,20 @@ def look_in(folder, listed=None):
     # The iPhone app, named like the game's or beside its files: listed, to be said to be of no use.
     iphone = [n for n in files if n.lower().endswith(IPA_SUFFIX) and (any(word in n.lower() for word in GAME_WORDS)
                                                                       or apks or archives)]
-    tree = game_folder_in(folder, listed)
-    if not (apks or archives or tree or iphone):
+    tree, songs_tree = game_files_in(folder, listed)
+    if not (apks or archives or tree or songs_tree or iphone):
         return None
-    return {"path": folder, "apks": apks, "archives": archives, "tree": tree, "iphone": iphone,
-            "parts": {n: len(importer.parts_with(n, files)) for n in archives}}
+    return {"path": folder, "apks": apks, "archives": archives, "tree": tree, "tree_kind": tree_kind(tree),
+            "songs_tree": songs_tree, "iphone": iphone, "parts": {n: len(importer.parts_with(n, files)) for n in archives}}
+
+
+def tree_kind(tree):
+    """What a folder of the game's files holds, for its label: "whole", "game" (the game data alone) or "songs"."""
+    if tree is None:
+        return None
+    if importer.whole_host_folder(tree):
+        return "whole"
+    return "game" if importer.host_folder(tree) else "songs"
 
 
 def known_folders():
@@ -415,20 +445,22 @@ def found_on_this_pc():
                     found.append(hit)
         # The same server files folder seen from two places (Downloads, and the folder in it): said once, by the folder
         # with files of its own beside it, else the one nearest to it. The same by their patch folder, which a folder
-        # and the patch folder copied into it share.
-        best, same = {}, {}
-        for h in found:
-            if h["tree"]:
-                same[id(h)] = same_files(h["tree"])
-                score = (bool(h["apks"] or h["archives"] or h["iphone"]), len(h["path"]))
-                if same[id(h)] not in best or score > best[same[id(h)]][0]:
-                    best[same[id(h)]] = (score, h)
-        for h in found:
-            if h["tree"] and best[same[id(h)]][1] is not h:
-                h["tree"] = None
-        found = [h for h in found if h["apks"] or h["archives"] or h["iphone"] or h["tree"]]
+        # and the patch folder copied into it share, and the songs alone by their folder.
+        for key in ("tree", "songs_tree"):
+            best, same = {}, {}
+            for h in found:
+                if h[key]:
+                    same[id(h)] = same_files(h[key])
+                    score = (bool(h["apks"] or h["archives"] or h["iphone"]), len(h["path"]))
+                    if same[id(h)] not in best or score > best[same[id(h)]][0]:
+                        best[same[id(h)]] = (score, h)
+            for h in found:
+                if h[key] and best[same[id(h)]][1] is not h:
+                    h[key] = None
+        found = [h for h in found if h["apks"] or h["archives"] or h["iphone"] or h["tree"] or h["songs_tree"]]
         # A folder with both the client and the server files first, then by how much it has; the iPhone app alone last.
-        found.sort(key=lambda h: (not (h["apks"] and (h["archives"] or h["tree"])), not (h["apks"] or h["archives"] or h["tree"]),
+        found.sort(key=lambda h: (not (h["apks"] and (h["archives"] or h["tree"])),
+                                  not (h["apks"] or h["archives"] or h["tree"] or h["songs_tree"]),
                                   -(len(h["apks"]) + len(h["archives"]))))
         _scan.update(key=tops, at=time.time(), found=found[:8])
         return _scan["found"]
@@ -476,8 +508,10 @@ def listing(path):
                 files.append((e.name, e.stat().st_size, os.path.join(path, e.name)))
         except OSError:
             continue
+    tree, songs_tree = game_files_in(path, listed)
     return {"path": path, "parent": parent_of(path), "folders": folders[:MAX_LISTED], "files": files[:MAX_LISTED],
-            "more": len(folders) > MAX_LISTED or len(files) > MAX_LISTED, "tree": game_folder_in(path, listed),
+            "more": len(folders) > MAX_LISTED or len(files) > MAX_LISTED, "tree": tree, "tree_kind": tree_kind(tree),
+            "songs_tree": songs_tree,
             "parts": {n: len(importer.parts_with(n, names)) for n, _, _ in files[:MAX_LISTED]}}
 
 
@@ -523,8 +557,11 @@ def what_words(w):
         return t("setup.what_gone")
     if w["kind"] == "app":
         return client_words(w["client"])
-    if w["kind"] == "server files":
-        words = t("setup.what_files", n=w["songs"]) if w["songs"] else t("setup.what_files_no_songs")
+    if w["kind"] in ("server files", "songs"):
+        if w["kind"] == "songs":
+            words = t("setup.what_songs", n=w["songs"])
+        else:
+            words = t("setup.what_files", n=w["songs"]) if w["songs"] else t("setup.what_files_no_songs")
         return f"{words}. {t('setup.what_with_app')}" if w["apps"] else words
     return t({"iphone app": "setup.what_ipa", "part": "setup.what_part", "unreadable": "setup.what_unreadable",
               "archive": "setup.what_inner" if w["ok"] else "setup.what_neither"}.get(w["kind"], "setup.what_neither"))

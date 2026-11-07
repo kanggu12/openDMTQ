@@ -203,7 +203,7 @@ class StepsTest(unittest.TestCase):
             self.assertFalse(setup.steps_done()["files"])
             page = inst.page(BASE + "/setup?step=files")
             self.assertIn("2 of its files are missing (dlc/d3_a0.unity3d, ...)", page)
-            self.assertIn("Import the whole server files again.", page)
+            self.assertIn("Import the game data again.", page)
 
     def test_a_server_waiting_for_its_files_is_pointed_to_the_setup_not_called_down(self):
         waiting = {"ok": False, "game_data": False, "database": True, "writable": True, "songs": 0, "host": HOST}
@@ -323,6 +323,26 @@ class FilesOnThisPcTest(unittest.TestCase):
             self.assertEqual(setup.game_folder_in(inst.path("home/Documents")), os.path.join(stuff, "server"))
             # A folder gone since it was found is still told apart from the others, by its own path.
             self.assertEqual(setup.same_files(inst.path("home/gone")), os.path.normpath(inst.path("home/gone")))
+
+    def test_the_game_data_and_the_songs_alone_are_found_and_named(self):
+        with HostInstall() as inst:
+            # The patch folder copied out, and the songs' folder with their jackets in a folder of their own.
+            os.makedirs(inst.path("home/Downloads/DMTQ/game data/patch/phone_new/1.003.005/android/table/us"))
+            os.makedirs(inst.path("home/Downloads/DMTQ/songs/DMQ/Songs/1"))
+            inst.write("home/Downloads/DMTQ/songs/DMQ/Songs/1/1.fpk", "m")
+            inst.write("home/Downloads/DMTQ/game.apk", "PK")
+            found = setup.look_in(inst.path("home/Downloads/DMTQ"))
+            self.assertEqual((found["tree"], found["tree_kind"], found["songs_tree"]),
+                             (inst.path("home/Downloads/DMTQ/game data"), "game", inst.path("home/Downloads/DMTQ/songs")))
+            inst.sign_in()
+            page = inst.page(BASE + "/setup?step=files")
+            self.assertIn("Game data folder: " + inst.path("home/Downloads/DMTQ/game data"), page)
+            self.assertIn("Songs folder: " + inst.path("home/Downloads/DMTQ/songs"), page)
+            self.assertIn("The songs", page)
+            # In the picker, the songs' folder says what it holds.
+            self.assertIn("This folder holds the game's songs.", inst.page(BASE + "/setup?step=files&dir="
+                                                                            + inst.path("home/Downloads/DMTQ/songs")))
+            self.assertEqual(setup.what_words(setup.what_is(inst.path("home/Downloads/DMTQ/songs"))), "Songs alone: 1 songs")
 
     def test_each_file_is_said_for_what_it_is(self):
         with HostInstall() as inst:

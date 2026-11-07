@@ -317,6 +317,15 @@ class ImportTest(unittest.TestCase):
             self.assertEqual(sb.call(app.cmd_import, path=folder, songs=True, no_game_data=True), 0, sb.output())
             self.assertEqual((sb.tool_calls[-1][2]["IMPORT_GAME"], sb.tool_calls[-1][2]["IMPORT_SONGS"]), ("no", "yes"))
 
+    def test_the_songs_folder_itself_is_read_with_the_folder_around_it(self):
+        # DMQ by itself: the jackets (viewImg) and the song list (_info) are beside it, so its folder is mounted.
+        with Sandbox() as sb:
+            sb.write("Downloads/server/DMQ/Songs/1/1.fpk", b"m")
+            dmq = sb.path("Downloads/server/DMQ")
+            self.assertEqual(sb.call(app.cmd_import, path=dmq, songs=True, no_game_data=True), 0, sb.output())
+            extra = sb.tool_calls[-1][2]
+            self.assertEqual((extra["IMPORT_FROM"], extra["IMPORT_ONLY"]), (os.path.dirname(dmq), "DMQ"))
+
     def test_an_earlier_tree_in_data_is_read_where_it_is(self):
         # data/server of an earlier OpenDMTQ: linked into data/content on the same disk, not copied through a mount.
         with Sandbox() as sb:

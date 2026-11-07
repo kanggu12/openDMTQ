@@ -59,6 +59,7 @@
   <div class="setup-need">
     <div><h3>{{ t('setup.need_app_title') }}</h3><p>{{ t('setup.need_app') }}</p></div>
     <div><h3>{{ t('setup.need_files_title') }}</h3><p>{{ t('setup.need_files') }}</p></div>
+    <div><h3>{{ t('setup.need_songs_title') }}</h3><p>{{ t('setup.need_songs') }}</p></div>
   </div>
   <dl class="setup-have">
     <div><dt>{{ t('setup.have_apk') }}</dt><dd>{% if has_apk %}<span class="lamp on"></span>{{ client_words }}{% elif client %}<span class="lamp bad"></span>{{ t('setup.client_unusable', names=client.unusable|map('first')|join(', ')) }}{% else %}<span class="lamp wait"></span>{{ t('setup.not_yet') }}{% endif %}</dd></div>
@@ -77,7 +78,9 @@
           {# Each file it holds, with what it is. #}
           <ul class="setup-files">
             {% for n in f.apks + f.archives + f.iphone %}<li><span class="setup-file">{{ n }}</span>{% if f.parts[n] %} <span class="meta-inline">{{ t('setup.parts', n=f.parts[n]) }}</span>{% endif %} {{ what(f.path ~ sep ~ n) }}</li>{% endfor %}
-            {% if f.tree %}<li><span class="setup-file">{{ t('setup.found_tree', path=f.tree) }}</span> {{ what(f.tree) }}</li>{% endif %}
+            {# The game's files folder, by what it holds; the songs alone beside it, which the import takes too. #}
+            {% if f.tree %}<li><span class="setup-file">{{ t({'game': 'setup.found_tree_game', 'songs': 'setup.found_tree_songs'}.get(f.tree_kind, 'setup.found_tree'), path=f.tree) }}</span> {{ what(f.tree) }}</li>{% endif %}
+            {% if f.songs_tree %}<li><span class="setup-file">{{ t('setup.found_tree_songs', path=f.songs_tree) }}</span> {{ what(f.songs_tree) }}</li>{% endif %}
           </ul>
         </div>
         {{ import_form(f.path, t('setup.import')) }}
@@ -104,7 +107,8 @@
     <div class="setup-picker">
       {# Where it is, each folder on the way a link back to it. #}
       <div class="setup-where"><nav class="setup-crumbs" aria-label="{{ t('setup.where') }}">{% for name, full in crumbs %}{% if not loop.last %}<a href="{{ full|setup_url }}">{{ name }}</a><span class="sep" aria-hidden="true">›</span>{% else %}<b aria-current="location">{{ name }}</b>{% endif %}{% endfor %}</nav>{% if listing.parent %}<a class="btn btn-sm" href="{{ listing.parent|setup_url }}">{{ t('setup.up') }}</a>{% endif %}</div>
-      {% if listing.tree %}<p class="flash ok" role="status">{{ what(listing.tree, t('setup.is_tree')) }}</p>{% endif %}
+      {% if listing.tree %}<p class="flash ok" role="status">{{ what(listing.tree, t({'game': 'setup.is_tree_game', 'songs': 'setup.is_tree_songs'}.get(listing.tree_kind, 'setup.is_tree'))) }}</p>{% endif %}
+      {% if listing.songs_tree %}<p class="flash ok" role="status">{{ what(listing.songs_tree, t('setup.is_tree_songs')) }}</p>{% endif %}
       {% if listing.folders or listing.files %}
       <ul class="setup-list">
         {% for name, full in listing.folders %}<li class="folder"><a href="{{ full|setup_url }}">{{ name }}</a></li>{% endfor %}

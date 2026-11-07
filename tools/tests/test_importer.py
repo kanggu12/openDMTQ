@@ -79,11 +79,15 @@ class PartsTest(unittest.TestCase):
             self.addCleanup(patcher.stop)
 
     def test_the_game_data_alone_has_no_song(self):
+        # The whole patch folder, every song's preview and tiles with it: the songs' files are their folder, their
+        # jackets and their list.
         self.assertTrue(importer.import_game_files([self.src], {"game"}))
         self.assertEqual(content_files(self.data), {
             "web/patch/phone_new/1.003.005/android/patch_new.csv.lz4",
             "web/patch/phone_new/1.003.005/android/table/us/song_song.csv.lz4",
             "web/patch/phone_new/1.003.005/android/dlc/d3_a0.unity3d.lz4",
+            "web/patch/phone_new/1.003.005/android/dlc/d3_e0.unity3d.lz4",
+            "web/patch/phone_new/1.003.005/android/preview/song1.p.opus.lz4",
             "web/static/dmq/banner/x/howtoplay_play.png",
             "web/viewImg/news/phone1.png",
         })
@@ -95,8 +99,6 @@ class PartsTest(unittest.TestCase):
             "songs.json",
             "web/DMQ/Songs/1/1.fpk", "web/DMQ/Songs/2/2.fpk",
             "web/DMQ/Patterns/1", "web/DMQ/Patterns/1_EARPHONE", "web/DMQ/Patterns/2", "web/DMQ/Patterns/2_EARPHONE",
-            "web/patch/phone_new/1.003.005/android/dlc/d3_e0.unity3d.lz4",
-            "web/patch/phone_new/1.003.005/android/preview/song1.p.opus.lz4",
             # The jacket as it was, and under the name the song list gives it (Windows ignored the case).
             "web/viewImg/eye/Song1.png", "web/viewImg/eye/song1.png",
         })
@@ -370,10 +372,13 @@ class GameDataAloneTest(unittest.TestCase):
     """The client's patch folder copied by itself, in each form it is copied in: the game data alone. It keeps the
     server's songs, and whole files beside it come first."""
 
-    # What the game data of game_folder() is, without its songs, its how-to-play picture and its news.
+    # What the game data of game_folder() is in its patch folder: all of that folder, every song's preview and tiles
+    # with it; not the pictures of HOW TO PLAY and of the news beside it.
     GAME_DATA = {"web/patch/phone_new/1.003.005/android/patch_new.csv.lz4",
                  "web/patch/phone_new/1.003.005/android/table/us/song_song.csv.lz4",
-                 "web/patch/phone_new/1.003.005/android/dlc/d3_a0.unity3d.lz4"}
+                 "web/patch/phone_new/1.003.005/android/dlc/d3_a0.unity3d.lz4",
+                 "web/patch/phone_new/1.003.005/android/dlc/d3_e0.unity3d.lz4",
+                 "web/patch/phone_new/1.003.005/android/preview/song1.p.opus.lz4"}
 
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
@@ -445,7 +450,7 @@ class GameDataAloneTest(unittest.TestCase):
         self.assertEqual(content_files(self.data),
                          before - {"web/patch/phone_new/1.003.005/android/dlc/d3_a0.unity3d.lz4"}
                          | {"web/patch/phone_new/1.003.005/android/table/us/song_new.csv.lz4"})
-        self.assertIn("  songs: none there, the songs on the server stay as they are", self.said)
+        self.assertIn("songs: none there, the songs on the server stay as they are", self.said)
         # Asked for the songs alone, it takes nothing at all.
         after = content_files(self.data)
         self.assertTrue(importer.import_game_files([os.path.join(self.tmp, "only")], {"songs"}))
@@ -515,8 +520,119 @@ class GameDataAloneTest(unittest.TestCase):
         self.assertEqual(importer.tree_in(listing), ("pack/www/", "pack/www/_info/songList.json"))
 
 
+class SongsAloneTest(unittest.TestCase):
+    """The songs copied by themselves (their DMQ folder, with the jackets' viewImg and the song list or without): they
+    come in on their own, onto the game data the server has, or with it from another place, and replace only what
+    they have."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.tmp = tmp.name
+        self.data = os.path.join(tmp.name, "data")
+        os.makedirs(self.data)
+        self.said = []
+        for patcher in (mock.patch.object(importer, "DATA", self.data), mock.patch.object(importer, "log", self.said.append)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        # The game data alone, with the client's song tables (two songs) and every song's preview and tiles.
+        self.game = os.path.join(self.tmp, "Downloads", "game")
+        tables(os.path.join(self.game), [(1, "first"), (2, "second")], [(11, 1), (12, 1), (21, 2)])
+        write(self.game, {"patch/phone_new/1.003.005/android/patch_new.csv.lz4": "manifest",
+                          "patch/phone_new/1.003.005/android/preview/first.p.opus.lz4": "preview",
+                          "patch/phone_new/1.003.005/android/dlc/d3_e0.unity3d.lz4": "tiles"})
+        # The songs alone: their folder, and their jackets.
+        self.songs = os.path.join(self.tmp, "Downloads", "songs")
+        write(self.songs, {"DMQ/Songs/1/1.fpk": "m", "DMQ/Songs/2/2.fpk": "m", "DMQ/Patterns/11": "c",
+                           "DMQ/Patterns/21": "c", "viewImg/eye/first.png": "j", "viewImg/eye/second.png": "j"})
+
+    def listed(self):
+        with open(os.path.join(self.data, "content", "songs.json"), encoding="utf-8") as f:
+            return json.load(f)
+
+    def test_after_the_game_data_the_songs_come_in_on_their_own(self):
+        self.assertTrue(importer.import_game_files([self.game], {"game", "songs"}))
+        game = content_files(self.data)
+        self.assertIn("web/patch/phone_new/1.003.005/android/preview/first.p.opus.lz4", game)
+        self.assertEqual(importer.what_is(self.songs)["kind"], "songs")
+        self.assertTrue(importer.import_game_files([self.songs], {"game", "songs"}))
+        self.assertIn("game data: none there, the game data on the server stays as it is", self.said)
+        # The list from the server's own tables, for the songs and the charts whose files came.
+        self.assertEqual([(s["song_id"], [c["pattern_id"] for c in s["song_patterns"]]) for s in self.listed()],
+                         [(1, [11]), (2, [21])])
+        self.assertEqual(content_files(self.data), game | {
+            "songs.json", "web/DMQ/Songs/1/1.fpk", "web/DMQ/Songs/2/2.fpk", "web/DMQ/Patterns/11", "web/DMQ/Patterns/21",
+            "web/viewImg/eye/first.png", "web/viewImg/eye/second.png"})
+
+    def test_the_game_data_and_the_songs_from_two_places_in_one_import(self):
+        downloads = os.path.join(self.tmp, "Downloads")
+        self.assertTrue(importer.import_game_files(list(importer.walk(downloads)), {"game", "songs"}))
+        got = content_files(self.data)
+        self.assertIn("web/patch/phone_new/1.003.005/android/patch_new.csv.lz4", got)
+        self.assertIn("web/DMQ/Songs/2/2.fpk", got)
+        self.assertEqual([s["song_id"] for s in self.listed()], [1, 2])
+
+    def test_the_songs_folder_itself_with_the_jackets_beside_it(self):
+        importer.import_game_files([self.game], {"game"})
+        self.assertTrue(importer.import_game_files([os.path.join(self.songs, "DMQ")], {"songs"}))
+        self.assertIn("web/viewImg/eye/second.png", content_files(self.data))
+        self.assertEqual([s["song_id"] for s in self.listed()], [1, 2])
+
+    def test_songs_without_jackets_keep_the_servers(self):
+        importer.import_game_files([self.game], {"game"})
+        importer.import_game_files([self.songs], {"songs"})
+        shutil.rmtree(os.path.join(self.songs, "viewImg"))
+        os.remove(os.path.join(self.songs, "DMQ", "Songs", "2", "2.fpk"))
+        self.assertTrue(importer.import_game_files([self.songs], {"songs"}))
+        got = content_files(self.data)
+        self.assertIn("web/viewImg/eye/second.png", got)
+        self.assertNotIn("web/DMQ/Songs/2/2.fpk", got)
+        self.assertEqual([s["song_id"] for s in self.listed()], [1])
+
+    def test_the_folder_chosen_counts_by_what_is_in_it(self):
+        # Mounted as /in, the songs' folder has lost its name.
+        importer.import_game_files([self.game], {"game"})
+        chosen = os.path.join(self.tmp, "in")
+        shutil.copytree(os.path.join(self.songs, "DMQ"), chosen)
+        self.assertEqual(importer.what_is(chosen)["kind"], "other")
+        self.assertEqual(importer.what_is(chosen, chosen=True)["songs"], 2)
+        self.assertTrue(importer.import_game_files(list(importer.walk(chosen)), {"songs"}, chosen=[chosen]))
+        self.assertEqual([s["song_id"] for s in self.listed()], [1, 2])
+
+    def test_without_the_game_data_the_list_waits_for_it(self):
+        self.assertTrue(importer.import_game_files([self.songs], {"songs"}))
+        self.assertEqual(self.listed(), [])
+        self.assertIn("  the song list needs the game data's tables: import the game data, then the songs again", self.said)
+
+    def test_a_songs_folder_of_another_program_is_not_the_games(self):
+        other = os.path.join(self.tmp, "tool")
+        write(other, {"DMQ/readme.txt": "x", "DMQ/Songs/notes.txt": "y"})
+        self.assertEqual(importer.what_is(other)["kind"], "other")
+        self.assertFalse(importer.import_game_files([other], {"songs"}))
+
+    def test_in_an_archive_listing(self):
+        listing = ["pack/DMQ/Songs/1/1.fpk", "pack/DMQ/Patterns/11", "pack/viewImg/eye/first.png", "pack/_info/songList.json"]
+        self.assertEqual(importer.songs_tree_in(listing), ("pack/", "pack/_info/songList.json"))
+        self.assertEqual(importer.songs_tree_in(["DMQ/Songs/1/1.fpk"]), ("", None))
+        self.assertIsNone(importer.songs_tree_in(["DMQ/Songs/1/2.fpk", "DMQ/readme.txt"]))
+        # The whole files are the whole files, with their songs.
+        self.assertIsNone(importer.patch_alone_in(listing))
+
+
 class CheckTest(unittest.TestCase):
     """import --check: what each file is, and nothing imported."""
+
+    def test_the_songs_alone_are_said_for_what_they_are(self):
+        with tempfile.TemporaryDirectory() as d:
+            src = os.path.join(d, "in")
+            write(src, {"songs/DMQ/Songs/1/1.fpk": "m", "songs/DMQ/Songs/2/2.fpk": "m"})
+            said = []
+            with mock.patch.multiple(importer, IN=src, DATA=d, log=said.append), \
+                    mock.patch.dict(os.environ, {"IMPORT_ONLY": "", "IMPORT_CHECK": "yes"}):
+                with self.assertRaises(SystemExit):
+                    importer.main()
+            self.assertEqual(said, ["ok   songs: the game's songs alone, 2 songs, for the game data imported apart, "
+                                    "no song list (made from the game's own tables)"])
 
     def test_the_game_data_alone_is_said_once_for_what_it_is(self):
         with tempfile.TemporaryDirectory() as d:
@@ -649,6 +765,27 @@ class ArchiveFormsTest(unittest.TestCase):
         shutil.copytree(os.path.join(tree, importer.GAME_DIR), os.path.join(self.src, "patch", "phone_new"))
         self.assertTrue(importer.import_game_files(list(importer.walk(self.src)), {"game", "songs"}))
         self.assertIn("web/DMQ/Songs/1/1.fpk", content_files(self.data))
+
+    def test_the_songs_alone_in_an_archive_onto_the_game_data(self):
+        tree = self.files()
+        importer.import_game_files([os.path.join(tree, importer.HOST, "patch")], {"game"})
+        songs = os.path.join(self.tmp, "songs")
+        shutil.copytree(os.path.join(tree, importer.HOST, "DMQ"), os.path.join(songs, "DMQ"))
+        shutil.copytree(os.path.join(tree, importer.HOST, "viewImg"), os.path.join(songs, "viewImg"))
+        shutil.copytree(os.path.join(tree, "_info"), os.path.join(songs, "_info"))
+        archive = os.path.join(self.src, "songs.zip")
+        self.pack(archive, songs, "-tzip")
+        self.assertEqual(importer.what_is(archive)["kind"], "songs")
+        self.assertTrue(importer.import_game_files([archive], {"game", "songs"}))
+        got = content_files(self.data)
+        self.assertIn("web/DMQ/Songs/1/1.fpk", got)
+        self.assertIn("web/viewImg/eye/Song1.png", got)
+        self.assertIn("web/patch/phone_new/1.003.005/android/patch_new.csv.lz4", got)
+        # The song list that came with them, in their folder.
+        with open(os.path.join(self.data, "content", "songs.json"), encoding="utf-8") as f:
+            self.assertEqual([s["song_id"] for s in json.load(f)], [1, 2])
+        # Programs and notes in the songs' folder stay out.
+        self.assertNotIn("web/DMQ/rpc.php", got)
 
     def test_the_client_in_an_apk_bundle(self):
         bundle = os.path.join(self.tmp, "bundle")
