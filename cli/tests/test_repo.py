@@ -6,8 +6,10 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from opendmtq_cli import system
 
@@ -307,6 +309,37 @@ class ReleaseNotesTest(unittest.TestCase):
         chart, _ = self.notes.chart_versions(self.notes.ROOT)
         out = self.run_notes("v" + chart)[1]
         self.assertFalse([line for line in out.splitlines() if line.startswith("  ") and not line.lstrip().startswith("- ")])
+
+
+class HostVersionTest(unittest.TestCase):
+    """The version a host install's pages show: a release's number, else the date and commit of a clone. Never git
+    describe's v1.2.3-4-gabcdef0: the pages put a v before the first part, and showed vv1.2.3."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, os.path.join(ROOT, "host"))
+        from opendmtq_host import folders
+        cls.folders = folders
+
+    def version(self, app):
+        # Without its cache, for a folder of the test's choosing.
+        with mock.patch.object(self.folders, "APP", app):
+            return self.folders.version.__wrapped__()
+
+    def test_a_release_names_itself_by_its_number(self):
+        # The Windows bundle's VERSION file, and the one host/get.sh writes for the release it fetched.
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "VERSION"), "w", encoding="utf-8") as f:
+                f.write("0.2.0\n")
+            self.assertEqual(self.version(d), "0.2.0")
+
+    @unittest.skipUnless(os.path.isdir(os.path.join(ROOT, ".git")), "needs a clone")
+    def test_a_clone_by_the_date_and_commit_of_its_code(self):
+        self.assertRegex(self.version(ROOT), r"^\d{4}\.\d\d\.\d\d-[0-9a-f]{7,}$")
+
+    def test_a_copy_with_neither_shows_none(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(self.version(d), "")
 
 
 class LineEndingTest(unittest.TestCase):

@@ -98,15 +98,18 @@ def tools_env(values, found):
 # Once: the watch below asks for the programs' environments every two seconds, and this may have to ask git.
 @functools.lru_cache(maxsize=None)
 def version():
-    """The version the pages show: the git commit of a clone, or the bundle's VERSION file."""
+    """The version the pages show: a release's number from the VERSION file (the Windows bundle's, or the one the
+    one-command install writes, "0.2.0"), else the date and commit of a clone's code ("2026.11.07-62ce933"), as with
+    Docker. The pages put a v before the first part and keep what follows the first dash for the pointer, so this is
+    never git describe's "v0.2.0-3-g655895c"."""
     try:
         with open(os.path.join(APP, "VERSION"), encoding="utf-8") as f:
             return f.read().strip()
     except OSError:
         pass
     try:
-        r = subprocess.run(["git", "-C", APP, "describe", "--always", "--dirty"], capture_output=True, text=True,
-                           encoding="utf-8", errors="replace", timeout=10)
+        r = subprocess.run(["git", "-C", APP, "log", "-1", "--format=%cd-%h", "--date=format:%Y.%m.%d"],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10)
         return r.stdout.strip() if r.returncode == 0 else ""
     except (OSError, subprocess.SubprocessError):
         return ""

@@ -6,6 +6,13 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+### Fixed
+
+- Linux and macOS: the site and the admin pages show the release a one-command install fetched (`0.2.0`), and a copy
+  from a clone the date and commit of its code. They showed nothing for the first, and `vv0.2.0` for the second.
+- Releases: a rehearsal on a branch (`gh workflow run release.yml`) checks the chart's version against the changelog;
+  it stopped at the version check, as a branch names no version.
+
 ## [0.2.0] - 2026-11-07
 
 ### Added

@@ -16,17 +16,19 @@ REPO=kanggu12/openDMTQ
 say() { printf '%s\n' "$*"; }
 die() { printf 'OpenDMTQ: %s\n' "$*" >&2; exit 1; }
 
-# Where the code comes from: the latest release, or the main branch while there is none. OPENDMTQ_TARBALL gives another
-# copy (the host install's test gives its own).
+# The latest release's tag (v1.2.3), or nothing when GitHub does not say.
+latest_tag() {
+  curl -fsSL --connect-timeout 15 --max-time 30 "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
+    | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n 1
+}
+
+# Where the code comes from: the release tagged $1, or the main branch while there is none. OPENDMTQ_TARBALL gives
+# another copy (the host install's test gives its own).
 code_url() {
   if [ -n "${OPENDMTQ_TARBALL:-}" ]; then
     printf '%s\n' "$OPENDMTQ_TARBALL"
-    return
-  fi
-  tag=$(curl -fsSL --connect-timeout 15 --max-time 30 "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
-    | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n 1) || tag=
-  if [ -n "$tag" ]; then
-    printf '%s\n' "https://github.com/$REPO/archive/refs/tags/$tag.tar.gz"
+  elif [ -n "$1" ]; then
+    printf '%s\n' "https://github.com/$REPO/archive/refs/tags/$1.tar.gz"
   else
     printf '%s\n' "https://github.com/$REPO/archive/refs/heads/main.tar.gz"
   fi
@@ -35,7 +37,11 @@ code_url() {
 # The code, into the folder only when it has come whole. Over what is there: only the program's files are in it, so the
 # settings (.env), the data (data/) and this install's own programs (.host/) stay.
 fetch_code() {
-  url=$(code_url)
+  tag=
+  if [ -z "${OPENDMTQ_TARBALL:-}" ]; then
+    tag=$(latest_tag) || tag=
+  fi
+  url=$(code_url "$tag")
   say "Downloading OpenDMTQ into $DIR"
   mkdir -p "$(dirname "$DIR")"
   work=$(mktemp -d "$DIR.new.XXXXXX")
@@ -49,6 +55,13 @@ fetch_code() {
   mkdir -p "$DIR"
   cp -R "$work/." "$DIR/"
   rm -rf "$work"
+  # The release it is, which the site and the admin pages show and a bug report asks for. Code from elsewhere has none:
+  # the number an earlier update wrote would be another's.
+  if [ -n "$tag" ]; then
+    printf '%s\n' "${tag#v}" > "$DIR/VERSION"
+  else
+    rm -f "$DIR/VERSION"
+  fi
 }
 
 main() {

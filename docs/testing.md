@@ -72,9 +72,11 @@ A rule that fits a page on purpose goes on that page's element as `data-layout-o
 `qa/local` when everything passed. `--no-status` runs it on a tree with changes, for a look. Its report, with each step's whole
 output, is in `_work/qa/<commit>`; the newest five are kept.
 
-**A release** (`.github/workflows/release.yml`, a tag `v*`) runs CI again on the tag's commit, asks for `qa/local`, and only then
-publishes the images, the chart and the GitHub release. `gh workflow run release.yml` rehearses it on any commit: all the gates,
-and nothing published.
+**A release** (`.github/workflows/release.yml`, a tag `v*`) first checks that the tag, the chart and CHANGELOG.md name one
+version (`.github/release_notes.py`), runs CI again on the tag's commit, asks for `qa/local`, and only then publishes the
+images, the chart, the Windows bundle and the GitHub release, whose notes are that version's section of the changelog.
+`gh workflow run release.yml` rehearses it on any commit: all the gates, with the chart's own version, and nothing
+published.
 
 **A deploy** (`./opendmtq deploy`) puts the commit that is checked out on this machine's server:
 
@@ -93,7 +95,7 @@ and nothing published.
 
 ## Measurements
 
-The README's charts come from runs like these, on a Ryzen 9 9950X with the container limited to two cores
+The charts here and in the README come from runs like these, on a Ryzen 9 9950X with the container limited to two cores
 (`docker run --cpus 2`). The data is made up: 300 players, 1,500 charts, a million plays over a year, 200 MB of added songs,
 two full request logs, and a home folder with 5,000 files and 600 folders.
 
@@ -102,6 +104,11 @@ two full request logs, and a home folder with 5,000 files and 600 folders.
   answers a second. A save is the client's two requests.
 - **Before and after:** the same script through the pages' real paths in the test client, best of five (of two for the
   backup), on the code before and after the tuning, in the same container.
+
+<p align="center">
+  <img src="images/chart-tuning.svg" alt="Before and after tuning: the in-game ranking of one song from 190 to 6.3 milliseconds; the Logs page looking for new lines from 460 to 21 milliseconds; a backup with 200 MB of added songs from 8 seconds to 528 milliseconds; four threads on one counter in the runtime from 2.9 seconds to 250 milliseconds; the setup searching a full home folder from 143 to 20 milliseconds; the Songs page from 322 to 68 milliseconds; the Status page from 294 to 152 milliseconds; the Players page from 278 to 174 milliseconds" width="100%">
+</p>
+
 - **The phone and the runtime:** [arm32/README.md](../arm32/README.md) says how each was measured, on a Galaxy S26 Ultra and
   on the emulator.
 - **Failover:** `tests/ha/failover.sh`, [kubernetes.md](kubernetes.md#measured).

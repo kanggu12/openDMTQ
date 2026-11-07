@@ -54,6 +54,11 @@ What this gives and what it does not:
 `tests/ha/failover.sh` on the kind cluster in `deploy/kind` (three nodes, node detection tuned to
 10 seconds) downloads one chart file (`/DMQ/Patterns/1`) and sends one game RPC every 0.5 seconds while it fails
 things.
+
+<p align="center">
+  <img src="images/chart-failover.svg" alt="Kubernetes drills, ten runs on three nodes. Server pod force-deleted: back in 4.5 to 6.9 seconds, no download failed. Its whole node stopped: back in 42.6 to 48.4 seconds, 0 to 3 of about 47 downloads failed. Players' data intact in every run" width="100%">
+</p>
+
 Latest figures, ten runs:
 
 | Drill | API recovery | Failed downloads | Data |

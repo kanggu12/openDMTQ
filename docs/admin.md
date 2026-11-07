@@ -1,7 +1,7 @@
 # The site and the admin pages
 
-Every server has two sets of pages: the players' site, open to everyone, and the admin pages, where the owner
-sets up and runs the server.
+Every server has two sets of pages: the players' site, for everyone with an account, and the admin pages, where the
+owner sets up and runs the server.
 
 ## The players' site
 

@@ -21,4 +21,5 @@ explains what the server does against forged scores.
 ## Supported versions
 
 Fixes go into `main` and the next release. A server stays safe on the latest one: with Docker Compose, `git pull`
-then `./opendmtq up`; on a host install, `git pull` then `./opendmtq restart`; on Windows, the newest bundle.
+then `./opendmtq up`; on a host install, the one command again (in a clone, `git pull` then `./opendmtq restart`); on
+Windows, the newest bundle.

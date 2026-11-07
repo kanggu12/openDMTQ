@@ -52,8 +52,8 @@ So the setup says what an `.ipa` is and does not import it.
 
 The import keeps every usable client in `data/apk/base`. The app is built from the one the phones' app came from, as
 long as it is there: an app made from another version could not be installed over it. Before the first build it takes
-the newest version (1.3.5 before 1.3.4), of one version the original before a changed copy, then the copy imported
-last. `BASE_APK=<file name>` in `.env` chooses another.
+the newest version (1.3.5 before 1.3.4); of one version, the original before a changed copy, then one every fix fits,
+then the copy imported last. `BASE_APK=<file name>` in `.env` chooses another.
 
 ## The server files
 

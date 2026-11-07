@@ -28,9 +28,16 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       # One version in the tag, the chart and CHANGELOG.md, and notes for it: checked first, so that nothing is built
-      # or published under a number the chart does not carry, or without notes.
+      # or published under a number the chart does not carry, or without notes. A rehearsal on a branch has no tag:
+      # it checks the chart's own version against CHANGELOG.md.
       - name: The tag, the chart and CHANGELOG.md name one version
-        run: python3 .github/release_notes.py "$GITHUB_REF_NAME"
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version=$GITHUB_REF_NAME
+          else
+            version=v$(sed -n 's/^version: *//p' deploy/helm/opendmtq/Chart.yaml)
+          fi
+          python3 .github/release_notes.py "$version"
       - name: The local quality gate passed on this commit
         env:
           GH_TOKEN: ${{ github.token }}

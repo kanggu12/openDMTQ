@@ -206,7 +206,7 @@ scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#pr
 | Guide | What it covers |
 |---|---|
 | [The game's files](docs/game-files.md) | What the app and the server files have to be |
-| [Questions and answers](docs/faq.md) | What it needs, which phones, playing with friends |
+| [Questions and answers](docs/faq.md) | What it needs, which phones, playing with friends, privacy |
 | [The site and the admin pages](docs/admin.md) | The setup, the app, songs, players, backups |
 | [Songs](docs/songs.md) | Importing songs, adding your own |
 | [Playing from outside your home](docs/internet.md) | A host name, one forwarded port, HTTPS |

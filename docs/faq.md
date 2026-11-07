@@ -1,6 +1,6 @@
 # Questions and answers
 
-What people ask first, about running a server, playing on one, and the project.
+What people ask first: running a server, playing on one, what leaves your computer, and the project.
 
 ## Running a server
 

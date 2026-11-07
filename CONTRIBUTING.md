@@ -84,7 +84,7 @@ coreutils`). The first run builds both images and pulls a headless Chromium and 
 ## Run the tests
 
 <p align="center">
-  <img src="docs/images/chart-checks.svg" alt="1238 automated checks: Tools and admin pages (unit) 382; The server on the real game files 301; Command line and repository (unit) 186; All pages in a real browser 136; Host install on a clean system 104; Windows bundle under Wine 73; The game server's contract 56" width="100%">
+  <img src="docs/images/chart-checks.svg" alt="1341 automated checks: Tools and admin pages (unit) 439; The server on the real game files 301; Command line and repository (unit) 201; All pages in a real browser 136; Host install on a clean system 111; Windows bundle under Wine 97; The game server's contract 56" width="100%">
 </p>
 
 You do not have to run them all: pick the line for what you changed, and CI runs the rest on your pull request.
@@ -119,8 +119,8 @@ A request from the game reaches `game/index.php`, which hands the batch to `src/
 
 1. Add it to `odq_methods()` in `src/rpc.php`, by its lowercase name, with the function that answers it.
 2. Write that function in the file for its kind (`game.php`, `shop.php`, `user.php`, `ranking.php`,
-   `achievement.php`). Answer with exactly the shape client 1.3.4 reads: a field it expects and does not find, or an
-   empty list where it wants an entry, can close the game.
+   `achievement.php`). Answer with exactly the shape clients 1.3.5 and 1.3.4 read: a field one expects and does not
+   find, or an empty list where it wants an entry, can close the game.
 3. Add a check to `tests/game/protocol.py` that names the client behaviour it protects, and a row to
    `docs/test-cases.md` (the CLI tests fail until the row is there).
 
@@ -182,8 +182,10 @@ A release, by a maintainer:
    `CLIENTS=<folder>` checks the patcher against every APK in that folder too: the game's other version, a copy
    changed for another server.
 3. Push the tag `v1.2.3`. `.github/workflows/release.yml` checks that the tag, the chart and the changelog name one
-   version (`.github/release_notes.py`), runs CI again, waits for the mark, and publishes the images, the Helm chart,
-   the Windows bundle and a GitHub release whose notes are that version's section of the changelog.
+   version (`.github/release_notes.py`), runs CI again, checks the mark, and publishes the images, the Helm chart, the
+   Windows bundle and a GitHub release whose notes are that version's section of the changelog. Without the mark it
+   stops: run `tests/qa.sh`, then run the release again (`gh run rerun`).
 
-Builds between releases name themselves by the date and commit of their code (`2026.11.07-62ce933`), which the site
-shows beside its logo and the admin pages on their Status page.
+A release names itself by its number (`0.2.0`): the Windows bundle, the one-command install and the Helm chart. A copy
+from a clone names itself by the date and commit of its code (`2026.11.07-62ce933`). The site shows it beside its logo,
+and the admin pages on their Status page.
