@@ -92,15 +92,16 @@ def songs_page():
         listed = songs.catalog()
     except (OSError, ValueError):
         listed = []
-    if not songs.has_game_data():
-        return render_template("songs.html", songs=[], no_game_data=True)
+    # Without the game data the game cannot start (the page says so above the list), but the songs imported on their
+    # own are there all the same: listed, not hidden as if the import had not worked.
+    no_game_data = not songs.has_game_data()
     # How much each is played: which are worth keeping and which only fill the list. The bar's full length is the most played.
     plays = song_plays()
     most = max((p["n"] for p in plays.values()), default=0)
     for s in listed:
         p = plays.get(s["song_id"], {"n": 0, "last": 0})
         s.update(plays=p["n"], share=p["n"] / most if most else 0, last=ago(p["last"]) if p["last"] else "")
-    return render_template("songs.html", songs=listed, no_tree=False)
+    return render_template("songs.html", songs=listed, no_tree=False, no_game_data=no_game_data)
 
 
 def song_title(song_id):

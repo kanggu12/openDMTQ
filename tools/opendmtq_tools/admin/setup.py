@@ -296,15 +296,24 @@ def game_files_in(path, listed=None):
     (their DMQ folder) when the files found have no songs of their own. listed: path's entries when the caller has
     them already. A folder is asked for the songs' folder by its name only, as its parent's listing has it."""
     whole = alone = songs = None
+    # Each folder asked once what it is: the search asks this of every folder it passes, and the second level again.
+    kinds = {}
+
+    def kind(folder):
+        """"whole" (the whole files), "alone" (the game data alone) or None."""
+        if folder not in kinds:
+            kinds[folder] = (None if importer.host_folder(folder) is None
+                             else "whole" if importer.whole_host_folder(folder) else "alone")
+        return kinds[folder]
 
     def note(folder, names):
         """Note what folder holds (names: its folders' names, when listed); True for the whole files with their songs,
         after which there is nothing more to look for."""
         nonlocal whole, alone, songs
-        if is_game_folder(folder):
-            if importer.whole_host_folder(folder):
-                whole = whole or folder
-                return importer.dmq_of(importer.host_folder(folder)) is not None
+        if kind(folder) == "whole":
+            whole = whole or folder
+            return importer.dmq_of(importer.host_folder(folder)) is not None
+        if kind(folder) == "alone":
             alone = alone or folder
         elif (songs is None and names is not None and (importer.SONGS_DIR in names
                                                        or os.path.basename(folder.rstrip("/\\")) == importer.SONGS_DIR)
@@ -322,7 +331,7 @@ def game_files_in(path, listed=None):
     # Two levels down, past the patch folders themselves: a folder that holds one may hold the whole files beside it,
     # as the import finds them.
     for sub in subs:
-        if importer.patch_itself(sub) or is_game_folder(sub) and importer.whole_host_folder(sub):
+        if importer.patch_itself(sub) or kind(sub) == "whole":
             continue
         listed_sub = entries(sub) or []
         note(sub, {e.name for e in listed_sub if is_dir(e)})
@@ -812,6 +821,19 @@ def setup_what():
         return jsonify(ok=False, text=t("setup.what_error"))
 
 
+def import_failure(lines):
+    """Why an import failed, in the page's words, from what the importer said (in English); None when it does not say."""
+    text = "\n".join(lines)
+    for mark, key in (("cannot read", "setup.why_cannot_read"),
+                      ("import the game data first", "setup.why_game_data_first"),
+                      ("7-Zip could not unpack", "setup.why_archive"), ("7-Zip cannot list", "setup.why_archive")):
+        if mark in text:
+            return t(key)
+    if "game files: none found" in text:
+        return t("setup.why_nothing" if "base APK: none found" in text else "setup.why_no_files")
+    return None
+
+
 @app.route(BASE + "/setup/import", methods=["POST"])
 def setup_import():
     """Import the game's files from a folder or file on this PC: the APK, the files the game needs to start, and the
@@ -835,7 +857,10 @@ def setup_import():
     else:
         env["OPENDMTQ_IMPORT_IN"] = path
         env.pop("IMPORT_ONLY", None)
-    env.update(IMPORT_GAME="yes", IMPORT_SONGS="yes" if request.form.get("songs") == "yes" else "no")
+    # The songs alone are imported as the songs, whatever the box: there is nothing else in them.
+    songs_alone = (os.path.isdir(path) and importer.host_folder(path, chosen=True) is None
+                   and importer.songs_host(path, chosen=True) is not None)
+    env.update(IMPORT_GAME="yes", IMPORT_SONGS="yes" if request.form.get("songs") == "yes" or songs_alone else "no")
     # The importer, then the song list the site and the game read (as ./opendmtq import does).
     cmds = [core.PYTHON + ["-m", "opendmtq_tools.importer"], core.PYTHON + ["-m", "opendmtq_tools.songs"]]
     # The check and the start under one lock: two clicks, or two pages, cannot start two jobs at once.
@@ -844,7 +869,7 @@ def setup_import():
         if why:
             flash(why, "bad")
             return redirect(url_for("setup_page", step="files"))
-        job = jobs.start_job("import", cmds, env=env, path=path)
+        job = jobs.start_job("import", cmds, env=env, explain=import_failure, path=path)
     changed("setup:import", path)
     return redirect(url_for("setup_page", step="files", job=job))
 

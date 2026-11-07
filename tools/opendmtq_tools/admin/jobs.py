@@ -13,12 +13,14 @@ _jobs = {}
 _jobs_lock = threading.Lock()
 
 
-def start_job(kind, cmd, env=None, **details):
+def start_job(kind, cmd, env=None, explain=None, **details):
     """Run a command in the background; its output is kept for the page to poll. cmd may also be a list of commands,
     run one after the other until one fails (the setup's import, then the song list). env, when given, is the
-    commands' environment. details (a build's address) stay with the job for the page."""
+    commands' environment. explain: what a failed job's output means in the page's words (a function of its lines).
+    details (a build's address) stay with the job for the page."""
     job_id = uuid.uuid4().hex[:12]
-    job = {"id": job_id, "kind": kind, "state": "running", "log": [], "started": time.time(), **details}
+    job = {"id": job_id, "kind": kind, "state": "running", "log": [], "started": time.time(), "explain": explain,
+           **details}
     with _jobs_lock:
         _jobs[job_id] = job
     # One command, or several in order.
@@ -57,4 +59,6 @@ def running_build():
 @app.route(BASE + "/jobs/<job_id>")
 def job_status(job_id):
     job = _jobs.get(job_id) or abort(404)
-    return jsonify(state=job["state"], log=job["log"][-200:])
+    # Why it failed, in the page's language: the programs' own lines are in English.
+    why = job["explain"](job["log"]) if job["state"] == "failed" and job.get("explain") else None
+    return jsonify(state=job["state"], log=job["log"][-200:], why=why)

@@ -95,6 +95,19 @@ class MatchesTest(unittest.TestCase):
             os.makedirs(os.path.join(d, "tool", "DMQ", "Songs"))
             self.assertIsNone(discover.game_folder_kind(os.path.join(d, "tool")))
 
+    def test_the_whole_files_unpacked_in_downloads_are_not_taken_for_their_parts(self):
+        with tempfile.TemporaryDirectory() as d:
+            downloads = os.path.join(d, "Downloads")
+            host = os.path.join(downloads, discover.HOST)
+            os.makedirs(os.path.join(host, discover.PATCH_DIR, "1.003.005", "android", "table"))
+            os.makedirs(os.path.join(host, "DMQ", "Songs", "1"))
+            touch(os.path.join(host, "DMQ", "Songs", "1"), "1.fpk")
+            os.makedirs(os.path.join(host, "static"))
+            # Its own patch and DMQ folders are none of the forms apart: the whole folder is, from Downloads.
+            self.assertEqual(discover.matches(host), [])
+            with mock.patch.object(discover, "candidate_dirs", lambda: [downloads]):
+                self.assertEqual(discover.find(), [(downloads, [discover.HOST])])
+
     def test_a_folder_that_cannot_be_read_holds_nothing(self):
         with tempfile.TemporaryDirectory() as d:
             self.assertEqual(discover.matches(os.path.join(d, "gone")), [])

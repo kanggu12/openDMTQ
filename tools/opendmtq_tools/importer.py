@@ -395,8 +395,11 @@ def game_prefix(paths):
 
 def _put(src, dest):
     """One file into the content: a hard link where the system allows one (the same disk: no second copy of
-    gigabytes, and the files never change), else a copy."""
+    gigabytes, and the files never change), else a copy. What is at dest goes first: it may be a hard link to the
+    live content's file (keep_others), which a copy would write through."""
     os.makedirs(os.path.dirname(dest), exist_ok=True)
+    if os.path.lexists(dest):
+        os.remove(dest)
     try:
         os.link(src, dest)
     except OSError:
@@ -468,9 +471,10 @@ def made_song_list(host):
     return out
 
 
-def collect(root, dest, parts, song_list=None):
+def collect(root, dest, parts, song_list=None, replaced=None):
     """Copy the files of the given parts ("game", "songs") that TAKE names from the game host's folder root into the
     content folder being built, with the song list (the old server's, at song_list, else made from the game's tables).
+    replaced: for part of the files, the places of the content it replaces (keep_others'): nothing else is taken.
     Returns how many songs, charts and other files came."""
     counts = {"songs": 0, "charts": 0, "files": 0}
     for there, here, keep in TAKE:
@@ -490,6 +494,8 @@ def collect(root, dest, parts, song_list=None):
             for f in files:
                 rel = os.path.relpath(os.path.join(d, f), base).replace(os.sep, "/")
                 if not keep.fullmatch(rel) or part_of(here + rel) not in parts:
+                    continue
+                if replaced is not None and not any((here + rel).startswith(r) for r in replaced if r.endswith("/")):
                     continue
                 _put(os.path.join(d, f), os.path.join(dest, here, rel))
                 if here == "web/DMQ/Songs/" and rel.endswith(".fpk"):
@@ -577,9 +583,10 @@ def import_folder(path, host, parts, kind=WHOLE):
     where = path[len(IN):] if path.startswith(IN) else path[len(DATA):] if path.startswith(DATA) else path
     log(f"{named(parts)}: folder {where or '/'}")
     view = viewimg_of(host)
+    replaced = replaced_by(kind, bool(view) and os.path.isdir(os.path.join(view, "eye")))
     built = os.path.join(DATA, "content.new")
-    keep_others(built, parts, replaced_by(kind, bool(view) and os.path.isdir(os.path.join(view, "eye"))))
-    counts = collect(host, built, parts, song_list_of(host))
+    keep_others(built, parts, replaced)
+    counts = collect(host, built, parts, song_list_of(host), replaced)
     install_content(built)
     report(parts, counts)
     return True
@@ -611,8 +618,9 @@ def import_archive(path, found, parts, kind=WHOLE):
         # Extracted on the same disk as the content: linked across, then the extraction goes.
         root = os.path.join(tmp, host) if host else tmp
         view = viewimg_of(root)
-        keep_others(built, parts, replaced_by(kind, bool(view) and os.path.isdir(os.path.join(view, "eye"))))
-        counts = collect(root, built, parts, os.path.join(tmp, listed) if listed else None)
+        replaced = replaced_by(kind, bool(view) and os.path.isdir(os.path.join(view, "eye")))
+        keep_others(built, parts, replaced)
+        counts = collect(root, built, parts, os.path.join(tmp, listed) if listed else None, replaced)
         install_content(built)
         report(parts, counts)
     finally:
@@ -622,13 +630,14 @@ def import_archive(path, found, parts, kind=WHOLE):
     return True
 
 
-def import_game_files(candidates, parts, inner=True, chosen=()):
+def import_game_files(candidates, parts, inner=True, chosen=(), whole_only=False):
     """Import the given parts from the game's files among candidates. The whole files come first, all from one place:
-    a folder before an archive, one with the songs in it before one without when the songs are asked for. Else an
-    archive inside one of the archives (inner: one level, deeper is no download anyone makes). Else each part from
-    where it is, the game data and the songs apart: the game data from the whole files without songs or from the
-    patch folder alone, the songs from their folder alone. chosen: the folders chosen for the import (host_folder's
-    chosen). True when something was found to import."""
+    a folder before an archive, one with the songs in it before one without when the songs are asked for, then those
+    in an archive inside one of the archives (inner: one level, deeper is no download anyone makes). Else each part
+    from where it is, the game data and the songs apart: the game data from the whole files without songs or from the
+    patch folder alone, the songs from their folder alone; parts of the files inside an inner archive only when
+    nothing is outside. chosen: the folders chosen for the import (host_folder's chosen). whole_only: the whole files
+    alone are looked for (the first look inside). True when something was found to import."""
     # What an earlier run left when it was killed: gigabytes each, and nothing else ever removes them.
     if inner:
         for old in glob.glob(os.path.join(DATA, ".extract-*")) + glob.glob(os.path.join(DATA, "content.new")):
@@ -659,9 +668,10 @@ def import_game_files(candidates, parts, inner=True, chosen=()):
         listing = archive_paths(path)
         found = whole_tree_in(listing)
         if found is None:
+            # One archive may hold both, apart: the patch folder alone and the songs alone.
             if patch_alone_in(listing) is not None:
                 alone_a.append((path, (patch_alone_in(listing), None)))
-            elif songs_tree_in(listing):
+            if songs_tree_in(listing):
                 songs_a.append((path, songs_tree_in(listing)))
             continue
         if want_songs and not has_songs_folder(listing, found[0]):
@@ -669,10 +679,20 @@ def import_game_files(candidates, parts, inner=True, chosen=()):
             continue
         if import_archive(path, found, parts):
             return True
-    if inner and not (whole or whole_a) and import_inside(archives, parts):
+    if inner and not (whole or whole_a) and import_inside(archives, parts, whole_only=True):
         return True
+    if whole_only:
+        # Whole files without the songs in them are whole files still.
+        for path, host in whole:
+            return import_folder(path, host, parts)
+        for path, found in whole_a:
+            if import_archive(path, found, parts):
+                return True
+        return False
     # Each part from where it is: the game data first, whose tables a song list of the songs alone is made from.
     found_any = bool(whole or whole_a or alone or alone_a or songs or songs_a)
+    if inner and not found_any:
+        return import_inside(archives, parts)
     did = failed = False
     for part, sources in (("game", [(WHOLE, p, f, False) for p, f in whole] + [(WHOLE, p, f, True) for p, f in whole_a]
                            + [(ALONE, p, f, False) for p, f in alone] + [(ALONE, p, f, True) for p, f in alone_a]),
@@ -680,6 +700,13 @@ def import_game_files(candidates, parts, inner=True, chosen=()):
         if part not in parts:
             continue
         for kind, path, found, archive in sources:
+            # The songs alone with no list of their own: it is made from the game data's tables, on the server.
+            if (kind == SONGS and not (found[1] if archive else song_list_of(found))
+                    and not patch_of(os.path.join(DATA, "content", "web"))):
+                log(f"songs: {os.path.basename(path)} has no song list, and the server has no game data to make one "
+                    "from: import the game data first, then the songs")
+                failed = True
+                continue
             ok = import_archive(path, found, {part}, kind) if archive else import_folder(path, found, {part}, kind)
             failed = failed or not ok
             if ok:
@@ -694,9 +721,9 @@ def import_game_files(candidates, parts, inner=True, chosen=()):
     return did or (found_any and not failed)
 
 
-def import_inside(archives, parts):
+def import_inside(archives, parts, whole_only=False):
     """import_game_files one level down: in an archive inside one of these (a .zip made of the .rar, say), with its
-    parts if it has any. True when it imported something."""
+    parts if it has any. whole_only: the whole files alone. True when it imported something."""
     for path in archives:
         inside = [m for m in archive_paths(path) if archive_role(m) and not m.lower().endswith(APK_BUNDLES)]
         if not any(archive_role(m) == "first" for m in inside):
@@ -709,7 +736,7 @@ def import_inside(archives, parts):
             except subprocess.CalledProcessError as e:
                 log(f"  skip {os.path.basename(path)}: 7-Zip could not unpack it (exit {e.returncode})")
                 continue
-            if import_game_files([os.path.join(tmp, m) for m in inside], parts, inner=False):
+            if import_game_files([os.path.join(tmp, m) for m in inside], parts, inner=False, whole_only=whole_only):
                 return True
         finally:
             shutil.rmtree(tmp, ignore_errors=True)

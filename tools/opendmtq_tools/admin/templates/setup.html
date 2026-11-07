@@ -33,17 +33,21 @@
       b.disabled = false;
       if (b.dataset.label) b.textContent = b.dataset.label;
     }
-    document.getElementById('job-failed').hidden = false;
+    const failed = document.getElementById('job-failed');
+    // Why, in the page's words, when the job's own lines say it.
+    if (j.why) failed.textContent = j.why;
+    failed.hidden = false;
   })();
 </script>
 <p class="flash bad" id="job-failed" role="status" hidden>{{ t('setup.import_failed') if step == 'files' else t('alert.build_failed') }}</p>
 {% endmacro %}
 
-{# The import form for one folder or file: its path, the songs or not, and the button. #}
-{% macro import_form(path, label) %}
+{# The import form for one folder or file: its path, the songs or not, and the button. The choice only where the files
+   may hold both the game data and the songs: an app has no songs, the songs alone are nothing but songs. #}
+{% macro import_form(path, label, choice=True) %}
 <form method="post" action="{{ url_for('setup_import') }}" class="setup-import">
   <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="path" value="{{ path }}">
-  <label class="check"><input type="checkbox" name="songs" value="yes" checked> {{ t('setup.songs_too') }}</label>
+  {% if choice %}<label class="check"><input type="checkbox" name="songs" value="yes" checked> {{ t('setup.songs_too') }}</label>{% else %}<input type="hidden" name="songs" value="yes">{% endif %}
   <button class="btn btn-primary" data-again {% if job %}disabled{% endif %}>{{ label }}</button>
 </form>
 {% endmacro %}
@@ -68,7 +72,8 @@
   </dl>
   {% if job %}<p class="meta">{{ t('setup.import_running') }}</p>{{ follow(job, 'files') }}{% endif %}
   {% if host_install %}
-    <h3>{{ t('setup.found') }}</h3>
+    {% if song_count %}<p class="meta">{{ t('setup.songs_replace') }}</p>{% endif %}
+    <h3 id="found">{{ t('setup.found') }}</h3>
     {% if found %}
     <ul class="setup-found">
       {% for f in found %}
@@ -83,7 +88,7 @@
             {% if f.songs_tree %}<li><span class="setup-file">{{ t('setup.found_tree_songs', path=f.songs_tree) }}</span> {{ what(f.songs_tree) }}</li>{% endif %}
           </ul>
         </div>
-        {{ import_form(f.path, t('setup.import')) }}
+        {{ import_form(f.path, t('setup.import'), f.tree or f.archives) }}
       </li>
       {% endfor %}
     </ul>
@@ -112,13 +117,13 @@
       {% if listing.folders or listing.files %}
       <ul class="setup-list">
         {% for name, full in listing.folders %}<li class="folder"><a href="{{ full|setup_url }}">{{ name }}</a></li>{% endfor %}
-        {% for name, size, full in listing.files %}<li class="file{% if name == picked %} picked{% endif %}"{% if name == picked %} id="picked"{% endif %}><span class="setup-file-line"><span class="setup-file">{{ name }} <span class="meta-inline">{{ size|short_size }}{% if listing.parts[name] %}, {{ t('setup.parts', n=listing.parts[name]) }}{% endif %}</span></span> {{ what(full) }}</span>{{ import_form(full, t('setup.import_file')) }}</li>{% endfor %}
+        {% for name, size, full in listing.files %}<li class="file{% if name == picked %} picked{% endif %}"{% if name == picked %} id="picked"{% endif %}><span class="setup-file-line"><span class="setup-file">{{ name }} <span class="meta-inline">{{ size|short_size }}{% if listing.parts[name] %}, {{ t('setup.parts', n=listing.parts[name]) }}{% endif %}</span></span> {{ what(full) }}</span>{{ import_form(full, t('setup.import_file'), not name.lower().endswith(('.apk', '.xapk', '.apks', '.ipa'))) }}</li>{% endfor %}
       </ul>
       {% if listing.more %}<p class="meta">{{ t('setup.more', n=400) }}</p>{% endif %}
       {% else %}
       <p class="empty">{{ t('setup.empty_folder') }}</p>
       {% endif %}
-      <div class="btn-line">{{ import_form(listing.path, t('setup.import_here')) }}</div>
+      <div class="btn-line">{{ import_form(listing.path, t('setup.import_here'), listing.tree or not listing.songs_tree) }}</div>
     </div>
     {% endif %}
   {% else %}

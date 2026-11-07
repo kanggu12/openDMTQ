@@ -115,8 +115,11 @@ def matches(folder):
         return []
     # Each name once in lower case: the suffixes and the game's words are matched without letter case.
     low = {n: n.lower() for n in names}
-    # Unpacked server files, in a folder of any name.
-    trees = [n for n in names if is_game_folder(os.path.join(folder, n))]
+    # Unpacked server files, in a folder of any name; not the parts of the game host's folder itself (its patch and
+    # DMQ folders are its own, and the whole folder is found from the folder above).
+    host_itself = os.path.isdir(os.path.join(folder, PATCH_DIR)) and (os.path.isdir(os.path.join(folder, "DMQ"))
+                                                                     or os.path.isdir(os.path.join(folder, "viewImg")))
+    trees = [n for n in names if not host_itself and is_game_folder(os.path.join(folder, n))]
     # Archives named like the game's, an archive in parts by its first part.
     archives = [n for n in names if is_archive(n) and named_like_the_game(n) and not low[n].startswith(OWN_APPS)
                 and os.path.isfile(os.path.join(folder, n))]
@@ -155,7 +158,8 @@ def find():
         # Of them, the whole files: an archive, or a folder with more than the patch folder alone.
         return any(is_archive(h) or game_folder_kind(os.path.join(folder, h)) == "whole" for h in files(hits))
 
-    # A folder with both the client and the whole server files first, then with the client and the game data alone,
-    # then the one with the most of them.
-    found.sort(key=lambda f: (not (has_client(f[1]) and whole(*f)), not (has_client(f[1]) and files(f[1])), -len(f[1])))
+    # A folder with both the client and the whole server files first, then with the client and parts of them, then the
+    # whole files without a client, then the one with the most of them.
+    found.sort(key=lambda f: (not (has_client(f[1]) and whole(*f)), not (has_client(f[1]) and files(f[1])),
+                              not whole(*f), -len(f[1])))
     return found

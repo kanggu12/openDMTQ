@@ -344,6 +344,17 @@ class FilesOnThisPcTest(unittest.TestCase):
                                                                             + inst.path("home/Downloads/DMTQ/songs")))
             self.assertEqual(setup.what_words(setup.what_is(inst.path("home/Downloads/DMTQ/songs"))), "Songs alone: 1 songs")
 
+    def test_the_search_asks_each_folder_once(self):
+        # The setup searches the home folders at each look at the page: each folder costs one question.
+        with HostInstall() as inst:
+            for i in range(5):
+                os.makedirs(inst.path(f"home/Downloads/folder{i}/inside"))
+            asked = []
+            real = setup.importer.host_folder
+            with mock.patch.object(setup.importer, "host_folder", lambda path, *a, **k: asked.append(path) or real(path, *a, **k)):
+                setup.listing(inst.path("home/Downloads"))
+            self.assertEqual(sorted(set(asked)), sorted(asked))
+
     def test_each_file_is_said_for_what_it_is(self):
         with HostInstall() as inst:
             inst.write("home/Downloads/client.apk", "PK")
@@ -396,7 +407,7 @@ class FilesOnThisPcTest(unittest.TestCase):
             os.remove(inst.path("apk/base/client.apk"))
             inst.write("apk/base/friend.apk", "PK")
             page = inst.page(BASE + "/setup?step=files")
-            self.assertIn("None to build from: friend.apk", page)
+            self.assertIn("The app cannot be built from friend.apk", page)
             self.assertFalse(setup.steps_done()["files"])
 
     def test_the_two_kinds_of_file_are_explained(self):
@@ -588,13 +599,23 @@ class FilesOnThisPcTest(unittest.TestCase):
                 inst.write(f"home/Downloads/{n}.zip", "PK")
             self.assertTrue(setup.listing(inst.path("home/Downloads"))["more"])
 
+    def test_songs_without_the_game_data_are_listed_with_the_warning(self):
+        # Imported on their own before the game data: there, and the page says what is missing.
+        song = {"song_id": 7, "name": "seven", "full_name": "Seven Seas", "artist_name": "Someone", "song_patterns": []}
+        with HostInstall() as inst, mock.patch.object(admin.songs, "has_game_data", lambda: False), \
+                mock.patch.object(admin.songs, "base_song_list", lambda: [song]):
+            inst.sign_in()
+            page = inst.page(BASE + "/songs")
+            self.assertIn("No game data yet", page)
+            self.assertIn("Seven Seas", page)
+
     def test_the_songs_page_leads_to_the_import_on_this_pc(self):
         with HostInstall() as inst, mock.patch.object(admin.songs, "has_game_data", lambda: True), \
                 mock.patch.object(admin.songs, "base_song_list", lambda: []):
             inst.sign_in()
             page = inst.page(BASE + "/songs")
             self.assertIn("Import yours from a folder on this PC", page)
-            self.assertIn(f'href="{BASE}/setup?step=files">Choose the folder</a>', page)
+            self.assertIn(f'href="{BASE}/setup?step=files#found">Choose the folder</a>', page)
         # In a container the command line does it, as the page says.
         with HostInstall(host_install=False) as inst, mock.patch.object(admin.songs, "has_game_data", lambda: True), \
                 mock.patch.object(admin.songs, "base_song_list", lambda: []):
@@ -647,6 +668,49 @@ class ImportTest(unittest.TestCase):
             self.assertEqual(job["env"]["OPENDMTQ_IMPORT_IN"], folder)
             self.assertEqual((job["env"]["IMPORT_GAME"], job["env"]["IMPORT_SONGS"]), ("yes", "yes"))
             self.assertNotIn("IMPORT_ONLY", job["env"])
+
+    def test_the_songs_alone_come_in_whatever_the_box(self):
+        # A folder of the songs alone has nothing else to import: the box has no say there, and is not shown.
+        with HostInstall() as inst:
+            inst.sign_in()
+            os.makedirs(inst.path("home/Downloads/songs/DMQ/Songs/1"))
+            inst.write("home/Downloads/songs/DMQ/Songs/1/1.fpk", "m")
+            r, job = self.run_import(inst, inst.path("home/Downloads/songs"))
+            self.assertEqual(job["env"]["IMPORT_SONGS"], "yes")
+            page = inst.page(BASE + "/setup?step=files&dir=" + inst.path("home/Downloads/songs"))
+            self.assertRegex(page, r'<input type="hidden" name="songs" value="yes">\s*<button class="btn btn-primary" data-again >'
+                                   r'Import from this folder')
+            self.assertNotIn("Import the songs too", page)
+
+    def test_a_failed_import_says_why_in_the_pages_language(self):
+        with HostInstall() as inst:
+            inst.sign_in()
+            cases = [(["base APK: none found (need ...)", "game files: none found (looked for ...)"], "Neither the game's Android app"),
+                     (["game files: none found (looked for ...)"], "No game data or songs there"),
+                     (["  skip x.rar: 7-Zip could not unpack it (exit 2); an archive in parts needs ..."], "An archive could not be opened"),
+                     (["import error: cannot read /in as uid 1000; make it readable"], "This program cannot read that folder"),
+                     (["songs: s has no song list, and the server has no game data to make one from: import the game data first, then the songs"], "The songs need the game data on the server first"),
+                     (["something else"], None)]
+            for lines, words in cases:
+                with self.subTest(words=words):
+                    admin.jobs._jobs["failed1"] = {"id": "failed1", "kind": "import", "state": "failed", "log": lines,
+                                                   "started": 0, "explain": setup.import_failure}
+                    why = inst.client.get(BASE + "/jobs/failed1").get_json()["why"]
+                    self.assertTrue(why.startswith(words) if words else why is None, why)
+            # In Korean on a Korean page.
+            inst.client.get(BASE + "/lang?to=ko&next=" + BASE + "/")
+            admin.jobs._jobs["failed1"]["log"] = ["game files: none found (looked for ...)"]
+            self.assertIn("게임 자료도 곡도 없습니다", inst.client.get(BASE + "/jobs/failed1").get_json()["why"])
+            admin.jobs._jobs.pop("failed1")
+
+    def test_an_app_file_has_no_songs_box(self):
+        with HostInstall() as inst:
+            inst.sign_in()
+            inst.write("home/Downloads/game.apk", "PK")
+            page = inst.page(BASE + "/setup?step=files&dir=" + inst.path("home/Downloads"))
+            row = page[page.index("game.apk <span"):]
+            row = row[:row.index("</li>")]
+            self.assertNotIn("Import the songs too", row)
 
     def test_a_single_file_is_its_folder_with_only_that_file(self):
         with HostInstall() as inst:

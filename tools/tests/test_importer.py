@@ -599,16 +599,37 @@ class SongsAloneTest(unittest.TestCase):
         self.assertTrue(importer.import_game_files(list(importer.walk(chosen)), {"songs"}, chosen=[chosen]))
         self.assertEqual([s["song_id"] for s in self.listed()], [1, 2])
 
-    def test_without_the_game_data_the_list_waits_for_it(self):
+    def test_without_the_game_data_the_songs_wait_for_it(self):
+        # No list of their own, and no tables on the server to make one from: nothing comes in, and the import says why.
+        self.assertFalse(importer.import_game_files([self.songs], {"songs"}))
+        self.assertFalse(os.path.exists(os.path.join(self.data, "content", "songs.json")))
+        self.assertTrue(any("import the game data first" in line for line in self.said), self.said)
+        # With a list of their own they come in, and wait for the game data.
+        write(self.songs, {importer.SONG_LIST: json.dumps([{"song_id": 1, "name": "first"}])})
         self.assertTrue(importer.import_game_files([self.songs], {"songs"}))
-        self.assertEqual(self.listed(), [])
-        self.assertIn("  the song list needs the game data's tables: import the game data, then the songs again", self.said)
+        self.assertEqual(self.listed(), [{"song_id": 1, "name": "first"}])
 
     def test_a_songs_folder_of_another_program_is_not_the_games(self):
         other = os.path.join(self.tmp, "tool")
         write(other, {"DMQ/readme.txt": "x", "DMQ/Songs/notes.txt": "y"})
         self.assertEqual(importer.what_is(other)["kind"], "other")
         self.assertFalse(importer.import_game_files([other], {"songs"}))
+
+    def test_the_patch_folder_alone_with_pictures_beside_it_replaces_the_patch_folder_only(self):
+        # A copy of the game host's folder without DMQ and viewImg: the patch folder alone, with HOW TO PLAY's pictures.
+        whole = os.path.join(self.tmp, "whole")
+        game_folder(whole)
+        importer.import_game_files([whole], {"game", "songs"})
+        live = os.path.join(self.data, "content", "web", "static", "dmq", "banner", "x", "howtoplay_play.png")
+        before = os.stat(live).st_ino
+        lean = os.path.join(self.tmp, "lean")
+        shutil.copytree(os.path.join(whole, importer.HOST, "patch"), os.path.join(lean, "patch"))
+        write(lean, {"static/dmq/banner/x/howtoplay_play.png": "another picture"})
+        self.assertTrue(importer.import_game_files([lean], {"game"}))
+        # The server's own picture stays, and the import wrote nothing through to it.
+        with open(live) as f:
+            self.assertEqual(f.read(), "how to play")
+        self.assertEqual(os.stat(live).st_ino, before)
 
     def test_in_an_archive_listing(self):
         listing = ["pack/DMQ/Songs/1/1.fpk", "pack/DMQ/Patterns/11", "pack/viewImg/eye/first.png", "pack/_info/songList.json"]
@@ -786,6 +807,32 @@ class ArchiveFormsTest(unittest.TestCase):
             self.assertEqual([s["song_id"] for s in json.load(f)], [1, 2])
         # Programs and notes in the songs' folder stay out.
         self.assertNotIn("web/DMQ/rpc.php", got)
+
+    def test_one_archive_with_the_patch_folder_alone_and_the_songs_alone(self):
+        tree = self.files()
+        both = os.path.join(self.tmp, "both")
+        shutil.copytree(os.path.join(tree, importer.GAME_DIR), os.path.join(both, "dmtq", "phone_new"))
+        shutil.copytree(os.path.join(tree, importer.HOST, "DMQ"), os.path.join(both, "dmtq", "DMQ"))
+        archive = os.path.join(self.src, "parts.zip")
+        self.pack(archive, both, "-tzip")
+        self.assertTrue(importer.import_game_files([archive], {"game", "songs"}))
+        got = content_files(self.data)
+        self.assertIn("web/patch/phone_new/1.003.005/android/patch_new.csv.lz4", got)
+        self.assertIn("web/DMQ/Songs/1/1.fpk", got)
+
+    def test_parts_inside_an_archive_in_an_archive_do_not_keep_the_parts_outside_out(self):
+        # The patch folder alone outside, the songs alone in an archive inside an archive: both come in.
+        tree = self.files()
+        shutil.copytree(os.path.join(tree, importer.GAME_DIR), os.path.join(self.src, "phone_new"))
+        songs = os.path.join(self.tmp, "songs")
+        shutil.copytree(os.path.join(tree, importer.HOST, "DMQ"), os.path.join(songs, "DMQ"))
+        inner = os.path.join(self.tmp, "inner")
+        os.makedirs(inner)
+        self.pack(os.path.join(inner, "songs.zip"), songs, "-tzip")
+        self.pack(os.path.join(self.src, "dmtq-songs.zip"), inner, "-tzip")
+        self.assertTrue(importer.import_game_files(list(importer.walk(self.src)), {"game", "songs"}))
+        got = content_files(self.data)
+        self.assertIn("web/patch/phone_new/1.003.005/android/patch_new.csv.lz4", got)
 
     def test_the_client_in_an_apk_bundle(self):
         bundle = os.path.join(self.tmp, "bundle")
