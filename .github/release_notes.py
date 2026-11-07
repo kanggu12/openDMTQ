@@ -3,9 +3,10 @@
     python3 .github/release_notes.py v1.2.3 [--root DIR]
 
 Checks that the tag, the Helm chart's version and appVersion (deploy/helm/opendmtq/Chart.yaml) and a section of
-CHANGELOG.md all name the same version, then prints that section, which release.yml publishes as the release's notes.
-Exits 1, saying what differs or what is missing: a release does not go out under a number its chart does not carry,
-or without notes. The standard library only: it runs on the runner's own Python, before any setup.
+CHANGELOG.md all name the same version, then prints that section, each paragraph and list item on one line, which
+release.yml publishes as the release's notes. Exits 1, saying what differs or what is missing: a release does not go
+out under a number its chart does not carry, or without notes. The standard library only: it runs on the runner's own
+Python, before any setup.
 """
 import argparse
 import re
@@ -38,6 +39,30 @@ def section(text, version):
     return found.group(1).strip() if found else None
 
 
+# A line that starts a block of its own: a heading, a list item, a quote or a table row.
+BLOCK_START = re.compile(r"\s*(#|[-*>|] |\d+\. )")
+
+
+def unwrap(body):
+    """The section with each paragraph and list item on one line. CHANGELOG.md wraps its lines at 120 characters, and a
+    GitHub release shows every line break as it is, in the middle of a sentence; code blocks keep theirs."""
+    lines = []
+    fenced = False
+    for line in body.split("\n"):
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            lines.append(line)
+            continue
+        previous = lines[-1] if lines else ""
+        # Joined to the line before: text that goes on from a paragraph or a list item, outside a code block.
+        if (not fenced and line.strip() and not BLOCK_START.match(line) and previous.strip()
+                and not previous.lstrip().startswith(("#", "|", "```"))):
+            lines[-1] = previous.rstrip() + " " + line.strip()
+        else:
+            lines.append(line)
+    return "\n".join(lines)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("tag", help="the release's tag, v1.2.3, or the bare number")
@@ -65,7 +90,7 @@ def main(argv=None):
         for problem in problems:
             print(problem, file=sys.stderr)
         return 1
-    print(body)
+    print(unwrap(body))
     return 0
 
 

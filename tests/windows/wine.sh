@@ -257,12 +257,12 @@ if [ -f app/tools/opendmtq_tools/opendmtq-arm32-runtime.zip ]; then
 else
   echo "SKIP this bundle has no runtime: the PC that built it had none"
 fi
-# The phone app, built from a real client (APK=...): imported in the setup, said to be the original, then the setup's own
-# build with the bundle's Java, Apktool and signer, and the runtime above.
+# The phone app, built from a real client (APK=...): imported in the setup, said to be the original or a copy changed for
+# another server, then the setup's own build with the bundle's Java, Apktool and signer, and the runtime above.
 if [ -n "${CLIENT:-}" ]; then
   mkdir -p /tmp/client
   cp "$CLIENT" /tmp/client/game.apk
-  expect "the setup says the client is the original" said 'Z:\tmp\client\game.apk' true 'original: ready'
+  expect "the setup says what the client is" said 'Z:\tmp\client\game.apk' true 'original: ready\|changed for another server'
   job=$(web -o /dev/null -w '%{redirect_url}' --data-urlencode "csrf=$(web "$A/setup" | token)" --data-urlencode 'path=Z:\tmp\client' \
     "$A/setup/import" | sed -n 's/.*[?&]job=\([0-9a-f]*\).*/\1/p')
   state=running

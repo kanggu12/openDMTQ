@@ -296,6 +296,18 @@ class ReleaseNotesTest(unittest.TestCase):
         self.assertEqual(self.notes.section(text, "Unreleased"), "")
         self.assertIsNone(self.notes.section(text, "0.9.0"))
 
+    def test_the_notes_have_each_paragraph_and_item_on_one_line(self):
+        # GitHub shows a release's line breaks as they are: the changelog's wrapping would break its sentences.
+        wrapped = ("### Added\n\n- one item\n  goes on here\n  - a nested one\n    with its own end\n- two\n\n"
+                   "A paragraph\nin two lines.\n\n```text\nkept\nas it is\n```\n| a | b |\n| 1 | 2 |")
+        self.assertEqual(self.notes.unwrap(wrapped),
+                         "### Added\n\n- one item goes on here\n  - a nested one with its own end\n- two\n\n"
+                         "A paragraph in two lines.\n\n```text\nkept\nas it is\n```\n| a | b |\n| 1 | 2 |")
+        # The notes this tree would publish: no line goes on from the one before.
+        chart, _ = self.notes.chart_versions(self.notes.ROOT)
+        out = self.run_notes("v" + chart)[1]
+        self.assertFalse([line for line in out.splitlines() if line.startswith("  ") and not line.lstrip().startswith("- ")])
+
 
 class LineEndingTest(unittest.TestCase):
     def test_scripts_keep_lf_on_every_checkout(self):
