@@ -65,6 +65,16 @@ phones.
 The song list is empty until the songs are imported: on the admin pages, **Songs**, **Choose the folder**, with
 **Import the songs too** ticked.
 
+## Privacy
+
+**What leaves my computer?**
+Accounts, scores, recordings and backups stay on the server's computer, in `data/`, and phones talk to the server alone.
+The server asks the internet for one thing: the runtime for newer phones, from this repository's latest release, when
+it builds the app without one (the Windows bundle carries its own). `./opendmtq check` on a server reachable from the
+internet asks check-host.net to open its page from outside, which tells that site the server's address. The game's own
+app, and Android, also look up a few Google and ad addresses; the game plays the same without them
+([without internet](closed-network.md)).
+
 ## The project
 
 **Is this official?**
