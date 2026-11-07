@@ -4,8 +4,8 @@
 
 # Guides
 
-New here? The [README](../README.md#quick-start) has the quick start for each way to run a server: Windows, Linux or
-macOS, Docker Compose and Kubernetes. [Questions and answers](faq.md) covers what people ask first.
+OpenDMTQ is an open-source project. New here? The [README](../README.md#quick-start) has the quick start for each way
+to run a server, and [Questions and answers](faq.md) covers what people ask first.
 
 ## Running a server
 

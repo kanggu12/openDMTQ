@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <b>The online side of DJMAX Technika Q, on your own computer.</b><br>
+  <b>An open-source server for DJMAX Technika Q, on your own computer.</b><br>
   Logins, scores, rankings and live broadcasts for you and your friends, with nothing to set on a phone.
 </p>
 
@@ -21,16 +21,16 @@
   <a href="#quick-start">Quick start</a> &nbsp;|&nbsp;
   <a href="#features">Features</a> &nbsp;|&nbsp;
   <a href="#guides">Guides</a> &nbsp;|&nbsp;
-  <a href="CONTRIBUTING.md">Contributing</a>
+  <a href="#open-source">Open source</a>
 </p>
 
 <p align="center">
   <img src="docs/images/screens.png" alt="The site's home page, rankings, live view and admin pages, with made-up players" width="100%">
 </p>
 
-The official service of **DJMAX Technika Q**, the Android rhythm game, ended in 2019. OpenDMTQ brings its online side
-back on a computer of your own. The server builds a copy of your APK that talks to it, and your friends install that
-copy from the server's web page.
+The official service of **DJMAX Technika Q**, the Android rhythm game, ended in 2019. OpenDMTQ is an open-source
+project that brings its online side back on a computer of your own. The server builds a copy of your APK that talks to
+it, and your friends install that copy from the server's web page.
 
 > [!IMPORTANT]
 > **No game files are included.** You need your own copy of the game's Android app and its server files. Please use
@@ -203,7 +203,7 @@ scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#pr
 
 ## Guides
 
-| | |
+| Guide | What it covers |
 |---|---|
 | [The game's files](docs/game-files.md) | What the app and the server files have to be |
 | [Questions and answers](docs/faq.md) | What it needs, which phones, playing with friends |
@@ -216,10 +216,16 @@ scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#pr
 | [Troubleshooting](docs/troubleshooting.md) | When something does not work |
 | [Architecture](docs/architecture.md) · [Testing](docs/testing.md) | How it is built and checked |
 
-## Contributing
+## Open source
 
-Bug reports, fixes and features are welcome, and the code needs none of the game's files: the tests make stand-ins of
-their own. Start with [CONTRIBUTING.md](CONTRIBUTING.md). Security problems go to [SECURITY.md](.github/SECURITY.md).
+OpenDMTQ is MIT licensed and built in the open: its own game server, site, app patcher and runtime, with every change
+checked by the tests in this repository before it reaches a server.
+
+- **Report a bug or ask for a feature** in [Issues](https://github.com/kanggu12/openDMTQ/issues/new/choose).
+- **Change the code.** None of the game's files are needed: the tests make stand-ins of their own.
+  [CONTRIBUTING.md](CONTRIBUTING.md) has a map of the code and how a change goes in.
+- **See what changed** in [CHANGELOG.md](CHANGELOG.md), and report security problems through
+  [SECURITY.md](.github/SECURITY.md).
 
 ## Credits and license
 

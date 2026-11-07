@@ -1,5 +1,7 @@
 # Questions and answers
 
+What people ask first, about running a server, playing on one, and the project.
+
 ## Running a server
 
 **What do I need?**
