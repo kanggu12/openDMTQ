@@ -43,7 +43,7 @@ import zlib
 
 import lz4.block
 
-from . import filelock, jacket_atlas, strings
+from . import filelock, jacket_atlas, song_files, strings
 
 # The imported content (read only) and the writable custom folder (container paths).
 CONTENT = os.environ.get("OPENDMTQ_CONTENT", "/srv/content")
@@ -424,6 +424,27 @@ def _add_package(path):
             if f in seen_files:
                 raise SongError("song.chart_twice", name=repr(f))
             seen_files.add(f)
+        # The files themselves, before anything is written: a pack or a chart the game could not load would break the
+        # song for every phone, and the game says nothing of why (song_files.py has what each check looks at).
+        problem = song_files.fpk_problem(z.read("song.fpk"))
+        if problem:
+            raise SongError(problem[0], **problem[1])
+        for f in sorted(seen_files):
+            problem = song_files.chart_problem(z.read(f))
+            if problem:
+                raise SongError(problem[0], name=repr(f), **problem[1])
+        if "song.webm" in names:
+            # Its first bytes say what it is; the video itself may be hundreds of MB.
+            with z.open("song.webm") as video:
+                problem = song_files.video_problem(video.read(16))
+            if problem:
+                raise SongError(problem[0], **problem[1])
+        if "preview.opus" in names:
+            # Its first Ogg page names the codec.
+            with z.open("preview.opus") as preview:
+                problem = song_files.preview_problem(preview.read(256))
+            if problem:
+                raise SongError(problem[0], **problem[1])
 
         # Ids above everything ever handed out, removed songs included: a reused id would attach the
         # removed song's scores, and phones' cached files, to the new one.
@@ -733,6 +754,11 @@ def rebuild():
             body = manifest_eol.join(lines) + (manifest_eol if manifest_final else "")
             f.write(lz4_encode(body.encode("utf-8")))
 
+    # Charts the imported files carry that the game cannot load (empty, or cut short): the overlay serves the chart's
+    # pair in their place. A chart and its earphone variant have their notes at the same ticks (every pair of the
+    # game's songs does), so the song plays the same. A chart whose pair cannot be loaded either stays as it is.
+    charts_from_pair, charts_unreadable = _repair_charts(new)
+
     # Facts of the client's tables the game server's replies need (src/content.php), from the tables as phones get them.
     def effective(rel):
         if rel in changed:
@@ -757,7 +783,43 @@ def rebuild():
     _write_json(os.path.join(CUSTOM, "missing-game-files.json"), game_missing)
     made = thumbnails(songs)
     return {"added": len(adds), "hidden": len(hide), "client_files": sorted(changed), "thumbnails": made,
-            "tile_failures": tile_failures, "missing_game_files": game_missing}
+            "tile_failures": tile_failures, "missing_game_files": game_missing,
+            "charts_from_pair": charts_from_pair, "charts_unreadable": charts_unreadable}
+
+
+def _chart_loads(path):
+    """True when the game can load the chart file at path (song_files.chart_readable); a file that cannot be read
+    counts as one the game could not load either."""
+    try:
+        with open(path, "rb") as f:
+            return song_files.chart_readable(f.read())
+    except OSError:
+        return False
+
+
+def _repair_charts(overlay):
+    """Put, into the overlay being built, the pair of every imported chart the game cannot load. Returns the charts
+    served from their pair and those left unreadable, by file name ("388", "534_EARPHONE")."""
+    patterns = os.path.join(content_web(), "DMQ", "Patterns")
+    from_pair, unreadable = [], []
+    for song in base_song_list():
+        for chart in song.get("song_patterns") or []:
+            pid = chart.get("pattern_id")
+            if pid is None:
+                continue
+            # A chart is asked for by its number, or with _EARPHONE for the earphone timing; each is the other's pair.
+            for name, pair in ((f"{pid}", f"{pid}_EARPHONE"), (f"{pid}_EARPHONE", f"{pid}")):
+                path = os.path.join(patterns, name)
+                # A chart the import did not bring is not this check's to answer; one that loads needs nothing.
+                if not os.path.isfile(path) or _chart_loads(path):
+                    continue
+                if _chart_loads(os.path.join(patterns, pair)):
+                    os.makedirs(os.path.join(overlay, "DMQ", "Patterns"), exist_ok=True)
+                    _place(os.path.join(patterns, pair), os.path.join(overlay, "DMQ", "Patterns", name))
+                    from_pair.append(name)
+                else:
+                    unreadable.append(name)
+    return from_pair, unreadable
 
 
 def _tile_template():

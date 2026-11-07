@@ -31,10 +31,11 @@ def read(path):
 
 
 def used_keys():
-    """Every key the admin's Python, its templates and songs.py ask for."""
-    # The admin's modules (its pages and the setup), songs.py, and every template.
+    """Every key the admin's Python, its templates, songs.py and song_files.py ask for."""
+    # The admin's modules (its pages and the setup), songs.py and the song file checks it raises from, and every
+    # template.
     sources = [read(os.path.join(ADMIN, name)) for name in sorted(os.listdir(ADMIN)) if name.endswith(".py")]
-    sources.append(read(os.path.join(TOOLS, "opendmtq_tools", "songs.py")))
+    sources += [read(os.path.join(TOOLS, "opendmtq_tools", name)) for name in ("songs.py", "song_files.py")]
     templates = os.path.join(ADMIN, "templates")
     sources += [read(os.path.join(templates, name)) for name in sorted(os.listdir(templates))]
     found = set()

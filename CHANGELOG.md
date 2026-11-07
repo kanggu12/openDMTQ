@@ -6,6 +6,17 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+### Added
+
+- A song package's files are checked before the song is added: the music pack, each chart, the video and the preview
+  must be in the game's formats, and a chart must have notes and not end before its last note. A package that fails
+  is refused with the file and the reason; every file of the game's own songs passes.
+
+### Fixed
+
+- A chart the server files carry empty or cut short, which the game cannot load, is served from its pair: a chart and
+  its earphone variant have their notes at the same ticks. The server files tested carry four.
+
 ## [0.3.0] - 2026-11-07
 
 ### Added

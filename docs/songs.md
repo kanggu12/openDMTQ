@@ -42,6 +42,9 @@ server rebuilds them (`data/custom/web`) with the rows of the imported and added
 without the files of the others. With every song of the tables imported and nothing added or hidden, nothing is
 rebuilt and the server serves exactly the imported files.
 
+A chart the game could not load, an empty or cut-short file, is served from its pair instead: a chart and its
+earphone variant have their notes at the same ticks. The server files tested carry four such charts.
+
 ## Hiding a song
 
 On the admin pages, **Songs**, any song can be hidden and shown again. A hidden song leaves the game's song list and
@@ -81,6 +84,15 @@ preview.opus     optional: the preview played on song select
 
 The files must already be in the game's formats; converting music or charts from other games is outside OpenDMTQ.
 Adding songs needs the game data: the song goes into the client's tables, which come from it.
+
+The upload checks the files before it takes anything, and every file of the game's own songs passes:
+
+- `song.fpk` is a music pack in the game's format, and its sounds are Ogg;
+- each chart is in the game's chart format, has notes, a tempo and a measure length, and does not end before its last
+  note (the game stops the song at the chart's end);
+- `song.webm` is a WebM video and `preview.opus` is Opus in Ogg.
+
+A package that fails is refused with the file and the reason.
 
 ### What happens
 
