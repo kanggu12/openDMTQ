@@ -6,6 +6,7 @@ import signal
 import subprocess
 import sys
 import time
+from xml.sax.saxutils import escape
 
 from opendmtq_cli import checks, env
 from .paths import HERE, CLI, DATA, ENV_FILE, LOGS, MAC, ROOT, START_WAIT, WINDOWS
@@ -210,6 +211,48 @@ def cmd_check(args):
     return 1 if failures else 0
 
 
+def launchd_plist(python, me, root):
+    """The launchd agent that starts the server at sign-in on macOS. Started again when it fails, not when it was
+    stopped (./opendmtq stop, the admin pages' Stop the server, both end it well), as systemd's Restart=on-failure.
+    The paths in it as XML text: one with & or < in it would break the file."""
+    p, m, r = (escape(x) for x in (python, me, root))
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>org.opendmtq.server</string>
+  <key>ProgramArguments</key><array>
+    <string>{p}</string><string>{m}</string><string>run</string><string>--log-to-file</string>
+  </array>
+  <key>WorkingDirectory</key><string>{r}</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+</dict></plist>
+"""
+
+
+def systemd_word(text):
+    """One word of a systemd unit's command: in quotes, its backslashes and quotes escaped, so that a path with spaces
+    stays one; and % doubled, as systemd reads %h and the like everywhere in a unit."""
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%") + '"'
+
+
+def systemd_unit(python, me, root):
+    """The user unit that starts the server at boot on Linux."""
+    plain = root.replace("%", "%%")
+    return f"""[Unit]
+Description=OpenDMTQ server ({plain})
+After=network-online.target
+
+[Service]
+ExecStart={systemd_word(python)} {systemd_word(me)} run --log-to-file
+WorkingDirectory={plain}
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+"""
+
+
 def cmd_service(args):
     """Start the server with the computer: a systemd unit on Linux, a launchd agent on macOS."""
     me = HERE
@@ -222,21 +265,8 @@ def cmd_service(args):
             ok("removed the launchd agent")
             return 0
         os.makedirs(os.path.dirname(plist), exist_ok=True)
-        # Started again when it fails, not when it was stopped (./opendmtq stop, the admin pages' Stop the server, both
-        # end it well): systemd's Restart=on-failure below.
         with open(plist, "w", encoding="utf-8") as f:
-            f.write(f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>Label</key><string>org.opendmtq.server</string>
-  <key>ProgramArguments</key><array>
-    <string>{sys.executable}</string><string>{me}</string><string>run</string><string>--log-to-file</string>
-  </array>
-  <key>WorkingDirectory</key><string>{ROOT}</string>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
-</dict></plist>
-""")
+            f.write(launchd_plist(sys.executable, me, ROOT))
         subprocess.run(["launchctl", "load", plist], check=False)
         ok(f"starts at sign-in: {plist}")
         return 0
@@ -254,18 +284,7 @@ def cmd_service(args):
         return 0
     os.makedirs(unit_dir, exist_ok=True)
     with open(unit, "w", encoding="utf-8") as f:
-        f.write(f"""[Unit]
-Description=OpenDMTQ server ({ROOT})
-After=network-online.target
-
-[Service]
-ExecStart={sys.executable} {me} run --log-to-file
-WorkingDirectory={ROOT}
-Restart=on-failure
-
-[Install]
-WantedBy=default.target
-""")
+        f.write(systemd_unit(sys.executable, me, ROOT))
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=False)
     subprocess.run(["systemctl", "--user", "enable", "--now", "opendmtq.service"], check=False)
     # Without lingering, a user's services stop when they sign out and start only when they sign in.

@@ -157,6 +157,9 @@ def compose_env(extra=None):
     env["OPENDMTQ_VERSION"] = code_version()
     # .env decides, also over a name left in the caller's shell: the CLI looks containers up by this one.
     env["COMPOSE_PROJECT_NAME"] = project()
+    # Container create/start chatter is noise here; errors still reach stderr. In the environment, not as compose's
+    # --progress flag: the Compose of Docker 23 has no such flag and stops at it, and ignores a variable it does not know.
+    env["COMPOSE_PROGRESS"] = "quiet"
     env.update(extra or {})
     return env
 
@@ -245,8 +248,7 @@ def compose(*args, extra_env=None, check=True, capture=False):
     """Run `docker compose <args>` in the repository."""
     require_docker()
     ensure_own_project()
-    # Container create/start chatter is noise here; errors still reach stderr.
-    cmd = ["docker", "compose", "--progress", "quiet", *args]
+    cmd = ["docker", "compose", *args]
     r = subprocess.run(cmd, cwd=ROOT, env=compose_env(extra_env), text=True,
                        capture_output=capture)
     if check and r.returncode != 0:

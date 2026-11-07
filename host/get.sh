@@ -16,10 +16,14 @@ REPO=kanggu12/openDMTQ
 say() { printf '%s\n' "$*"; }
 die() { printf 'OpenDMTQ: %s\n' "$*" >&2; exit 1; }
 
-# The latest release's tag (v1.2.3), or nothing when GitHub does not say.
+# The latest release's tag (v1.2.3), or nothing when there is no release; fails when GitHub cannot be asked. Its page
+# answers with a redirect to the tag's: not the API, whose limit for unnamed callers a shared address runs into.
 latest_tag() {
-  curl -fsSL --connect-timeout 15 --max-time 30 "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
-    | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n 1
+  where=$(curl -fsSI --connect-timeout 15 --max-time 30 -o /dev/null -w '%{redirect_url}' \
+    "https://github.com/$REPO/releases/latest") || return 1
+  case $where in
+    */releases/tag/*) printf '%s\n' "${where##*/}" ;;
+  esac
 }
 
 # Where the code comes from: the release tagged $1, or the main branch while there is none. OPENDMTQ_TARBALL gives
@@ -39,7 +43,8 @@ code_url() {
 fetch_code() {
   tag=
   if [ -z "${OPENDMTQ_TARBALL:-}" ]; then
-    tag=$(latest_tag) || tag=
+    # Not knowing is not "no release": that would put the newest code, tried by no release, in its place.
+    tag=$(latest_tag) || die "GitHub could not be asked for the latest release: check the connection, then run this again${updating:+ (./opendmtq start starts the server meanwhile)}"
   fi
   url=$(code_url "$tag")
   say "Downloading OpenDMTQ into $DIR"
@@ -50,7 +55,7 @@ fetch_code() {
   if ! curl -fsSL --connect-timeout 30 --speed-limit 10000 --speed-time 60 "$url" \
       | tar -xz --strip-components=1 -C "$work"; then
     rm -rf "$work"
-    die "the download did not work: $url"
+    die "the download did not work: $url${updating:+. The server was stopped for the update: ./opendmtq start starts it again}"
   fi
   mkdir -p "$DIR"
   cp -R "$work/." "$DIR/"

@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import xml.dom.minidom
 from unittest import mock
 
 from opendmtq_cli import system
@@ -175,6 +176,26 @@ class ServiceUnitTest(unittest.TestCase):
             text = f.read()
         self.assertIn('ExecStart="$REPO/opendmtq" up', text)
         self.assertIn('ExecStop="$REPO/opendmtq" down', text)
+
+
+class HostServiceTest(unittest.TestCase):
+    """./opendmtq service on a host install: the unit (Linux) and the agent (macOS) keep a path whole, whatever is in it."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, os.path.join(ROOT, "host"))
+        from opendmtq_host import commands
+        cls.commands = commands
+
+    def test_a_path_with_spaces_and_signs_stays_one_word(self):
+        home = "/home/a/My Games 100%/openDMTQ"
+        unit = self.commands.systemd_unit("/usr/bin/python3", home + "/host/opendmtq_host", home)
+        self.assertIn('ExecStart="/usr/bin/python3" "/home/a/My Games 100%%/openDMTQ/host/opendmtq_host" run --log-to-file',
+                      unit)
+        self.assertIn("WorkingDirectory=/home/a/My Games 100%%/openDMTQ\n", unit)
+        plist = self.commands.launchd_plist("/opt/py", "/Users/a/R&D <1>/openDMTQ/host", "/Users/a/R&D <1>/openDMTQ")
+        xml.dom.minidom.parseString(plist)
+        self.assertIn("<string>/Users/a/R&amp;D &lt;1&gt;/openDMTQ/host</string>", plist)
 
 
 class VirtualInterfacesTest(unittest.TestCase):
