@@ -1,13 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 616" width="956" height="616" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="The content. The import takes your APK into data/apk/base, and the game data and, with --songs, the songs from your server files into data/content, read only. A song package added on the admin pages goes to data/custom with the hidden flags. songs.py rebuilds the song list and the client's tables into data/custom before every start; phones download what changed, from data/custom first, otherwise from data/content">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 616" width="956" height="616" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="The content. The import takes your APK into data/apk/base, and the client data and, with --songs, the song data from your files into data/content, read only. A song package added on the admin pages goes to data/custom with the hidden flags. songs.py rebuilds the song list and the client's tables into data/custom before every start; phones download what changed, from data/custom first, otherwise from data/content">
 <rect x="-28" y="-28" width="956" height="616" rx="16" fill="#11151a"/>
 <rect x="0" y="0" width="230" height="250" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
 <text x="14" y="22" font-size="13" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,216">Your own files</text>
 <path d="M14,36 H204 L216,48 V96 H14 Z" fill="#1a1f25" stroke="#ffb13d" stroke-width="2" stroke-linejoin="round"/>
 <text x="28" y="70.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,202">The game's APK</text>
 <path d="M14,120 H204 L216,132 V230 H14 Z" fill="#1a1f25" stroke="#ffb13d" stroke-width="2" stroke-linejoin="round"/>
-<text x="28" y="161.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,202">The game's server</text>
-<text x="28" y="180.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,202">files: a folder or an</text>
-<text x="28" y="198" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,202">archive</text>
+<text x="28" y="161.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,202">Client data and</text>
+<text x="28" y="180.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,202">song data: a folder or</text>
+<text x="28" y="198" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,202">an archive</text>
 <path d="M290,36 H608 L620,48 V96 H290 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
 <text x="304" y="70.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="304,606">data/apk/base</text>
 <path d="M216.5,66 L282,66" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
@@ -16,7 +16,7 @@
 <rect x="290" y="120" width="330" height="240" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
 <text x="304" y="142" font-size="13" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="304,606">data/content, read only</text>
 <path d="M304,156 H594 L606,168 V226 H304 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="318" y="186.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="318,592">Game data</text>
+<text x="318" y="186.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="318,592">Client data</text>
 <text x="318" y="205.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="318,592">tables, screen images, fonts</text>
 <path d="M304,242 H594 L606,254 V346 H304 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
 <text x="318" y="280.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="318,592">Songs</text>

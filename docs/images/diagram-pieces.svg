@@ -1,12 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 456" width="956" height="456" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="Your APK and server files are imported by the setup into the OpenDMTQ server on your PC. The server answers the game, builds the app from your APK, and serves the players' site, live broadcasts and the admin pages. Phones get the app from the site and play; browsers see rankings and broadcasts; you set it up and run it on the admin pages">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 456" width="956" height="456" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="Your APK, client data and song data are imported by the setup into the OpenDMTQ server on your PC. The server answers the game, builds the app from your APK, and serves the players' site, live broadcasts and the admin pages. Phones get the app from the site and play; browsers see rankings and broadcasts; you set it up and run it on the admin pages">
 <rect x="-28" y="-28" width="956" height="456" rx="16" fill="#11151a"/>
 <path d="M0,75 H184 L196,87 V159 H0 Z" fill="#1a1f25" stroke="#ffb13d" stroke-width="2" stroke-linejoin="round"/>
 <text x="14" y="103.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,182">Your APK</text>
 <text x="14" y="122.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,182">the game's Android app:</text>
 <text x="14" y="140" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,182">original or changed</text>
 <path d="M0,201 H184 L196,213 V285 H0 Z" fill="#1a1f25" stroke="#ffb13d" stroke-width="2" stroke-linejoin="round"/>
-<text x="14" y="229.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,182">Your server files</text>
-<text x="14" y="248.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,182">game data and songs:</text>
+<text x="14" y="229.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,182">Your client data</text>
+<text x="14" y="248.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,182">and song data:</text>
 <text x="14" y="266" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,182">a folder or an archive</text>
 <path d="M310,8 H548 L560,20 V352 H310 Z" fill="#1a1f25" stroke="#8cf23d" stroke-width="2" stroke-linejoin="round"/>
 <text x="324" y="140.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="324,546">OpenDMTQ server</text>
