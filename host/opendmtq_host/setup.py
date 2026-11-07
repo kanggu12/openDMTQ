@@ -41,7 +41,7 @@ def find_files(given):
         return folder, names
     if sys.stdin and sys.stdin.isatty():
         say("No game files found in Downloads or on the Desktop.")
-        say("Drag the folder with your game files (the APK and the game data) onto this window, then press Enter:")
+        say("Drag the folder with your game files (the APK and the client data) onto this window, then press Enter:")
         for _ in range(3):
             try:
                 answer = input("> ").strip().strip('"').strip("'")
@@ -65,7 +65,7 @@ def ask_songs(args):
 
 
 def have_game_data():
-    """True when data/content holds the game data (the client's tables)."""
+    """True when data/content holds the client data (the client's tables)."""
     tables = os.path.join(DATA, "content", "web", "patch", "phone_new", "*", "android", "patch_new.csv.lz4")
     return bool(glob.glob(tables))
 

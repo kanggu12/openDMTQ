@@ -152,7 +152,8 @@ function song_count(): int
     return count(array_filter(song_list(), fn($s) => ($s['hidden_yn'] ?? 'N') !== 'Y'));
 }
 
-/* True when the game data is there: the manifest of the client's data folder, in the admin's overlay or the content. */
+/* True when the client data is there: the manifest of the client's data folder, in the admin's overlay or the
+   content. */
 function game_data_present(): bool
 {
     return odq_served_file('patch/phone_new/' . odq_patch_id() . '/android/patch_new.csv.lz4') !== null;

@@ -135,18 +135,18 @@ logins and the start batch.
 ## The content
 
 OpenDMTQ ships none of the game's files. `./opendmtq import` takes them from the owner's
-folder or archive, a copy of the game's server files with the game host's `patch/phone_new` in it (under any folder
-name, with or without a song list: [the forms](game-files.md#the-server-files)), in two parts that can each come on
+folder or archive, a copy of the game host's folder with its `patch/phone_new` in it (under any folder name, with or
+without a song list: [the forms](game-files.md#the-client-data-and-the-song-data)), in two parts that can each come on
 their own, from the same files or from two places (the patch folder alone, the `DMQ` folder alone). Each replaces only
 what it has:
 
 | Part | What | Into `data/content` |
 |---|---|---|
-| Game data | The client's patch folder (its tables, the image bundles of its screens, its fonts, every song's preview and tile), the news images, the pictures of HOW TO PLAY | `web/patch`, `web/static`, `web/viewImg` |
-| Songs (`--songs`) | Music, videos, charts, jackets, the song list | `web/DMQ`, `web/viewImg/eye`, `songs.json` |
+| Client data | The client's patch folder (its tables, the image bundles of its screens, its fonts, every song's preview and tile), the news images, the pictures of HOW TO PLAY | `web/patch`, `web/static`, `web/viewImg` |
+| Song data (`--songs`) | Music, videos, charts, jackets, the song list | `web/DMQ`, `web/viewImg/eye`, `songs.json` |
 
 <p align="center">
-  <img src="images/fig-content-flow.svg" alt="The content. The import takes your APK into data/apk/base, and the game data and, with --songs, the songs from your server files into data/content, read only. A song package added on the admin pages goes to data/custom with the hidden flags. songs.py rebuilds the song list and the client's tables into data/custom before every start; phones download what changed, from data/custom first, otherwise from data/content" width="100%">
+  <img src="images/fig-content-flow.svg" alt="The content. The import takes your APK into data/apk/base, and the client data and, with --songs, the song data from your files into data/content, read only. A song package added on the admin pages goes to data/custom with the hidden flags. songs.py rebuilds the song list and the client's tables into data/custom before every start; phones download what changed, from data/custom first, otherwise from data/content" width="100%">
 </p>
 
 Only those files are taken: never programs, databases or notes (`TAKE` in `importer.py`). An archive is opened with
@@ -162,8 +162,8 @@ Before every start `songs.py` rebuilds `data/custom` from the content and the ad
   songs, and the patch manifest (`patch_new.csv.lz4`) with their sizes and checksums. Phones download what changed at
   their next start.
 
-With the game data and no songs, the tables lose every song's row and the game starts with an empty song list. The
-chart table keeps its rows: the client refuses an empty one. Without the game data the game cannot start at all (it
+With the client data and no songs, the tables lose every song's row and the game starts with an empty song list. The
+chart table keeps its rows: the client refuses an empty one. Without the client data the game cannot start at all (it
 fetches the images of its screens from the server), so the server reports itself unhealthy until it is imported.
 
 ## The app patch
@@ -390,7 +390,7 @@ A host install (`host/install.sh`, then `./opendmtq setup`) and the Windows bund
 
 | Path | Contents | Backed up |
 |---|---|---|
-| `data/content/` | What was imported: the game data and the songs, read only | No (import again) |
+| `data/content/` | What was imported: the client data and the song data, read only | No (import again) |
 | `data/state/dmtq.db3` (and its `-wal`, `-shm`) | Accounts and scores | Yes |
 | `data/state/live/` | The live view's window: the last segments of each broadcast. Cleared at start | No |
 | `data/state/live-rec/` | Recordings of broadcasts, up to the limits on the admin Recordings page | No |

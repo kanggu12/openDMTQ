@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # The Windows bundle under Wine, on Linux: a smoke test for when no Windows is at hand (CI's windows job runs the bundle
 # on Windows itself, tests/windows/run.ps1). Builds the bundle (host/windows/build.sh), lays out the pages' stand-in game
-# files as the game's server files, starts OpenDMTQ.exe as a double-click does, and checks the game server's contract
-# (tests/game/protocol.py), the admin pages, and the setup pages: the one-time sign-in, the import from the folder, and
-# another address with the restart it makes. Needs Docker; nothing of the game's own, but with APK= the game's client
-# goes through the setup too and the phone app is built with the bundle's Java, Apktool and signer.
+# files like the game's client data and song data, starts OpenDMTQ.exe as a double-click does, and checks the game
+# server's contract (tests/game/protocol.py), the admin pages, and the setup pages: the one-time sign-in, the import
+# from the folder, and another address with the restart it makes. Needs Docker; nothing of the game's own, but with APK=
+# the game's client goes through the setup too and the phone app is built with the bundle's Java, Apktool and signer.
 #
 # Wine is not Windows. Four things differ, and the test changes only its own copy of the bundle for them:
 # - Wine (8.0 at least) lacks propsys' VariantToString, which Python's WMI module calls for platform details: it goes.
@@ -94,7 +94,7 @@ wine cmd /c ver >/dev/null 2>&1 || true
 
 expect "OpenDMTQ.exe starts the bundle's Python and the host program" sh -c 'wine OpenDMTQ.exe --help 2>&1 | grep -q "Run an OpenDMTQ server without containers"'
 
-# The pages' stand-in game files, laid out as the game's server files.
+# The pages' stand-in game files, laid out like the game's client data and song data.
 mkdir -p /tmp/content /tmp/game/dmqglb.mb.pmang.com /tmp/game/_info
 php /repo/tests/ui/make_content.php /tmp/content >/dev/null
 cp -r /tmp/content/web/. /tmp/game/dmqglb.mb.pmang.com/
@@ -135,7 +135,7 @@ mkdir -p .host/run && echo 0 > .host/run/stop.request
 # OpenDMTQ.exe as a double-click starts it: setup, then the server in its window, the setup pages opened for what is
 # left. Its output goes through a pipe (see above). The wait for the first answer is cut to a few seconds, far less than
 # Apache takes here: this is the slow first start of a PC whose antivirus looks at every new program. Until it answers:
-# with nothing imported yet, its health page says so (503, no game data).
+# with nothing imported yet, its health page says so (503, no client data).
 (OPENDMTQ_START_WAIT=5 timeout 1500 wine OpenDMTQ.exe 2>&1 | cat > /tmp/run.log &)
 for _ in $(seq 1 150); do
   case "$(code "http://127.0.0.1:$PORT/opendmtq/health.php")" in 200 | 503) break ;; esac
@@ -199,7 +199,7 @@ expect "the import from an archive ends well ($state)" test "$state" = "done"
 expect "and it found the game's files in the archive" sh -c "web() { curl -s -m 60 -b $jar \"\$@\"; }; web '$A/jobs/$job' | grep -q 'game-files.zip'"
 expect "with the archive's files in, the server is healthy" is 200 "http://127.0.0.1:$PORT/opendmtq/health.php"
 # What the setup says of each file, as its lists ask (Windows' 7-Zip lists the archive): the folder and the archive of the
-# server files, and the iPhone app, which is of no use.
+# client data and the song data, and the iPhone app, which is of no use.
 : > /tmp/game.ipa
 what() { web -G --data-urlencode "path=$1" "$A/setup/what"; }
 # said <path> <true|false> <words>: the setup's answer for that file, shown, has that verdict and those words.
@@ -208,8 +208,8 @@ said() {
   echo "    $(cat /tmp/said.json)"
   grep -q "\"ok\": *$2" /tmp/said.json && grep -q "$3" /tmp/said.json
 }
-expect "the setup says the folder holds the server files" said 'Z:\tmp\game' true 'Server files'
-expect "and so does the archive, read by Windows' 7-Zip" said 'Z:\tmp\game-files.zip' true 'Server files'
+expect "the setup says the folder holds the client data" said 'Z:\tmp\game' true 'Client data'
+expect "and so does the archive, read by Windows' 7-Zip" said 'Z:\tmp\game-files.zip' true 'Client data'
 expect "and the iPhone app is of no use" said 'Z:\tmp\game.ipa' false 'iPhone app'
 # The game server's contract, as on the image and on a host install.
 if python3 /repo/tests/game/protocol.py "http://127.0.0.1:$PORT"; then

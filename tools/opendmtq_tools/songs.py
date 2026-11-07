@@ -21,7 +21,7 @@ The game learns about songs twice: the server's song list (what it offers) and t
 product_product and category_categoryproduct), which the client downloads when the patch manifest
 (patch_new.csv.lz4) lists a different checksum. rebuild() regenerates both.
 
-What phones are told of is what the server has. The game data (the client's tables, the images of its screens and
+What phones are told of is what the server has. The client data (the client's tables, the images of its screens and
 its fonts) comes from the operator's files; the songs are imported apart from it. Without imported songs the tables
 lose every song's row, item and product (the chart table keeps its rows: the client refuses an empty one); the
 songs' previews and tiles stay with the patch folder they came in. The game then starts with an empty song list, and
@@ -228,7 +228,7 @@ def content_web():
 
 
 def has_game_data():
-    """True once the game data is imported (the client's patch folder with its manifest): the game cannot start
+    """True once the client data is imported (the client's patch folder with its manifest): the game cannot start
     without it, songs or no songs."""
     return os.path.isfile(os.path.join(patch_dir(content_web()), "patch_new.csv.lz4"))
 
@@ -572,9 +572,9 @@ def rebuild():
     # Sprite name by song id, for the added songs whose tile bundle could be made.
     tiles = {}
     tile_failures = []
-    # The client's tables, image bundles and fonts: the game data imported from the operator's files (the content's
+    # The client's tables, image bundles and fonts: the client data imported from the operator's files (the content's
     # patch folder). Phones are told only of what the server has: the songs that came with the import and the added
-    # ones; the other songs' rows, previews and tiles leave the tables and the manifest. Without game data the game
+    # ones; the other songs' rows, previews and tiles leave the tables and the manifest. Without client data the game
     # cannot start at all (it needs the images of its screens): there is nothing to rebuild then.
     content_patch = patch_dir(content_web())
     imported = {s["song_id"] for s in base_song_list()}

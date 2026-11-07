@@ -13,7 +13,7 @@ from opendmtq_tools import importer
 
 
 def game_folder(root, songs=(1, 2)):
-    """A small tree of the game's server files: the client's patch folder, songs with their charts and
+    """A small tree of the client data and the song data: the client's patch folder, songs with their charts and
     jackets, the song list, and what must never come along (programs, a database, notes)."""
     files = {
         "_info/songList.json": json.dumps([{"song_id": s, "name": f"song{s}"} for s in songs]),
@@ -301,8 +301,8 @@ def write(root, files):
 
 
 class FormsTest(unittest.TestCase):
-    """The game's server files in the forms people have them: without the old server's song list, in a folder of another
-    name, as an OpenDMTQ server's content."""
+    """The client data and the song data in the forms people have them: without the old server's song list, in a folder
+    of another name, as an OpenDMTQ server's content."""
 
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
@@ -369,10 +369,10 @@ class FormsTest(unittest.TestCase):
 
 
 class GameDataAloneTest(unittest.TestCase):
-    """The client's patch folder copied by itself, in each form it is copied in: the game data alone. It keeps the
+    """The client's patch folder copied by itself, in each form it is copied in: the client data alone. It keeps the
     server's songs, and whole files beside it come first."""
 
-    # What the game data of game_folder() is in its patch folder: all of that folder, every song's preview and tiles
+    # What the client data of game_folder() is in its patch folder: all of that folder, every song's preview and tiles
     # with it; not the pictures of HOW TO PLAY and of the news beside it.
     GAME_DATA = {"web/patch/phone_new/1.003.005/android/patch_new.csv.lz4",
                  "web/patch/phone_new/1.003.005/android/table/us/song_song.csv.lz4",
@@ -437,7 +437,7 @@ class GameDataAloneTest(unittest.TestCase):
 
     def test_over_a_whole_import_it_replaces_the_patch_folder_only(self):
         # The setup asks for the songs unless told not to: files without any must not empty the song list. Nor does the
-        # patch folder take the game data's other pictures (HOW TO PLAY, the news) with it.
+        # patch folder take the client data's other pictures (HOW TO PLAY, the news) with it.
         importer.import_game_files([self.whole], {"game", "songs"})
         before = content_files(self.data)
         self.assertIn("web/DMQ/Songs/1/1.fpk", before)
@@ -522,7 +522,7 @@ class GameDataAloneTest(unittest.TestCase):
 
 class SongsAloneTest(unittest.TestCase):
     """The songs copied by themselves (their DMQ folder, with the jackets' viewImg and the song list or without): they
-    come in on their own, onto the game data the server has, or with it from another place, and replace only what
+    come in on their own, onto the client data the server has, or with it from another place, and replace only what
     they have."""
 
     def setUp(self):
@@ -535,7 +535,7 @@ class SongsAloneTest(unittest.TestCase):
         for patcher in (mock.patch.object(importer, "DATA", self.data), mock.patch.object(importer, "log", self.said.append)):
             patcher.start()
             self.addCleanup(patcher.stop)
-        # The game data alone, with the client's song tables (two songs) and every song's preview and tiles.
+        # The client data alone, with the client's song tables (two songs) and every song's preview and tiles.
         self.game = os.path.join(self.tmp, "Downloads", "game")
         tables(os.path.join(self.game), [(1, "first"), (2, "second")], [(11, 1), (12, 1), (21, 2)])
         write(self.game, {"patch/phone_new/1.003.005/android/patch_new.csv.lz4": "manifest",
@@ -556,7 +556,7 @@ class SongsAloneTest(unittest.TestCase):
         self.assertIn("web/patch/phone_new/1.003.005/android/preview/first.p.opus.lz4", game)
         self.assertEqual(importer.what_is(self.songs)["kind"], "songs")
         self.assertTrue(importer.import_game_files([self.songs], {"game", "songs"}))
-        self.assertIn("game data: none there, the game data on the server stays as it is", self.said)
+        self.assertIn("client data: none there, the client data on the server stays as it is", self.said)
         # The list from the server's own tables, for the songs and the charts whose files came.
         self.assertEqual([(s["song_id"], [c["pattern_id"] for c in s["song_patterns"]]) for s in self.listed()],
                          [(1, [11]), (2, [21])])
@@ -603,8 +603,8 @@ class SongsAloneTest(unittest.TestCase):
         # No list of their own, and no tables on the server to make one from: nothing comes in, and the import says why.
         self.assertFalse(importer.import_game_files([self.songs], {"songs"}))
         self.assertFalse(os.path.exists(os.path.join(self.data, "content", "songs.json")))
-        self.assertTrue(any("import the game data first" in line for line in self.said), self.said)
-        # With a list of their own they come in, and wait for the game data.
+        self.assertTrue(any("import the client data first" in line for line in self.said), self.said)
+        # With a list of their own they come in, and wait for the client data.
         write(self.songs, {importer.SONG_LIST: json.dumps([{"song_id": 1, "name": "first"}])})
         self.assertTrue(importer.import_game_files([self.songs], {"songs"}))
         self.assertEqual(self.listed(), [{"song_id": 1, "name": "first"}])
@@ -652,7 +652,7 @@ class CheckTest(unittest.TestCase):
                     mock.patch.dict(os.environ, {"IMPORT_ONLY": "", "IMPORT_CHECK": "yes"}):
                 with self.assertRaises(SystemExit):
                     importer.main()
-            self.assertEqual(said, ["ok   songs: the game's songs alone, 2 songs, for the game data imported apart, "
+            self.assertEqual(said, ["ok   songs: the song data alone, 2 songs, for the client data imported apart, "
                                     "no song list (made from the game's own tables)"])
 
     def test_the_game_data_alone_is_said_once_for_what_it_is(self):
@@ -668,7 +668,7 @@ class CheckTest(unittest.TestCase):
                 with self.assertRaises(SystemExit) as e:
                     importer.main()
             self.assertEqual(e.exception.code, 0)
-            self.assertEqual(said, ["ok   client: the game's server files without songs: the game starts, with nothing to play yet"])
+            self.assertEqual(said, ["ok   client: the client data without song data: the game starts, with nothing to play yet"])
 
     def test_each_file_is_said_for_what_it_is_and_nothing_comes_in(self):
         with tempfile.TemporaryDirectory() as d:
@@ -686,7 +686,7 @@ class CheckTest(unittest.TestCase):
                     importer.main()
             self.assertEqual(e.exception.code, 0)
             text = "\n".join(said)
-            self.assertIn("ok   files: the game's server files, 2 songs", text)
+            self.assertIn("ok   files: the client data and the song data, 2 songs", text)
             self.assertIn("ok   game.apk: client 1.3.4, original", text)
             self.assertIn("ok   changed.apk: client 1.3.5, changed for another server (play.example.net)", text)
             self.assertIn("no   game.ipa: the iPhone app", text)

@@ -408,7 +408,7 @@ IL2CPP_EDITS = [
         "1.3.4": [(0xEF40F0, bytes.fromhex("0010a0e3" "ac61f9eb"), arm_branch(0xEF40F0, 0xEF42D0) + bytes.fromhex("ac61f9eb"))],
         "1.3.5": [(0xF39D24, bytes.fromhex("0010a0e3" "815ef9eb"), arm_branch(0xF39D24, 0xF39F04) + bytes.fromhex("815ef9eb"))],
     }),
-    # A new install fetches about 42 MB of game data from this server, and the game first asks "Additional
+    # A new install fetches about 42 MB of client data from this server, and the game first asks "Additional
     # files will be downloaded" with one button, OK. Login2SceneConfig.ShowStartPatchPopup keeps its
     # first part, which saves the callback in the small object behind the popup's button, and then
     # calls that button's own handler (<ShowStartPatchPopup>c__AnonStoreyA.<>m__0, which only

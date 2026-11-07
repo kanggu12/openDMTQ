@@ -9,7 +9,7 @@ OpenDMTQ is an unofficial, non-commercial community project. It is not affiliate
 NEOWIZ. DJMAX and TECHNIKA Q are trademarks of NEOWIZ, and the game is NEOWIZ's copyrighted work.
 
 OpenDMTQ is a server framework. The repository contains no game data: no game client, songs, charts, images or
-videos. A server runs only with files its owner provides: their own copy of the game's Android app (APK) and its game
+videos. A server runs only with files its owner provides: their own copy of the game's Android app (APK) and its client
 data, which the game cannot start without. Songs are imported separately; a server without them starts the game with
 an empty song list. What the repository does hold is OpenDMTQ's own code and what it takes to work with those files:
 the names of the game's requests and files and the shapes of the replies the client reads, the short byte patterns and

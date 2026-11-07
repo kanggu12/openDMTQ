@@ -38,13 +38,14 @@ The admin pages start with a setup of four steps. On a host install and in the W
 the browser the first time, signed in by a one-time link (it works once, from the server PC, within an hour). Later it
 is at `/opendmtq/admin/setup`, and the status page leads there until every step is done.
 
-1. **Game files.** The game's Android app and the server files, found in Downloads, on the Desktop and in Documents
-   (OneDrive's too), or anywhere else on the PC: type or paste the path of the folder, archive or file, or click your
-   way to it. Each file found or listed says what it is (the app and its version, a copy changed for another server,
-   server files and their songs, the game data or the songs alone, the iPhone app, a part of an archive, one that
-   cannot be read), and one of no use cannot be imported ([the forms each may come in](game-files.md)). The import takes
-   the app and the game data, the songs too when their box is ticked, each from where it is, then makes the song list.
-   The songs can also come later, on their own. Its output shows as it goes.
+1. **Game files.** The game's Android app, the client data and the song data, found in Downloads, on the Desktop and in
+   Documents (OneDrive's too), or anywhere else on the PC: type or paste the path of the folder, archive or file, or
+   click your way to it. Each file found or listed says what it is (the app and its version, a copy changed for another
+   server, the client data and the song data with how many songs, the client data or the song data alone, the iPhone
+   app, a part of an archive, one that cannot be read), and one of no use cannot be imported
+   ([the forms each may come in](game-files.md)). The import takes the app and the client data, the songs too when their
+   box is ticked, each from where it is, then makes the song list. The songs can also come later, on their own. Its
+   output shows as it goes.
 2. **Address.** The address phones use, which goes into the app: this PC's address on its network. A PC with several
    (wired and Wi-Fi) offers each. A new one is written to `.env`, and the server starts again for it.
 3. **Players.** An account for each player, its password shown once with the message to send.
@@ -99,7 +100,7 @@ Keep the password unique and change it if in doubt: edit `.env`, then restart th
 | Setup | The four steps above: the game's files, the address, the players and the app. Reached from the status page while a step is left, and from the Songs page to import songs. |
 | Status | Things to look at first when there are any (no app, no backup, little disk, a failed build). Game server health, players, plays in the last 24 hours, players broadcasting now, disk space, current app, last backup, maintenance. A message to send a friend with where to get the app and how to sign in, and its QR code. Plays over the last 30 days, when people play by weekday and hour, who plays most, the most played songs, what takes the disk, best records by grade, recent plays. |
 | App | The app's name on phones, TECHNIKA Q (<name>): SERVER_NAME, or the address in PUBLIC_HOST when it is unset. Build the app (about 20 seconds, output shown live), download any build, delete one, or all the old ones at once. A build for another address is kept for download and does not replace the one the site offers. |
-| Songs | Add a song package, remove added songs, hide or show any song. Each song's plays over the last 30 days, against the most played, and when it was last played. Says so when the server has no game data or no songs yet. See [songs.md](songs.md). |
+| Songs | Add a song package, remove added songs, hide or show any song. Each song's plays over the last 30 days, against the most played, and when it was last played. Says so when the server has no client data or no songs yet. See [songs.md](songs.md). |
 | Players | Search by name, sort by any column, when each last played, and a row of 14 small cells, one per day of the last two weeks, darker on days with more plays. A spreadsheet of them all. A name leads to the player's page on the site. On each row whether their broadcast is on, with its switch; under More: rename, reset scores, delete (those two ask first and make a backup first, and take the player's achievements with their scores) ([live.md](live.md)). |
 | Accounts | The site's accounts, the only way into it: make one (an ID, a password typed or made, whom it is for, the game player it is, admin rights to these pages too), and its password shows once with the message to send; a new password, disable or enable, delete. Each with when it was made and last signed in. |
 | Recordings | Every broadcast, kept (players see them as past broadcasts): watch, download as one file, hide from players, delete one, selected or all of a player's. Disk used against the two limits (20 GB and 30 days by default), which are set here, and about how many hours of broadcast still fit. See [live.md](live.md#recordings). |

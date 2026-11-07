@@ -28,7 +28,8 @@ const ALL_WIDTHS = [360, 744, 1024, 1280, 1920];
 const FEW_WIDTHS = [360, 1280];
 // Player numbers and song numbers from seed.php and make_content.php: 1 plays much, 4 and 5 have the longest names, 10 has no
 // plays; song 25 has the longest name, song 26 has no jacket.
-// The setup's steps as a host install shows them: run.sh puts a client and the server files in the owner's Downloads.
+// The setup's steps as a host install shows them: run.sh puts a client and a folder of the client data and the song
+// data in the owner's Downloads.
 const SETUP = [
   ['admin-setup', `${A}/setup?step=files`],
   ['admin-setup-picker', `${A}/setup?step=files&dir=%2Fhome%2Fplayer%2FDownloads`],

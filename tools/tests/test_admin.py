@@ -540,7 +540,7 @@ class OverLimitUploadTest(unittest.TestCase):
             response, stream = self.post_too_large(inst, "/opendmtq/admin/songs")
             self.assertEqual(response.status_code, 302)
             self.assertEqual(stream.read(), b"", "the refused body was left unread")
-            # Any page shows the message; this one needs no game data.
+            # Any page shows the message; this one needs no client data.
             self.assertIn("upload limit", inst.client.get("/opendmtq/admin/backups").get_data(as_text=True))
 
 
@@ -1328,15 +1328,15 @@ class PagesThatCannotWorkSaySoTest(unittest.TestCase):
             self.assertIn("데이터베이스를 읽을 수 없습니다", page)
 
     def test_no_game_data_is_said_on_the_songs_page(self):
-        # Without the game data the game cannot start: the page says how it comes, instead of failing.
+        # Without the client data the game cannot start: the page says how it comes, instead of failing.
         with Install() as inst, mock.patch.object(admin.songs, "has_game_data", return_value=False):
             inst.sign_in()
             r = inst.client.get("/opendmtq/admin/songs")
             self.assertEqual(r.status_code, 200)
-            self.assertIn("No game data yet", r.get_data(as_text=True))
+            self.assertIn("No client data yet", r.get_data(as_text=True))
 
     def test_no_songs_yet_is_said_on_the_songs_page(self):
-        # The game data without songs is a server that works: the page says how songs come, as a note, not an error.
+        # The client data without songs is a server that works: the page says how songs come, as a note, not an error.
         with Install() as inst, mock.patch.object(admin.songs, "has_game_data", return_value=True), \
                 mock.patch.object(admin.songs, "base_song_list", return_value=[]):
             inst.sign_in()

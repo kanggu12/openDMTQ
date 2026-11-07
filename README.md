@@ -33,18 +33,19 @@ project that brings its online side back on a computer of your own. The server b
 it, and your friends install that copy from the server's web page.
 
 > [!IMPORTANT]
-> **No game files are included.** You need your own copy of the game's Android app and its server files. Please use
-> only files you have the right to use. OpenDMTQ is an unofficial, non-commercial project, not affiliated with or
-> endorsed by NEOWIZ.
+> **No game files are included.** You need your own copy of the game's Android app and its client data, and its song
+> data for the songs. Please use only files you have the right to use. OpenDMTQ is an unofficial, non-commercial
+> project, not affiliated with or endorsed by NEOWIZ.
 
 ## Quick start
 
-You need your own copy of the game's Android app (`.apk`) and its server files: [what each has to be](docs/game-files.md).
+You need your own copy of the game's Android app (`.apk`) and its client data, and its song data for the songs:
+[what each has to be](docs/game-files.md).
 Phones play on Android, on the same Wi-Fi as the server or [over the internet](docs/internet.md);
 [iPhones cannot](docs/game-files.md#iphones). The setup says what each file is before it imports anything.
 
 <p align="center">
-  <img src="docs/images/setup.jpg" alt="The setup in the browser: the game's Android app and the server files found in Downloads, each labeled with what it is, with a button to import them" width="100%">
+  <img src="docs/images/setup.jpg" alt="The setup in the browser: the game's Android app, the client data and the song data found in Downloads, each labeled with what it is, with a button to import them" width="100%">
 </p>
 
 **Windows 10 or 11**, in Windows PowerShell:
@@ -124,7 +125,7 @@ Plain PHP on SQLite, with no database server to look after. Two cores answer hun
 ## How it works
 
 <p align="center">
-  <img src="docs/images/diagram-pieces.svg" alt="Your APK and server files are imported by the setup into the OpenDMTQ server on your PC. The server answers the game, builds the app from your APK, and serves the players' site, live broadcasts and the admin pages. Phones get the app from the site and play; browsers see rankings and broadcasts; you set it up and run it on the admin pages" width="100%">
+  <img src="docs/images/diagram-pieces.svg" alt="Your APK, client data and song data are imported by the setup into the OpenDMTQ server on your PC. The server answers the game, builds the app from your APK, and serves the players' site, live broadcasts and the admin pages. Phones get the app from the site and play; browsers see rankings and broadcasts; you set it up and run it on the admin pages" width="100%">
 </p>
 
 The app sends the game's four official hosts to one address, where a single server answers the game, its login, its
@@ -136,7 +137,7 @@ scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#pr
 | Guide | What it covers |
 |---|---|
 | [Installing](docs/install.md) | Each system step by step, the phones, everyday use, what it runs on |
-| [The game's files](docs/game-files.md) | What the app and the server files have to be |
+| [The game's files](docs/game-files.md) | What the app, the client data and the song data have to be |
 | [Questions and answers](docs/faq.md) | What it needs, which phones, playing with friends, privacy |
 | [The site and the admin pages](docs/admin.md) | The setup, the app, songs, players, backups |
 | [Songs](docs/songs.md) | Importing songs, adding your own |

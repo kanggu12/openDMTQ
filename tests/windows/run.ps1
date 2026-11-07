@@ -32,7 +32,7 @@ $help = & $exe --help 2>&1 | Out-String
 if ($help -match "Run an OpenDMTQ server without containers") { Pass "OpenDMTQ.exe starts the bundle's Python and the host program" }
 else { Write-Output $help; Fail "OpenDMTQ.exe starts the bundle's Python and the host program" }
 
-# 2. The pages' stand-in game files, made by the bundle's own PHP and laid out as the game's server files.
+# 2. The pages' stand-in game files, made by the bundle's own PHP, laid out like the game's client data and song data.
 $content = Join-Path $env:RUNNER_TEMP "odq-content"
 $game = Join-Path $env:RUNNER_TEMP "odq-game"
 foreach ($d in @($content, $game)) { if (Test-Path $d) { Remove-Item -Recurse -Force $d } }
@@ -73,8 +73,8 @@ Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $bundle ".h
 Set-Content -Path (Join-Path $bundle ".env") -Encoding utf8 -Value @(
     "PUBLIC_HOST=127.0.0.1:$Port", "LISTEN_PORT=$Port", "ADMIN_PORT=$($Port + 1)", "ADMIN_PASSWORD=ci")
 $import = & $exe import $game --songs 2>&1 | Out-String
-if ($LASTEXITCODE -eq 0 -and $import -match "game data and") { Pass "OpenDMTQ.exe imports the game data and the songs from a folder" }
-else { Write-Output $import; Fail "OpenDMTQ.exe imports the game data and the songs from a folder" }
+if ($LASTEXITCODE -eq 0 -and $import -match "client data and") { Pass "OpenDMTQ.exe imports the client data and the song data from a folder" }
+else { Write-Output $import; Fail "OpenDMTQ.exe imports the client data and the song data from a folder" }
 
 # 3. The server, until it answers.
 # A stop the admin pages asked of an earlier run whose window closed before it read it: not this run's to do.

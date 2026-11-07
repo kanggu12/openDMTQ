@@ -395,7 +395,7 @@ def restore_backup(name, path):
             try:
                 songs.rebuild()
             except (songs.SongError, OSError, ValueError) as e:
-                # Without game data there is nothing to merge them with yet; the database is back all the same.
+                # Without client data there is nothing to merge them with yet; the database is back all the same.
                 app.logger.warning("restore: songs not rebuilt: %s", e)
     changed("backup_action:restore", name)
     flash(t("bak.restored_damaged", name=name, kept=kept) if kept else t("bak.restored", name=name, saved=saved), "ok")

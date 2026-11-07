@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # A host install on a clean system: a container stands in for the computer (Ubuntu 24.04 by default), with a user who
-# installs as people do. host/install.sh; the stand-in game files of the pages' tests in Downloads, laid out as the
-# game's server files; opendmtq setup, and its pages in the browser as the owner goes through them (the one-time link, the files
-# found and imported, a player's account); the game server's contract (tests/game/protocol.py), the site, a stop and a
-# start again, another address chosen in the setup and the restart it makes, the port taken by another program, and
-# PHP's log. With APK=<file> the client
+# installs as people do. host/install.sh; the stand-in game files of the pages' tests in Downloads, laid out like the
+# game's client data and song data; opendmtq setup, and its pages in the browser as the owner goes through them (the
+# one-time link, the files found and imported, a player's account); the game server's contract (tests/game/protocol.py),
+# the site, a stop and a start again, another address chosen in the setup and the restart it makes, the port taken by
+# another program, and PHP's log. With APK=<file> the client
 # goes beside the files and the setup builds the phone app from it (it never leaves this machine). Needs Docker and
 # Python 3; nothing of the game's own.
 #
@@ -72,9 +72,9 @@ else
 fi
 expect "opendmtq is on the PATH, and runs the host install" inside "opendmtq --help | grep -q 'without containers'"
 
-# 2. The game's files where people keep them: the stand-in server files unpacked in a folder in Downloads, with the
-#    client beside them when one is given (it is copied in for this run only). Nothing is imported yet: the setup pages
-#    find them there.
+# 2. The game's files where people keep them: the stand-in client data and song data unpacked in a folder in Downloads,
+#    with the client beside them when one is given (it is copied in for this run only). Nothing is imported yet: the
+#    setup pages find them there.
 inside "mkdir -p /tmp/content && php OpenDMTQ/tests/ui/make_content.php /tmp/content >/dev/null \
   && mkdir -p Downloads/DMTQ/dmtq/dmqglb.mb.pmang.com Downloads/DMTQ/dmtq/_info \
   && cp -r /tmp/content/web/. Downloads/DMTQ/dmtq/dmqglb.mb.pmang.com/ && cp /tmp/content/songs.json Downloads/DMTQ/dmtq/_info/songList.json"
@@ -149,7 +149,7 @@ expect "the setup starts the import" test -n "$job"
 state=$(follow "$job" | tail -n 1)
 expect "the import ends well ($state)" test "$state" = "done"
 files=$(web "$admin" "$A/setup?step=files")
-expect "the files step has the game data" have "Game data" <<<"$files"
+expect "the files step has the client data" have "Client data" <<<"$files"
 expect "the files step has the songs" have "Songs" <<<"$files"
 expect "with the game's files in, the server is healthy" is 200 "http://127.0.0.1:$PORT/opendmtq/health.php"
 expect "a song's jacket is served from the imported content" is 200 "http://127.0.0.1:$PORT/viewImg/eye/fixture1.png"

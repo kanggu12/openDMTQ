@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The live view's smoke test on a throwaway server: builds the images from this working tree, starts
 # the server and the admin service on loopback with an empty database in a temporary folder, runs
-# smoke.py against them and removes everything again. Needs the game data and the songs in data/content
+# smoke.py against them and removes everything again. Needs the client data and the song data in data/content
 # (./opendmtq import --songs <folder with your game files>).
 #
 # KEEP=1 leaves the stack up after the test and prints how to remove it. BROWSER=1 also plays a real

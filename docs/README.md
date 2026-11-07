@@ -12,7 +12,7 @@ to run a server, and [Questions and answers](faq.md) covers what people ask firs
 | Guide | For |
 |---|---|
 | [Questions and answers](faq.md) | What it needs, which phones, playing with friends, what leaves your computer |
-| [The game's files](game-files.md) | What your APK and server files have to be, the forms they come in, how to check them |
+| [The game's files](game-files.md) | What your APK, client data and song data have to be, the forms they come in, how to check them |
 | [The site and the admin pages](admin.md) | The setup in the browser, the players' site, building the app, players, accounts, recordings, backups, the maintenance notice |
 | [Songs](songs.md) | Importing the songs, hiding them, adding your own as song packages |
 | [Playing from outside your home](internet.md) | A host name, one forwarded port, HTTPS |

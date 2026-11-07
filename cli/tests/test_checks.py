@@ -13,7 +13,7 @@ from .sandbox import Sandbox
 
 
 def install(sb, key=b"key", signed_with=None):
-    """A complete install: game data, base APK, a running server, and an app built for .env's
+    """A complete install: client data, base APK, a running server, and an app built for .env's
     address and signed with signed_with (the key in data/apk/keystore by default)."""
     host = sb.env()["PUBLIC_HOST"]
     sb.write("data/content/web/patch/phone_new/1.003.005/android/patch_new.csv.lz4", b"")
@@ -160,7 +160,7 @@ class BuildStatusTest(unittest.TestCase):
             sb.write("data/custom/missing-game-files.json", json.dumps(["dlc/d3_a0.unity3d"]))
             self.assertGreaterEqual(checks.doctor(), 1, sb.output())
             self.assertIn("of the game's own files are missing (dlc/d3_a0.unity3d", sb.output())
-            self.assertIn("Import the whole server files again", sb.output())
+            self.assertIn("Import the client data again", sb.output())
 
     def test_doctor_fails_on_a_failed_rebuild(self):
         # An app for this address exists, but rebuilding it failed: every up stops on that.

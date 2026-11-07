@@ -88,8 +88,8 @@ if ! curl -sf -m 3 -o /dev/null "http://127.0.0.1:$SITE_PORT/opendmtq/health.php
   exit 1
 fi
 echo "PASS the real start script starts on the stand-in game files"
-# The game's files where the setup pages look for them: a client beside a folder of the server files in Downloads (laid
-# out as one, with nothing in it), an archive of them, and the other folders a home has.
+# The game's files where the setup pages look for them: a client beside a folder of the client data and the song data in
+# Downloads (laid out as one, with nothing in it), an archive of them, and the other folders a home has.
 docker exec "$ADMIN" sh -c 'd=/home/player/Downloads/DMTQ && mkdir -p "$d/dmtq/dmqglb.mb.pmang.com/patch/phone_new" "$d/dmtq/_info" \
   /home/player/Desktop /home/player/Documents /home/player/Downloads/Music && echo "[]" > "$d/dmtq/_info/songList.json" \
   && head -c 4096 /dev/zero > "$d/game.apk" && head -c 2048 /dev/zero > "/home/player/Downloads/dmtq-files.rar"'

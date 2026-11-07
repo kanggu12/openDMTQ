@@ -123,7 +123,7 @@ addresses. The media requests are left out of its access log too.
 Requirements:
 
 - A ReadWriteMany volume (NFS, CephFS, Longhorn RWX, ...) or a host path present on every node,
-  holding `content/` (the game data, and the songs if you have them) and `apk/base/` (a base APK). The
+  holding `content/` (the client data, and the song data if you have it) and `apk/base/` (a base APK). The
   layout matches the repository's `data/` folder, so `opendmtq import [--songs] <folder>` on any machine
   prepares it. What phones without 32-bit support need comes with the tools image: the builder job adds it.
 - S3-compatible object storage for the database replica.

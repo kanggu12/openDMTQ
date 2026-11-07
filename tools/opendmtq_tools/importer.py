@@ -4,22 +4,22 @@ Accepts a folder (or files) holding any mix of:
   * the game's Android client (APK): loose, inside an archive, or in an APK bundle (.xapk, .apks). Kept in
     data/apk/base, the base every phone app of this server is built from: the original, or one changed for another
     server (its build points it at this one). An app OpenDMTQ built is not a base, nor is any other app.
-  * the game's server files: the game host's folder (dmqglb.mb.pmang.com, or the same files in a folder of another
-    name, such as the web folder of an OpenDMTQ server's content), loose or in an archive, at any depth, with or
-    without the song list kept beside the folder or in it (_info/songList.json, or songs.json; without one the list is
-    made from the game's own tables). Or part of them, each part apart: the client's patch folder by itself (patch, or
-    phone_new: the game data alone), the songs' folder by itself (DMQ, with the jackets' viewImg and the song list or
-    without). The whole files are taken before parts of them. Copied into data/content in two parts, each on its own:
-      game data   the client's patch folder (its tables, the images of its screens, its fonts, and every song's
-                  preview and tiles in the song list), and the pictures of the news and of HOW TO PLAY
-      songs       the songs' folder (music and charts), their jackets, and the song list
+  * the client data and the song data: the game host's folder (dmqglb.mb.pmang.com, or the same files in a folder of
+    another name, such as the web folder of an OpenDMTQ server's content), loose or in an archive, at any depth, with
+    or without the song list kept beside the folder or in it (_info/songList.json, or songs.json; without one the list
+    is made from the game's own tables). Or part of them, each part apart: the client's patch folder by itself (patch,
+    or phone_new: the client data alone), the songs' folder by itself (DMQ, with the jackets' viewImg and the song list
+    or without). The whole files are taken before parts of them. Copied into data/content in two parts, each on its own:
+      client data  the client's patch folder (its tables, the images of its screens, its fonts, and every song's
+                   preview and tiles in the song list), and the pictures of the news and of HOW TO PLAY
+      song data    the songs' folder (music and charts), their jackets, and the song list
     Nothing else of it: no program code, no database, no notes. A part of the files replaces only what it has.
   * archives as people have them: .zip, .7z, .rar, one split in parts (.7z.001, .part1.rar and the like, all parts in
     one folder), and one archive inside another.
 
-OpenDMTQ itself ships none of these files. With the game data and no songs the server runs with an empty song list.
+OpenDMTQ itself ships none of these files. With the client data and no songs the server runs with an empty song list.
 IMPORT_SONGS=yes imports the songs too (the CLI's --songs), from files that have their folder: without, the server
-keeps its songs. IMPORT_GAME=no leaves the game data as it is. Archives are opened with 7-Zip inside this container,
+keeps its songs. IMPORT_GAME=no leaves the client data as it is. Archives are opened with 7-Zip inside this container,
 never on the host.
 
 Usage (inside the tools container): python3 -m opendmtq_tools.importer
@@ -43,13 +43,13 @@ from .patch_apk import describe, inspect, sha256
 # What to read and where data/ is: compose's mount points, or a host install's own folders.
 IN = os.environ.get("OPENDMTQ_IMPORT_IN", "/in")
 DATA = os.environ.get("OPENDMTQ_DATA", "/data")
-# The game's server files: the game host's folder, with the client's patch folder in it. An old server kept a song list
-# beside that folder; the list is optional (made from the game's own tables without it).
+# The client data and the song data: the game host's folder, with the client's patch folder in it. An old server kept
+# a song list beside that folder; the list is optional (made from the game's own tables without it).
 HOST = "dmqglb.mb.pmang.com"
 GAME_DIR = HOST + "/patch/phone_new"
 PATCH_DIR = "patch/phone_new"
 SONG_LIST = "_info/songList.json"
-# The client's patch folder copied by itself (phone_new, or the patch folder around it) is the game data alone. It
+# The client's patch folder copied by itself (phone_new, or the patch folder around it) is the client data alone. It
 # counts by what is in it too, since another program may have a patch folder: a client version's folder (1.003.005)
 # with the client's tables for Android.
 PATCH_NAME = "phone_new"
@@ -122,7 +122,7 @@ def patch_itself(path):
 
 
 def patch_of(host):
-    """The client's patch folder of a game host's folder, or None: its patch/phone_new, else the game data alone (the
+    """The client's patch folder of a game host's folder, or None: its patch/phone_new, else the client data alone (the
     phone_new in host, or host itself), by what is in it: asked only of folders found already, whatever their names."""
     # Each in one spelling (normpath): the same folder found from two places compares equal, on Windows too, where
     # PATCH_DIR's slash would sit beside the system's backslashes.
@@ -138,7 +138,7 @@ def patch_of(host):
 def host_folder(path, alone=True, chosen=False):
     """What stands for the game host's folder in or at path, or None: path/dmqglb.mb.pmang.com, or path itself when it
     holds the same files under another name (the client's patch folder, and the songs' or the images' folder beside
-    it), or path/web in an OpenDMTQ server's content folder. Else, unless alone is False, the game data alone: path,
+    it), or path/web in an OpenDMTQ server's content folder. Else, unless alone is False, the client data alone: path,
     when it holds the client's patch folder by itself (patch/phone_new) or is that folder (patch, phone_new). The
     patch folder alone counts by what is in it, as another program may have one. chosen: path is the folder chosen
     for the import, whose name may be lost (mounted as /in): the patch folder counts by what is in it alone."""
@@ -158,7 +158,7 @@ def host_folder(path, alone=True, chosen=False):
 
 
 def whole_host_folder(path):
-    """The whole game host's folder in or at path (host_folder without the game data alone), or None."""
+    """The whole game host's folder in or at path (host_folder without the client data alone), or None."""
     return host_folder(path, alone=False)
 
 
@@ -194,8 +194,8 @@ def songs_in(host):
 
 def songs_host(path, chosen=False):
     """The songs alone at path, or None: path when it holds the songs' folder (DMQ) with music in it and none of the
-    game data (host_folder takes those), or is that folder: named DMQ, or chosen for the import (host_folder's chosen).
-    Asked only once a folder holds DMQ or is named so (a search knows its folders' names)."""
+    client data (host_folder takes those), or is that folder: named DMQ, or chosen for the import (host_folder's
+    chosen). Asked only once a folder holds DMQ or is named so (a search knows its folders' names)."""
     name = os.path.basename(path.rstrip("/\\"))
     for dmq in (os.path.join(path, SONGS_DIR), path if chosen or name == SONGS_DIR else ""):
         if dmq and songs_in_dmq(dmq):
@@ -226,7 +226,7 @@ def song_list_of(host):
 
 
 def is_game_folder(path):
-    """True when path is a folder of the game's server files, whatever its name."""
+    """True when path is a folder of the client data, with the song data or alone, whatever its name."""
     return host_folder(path) is not None
 
 
@@ -307,7 +307,7 @@ def named_like_the_game(path):
 
 
 def patch_alone_in(paths):
-    """The game data alone in an archive's listing, the client's patch folder in it by itself (known by the client's
+    """The client data alone in an archive's listing, the client's patch folder in it by itself (known by the client's
     tables in it): the folder that stands for the game host's, as host_folder takes it from a folder (the one that holds
     patch/phone_new, else phone_new itself), the one nearest the top; or None."""
     found = set()
@@ -323,9 +323,9 @@ def patch_alone_in(paths):
 
 
 def tree_in(paths):
-    """Where the game's server files are inside an archive: (the game host's folder, the song list or None), or None.
-    The folder is the game host's (dmqglb.mb.pmang.com), or one of another name with the same files (whole_tree_in);
-    else the game data alone (patch_alone_in), without a song list: it has no songs."""
+    """Where the client data and the song data are inside an archive: (the game host's folder, the song list or None),
+    or None. The folder is the game host's (dmqglb.mb.pmang.com), or one of another name with the same files
+    (whole_tree_in); else the client data alone (patch_alone_in), without a song list: it has no songs."""
     found = whole_tree_in(paths)
     if found:
         return found
@@ -408,7 +408,7 @@ def _put(src, dest):
 
 def keep_others(dest, parts, replaced=None):
     """Start the content folder being built with the current content's files of the parts not imported now (linked,
-    not copied), so that importing the songs keeps the game data and the other way round. replaced: the files come
+    not copied), so that importing the songs keeps the client data and the other way round. replaced: the files come
     from part of the game's files (the patch folder alone, the songs alone), which replace these places of the content
     only (paths in it, a folder's with "/" at its end): everything else stays, the pictures of HOW TO PLAY and of the
     news with the patch folder alone, the jackets with songs that have none of their own."""
@@ -445,7 +445,7 @@ def _table(path_plain):
 def made_song_list(host):
     """The song list, from the game's own tables, for the songs whose files the folder host has: what an old server
     kept as _info/songList.json holds the same fields. A chart is listed when its file is there. The tables of the
-    host's patch folder, or of the server's game data for the songs alone."""
+    host's patch folder, or of the server's client data for the songs alone."""
     patch = patch_of(host) or patch_of(os.path.join(DATA, "content", "web"))
     tables = sorted(glob.glob(os.path.join(patch, "*", "android", "table", "*", "song_song.csv*"))) if patch else []
     dmq = dmq_of(host)
@@ -514,8 +514,8 @@ def collect(root, dest, parts, song_list=None, replaced=None):
         songs = made_song_list(root)
         log(f"  song list: made from the game's own tables ({len(songs)} songs with their files)")
         if not songs and counts["songs"]:
-            # The songs alone, onto a server without the game data: the tables the list is made from are in it.
-            log("  the song list needs the game data's tables: import the game data, then the songs again")
+            # The songs alone, onto a server without the client data: the tables the list is made from are in it.
+            log("  the song list needs the client data's tables: import the client data, then the songs again")
     with open(os.path.join(dest, "songs.json"), "w", encoding="utf-8") as f:
         json.dump(songs, f, ensure_ascii=False, indent=1)
     # Windows ignored letter case and Linux does not: the game asks for <name>.png with the name from the song list,
@@ -535,7 +535,7 @@ def report(parts, counts):
     """One line for what came in."""
     what = []
     if "game" in parts:
-        what.append("game data")
+        what.append("client data")
     if "songs" in parts:
         what.append(f"{counts['songs']} songs, {counts['charts']} charts")
     log(f"  {' and '.join(what)} ({counts['files']} other files) -> data/content")
@@ -559,13 +559,13 @@ def install_content(built):
 
 
 def named(parts):
-    """The parts in words, for the log: "game data and songs"."""
-    return " and ".join(("game data" if p == "game" else "songs") for p in sorted(parts))
+    """The parts in words, for the log: "client data and songs"."""
+    return " and ".join(("client data" if p == "game" else "songs") for p in sorted(parts))
 
 
 # What a source of the game's files is, and so what it replaces in the content: the whole files the parts asked for,
 # the patch folder alone that folder only, the songs alone their folder, the song list and their jackets.
-WHOLE, ALONE, SONGS = "whole", "game data alone", "songs alone"
+WHOLE, ALONE, SONGS = "whole", "client data alone", "songs alone"
 
 
 def replaced_by(kind, has_jackets):
@@ -634,10 +634,10 @@ def import_game_files(candidates, parts, inner=True, chosen=(), whole_only=False
     """Import the given parts from the game's files among candidates. The whole files come first, all from one place:
     a folder before an archive, one with the songs in it before one without when the songs are asked for, then those
     in an archive inside one of the archives (inner: one level, deeper is no download anyone makes). Else each part
-    from where it is, the game data and the songs apart: the game data from the whole files without songs or from the
-    patch folder alone, the songs from their folder alone; parts of the files inside an inner archive only when
-    nothing is outside. chosen: the folders chosen for the import (host_folder's chosen). whole_only: the whole files
-    alone are looked for (the first look inside). True when something was found to import."""
+    from where it is, the client data and the song data apart: the client data from the whole files without songs or
+    from the patch folder alone, the song data from its folder alone; parts of the files inside an inner archive only
+    when nothing is outside. chosen: the folders chosen for the import (host_folder's chosen). whole_only: the whole
+    files alone are looked for (the first look inside). True when something was found to import."""
     # What an earlier run left when it was killed: gigabytes each, and nothing else ever removes them.
     if inner:
         for old in glob.glob(os.path.join(DATA, ".extract-*")) + glob.glob(os.path.join(DATA, "content.new")):
@@ -689,7 +689,7 @@ def import_game_files(candidates, parts, inner=True, chosen=(), whole_only=False
             if import_archive(path, found, parts):
                 return True
         return False
-    # Each part from where it is: the game data first, whose tables a song list of the songs alone is made from.
+    # Each part from where it is: the client data first, whose tables a song list of the songs alone is made from.
     found_any = bool(whole or whole_a or alone or alone_a or songs or songs_a)
     if inner and not found_any:
         return import_inside(archives, parts)
@@ -700,11 +700,11 @@ def import_game_files(candidates, parts, inner=True, chosen=(), whole_only=False
         if part not in parts:
             continue
         for kind, path, found, archive in sources:
-            # The songs alone with no list of their own: it is made from the game data's tables, on the server.
+            # The songs alone with no list of their own: it is made from the client data's tables, on the server.
             if (kind == SONGS and not (found[1] if archive else song_list_of(found))
                     and not patch_of(os.path.join(DATA, "content", "web"))):
-                log(f"songs: {os.path.basename(path)} has no song list, and the server has no game data to make one "
-                    "from: import the game data first, then the songs")
+                log(f"songs: {os.path.basename(path)} has no song list, and the server has no client data to make one "
+                    "from: import the client data first, then the songs")
                 failed = True
                 continue
             ok = import_archive(path, found, {part}, kind) if archive else import_folder(path, found, {part}, kind)
@@ -715,7 +715,7 @@ def import_game_files(candidates, parts, inner=True, chosen=(), whole_only=False
         else:
             # Asked for, and not in the files given: what the server has of it stays.
             if found_any and not sources:
-                log("game data: none there, the game data on the server stays as it is" if part == "game"
+                log("client data: none there, the client data on the server stays as it is" if part == "game"
                     else "songs: none there, the songs on the server stay as they are")
     # Found, though with nothing of the parts asked for in it, counts as found; a damaged archive and nothing else not.
     return did or (found_any and not failed)
@@ -800,9 +800,9 @@ def what_is(path, chosen=False):
     """What one file or folder is to the import, without importing anything: {"kind", "ok", ...}.
       kind  "app"           an Android app (.apk, or one in an .xapk or .apks bundle): "client" has inspect()'s answer
             "iphone app"    the game's iPhone app (.ipa): of no use here
-            "server files"  a folder or an archive with the game's server files: "songs", "song_list" (True when one
-                            comes with them), and "apps" for the clients in the same archive
-            "songs"         the songs alone (their DMQ folder, without the game data): the same keys
+            "server files"  a folder or an archive with the client data, with the song data or alone: "songs",
+                            "song_list" (True when one comes with them), and "apps" for the clients in the same archive
+            "songs"         the songs alone (their DMQ folder, without the client data): the same keys
             "part"          a later part of an archive split in parts: read through its first part
             "archive"       an archive with neither (it may hold another archive, which the import opens)
             "unreadable"    an archive 7-Zip cannot read: damaged, or split with a part missing
@@ -857,7 +857,7 @@ def check(paths, chosen=()):
     seen = set()
     for path in paths:
         # A folder and the game host's folder in it are the same files: said once (by their patch folder, which the
-        # game data alone has too, or the songs' folder of the songs alone).
+        # client data alone has too, or the songs' folder of the songs alone).
         host = host_folder(path, chosen=path in chosen) if os.path.isdir(path) else None
         same = patch_of(host) if host is not None else (dmq_of(path) if os.path.isdir(path)
                                                           and songs_host(path, chosen=path in chosen) else None)
@@ -870,17 +870,17 @@ def check(paths, chosen=()):
         if w["kind"] == "app":
             line = describe(w["client"])
         elif w["kind"] == "server files":
-            line = ((f"the game's server files, {w['songs']} songs" + ("" if w["song_list"] else
+            line = ((f"the client data and the song data, {w['songs']} songs" + ("" if w["song_list"] else
                      ", no song list (made from the game's own tables)")) if w["songs"] else
-                    "the game's server files without songs: the game starts, with nothing to play yet") + (
+                    "the client data without song data: the game starts, with nothing to play yet") + (
                     f", with {len(w['apps'])} app(s)" if w["apps"] else "")
         elif w["kind"] == "songs":
-            line = (f"the game's songs alone, {w['songs']} songs, for the game data imported apart"
+            line = (f"the song data alone, {w['songs']} songs, for the client data imported apart"
                     + ("" if w["song_list"] else ", no song list (made from the game's own tables)"))
         else:
             line = {"iphone app": "the iPhone app: of no use here, the Android app (.apk) is needed",
                     "part": "a part of an archive in parts: read through its first part, all parts in one folder",
-                    "archive": "an archive with neither the game's app nor its server files" + (
+                    "archive": "an archive without the game's app, client data or song data" + (
                         " (it holds another archive, which the import opens)" if w["ok"] else ""),
                     "unreadable": "7-Zip cannot read it: damaged, or split in parts with one missing",
                     "other": "not one of the game's files"}[w["kind"]]
@@ -911,7 +911,7 @@ def main():
         # Folders first, then the files by name.
         check(sorted(found, key=lambda c: (not os.path.isdir(c), os.path.basename(c).lower())), chosen=targets)
         sys.exit(0)
-    # The game data unless told otherwise; the songs only when asked for.
+    # The client data unless told otherwise; the song data only when asked for.
     parts = set()
     if os.environ.get("IMPORT_GAME", "yes") != "no":
         parts.add("game")

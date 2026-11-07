@@ -2,9 +2,9 @@ OpenDMTQ for Windows
 ====================
 
 An open-source server for DJMAX Technika Q. No game files are included: it runs with your own copy of the game's
-Android app (an .apk; the original, or a copy changed for another server) and its server files (a folder or an
-archive, also one in parts). Please use only files you have the right to use. Importing the songs themselves is
-optional.
+Android app (an .apk; the original, or a copy changed for another server) and its client data and song data (a
+folder or an archive, also one in parts). Please use only files you have the right to use. Importing the song data,
+the songs' music, charts and jackets, is optional.
 
 OpenDMTQ is an unofficial, non-commercial project, not affiliated with or endorsed by NEOWIZ. DJMAX and TECHNIKA Q are
 trademarks of NEOWIZ. If a rights holder asks, the project will be made private or taken down.
@@ -31,8 +31,8 @@ by a publisher Windows knows.
 Later
 -----
 
-- Songs: on the admin pages, Songs, then "Choose the folder": the server files, or their DMQ folder alone. An import
-  replaces the songs imported before; single songs can be added on the same page and stay.
+- Songs: on the admin pages, Songs, then "Choose the folder": the client data and the song data together, or the DMQ
+  folder alone. An import replaces the songs imported before; single songs can be added on the same page and stay.
 - The admin pages: the window shows their address (usually http://localhost:8791/opendmtq/admin/), the user (admin) and
   the password.
 - Commands: open a terminal in this folder (type cmd in Explorer's address bar, then Enter), then for example

@@ -38,7 +38,7 @@ services:
       TZ: ${TZ:-UTC}
     # No published port: phones and browsers come in through the edge service below.
     volumes:
-      # The game data and songs from `opendmtq import` (the operator's own files), read-only.
+      # The client data and song data from `opendmtq import` (the operator's own files), read-only.
       - ./data/content:/srv/content:ro
       # The only state: accounts and scores.
       - ./data/state:/data
@@ -217,7 +217,7 @@ services:
     environment:
       # Which files of the folder to take (setup passes the files its search matched).
       IMPORT_ONLY: ${IMPORT_ONLY:-}
-      # The game data (yes unless told), the songs (only when asked: ./opendmtq import --songs).
+      # The client data (yes unless told), the song data (only when asked: ./opendmtq import --songs).
       IMPORT_GAME: ${IMPORT_GAME:-yes}
       IMPORT_SONGS: ${IMPORT_SONGS:-no}
       # A folder inside data/ read where it is (data/server of an earlier OpenDMTQ), so its files are linked, not copied.

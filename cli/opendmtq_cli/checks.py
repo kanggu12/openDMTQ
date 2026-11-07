@@ -255,10 +255,10 @@ def doctor():
         return failures + 1
     ok(f"Docker {r.stdout.strip()}")
 
-    # Content: the game data the game cannot start without, and the songs, which a server may well not have yet.
+    # Content: the client data the game cannot start without, and the song data, which a server may well not have yet.
     import glob
     if glob.glob(os.path.join(DATA, "content", "web", "patch", "phone_new", "*", "android", "patch_new.csv.lz4")):
-        ok("game data in data/content")
+        ok("client data in data/content")
         # All of it: without the image bundles of its screens the game stops at its start and says nothing.
         try:
             with open(os.path.join(DATA, "custom", "missing-game-files.json"), encoding="utf-8") as f:
@@ -267,10 +267,10 @@ def doctor():
             missing = []
         if missing:
             fail(f"{len(missing)} of the game's own files are missing ({missing[0]}, ...): phones stop at the game's start "
-                 "without them. Import the whole server files again: ./opendmtq import <folder with your game files>")
+                 "without them. Import the client data again: ./opendmtq import <folder with your game files>")
             failures += 1
     else:
-        fail("no game data; run ./opendmtq import <folder with your game files>")
+        fail("no client data; run ./opendmtq import <folder with your game files>")
         failures += 1
     try:
         with open(os.path.join(DATA, "content", "songs.json"), encoding="utf-8-sig") as f:

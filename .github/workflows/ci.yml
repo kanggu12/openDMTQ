@@ -252,7 +252,7 @@ jobs:
 
       - name: Smoke test
         run: |
-          # Without game files the server starts, says what to do, and reports itself unhealthy until the game data is there.
+          # Without game files the server starts, says what to do, and reports itself unhealthy until the client data is there.
           docker run -d --name bare -e PUBLIC_HOST=10.0.0.5 -p 127.0.0.1:18080:8080 opendmtq-server:ci >/dev/null
           for _ in $(seq 1 30); do code=$(curl -s -o /tmp/health.json -w '%{http_code}' http://127.0.0.1:18080/opendmtq/health.php || true); [ "$code" = 000 ] || break; sleep 1; done
           docker logs bare 2>&1 | tee /tmp/bare.log

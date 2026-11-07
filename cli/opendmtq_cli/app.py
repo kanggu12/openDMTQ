@@ -112,7 +112,7 @@ def ensure_env(host=None, quiet=False, reset=None, adopt=True, retry="./opendmtq
 
 
 def have_game_data():
-    """True once the game data is imported: the client's patch folder with its manifest (data/content). Without it the
+    """True once the client data is imported: the client's patch folder with its manifest (data/content). Without it the
     game cannot start: it downloads the images of its screens from the server."""
     import glob
     return bool(glob.glob(os.path.join(DATA, "content", "web", "patch", "phone_new", "*", "android", "patch_new.csv.lz4")))
@@ -249,7 +249,7 @@ def ensure_admin_port():
 def cmd_up(args):
     host = require_host()
     if not have_game_data():
-        die("no game data yet; run ./opendmtq import <folder with your game files>")
+        die("no client data yet; run ./opendmtq import <folder with your game files>")
     # Folders the containers mount must exist and belong to the user they run as, not be created by
     # docker as root; and after a run with sudo they may belong to another user.
     system.make_data_dirs()
@@ -402,7 +402,7 @@ def cmd_import(args):
     # machine now uses another one: the server would move without a new app (`host` does both).
     ensure_env(quiet=True, adopt=False)
     os.makedirs(os.path.join(DATA, "apk", "base"), exist_ok=True)
-    # The game data unless --no-game-data, the songs with --songs; with --check only what each file is.
+    # The client data unless --no-game-data, the song data with --songs; with --check only what each file is.
     extra = {"IMPORT_FROM": src, "IMPORT_SONGS": "yes" if getattr(args, "songs", False) else "no",
              "IMPORT_GAME": "no" if getattr(args, "no_game_data", False) else "yes"}
     checking = getattr(args, "check", False)
@@ -798,9 +798,9 @@ def cmd_setup(args):
             songs = (input("  Import the songs from there too? [Y/n] ").strip().lower() or "y").startswith("y")
         cmd_import(argparse.Namespace(path=source, names=names, songs=bool(songs), no_game_data=False))
     if not have_game_data() or not has_base():
-        die("still missing the game data or the base APK after the import (see above)"
+        die("still missing the client data or the base APK after the import (see above)"
             + ("; if they are in another folder, pass it: ./opendmtq setup --from <folder>" if names else ""))
-    ok("game data and base APK present")
+    ok("client data and base APK present")
     count = song_count()
     if count:
         ok(f"{count} songs")
@@ -872,10 +872,10 @@ def main(argv=None):
     songs.add_argument("--no-songs", dest="songs", action="store_false", help="leave the songs out (the game starts with an empty song list)")
     p.set_defaults(fn=cmd_setup)
 
-    p = sub.add_parser("import", help="take the base APK and the game data (and with --songs the songs) from a folder of your game files")
+    p = sub.add_parser("import", help="take the base APK and the client data (and with --songs the song data) from a folder of your game files")
     p.add_argument("path")
     p.add_argument("--songs", action="store_true", help="import the songs too (on their own with --no-game-data)")
-    p.add_argument("--no-game-data", action="store_true", help="leave the game data as it is")
+    p.add_argument("--no-game-data", action="store_true", help="leave the client data as it is")
     p.add_argument("--check", action="store_true", help="only say what each file there is and whether it can be used")
     p.set_defaults(fn=cmd_import)
 

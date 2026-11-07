@@ -85,7 +85,8 @@ class HostInstall(Install):
 
 
 def game_folder(root):
-    """A folder of the game's server files as an archive of them unpacks: the patch folder and the song list."""
+    """A folder of the client data and the song data as an archive of them unpacks: the patch folder and the song
+    list."""
     os.makedirs(os.path.join(root, setup.GAME_DIR))
     os.makedirs(os.path.join(root, "_info"))
     with open(os.path.join(root, "_info", "songList.json"), "w", encoding="utf-8") as f:
@@ -203,7 +204,7 @@ class StepsTest(unittest.TestCase):
             self.assertFalse(setup.steps_done()["files"])
             page = inst.page(BASE + "/setup?step=files")
             self.assertIn("2 of its files are missing (dlc/d3_a0.unity3d, ...)", page)
-            self.assertIn("Import the game data again.", page)
+            self.assertIn("Import the client data again.", page)
 
     def test_a_server_waiting_for_its_files_is_pointed_to_the_setup_not_called_down(self):
         waiting = {"ok": False, "game_data": False, "database": True, "writable": True, "songs": 0, "host": HOST}
@@ -239,7 +240,7 @@ class FilesOnThisPcTest(unittest.TestCase):
 
     def test_the_downloads_folder_is_looked_in_and_the_complete_folder_comes_first(self):
         with HostInstall() as inst:
-            # An APK alone on the Desktop, and the APK with the server files in a folder in Downloads.
+            # An APK alone on the Desktop, and the APK with the client data and the song data in a folder in Downloads.
             inst.write("home/Desktop/technika-q.apk", "PK")
             os.makedirs(inst.path("home/Downloads/DMTQ"))
             inst.write("home/Downloads/DMTQ/game.apk", "PK")
@@ -304,7 +305,7 @@ class FilesOnThisPcTest(unittest.TestCase):
 
     def test_the_patch_folder_alone_is_found_and_whole_files_beside_it_first(self):
         with HostInstall() as inst:
-            # The patch folder copied out by itself: the game data alone, seen from Downloads and from its own folder,
+            # The patch folder copied out by itself: the client data alone, seen from Downloads and from its own folder,
             # and said once, by its own.
             os.makedirs(inst.path("home/Downloads/patch/phone_new/1.003.005/android/table/us"))
             downloads = inst.path("home/Downloads")
@@ -336,13 +337,14 @@ class FilesOnThisPcTest(unittest.TestCase):
                              (inst.path("home/Downloads/DMTQ/game data"), "game", inst.path("home/Downloads/DMTQ/songs")))
             inst.sign_in()
             page = inst.page(BASE + "/setup?step=files")
-            self.assertIn("Game data folder: " + inst.path("home/Downloads/DMTQ/game data"), page)
-            self.assertIn("Songs folder: " + inst.path("home/Downloads/DMTQ/songs"), page)
-            self.assertIn("The songs", page)
+            self.assertIn("Client data folder: " + inst.path("home/Downloads/DMTQ/game data"), page)
+            self.assertIn("Song data folder: " + inst.path("home/Downloads/DMTQ/songs"), page)
+            self.assertIn("The song data", page)
             # In the picker, the songs' folder says what it holds.
-            self.assertIn("This folder holds the game's songs.", inst.page(BASE + "/setup?step=files&dir="
-                                                                            + inst.path("home/Downloads/DMTQ/songs")))
-            self.assertEqual(setup.what_words(setup.what_is(inst.path("home/Downloads/DMTQ/songs"))), "Songs alone: 1 songs")
+            self.assertIn("This folder holds the song data.", inst.page(BASE + "/setup?step=files&dir="
+                                                                         + inst.path("home/Downloads/DMTQ/songs")))
+            self.assertEqual(setup.what_words(setup.what_is(inst.path("home/Downloads/DMTQ/songs"))),
+                             "Song data alone: 1 songs")
 
     def test_the_search_asks_each_folder_once(self):
         # The setup searches the home folders at each look at the page: each folder costs one question.
@@ -377,7 +379,7 @@ class FilesOnThisPcTest(unittest.TestCase):
             self.assertFalse(said("home/Downloads/game.ipa")["ok"])
             self.assertIn("iPhone app", said("home/Downloads/game.ipa")["text"])
             self.assertIn("first part", said("home/Downloads/files.7z.002")["text"])
-            self.assertEqual(said("home/Downloads/server/www"), {"ok": True, "text": "Server files with 2 songs"})
+            self.assertEqual(said("home/Downloads/server/www"), {"ok": True, "text": "Client data and song data, 2 songs"})
             self.assertEqual(said("home/Downloads/gone.apk"), {"ok": False, "text": "Not there any more"})
             with mock.patch.object(setup.importer, "archive_paths", lambda path, say=True: []):
                 self.assertIn("Cannot be read", said("home/Downloads/broken.zip")["text"])
@@ -549,7 +551,8 @@ class FilesOnThisPcTest(unittest.TestCase):
         with HostInstall() as inst:
             tree = game_folder(inst.path("home/Downloads/dmtq"))
             inst.sign_in()
-            self.assertIn("This folder holds the game's server files.", inst.page(BASE + f"/setup?step=files&dir={tree}"))
+            self.assertIn("This folder holds the client data and the song data.",
+                          inst.page(BASE + f"/setup?step=files&dir={tree}"))
             self.assertEqual(setup.game_folder_in(inst.path("home/Downloads")), tree)
 
     def test_a_folder_that_cannot_be_opened_says_so_with_the_way_up(self):
@@ -600,13 +603,13 @@ class FilesOnThisPcTest(unittest.TestCase):
             self.assertTrue(setup.listing(inst.path("home/Downloads"))["more"])
 
     def test_songs_without_the_game_data_are_listed_with_the_warning(self):
-        # Imported on their own before the game data: there, and the page says what is missing.
+        # Imported on their own before the client data: there, and the page says what is missing.
         song = {"song_id": 7, "name": "seven", "full_name": "Seven Seas", "artist_name": "Someone", "song_patterns": []}
         with HostInstall() as inst, mock.patch.object(admin.songs, "has_game_data", lambda: False), \
                 mock.patch.object(admin.songs, "base_song_list", lambda: [song]):
             inst.sign_in()
             page = inst.page(BASE + "/songs")
-            self.assertIn("No game data yet", page)
+            self.assertIn("No client data yet", page)
             self.assertIn("Seven Seas", page)
 
     def test_the_songs_page_leads_to_the_import_on_this_pc(self):
@@ -686,10 +689,10 @@ class ImportTest(unittest.TestCase):
         with HostInstall() as inst:
             inst.sign_in()
             cases = [(["base APK: none found (need ...)", "game files: none found (looked for ...)"], "Neither the game's Android app"),
-                     (["game files: none found (looked for ...)"], "No game data or songs there"),
+                     (["game files: none found (looked for ...)"], "No client data or song data there"),
                      (["  skip x.rar: 7-Zip could not unpack it (exit 2); an archive in parts needs ..."], "An archive could not be opened"),
                      (["import error: cannot read /in as uid 1000; make it readable"], "This program cannot read that folder"),
-                     (["songs: s has no song list, and the server has no game data to make one from: import the game data first, then the songs"], "The songs need the game data on the server first"),
+                     (["songs: s has no song list, and the server has no client data to make one from: import the client data first, then the songs"], "The songs need the client data on the server first"),
                      (["something else"], None)]
             for lines, words in cases:
                 with self.subTest(words=words):
@@ -700,7 +703,7 @@ class ImportTest(unittest.TestCase):
             # In Korean on a Korean page.
             inst.client.get(BASE + "/lang?to=ko&next=" + BASE + "/")
             admin.jobs._jobs["failed1"]["log"] = ["game files: none found (looked for ...)"]
-            self.assertIn("게임 자료도 곡도 없습니다", inst.client.get(BASE + "/jobs/failed1").get_json()["why"])
+            self.assertIn("클라이언트 데이터도 곡 데이터도 없습니다", inst.client.get(BASE + "/jobs/failed1").get_json()["why"])
             admin.jobs._jobs.pop("failed1")
 
     def test_an_app_file_has_no_songs_box(self):

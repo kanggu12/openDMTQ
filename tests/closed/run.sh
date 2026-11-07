@@ -91,8 +91,9 @@ python3 "$ROOT/tools/opendmtq_tools/runtime.py" --pack "$BUNDLE" "$KIT/$ZIP" >/d
 docker network rm "$NET" >/dev/null 2>&1 || true
 docker network create --internal --subnet 192.168.98.0/24 "$NET" >/dev/null
 
-# The game's files, as the owner carries them in: the pages' stand-in files, laid out as the game's server files, with a file
-# behind each song's address for the setup's self-check to find, and the client beside them when there is one.
+# The game's files, as the owner carries them in: the pages' stand-in files, laid out like the game's client data and
+# song data, with a file behind each song's address for the setup's self-check to find, and the client beside them when
+# there is one.
 docker build -q -t "$SERVER_IMAGE" "$ROOT/server" >/dev/null
 mkdir -p "$KIT/content"
 docker run --rm -u "$(id -u):$(id -g)" -v "$KIT/content:/content" -v "$ROOT/tests/ui:/ui:ro" --entrypoint php "$SERVER_IMAGE" \

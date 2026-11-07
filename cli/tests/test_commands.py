@@ -307,7 +307,7 @@ class ImportTest(unittest.TestCase):
             self.assertIn("logs", sb.output())
 
     def test_the_game_data_comes_and_the_songs_only_when_asked(self):
-        # The songs are an import of their own: a server starts with the game data alone, and an empty song list.
+        # The songs are an import of their own: a server starts with the client data alone, and an empty song list.
         with Sandbox() as sb:
             folder = os.path.dirname(sb.write("Downloads/game.apk", b"apk"))
             self.assertEqual(sb.call(app.cmd_import, path=folder), 0, sb.output())

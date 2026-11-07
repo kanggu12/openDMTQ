@@ -13,10 +13,10 @@ ROLE=${ROLE:-api}
 # The writable folder for the settings made below and Apache's own files.
 mkdir -p /var/opendmtq/run
 
-# Without the game data the game cannot start (it downloads the images of its screens from here): say what to do. A
+# Without the client data the game cannot start (it downloads the images of its screens from here): say what to do. A
 # server without songs works: the game starts with an empty song list.
 if ! ls "${OPENDMTQ_CONTENT:-/srv/content}"/web/patch/phone_new/*/android/patch_new.csv.lz4 >/dev/null 2>&1; then
-    echo "opendmtq: no game data yet; import it with ./opendmtq import <folder with your game files>"
+    echo "opendmtq: no client data yet; import it with ./opendmtq import <folder with your game files>"
 elif [ ! -s "${OPENDMTQ_CONTENT:-/srv/content}/songs.json" ]; then
     echo "opendmtq: no songs yet; add them with ./opendmtq import --songs <folder> or on the admin pages"
 fi

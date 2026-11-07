@@ -174,7 +174,7 @@ The pages, the player and its controls are tested in a real browser by `tests/ui
 ([testing.md](testing.md)).
 
 `tests/live/run.sh` builds the images from the working tree and runs `tests/live/smoke.py` against a
-throwaway server and admin service on loopback, with an empty database. It needs the game data and the songs in
+throwaway server and admin service on loopback, with an empty database. It needs the client data and the song data in
 `data/content` and Docker, so it does not run in CI (`tests/qa.sh` runs it). `BROWSER=1` also plays a real recording in headless Chromium
 (`tests/live/browser.js`), and in a Chromium with a sound card that records, whose output has to match the
 recording almost to the bit (`tests/live/sound`). Never point `smoke.py` at a server people play on: it makes

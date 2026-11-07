@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The real game on an emulator on a network with no way out: the emulator reaches the server and nothing else, and nothing in
 # the phone is changed for that. The tour of tests/game/tour.sh; a song downloaded, played, paused and played to its result, with
-# the score on the server; something bought in the shop; then a server with the game data and no songs, whose songs come later.
+# the score on the server; something bought in the shop; then a server with the client data and no songs, whose songs come later.
 # The app is built with no network at all, with the runtime from a zip, as on a closed server.
 #
 # Needs: this machine's game files in data/ (read, never written), the Android SDK with its emulator, platform tools and the
@@ -243,7 +243,7 @@ for folder, _, names in os.walk("/c"):
 docker run --rm --network none -u 33:33 -e HOME=/tmp -v "$WORK/nosongs:/srv/content:ro" -v "$WORK/nosongs-custom:/custom" -v "$WORK/nosongs-state:/data" \
   "$TOOLS_IMAGE" opendmtq_tools.songs >/dev/null
 failed() { docker logs "$SITE" 2>&1 | grep -cE '" (4|5)[0-9][0-9] '; }
-expect "a server with the game data and no songs answers" start_server "$WORK/nosongs" "$WORK/nosongs-custom" "$WORK/nosongs-state"
+expect "a server with the client data and no songs answers" start_server "$WORK/nosongs" "$WORK/nosongs-custom" "$WORK/nosongs-state"
 # A phone that has never seen this server's songs: the app's data goes, and with it Android's answer on storage.
 adb shell am force-stop "$PACKAGE"
 adb shell pm clear "$PACKAGE" >/dev/null

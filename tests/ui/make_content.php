@@ -15,7 +15,7 @@ if ($tree === '' || !is_dir($tree)) {
 }
 
 // The client data folder: a manifest that lists nothing, in the game's container for a file kept as it is (type 2, the
-// length as a varint, the bytes). Phones would get no file from it; the pages only need to see game data there.
+// length as a varint, the bytes). Phones would get no file from it; the pages only need to see client data there.
 $manifest = "file_name,file_size,checksum,compressed_file_size,compressed_checksum,acquire_on_demand,compressed,platform,tag,\r\n";
 $varint = function (int $n): string {
     $out = '';

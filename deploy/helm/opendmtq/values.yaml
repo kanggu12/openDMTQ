@@ -30,7 +30,7 @@ image:
     tag: "0.3.13"
   pullPolicy: IfNotPresent
 
-# Game files, laid out like the repository's data/ folder: content/ (the game data and songs that
+# Game files, laid out like the repository's data/ folder: content/ (the client data and song data that
 # ./opendmtq import brings from the operator's own files) and apk/ (base/, out/, keystore/).
 # Read-only for the servers; the builder job writes apk/.
 # Use a ReadWriteMany claim, or a host path that exists on every node.

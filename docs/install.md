@@ -10,16 +10,16 @@ All four run the same server. Phones join over the same Wi-Fi, or over the inter
 - **The game's Android app** (`.apk`, any file name). Version 1.3.5 or 1.3.4, original or changed for another server,
   gets every fix; other versions play the same, with a few screens as the game had them. It may be in an archive, an
   `.xapk` or an `.apks`. Phones play on Android; [iPhones cannot](game-files.md#iphones).
-- **The game data**: the server files' `patch/phone_new` folder, in a folder or an archive (`.zip`, `.7z`, `.rar`,
-  also in parts).
-- **The songs**, if you want them: the server files' `DMQ` folder, with `viewImg` for the jackets. They can come with
-  the game data or later on their own.
+- **The client data**: the `patch/phone_new` folder, the data the game downloads at its first start, in a folder or an
+  archive (`.zip`, `.7z`, `.rar`, also in parts).
+- **The song data**, if you want the songs: the `DMQ` folder with their music and charts, and `viewImg` for the
+  jackets. It can come with the client data or later on its own.
 
 The setup says what each file is before it imports anything. [The game's files](game-files.md) has every form it
 accepts.
 
 <p align="center">
-  <img src="images/setup.jpg" alt="The setup in the browser: the game's Android app and the server files found in Downloads, each labeled with what it is, with a button to import them" width="100%">
+  <img src="images/setup.jpg" alt="The setup in the browser: the game's Android app, the client data and the song data found in Downloads, each labeled with what it is, with a button to import them" width="100%">
 </p>
 
 ## Windows
@@ -130,9 +130,9 @@ Everything else is on the admin pages: the app, songs, players, accounts, record
 | **Disk** | 1 GB without the songs | 7 GB with every song |
 | **Phones** | Android 5.0 | Android 8 or newer to broadcast |
 
-At rest the server takes about 170 MB of memory, and up to 1.6 GB for half a minute while it builds the app. The game
-data takes about 120 MB and the songs 4.5 GB; each app build about 110 MB, the last ten kept. Broadcast recordings take
-up to 20 GB more.
+At rest the server takes about 170 MB of memory, and up to 1.6 GB for half a minute while it builds the app. The client
+data takes about 120 MB and the song data 4.5 GB; each app build about 110 MB, the last ten kept. Broadcast recordings
+take up to 20 GB more.
 
 Tested on Windows Server 2022 and Wine, Debian 12, Ubuntu 24.04, Docker on Linux and a three-node Kubernetes cluster,
 with a Galaxy S26 Ultra (Android 17, no 32-bit support) and the Android 11 emulator.

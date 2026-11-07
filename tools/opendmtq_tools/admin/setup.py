@@ -1,7 +1,7 @@
-"""The setup pages (/opendmtq/admin/setup): a server's first steps in the browser, for an owner who has the game's APK
-and its server files and nothing else. Four steps, each done once and checked again on every visit:
+"""The setup pages (/opendmtq/admin/setup): a server's first steps in the browser, for an owner who has the game's APK,
+its client data and its song data, and nothing else. Four steps, each done once and checked again on every visit:
 
-  files     the APK and the server files, found on this PC or chosen there, then imported
+  files     the APK, the client data and the song data, found on this PC or chosen there, then imported
   address   the address phones use, this PC's own on the local network
   players   an account for each player (the site and the app download open to them only)
   app       the phone app, built for that address, with the QR code and what to do on the phone
@@ -50,8 +50,8 @@ STARTED = f"{os.getpid()}-{int(time.time())}"
 STEPS = ("files", "address", "players", "app")
 
 # The game's files as people keep them: the client (an APK, alone or in a bundle), the iPhone app often beside it (said
-# to be of no use), and archives of the server files, whole or in parts (cli/opendmtq_cli/discover.py looks for them on
-# the command line; importer.what_is says what each one is).
+# to be of no use), and archives of the client data and the song data, whole or in parts (cli/opendmtq_cli/discover.py
+# looks for them on the command line; importer.what_is says what each one is).
 # Words the game's files are usually named with: an archive with one of them in its name is taken for the game's.
 GAME_WORDS = ("dmtq", "djmax", "technika")
 APK_SUFFIX = ".apk"
@@ -175,7 +175,8 @@ def setup_complete():
 # ------------------------------------------------------------------------------ the game's files on this PC
 
 def is_game_folder(path):
-    """True when path is a folder of the game's server files, in any of the forms the import takes."""
+    """True when path is a folder of the client data, with the song data or alone, in any of the forms the import
+    takes."""
     return importer.is_game_folder(path)
 
 
@@ -292,7 +293,7 @@ def is_file(entry):
 def game_files_in(path, listed=None):
     """(the game's files, the songs alone) in path itself or up to two levels down (an archive unpacked into a folder
     of its own, with one more around the game's: a web server's htdocs, say), as the import takes them, each the
-    nearest or None: the whole files before the game data alone (the patch folder copied by itself); the songs alone
+    nearest or None: the whole files before the client data alone (the patch folder copied by itself); the songs alone
     (their DMQ folder) when the files found have no songs of their own. listed: path's entries when the caller has
     them already. A folder is asked for the songs' folder by its name only, as its parent's listing has it."""
     whole = alone = songs = None
@@ -300,7 +301,7 @@ def game_files_in(path, listed=None):
     kinds = {}
 
     def kind(folder):
-        """"whole" (the whole files), "alone" (the game data alone) or None."""
+        """"whole" (the whole files), "alone" (the client data alone) or None."""
         if folder not in kinds:
             kinds[folder] = (None if importer.host_folder(folder) is None
                              else "whole" if importer.whole_host_folder(folder) else "alone")
@@ -382,7 +383,7 @@ def look_in(folder, listed=None):
 
 
 def tree_kind(tree):
-    """What a folder of the game's files holds, for its label: "whole", "game" (the game data alone) or "songs"."""
+    """What a folder of the game's files holds, for its label: "whole", "game" (the client data alone) or "songs"."""
     if tree is None:
         return None
     if importer.whole_host_folder(tree):
@@ -452,9 +453,9 @@ def found_on_this_pc():
                 hit = look_in(folder, inside)
                 if hit:
                     found.append(hit)
-        # The same server files folder seen from two places (Downloads, and the folder in it): said once, by the folder
-        # with files of its own beside it, else the one nearest to it. The same by their patch folder, which a folder
-        # and the patch folder copied into it share, and the songs alone by their folder.
+        # The same folder of the client data seen from two places (Downloads, and the folder in it): said once, by the
+        # folder with files of its own beside it, else the one nearest to it. The same by their patch folder, which a
+        # folder and the patch folder copied into it share, and the songs alone by their folder.
         for key in ("tree", "songs_tree"):
             best, same = {}, {}
             for h in found:
@@ -467,7 +468,7 @@ def found_on_this_pc():
                 if h[key] and best[same[id(h)]][1] is not h:
                     h[key] = None
         found = [h for h in found if h["apks"] or h["archives"] or h["iphone"] or h["tree"] or h["songs_tree"]]
-        # A folder with both the client and the server files first, then by how much it has; the iPhone app alone last.
+        # A folder with both the client and the client data first, then by how much it has; the iPhone app alone last.
         found.sort(key=lambda h: (not (h["apks"] and (h["archives"] or h["tree"])),
                                   not (h["apks"] or h["archives"] or h["tree"] or h["songs_tree"]),
                                   -(len(h["apks"]) + len(h["archives"]))))
@@ -825,7 +826,7 @@ def import_failure(lines):
     """Why an import failed, in the page's words, from what the importer said (in English); None when it does not say."""
     text = "\n".join(lines)
     for mark, key in (("cannot read", "setup.why_cannot_read"),
-                      ("import the game data first", "setup.why_game_data_first"),
+                      ("import the client data first", "setup.why_game_data_first"),
                       ("7-Zip could not unpack", "setup.why_archive"), ("7-Zip cannot list", "setup.why_archive")):
         if mark in text:
             return t(key)

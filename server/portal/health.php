@@ -14,7 +14,7 @@ $host = public_host();
 $status = [
     'host' => $host,
     'songs' => song_count(),
-    // The game data (the client's tables and the images of its screens): without it the game cannot start, with no
+    // The client data (the client's tables and the images of its screens): without it the game cannot start, with no
     // songs it starts with an empty song list, which is a server that works.
     'game_data' => game_data_present(),
     'patch' => patch_version(),

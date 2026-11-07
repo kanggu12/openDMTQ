@@ -11,7 +11,7 @@ Enter. Then type, for example, `OpenDMTQ.exe status`.
 When the game does not start or shows no songs, this chart leads to the right section:
 
 <p align="center">
-  <img src="images/fig-troubleshooting.svg" alt="When the game does not start or shows no songs: if the app does not install, see The app does not install; if the phone cannot open the server's page, see that section; without game data imported, The game stops at its start; if it does not get past its start, The app installs but cannot connect; with no songs in its list, The song list is empty; otherwise the server works" width="100%">
+  <img src="images/fig-troubleshooting.svg" alt="When the game does not start or shows no songs: if the app does not install, see The app does not install; if the phone cannot open the server's page, see that section; without client data imported, The game stops at its start; if it does not get past its start, The app installs but cannot connect; with no songs in its list, The song list is empty; otherwise the server works" width="100%">
 </p>
 
 ## The phone cannot open the server page
@@ -45,15 +45,15 @@ When the game does not start or shows no songs, this chart leads to the right se
 
 ## The game stops at its start, or the song list is empty
 
-- **No game data.** The game cannot start without the client's tables and the images of its screens, which it downloads
-  from the server. The server reports itself unhealthy until they are imported (`./opendmtq doctor` says so, and so does
-  `/opendmtq/health.php`). They are the server files' `patch/phone_new` folder
+- **No client data.** The game cannot start without the client's tables and the images of its screens, which it
+  downloads from the server. The server reports itself unhealthy until they are imported (`./opendmtq doctor` says so,
+  and so does `/opendmtq/health.php`). They are the client data, the `patch/phone_new` folder
   ([what you need](install.md#what-you-need)). On Windows and on a host install, import them on the admin pages:
   **Songs**, **Choose the folder**. With Docker Compose: `./opendmtq import <folder with your game files>`.
-- **No songs.** With the game data and no songs, the game starts with an empty song list. Import them the same way with
-  **Import the songs too** ticked, from the server files or their `DMQ` folder alone (with Docker Compose,
-  `./opendmtq import --songs <folder>`), or add songs one by one on the admin pages ([songs.md](songs.md)). The app
-  does not need to be rebuilt: an installed app gets the songs at its next start.
+- **No songs.** With the client data and no songs, the game starts with an empty song list. Import them the same way
+  with **Import the songs too** ticked, from the client data and the song data together, or the `DMQ` folder alone
+  (with Docker Compose, `./opendmtq import --songs <folder>`), or add songs one by one on the admin pages
+  ([songs.md](songs.md)). The app does not need to be rebuilt: an installed app gets the songs at its next start.
 
 ## The app installs but cannot connect
 
@@ -101,8 +101,9 @@ uninstalled, which also takes the data with it.
 
 `setup` looks in the current folder, `~/Downloads` and `~/Desktop` (under WSL, also every Windows user's Downloads and
 Desktop), one folder down in each. It takes archives and apps whose names contain `dmtq`, `djmax` or `technika`,
-unpacked folders of the server files, and any app next to those. Otherwise pass the folder, which is then searched as a
-whole (an extracted copy of the server files included): `./opendmtq setup --from /path/to/folder`.
+unpacked folders of the client data and the song data, and any app next to those. Otherwise pass the folder, which is
+then searched as a whole (an extracted copy of the client data and the song data included):
+`./opendmtq setup --from /path/to/folder`.
 
 The setup in the browser (the Windows bundle and a host install) looks in Downloads, on the Desktop and in Documents
 (OneDrive's too), and one folder down in each. When it finds nothing, open the folder in the picker under the list:
@@ -110,10 +111,10 @@ the PC's drives and home folders are there, and **Import from this folder** take
 archive can be imported as it is, or unpacked first; one in parts needs every part in one folder.
 
 Each file the setup lists says what it is, and `./opendmtq import --check <folder>` does the same on the command line.
-The server files are found by what is in them: a folder with the game's `patch/phone_new` in it, under any name, with or
-without a song list, or the songs' `DMQ` folder alone. The Android app may be the original or a copy changed for
-another server; the iPhone app is not used, nor is an app OpenDMTQ built. [The game's files](game-files.md) has every
-form the import takes.
+The client data and the song data are found by what is in them: a folder with the game's `patch/phone_new` in it, under
+any name, with or without a song list, or the songs' `DMQ` folder alone. The Android app may be the original or a copy
+changed for another server; the iPhone app is not used, nor is an app OpenDMTQ built. [The game's files](game-files.md)
+has every form the import takes.
 
 ## The setup's link does not sign in
 

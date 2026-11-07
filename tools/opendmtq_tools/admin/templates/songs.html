@@ -3,7 +3,8 @@
 {% if no_game_data %}<p class="flash bad" role="status">{{ t('songs.no_game_data_host' if host_install else 'songs.no_game_data') }}</p>
 {% elif not songs %}<p class="flash note" role="status">{{ t('songs.none_yet_host' if host_install else 'songs.none_yet') }}</p>{% endif %}
 {% if host_install %}
-{# On the server PC itself: the server files as they were downloaded, imported through the setup's first step. #}
+{# On the server PC itself: the client data and the song data as they were downloaded, imported through the setup's
+   first step. #}
 <section class="card">
   <h2>{{ t('songs.from_folder') }}</h2>
   <p class="lead">{{ t('songs.from_folder_lead') }}</p>

@@ -106,7 +106,7 @@ def cmd_status(args):
     say(f"Admin pages  http://localhost:{admin_port(values)}/opendmtq/admin/  (user {user})")
     say(f"Server       {'running' if h is not None else 'not running'}")
     if h is not None:
-        say(f"Game data    {'yes' if h.get('game_data') else f'missing: {CLI} import <folder>'}")
+        say(f"Client data  {'yes' if h.get('game_data') else f'missing: {CLI} import <folder>'}")
         say(f"Songs        {h.get('songs', 0)}")
         say(f"Players      {h.get('players', 0)}")
     m = app_manifest()
@@ -116,7 +116,7 @@ def cmd_status(args):
 
 
 def cmd_import(args):
-    """Take the base APK and the game data (and with --songs the songs) from a folder or file."""
+    """Take the base APK and the client data (and with --songs the song data) from a folder or file."""
     values = settings()
     found = programs()
     src = os.path.abspath(os.path.expanduser(args.path))

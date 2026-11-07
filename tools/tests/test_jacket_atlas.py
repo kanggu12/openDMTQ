@@ -1,7 +1,7 @@
 """Tests for the song-list jacket bundles: what a shipped atlas turns into, and how rebuild() delivers it.
 
-The template here is a small bundle made by the test, in the layout of the shipped ones (their game data
-is not in the repository). A real one was checked with UnityPy and in the game; see docs/songs.md.
+The template here is a small bundle made by the test, in the layout of the shipped ones (they come with the client
+data, which is not in the repository). A real one was checked with UnityPy and in the game; see docs/songs.md.
 """
 
 import io

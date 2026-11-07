@@ -5,8 +5,9 @@ What people ask first: running a server, playing on one, what leaves your comput
 ## Running a server
 
 **What do I need?**
-A computer (Windows, Linux or macOS) and your own copy of the game's Android app and its server files. Please use only
-files you have the right to use. OpenDMTQ does not come with any, and does not say where to get them.
+A computer (Windows, Linux or macOS) and your own copy of the game's Android app and its client data, and its song data
+for the songs. Please use only files you have the right to use. OpenDMTQ does not come with any, and does not say where
+to get them.
 [The game's files](game-files.md) says what each has to be.
 
 **My copy of the app was changed for another server. Does it work?**
@@ -64,7 +65,7 @@ phones.
 
 **The game shows no songs.**
 The song list is empty until the songs are imported: on the admin pages, **Songs**, **Choose the folder**, then the
-server files or their `DMQ` folder alone, with **Import the songs too** ticked.
+client data and the song data together, or the `DMQ` folder alone, with **Import the songs too** ticked.
 
 ## Privacy
 

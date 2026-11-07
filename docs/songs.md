@@ -1,38 +1,39 @@
 # Songs
 
 OpenDMTQ comes without songs. A server gets them in two ways: imported from the owner's own copy of the game's
-server files, or added one by one as song packages on the admin pages. With neither, the game starts with an empty
+song data, or added one by one as song packages on the admin pages. With neither, the game starts with an empty
 song list.
 
 <p align="center">
-  <img src="images/fig-songs-flow.svg" alt="Songs: the songs in the server files are imported into data/content; a song package added on the admin pages goes to data/custom/songs with ids from 1001; hiding and showing writes data/custom/hidden.json. songs.py rebuilds, before every start and after every change, the song list game.getSongList offers and data/custom/web with the client's tables, tiles and patch manifest. The phone gets the list, what changed at its next start, and a song's files from data/content when first picked" width="100%">
+  <img src="images/fig-songs-flow.svg" alt="Songs: the song data is imported into data/content; a song package added on the admin pages goes to data/custom/songs with ids from 1001; hiding and showing writes data/custom/hidden.json. songs.py rebuilds, before every start and after every change, the song list game.getSongList offers and data/custom/web with the client's tables, tiles and patch manifest. The phone gets the list, what changed at its next start, and a song's files from data/content when first picked" width="100%">
 </p>
 
 ## Importing the songs
 
-The songs are the server files' `DMQ` folder, with their jackets in `viewImg` and the song list in `_info`: in the
-server files as they come, or on their own ([the forms they may come in](game-files.md#the-songs-on-their-own)). They
-need the game data on the server, imported with them or before.
+The song data holds the songs: the `DMQ` folder with their music and charts, their jackets in `viewImg` and the song
+list in `_info`. It comes with the client data, or on its own
+([the forms it may come in](game-files.md#the-song-data-on-its-own)). The songs need the client data on the server,
+imported with them or before.
 
 On Windows and on a host install, the admin pages import them: **Songs**, **Choose the folder**, then the `DMQ` folder,
-the folder that holds it, or the server files' folder or archive, with **Import the songs too** ticked. The setup looks
-for them in Downloads, on the Desktop and in Documents first. An import replaces the songs imported before; songs added
-as packages stay, and files without the songs' folder (`DMQ`) change none.
+the folder that holds it, or the folder or archive of the client data and the song data, with **Import the songs too**
+ticked. The setup looks for them in Downloads, on the Desktop and in Documents first. An import replaces the songs
+imported before; songs added as packages stay, and files without the songs' folder (`DMQ`) change none.
 
 On the command line they are imported on their own:
 
 ```sh
 ./opendmtq import --songs <folder or archive>
 ./opendmtq import --songs ~/Downloads/DMQ                      # the songs' folder alone
-./opendmtq import --songs --no-game-data <folder or archive>   # the songs only, the game data as it is
+./opendmtq import --songs --no-game-data <folder or archive>   # the songs only, the client data as it is
 ```
 
 The same commands work with Docker Compose and on a host install; on Windows they are `OpenDMTQ.exe import --songs
 <folder>` in a terminal. With Docker Compose, `./opendmtq setup` asks whether to import the songs when the server has
 none yet (`--songs` and `--no-songs` answer for it). The import takes the music and videos (`DMQ/Songs`), the charts
 (`DMQ/Patterns`), the jackets (`viewImg/eye`) and the song list itself into `data/content`; the previews and the song
-list's tiles come with the game data, in the client's patch folder. Nothing else of the server files is taken. Without
-a song list among them, the import makes one from the game's own tables, for the songs whose music is there.
+list's tiles come with the client data, in the client's patch folder. Nothing else of the files given is taken.
+Without a song list among them, the import makes one from the game's own tables, for the songs whose music is there.
 
 With Docker Compose, `./opendmtq import` restarts a running server; a host install reads the new list at once. Installed
 apps get the new songs at their next start.
@@ -43,7 +44,7 @@ without the files of the others. With every song of the tables imported and noth
 rebuilt and the server serves exactly the imported files.
 
 A chart the game could not load, an empty or cut-short file, is served from its pair instead: a chart and its
-earphone variant have their notes at the same ticks. The server files tested carry four such charts.
+earphone variant have their notes at the same ticks. The song data tested carries four such charts.
 
 ## Hiding a song
 
@@ -83,7 +84,7 @@ preview.opus     optional: the preview played on song select
   One chart per line and signature.
 
 The files must already be in the game's formats; converting music or charts from other games is outside OpenDMTQ.
-Adding songs needs the game data: the song goes into the client's tables, which come from it.
+Adding songs needs the client data: the song goes into the client's tables, which come from it.
 
 The upload checks the files before it takes anything, and every file of the game's own songs passes:
 

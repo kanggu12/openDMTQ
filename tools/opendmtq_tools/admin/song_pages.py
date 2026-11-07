@@ -86,13 +86,13 @@ def songs_page():
     # A song whose tile image could not be made still plays; the owner should know why it looks bare.
     for failure in songs.tile_failures():
         flash(t("songs.no_tile", reason=failure), "bad")
-    # No game data yet (the game's files were not imported): the page says so instead of failing. Without songs it says
-    # how they come.
+    # No client data yet (the game's files were not imported): the page says so instead of failing. Without songs it
+    # says how they come.
     try:
         listed = songs.catalog()
     except (OSError, ValueError):
         listed = []
-    # Without the game data the game cannot start (the page says so above the list), but the songs imported on their
+    # Without the client data the game cannot start (the page says so above the list), but the songs imported on their
     # own are there all the same: listed, not hidden as if the import had not worked.
     no_game_data = not songs.has_game_data()
     # How much each is played: which are worth keeping and which only fill the list. The bar's full length is the most played.

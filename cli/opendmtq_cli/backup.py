@@ -234,7 +234,7 @@ def restore(name, with_key=False):
                 elif os.path.exists(src):
                     shutil.copyfile(src, dst)
             system.own_data_dirs()
-            # Regenerate the overlay and song list for the restored songs. Without game data (a new machine) there is
+            # Regenerate the overlay and song list for the restored songs. Without client data (a new machine) there is
             # nothing to merge them with yet; `up` does it after the import.
             import glob
             if glob.glob(os.path.join(DATA, "content", "web", "patch", "phone_new", "*", "android", "patch_new.csv.lz4")):

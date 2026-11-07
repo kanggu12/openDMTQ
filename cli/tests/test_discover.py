@@ -15,7 +15,8 @@ def touch(folder, *names):
 
 
 def unpacked(folder, name):
-    """A folder of the game's server files, unpacked under this name, with the song list an old server kept."""
+    """A folder of the client data and the song data, unpacked under this name, with the song list an old server
+    kept."""
     tree = os.path.join(folder, name)
     os.makedirs(os.path.join(tree, discover.GAME_DIR))
     os.makedirs(os.path.join(tree, "_info"))
