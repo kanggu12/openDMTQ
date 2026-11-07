@@ -6,6 +6,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-08
+
 ### Added
 
 - A song package's files are checked before the song is added: the music pack, each chart, the video and the preview
@@ -151,7 +153,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 - Four ways to run it: the Windows bundle, one command on Linux or macOS, Docker Compose, and a Helm chart for
   Kubernetes.
 
-[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/kanggu12/openDMTQ/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/kanggu12/openDMTQ/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/kanggu12/openDMTQ/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/kanggu12/openDMTQ/compare/v0.1.3...v0.2.0
