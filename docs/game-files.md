@@ -67,11 +67,13 @@ game host folder/                  any name: what counts is what is inside
     DMQ/Patterns/                   their charts (optional)
     viewImg/                        jackets and pictures
     static/                         the pictures of HOW TO PLAY
-_info/songList.json                 a song list beside the folder (optional)
+_info/songList.json                 a song list beside the folder or in it (optional)
 ```
 
-A folder of another name counts when it has `patch/phone_new` and `DMQ` or `viewImg` in it. Only the game's data files
-are imported. Programs, databases and notes in the same folder or archive are left alone.
+A folder of another name counts when it has `patch/phone_new` and `DMQ` or `viewImg` in it. The patch folder copied by
+itself counts too (`patch`, `phone_new`, or a folder that holds one of them): it is what the game needs to start,
+without the songs. Only the game's data files are imported. Programs, databases and notes in the same folder or
+archive are left alone.
 
 The forms the import takes:
 
@@ -82,20 +84,23 @@ The forms the import takes:
 | An archive in parts, every part in one folder | `files.7z.001`, `files.part1.rar`, `files.zip.001`, `files.rar` with `files.r00` |
 | An archive inside an archive | a `.zip` that holds a `.7z` (one level) |
 | The content folder of another OpenDMTQ server | `content/web/...` with `content/songs.json` |
+| Only what the game needs to start | `patch/phone_new`, `phone_new`, or an archive of either |
 
-For an archive in parts, choose its first part, or the folder that holds the parts.
+For an archive in parts, choose its first part, or the folder that holds the parts. When a folder holds several of
+these, the whole server files come before the patch folder alone.
 
 ### The song list
 
 The list is optional. Without one, the import makes it from the game's own tables, for the songs whose music is there,
-with the charts whose files are there. A list that comes with the files (`_info/songList.json`, or `songs.json` beside
-a content folder) is used as it is.
+with the charts whose files are there. A list that comes with the files (`_info/songList.json` beside the game host's
+folder or in it, or `songs.json` beside a content folder) is used as it is.
 
 ### Without the songs
 
 What the game needs to start is always imported; the songs only when you ask (**Import the songs too** in the setup,
 `--songs` on the command line). Without them the game starts with an empty song list, and songs imported later reach
-the installed apps at their next start. If part of what the game needs to start is missing, the setup's lamp turns red
+the installed apps at their next start. Files without songs, such as the patch folder alone, leave the songs on the
+server as they are. If part of what the game needs to start is missing, the setup's lamp turns red
 and `./opendmtq doctor` names the files: import the whole server files again.
 
 ## Check before you import

@@ -15,7 +15,8 @@ folder in it ([the forms it may come in](game-files.md#the-server-files)).
 
 On Windows and on a host install, the admin pages import them: **Songs**, **Choose the folder**, then the folder or
 the archive, with **Import the songs too** ticked. The setup looks for them in Downloads, on the Desktop and in
-Documents first. An import replaces the songs imported before; songs added as packages stay.
+Documents first. An import replaces the songs imported before; songs added as packages stay, and files without songs
+change none.
 
 On the command line they are imported on their own:
 

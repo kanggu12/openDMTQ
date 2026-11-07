@@ -66,6 +66,23 @@ class MatchesTest(unittest.TestCase):
             os.makedirs(os.path.join(other, discover.PATCH_DIR))
             self.assertFalse(discover.is_game_folder(other))
 
+    def test_the_patch_folder_by_itself_is_the_game_data(self):
+        with tempfile.TemporaryDirectory() as d:
+            # phone_new in patch/, by itself, and in a folder of another name: each with a client version's tables.
+            table = os.path.join("1.003.005", "android", "table", "us")
+            for where in ("a/patch/phone_new", "b/phone_new", "c/files/phone_new"):
+                os.makedirs(os.path.join(d, where, table))
+            for chosen in ("a", "a/patch", "b/phone_new", "c/files/phone_new"):
+                self.assertTrue(discover.is_game_folder(os.path.join(d, chosen)), chosen)
+            # The folder of another name is not the patch folder: the phone_new in it is, one folder down.
+            self.assertFalse(discover.is_game_folder(os.path.join(d, "c", "files")))
+            self.assertEqual(discover.matches(os.path.join(d, "c", "files")), ["phone_new"])
+            # Another program's: a name alone, or the iPhone's tables only.
+            os.makedirs(os.path.join(d, "app", "phone_new", "1.0", "ios", "table"))
+            os.makedirs(os.path.join(d, "app", "phone_new", "latest", "android", "table"))
+            self.assertFalse(discover.is_game_folder(os.path.join(d, "app")))
+            self.assertFalse(discover.is_game_folder(os.path.join(d, "app", "phone_new")))
+
     def test_a_folder_that_cannot_be_read_holds_nothing(self):
         with tempfile.TemporaryDirectory() as d:
             self.assertEqual(discover.matches(os.path.join(d, "gone")), [])

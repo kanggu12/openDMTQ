@@ -302,6 +302,21 @@ class FilesOnThisPcTest(unittest.TestCase):
             inst.write("home/Downloads/server/www/DMQ/Songs/7/7.fpk", "m")
             self.assertEqual(setup.game_folder_in(inst.path("home/Downloads/server")), www)
 
+    def test_the_patch_folder_alone_is_found_and_whole_files_beside_it_first(self):
+        with HostInstall() as inst:
+            # The patch folder copied out by itself: the game data alone, seen from Downloads and from its own folder,
+            # and said once, by its own.
+            os.makedirs(inst.path("home/Downloads/patch/phone_new/1.003.005/android/table/us"))
+            downloads = inst.path("home/Downloads")
+            self.assertEqual(setup.game_folder_in(downloads), downloads)
+            self.assertEqual([f["tree"] for f in setup.found_on_this_pc()], [inst.path("home/Downloads/patch")])
+            # The whole files beside it: they are what an import of Downloads takes, and what is shown.
+            www = inst.path("home/Downloads/server/www")
+            os.makedirs(os.path.join(www, "patch", "phone_new"))
+            os.makedirs(os.path.join(www, "DMQ", "Songs", "7"))
+            inst.write("home/Downloads/server/www/DMQ/Songs/7/7.fpk", "m")
+            self.assertEqual(setup.game_folder_in(downloads), www)
+
     def test_each_file_is_said_for_what_it_is(self):
         with HostInstall() as inst:
             inst.write("home/Downloads/client.apk", "PK")

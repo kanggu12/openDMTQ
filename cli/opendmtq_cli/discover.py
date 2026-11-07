@@ -15,11 +15,15 @@ ARCHIVES = (".rar", ".zip", ".7z")
 FIRST_PART = re.compile(r".+(?:\.part0*1\.rar|\.(?:7z|zip|rar)\.001)", re.I)
 LATER_PART = re.compile(r".+(?:\.part0*(?:[2-9]|\d{2,})\.rar)", re.I)
 # Inside an unpacked folder of the server files: the client's patch folder in the game host's folder, or in a folder
-# of another name with the songs or the images beside it (the same marks as host_folder in
-# tools/opendmtq_tools/importer.py).
+# of another name with the songs or the images beside it, or by itself (patch, phone_new: the game data alone, known
+# by a client version's folder with the client's Android tables). The same marks as host_folder in
+# tools/opendmtq_tools/importer.py.
 HOST = "dmqglb.mb.pmang.com"
 PATCH_DIR = os.path.join("patch", "phone_new")
 GAME_DIR = os.path.join(HOST, PATCH_DIR)
+PATCH_NAME = "phone_new"
+PATCH_PARENT = "patch"
+CLIENT_VERSION = re.compile(r"\d+(?:\.\d+)+")
 # This project's own downloads start with its name: the apps it builds, its Windows bundle. They are none of the game's.
 OWN_APPS = "opendmtq"
 
@@ -39,16 +43,32 @@ def candidate_dirs():
     return [d for d in dict.fromkeys(dirs) if os.path.isdir(d)]
 
 
+def is_patch_folder(path):
+    """True when path is the client's patch folder by what is in it: a client version's folder with its Android tables."""
+    try:
+        names = os.listdir(path)
+    except OSError:
+        return False
+    return any(CLIENT_VERSION.fullmatch(n) and os.path.isdir(os.path.join(path, n, "android", "table")) for n in names)
+
+
 def is_game_folder(path):
     """True when path is an unpacked folder of the game's server files, whatever its name: with the game host's folder in
-    it, the game host's folder itself under any name, or an OpenDMTQ server's content folder (its web/)."""
+    it, the game host's folder itself under any name, or an OpenDMTQ server's content folder (its web/); or the game
+    data alone, the client's patch folder in it by itself (patch/phone_new, phone_new) or path that folder."""
     if os.path.isdir(os.path.join(path, GAME_DIR)):
         return True
-    for here in (path, os.path.join(path, "web")):
-        if os.path.isdir(os.path.join(here, PATCH_DIR)) and (os.path.isdir(os.path.join(here, "DMQ"))
-                                                            or os.path.isdir(os.path.join(here, "viewImg"))):
+    # Each folder asked once: the search asks this of every folder it passes.
+    patch = os.path.join(path, PATCH_DIR)
+    has_patch = os.path.isdir(patch)
+    for here, there in ((path, has_patch), (os.path.join(path, "web"), None)):
+        if (there if there is not None else os.path.isdir(os.path.join(here, PATCH_DIR))) and (
+                os.path.isdir(os.path.join(here, "DMQ")) or os.path.isdir(os.path.join(here, "viewImg"))):
             return True
-    return False
+    # The patch folder alone, by what is in it; path itself looked into only when named as the client names it.
+    name = os.path.basename(os.path.normpath(path))
+    return ((has_patch and is_patch_folder(patch)) or (name == PATCH_NAME and is_patch_folder(path))
+            or (name == PATCH_PARENT and is_patch_folder(os.path.join(path, PATCH_NAME))))
 
 
 def is_archive(name):

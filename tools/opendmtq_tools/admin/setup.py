@@ -291,19 +291,33 @@ def is_file(entry):
 
 def game_folder_in(path, listed=None):
     """The folder of the game's server files in path itself or up to two levels down (an archive unpacked into a folder
-    of its own, with one more around the game's: a web server's htdocs, say), or None. listed: path's entries when the
+    of its own, with one more around the game's: a web server's htdocs, say), or None. The nearest, whole files before
+    the game data alone (the patch folder copied by itself), as the import takes them. listed: path's entries when the
     caller has them already."""
+    # The first patch folder alone met: what is shown when no whole files come after it.
+    alone = None
     if is_game_folder(path):
-        return path
+        if importer.whole_host_folder(path) or importer.patch_itself(path):
+            return path
+        alone = path
     subs = [e.path for e in (listed if listed is not None else entries(path) or []) if is_dir(e)]
+    games = set()
     for sub in subs:
         if is_game_folder(sub):
-            return sub
+            if importer.whole_host_folder(sub):
+                return sub
+            alone = alone or sub
+            games.add(sub)
+    # Two levels down, past the folders that are the game's already.
     for sub in subs:
+        if sub in games:
+            continue
         for e in entries(sub) or []:
             if is_dir(e) and is_game_folder(e.path):
-                return e.path
-    return None
+                if importer.whole_host_folder(e.path):
+                    return e.path
+                alone = alone or e.path
+    return alone
 
 
 def look_in(folder, listed=None):
@@ -393,15 +407,17 @@ def found_on_this_pc():
                 if hit:
                     found.append(hit)
         # The same server files folder seen from two places (Downloads, and the folder in it): said once, by the folder
-        # with files of its own beside it, else the one nearest to it.
+        # with files of its own beside it, else the one nearest to it. The same by their patch folder, which a folder
+        # and the patch folder copied into it share.
         best = {}
         for h in found:
             if h["tree"]:
+                same = importer.patch_of(importer.host_folder(h["tree"]))
                 score = (bool(h["apks"] or h["archives"] or h["iphone"]), len(h["path"]))
-                if h["tree"] not in best or score > best[h["tree"]][0]:
-                    best[h["tree"]] = (score, h)
+                if same not in best or score > best[same][0]:
+                    best[same] = (score, h)
         for h in found:
-            if h["tree"] and best[h["tree"]][1] is not h:
+            if h["tree"] and best[importer.patch_of(importer.host_folder(h["tree"]))][1] is not h:
                 h["tree"] = None
         found = [h for h in found if h["apks"] or h["archives"] or h["iphone"] or h["tree"]]
         # A folder with both the client and the server files first, then by how much it has; the iPhone app alone last.

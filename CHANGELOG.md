@@ -12,6 +12,14 @@ one that only fixes raises the patch number. Each release's section here is its 
   from a clone the date and commit of its code. They showed nothing for the first, and `vv0.2.0` for the second.
 - Releases: a rehearsal on a branch (`gh workflow run release.yml`) checks the chart's version against the changelog;
   it stopped at the version check, as a branch names no version.
+- The import and the setup take the game's patch folder by itself (`patch/phone_new`, `phone_new`, or an archive of
+  either) as what the game needs to start, as the setup says. They found nothing in it unless the songs' or the
+  images' folder was beside it.
+- Files without songs leave the server's songs as they are. With **Import the songs too** ticked, as it is at first,
+  they emptied the song list. Where a folder holds the patch folder alone and the whole server files, the whole files
+  come first.
+- A song list kept in the folder with the songs (`_info/songList.json`) is read. Only one beside the folder was, and
+  the list was made from the game's tables instead.
 
 ## [0.2.0] - 2026-11-07
 

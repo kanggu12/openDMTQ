@@ -136,7 +136,7 @@ class OnlyTest(unittest.TestCase):
         """importer.main over a folder with three downloads; returns (exit code, files it considered, parts asked)."""
         seen, asked = [], []
 
-        def take(candidates, parts):
+        def take(candidates, parts, chosen=()):
             seen.extend(candidates)
             asked.append(sorted(parts))
             return True
@@ -195,7 +195,7 @@ class OnlyTest(unittest.TestCase):
             os.makedirs(src)
             open(os.path.join(src, "game.ipa"), "wb").close()
             said = []
-            with mock.patch.multiple(importer, IN=src, DATA=os.path.join(d, "data"), import_game_files=lambda c, p: False,
+            with mock.patch.multiple(importer, IN=src, DATA=os.path.join(d, "data"), import_game_files=lambda c, p, chosen=(): False,
                                      log=said.append), mock.patch.dict(os.environ, {"IMPORT_ONLY": ""}):
                 with self.assertRaises(SystemExit):
                     importer.main()
@@ -366,8 +366,143 @@ class FormsTest(unittest.TestCase):
         self.assertEqual(importer.tree_in([importer.GAME_DIR + "/a", "old/" + importer.GAME_DIR + "/a"])[0], importer.HOST + "/")
 
 
+class GameDataAloneTest(unittest.TestCase):
+    """The client's patch folder copied by itself, in each form it is copied in: the game data alone. It keeps the
+    server's songs, and whole files beside it come first."""
+
+    # What the game data of game_folder() is, without its songs, its how-to-play picture and its news.
+    GAME_DATA = {"web/patch/phone_new/1.003.005/android/patch_new.csv.lz4",
+                 "web/patch/phone_new/1.003.005/android/table/us/song_song.csv.lz4",
+                 "web/patch/phone_new/1.003.005/android/dlc/d3_a0.unity3d.lz4"}
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.tmp = tmp.name
+        self.data = os.path.join(tmp.name, "data")
+        os.makedirs(self.data)
+        self.whole = os.path.join(tmp.name, "whole")
+        game_folder(self.whole)
+        self.said = []
+        for patcher in (mock.patch.object(importer, "DATA", self.data), mock.patch.object(importer, "log", self.said.append)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def copy_patch(self, rel):
+        """The whole files' patch folder (phone_new) copied to rel under the test's folder."""
+        shutil.copytree(os.path.join(self.whole, importer.GAME_DIR), os.path.join(self.tmp, rel))
+
+    def test_each_form_of_the_patch_folder_by_itself_is_the_game_data(self):
+        # The folder chosen, and where its phone_new is: in patch/, the patch folder itself, phone_new itself.
+        for chosen, patch in (("a", "a/patch/phone_new"), ("b/patch", "b/patch/phone_new"), ("c/phone_new", "c/phone_new")):
+            with self.subTest(chosen=chosen):
+                self.copy_patch(patch)
+                path = os.path.join(self.tmp, chosen)
+                self.assertTrue(importer.is_game_folder(path))
+                self.assertEqual(importer.what_is(path), {"kind": "server files", "ok": True, "songs": 0,
+                                                          "song_list": False, "apps": []})
+                shutil.rmtree(os.path.join(self.data, "content"), ignore_errors=True)
+                self.assertTrue(importer.import_game_files([path], {"game"}))
+                self.assertEqual(content_files(self.data), self.GAME_DATA)
+
+    def test_the_folder_chosen_counts_by_what_is_in_it(self):
+        # Mounted as /in, the chosen folder's own name is gone: phone_new itself, or the patch folder around it.
+        for name, rel in (("in", "in"), ("in2", "in2/phone_new")):
+            with self.subTest(rel=rel):
+                self.copy_patch(rel)
+                chosen = os.path.join(self.tmp, name)
+                self.assertEqual(importer.what_is(chosen)["kind"], "other")
+                self.assertEqual(importer.what_is(chosen, chosen=True)["kind"], "server files")
+                shutil.rmtree(os.path.join(self.data, "content"), ignore_errors=True)
+                with mock.patch.object(importer, "IN", chosen), \
+                        mock.patch.dict(os.environ, {"IMPORT_ONLY": "", "IMPORT_DATA": "", "IMPORT_CHECK": "",
+                                                     "IMPORT_GAME": "yes", "IMPORT_SONGS": "no"}):
+                    with self.assertRaises(SystemExit) as e:
+                        importer.main()
+                self.assertEqual(e.exception.code, 0)
+                self.assertEqual(content_files(self.data), self.GAME_DATA)
+
+    def test_phone_new_in_a_folder_of_another_name_is_found_below_it(self):
+        # The patch folder renamed: the folder chosen is none of the game's, the phone_new in it is.
+        self.copy_patch("files/client data/phone_new")
+        chosen = os.path.join(self.tmp, "files")
+        self.assertFalse(importer.is_game_folder(os.path.join(chosen, "client data")))
+        self.assertTrue(importer.import_game_files(list(importer.walk(chosen)), {"game"}))
+        self.assertEqual(content_files(self.data), self.GAME_DATA)
+
+    def test_with_the_songs_asked_for_the_servers_songs_stay(self):
+        # The setup asks for the songs unless told not to: files without any must not empty the song list.
+        importer.import_game_files([self.whole], {"game", "songs"})
+        songs = {f for f in content_files(self.data) if importer.part_of(f) == "songs"}
+        self.assertIn("web/DMQ/Songs/1/1.fpk", songs)
+        self.copy_patch("only/patch/phone_new")
+        self.assertTrue(importer.import_game_files([os.path.join(self.tmp, "only")], {"game", "songs"}))
+        self.assertEqual(content_files(self.data), songs | self.GAME_DATA)
+        self.assertIn("  songs: none there, the songs on the server stay as they are", self.said)
+        # Asked for the songs alone, it takes nothing at all.
+        self.assertTrue(importer.import_game_files([os.path.join(self.tmp, "only")], {"songs"}))
+        self.assertEqual(content_files(self.data), songs | self.GAME_DATA)
+
+    def test_whole_files_beside_it_come_first(self):
+        # A patch folder copied out on its own, and the whole files unpacked further down.
+        down = os.path.join(self.tmp, "Downloads")
+        self.copy_patch("Downloads/patch/phone_new")
+        game_folder(os.path.join(down, "unpacked", "server"))
+        candidates = list(importer.walk(down))
+        self.assertIn(os.path.join(down, "unpacked", "server"), candidates)
+        self.assertTrue(importer.import_game_files(candidates, {"game", "songs"}))
+        self.assertIn("web/DMQ/Songs/1/1.fpk", content_files(self.data))
+        self.assertIn("web/static/dmq/banner/x/howtoplay_play.png", content_files(self.data))
+
+    def test_a_phone_new_folder_of_another_program_is_not_the_game(self):
+        # A client version's folder with its Android tables is what counts: not a name alone, not the iPhone's.
+        other = os.path.join(self.tmp, "app")
+        write(other, {"phone_new/1.0/android/readme.txt": "x", "patch/phone_new/2.0/ios/table/x": "y",
+                      "phone_new/latest/android/table/x": "z"})
+        for path in (other, os.path.join(other, "phone_new"), os.path.join(other, "patch")):
+            self.assertFalse(importer.is_game_folder(path), path)
+
+    def test_the_song_list_in_the_folder_with_the_songs(self):
+        # The game host's folders copied into one of another name, the song list's folder with them.
+        mine = os.path.join(self.tmp, "mine")
+        shutil.copytree(os.path.join(self.whole, importer.HOST), mine)
+        write(mine, {importer.SONG_LIST: json.dumps([{"song_id": 2, "name": "listed"}])})
+        self.assertTrue(importer.what_is(mine)["song_list"])
+        self.assertTrue(importer.import_game_files([mine], {"game", "songs"}))
+        with open(os.path.join(self.data, "content", "songs.json"), encoding="utf-8") as f:
+            self.assertEqual(json.load(f), [{"song_id": 2, "name": "listed"}])
+
+    def test_inside_an_archive_the_patch_folder_alone_and_the_song_list_in_the_folder(self):
+        table = "1.003.005/android/table/us/song_song.csv.lz4"
+        self.assertEqual(importer.tree_in(["files/patch/phone_new/" + table]), ("files/", None))
+        self.assertEqual(importer.tree_in(["patch/phone_new/" + table]), ("", None))
+        self.assertEqual(importer.tree_in(["phone_new/" + table, "phone_new/1.003.005/android/patch_new.csv.lz4"]),
+                         ("phone_new/", None))
+        self.assertEqual(importer.tree_in(["x/phone_new/" + table]), ("x/phone_new/", None))
+        # Not without its own folder (the version folders at the top), nor without the Android tables.
+        self.assertIsNone(importer.tree_in([table]))
+        self.assertIsNone(importer.tree_in(["tool/phone_new/1.0/android/readme.txt", "tool/phone_new/2.0/ios/table/x"]))
+        listing = ["pack/www/patch/phone_new/1.003.005/android/a", "pack/www/DMQ/Songs/1/1.fpk", "pack/www/_info/songList.json"]
+        self.assertEqual(importer.tree_in(listing), ("pack/www/", "pack/www/_info/songList.json"))
+
+
 class CheckTest(unittest.TestCase):
     """import --check: what each file is, and nothing imported."""
+
+    def test_the_game_data_alone_is_said_once_for_what_it_is(self):
+        with tempfile.TemporaryDirectory() as d:
+            whole = os.path.join(d, "whole")
+            game_folder(whole)
+            src = os.path.join(d, "in")
+            # The folder chosen holds a folder that holds the patch folder: one thing, said once.
+            shutil.copytree(os.path.join(whole, importer.GAME_DIR), os.path.join(src, "client", "patch", "phone_new"))
+            said = []
+            with mock.patch.multiple(importer, IN=src, DATA=d, log=said.append), \
+                    mock.patch.dict(os.environ, {"IMPORT_ONLY": "", "IMPORT_CHECK": "yes"}):
+                with self.assertRaises(SystemExit) as e:
+                    importer.main()
+            self.assertEqual(e.exception.code, 0)
+            self.assertEqual(said, ["ok   client: the game's server files without songs: the game starts, with nothing to play yet"])
 
     def test_each_file_is_said_for_what_it_is_and_nothing_comes_in(self):
         with tempfile.TemporaryDirectory() as d:
@@ -458,6 +593,23 @@ class ArchiveFormsTest(unittest.TestCase):
         self.assertTrue(importer.import_game_files([os.path.join(self.src, "download.zip")], {"game", "songs"}))
         self.assertIn("web/DMQ/Songs/2/2.fpk", content_files(self.data))
         self.assertEqual([n for n in os.listdir(self.data) if n.startswith(".extract-")], [])
+
+    def test_the_patch_folder_alone_in_an_archive(self):
+        # phone_new by itself, packed as a file manager packs a folder: with the folder at the top.
+        alone = os.path.join(self.tmp, "alone")
+        shutil.copytree(os.path.join(self.files(), importer.GAME_DIR), os.path.join(alone, "phone_new"))
+        archive = os.path.join(self.src, "client-data.zip")
+        self.pack(archive, alone, "-tzip")
+        self.assertEqual(importer.what_is(archive)["songs"], 0)
+        self.assertTrue(importer.import_game_files([archive], {"game", "songs"}))
+        self.assertEqual(content_files(self.data), GameDataAloneTest.GAME_DATA)
+
+    def test_whole_files_in_an_archive_before_a_patch_folder_alone_beside_it(self):
+        tree = self.files()
+        self.pack(os.path.join(self.src, "dmtq.7z"), tree)
+        shutil.copytree(os.path.join(tree, importer.GAME_DIR), os.path.join(self.src, "patch", "phone_new"))
+        self.assertTrue(importer.import_game_files(list(importer.walk(self.src)), {"game", "songs"}))
+        self.assertIn("web/DMQ/Songs/1/1.fpk", content_files(self.data))
 
     def test_the_client_in_an_apk_bundle(self):
         bundle = os.path.join(self.tmp, "bundle")
