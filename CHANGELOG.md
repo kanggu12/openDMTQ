@@ -6,6 +6,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-08
+
 ### Added
 
 - A player for Windows. The server makes one with its app in it, next to the app, and the site's Download page offers
@@ -200,7 +202,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 - Four ways to run it: the Windows bundle, one command on Linux or macOS, Docker Compose, and a Helm chart for
   Kubernetes.
 
-[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/kanggu12/openDMTQ/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/kanggu12/openDMTQ/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/kanggu12/openDMTQ/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/kanggu12/openDMTQ/compare/v0.3.0...v0.4.0
