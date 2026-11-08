@@ -1,4 +1,5 @@
-"""The Accounts page: the sign-ins of the site and of these pages, and each new password shown once."""
+"""The Accounts page: the sign-ins of the site and of these pages, and each new password shown once. Each form's work is
+a function of its own (create, change, link), apart from the page that calls it."""
 
 import secrets
 import sqlite3
@@ -8,29 +9,37 @@ import time
 from flask import flash, redirect, render_template, request, session, url_for
 
 from . import apps, auth, core
-from .core import ago, app, BASE, changed, db, t, why
+from .core import Refused, ago, app, BASE, changed, db, t, why
 
 # A new account's password, or a new password, shown on the next page only: never in the session's cookie (the browser
 # keeps that) and never twice. Waits ten minutes at most. In memory: the service runs one process.
 _shown = {}
 _shown_lock = threading.Lock()
 
+# The buttons of an account's row, by the form's action.
+ACTIONS = ("password", "off", "on", "delete", "admin", "player")
+
 
 def keep_once(name, password, note, word):
     """Keeps an account's password for the next page to show, once: the session holds only the way to it."""
+    _keep("shown", {"name": name, "password": password, "note": note, "word": word})
+
+
+def _keep(key, shown):
+    """Keeps what one page is to show once, under key in the session: ten minutes at most, in memory only."""
     now = time.time()
     token = secrets.token_urlsafe(16)
     with _shown_lock:
         for old in [k for k, v in _shown.items() if now - v["at"] > 600]:
             del _shown[old]
-        _shown[token] = {"name": name, "password": password, "note": note, "word": word, "at": now}
-    session["shown"] = token
+        _shown[token] = dict(shown, at=now)
+    session[key] = token
 
 
-def take_once():
-    """The account keep_once kept for this page, once and for ten minutes at most, or None."""
+def take_once(key="shown"):
+    """What keep_once kept for this page under key, once and for ten minutes at most, or None."""
     with _shown_lock:
-        shown = _shown.pop(session.pop("shown", ""), None)
+        shown = _shown.pop(session.pop(key, ""), None)
     return shown if shown and time.time() - shown["at"] <= 600 else None
 
 
@@ -67,42 +76,86 @@ def accounts_action():
     action = request.form.get("action", "")
     name = request.form.get("name", "").strip()
     if action == "create":
-        password = request.form.get("password", "")
         note = request.form.get("note", "").strip()[:40]
-        if not auth.ACCOUNT_NAME.fullmatch(name):
-            flash(t("acc.bad_id"), "bad")
-        elif password and not 6 <= len(password) <= 64:
-            flash(t("acc.bad_password"), "bad")
-        elif password and request.form.get("password2", "") != password:
-            flash(t("acc.mismatch"), "bad")
-        elif (guid := account_player(request.form.get("player", ""))) is False:
-            flash(t("acc.bad_player"), "bad")
-        else:
-            # An empty password field: one is made, easy to read off a phone.
-            password = password or auth.account_password()
-            if auth.account_create(name, password, note, request.form.get("admin") == "1", guid):
-                changed("accounts_page:create", name)
-                return show_once(name, password, note, "acc.made")
-            flash(t("acc.taken", name=name), "bad")
-        return redirect(url_for("accounts_page"))
-    row = auth.account_find(name)
-    if not row or action not in ("password", "off", "on", "delete", "admin", "player", "link"):
-        flash(t("acc.gone", name=name), "bad")
-        return redirect(url_for("accounts_page"))
-    name = row["name"]
+        try:
+            password = create(name, request.form.get("password", ""), request.form.get("password2", ""), note,
+                              request.form.get("admin") == "1", request.form.get("player", ""))
+        except Refused as e:
+            flash(e.words, e.tone)
+            return redirect(url_for("accounts_page"))
+        return show_once(name, password, note, "acc.made")
     # The game player the account is: any account, the one these pages are open with too.
     if action == "link":
-        return account_link(row)
+        try:
+            name, guid, player = link(name, request.form.get("player", ""))
+        except Refused as e:
+            # Linked to that player already: nothing to say.
+            if e.words is not None:
+                flash(e.words, e.tone)
+            return redirect(url_for("accounts_page"))
+        flash(t("acc.done_link", name=name, player=player) if guid is not None else t("acc.done_unlink", name=name), "ok")
+        return redirect(url_for("accounts_page"))
+    try:
+        done = change(name, action if action in ACTIONS else "", page_acting())
+    except Refused as e:
+        # Enabling what is enabled, giving rights it has: nothing happens, and nothing is said.
+        if e.words is not None:
+            flash(e.words, e.tone)
+        return redirect(url_for("accounts_page"))
     # The account these pages are open with: a new password for it keeps this sign-in (the session takes the new one).
-    # Disabling it, deleting it or changing its rights is for another admin, or the owner.
-    own = session.get("stamp") != "owner" and name.lower() == str(session.get("who", "")).lower()
+    if done["own"]:
+        session["stamp"] = auth.account_stamp(done["stored"])
+    if action == "password":
+        return show_once(done["name"], done["password"], done["note"], "acc.new_done")
+    flash(t({"off": "acc.done_off", "on": "acc.done_on", "delete": "acc.done_delete", "admin": "acc.done_admin", "player": "acc.done_player"}[action],
+            name=done["name"]), "ok")
+    return redirect(url_for("accounts_page"))
+
+
+def page_acting():
+    """Who acts on the Accounts page: (ID, owner) of the admin signed in."""
+    return str(session.get("who", "")), session.get("stamp") == "owner"
+
+
+def create(name, password, password2, note, admin_rights, player):
+    """Makes an account, as the Accounts page's form does: an ID, a password typed (twice) or, empty, made here, a note,
+    admin rights or not, and the game player it is (a guid, or empty for none). Returns the password."""
+    if not auth.ACCOUNT_NAME.fullmatch(name):
+        raise Refused(400, "bad_id", t("acc.bad_id"))
+    if password and not 6 <= len(password) <= 64:
+        raise Refused(400, "bad_password", t("acc.bad_password"))
+    if password and password2 != password:
+        raise Refused(400, "password_mismatch", t("acc.mismatch"))
+    guid = account_player(player)
+    if guid is False:
+        raise Refused(400, "bad_player", t("acc.bad_player"))
+    # An empty password field: one is made, easy to read off a phone.
+    password = password or auth.account_password()
+    if not auth.account_create(name, password, note, admin_rights, guid):
+        raise Refused(409, "id_taken", t("acc.taken", name=name))
+    changed("accounts_page:create", name)
+    return password
+
+
+def change(name, action, acting):
+    """One of an account's buttons: a new password (password), off, on, delete, admin (give admin rights) or player (take
+    them away). acting: (ID, owner) of who does it: an admin cannot disable, delete or demote their own account, which is
+    for another admin or the owner. Returns {name, password (new, or empty), note, stored (its hash), own}."""
+    row = auth.account_find(name)
+    if not row or action not in ACTIONS:
+        raise Refused(404, "account_not_found", t("acc.gone", name=name))
+    name = row["name"]
+    who, owner = acting
+    own = not owner and name.lower() == who.lower()
     if own and action != "password":
-        flash(t("acc.self", name=name), "bad")
-        return redirect(url_for("accounts_page"))
-    # Enabling what is enabled, giving rights it has: nothing happens.
-    if (action == "off" and row["off"]) or (action == "on" and not row["off"]) \
-            or (action == "admin" and row["admin"]) or (action == "player" and not row["admin"]):
-        return redirect(url_for("accounts_page"))
+        raise Refused(409, "own_account", t("acc.self", name=name))
+    # Enabling what is enabled, giving rights it has: nothing happens, and nothing goes into the log of changes.
+    already = {"off": (row["off"], f"The account {name} is disabled already."),
+               "on": (not row["off"], f"The account {name} is enabled already."),
+               "admin": (row["admin"], f"The account {name} has admin rights already."),
+               "player": (not row["admin"], f"The account {name} has no admin rights.")}
+    if action in already and already[action][0]:
+        raise Refused(409, "already_so", message=already[action][1])
     password = auth.account_password() if action == "password" else ""
     stored = auth.account_hash(password) if password else ""
     try:
@@ -116,15 +169,9 @@ def accounts_action():
             else:
                 con.execute("UPDATE SiteUser SET off = ? WHERE name = ?", (1 if action == "off" else 0, name))
     except sqlite3.Error as e:
-        flash(t("err.db_title") + f": {why(e)}", "bad")
-        return redirect(url_for("accounts_page"))
-    if own:
-        session["stamp"] = auth.account_stamp(stored)
+        raise Refused(503, "database_unavailable", t("err.db_title") + f": {why(e)}")
     changed(f"accounts_page:{action}", name)
-    if action == "password":
-        return show_once(name, password, row["note"], "acc.new_done")
-    flash(t({"off": "acc.done_off", "on": "acc.done_on", "delete": "acc.done_delete", "admin": "acc.done_admin", "player": "acc.done_player"}[action], name=name), "ok")
-    return redirect(url_for("accounts_page"))
+    return {"name": name, "password": password, "note": row["note"], "stored": stored, "own": own}
 
 
 def account_player(value):
@@ -136,23 +183,25 @@ def account_player(value):
         return False if value else None
 
 
-def account_link(row):
-    """Links an account to the game player it is, or unlinks it; nothing when it is so already."""
+def link(name, value):
+    """Links an account to the game player it is (value: a guid), or unlinks it (empty). Returns (the account's ID as
+    kept, guid or None, the player's name). Refused: no such account, no such player, or linked so already (nothing to say
+    then)."""
+    row = auth.account_find(name)
+    if not row:
+        raise Refused(404, "account_not_found", t("acc.gone", name=name))
     name = row["name"]
-    guid = account_player(request.form.get("player", ""))
+    guid = account_player(value)
     if guid is False:
-        flash(t("acc.bad_player"), "bad")
-        return redirect(url_for("accounts_page"))
+        raise Refused(400, "bad_player", t("acc.bad_player"))
     if guid == (row["guid"] if "guid" in row.keys() else None):
-        return redirect(url_for("accounts_page"))
+        raise Refused(409, "already_so", message=f"The account {name} is linked so already.")
     try:
         with db() as con:
             auth.account_table(con)
             con.execute("UPDATE SiteUser SET guid = ? WHERE name = ?", (guid, name))
             player = dict(auth.game_players(con)).get(guid, "")
     except sqlite3.Error as e:
-        flash(t("err.db_title") + f": {why(e)}", "bad")
-        return redirect(url_for("accounts_page"))
+        raise Refused(503, "database_unavailable", t("err.db_title") + f": {why(e)}")
     changed("accounts_page:link", name)
-    flash(t("acc.done_link", name=name, player=player) if guid is not None else t("acc.done_unlink", name=name), "ok")
-    return redirect(url_for("accounts_page"))
+    return name, guid, player

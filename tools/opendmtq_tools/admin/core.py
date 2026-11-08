@@ -8,6 +8,7 @@ Run: gunicorn -w 1 --threads 8 -b 0.0.0.0:8000 opendmtq_tools.admin:app
 import datetime
 import errno
 import hmac
+import html
 import json
 import os
 import re
@@ -88,6 +89,27 @@ class AdminRequest(Request):
             os.makedirs(BACKUPS, exist_ok=True)
             return tempfile.TemporaryFile(dir=BACKUPS)
         return super()._get_file_stream(total_content_length, content_type, filename, content_length)
+
+
+class Refused(Exception):
+    """An action that did not happen, and why: each action is one function, apart from the page that calls it. words:
+    what the page says, made in the page's language, or None where the page says nothing (it was so already). status and
+    code: what another caller is told (an HTTP status and a short code). message: the sentence for them where the page has
+    no words. tone: the page's colour for the words ("bad", or "ok" where nothing went wrong). extra: what a page needs to
+    answer it (the address typed, limits waiting for a yes)."""
+
+    def __init__(self, status, code, words=None, message=None, tone="bad", **extra):
+        super().__init__(code)
+        self.status, self.code, self.words, self.message, self.tone, self.extra = status, code, words, message, tone, extra
+
+    def sentence(self):
+        """The sentence for another caller: its own, else the page's words as plain text."""
+        return self.message or plain(self.words)
+
+
+def plain(words):
+    """Words made for a page as plain text: their markup out, what it escaped back (a name with a < in it stays one)."""
+    return html.unescape(re.sub(r"<[^>]+>", "", str(words or "")))
 
 # Where these pages live: under the players' site's own address, so that the server has one tree (/opendmtq for the
 # players, /opendmtq/admin for the owner). Until 2026-11 they were at /admin, which now leads here (old_address()).

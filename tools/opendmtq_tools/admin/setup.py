@@ -28,7 +28,11 @@ from flask import abort, flash, jsonify, redirect, render_template, request, ses
 
 from .. import importer, patch_apk, songs
 from . import accounts, apps, auth, core, jobs
-from .core import app, BASE, changed, same_text, t
+from .core import Refused, app, BASE, changed, same_text, t
+
+# What a caller other than the pages is told where only a host install can do a thing (the pages answer 404 there, and
+# name the command instead).
+HOST_ONLY = "Only a host install (or the Windows bundle) does this from its pages. With Docker Compose and Kubernetes it is a command on the server PC."
 
 # ------------------------------------------------------------------------------ where these pages run
 
@@ -494,11 +498,27 @@ def drives():
     return [f"{c}:\\" for i, c in enumerate(string.ascii_uppercase) if mask >> i & 1]
 
 
+def places():
+    """Where the folder picker goes in one step: the folders people keep files in (home_folders), then the drives. The
+    setup page shows them as buttons above the picker; a function apart from the page, as its other actions are."""
+    return home_folders() + drives()
+
+
 def parent_of(path):
     """The folder above path, or None at the top of a drive, a network share or the file system."""
     here = os.path.normpath(path)
     up = os.path.dirname(here)
     return up if up != here else None
+
+
+def nearest_open(path):
+    """The folder the picker opens when path cannot be opened: the nearest folder above it that can be read (a typo near
+    the end leaves the person close to where they meant), else where the picker opens by default."""
+    near = parent_of(path)
+    # Up one folder at a time, until one can be read or there is none above.
+    while near and listing(near) is None:
+        near = parent_of(near)
+    return near or default_folder()
 
 
 def listing(path):
@@ -757,15 +777,12 @@ def setup_page():
             if view["listing"] is None:
                 view["cannot_open"], view["cannot_up"] = browse, parent_of(browse)
                 view["not_there"] = not os.path.exists(browse)
-                near = parent_of(browse)
-                while near and listing(near) is None:
-                    near = parent_of(near)
-                browse = near or default_folder()
+                browse = nearest_open(browse)
                 view["listing"] = listing(browse)
             if view["listing"] is not None:
                 view["crumbs"] = crumbs(browse)
-            view["drives"] = drives()
-            view["homes"] = home_folders()
+            # The places to go in one step.
+            view["places"] = places()
             view["path_example"] = ("C:\\Users\\you\\Downloads\\DMTQ" if os.name == "nt"
                                     else os.path.join(os.path.expanduser("~"), "Downloads", "DMTQ"))
     elif step == "address":
@@ -839,18 +856,30 @@ def import_failure(lines):
 def setup_import():
     """Import the game's files from a folder or file on this PC: the APK, the files the game needs to start, and the
     songs when asked; then the song list. On a host install only."""
+    try:
+        job = import_files(request.form.get("path", ""), request.form.get("songs") == "yes")
+    except Refused as e:
+        if e.code == "host_only":
+            abort(404)
+        flash(e.words, e.tone)
+        # A folder that cannot be read or is too wide: the picker opens there.
+        return redirect(url_for("setup_page", step="files", dir=e.extra["path"]) if "path" in e.extra else url_for("setup_page", step="files"))
+    return redirect(url_for("setup_page", step="files", job=job))
+
+
+def import_files(typed, with_songs):
+    """Starts the import of the game's files from a folder or file on this PC, as the setup's form does: the path as
+    typed or pasted (clean_path), and the songs too when with_songs (the songs alone are imported as the songs whatever
+    it says). Then the song list. Returns the job's id. On a host install only."""
     if not HOST_INSTALL:
-        abort(404)
-    path = clean_path(request.form.get("path", ""))
+        raise Refused(404, "host_only", message=HOST_ONLY)
+    path = clean_path(typed)
     if not path or not os.path.exists(path):
-        flash(t("setup.no_path"), "bad")
-        return redirect(url_for("setup_page", step="files"))
+        raise Refused(404 if path else 400, "path_not_found" if path else "no_path", t("setup.no_path"))
     if not os.access(path, os.R_OK) or (os.path.isdir(path) and not os.access(path, os.X_OK)):
-        flash(t("setup.cannot_read", path=path), "bad")
-        return redirect(url_for("setup_page", step="files", dir=path))
+        raise Refused(400, "cannot_read", t("setup.cannot_read", path=path), path=path)
     if os.path.isdir(path) and too_wide(path):
-        flash(t("setup.too_wide", path=path), "bad")
-        return redirect(url_for("setup_page", step="files", dir=path))
+        raise Refused(400, "too_wide", t("setup.too_wide", path=path), path=path)
     env = dict(os.environ)
     if os.path.isfile(path):
         # A single file: its folder, and only that file in it.
@@ -861,27 +890,54 @@ def setup_import():
     # The songs alone are imported as the songs, whatever the box: there is nothing else in them.
     songs_alone = (os.path.isdir(path) and importer.host_folder(path, chosen=True) is None
                    and importer.songs_host(path, chosen=True) is not None)
-    env.update(IMPORT_GAME="yes", IMPORT_SONGS="yes" if request.form.get("songs") == "yes" or songs_alone else "no")
+    env.update(IMPORT_GAME="yes", IMPORT_SONGS="yes" if with_songs or songs_alone else "no")
     # The importer, then the song list the site and the game read (as ./opendmtq import does).
     cmds = [core.PYTHON + ["-m", "opendmtq_tools.importer"], core.PYTHON + ["-m", "opendmtq_tools.songs"]]
     # The check and the start under one lock: two clicks, or two pages, cannot start two jobs at once.
     with _busy_lock:
         why = busy()
         if why:
-            flash(why, "bad")
-            return redirect(url_for("setup_page", step="files"))
+            raise Refused(409, "busy", why)
         job = jobs.start_job("import", cmds, env=env, explain=import_failure, path=path)
     changed("setup:import", path)
-    return redirect(url_for("setup_page", step="files", job=job))
+    return job
 
 
 @app.route(BASE + "/setup/address", methods=["POST"])
 def setup_address():
     """Change the address phones use and restart the server for it (host install only): the app is built again for it
     at the start."""
+    back = []
+
+    def way_back():
+        # On the server PC the browser comes back signed in after the restart (these pages' sessions end with it).
+        # From anywhere else that link would not open: the sign-in page leads back to the setup instead.
+        if from_this_pc():
+            back.append(url_for("setup_start", key=new_signin_key(), step="players"))
+        else:
+            back.append(url_for("setup_page", step="players"))
+
+    try:
+        change_address(request.form.get("host", ""), way_back)
+    except Refused as e:
+        if e.code == "host_only":
+            abort(404)
+        # The address in use already: nothing to change, and no restart for it.
+        if e.code == "same_address":
+            return redirect(url_for("setup_page", step="players"))
+        flash(e.words, e.tone)
+        return redirect(url_for("setup_page", step="address"))
+    return render_template("setup_restart.html", back=back[0], instance=STARTED)
+
+
+def change_address(typed, before_restart=None):
+    """Changes the address phones use to another private address of this PC (typed: an IPv4 address; the port stays as
+    it is), writes it to .env and asks the host program to start every program again for it. before_restart: what to do
+    once the address is written, before the restart is asked for (the page makes its way back in). Returns the new
+    address. On a host install only."""
     if not (HOST_INSTALL and ENV_FILE and RUN_DIR):
-        abort(404)
-    host = request.form.get("host", "").strip()
+        raise Refused(404, "host_only", message=HOST_ONLY)
+    host = (typed or "").strip()
     port = address_parts(core.PUBLIC_HOST)[1]
     try:
         ip = ipaddress.IPv4Address(host)
@@ -889,84 +945,110 @@ def setup_address():
     except ValueError:
         ok = False
     if not ok:
-        flash(t("setup.bad_address", host=host), "bad")
-        return redirect(url_for("setup_page", step="address"))
+        raise Refused(400, "bad_address", t("setup.bad_address", host=host))
     new = host if port == 80 else f"{host}:{port}"
     # The address in use already: nothing to change, and no restart for it.
     if new == core.PUBLIC_HOST:
-        return redirect(url_for("setup_page", step="players"))
+        raise Refused(409, "same_address", message=f"The server uses {new} already.")
     with _busy_lock:
         # A restart now would cut off the import or the build that runs.
         why = busy()
         if why:
-            flash(why, "bad")
-            return redirect(url_for("setup_page", step="address"))
+            raise Refused(409, "busy", why)
         save_env({"PUBLIC_HOST": new})
-        # On the server PC the browser comes back signed in after the restart (these pages' sessions end with it).
-        # From anywhere else that link would not open: the sign-in page leads back to the setup instead.
-        if from_this_pc():
-            back = url_for("setup_start", key=new_signin_key(), step="players")
-        else:
-            back = url_for("setup_page", step="players")
+        if before_restart:
+            before_restart()
         with open(os.path.join(RUN_DIR, "restart.request"), "w", encoding="ascii") as f:
             f.write(str(int(time.time())))
     changed("setup:address", host)
-    return render_template("setup_restart.html", back=back, instance=STARTED)
+    return new
 
 
 @app.route(BASE + "/server/stop", methods=["POST"])
 def server_stop():
     """Stop the server (a host install: the Windows bundle, Linux, macOS): the program that runs it stops every part, as
     closing its window or Ctrl+C would. These pages stop with it, so the answer comes first and says how to start again."""
+    try:
+        stop_server()
+    except Refused as e:
+        if e.code == "host_only":
+            abort(404)
+        flash(e.words, e.tone)
+        return redirect(url_for("maintenance_page"))
+    # How to start it again: OpenDMTQ.exe on Windows, the command elsewhere.
+    return render_template("server_stopped.html", windows=os.name == "nt")
+
+
+def stop_server():
+    """Asks the program that runs the server to stop every part of it (a host install only): it reads stop.request in its
+    run folder within a second or two, and these pages stop with it."""
     if not (HOST_INSTALL and RUN_DIR):
-        abort(404)
+        raise Refused(404, "host_only", message=HOST_ONLY)
     try:
         with open(os.path.join(RUN_DIR, "stop.request"), "w", encoding="ascii") as f:
             f.write(str(int(time.time())))
     except OSError as e:
-        flash(t("server.stop_failed", why=e.strerror or str(e)), "bad")
-        return redirect(url_for("maintenance_page"))
+        raise Refused(500, "stop_failed", t("server.stop_failed", why=e.strerror or str(e)))
     changed("server:stop", auth.client_ip())
-    # How to start it again: OpenDMTQ.exe on Windows, the command elsewhere.
-    return render_template("server_stopped.html", windows=os.name == "nt")
 
 
 @app.route(BASE + "/setup/player", methods=["POST"])
 def setup_player():
     """An account for a player, made here as on the Accounts page; its ID and password are shown once."""
     name = request.form.get("name", "").strip()
-    if not auth.ACCOUNT_NAME.fullmatch(name):
-        flash(t("acc.bad_id"), "bad")
+    try:
+        password = make_player(name)
+    except Refused as e:
+        flash(e.words, e.tone)
         return redirect(url_for("setup_page", step="players"))
-    password = auth.account_password()
-    if not auth.account_create(name, password, t("setup.made_note")):
-        flash(t("acc.taken", name=name), "bad")
-        return redirect(url_for("setup_page", step="players"))
-    changed("accounts_page:create", name)
     # The password waits on the server for the next page only, never in the session's cookie.
     accounts.keep_once(name, password, t("setup.made_note"), "acc.made")
     return redirect(url_for("setup_page", step="players"))
 
 
+def make_player(name):
+    """An account for a player, as the setup's players step makes one: a password made here, the setup's note, no admin
+    rights, no game player linked. Returns the password."""
+    if not auth.ACCOUNT_NAME.fullmatch(name):
+        raise Refused(400, "bad_id", t("acc.bad_id"))
+    password = auth.account_password()
+    if not auth.account_create(name, password, t("setup.made_note")):
+        raise Refused(409, "id_taken", t("acc.taken", name=name))
+    changed("accounts_page:create", name)
+    return password
+
+
 @app.route(BASE + "/setup/build", methods=["POST"])
 def setup_build():
     """Build the phone app for this server's address, as the App page does."""
-    if not has_base_apk():
-        flash(t("app.no_base"), "bad")
+    try:
+        job = start_build()
+    except Refused as e:
+        # One build at a time: the page follows the one running.
+        if e.words is not None:
+            flash(e.words, e.tone)
         return redirect(url_for("setup_page", step="app"))
+    return redirect(url_for("setup_page", step="app", job=job))
+
+
+def start_build():
+    """Starts the setup's build of the app, for this server's address. Returns the job's id. Refused: no client to build
+    from, a build running already (the setup's or the server's own at its start), or an import that runs (it may be
+    bringing the client in)."""
+    if not has_base_apk():
+        raise Refused(409, "no_client", t("app.no_base"))
     cmd = core.PYTHON + ["-m", "opendmtq_tools.builder", "--force", "--host", core.PUBLIC_HOST]
     with _busy_lock:
         # One build at a time: the page follows the one running.
         if jobs.running_build() or builder_running():
-            return redirect(url_for("setup_page", step="app"))
+            raise Refused(409, "build_running", message="An app build runs already.")
         # An import first ends: it may be bringing the client in.
         why = busy()
         if why:
-            flash(why, "bad")
-            return redirect(url_for("setup_page", step="app"))
+            raise Refused(409, "busy", why)
         job = jobs.start_job("build", cmd, host=core.PUBLIC_HOST)
     changed("app_page:", core.PUBLIC_HOST)
-    return redirect(url_for("setup_page", step="app", job=job))
+    return job
 
 
 @app.template_filter("setup_url")

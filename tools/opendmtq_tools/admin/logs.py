@@ -67,29 +67,50 @@ def change_view(entry):
     return dict(entry, ago=ago(entry["at"]), words=words, target=target, who=entry.get("who", ""))
 
 
+def changes():
+    """The log of changes as its tab shows it, newest first: each line with its words in the page's language."""
+    return [change_view(c) for c in insights.audit_read(os.path.dirname(core.DB))]
+
+
+# How many of the newest requests the Requests tab lists.
+REQUESTS_SHOWN = 400
+
+
+def requests_found(q, status, kind):
+    """The requests read from the log (oldest first, LogRows), and those the tab's filters leave: a word (q), a result
+    (2xx to 5xx, or err) and a kind (LOG_KINDS)."""
+    # What was asked for by the requests read here; the health checks are not among them.
+    rows = insights.read_log(core.LOGS)
+    return rows, [r for r in rows if insights.wanted(r, q, status, kind)]
+
+
+def requests_day(rows, picked):
+    """What the tab's chart and cards look at: the last 24 hours of what the filters leave, by hour (insights.by_hour) and
+    as rows, and since when the log counts when only its newest part was read (a time, or None)."""
+    since = time.time() - 86400
+    # Only the newest part of a busy log is read, which may not reach back that far: the chart says from when it counts.
+    covered = rows[0]["at"] if rows and rows.cut and rows[0]["at"] > since else None
+    return insights.by_hour(picked), [r for r in picked if r["at"] >= since], covered
+
+
 @app.route(BASE + "/logs")
 def logs_page():
     tab = request.args.get("tab", "requests")
     if tab == "plays":
         return plays_tab()
     if tab == "changes":
-        return render_template("logs.html", tab="changes", changes=[change_view(c) for c in insights.audit_read(os.path.dirname(core.DB))])
+        return render_template("logs.html", tab="changes", changes=changes())
     q = request.args.get("q", "").strip()
     status = request.args.get("status", "")
     kind = request.args.get("kind", "")
-    # What was asked for by the requests read here; the health checks are not among them.
-    rows = insights.read_log(core.LOGS)
-    picked = [r for r in rows if insights.wanted(r, q, status, kind)]
-    view = {"tab": "requests", "q": q, "status": status, "kind": kind, "kinds": LOG_KINDS, "rows": picked[-400:][::-1], "matched": len(picked), "kept": len(rows)}
+    rows, picked = requests_found(q, status, kind)
+    view = {"tab": "requests", "q": q, "status": status, "kind": kind, "kinds": LOG_KINDS, "rows": picked[-REQUESTS_SHOWN:][::-1], "matched": len(picked), "kept": len(rows)}
     # The page's own look at new lines, every few seconds: only the list, without the chart and the cards.
     if request.args.get("rows"):
         return render_template("log_rows.html", **view)
     # The chart and the cards follow the filter as the list does, and all look at the same last 24 hours.
-    day = insights.by_hour(picked)
-    since = time.time() - 86400
-    last_day = [r for r in picked if r["at"] >= since]
-    # Only the newest part of a busy log is read, which may not reach back that far: the chart says from when it counts.
-    covered_from = time.strftime("%m-%d %H:%M", time.localtime(rows[0]["at"])) if rows and rows.cut and rows[0]["at"] > since else ""
+    day, last_day, covered = requests_day(rows, picked)
+    covered_from = time.strftime("%m-%d %H:%M", time.localtime(covered)) if covered else ""
     timeline = charts.stacked([(time.strftime("%H", time.localtime(at)) + ":00" if i % 4 == 3 else "",
                                 tp("logs.c_hour", hour=time.strftime("%m-%d %H:00", time.localtime(at)), ok=fine, bad=failed), fine, failed)
                                for i, (at, fine, failed) in enumerate(day)], (tp("logs.c_fine"), tp("logs.c_failed")), tp("logs.c_title"))
@@ -117,13 +138,15 @@ def plays_day(text):
     return day
 
 
-def plays_filter():
-    """What the address narrows the plays by. Days the wrong way round are taken as they were meant."""
-    first, last = plays_day(request.args.get("from")), plays_day(request.args.get("to"))
+def plays_filter(args=None):
+    """What the address narrows the plays by (args: its query, the request's own unless given). Days the wrong way round
+    are taken as they were meant."""
+    args = request.args if args is None else args
+    first, last = plays_day(args.get("from")), plays_day(args.get("to"))
     if first and last and first > last:
         first, last = last, first
-    player = request.args.get("player", "")
-    return {"q": request.args.get("q", "").strip(), "player": int(player) if re.fullmatch(r"[0-9]{1,12}", player) else None,
+    player = args.get("player", "")
+    return {"q": args.get("q", "").strip(), "player": int(player) if re.fullmatch(r"[0-9]{1,12}", player) else None,
             "from": first, "to": last}
 
 
@@ -269,13 +292,29 @@ def plays_csv(found, name="opendmtq-plays.csv"):
     return r
 
 
-def plays_tab():
-    """Every play the server has noted, newest first, narrowed by a word, a player and days, a page at a time."""
-    wanted = plays_filter()
+def plays_page_number(text):
+    """The page of plays an address asks for: 1 and up, 1 for anything else."""
     try:
-        page = max(1, int(request.args.get("page", "1")))
+        return max(1, int(text or "1"))
     except ValueError:
-        page = 1
+        return 1
+
+
+def plays_file(con, wanted):
+    """Every play the filter leaves as a file (plays_csv), named for what it holds: the player and the days it was
+    narrowed to. Someone without plays (an old address) counts as no player."""
+    people = plays_players(con)
+    if wanted["player"] not in {guid for guid, _ in people}:
+        wanted["player"] = None
+    parts = ["opendmtq-plays"] + ([f"player{wanted['player']}"] if wanted["player"] is not None else []) \
+        + [d.date().isoformat() for d in (wanted["from"], wanted["to"]) if d]
+    return plays_csv(plays_found(con, wanted), "-".join(parts) + ".csv")
+
+
+def plays_found_page(wanted, page):
+    """One page of the plays the filter leaves, with what all of them add up to: {plays (this page's, each with at, its
+    time in words), people (who has plays), total, last_page, broken (the database could not be read), summed (a
+    PlaysSum)}. Someone without plays (an old address) counts as no player: the whole list, not an empty one."""
     rows, people = [], []
     total = 0
     broken = False
@@ -286,11 +325,6 @@ def plays_tab():
             # Someone without plays (an old address): the whole list, not an empty one with no name picked in the form.
             if wanted["player"] not in {guid for guid, _ in people}:
                 wanted["player"] = None
-            if request.args.get("csv"):
-                # The file says what it holds: the player and the days it was narrowed to.
-                parts = ["opendmtq-plays"] + ([f"player{wanted['player']}"] if wanted["player"] is not None else []) \
-                    + [d.date().isoformat() for d in (wanted["from"], wanted["to"]) if d]
-                return plays_csv(plays_found(con, wanted), "-".join(parts) + ".csv")
             first = (page - 1) * PLAYS_PAGE
             if wanted["q"]:
                 # A word: every play is looked at here, each kept only when it is on the page.
@@ -308,8 +342,24 @@ def plays_tab():
                         for play in plays_found(con, wanted, PLAYS_PAGE, first)]
     except sqlite3.Error:
         broken = True
+    return {"plays": rows, "people": people, "total": total, "last_page": max(1, -(-total // PLAYS_PAGE)), "broken": broken, "summed": summed}
+
+
+def plays_tab():
+    """Every play the server has noted, newest first, narrowed by a word, a player and days, a page at a time."""
+    wanted = plays_filter()
+    page = plays_page_number(request.args.get("page", "1"))
+    if request.args.get("csv"):
+        # The file; a database that cannot be read gives the tab, which says so.
+        try:
+            with db() as con:
+                return plays_file(con, wanted)
+        except sqlite3.Error:
+            pass
+    found = plays_found_page(wanted, page)
+    rows, people, total, broken, summed = found["plays"], found["people"], found["total"], found["broken"], found["summed"]
     shown = plays_shown(wanted)
-    last_page = max(1, -(-total // PLAYS_PAGE))
+    last_page = found["last_page"]
     # An old address: the last page there is, not an empty one that says there are no plays.
     if page > last_page:
         return redirect(url_for("logs_page", tab="plays", page=last_page, **shown))

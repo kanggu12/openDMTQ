@@ -1,4 +1,5 @@
-"""The App page: the builds of the phone app, the one on offer, what the last build said, and the QR code."""
+"""The App page: the builds of the phone app, the one on offer, what the last build said, and the QR code. Each form's work
+is a function (start_build, prune, delete), apart from the page that calls it."""
 
 import datetime
 import json
@@ -11,7 +12,7 @@ from flask import abort, flash, redirect, render_template, request, send_file, u
 from werkzeug.exceptions import NotFound
 
 from . import core, jobs
-from .core import app, BASE, changed, human, safe_name, t, tp
+from .core import Refused, app, BASE, changed, human, safe_name, t, tp
 
 
 def builds():
@@ -125,40 +126,67 @@ def invite_qr():
     return send_file(path, mimetype="image/svg+xml", max_age=60)
 
 
+def start_build(typed):
+    """Starts a build of the app, as the App page's form does: for the address typed (as pasted from a browser's address
+    bar too), or this server's when it is empty. Returns (the job's id, the address)."""
+    if jobs.running_build():
+        raise Refused(409, "build_running", t("app.already"))
+    # What was pasted from a browser's address bar is meant the same.
+    host = re.sub(r"^https?://", "", (typed or "").strip()).rstrip("/") or core.PUBLIC_HOST
+    if not re.fullmatch(r"[A-Za-z0-9.-]{1,74}(:[0-9]{1,5})?", host):
+        raise Refused(400, "bad_host", t("app.bad_host", host=host), host=host)
+    # No base APK at all (data/apk/base missing counts as empty): say so rather than start a
+    # build that cannot work.
+    base = os.path.join(core.APK, "base")
+    if not any(f.lower().endswith(".apk") for f in (os.listdir(base) if os.path.isdir(base) else [])):
+        raise Refused(409, "no_client", t("app.no_base"), host=host)
+    if host == core.PUBLIC_HOST:
+        # The server's own address: through the builder, as at every start, so that build.json
+        # (what the portal, this dashboard and ./opendmtq doctor say about the app) tells this
+        # build's outcome too, and a failure noted earlier goes away once a build succeeds. It
+        # reads BASE_APK from the environment.
+        cmd = core.PYTHON + ["-m", "opendmtq_tools.builder", "--force", "--host", host]
+    else:
+        cmd = core.PYTHON + ["-m", "opendmtq_tools.patch_apk", "--host", host,
+               "--stamp", datetime.date.today().strftime("%Y.%m.%d")]
+        # BASE_APK in .env picks one when data/apk/base holds several different clients, else the newest (as for
+        # the builder).
+        if os.environ.get("BASE_APK"):
+            cmd += ["--base", os.environ["BASE_APK"]]
+        # Only a build for the server's own address becomes the portal's download.
+        cmd.append("--keep-latest")
+    changed("app_page:", host)
+    return jobs.start_job("build", cmd, host=host), host
+
+
+def offer_state(listed=None):
+    """What the App page says of the app on offer, at its top: (its build or None, (light, words) or None, why the last
+    build failed or None). The words: a failed rebuild, an app for an address that is not this server's, or right.
+    listed: builds() when the caller has it already."""
+    listed = builds() if listed is None else listed
+    offer = next((b for b in listed if b["current"]), None)
+    failed = build_error()
+    if offer is None:
+        state = None
+    elif failed:
+        state = ("wait", tp("app.offer_failed", why=failed))
+    elif offer["host"] != core.PUBLIC_HOST:
+        state = ("bad", tp("app.offer_other", host=offer["host"]))
+    else:
+        state = ("on", tp("app.offer_ok", host=core.PUBLIC_HOST))
+    return offer, state, failed
+
+
 @app.route(BASE + "/app", methods=["GET", "POST"])
 def app_page():
     if request.method == "POST":
-        if jobs.running_build():
-            flash(t("app.already"), "bad")
-            return redirect(url_for("app_page"))
-        # What was pasted from a browser's address bar is meant the same.
-        host = re.sub(r"^https?://", "", request.form.get("host", "").strip()).rstrip("/") or core.PUBLIC_HOST
-        if not re.fullmatch(r"[A-Za-z0-9.-]{1,74}(:[0-9]{1,5})?", host):
-            flash(t("app.bad_host", host=host), "bad")
-            return redirect(url_for("app_page", host=host))
-        # No base APK at all (data/apk/base missing counts as empty): say so rather than start a
-        # build that cannot work.
-        base = os.path.join(core.APK, "base")
-        if not any(f.lower().endswith(".apk") for f in (os.listdir(base) if os.path.isdir(base) else [])):
-            flash(t("app.no_base"), "bad")
-            return redirect(url_for("app_page", host=host))
-        if host == core.PUBLIC_HOST:
-            # The server's own address: through the builder, as at every start, so that build.json
-            # (what the portal, this dashboard and ./opendmtq doctor say about the app) tells this
-            # build's outcome too, and a failure noted earlier goes away once a build succeeds. It
-            # reads BASE_APK from the environment.
-            cmd = core.PYTHON + ["-m", "opendmtq_tools.builder", "--force", "--host", host]
-        else:
-            cmd = core.PYTHON + ["-m", "opendmtq_tools.patch_apk", "--host", host,
-                   "--stamp", datetime.date.today().strftime("%Y.%m.%d")]
-            # BASE_APK in .env picks one when data/apk/base holds several different clients, else the newest (as for
-            # the builder).
-            if os.environ.get("BASE_APK"):
-                cmd += ["--base", os.environ["BASE_APK"]]
-            # Only a build for the server's own address becomes the portal's download.
-            cmd.append("--keep-latest")
-        changed("app_page:", host)
-        return redirect(url_for("app_page", job=jobs.start_job("build", cmd, host=host)))
+        try:
+            job, _ = start_build(request.form.get("host", ""))
+        except Refused as e:
+            flash(e.words, e.tone)
+            # The address field keeps what was refused, or what a build waits for a client for.
+            return redirect(url_for("app_page", host=e.extra["host"]) if "host" in e.extra else url_for("app_page"))
+        return redirect(url_for("app_page", job=job))
     # Back from a build that finished: it says so once, on the page with the new list.
     built = jobs._jobs.get(request.args.get("built", ""))
     if built:
@@ -175,17 +203,7 @@ def app_page():
     # The address field keeps what was typed for another address (or refused) here.
     job = jobs._jobs.get(wanted, {})
     listed = builds()
-    offer = next((b for b in listed if b["current"]), None)
-    # What is said of the app on offer: a failed rebuild, an app for an address that is not this server's, or right.
-    failed = build_error()
-    if offer is None:
-        state = None
-    elif failed:
-        state = ("wait", tp("app.offer_failed", why=failed))
-    elif offer["host"] != core.PUBLIC_HOST:
-        state = ("bad", tp("app.offer_other", host=offer["host"]))
-    else:
-        state = ("on", tp("app.offer_ok", host=core.PUBLIC_HOST))
+    offer, state, _ = offer_state(listed)
     typed = job.get("host") or request.args.get("host") or ""
     return render_template("app.html", offer=offer, state=state, others=[b for b in listed if not b["current"]],
                            job=wanted or None, running=jobs.running_build(), host=typed if typed != core.PUBLIC_HOST else "",
@@ -203,12 +221,24 @@ def app_icon():
 
 @app.route(BASE + "/app/prune", methods=["POST"])
 def app_prune():
-    """Deletes every build but the one the portal offers. Not while one is being made, or with no way to tell which is on
-    offer: it would take that one too."""
+    """Deletes every build but the one the portal offers."""
+    try:
+        n, freed = prune()
+    except Refused as e:
+        flash(e.words, e.tone)
+        return redirect(url_for("app_page"))
+    flash(t("app.pruned", n=n, size=human(freed)), "ok")
+    return redirect(url_for("app_page"))
+
+
+def prune():
+    """Deletes every build but the one the portal offers: (how many, bytes freed). Not while one is being made, or with no
+    way to tell which is on offer: it would take that one too."""
     listed = builds()
     if jobs.running_build() or not any(b["current"] for b in listed):
-        flash(t("app.already") if jobs.running_build() else t("app.prune_unknown"), "bad")
-        return redirect(url_for("app_page"))
+        if jobs.running_build():
+            raise Refused(409, "build_running", t("app.already"))
+        raise Refused(409, "offer_unknown", t("app.prune_unknown"))
     n = freed = 0
     for b in listed:
         if b["current"]:
@@ -225,29 +255,40 @@ def app_prune():
             pass
     if n:
         changed("app_prune:", str(n))
-    flash(t("app.pruned", n=n, size=human(freed)), "ok")
-    return redirect(url_for("app_page"))
+    return n, freed
+
+
+def download(name):
+    """One build's file, as its download button gives it (404 for a name that is no build)."""
+    return send_file(safe_name(name, os.path.join(core.APK, "out"), ".apk"), as_attachment=True,
+                     mimetype="application/vnd.android.package-archive")
 
 
 @app.route(BASE + "/app/download/<name>")
 def app_download(name):
-    return send_file(safe_name(name, os.path.join(core.APK, "out"), ".apk"), as_attachment=True,
-                     mimetype="application/vnd.android.package-archive")
+    return download(name)
 
 
 @app.route(BASE + "/app/delete/<name>", methods=["POST"])
 def app_delete(name):
     try:
+        delete(name)
+    except Refused as e:
+        flash(e.words, e.tone)
+        return redirect(url_for("app_page"))
+    flash(t("app.deleted", name=name), "ok")
+    return redirect(url_for("app_page"))
+
+
+def delete(name):
+    """Deletes one build and its manifest. Refused: no such build, or the one the portal offers."""
+    try:
         path = safe_name(name, os.path.join(core.APK, "out"), ".apk")
     except NotFound:
-        flash(t("app.gone"), "bad")
-        return redirect(url_for("app_page"))
+        raise Refused(404, "build_not_found", t("app.gone"))
     if any(b["file"] == name and b["current"] for b in builds()):
-        flash(t("app.is_public"), "bad")
-    else:
-        os.remove(path)
-        if os.path.exists(path + ".json"):
-            os.remove(path + ".json")
-        changed("app_delete:", name)
-        flash(t("app.deleted", name=name), "ok")
-    return redirect(url_for("app_page"))
+        raise Refused(409, "on_offer", t("app.is_public"))
+    os.remove(path)
+    if os.path.exists(path + ".json"):
+        os.remove(path + ".json")
+    changed("app_delete:", name)

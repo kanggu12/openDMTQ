@@ -12,7 +12,7 @@ import time
 from flask import abort, flash, redirect, render_template, request, send_file, url_for
 
 from . import core, players, status
-from .core import app, BASE, changed, db, t
+from .core import Refused, app, BASE, changed, db, t
 
 # The live view: the owner's switch per player, the phone's upload key, the notice waiting to be shown
 # ("on" or "off") and whether the player is in a song. The server makes this table at start
@@ -237,20 +237,14 @@ def recordings_action():
     action = request.form.get("action", "")
     if action == "limits":
         try:
-            cap_gb, days = float(request.form.get("cap_gb", "")), int(request.form.get("days", ""))
-            if not (0.001 <= cap_gb <= 1000000 and 1 <= days <= 36500):
-                raise ValueError
-        except ValueError:
-            flash(t("rec.bad_limits"), "bad")
+            removed = set_limits(request.form.get("cap_gb", ""), request.form.get("days", ""), request.form.get("confirmed") == "1")
+        except Refused as e:
+            # Lower limits delete at once, for good: first the page says how much, and asks.
+            if e.code == "would_delete":
+                return recordings_view(e.extra["pending"])
+            flash(e.words, e.tone)
             return redirect(url_for("recordings_page"))
-        # Lower limits delete at once, for good: first the page says how much, and asks.
-        over = rec_over_limits(cap_gb, days)
-        if over and request.form.get("confirmed") != "1":
-            return recordings_view({"cap_gb": cap_gb, "days": days, "n": len(over), "size": sum(r["size"] for r in over)})
-        rec_save_limits(cap_gb, days)
-        changed("recordings_page:limits", f"{cap_gb:g} GB / {days} d")
-        rec_sweep_now()
-        flash(t("rec.limits_removed", n=len(over)) if over else t("rec.limits_saved"), "ok")
+        flash(t("rec.limits_removed", n=removed) if removed else t("rec.limits_saved"), "ok")
         return redirect(url_for("recordings_page"))
     # "hide 7/1798000000": one row's button. The rest name their recordings in the check boxes.
     verb, _, one = action.partition(" ")
@@ -258,6 +252,40 @@ def recordings_action():
     # "delete-player 7": all of theirs.
     if verb == "delete-player":
         names = [f"{r['guid']}/{r['id']}" for r in rec_all() if str(r["guid"]) == one]
+    done, kept = act_on(verb, names)
+    word = {"hide": "rec.done_hide", "show": "rec.done_show"}.get(verb, "rec.done_delete")
+    if done or kept:
+        flash(t(word, n=done) + (t("rec.kept", n=kept) if kept else ""), "ok" if done else "bad")
+    else:
+        # A page left open: someone or the limits got there first.
+        flash(t("rec.nothing"), "bad")
+    return redirect(url_for("recordings_page"))
+
+
+def set_limits(cap_gb, days, confirmed):
+    """The recordings' limits, as the Recordings page's form sends them: a total size in GB (a number, as text or not) and
+    an age in whole days. Lower limits delete recordings at once and for good: unless confirmed, they are refused with
+    what they would delete (pending, for the page's question). Returns how many recordings they deleted."""
+    try:
+        cap_gb, days = float(str(cap_gb)), int(str(days))
+        if not (0.001 <= cap_gb <= 1000000 and 1 <= days <= 36500):
+            raise ValueError
+    except ValueError:
+        raise Refused(400, "bad_limits", t("rec.bad_limits"))
+    over = rec_over_limits(cap_gb, days)
+    if over and not confirmed:
+        size = sum(r["size"] for r in over)
+        raise Refused(409, "would_delete", message=core.plain(t("rec.limits_confirm", n=len(over), size=core.human(size)))
+                      + ' Send "confirm": true to save them.', pending={"cap_gb": cap_gb, "days": days, "n": len(over), "size": size})
+    rec_save_limits(cap_gb, days)
+    changed("recordings_page:limits", f"{cap_gb:g} GB / {days} d")
+    rec_sweep_now()
+    return len(over)
+
+
+def act_on(verb, names):
+    """Hides (hide), shows (show) or deletes (delete, delete-player) recordings by their names ("7/1798000000"); names that
+    are malformed or name no recording are left out. A recording still being made is kept. Returns (done, kept)."""
     done = kept = 0
     who = set()
     for name in names:
@@ -279,7 +307,6 @@ def recordings_action():
         else:
             continue
         done += 1
-    word = {"hide": "rec.done_hide", "show": "rec.done_show"}.get(verb, "rec.done_delete")
     if done:
         # Whose, by name as it is now, and how many: the numbers the files go by say nothing to anyone.
         try:
@@ -288,12 +315,7 @@ def recordings_action():
         except sqlite3.Error:
             whose = ", ".join(str(guid) for guid in sorted(who))
         changed(f"recordings_page:{verb}", f"{whose} ({done})")
-    if done or kept:
-        flash(t(word, n=done) + (t("rec.kept", n=kept) if kept else ""), "ok" if done else "bad")
-    else:
-        # A page left open: someone or the limits got there first.
-        flash(t("rec.nothing"), "bad")
-    return redirect(url_for("recordings_page"))
+    return done, kept
 
 
 @app.route(BASE + "/recordings/<int:guid>/<int:rid>/download")

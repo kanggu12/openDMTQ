@@ -84,9 +84,10 @@ def _size_of(path):
         return 0
 
 
-def disk_parts(usage):
-    """What takes the data disk: [(name, bytes, shown)], for the status page. Counted at most every minute, and again after a
-    backup is made or a recording deleted."""
+def disk_use(usage):
+    """What takes the data disk, in bytes: recordings, backups, builds (the app's), songs (added ones), db (the database),
+    other (what is not ours, still part of the whole) and free. Counted at most every minute, and again after a backup is
+    made or a recording deleted."""
     now = time.time()
     if now - _disk_cache.get("at", 0) > 60:
         try:
@@ -95,11 +96,17 @@ def disk_parts(usage):
             db_size = 0
         _disk_cache.update(at=now, recordings=sum(r.get("size") or 0 for r in recordings.rec_all()), backups=sum(_size_of(os.path.join(core.BACKUPS, f[0])) for f in backups.backup_files()),
                            builds=sum(b["size"] for b in apps.builds()), songs=insights.folder_size(os.path.join(songs.CUSTOM, "songs")), db=db_size)
-    known = [("disk.rec", "recordings"), ("disk.bak", "backups"), ("disk.app", "builds"), ("disk.song", "songs"), ("disk.db", "db")]
-    parts = [(t(key), _disk_cache[name], human(_disk_cache[name])) for key, name in known]
+    use = {name: _disk_cache[name] for name in ("recordings", "backups", "builds", "songs", "db")}
     # The rest of what the disk holds is not ours, and still part of the whole: without it the free part reads far too big.
-    others = max(0, usage.used - sum(_disk_cache[name] for _, name in known))
-    return parts + [(t("disk.other"), others, human(others)), (t("disk.free"), usage.free, human(usage.free))]
+    return dict(use, other=max(0, usage.used - sum(use.values())), free=usage.free)
+
+
+def disk_parts(usage):
+    """What takes the data disk: [(name, bytes, shown)], for the status page (disk_use, in words)."""
+    use = disk_use(usage)
+    known = [("disk.rec", "recordings"), ("disk.bak", "backups"), ("disk.app", "builds"), ("disk.song", "songs"), ("disk.db", "db"),
+             ("disk.other", "other"), ("disk.free", "free")]
+    return [(t(key), use[name], human(use[name])) for key, name in known]
 
 # The machine the server runs on, for the status page: its processors, memory, swap, load and how long it has been up.
 # Read from /proc, which inside a container describes the machine itself (WSL's, or a Kubernetes node). A thread looks
@@ -278,41 +285,45 @@ threading.Thread(target=_machine_loop, name="machine", daemon=True).start()
 GRADE_COLOURS = {"S": "#78cf2e", "A": "#2fa8e0", "B": "#a783f2", "C": "#d9a11a", "D": "#e07a3c", "E": "#5c6773", "F": "#46505b"}
 
 
-@app.route(BASE + "/")
-def dashboard():
-    health = core.server_health(fresh=True)
+def counts_of(con):
+    """The status page's numbers: players, records (best results), plays in the last 24 hours and 7 days, players who
+    played in the last 7 days, players on air now."""
     counts = {}
-    charts_view = {}
+    counts["players"] = con.execute(f"SELECT COUNT(*) FROM ({core.PLAYER_ROWS})", (core.CHECK_UDID,)).fetchone()[0]
+    counts["records"] = con.execute("SELECT COUNT(*) FROM Play").fetchone()[0]
+    try:
+        counts["plays_today"] = con.execute(
+            "SELECT COUNT(*) FROM PlayLog WHERE played_at > strftime('%s','now') - 86400").fetchone()[0]
+        counts["plays_week"] = con.execute(
+            "SELECT COUNT(*) FROM PlayLog WHERE played_at > strftime('%s','now') - 604800").fetchone()[0]
+        counts["active_week"] = con.execute(
+            "SELECT COUNT(DISTINCT user_id) FROM PlayLog WHERE played_at > strftime('%s','now') - 604800").fetchone()[0]
+    except sqlite3.OperationalError:
+        counts["plays_today"] = counts["plays_week"] = counts["active_week"] = 0
+    counts["live"] = sum(recordings.live_rows(con).values())
+    return counts
+
+
+def activity(con):
+    """What the status page's charts draw, as figures: plays on each of the last 30 days, by weekday (Monday first) and
+    hour over the last 4 weeks, who played most and the most played songs over 30 days, and best records by grade."""
+    return {"days": insights.plays_by_day(con), "hours": insights.plays_by_hour(con),
+            "players": insights.top_players(con, core.PLAYER_ROWS, core.CHECK_UDID),
+            "songs": insights.top_songs(con, song_pages.chart_names()), "grades": insights.grade_counts(con)}
+
+
+def facts():
+    """What the status page says, as data: the game server's health (asked now), the numbers (None when the database
+    cannot be read), the newest plays, the charts' figures, the disk, the backups made here, the notice, the app on offer and
+    why its last build failed."""
+    health = core.server_health(fresh=True)
     try:
         with db() as con:
-            counts["players"] = con.execute(f"SELECT COUNT(*) FROM ({core.PLAYER_ROWS})", (core.CHECK_UDID,)).fetchone()[0]
-            counts["records"] = con.execute("SELECT COUNT(*) FROM Play").fetchone()[0]
-            try:
-                counts["plays_today"] = con.execute(
-                    "SELECT COUNT(*) FROM PlayLog WHERE played_at > strftime('%s','now') - 86400").fetchone()[0]
-                counts["plays_week"] = con.execute(
-                    "SELECT COUNT(*) FROM PlayLog WHERE played_at > strftime('%s','now') - 604800").fetchone()[0]
-                counts["active_week"] = con.execute(
-                    "SELECT COUNT(DISTINCT user_id) FROM PlayLog WHERE played_at > strftime('%s','now') - 604800").fetchone()[0]
-            except sqlite3.OperationalError:
-                counts["plays_today"] = counts["plays_week"] = counts["active_week"] = 0
-            counts["live"] = sum(recordings.live_rows(con).values())
+            counts = counts_of(con)
             recent = recent_plays(con)
-            days = insights.plays_by_day(con)
-            day_names = [t(d) for d in ("day.mon", "day.tue", "day.wed", "day.thu", "day.fri", "day.sat", "day.sun")]
-            names = song_pages.chart_names()
-            grades = insights.grade_counts(con)
-            charts_view = {
-                "days": charts.columns([(d.strftime("%m-%d") if i % 5 == 4 else "", tp("chart.day", day=d.isoformat(), n=n), n) for i, (d, n) in enumerate(days)], tp("dash.c_days")),
-                "days_total": sum(n for _, n in days),
-                "spark": charts.spark([n for _, n in days[-7:]], tp("dash.plays_week", n=counts["plays_week"])),
-                "heat": charts.heatmap(insights.plays_by_hour(con), day_names, lambda day, hour, n: tp("chart.hour", day=day, hour=hour, n=n), tp("dash.c_when"), (tp("chart.fewer"), tp("chart.more"))),
-                "who": charts.ranked([((name or tp("player.fallback", id=guid)), n, n, f"{core.public_url()}/opendmtq/player.php?id={guid}") for guid, name, n in insights.top_players(con, core.PLAYER_ROWS, core.CHECK_UDID)], tp("dash.c_who")),
-                "songs": charts.ranked([(title, n, n, None) for title, n in insights.top_songs(con, names)], tp("dash.c_songs")),
-                "grades": charts.segments([(g, n, n) for g, n in grades], tp("dash.c_grades"), colours=[GRADE_COLOURS[g] for g, _ in grades]),
-            }
+            figures = activity(con)
     except sqlite3.Error:
-        counts, recent = None, []
+        counts, recent, figures = None, [], None
     usage = shutil.disk_usage(os.path.dirname(core.DB))
     # When the newest was made; older than a week reads as a warning. An uploaded archive backs up nothing of
     # this server's present state, so it does not count.
@@ -323,6 +334,28 @@ def dashboard():
     # The players' page asks them to tell the owner when the app could not be built: here is why. A
     # failed rebuild is shown too, above the earlier app that phones still get.
     failed = apps.build_error()
+    return {"health": health, "counts": counts, "recent": recent, "figures": figures, "usage": usage, "saved": saved,
+            "backup_age": backup_age, "maintenance": on, "build": build, "failed": failed}
+
+
+@app.route(BASE + "/")
+def dashboard():
+    f = facts()
+    health, counts, recent, usage, saved, backup_age, on, build, failed = (
+        f["health"], f["counts"], f["recent"], f["usage"], f["saved"], f["backup_age"], f["maintenance"], f["build"], f["failed"])
+    charts_view = {}
+    if f["figures"]:
+        days, grades = f["figures"]["days"], f["figures"]["grades"]
+        day_names = [t(d) for d in ("day.mon", "day.tue", "day.wed", "day.thu", "day.fri", "day.sat", "day.sun")]
+        charts_view = {
+            "days": charts.columns([(d.strftime("%m-%d") if i % 5 == 4 else "", tp("chart.day", day=d.isoformat(), n=n), n) for i, (d, n) in enumerate(days)], tp("dash.c_days")),
+            "days_total": sum(n for _, n in days),
+            "spark": charts.spark([n for _, n in days[-7:]], tp("dash.plays_week", n=counts["plays_week"])),
+            "heat": charts.heatmap(f["figures"]["hours"], day_names, lambda day, hour, n: tp("chart.hour", day=day, hour=hour, n=n), tp("dash.c_when"), (tp("chart.fewer"), tp("chart.more"))),
+            "who": charts.ranked([((name or tp("player.fallback", id=guid)), n, n, f"{core.public_url()}/opendmtq/player.php?id={guid}") for guid, name, n in f["figures"]["players"]], tp("dash.c_who")),
+            "songs": charts.ranked([(title, n, n, None) for title, n in f["figures"]["songs"]], tp("dash.c_songs")),
+            "grades": charts.segments([(g, n, n) for g, n in grades], tp("dash.c_grades"), colours=[GRADE_COLOURS[g] for g, _ in grades]),
+        }
     disk = disk_parts(usage)
     # The whole disk with OpenDMTQ's part as one, then that part alone at its own scale: on a big disk its pieces would be
     # slivers of a pixel.

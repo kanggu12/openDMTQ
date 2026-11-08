@@ -1,4 +1,5 @@
-"""Backups: made by hand or every day, kept to a limit, downloaded, brought in and restored."""
+"""Backups: made by hand or every day, kept to a limit, downloaded, brought in and restored. Each form's work is a function
+(create, upload, delete, restore_backup, set_auto), apart from the page that calls it."""
 
 import datetime
 import hashlib
@@ -16,7 +17,7 @@ from werkzeug.exceptions import NotFound
 
 from .. import songs
 from . import auth, core, recordings, status
-from .core import ago, app, BASE, changed, db, private_file, safe_name, t, tp, why
+from .core import Refused, ago, app, BASE, changed, db, private_file, safe_name, t, tp, why
 
 # Backups made here are kept up to this many, like the CLI's.
 KEEP_BACKUPS = 30
@@ -210,56 +211,42 @@ def current_key_digest():
 @app.route(BASE + "/backups/auto", methods=["POST"])
 def backups_auto():
     """Turns the daily backup on or off."""
-    core.save_settings(auto_backup=request.form.get("action") == "on")
-    changed("backups_auto:" + ("on" if core.settings()["auto_backup"] else "off"))
-    flash(t("bak.auto_on" if core.settings()["auto_backup"] else "bak.auto_off"), "ok")
+    on = set_auto(request.form.get("action") == "on")
+    flash(t("bak.auto_on" if on else "bak.auto_off"), "ok")
     return redirect(url_for("backups_page"))
+
+
+def set_auto(on):
+    """Turns the daily backup on or off. Returns whether it is on now."""
+    core.save_settings(auto_backup=on)
+    changed("backups_auto:" + ("on" if core.settings()["auto_backup"] else "off"))
+    return core.settings()["auto_backup"]
 
 
 @app.route(BASE + "/backups", methods=["GET", "POST"])
 def backups_page():
     if request.method == "POST":
         action = request.form.get("action")
-        if action == "create":
-            # A locked database or a full disk: said on the page, without the half-made archive. Not in the middle of a
-            # restore, which would make a backup of something half put back.
-            if not _restoring.acquire(blocking=False):
-                flash(t("bak.busy"), "bad")
-                return redirect(url_for("backups_page"))
-            try:
-                name = make_backup("admin")
-                changed("backups_page:create", name)
-                flash(t("bak.created", name=name), "ok")
-            except (sqlite3.Error, OSError, tarfile.TarError) as e:
-                flash(t("bak.failed", detail=why(e)), "bad")
-            finally:
-                _restoring.release()
-        elif action == "upload":
-            f = request.files.get("file")
-            if not f or not f.filename.endswith(".tar.gz"):
-                flash(t("bak.choose"), "bad")
-            else:
-                path = new_backup_path("uploaded")
-                name = os.path.basename(path)
-                try:
-                    os.makedirs(core.BACKUPS, exist_ok=True)
-                    with private_file(path) as out:
-                        f.save(out)
-                    # Only what could be restored joins the list. A closer look comes when it is restored.
-                    try:
-                        with tarfile.open(path) as archive:
-                            archive.getmember("dmtq.db3")
-                        changed("backups_page:upload", name)
-                        flash(t("bak.uploaded", name=name), "ok")
-                    except (tarfile.TarError, KeyError, EOFError):
-                        os.remove(path)
-                        flash(t("bak.not_backup"), "bad")
-                except OSError as e:
-                    # Half a file (a full disk) must not join the list as a backup.
-                    if os.path.exists(path):
-                        os.remove(path)
-                    flash(t("bak.upload_failed", detail=why(e)), "bad")
+        try:
+            if action == "create":
+                flash(t("bak.created", name=create()), "ok")
+            elif action == "upload":
+                flash(t("bak.uploaded", name=upload(request.files.get("file"))), "ok")
+        except Refused as e:
+            flash(e.words, e.tone)
         return redirect(url_for("backups_page"))
+    files = listing()
+    daily, next_due = dailies(files)
+    # The daily backups kept, as their places: the newest on the right, the empty ones at the left.
+    slots = [None] * (KEEP_AUTO_BACKUPS - len(daily)) + daily[::-1]
+    next_at = datetime.datetime.fromtimestamp(next_due).strftime("%m-%d %H:%M") if next_due else ""
+    return render_template("backups.html", files=files, auto=core.settings().get("auto_backup"), slots=slots, next_at=next_at,
+                           others=len(files) - len(daily))
+
+
+def listing():
+    """The backups, newest first: name, size, when made (and how long ago, for the page), and its kind (a key of the
+    page's words)."""
     files = []
     for name, made in backup_files():
         try:
@@ -267,16 +254,58 @@ def backups_page():
         except OSError:
             # Deleted a moment ago.
             pass
-    # The daily backups kept, as their places: the newest on the right, the empty ones at the left. And when the next one
-    # comes: a day after the newest backup made here (an uploaded one does not count), at the first look after it (every
-    # half an hour), if the game's data changed meanwhile.
-    daily = [f for f in files if f["kind"] == "bak.kind_auto"][:KEEP_AUTO_BACKUPS][::-1]
-    slots = [None] * (KEEP_AUTO_BACKUPS - len(daily)) + daily
+    return files
+
+
+def dailies(files):
+    """The daily backups kept (newest first, as many as are kept), and when the next one comes, or None when it is due
+    already: a day after the newest backup made here (an uploaded one does not count), at the first look after it (every
+    half an hour), if the game's data changed meanwhile."""
+    daily = [f for f in files if f["kind"] == "bak.kind_auto"][:KEEP_AUTO_BACKUPS]
     made_here = [f["made"] for f in files if f["kind"] != "bak.kind_uploaded"]
     due = max(made_here) + 86400 if made_here else None
-    next_at = datetime.datetime.fromtimestamp(due).strftime("%m-%d %H:%M") if due and due > time.time() else ""
-    return render_template("backups.html", files=files, auto=core.settings().get("auto_backup"), slots=slots, next_at=next_at,
-                           others=len(files) - len(daily))
+    return daily, (due if due and due > time.time() else None)
+
+
+def create():
+    """Makes a backup now: its name. Refused while a restore runs (it would be a backup of something half put back), and
+    when it cannot be made (a locked database, a full disk), with no half-made archive left behind."""
+    if not _restoring.acquire(blocking=False):
+        raise Refused(409, "busy", t("bak.busy"))
+    try:
+        name = make_backup("admin")
+    except (sqlite3.Error, OSError, tarfile.TarError) as e:
+        raise Refused(500, "backup_failed", t("bak.failed", detail=why(e)))
+    finally:
+        _restoring.release()
+    changed("backups_page:create", name)
+    return name
+
+
+def upload(storage):
+    """Brings in a backup archive (.tar.gz) from elsewhere: its name here. Only what could be restored joins the list; a
+    closer look comes when it is restored."""
+    if not storage or not storage.filename.endswith(".tar.gz"):
+        raise Refused(400, "no_file", t("bak.choose"))
+    path = new_backup_path("uploaded")
+    name = os.path.basename(path)
+    try:
+        os.makedirs(core.BACKUPS, exist_ok=True)
+        with private_file(path) as out:
+            storage.save(out)
+        try:
+            with tarfile.open(path) as archive:
+                archive.getmember("dmtq.db3")
+        except (tarfile.TarError, KeyError, EOFError):
+            os.remove(path)
+            raise Refused(422, "not_backup", t("bak.not_backup"))
+    except OSError as e:
+        # Half a file (a full disk) must not join the list as a backup.
+        if os.path.exists(path):
+            os.remove(path)
+        raise Refused(500, "upload_failed", t("bak.upload_failed", detail=why(e)))
+    changed("backups_page:upload", name)
+    return name
 
 
 def backup_kind(name):
@@ -299,28 +328,48 @@ def backup_download(name):
 
 @app.route(BASE + "/backups/<name>", methods=["POST"])
 def backup_action(name):
+    action = request.form.get("action")
     try:
-        path = safe_name(name, core.BACKUPS, ".tar.gz")
-    except NotFound:
-        flash(t("bak.gone"), "bad")
-        return redirect(url_for("backups_page"))
-    if request.form.get("action") == "delete":
-        os.remove(path)
-        changed("backup_action:delete", name)
-        flash(t("bak.deleted", name=name), "ok")
-    elif request.form.get("action") == "restore":
-        if not _restoring.acquire(blocking=False):
-            flash(t("bak.busy"), "bad")
-            return redirect(url_for("backups_page"))
-        try:
-            restore_backup(name, path)
-        finally:
-            _restoring.release()
+        if action == "delete":
+            delete(name)
+            flash(t("bak.deleted", name=name), "ok")
+        elif action == "restore":
+            path = backup_path(name)
+            if not _restoring.acquire(blocking=False):
+                raise Refused(409, "busy", t("bak.busy"))
+            try:
+                said, done = restore_backup(name, path)
+            finally:
+                _restoring.release()
+            if done:
+                changed("backup_action:restore", name)
+            for tone, words in said:
+                flash(words, tone)
+        else:
+            # Any other button on a backup that is gone says so too; one that is there changes nothing.
+            backup_path(name)
+    except Refused as e:
+        flash(e.words, e.tone)
     return redirect(url_for("backups_page"))
 
 
+def backup_path(name):
+    """A backup's archive by its name. Refused: no such backup (deleted meanwhile, or a name that is none)."""
+    try:
+        return safe_name(name, core.BACKUPS, ".tar.gz")
+    except NotFound:
+        raise Refused(404, "backup_not_found", t("bak.gone"))
+
+
+def delete(name):
+    """Deletes a backup."""
+    os.remove(backup_path(name))
+    changed("backup_action:delete", name)
+
+
 def restore_backup(name, path):
-    """Puts an archive's database and added songs in place; says on the page how that went."""
+    """Puts an archive's database and added songs in place, as the page's Restore does. Returns what to say of it, in the
+    page's words, [(tone, words)], and whether it was restored: the caller notes the change. The caller holds _restoring."""
     with tempfile.TemporaryDirectory() as tmp:
         try:
             with tarfile.open(path) as tar:
@@ -335,14 +384,11 @@ def restore_backup(name, path):
             restored = os.path.join(tmp, "dmtq.db3")
             check_restorable(restored)
         except ValueError as e:
-            flash(t("bak.not_restored", detail=str(e)), "bad")
-            return
+            return [("bad", t("bak.not_restored", detail=str(e)))], False
         except sqlite3.DatabaseError:
-            flash(t("bak.not_restored", detail=tp("bak.damaged")), "bad")
-            return
+            return [("bad", t("bak.not_restored", detail=tp("bak.damaged")))], False
         except (tarfile.TarError, OSError, EOFError, zlib.error) as e:
-            flash(t("bak.not_restored", detail=why(e)), "bad")
-            return
+            return [("bad", t("bak.not_restored", detail=why(e)))], False
         # The way back first. A live database too damaged to copy is the case a backup is for: kept as a file instead.
         saved = kept = None
         try:
@@ -350,8 +396,7 @@ def restore_backup(name, path):
         except (sqlite3.Error, OSError, tarfile.TarError) as e:
             if not (isinstance(e, sqlite3.DatabaseError) and database_is_damaged()):
                 # Nothing has changed yet, and nothing changes without the way back.
-                flash(t("bak.not_saved", detail=why(e)), "bad")
-                return
+                return [("bad", t("bak.not_saved", detail=why(e)))], False
             kept = set_damaged_aside()
         try:
             # Who is shown live is today's decision, not the backup's: an old backup must not start
@@ -378,8 +423,7 @@ def restore_backup(name, path):
                                   r["pattern_id"], r["play_at"]) for r in switches])
         except (sqlite3.Error, OSError) as e:
             app.logger.exception("restore of %s failed", name)
-            flash(t("bak.restore_failed", detail=why(e), saved=saved or kept), "bad")
-            return
+            return [("bad", t("bak.restore_failed", detail=why(e), saved=saved or kept))], False
         restored_custom = os.path.join(tmp, "custom")
         if os.path.isdir(restored_custom):
             for item in ("songs", "hidden.json", "ids.json"):
@@ -397,13 +441,13 @@ def restore_backup(name, path):
             except (songs.SongError, OSError, ValueError) as e:
                 # Without client data there is nothing to merge them with yet; the database is back all the same.
                 app.logger.warning("restore: songs not rebuilt: %s", e)
-    changed("backup_action:restore", name)
-    flash(t("bak.restored_damaged", name=name, kept=kept) if kept else t("bak.restored", name=name, saved=saved), "ok")
+    said = [("ok", t("bak.restored_damaged", name=name, kept=kept) if kept else t("bak.restored", name=name, saved=saved))]
     # The signing key stays this server's. A backup from another server (a move to a new PC)
     # needs its key, or its players' phones cannot update; only the CLI puts a key back.
     theirs = key_digest_in(path)
     if theirs and theirs != current_key_digest():
-        flash(t("bak.other_key", name=name), "bad")
+        said.append(("bad", t("bak.other_key", name=name)))
+    return said, True
 
 # A backup a day, by itself, while the owner has that on: only when something changed since the last one, and at most the
 # latest few of these are kept. One thread, from the moment this service starts: nobody needs to open a page for it, as after
