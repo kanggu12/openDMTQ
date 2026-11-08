@@ -6,6 +6,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-08
+
 ### Added
 
 - The player for Windows takes a computer's keyboard and mouse as a phone's: Esc is the phone's Back key (it pauses a
@@ -231,7 +233,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 - Four ways to run it: the Windows bundle, one command on Linux or macOS, Docker Compose, and a Helm chart for
   Kubernetes.
 
-[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/kanggu12/openDMTQ/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/kanggu12/openDMTQ/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/kanggu12/openDMTQ/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/kanggu12/openDMTQ/compare/v0.4.0...v0.4.1
