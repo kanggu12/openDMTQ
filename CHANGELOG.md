@@ -6,6 +6,22 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+### Added
+
+- A player for Windows. The server makes one with its app in it, next to the app, and the site's Download page offers
+  it to computers (`/windows`): unzip it and start `OpenDMTQ-Player.exe`, nothing is installed. It runs the same app as
+  the phones, through the arm32 runtime on a layer for Windows, with OpenGL ES on Direct3D 11 (ANGLE), sound through
+  WASAPI at the device's own rate, video through Media Foundation, the mouse, a pen or a touch screen's fingers, and
+  Windows' display language. A release's tools image and the Windows bundle carry it. A server without it (Docker
+  Compose built from the source, a host install) fetches the latest release's, again once its copy is a week old, and
+  waits a day after a fetch that failed. The App page and the API (`GET /app/windows`) hand it out too
+  ([the player for Windows](docs/windows-player.md)).
+
+### Fixed
+
+- On phones that run the game through the arm32 runtime, the game's clock follows the phone's current time zone rules:
+  Android 10 and later keep them in a time zone module, which the runtime now reads.
+
 ## [0.5.0] - 2026-11-08
 
 ### Added

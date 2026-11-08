@@ -314,6 +314,7 @@ The App page: the app on offer, its builds, the way friends get it.
 | Route | Scope | What it does |
 |:---|:---:|:---|
 | [`GET /app`](#get-app) | read | The app players get: its build, whether it is right for this server, a build running now. |
+| [`GET /app/windows`](#get-appwindows) | read | The player for Windows with the app on offer in it, as the site hands it to computers. |
 | [`GET /app/icon`](#get-appicon) | read | The launcher icon of the app on offer, as the builder kept it. |
 | [`GET /builds`](#get-builds) | read | Every build of the app, newest first. |
 | [`POST /builds`](#post-builds) | write | Starts a build of the app, as the App page's buttons do. |
@@ -329,6 +330,16 @@ The App page: the app on offer, its builds, the way friends get it.
 The app players get: its build, whether it is right for this server, a build running now.
 
 Answer: `200` with [AppOnOffer](#apponoffer).
+
+#### `GET /app/windows`
+
+The player for Windows with the app on offer in it, as the site hands it to computers.
+
+Answer: `200` with the file itself (`application/zip`).
+
+Refusals:
+
+- `404 not_found`: No player for Windows is kept for the app on offer.
 
 #### `GET /app/icon`
 
@@ -1779,7 +1790,18 @@ The app players get.
 - `says` (string, or null): The same in words.
 - `build_error` (string, or null): Why the last build for this address failed.
 - `icon` (boolean): True when its icon is kept (GET /app/icon).
+- `windows` ([WindowsPlayer](#windowsplayer), or null): The player for Windows with this app in it, which the site offers computers (GET /app/windows); null on a server without the player, and while no zip holds the app on offer (by its file name and its hash).
 - `building` ([Job](#job), or null): A build running now.
+
+#### WindowsPlayer
+
+The player for Windows with the app on offer in it, as the builder made it.
+
+- `file` (string): Its file name: the app's, ending in -windows.zip.
+- `size` (integer): Its size (bytes).
+- `sha256` (string): Its SHA-256.
+- `built_at` (string): When the builder made it (YYYY-MM-DDTHH:MM:SS).
+- `player` (string): The version of the player in it.
 
 #### Build
 

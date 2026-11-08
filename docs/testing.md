@@ -20,6 +20,7 @@ both.
 | Unit | The broadcast's transport stream writer | see `ci.yml` | CI | no |
 | Scripts | ShellCheck on every script, at the version GitHub's runners have | see `ci.yml`, `shell_tests` in `tests/qa.sh` | CI, `qa.sh` | no |
 | Build | The arm32 runtime and shim, both images, the Helm chart against Kubernetes' schemas, a start without game files | see `ci.yml` | CI | no |
+| Windows player | The runtime's guest programs with the Windows runner, the player's Java VM, mixer and video reader: under Wine, then on Windows itself | `arm32/test_windows.sh` (Wine), `arm32/test_windows.ps1` (Windows) | CI (`arm32-windows`, `arm32-windows-real`) | no |
 | Contract | Every reply of the game server the client depends on, its quirks, a save under a held lock, and not one PHP warning | `tests/game/protocol.sh` (`protocol.py`, `lock.php`) | CI, `qa.sh` | no |
 | Pages | All pages at five screen widths in both languages, empty and full, on air and under maintenance; the replay player and the owner's forms | `tests/ui/run.sh` | CI, `qa.sh` | no |
 | Server | The real game files: every request the game makes, broadcasts, recordings, sign-ins | `tests/live/run.sh` (`BROWSER=1` adds a real video) | `qa.sh` | yes |

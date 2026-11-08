@@ -9,8 +9,9 @@ owner sets up and runs the server.
 
 - **Home:** the server's version beside the logo, the way to the download page, what is on the server, top players,
   newest records.
-- **Download:** the app (.apk) and its QR code, the three steps after it, and help. Android only, as it says before
-  anyone signs in.
+- **Download:** the app (.apk) and its QR code, the three steps after it, and help, for Android, as it says before
+  anyone signs in; and the player for Windows with the same app, for a PC, when the server has it
+  ([the player for Windows](windows-player.md)).
 - **Rankings:** the first three on a podium, then the others who have played, by total best score (best score per
   chart, summed), or by S grades, perfect plays, charts played. Players with nothing in a category are not listed in
   it. Average accuracy is the game's own figure.
@@ -98,10 +99,10 @@ KB of any request. On the PC's own address the password travels without TLS, but
 Keep the password unique and change it if in doubt: edit `.env`, then restart the server.
 
 | Page | What it does |
-|---|---|
+| :--- | :--- |
 | Setup | The four steps above: the game's files, the address, the players and the app. Reached from the status page while a step is left, and from the Songs page to import songs. |
 | Status | Things to look at first when there are any (no app, no backup, little disk, a failed build). Game server health, players, plays in the last 24 hours, players broadcasting now, disk space, current app, last backup, maintenance. A message to send a friend with where to get the app and how to sign in, and its QR code. Plays over the last 30 days, when people play by weekday and hour, who plays most, the most played songs, what takes the disk, best records by grade, recent plays. |
-| App | The app's name on phones, `TECHNIKA Q (<name>)`: SERVER_NAME, or the address in PUBLIC_HOST when it is unset. Build the app (about 20 seconds, output shown live), download any build, delete one, or all the old ones at once. A build for another address is kept for download and does not replace the one the site offers. |
+| App | The app's name on phones, `TECHNIKA Q (<name>)`: SERVER_NAME, or the address in PUBLIC_HOST when it is unset. Build the app (about 20 seconds, output shown live), download any build, delete one, or all the old ones at once. A build for another address is kept for download and does not replace the one the site offers. The player for Windows with the app on offer, its size and its own download, once the builder has made it for that app (by its file and its hash: an app built again keeps its name). |
 | Songs | Add a song package, remove added songs, hide or show any song. Each song's plays over the last 30 days, against the most played, and when it was last played. Says so when the server has no client data or no songs yet. See [songs.md](songs.md). |
 | Players | Search by name, sort by any column, when each last played, and a row of 14 small cells, one per day of the last two weeks, darker on days with more plays. A spreadsheet of them all. A name leads to the player's page on the site. On each row whether their broadcast is on, with its switch; under More: rename, reset scores, delete (those two ask first and make a backup first, and take the player's achievements with their scores) ([live.md](live.md)). |
 | Accounts | The site's accounts, the only way into it: make one (an ID, a password typed or made, whom it is for, the game player it is, admin rights to these pages too), and its password shows once with the message to send; a new password, disable or enable, delete. Each with when it was made and last signed in. Under them the API's tokens: make one (a name and a scope, read or write), shown once; each with whose it is, when it was last used and whether it works; revoke ([api.md](api.md)). |

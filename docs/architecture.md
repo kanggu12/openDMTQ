@@ -8,11 +8,11 @@ How the parts of OpenDMTQ fit together, for anyone who wants to change them. The
 With Docker Compose:
 
 <p align="center">
-  <img src="images/fig-parts-docker.svg" alt="The parts with Docker Compose. Phones (plain HTTP) and browsers (HTTPS) reach the edge, nginx on the one public port, which ends HTTPS and passes each connection to one of Apache's two doors; site.conf sends it to the game server, the players' site or, for /opendmtq/admin, the admin pages, which the owner also opens at localhost:8791. The game server, the site and the admin pages work on data/; the builder puts the app in data/apk/out at every start" width="100%">
+  <img src="images/fig-parts-docker.svg" alt="The parts with Docker Compose. Phones (plain HTTP) and browsers (HTTPS) reach the edge, nginx on the one public port, which ends HTTPS and passes each connection to one of Apache's two doors; site.conf sends it to the game server, the players' site or, for /opendmtq/admin, the admin pages, which the owner also opens at localhost:8791. The game server, the site and the admin pages work on data/; the builder puts the app, and the player for Windows with it, in data/apk/out at every start" width="100%">
 </p>
 
 | Part | What it does | Code | With Docker Compose | Without containers |
-|---|---|---|---|---|
+| :--- | :--- | :--- | :--- | :--- |
 | Edge | The one public port: plain HTTP for the game, HTTPS for browsers | `server/edge` | `edge` (nginx) | none: Apache holds the port, plain HTTP only |
 | Server | The game server, the platform's login, the players' site, live broadcasts, the files the game downloads | `server/game`, `server/portal`, `server/apache` | `server` (Apache with PHP) | Apache with PHP's module, started by `host/opendmtq_host` |
 | Admin pages | The setup, app builds, songs, players, accounts, recordings, backups, the maintenance notice, and their API ([api.md](api.md)) | `tools/opendmtq_tools/admin` | `admin` (Flask on gunicorn) | Flask on waitress |
@@ -20,6 +20,7 @@ With Docker Compose:
 | Import | Takes the game's data files from the owner's folder or archive | `tools/opendmtq_tools/importer.py` | `importer`, one-shot | plain Python |
 | Song list | The song list and the client's tables, from what was imported and added | `tools/opendmtq_tools/songs.py` | `tools`, before every start | before every start |
 | arm32 runtime | Runs the 32-bit game on phones without 32-bit support | `arm32/`; handed out by `tools/opendmtq_tools/runtime.py` | ready-made from a release into `data/apk/arm32`, added to the app by the app builder | the same |
+| Player for Windows | Runs the same app on a PC: the arm32 runtime on a layer for Windows, a Java VM of its own, ANGLE, WASAPI, Media Foundation | `arm32/desktop`, `arm32/jvm`, `arm32/src/win`; the zip with the app made by `tools/opendmtq_tools/player_windows.py` | in a release's tools image, which the Helm chart runs too. Compose builds its images from the source by default, and those have none: the app builder then fetches the latest release's into `data/apk`. It adds the app to the player | the Windows bundle has it; a host install fetches the latest release's into `data/apk` |
 | Command line | Setup, start and stop, checks, backups | `opendmtq`, `cli/opendmtq_cli`, `host/opendmtq_host` | `./opendmtq` | `./opendmtq`, passed on to `host/opendmtq_host`; `OpenDMTQ.exe` on Windows |
 
 The Helm chart runs the same images with a router in front ([kubernetes.md](kubernetes.md)).
@@ -37,7 +38,7 @@ collide:
 | `static.pmangplus.com` | `/inspection` | The maintenance notice |
 
 OpenDMTQ adds `/` (sends a visitor to the site), `/opendmtq/` (the site and `health.php`), `/thumbs` (small jackets for
-the site), `/apk` (the newest app), `/ca.crt` (the server's own certificate authority), `/live/` (the phones' live
+the site), `/apk` (the newest app), `/windows` (the player for Windows with it), `/ca.crt` (the server's own certificate authority), `/live/` (the phones' live
 view uploads), `/opendmtq/admin/` (passed to the admin pages; the old `/admin/` leads there) and `/opendmtq/api/` (their
 API, passed on with them).
 
@@ -407,7 +408,7 @@ A host install (`host/install.sh`, then `./opendmtq setup`) and the Windows bund
 ## Data
 
 | Path | Contents | Backed up |
-|---|---|---|
+| :--- | :--- | :--- |
 | `data/content/` | What was imported: the client data and the song data, read only | No (import again) |
 | `data/state/dmtq.db3` (and its `-wal`, `-shm`) | Accounts and scores | Yes |
 | `data/state/live/` | The live view's window: the last segments of each broadcast. Cleared at start | No |
@@ -415,7 +416,8 @@ A host install (`host/install.sh`, then `./opendmtq setup`) and the Windows bund
 | `data/state/logs/` | The request log the admin Logs page reads (three files of 10 MB), and a host install's other logs | No |
 | `data/state/admin-cache/` | The admin pages' copies of the site's stylesheet, fonts and icon | No (fetched again) |
 | `data/apk/base/` | The owner's APK | No (import again) |
-| `data/apk/out/` | Patched apps with a manifest each, `latest.json` (the one the site offers), `build.json` (the builder's last run), the QR code | No (rebuilt) |
+| `data/apk/out/` | Patched apps with a manifest each, `latest.json` (the one the site offers), `build.json` (the builder's last run), the QR code, and the player for Windows with the app on offer (`<the app's name>-windows.zip`, described in `windows.json`) | No (rebuilt) |
+| `data/apk/opendmtq-player-windows.zip` | The player for Windows without an app, where a server without one beside its code keeps it: fetched from the latest release, or put there by hand | No (the app builder fetches it again) |
 | `data/apk/keystore/` | The signing key and its password | Yes |
 | `data/apk/arm32/` | The arm32 runtime bundle | No (the app builder brings it back) |
 | `data/custom/` | Added songs (`songs/`, `ids.json`) and hidden flags (`hidden.json`); the song list, `catalog.json`, the overlay and the site's jackets made from them | The songs and flags; the rest is rebuilt |
