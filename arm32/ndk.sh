@@ -24,3 +24,17 @@ find_ndk() {
       rm -rf part ndk.zip"
     ndk=$(ls -d "$work"/ndk/android-ndk-* | sort -V | tail -n 1)
 }
+
+# jni.h from the NDK, alone in $work/jni-include with Android's android/ and SLES/ headers (the NDK's other headers are
+# Android's C library and would shadow the host's): the Java VM in arm32/jvm implements JNI with the same types as on a
+# phone, the player's NDK functions (arm32/desktop/ndk.cpp) take libandroid's declarations and constants, and its sound
+# bridge is written against OpenSL ES's. For the builds for computers (build_desktop.sh, build_windows.sh), after find_ndk.
+jni_headers() {
+    jni_h=$(ls "$ndk"/toolchains/llvm/prebuilt/*/sysroot/usr/include/jni.h | head -n 1)
+    mkdir -p "$work/jni-include"
+    cp "$jni_h" "$work/jni-include/jni.h"
+    # Whole folders again: a header gone from a newer NDK goes here too.
+    rm -rf "$work/jni-include/android" "$work/jni-include/SLES"
+    cp -r "$(dirname "$jni_h")/android" "$work/jni-include/android"
+    cp -r "$(dirname "$jni_h")/SLES" "$work/jni-include/SLES"
+}

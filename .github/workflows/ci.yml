@@ -53,7 +53,7 @@ jobs:
         run: |
           shellcheck --severity=warning server/entrypoint.sh server/edge/start.sh cli/install.sh host/get.sh host/install.sh host/windows/build.sh tests/closed/run.sh tests/closed/game.sh tests/ha/failover.sh tests/qa.sh tests/ui/run.sh tests/game/tour.sh tests/game/protocol.sh tests/host/run.sh tests/windows/wine.sh tests/live/run.sh tests/live/sound/run.sh tests/live/sound/card.sh deploy/kind/up.sh
           # The runtime's build scripts: warnings and errors (they keep two style notes).
-          shellcheck --severity=warning -x -P arm32 arm32/build.sh arm32/bundle.sh arm32/test.sh arm32/ndk.sh
+          shellcheck --severity=warning -x -P arm32 arm32/build.sh arm32/bundle.sh arm32/test.sh arm32/ndk.sh arm32/build_desktop.sh arm32/build_windows.sh arm32/bundle_windows.sh arm32/test_desktop.sh arm32/test_windows.sh
 
       - name: PHP syntax (game server, portal and the test helpers, PHP 8.3)
         run: docker run --rm -v "$PWD/server:/s:ro" -v "$PWD/tests/ui:/ui:ro" -v "$PWD/tests/game:/gametest:ro" php:8.3-cli sh -c 'for f in /s/portal/*.php /ui/*.php /gametest/*.php $(find /s/game -name "*.php"); do php -l "$f" || exit 1; done'

@@ -90,8 +90,12 @@ jobs:
 
       # The player for Windows without an app: with the release, for a server that fetches it; in the tools image and the
       # Windows bundle, beside the code that adds each server's app to it for the site (tools/opendmtq_tools/player_windows.py).
-      # It is built from the same guest system and Dynarmic as the runtime above.
+      # It is built from the same guest system and Dynarmic as the runtime above, and its Java VM against the same NDK's
+      # jni.h (arm32/ndk.sh's jni_headers).
       - name: The player for Windows
+        env:
+          ANDROID_NDK: ""
+          ANDROID_HOME: /nonexistent
         run: |
           arm32/build_windows.sh player
           arm32/bundle_windows.sh dist/opendmtq-player-windows.zip

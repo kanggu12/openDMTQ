@@ -88,7 +88,8 @@ cli_tests() {
 shell_tests() {
   local shellcheck=(docker run --rm -v "$ROOT:/mnt:ro" -w /mnt koalaman/shellcheck:v0.9.0 --severity=warning)
   git ls-files -z '*.sh' | grep -zv '^arm32/' | xargs -0 "${shellcheck[@]}" || return 1
-  "${shellcheck[@]}" -x -P arm32 arm32/build.sh arm32/bundle.sh arm32/test.sh arm32/ndk.sh
+  "${shellcheck[@]}" -x -P arm32 arm32/build.sh arm32/bundle.sh arm32/test.sh arm32/ndk.sh arm32/build_desktop.sh arm32/build_windows.sh \
+    arm32/bundle_windows.sh arm32/test_desktop.sh arm32/test_windows.sh
 }
 
 step shell shell_tests

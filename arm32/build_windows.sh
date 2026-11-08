@@ -10,6 +10,12 @@ set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(dirname "$here")
 [ -f "$root/_work/arm32/dynarmic/CMakeLists.txt" ] || { echo "no Dynarmic in _work/arm32/dynarmic: run arm32/build.sh once" >&2; exit 1; }
+# jni.h and Android's headers from the NDK the Android build uses, for the Java VM and the player, as the build for a
+# desktop Linux host has them (ndk.sh): a fresh checkout, as CI's, has only what arm32/build.sh made.
+work=$root/_work/arm32
+. "$here/ndk.sh"
+find_ndk
+jni_headers
 targets=${*:-arm32run}
 # The common standard headers before every C++ file: Dynarmic and its fmt (11.1.4) use std::vector, malloc and others
 # without including them, which older libc++ (the NDK's) and glibc's headers bring in on the way and llvm-mingw's newer
