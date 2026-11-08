@@ -77,6 +77,8 @@ Where they are:
 | Host install and Windows | `http://localhost:8791/opendmtq/admin/` on the server PC (another port when 8791 was taken: `./opendmtq status` shows it, and on Windows the window), and `http://<server>:<port>/opendmtq/admin/` from the local network (without `:<port>` when it is 80) |
 | Kubernetes | Through the router when `admin.onPublicPort` allows it, else `kubectl port-forward` ([kubernetes.md](kubernetes.md)) |
 
+Their API is at the same addresses, under `/opendmtq/api/v1/`, for scripts and other programs ([api.md](api.md)).
+
 HTTPS uses the server's own certificate, which browsers warn about once ([internet.md](internet.md#https)). The site's
 footer has an ADMIN link to the pages whenever they are on the public port. Until 2026-11 the pages were at `/admin/`:
 that address leads to the same page at the new one (a permanent redirect, which also keeps a form's POST).
@@ -99,10 +101,10 @@ Keep the password unique and change it if in doubt: edit `.env`, then restart th
 |---|---|
 | Setup | The four steps above: the game's files, the address, the players and the app. Reached from the status page while a step is left, and from the Songs page to import songs. |
 | Status | Things to look at first when there are any (no app, no backup, little disk, a failed build). Game server health, players, plays in the last 24 hours, players broadcasting now, disk space, current app, last backup, maintenance. A message to send a friend with where to get the app and how to sign in, and its QR code. Plays over the last 30 days, when people play by weekday and hour, who plays most, the most played songs, what takes the disk, best records by grade, recent plays. |
-| App | The app's name on phones, TECHNIKA Q (<name>): SERVER_NAME, or the address in PUBLIC_HOST when it is unset. Build the app (about 20 seconds, output shown live), download any build, delete one, or all the old ones at once. A build for another address is kept for download and does not replace the one the site offers. |
+| App | The app's name on phones, `TECHNIKA Q (<name>)`: SERVER_NAME, or the address in PUBLIC_HOST when it is unset. Build the app (about 20 seconds, output shown live), download any build, delete one, or all the old ones at once. A build for another address is kept for download and does not replace the one the site offers. |
 | Songs | Add a song package, remove added songs, hide or show any song. Each song's plays over the last 30 days, against the most played, and when it was last played. Says so when the server has no client data or no songs yet. See [songs.md](songs.md). |
 | Players | Search by name, sort by any column, when each last played, and a row of 14 small cells, one per day of the last two weeks, darker on days with more plays. A spreadsheet of them all. A name leads to the player's page on the site. On each row whether their broadcast is on, with its switch; under More: rename, reset scores, delete (those two ask first and make a backup first, and take the player's achievements with their scores) ([live.md](live.md)). |
-| Accounts | The site's accounts, the only way into it: make one (an ID, a password typed or made, whom it is for, the game player it is, admin rights to these pages too), and its password shows once with the message to send; a new password, disable or enable, delete. Each with when it was made and last signed in. |
+| Accounts | The site's accounts, the only way into it: make one (an ID, a password typed or made, whom it is for, the game player it is, admin rights to these pages too), and its password shows once with the message to send; a new password, disable or enable, delete. Each with when it was made and last signed in. Under them the API's tokens: make one (a name and a scope, read or write), shown once; each with whose it is, when it was last used and whether it works; revoke ([api.md](api.md)). |
 | Recordings | Every broadcast, kept (players see them as past broadcasts): watch, download as one file, hide from players, delete one, selected or all of a player's. Disk used against the two limits (20 GB and 30 days by default), which are set here, and about how many hours of broadcast still fit. See [live.md](live.md#recordings). |
 | Backups | Back up now, download, upload, restore (the server keeps running; the current state is saved first), delete, each with its date and kind. A daily backup when turned on: one a day while something has changed, the latest seven kept. The page shows those seven as seven slots, the newest on the right, and when the next one comes. |
 | Maintenance | Turn the in-game maintenance notice on or off, with a message, typed or one of a few ready ones. The site shows it too. On the server PC's own install (the Windows bundle, Linux, macOS), **Stop the server** stops every part of it. With Docker Compose the page names the command instead, `./opendmtq down`, which also makes a backup. |
@@ -122,8 +124,10 @@ restart the containers. The ports and the passwords are in `.env`; change them t
 
 The admin pages are a small Flask application in the tools package (`tools/opendmtq_tools/admin`), next to the app
 builder they start. Docker Compose runs them as the `admin` service, on gunicorn; the game server passes
-`/opendmtq/admin` (and the old `/admin`) to them. In Kubernetes they are a sidecar of the api pod, because they work on
-the database in that pod. A host install runs them on waitress, on this PC's loopback address.
+`/opendmtq/admin` (and the old `/admin`) to them, and `/opendmtq/api`, their API, on the same terms. In Kubernetes they
+are a sidecar of the api pod, because they work on the database in that pod. A host install runs them on waitress, on
+this PC's loopback address. The API ([api.md](api.md)) is part of the same application: each of its routes calls the same
+function as the page's form.
 
 ## Notice
 

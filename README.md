@@ -140,6 +140,7 @@ scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#pr
 | [The game's files](docs/game-files.md) | What the app, the client data and the song data have to be |
 | [Questions and answers](docs/faq.md) | What it needs, which phones, playing with friends, privacy |
 | [The site and the admin pages](docs/admin.md) | The setup, the app, songs, players, backups |
+| [The API](docs/api.md) | All the admin pages show and do, and what the players' site shows, as JSON |
 | [Songs](docs/songs.md) | Importing songs, adding your own |
 | [Playing from outside your home](docs/internet.md) | A host name, one forwarded port, HTTPS |
 | [Live broadcasts](docs/live.md) | Watching players in a song, recordings |

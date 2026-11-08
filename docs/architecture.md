@@ -15,7 +15,7 @@ With Docker Compose:
 |---|---|---|---|---|
 | Edge | The one public port: plain HTTP for the game, HTTPS for browsers | `server/edge` | `edge` (nginx) | none: Apache holds the port, plain HTTP only |
 | Server | The game server, the platform's login, the players' site, live broadcasts, the files the game downloads | `server/game`, `server/portal`, `server/apache` | `server` (Apache with PHP) | Apache with PHP's module, started by `host/opendmtq_host` |
-| Admin pages | The setup, app builds, songs, players, accounts, recordings, backups, the maintenance notice | `tools/opendmtq_tools/admin` | `admin` (Flask on gunicorn) | Flask on waitress |
+| Admin pages | The setup, app builds, songs, players, accounts, recordings, backups, the maintenance notice, and their API ([api.md](api.md)) | `tools/opendmtq_tools/admin` | `admin` (Flask on gunicorn) | Flask on waitress |
 | App builder | Patches the owner's APK for this server's address | `tools/opendmtq_tools/builder.py`, `patch_apk.py` | `builder`, at every start | run at every start |
 | Import | Takes the game's data files from the owner's folder or archive | `tools/opendmtq_tools/importer.py` | `importer`, one-shot | plain Python |
 | Song list | The song list and the client's tables, from what was imported and added | `tools/opendmtq_tools/songs.py` | `tools`, before every start | before every start |
@@ -38,7 +38,8 @@ collide:
 
 OpenDMTQ adds `/` (sends a visitor to the site), `/opendmtq/` (the site and `health.php`), `/thumbs` (small jackets for
 the site), `/apk` (the newest app), `/ca.crt` (the server's own certificate authority), `/live/` (the phones' live
-view uploads) and `/opendmtq/admin/` (passed to the admin pages; the old `/admin/` leads there).
+view uploads), `/opendmtq/admin/` (passed to the admin pages; the old `/admin/` leads there) and `/opendmtq/api/` (their
+API, passed on with them).
 
 ## How a request is answered
 
@@ -258,6 +259,7 @@ erDiagram
   Member ||--o{ AchievementDate : "earned, by guid"
   Member ||--o| LiveSwitch : "broadcast switch"
   SiteUser }o--o| Member : "linked player"
+  SiteUser |o--o{ ApiToken : "an admin's tokens"
   Member {
     INTEGER id "no key: the game's own table"
     NVARCHAR nickname
@@ -314,6 +316,17 @@ erDiagram
     INTEGER off
     INTEGER guid
   }
+  ApiToken {
+    TEXT id PK "the token's first part"
+    TEXT name
+    TEXT scope "read or write"
+    TEXT hash "SHA-256 of the token"
+    TEXT admin "whose: an account, or the owner"
+    INTEGER owner
+    INTEGER admin_since "when that account was made"
+    INTEGER created_at
+    INTEGER used_at
+  }
 ```
 
 | Table | Holds |
@@ -324,6 +337,7 @@ erDiagram
 | `AchievementDate` | When each player earned each achievement |
 | `LiveSwitch` | The live view's switch per player, the upload token, who is in a song |
 | `SiteUser` | The site's accounts, made on the admin pages |
+| `ApiToken` | The API's tokens, made on the admin pages: a hash of each, and the admin it belongs to |
 
 `Member` and `Play` keep the names and types of the tables earlier DMTQ servers used, so their databases open
 unchanged. The
@@ -347,6 +361,10 @@ hand.
 - The admin pages are published on `127.0.0.1:8791` only (`ADMIN_BIND`, `ADMIN_PORT`). The server also passes
   `/opendmtq/admin` to them unless `ADMIN_ON_PUBLIC_PORT=no`; once HTTPS is set up a plain-HTTP visit is sent to
   HTTPS.
+- Their API (`/opendmtq/api`) is passed on where they are, with a token on each request. Once HTTPS is set up, a
+  plain-HTTP request to it is refused (`403 use_https`) and passed on nowhere: its token has gone out in clear already.
+  The database keeps a SHA-256 of each token, compared in constant time; a token that works is never throttled, and
+  wrong ones count with the sign-in throttle; a token works while its admin can open the pages ([api.md](api.md)).
 - The game's own protocol has no real authentication: the platform login trusts the phone's device id, and the game
   login the player id in its token. Anyone who reaches the port can make accounts and act as any player. Open the
   server to the internet only through `./opendmtq expose` ([internet.md](internet.md)), for people you trust.
@@ -372,8 +390,8 @@ A host install (`host/install.sh`, then `./opendmtq setup`) and the Windows bund
 - Apache runs with the system's PHP module (Homebrew's on macOS, the bundle's on Windows); the admin pages run on
   waitress at `127.0.0.1:<ADMIN_PORT>`; the database keeper, the song list and the app builder are the same as in the
   image. If a program stops by itself, it is started again.
-- There is no edge, so no HTTPS: the admin pages are on the public port only for a local network address, and on this
-  PC at `http://localhost:<ADMIN_PORT>/opendmtq/admin/` always.
+- There is no edge, so no HTTPS: the admin pages and their API are on the public port only for a local network
+  address, and on this PC at `http://localhost:<ADMIN_PORT>/opendmtq/admin/` always.
 - The setup pages (`tools/opendmtq_tools/admin/setup.py`) know they run on the server PC from `OPENDMTQ_HOST_INSTALL`,
   which the host program sets. They then look in the owner's folders, run the import as a job, and change the
   address: they write `PUBLIC_HOST` to `.env` and leave `.host/run/restart.request`, and the host program's watch loop

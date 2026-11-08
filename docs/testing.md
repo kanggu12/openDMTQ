@@ -15,7 +15,7 @@ both.
 
 | Level | What | Command | Where | Game files |
 |---|---|---|---|---|
-| Unit | The admin pages, the patcher, song packages, certificates (`tools/tests`) | `docker run ... python3 -m unittest discover -s tests -t .` in the tools image | CI, `qa.sh` | no |
+| Unit | The admin pages and their API, the patcher, song packages, certificates (`tools/tests`) | `docker run ... python3 -m unittest discover -s tests -t .` in the tools image | CI, `qa.sh` | no |
 | Unit | The command line (`cli/tests`), on the oldest Python it supports too | `(cd cli && python3 -m unittest discover -s tests -t .)` | CI, `qa.sh` | no |
 | Unit | The broadcast's transport stream writer | see `ci.yml` | CI | no |
 | Scripts | ShellCheck on every script, at the version GitHub's runners have | see `ci.yml`, `shell_tests` in `tests/qa.sh` | CI, `qa.sh` | no |
@@ -24,7 +24,7 @@ both.
 | Pages | All pages at five screen widths in both languages, empty and full, on air and under maintenance; the replay player and the owner's forms | `tests/ui/run.sh` | CI, `qa.sh` | no |
 | Server | The real game files: every request the game makes, broadcasts, recordings, sign-ins | `tests/live/run.sh` (`BROWSER=1` adds a real video) | `qa.sh` | yes |
 | Host install | The README's one command (`host/get.sh`, `host/install.sh`) on a clean system in a container, `./opendmtq setup`, then its setup in the browser (the one-time link, the files found and imported, an account, the app, another address and the restart), the contract, the pages, stop and start | `tests/host/run.sh` (`DISTRO=debian:12`; `APK=<file>` also builds the app) | CI (Ubuntu 24.04, Debian 12), `qa.sh` (with the app) | no (yes with `APK`) |
-| Windows bundle | The bundle built from its pinned downloads, every program's DLLs found, then run: under Wine on Linux (a first start with no settings, then started as a double-click starts it, through the setup's sign-in, what it says of each file, import and restart, and with APK=<client> the phone app's build), and on Windows itself in a folder with a space; the import, the contract, the admin pages, nothing left running after its window | `host/windows/build.sh`, `tests/windows/wine.sh`, `tests/windows/run.ps1` | CI | no |
+| Windows bundle | The bundle built from its pinned downloads, every program's DLLs found, then run: under Wine on Linux (a first start with no settings, then started as a double-click starts it, through the setup's sign-in, what it says of each file, import and restart, and with `APK=<client>` the phone app's build), and on Windows itself in a folder with a space; the import, the contract, the admin pages, nothing left running after its window | `host/windows/build.sh`, `tests/windows/wine.sh`, `tests/windows/run.ps1` | CI | no |
 | Client | Every edit of the patcher finds its bytes, settings and screen objects in the real game clients, each in its own version | `tools/tests/test_real_client.py` (`OPENDMTQ_BASE_APK`; `CLIENTS=<folder>` for `qa.sh` adds the APKs in it) | `qa.sh` | yes |
 | Sound | What leaves the phone comes out of the browser whole | `tests/live/sound/run.sh` | by hand, with a change to the sound path | yes |
 | Closed network | [Without internet](closed-network.md), step by step, on a network with no way out: Docker Compose from a release's images, a host install from what is carried in, the chart. The Windows bundle has it too | `tests/closed/run.sh`, `CLOSED=1 tests/windows/wine.sh` | by hand, with a change to how a server gets its programs | stand-ins; a client for the app (`APK=`) |

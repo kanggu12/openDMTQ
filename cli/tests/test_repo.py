@@ -62,6 +62,53 @@ class TestCasesTest(unittest.TestCase):
                 self.assertIn(name, self.text, f"{name} is in no test case")
 
 
+class ApiDocsTest(unittest.TestCase):
+    """docs/api.md keeps up with the API's route table (tools/opendmtq_tools/admin/api_routes.py, which the API registers its
+    routes from): every route is in it, its reference is the one the table makes, and it names no route there is not."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        # Loaded from its path: the admin package itself needs Flask, the table only the standard library.
+        spec = importlib.util.spec_from_file_location("api_routes", os.path.join(ROOT, "tools", "opendmtq_tools", "admin", "api_routes.py"))
+        cls.table = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.table)
+        with open(os.path.join(ROOT, "docs", "api.md"), encoding="utf-8") as f:
+            cls.text = f.read()
+
+    def route_for(self, path, method=None):
+        """The route a path names (its parts may be values or {names}), with this method when given; None when none does."""
+        path = path.split("?", 1)[0].rstrip(".,:")
+        for route in self.table.ROUTES:
+            pattern = "^" + re.sub(r"\\\{\w+\\\}", "[^/]+", re.escape(route.path)) + "$"
+            if re.match(pattern, path) and (method is None or route.method == method):
+                return route
+        return None
+
+    def test_every_route_is_in_the_docs(self):
+        for route in self.table.ROUTES:
+            self.assertIn(f"`{route.method} {route.path}`", self.text, route.name)
+
+    def test_the_reference_is_the_one_the_table_makes(self):
+        start, end = self.text.index(self.table.REFERENCE_START), self.text.index(self.table.REFERENCE_END)
+        made = self.table.reference()
+        self.assertEqual(self.text[start:end + len(self.table.REFERENCE_END)] + "\n", made,
+                         "run: python3 tools/opendmtq_tools/admin/api_routes.py docs/api.md")
+
+    def test_the_docs_name_no_route_there_is_not(self):
+        base = self.table.BASE
+        # A method and a path ("POST /builds"), an address under the API's own, and the examples' $API/...
+        named = [(m, p[len(base):] if p.startswith(base) else p) for m, p in re.findall(r"\b(GET|POST|PUT|DELETE|PATCH) (/[^\s`)\"'<]*)", self.text)]
+        named += [(None, p) for p in re.findall(re.escape(base) + r"(/[^\s`)\"'<]*)", self.text)]
+        named += [(None, p) for p in re.findall(r"\$API(/[^\s`)\"'<]*)", self.text)]
+        self.assertGreater(len(named), 100)
+        for method, path in named:
+            # The API's own address alone is no route.
+            if path.split("?", 1)[0] in ("/", ""):
+                continue
+            self.assertIsNotNone(self.route_for(path, method), f"{method or ''} {path}")
+
+
 class DesignTest(unittest.TestCase):
     """What the markup asks of the stylesheets, including pages no test reaches with a browser (an error page, a rare state)."""
 

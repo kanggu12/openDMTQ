@@ -12,7 +12,7 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 ## TS-PAGE: the public pages
 
 | ID | Scenario | Expected | Checked by | Stage |
-|---|---|---|---|---|
+|:---|:---|:---|:---|:---:|
 | PAGE-01 | A browser set to Korean opens the site for the first time | English: the language follows the visitor's choice only | `tests/ui/audit.js#a browser set to Korean first sees English` | ui |
 | PAGE-02 | The visitor picks a language | The page changes, and the choice stays | `tests/ui/audit.js#the language switch changes the page` | ui |
 | PAGE-03 | Every page, at 360, 744, 1024, 1280 and 1920 wide, in both languages | No text cut off, past its box, on other text or under a box; rows and columns in line; nothing past the screen | `tests/ui/audit.js#const FULL` | ui |
@@ -42,7 +42,7 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 ## TS-LIVE: broadcasts and replays
 
 | ID | Scenario | Expected | Checked by | Stage |
-|---|---|---|---|---|
+|:---|:---|:---|:---|:---:|
 | LIVE-01 | A player the owner has not switched on | No upload key, no notice | `tests/live/smoke.py#off by default: no token, no notice` | qa |
 | LIVE-02 | Two players on air | The video runs, marked LIVE; both listed; pages show who is on | `tests/ui/audit.js#the broadcast plays` | ui |
 | LIVE-03 | The pages while players are on air | No layout findings, at a phone's and a laptop's width | `tests/ui/audit.js#const AIR` | ui |
@@ -70,7 +70,7 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 ## TS-ADMIN: the owner's pages
 
 | ID | Scenario | Expected | Checked by | Stage |
-|---|---|---|---|---|
+|:---|:---|:---|:---|:---:|
 | ADM-01 | A wrong password | Says so, in the page's look, on a phone too | `tests/ui/audit.js#a wrong admin password says so` | ui |
 | ADM-02 | Renaming a player | A message says so; the name stays | `tests/ui/audit.js#renaming says so` | ui |
 | ADM-03 | The players list | Its search, sort and spreadsheet download work | `tests/ui/audit.js#the players download` | ui |
@@ -139,7 +139,7 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 ## TS-API: the HTTP API
 
 | ID | Scenario | Expected | Checked by | Stage |
-|---|---|---|---|---|
+|:---|:---|:---|:---|:---:|
 | API-01 | A request with no token, or one that is not the server's | 401 with the code that says which, on every route but the OpenAPI document | `tools/tests/test_api.py#test_without_a_token_every_route_but_the_document_says_401`, `tools/tests/test_api.py#test_an_unknown_or_malformed_token_is_401` | unit |
 | API-02 | Wrong tokens, over and over | They count as failed sign-ins: after five, wrong tokens from that address are answered 429 with Retry-After and the sign-in page makes it wait; a token that works still works | `tools/tests/test_api.py#test_wrong_tokens_count_with_the_sign_in_throttle` | unit |
 | API-03 | A read token on a route of the write scope: every change, and a backup's download | 403, nothing changes; every reading route answers it | `tools/tests/test_api.py#test_a_read_token_reads_and_every_write_refuses_it` | unit |
@@ -154,6 +154,7 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 | API-12 | Uploads and downloads | A song package and a backup go up, checked as on the pages; over its limit 413, with the body read; files come down with their own types | `tools/tests/test_api.py#test_a_song_package_goes_up_and_shows_in_the_list`, `tools/tests/test_api.py#test_an_upload_over_its_limit_is_413_and_read_to_its_end`, `tools/tests/test_api.py#test_downloads_are_the_files_with_their_types` | unit |
 | API-13 | The OpenAPI document | OpenAPI 3.1 in shape, without a token, with exactly the routes Flask has | `tools/tests/test_api.py#test_the_document_is_openapi_3_1_in_shape`, `tools/tests/test_api.py#test_the_document_lists_exactly_the_routes_flask_has` | unit |
 | API-14 | A form's action, a page's data, an argument of a page's address, or a page of the players' site without a place in the API | The test fails, naming it; the filters' words and days work through the API as on the Logs page | `tools/tests/test_api.py#test_every_page_action_has_a_route`, `tools/tests/test_api.py#test_every_argument_of_a_pages_address_has_its_place_in_a_route`, `tools/tests/test_api.py#test_every_page_of_the_players_site_has_its_routes`, `tools/tests/test_api.py#test_the_plays_by_their_words_and_days` | unit |
+| API-15 | docs/api.md | Names every route and no route there is not; its reference is the one the route table makes | `cli/tests/test_repo.py#class ApiDocsTest` | unit |
 | API-16 | The API through the server | Where the admin pages are: passed on over HTTPS, with the visitor's address; over plain HTTP while HTTPS works, refused in the API's JSON (403 use_https, with the HTTPS address) and passed on nowhere; not there when the pages are kept off the port | `tests/live/run.sh#the API's refusal on the plain door`, `tests/live/run.sh#the API is told the visitor's address`, `tests/live/run.sh#the API is off the public port with the admin pages` | qa |
 | API-17 | The API on a host install's public port | Passed on with the admin pages on a local network address, refused with them on an internet one or when they are kept off the port | `cli/tests/test_repo.py#class HostAdminConfTest` | unit |
 | API-18 | A path the setup is asked about, on the page or through the API | `$NAME`, `${NAME}` and `%NAME%` stay as written, and no answer holds a setting's value; a network path (`\\server\share`, `//server/share`, a `file://` address with a host) is refused before anything looks at it | `tools/tests/test_api.py#test_names_of_settings_in_a_path_stay_as_they_are_written`, `tools/tests/test_api.py#test_a_path_on_another_computer_is_refused_before_anything_looks_at_it`, `tools/tests/test_setup.py#test_a_path_on_another_computer_is_refused_on_every_system`, `tools/tests/test_setup.py#test_the_picker_says_why_it_will_not_open_a_network_path` | unit |
@@ -166,7 +167,7 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 ## TS-GAME: the patched client
 
 | ID | Scenario | Expected | Checked by | Stage |
-|---|---|---|---|---|
+|:---|:---|:---|:---|:---:|
 | GAME-01 | Every code edit on the real clients | Finds its bytes in the client's own version, and no other version's | `tools/tests/test_real_client.py#test_every_code_edit_fits_in_the_clients_own_version` | qa |
 | GAME-02 | Every screen edit on the real client | Finds its object, which was not hidden already | `tools/tests/test_real_client.py#test_every_screen_edit_finds_its_object` | qa |
 | GAME-03 | The screen edit tool | Changes only the bytes it must; refuses another format, a cut file, a name used twice | `tools/tests/test_unity_assets.py#test_hide_and_move_change_only_their_bytes` | unit |
@@ -214,7 +215,7 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 ## TS-SERVER: the server and its songs
 
 | ID | Scenario | Expected | Checked by | Stage |
-|---|---|---|---|---|
+|:---|:---|:---|:---|:---:|
 | SRV-01 | Starting by the real script on stand-in game files | The server comes up and its pages answer | `tests/ui/run.sh#the real start script starts on the stand-in game files` | ui |
 | SRV-02 | Starting without the game's files | Starts, says what to do, and reports itself unhealthy until the client data is there | `.github/workflows/ci.yml#Without game files the server starts, says what to do` | unit |
 | SRV-03 | The PHP of the game server, the portal and the test helpers | Valid on PHP 8.3 | `.github/workflows/ci.yml#PHP syntax (game server, portal and the test helpers, PHP 8.3)` | unit |
@@ -241,7 +242,7 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 ## TS-CLI: the command line
 
 | ID | Scenario | Expected | Checked by | Stage |
-|---|---|---|---|---|
+|:---|:---|:---|:---|:---:|
 | CLI-01 | A backup on a full disk | No half archive left | `cli/tests/test_backup.py#test_a_disk_that_fills_up_leaves_no_half_archive` | unit |
 | CLI-02 | Restoring | A bad one changes nothing; the current state is saved first | `cli/tests/test_backup.py#test_a_refused_archive_changes_nothing` | unit |
 | CLI-03 | A second copy of the server on one machine | Takes its own name and port | `cli/tests/test_two_copies.py#test_a_running_other_copy_means_the_next_name` | unit |
@@ -262,7 +263,7 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 ## TS-DEPLOY: packaging and releases
 
 | ID | Scenario | Expected | Checked by | Stage |
-|---|---|---|---|---|
+|:---|:---|:---|:---|:---:|
 | DEP-01 | The arm32 runtime and shim, from source | Build as a release's job does | `.github/workflows/ci.yml#Build the runtime and the shim` | unit |
 | DEP-02 | The Helm chart, three ways | Valid against Kubernetes' schemas | `.github/workflows/ci.yml#Schema-check every rendered object` | unit |
 | DEP-03 | Kubernetes: a pod killed, a node stopped | Assets keep serving; the api comes back with its data | `tests/ha/failover.sh#Kill the api pod` | hand |

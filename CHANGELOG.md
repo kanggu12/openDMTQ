@@ -6,6 +6,26 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+### Added
+
+- An HTTP API at `/opendmtq/api/v1/`: all the admin pages show and do, and what the players' site shows, as JSON. A
+  request carries a token for reading or for writing, made and revoked on the **Accounts** page or through the API
+  itself. The OpenAPI document, `/opendmtq/api/v1/openapi.json`, needs none. The API is open where the admin pages are,
+  and nowhere else. `docs/api.md` has the guide and every route.
+
+### Fixed
+
+- The App page starts one build when it is asked for two at once, and waits while an import or the server's own build
+  runs, as the setup does.
+
+### Security
+
+- The setup takes `$NAME` and `%NAME%` in a path as they are written, `%USERPROFILE%` among them: a path no longer
+  brings out a value of the server's settings. `~` is still the home folder. A path on another computer
+  (`\\server\share`, `//server/share`, a `file://` address with a host) is refused before anything looks at it.
+- A backup or a build is found by a plain name only. On Windows a name with a backslash or a drive's colon could lead
+  outside its folder.
+
 ## [0.4.1] - 2026-11-08
 
 ### Changed
@@ -25,8 +45,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ### Fixed
 
-- A chart the server files carry empty or cut short, which the game cannot load, is served from its pair: a chart and
-  its earphone variant have their notes at the same ticks. The server files tested carry four.
+- A chart the song data carries empty or cut short, which the game cannot load, is served from its pair: a chart and
+  its earphone variant have their notes at the same ticks. The song data tested carries four.
 
 ## [0.3.0] - 2026-11-07
 
