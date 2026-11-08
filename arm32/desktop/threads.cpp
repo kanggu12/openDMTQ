@@ -3,11 +3,14 @@
 // posted from, at the display's next refresh, with that refresh's time (the game's C# paces its frames by them).
 #include "player.h"
 
+#include "pacing.h"
+
 #include <algorithm>
 #include <ctime>
 #include <map>
 #include <sys/prctl.h>
 #include <thread>
+#include <unistd.h>
 
 namespace player {
 
@@ -26,6 +29,7 @@ void Looper::post(std::function<void()> job, Clock::time_point at, const void* o
         jobs_.push_back(Job{at, next_order_++, std::move(job), owner, what, runnable});
     }
     posted_.notify_all();
+    if (auto w = wake.load()) w();
 }
 
 void Looper::remove(const void* owner, int what, const jvm::Object* runnable) {
@@ -493,12 +497,31 @@ jlong mono_ns() {
     return static_cast<jlong>(ts.tv_sec) * 1000000000 + ts.tv_nsec;
 }
 
-// The first refresh at or after `ns`: refreshes fall on whole periods of the display's rate.
-jlong refresh_at_or_after(jlong ns) {
+}  // namespace
+
+float display_rate() {
+    // The display's own, once the window has read it; the App's (--refresh, 60) until then.
+    const std::int64_t interval = arm32::g_display_interval.load(std::memory_order_relaxed);
+    return interval > 0 ? static_cast<float>(1e9 / static_cast<double>(interval)) : app().refresh;
+}
+
+std::int64_t refresh_at_or_after(std::int64_t ns) {
+    // On the display's own refreshes once the window knows one of them: its last refresh, and whole intervals from it.
+    const std::int64_t interval = arm32::g_display_interval.load(std::memory_order_relaxed);
+    if (interval > 0) {
+        const std::int64_t phase = arm32::g_display_vblank.load(std::memory_order_relaxed);
+        const std::int64_t d = ns - phase;
+        // Whole intervals up from the refresh, or back from it for a time before it.
+        const std::int64_t k = d >= 0 ? (d + interval - 1) / interval : -((-d) / interval);
+        return phase + k * interval;
+    }
+    // Otherwise whole periods of the rate given.
     double rate = app().refresh > 1 ? app().refresh : 60.0;
     auto period = static_cast<jlong>(1e9 / rate);
     return (ns + period - 1) / period * period;
 }
+
+namespace {
 
 void define_choreographer() {
     jvm::define_interface("android/view/Choreographer$FrameCallback").declare("doFrame", "(J)V");
@@ -550,6 +573,17 @@ void define_choreographer() {
     });
     Class& sys = jvm::define("java/lang/System");
     sys.static_method("nanoTime", "()J", [](Call&) { return Value::J(mono_ns()); });
+    // The game ending its own process: the player leaves (main.cpp).
+    sys.static_method("exit", "(I)V", [](Call&) {
+        quit_game("System.exit");
+        return Value();
+    });
+    Class& process = jvm::define("android/os/Process");
+    process.static_method("myPid", "()I", [](Call&) { return Value::I(static_cast<jint>(getpid())); });
+    process.static_method("killProcess", "(I)V", [](Call& c) {
+        if (c.i(0) == static_cast<jint>(getpid())) quit_game("Process.killProcess");
+        return Value();
+    });
     sys.static_method("currentTimeMillis", "()J", [](Call&) {
         timespec ts;
         clock_gettime(CLOCK_REALTIME, &ts);

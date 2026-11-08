@@ -1,32 +1,83 @@
-// The player's window on Windows: a Win32 window that the game's EGL surface draws into, through ANGLE. The window's
-// handle (HWND) is what the game gets as its ANativeWindow (ndk.cpp) and what ANGLE's EGL takes as the native window,
-// so the runtime's EGL bridge passes it on as it is. The Java side is an android.view.Surface naming the window.
+// The player's window on Windows: a frame window and, inside it, the game's own window, a child that the game's EGL
+// surface draws into through ANGLE. The child's handle (HWND) is what the game gets as its ANativeWindow (ndk.cpp) and
+// what ANGLE's EGL takes as the native window, so the runtime's EGL bridge passes it on as it is. The Java side is an
+// android.view.Surface naming it.
 //
-// The window keeps the screen's own pixels (per-monitor DPI awareness): the game renders at the size Windows shows,
-// not at a smaller one stretched. A touch screen's fingers (several at once, through the pointer messages), a pen and
-// the mouse's left button are the game's fingers; the keyboard types into the soft keyboard while the game asks for
-// text. F11 and Alt+Enter switch full screen.
+// The game's window keeps the screen's own pixels (per-monitor DPI awareness): the game renders at the size Windows
+// shows, not at a smaller one stretched. It fills the frame while the frame's shape is one the game lays itself out for,
+// from a tablet's 4:3 to a long phone's 21:9; a frame of another shape (a portrait monitor in full screen) gets the
+// largest such area, centred, with black around it. When its size changes (the frame resized, full screen, another
+// display's scaling) the game is told, as Android tells it (surface_changed).
+//
+// The display the window is on gives the frame rate: its exact refresh rate from the display configuration, and its
+// refreshes from DXGI's wait for them, on a thread of its own (pacing.h). Both are read again when the window moves to
+// another display or a display's mode changes.
+//
+// Input: a touch screen's fingers (several at once, through the pointer messages, with the time the screen saw each), a
+// pen and the mouse's left button are the game's fingers, and the wheel a finger's drag that scrolls. Windows' own touch
+// feedback and gestures stay out of the game's way (no circles, no press-and-hold, no edge swipes in full screen), and
+// the UI thread takes each event as it comes. The keyboard types into the soft keyboard while the
+// game asks for text, through a text field of the window's that it focuses meanwhile (Windows' touch keyboard offers
+// itself there on a PC without a keyboard); otherwise its keys are the phone's, Escape the Back key (it pauses a song and
+// closes what is open). F11 and Alt+Enter switch full screen.
 #include "player.h"
 
-#include <windows.h>
+#include "pacing.h"
 
+#include <windows.h>
+#include <dxgi.h>
+#include <imm.h>
+#include <inspectable.h>
+#include <propsys.h>
+#include <shellapi.h>
+
+#include <algorithm>
+#include <atomic>
+#include <cmath>
 #include <cstdlib>
+#include <ctime>
+#include <cwchar>
+#include <map>
 #include <string>
+#include <thread>
+#include <vector>
 
 namespace player {
 
 namespace {
 
+// The frame (title, border, the black around the game) and the game's window in it.
+HWND g_frame = nullptr;
 HWND g_window = nullptr;
 // The close button was pressed.
 bool g_closed = false;
+// The window is open and the game has its surface: size changes are the game's to hear from then on.
+bool g_started = false;
 // Whether the mouse's left button is down (a finger on the screen).
 bool g_pressed = false;
-// Full screen: the window's place and style before, to go back to.
+// Full screen: the frame's place and style before, to go back to.
 bool g_fullscreen = false;
 WINDOWPLACEMENT g_placement{};
 // A UTF-16 high surrogate from WM_CHAR, waiting for its low half.
 wchar_t g_high = 0;
+// The keys held down, as the phone's keys, with how often each has repeated: lifted when the window loses the keyboard.
+std::map<WPARAM, int> g_keys_down;
+// The UI thread, which a job posted to its looper wakes (wait_for_events), and the text field the keyboard types into
+// while the game asks for text (soft_keyboard).
+DWORD g_ui_thread = 0;
+HWND g_edit = nullptr;
+// Whether the last input on the game was a touch (a pen's too): the touch keyboard then offers itself for text.
+bool g_last_touch = false;
+
+// The shapes the game lays itself out for: a tablet's 4:3 to a long phone's 21:9. Beyond them its screens fall apart
+// (a portrait shape squeezes its whole layout into the middle).
+constexpr double kNarrowest = 4.0 / 3.0, kWidest = 21.0 / 9.0;
+// The smallest game area the frame can be made to hold.
+constexpr int kMinWidth = 480, kMinHeight = 270;
+
+// The display the frame is on, for its refresh rate and refreshes, and a display's mode change for the refresh thread.
+std::atomic<HMONITOR> g_monitor{nullptr};
+std::atomic<bool> g_displays_changed{false};
 
 // android.view.Surface: the window it stands for.
 class Surface : public jvm::Object {
@@ -37,14 +88,222 @@ public:
 
 jvm::Ref<jvm::Object> g_surface;
 
-// The window over the whole monitor it is on, without its frame, and back.
+// The monotonic clock, as the runtime's pacing reads it (the Windows layer's clock_gettime).
+std::int64_t now_ns() {
+    timespec ts{};
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return static_cast<std::int64_t>(ts.tv_sec) * 1000000000 + ts.tv_nsec;
+}
+
+std::string narrow(const wchar_t* s) {
+    int n = WideCharToMultiByte(CP_UTF8, 0, s, -1, nullptr, 0, nullptr, nullptr);
+    std::string out(static_cast<std::size_t>(n > 0 ? n - 1 : 0), '\0');
+    if (n > 1) WideCharToMultiByte(CP_UTF8, 0, s, -1, out.data(), n, nullptr, nullptr);
+    return out;
+}
+
+// The frame's outer size for a client area of w by h at the frame's own scaling (Windows 10 1607 has the call that
+// takes it; an older Windows sizes by the system's).
+SIZE frame_size(int w, int h) {
+    RECT r{0, 0, w, h};
+    using ForDpi = BOOL(WINAPI*)(LPRECT, DWORD, BOOL, DWORD, UINT);
+    using DpiOf = UINT(WINAPI*)(HWND);
+    static HMODULE user = GetModuleHandleW(L"user32.dll");
+    static auto for_dpi = reinterpret_cast<ForDpi>(user ? GetProcAddress(user, "AdjustWindowRectExForDpi") : nullptr);
+    static auto dpi_of = reinterpret_cast<DpiOf>(user ? GetProcAddress(user, "GetDpiForWindow") : nullptr);
+    const DWORD style = static_cast<DWORD>(GetWindowLongW(g_frame, GWL_STYLE));
+    if (for_dpi && dpi_of && g_frame) for_dpi(&r, style, FALSE, 0, dpi_of(g_frame));
+    else AdjustWindowRectEx(&r, style, FALSE, 0);
+    return SIZE{r.right - r.left, r.bottom - r.top};
+}
+
+// The game's window in the frame: all of its client area while that has a shape the game lays itself out for, else the
+// largest such area in the middle. The game hears of a new size.
+void place_game() {
+    if (!g_frame || !g_window) return;
+    RECT c{};
+    GetClientRect(g_frame, &c);
+    const int cw = c.right - c.left, ch = c.bottom - c.top;
+    // Minimized: the game keeps its size.
+    if (cw <= 0 || ch <= 0) return;
+    int w = cw, h = ch;
+    const double shape = static_cast<double>(cw) / static_cast<double>(ch);
+    if (shape > kWidest) w = static_cast<int>(std::lround(ch * kWidest));
+    else if (shape < kNarrowest) h = static_cast<int>(std::lround(cw / kNarrowest));
+    MoveWindow(g_window, (cw - w) / 2, (ch - h) / 2, w, h, TRUE);
+    // The text field stays under the game's window, out of sight whatever the black around it.
+    if (g_edit) SetWindowPos(g_edit, HWND_BOTTOM, (cw - w) / 2, (ch - h) / 2, 1, 1, SWP_NOACTIVATE);
+    const bool changed = w != app().width || h != app().height;
+    app().width = w;
+    app().height = h;
+    if (changed && g_started) surface_changed();
+}
+
+// The refresh rate of a display: exact from the display configuration (240084/1000 Hz), else GDI's whole hertz; 0 when
+// neither says.
+double monitor_rate(HMONITOR m, MONITORINFOEXW& mi) {
+    mi.cbSize = sizeof mi;
+    if (!GetMonitorInfoW(m, &mi)) return 0;
+    UINT32 np = 0, nm = 0;
+    if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &np, &nm) == ERROR_SUCCESS) {
+        std::vector<DISPLAYCONFIG_PATH_INFO> paths(np);
+        std::vector<DISPLAYCONFIG_MODE_INFO> modes(nm);
+        if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &np, paths.data(), &nm, modes.data(), nullptr) == ERROR_SUCCESS) {
+            for (UINT32 i = 0; i < np; ++i) {
+                // The path whose source is this monitor's GDI device (\\.\DISPLAY1).
+                DISPLAYCONFIG_SOURCE_DEVICE_NAME source{};
+                source.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+                source.header.size = sizeof source;
+                source.header.adapterId = paths[i].sourceInfo.adapterId;
+                source.header.id = paths[i].sourceInfo.id;
+                if (DisplayConfigGetDeviceInfo(&source.header) != ERROR_SUCCESS) continue;
+                if (std::wcscmp(source.viewGdiDeviceName, mi.szDevice) != 0) continue;
+                const DISPLAYCONFIG_RATIONAL& r = paths[i].targetInfo.refreshRate;
+                if (r.Numerator && r.Denominator) return static_cast<double>(r.Numerator) / static_cast<double>(r.Denominator);
+            }
+        }
+    }
+    DEVMODEW dm{};
+    dm.dmSize = sizeof dm;
+    if (EnumDisplaySettingsW(mi.szDevice, ENUM_CURRENT_SETTINGS, &dm) && dm.dmDisplayFrequency > 1) return dm.dmDisplayFrequency;
+    return 0;
+}
+
+// The display the frame is on, read again when that is another one or `changed` (a display's mode changed): its rate
+// for the runtime (unless --refresh named one), and the display for the refresh thread.
+void watch_display(bool changed) {
+    if (!g_frame) return;
+    HMONITOR m = MonitorFromWindow(g_frame, MONITOR_DEFAULTTONEAREST);
+    if (m == g_monitor.load() && !changed) return;
+    MONITORINFOEXW mi{};
+    const double hz = monitor_rate(m, mi);
+    // A rate below 20 Hz, or none, is no display's to pace by: frames then go as they would without one.
+    if (!app().refresh_set) arm32::g_display_interval.store(hz >= 20 ? std::llround(1e9 / hz) : 0);
+    if (changed) g_displays_changed.store(true);
+    const bool moved = g_monitor.load() && m != g_monitor.load();
+    g_monitor.store(m);
+    // In full screen on another display (Win+Shift+arrow): over the whole of that one.
+    if (moved && g_fullscreen) {
+        SetWindowPos(g_frame, nullptr, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left, mi.rcMonitor.bottom - mi.rcMonitor.top,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    jvm::log("player: the window is on %s, %ldx%ld at %.3f Hz%s", narrow(mi.szDevice).c_str(), mi.rcMonitor.right - mi.rcMonitor.left,
+             mi.rcMonitor.bottom - mi.rcMonitor.top, hz, app().refresh_set ? " (the game is told the rate given)" : "");
+}
+
+// DXGI's output that shows a display, or null (a remote session's, or one gone).
+IDXGIOutput* output_for(IDXGIFactory1* factory, HMONITOR m) {
+    IDXGIAdapter1* adapter = nullptr;
+    for (UINT i = 0; SUCCEEDED(factory->EnumAdapters1(i, &adapter)); ++i) {
+        IDXGIOutput* out = nullptr;
+        for (UINT j = 0; SUCCEEDED(adapter->EnumOutputs(j, &out)); ++j) {
+            DXGI_OUTPUT_DESC d{};
+            if (SUCCEEDED(out->GetDesc(&d)) && d.Monitor == m) {
+                adapter->Release();
+                return out;
+            }
+            out->Release();
+        }
+        adapter->Release();
+    }
+    return nullptr;
+}
+
+// The display's refreshes, as the runtime paces by them (pacing.h's g_display_vblank): DXGI wakes this thread at each
+// one. A wake comes a little after its refresh and by a varying amount, so the time kept follows the wakes slowly (an
+// eighth of each one's difference from where the last refreshes put it), and the refreshes in between are whole
+// intervals. A wake far off that grid is not followed alone: three such in a row (the display changed its timing) start
+// the grid over from the last of them. A wait that comes back at once (a display asleep, a remote session) is no refresh
+// and leaves the time as it was; failures in a row look for the output again. The intervals the wakes keep are measured
+// too: a display whose rate the system gave in whole hertz only (59 for 59.94) gets its measured interval instead.
+void refresh_loop() {
+    name_thread("refreshes");
+    // Woken on time: the thread waits for a refresh and does almost nothing else.
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+    IDXGIFactory1* factory = nullptr;
+    IDXGIOutput* output = nullptr;
+    HMONITOR current = nullptr;
+    std::int64_t phase = 0, last = 0, measured_from = 0, measured_wakes = 0;
+    int off_grid = 0, failures = 0;
+    for (;;) {
+        HMONITOR want = g_monitor.load();
+        if (want != current || g_displays_changed.exchange(false) || failures >= 20) {
+            if (output) output->Release();
+            output = nullptr;
+            // Adapters and outputs as they are now: a display added or taken away needs a new factory.
+            if (factory) factory->Release();
+            factory = nullptr;
+            if (FAILED(CreateDXGIFactory1(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&factory)))) factory = nullptr;
+            if (factory && want) output = output_for(factory, want);
+            if (want != current || failures < 20) {
+                jvm::log("player: the display's refreshes %s", output ? "are followed" : "cannot be followed: frames go by its rate");
+            }
+            current = want;
+            phase = last = measured_from = measured_wakes = 0;
+            off_grid = failures = 0;
+            arm32::g_display_vblank.store(0);
+        }
+        const std::int64_t interval = arm32::g_display_interval.load();
+        if (!output || interval <= 0 || FAILED(output->WaitForVBlank())) {
+            ++failures;
+            Sleep(50);
+            continue;
+        }
+        const std::int64_t t = now_ns();
+        // Back at once, with no refresh in between (a display asleep): not one.
+        if (last && t - last < interval / 2) {
+            ++failures;
+            Sleep(1);
+            continue;
+        }
+        failures = 0;
+        last = t;
+        if (phase) {
+            // Where the refreshes so far put this one, and the wake's difference from it.
+            const std::int64_t k = (t - phase + interval / 2) / interval;
+            const std::int64_t predicted = phase + k * interval;
+            const std::int64_t off = t - predicted;
+            if (std::llabs(off) < interval / 4) {
+                phase = predicted + off / 8;
+                off_grid = 0;
+            } else if (++off_grid >= 3) {
+                phase = t;
+                off_grid = 0;
+                measured_from = measured_wakes = 0;
+            }
+        } else {
+            phase = t;
+        }
+        arm32::g_display_vblank.store(phase);
+        // The interval the wakes keep, over some seconds: one off the rate the system gave by more than a few in a
+        // thousand is the display's real one.
+        if (!measured_from) {
+            measured_from = phase;
+            measured_wakes = 0;
+        } else if (++measured_wakes >= 4 * 240) {
+            const std::int64_t refreshes = (phase - measured_from + interval / 2) / interval;
+            if (refreshes > 0) {
+                const std::int64_t real = (phase - measured_from) / refreshes;
+                if (std::llabs(real - interval) * 1000 > interval * 3 && arm32::g_display_interval.load() == interval) {
+                    arm32::g_display_interval.store(real);
+                    jvm::log("player: the display refreshes every %.4f ms, not the %.4f ms its rate says: %.3f Hz from now on",
+                             static_cast<double>(real) / 1e6, static_cast<double>(interval) / 1e6, 1e9 / static_cast<double>(real));
+                }
+            }
+            measured_from = phase;
+            measured_wakes = 0;
+        }
+    }
+}
+
+// The frame over the whole display it is on, without its border, and back.
 void toggle_fullscreen(HWND h) {
     DWORD style = static_cast<DWORD>(GetWindowLongW(h, GWL_STYLE));
     if (!g_fullscreen) {
         MONITORINFO mi{};
         mi.cbSize = sizeof mi;
         g_placement.length = sizeof g_placement;
-        if (GetWindowPlacement(h, &g_placement) && GetMonitorInfoW(MonitorFromWindow(h, MONITOR_DEFAULTTOPRIMARY), &mi)) {
+        if (GetWindowPlacement(h, &g_placement) && GetMonitorInfoW(MonitorFromWindow(h, MONITOR_DEFAULTTONEAREST), &mi)) {
             SetWindowLongW(h, GWL_STYLE, static_cast<LONG>(style & ~WS_OVERLAPPEDWINDOW));
             SetWindowPos(h, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left, mi.rcMonitor.bottom - mi.rcMonitor.top,
                          SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
@@ -56,6 +315,28 @@ void toggle_fullscreen(HWND h) {
         SetWindowPos(h, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
         g_fullscreen = false;
     }
+}
+
+// A first size that fits the display the frame is on: three quarters of the height its taskbar leaves, at 16:9, and no
+// wider than nine tenths of it, the pixels being the display's own. Where Windows put the frame stays, moved in as far
+// as it would run off that area.
+void fit_display() {
+    MONITORINFO mi{};
+    mi.cbSize = sizeof mi;
+    if (!GetMonitorInfoW(MonitorFromWindow(g_frame, MONITOR_DEFAULTTONEAREST), &mi)) return;
+    const RECT work = mi.rcWork;
+    const int ww = work.right - work.left, wh = work.bottom - work.top;
+    int h = wh * 3 / 4, w = h * 16 / 9;
+    if (w > ww * 9 / 10) {
+        w = ww * 9 / 10;
+        h = w * 9 / 16;
+    }
+    const SIZE outer = frame_size(w, h);
+    RECT at{};
+    GetWindowRect(g_frame, &at);
+    LONG x = std::max(work.left, std::min(at.left, work.right - outer.cx));
+    LONG y = std::max(work.top, std::min(at.top, work.bottom - outer.cy));
+    SetWindowPos(g_frame, nullptr, x, y, outer.cx, outer.cy, SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 // One character typed (WM_CHAR's UTF-16 units) as UTF-8, for the soft keyboard.
@@ -77,22 +358,334 @@ void typed(wchar_t c) {
     if (k > 0) type_text(std::string(out, static_cast<std::size_t>(k)));
 }
 
-LRESULT CALLBACK window_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
+// The phone's key for a computer's key (0: the phone has none for it), and the character it types (0: none).
+int phone_key(WPARAM vk, int& unicode) {
+    unicode = 0;
+    if (vk >= 'A' && vk <= 'Z') {
+        unicode = static_cast<int>('a' + (vk - 'A'));
+        return kKeycodeA + static_cast<int>(vk - 'A');
+    }
+    if (vk >= '0' && vk <= '9') {
+        unicode = static_cast<int>(vk);
+        return kKeycode0 + static_cast<int>(vk - '0');
+    }
+    switch (vk) {
+    case VK_ESCAPE: return kKeycodeBack;
+    case VK_RETURN: unicode = '\n'; return kKeycodeEnter;
+    case VK_SPACE: unicode = ' '; return kKeycodeSpace;
+    case VK_BACK: return kKeycodeDel;
+    case VK_TAB: unicode = '\t'; return kKeycodeTab;
+    case VK_UP: return kKeycodeDpadUp;
+    case VK_DOWN: return kKeycodeDpadDown;
+    case VK_LEFT: return kKeycodeDpadLeft;
+    case VK_RIGHT: return kKeycodeDpadRight;
+    case VK_PRIOR: return kKeycodePageUp;
+    case VK_NEXT: return kKeycodePageDown;
+    case VK_HOME: return kKeycodeHome;
+    case VK_END: return kKeycodeEnd;
+    case VK_DELETE: return kKeycodeForwardDel;
+    default: return 0;
+    }
+}
+
+// Every key still held, lifted: the window lost the keyboard, and would not see them go up.
+void lift_keys() {
+    for (auto& [vk, repeat] : g_keys_down) {
+        int unicode = 0;
+        if (int code = phone_key(vk, unicode)) key(code, false, 0, unicode);
+    }
+    g_keys_down.clear();
+}
+
+// The wheel at screen point p turned by `delta` (WHEEL_DELTA a notch), sideways or not: the game's finger drag, when the
+// point is on the game and no mouse button holds a finger down already.
+void wheel_at(POINT p, int delta, bool sideways) {
+    if (g_pressed || !g_window) return;
+    ScreenToClient(g_window, &p);
+    if (p.x < 0 || p.y < 0 || p.x >= app().width || p.y >= app().height) return;
+    float notches = static_cast<float>(delta) / WHEEL_DELTA;
+    // Shift with the wheel turns it sideways, as in most programs: a turn down goes to the right.
+    if (!sideways && (GetKeyState(VK_SHIFT) & 0x8000)) {
+        sideways = true;
+        notches = -notches;
+    }
+    wheel(static_cast<float>(p.x), static_cast<float>(p.y), sideways ? notches : 0.0f, sideways ? 0.0f : notches);
+}
+
+// A touch screen is the game's, as a phone's is: no circle under each finger, no square for a press and hold, no right
+// click for it, no flicks. Windows 8 has the call for its touch feedback; the tablet service's property covers what still
+// goes through it.
+void quiet_touch(HWND h) {
+    using SetFeedback = BOOL(WINAPI*)(HWND, FEEDBACK_TYPE, DWORD, UINT32, const VOID*);
+    static auto set = reinterpret_cast<SetFeedback>(GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetWindowFeedbackSetting"));
+    if (set) {
+        const BOOL off = FALSE;
+        for (FEEDBACK_TYPE t : {FEEDBACK_TOUCH_CONTACTVISUALIZATION, FEEDBACK_TOUCH_TAP, FEEDBACK_TOUCH_DOUBLETAP, FEEDBACK_TOUCH_PRESSANDHOLD,
+                                FEEDBACK_TOUCH_RIGHTTAP, FEEDBACK_GESTURE_PRESSANDTAP, FEEDBACK_PEN_BARRELVISUALIZATION, FEEDBACK_PEN_TAP,
+                                FEEDBACK_PEN_DOUBLETAP, FEEDBACK_PEN_PRESSANDHOLD, FEEDBACK_PEN_RIGHTTAP}) {
+            set(h, t, 0, sizeof off, &off);
+        }
+    }
+    // tpcshrd.h's flags: press and hold, pen tap and barrel feedback, flicks and their keys, smooth scrolling.
+    constexpr ULONG_PTR kNoPressAndHold = 0x1, kNoPenTap = 0x8, kNoPenBarrel = 0x10, kNoFlicks = 0x10000, kNoSmoothScroll = 0x80000,
+                        kNoFlickKeys = 0x100000;
+    const ATOM atom = GlobalAddAtomW(L"MicrosoftTabletPenServiceProperty");
+    SetPropW(h, L"MicrosoftTabletPenServiceProperty",
+             reinterpret_cast<HANDLE>(kNoPressAndHold | kNoPenTap | kNoPenBarrel | kNoFlicks | kNoSmoothScroll | kNoFlickKeys));
+    GlobalDeleteAtom(atom);
+}
+
+// In full screen, a finger that comes in from the screen's edge stays the game's: Windows keeps its edge swipes (the
+// notifications, the task view) for windows that do not cover the screen.
+void keep_edges(HWND h) {
+    // PKEY_EdgeGesture_DisableTouchWhenFullscreen, as propkey.h names it.
+    static const PROPERTYKEY key{{0x32CE38B2, 0x2C9A, 0x41B1, {0x9B, 0xC5, 0xB3, 0x78, 0x43, 0x94, 0xAA, 0x44}}, 2};
+    IPropertyStore* store = nullptr;
+    if (FAILED(SHGetPropertyStoreForWindow(h, IID_PPV_ARGS(&store))) || !store) return;
+    PROPVARIANT on{};
+    on.vt = VT_BOOL;
+    on.boolVal = VARIANT_TRUE;
+    store->SetValue(key, on);
+    store->Release();
+}
+
+// When a touch screen saw a pointer's contact, on the monotonic clock (the performance counter, as the Windows layer's
+// clock counts); now when Windows does not say.
+std::int64_t contact_time(UINT32 id) {
+    POINTER_INFO info{};
+    if (!GetPointerInfo(id, &info) || !info.PerformanceCount) return now_ns();
+    static const std::int64_t frequency = [] {
+        LARGE_INTEGER f;
+        QueryPerformanceFrequency(&f);
+        return static_cast<std::int64_t>(f.QuadPart);
+    }();
+    const std::int64_t c = static_cast<std::int64_t>(info.PerformanceCount);
+    return c / frequency * 1000000000LL + c % frequency * 1000000000LL / frequency;
+}
+
+// Windows' touch keyboard, shown and hidden for the text field through the input pane of the window (Windows 10's
+// Windows.UI.ViewManagement.InputPane, by its interop for desktop windows): a field focused by the program, and not by a
+// tap on it, does not bring the keyboard up by itself. The interfaces as the Windows SDK declares them.
+struct IInputPaneInterop : IInspectable {
+    virtual HRESULT STDMETHODCALLTYPE GetForWindow(HWND window, REFIID riid, void** pane) = 0;
+};
+struct IInputPane2 : IInspectable {
+    virtual HRESULT STDMETHODCALLTYPE TryShow(boolean* shown) = 0;
+    virtual HRESULT STDMETHODCALLTYPE TryHide(boolean* hidden) = 0;
+};
+
+void touch_keyboard(bool show) {
+    using CreateString = HRESULT(WINAPI*)(PCWSTR, UINT32, HSTRING*);
+    using DeleteString = HRESULT(WINAPI*)(HSTRING);
+    using GetFactory = HRESULT(WINAPI*)(HSTRING, REFIID, void**);
+    static HMODULE combase = LoadLibraryW(L"combase.dll");
+    static auto create = reinterpret_cast<CreateString>(combase ? GetProcAddress(combase, "WindowsCreateString") : nullptr);
+    static auto remove = reinterpret_cast<DeleteString>(combase ? GetProcAddress(combase, "WindowsDeleteString") : nullptr);
+    static auto factory = reinterpret_cast<GetFactory>(combase ? GetProcAddress(combase, "RoGetActivationFactory") : nullptr);
+    if (!create || !remove || !factory) return;
+    static const IID kInterop{0x75CF2C57, 0x9195, 0x4931, {0x83, 0x32, 0xF0, 0xB4, 0x09, 0xE9, 0x16, 0xAF}};
+    static const IID kPane2{0x8A6B3F26, 0x7090, 0x4793, {0x94, 0x4C, 0xC3, 0xF2, 0xCD, 0xE2, 0x62, 0x76}};
+    static const wchar_t kClass[] = L"Windows.UI.ViewManagement.InputPane";
+    HSTRING name = nullptr;
+    if (FAILED(create(kClass, static_cast<UINT32>(std::wcslen(kClass)), &name))) return;
+    IInputPaneInterop* interop = nullptr;
+    IInputPane2* pane = nullptr;
+    boolean done = 0;
+    if (SUCCEEDED(factory(name, kInterop, reinterpret_cast<void**>(&interop))) && interop &&
+        SUCCEEDED(interop->GetForWindow(g_frame, kPane2, reinterpret_cast<void**>(&pane))) && pane) {
+        if (show) pane->TryShow(&done);
+        else pane->TryHide(&done);
+        jvm::log("player: the touch keyboard %s", show ? (done ? "is up" : "did not come up") : "is down");
+    }
+    if (pane) pane->Release();
+    if (interop) interop->Release();
+    remove(name);
+}
+
+// An input method's string for the text field: what it composes (GCS_COMPSTR) or what it has done (GCS_RESULTSTR).
+std::string ime_string(HWND h, DWORD which) {
+    std::string out;
+    HIMC imc = ImmGetContext(h);
+    if (!imc) return out;
+    const LONG bytes = ImmGetCompositionStringW(imc, which, nullptr, 0);
+    if (bytes > 0) {
+        std::wstring w(static_cast<std::size_t>(bytes) / sizeof(wchar_t), L'\0');
+        ImmGetCompositionStringW(imc, which, w.data(), static_cast<DWORD>(bytes));
+        out = narrow(w.c_str());
+    }
+    ImmReleaseContext(h, imc);
+    return out;
+}
+
+// The text field's input method stops composing and drops what it had: the game has it already (type_composing).
+void ime_cancel(HWND h) {
+    if (HIMC imc = ImmGetContext(h)) {
+        ImmNotifyIME(imc, NI_COMPOSITIONSTR, CPS_CANCEL, 0);
+        ImmReleaseContext(h, imc);
+    }
+}
+
+// The edit control's own window procedure, which edit_proc hands on to.
+WNDPROC g_edit_default = nullptr;
+
+// The text field's keys and characters while the game asks for text: to the game's text as the frame's would go; the
+// rest (an input method composing, a touch keyboard's own keys) as an edit control has them.
+LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
+    switch (msg) {
+    case WM_CHAR:
+        if (typing() && w >= 0x20) typed(static_cast<wchar_t>(w));
+        return 0;
+    case WM_IME_COMPOSITION:
+        // An input method's done text goes in as typed; what it still composes shows after it (a Hangul syllable before
+        // its last key), as a phone's field shows it. Taken here, the edit control inserts none of it itself.
+        if (l & GCS_RESULTSTR) type_text(ime_string(h, GCS_RESULTSTR));
+        type_composing((l & GCS_COMPSTR) ? ime_string(h, GCS_COMPSTR) : std::string());
+        return 0;
+    case WM_IME_ENDCOMPOSITION:
+        type_composing("");
+        break;
+    case WM_KEYDOWN:
+        // Enter takes what is being composed along (finish adds it).
+        if (w == VK_RETURN) type_key(kKeyEnter);
+        else if (w == VK_ESCAPE) type_key(kKeyEscape);
+        else if (w == VK_BACK) type_key(kKeyBackspace);
+        else if (w == VK_F11 && !(l & (1L << 30))) toggle_fullscreen(g_frame);
+        else break;
+        return 0;
+    case WM_SYSKEYDOWN:
+        if (w == VK_RETURN && (HIWORD(l) & KF_ALTDOWN) && !(l & (1L << 30))) {
+            toggle_fullscreen(g_frame);
+            return 0;
+        }
+        break;
+    case WM_SYSCHAR:
+        // Alt+Enter's character: no beep for it.
+        if (w == VK_RETURN) return 0;
+        break;
+    default:
+        break;
+    }
+    return CallWindowProcW(g_edit_default, h, msg, w, l);
+}
+
+// Keys and window events for the frame.
+LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     switch (msg) {
     case WM_CLOSE:
         g_closed = true;
         return 0;
     case WM_SIZE:
-        // The size ANativeWindow reports follows the window's.
-        if (w != SIZE_MINIMIZED) {
-            app().width = LOWORD(l);
-            app().height = HIWORD(l);
+        place_game();
+        return 0;
+    case WM_WINDOWPOSCHANGED:
+        // Moved to another display, perhaps: its rate and refreshes from now on.
+        watch_display(false);
+        break;
+    case WM_DISPLAYCHANGE:
+        // A display's mode (size, rate) changed, or a display came or went.
+        watch_display(true);
+        // In full screen the frame covers the display at its new size.
+        if (g_fullscreen) {
+            MONITORINFO mi{};
+            mi.cbSize = sizeof mi;
+            if (GetMonitorInfoW(MonitorFromWindow(h, MONITOR_DEFAULTTONEAREST), &mi)) {
+                SetWindowPos(h, nullptr, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left,
+                             mi.rcMonitor.bottom - mi.rcMonitor.top, SWP_NOZORDER | SWP_NOACTIVATE);
+            }
         }
         return 0;
+    case WM_DPICHANGED: {
+        // On a display of another scaling: the size Windows proposes keeps the window's size on screen; the game then
+        // draws at the pixels that has there.
+        if (!g_fullscreen) {
+            const RECT* r = reinterpret_cast<const RECT*>(l);
+            SetWindowPos(h, nullptr, r->left, r->top, r->right - r->left, r->bottom - r->top, SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+        return 0;
+    }
+    case WM_GETMINMAXINFO: {
+        // The frame never so small that the game's area falls below its smallest.
+        const SIZE least = frame_size(kMinWidth, kMinHeight);
+        auto* mm = reinterpret_cast<MINMAXINFO*>(l);
+        mm->ptMinTrackSize.x = least.cx;
+        mm->ptMinTrackSize.y = least.cy;
+        return 0;
+    }
+    case WM_KILLFOCUS:
+        lift_keys();
+        return 0;
+    case WM_SETFOCUS:
+        // Back in the window while the game asks for text (Alt+Tab, a click): the text field has the keyboard again.
+        if (typing() && g_edit) {
+            SetFocus(g_edit);
+            return 0;
+        }
+        break;
+    case WM_SYSCHAR:
+        // Alt+Enter's character: no beep for it.
+        if (w == VK_RETURN) return 0;
+        break;
+    case WM_CHAR:
+        // Text while the game asks for it: printable characters only; the keys that end or edit it come as keys.
+        if (typing() && w >= 0x20) typed(static_cast<wchar_t>(w));
+        return 0;
+    case WM_SYSKEYDOWN:
+        // Alt+Enter: full screen, as Windows games switch; once per press, not again while held.
+        if (w == VK_RETURN && (HIWORD(l) & KF_ALTDOWN)) {
+            if (!(l & (1L << 30))) toggle_fullscreen(h);
+            return 0;
+        }
+        break;
+    case WM_KEYDOWN: {
+        if (w == VK_F11) {
+            if (!(l & (1L << 30))) toggle_fullscreen(h);
+            return 0;
+        }
+        g_last_touch = false;
+        if (typing()) {
+            if (w == VK_RETURN) type_key(kKeyEnter);
+            else if (w == VK_ESCAPE) type_key(kKeyEscape);
+            else if (w == VK_BACK) type_key(kKeyBackspace);
+            return 0;
+        }
+        int unicode = 0;
+        const int code = phone_key(w, unicode);
+        if (!code) return 0;
+        // Held, it repeats: Windows says so in bit 30 (it was down before).
+        const bool again = (l & (1L << 30)) != 0 && g_keys_down.count(w);
+        const int repeat = again ? ++g_keys_down[w] : (g_keys_down[w] = 0);
+        key(code, true, repeat, unicode);
+        return 0;
+    }
+    case WM_KEYUP: {
+        auto it = g_keys_down.find(w);
+        if (it == g_keys_down.end()) return 0;
+        g_keys_down.erase(it);
+        int unicode = 0;
+        if (int code = phone_key(w, unicode)) key(code, false, 0, unicode);
+        return 0;
+    }
+    case WM_MOUSEWHEEL:
+    case WM_MOUSEHWHEEL: {
+        // The point is on the screen; the turn sideways for a tilt wheel.
+        POINT p{static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l))};
+        wheel_at(p, GET_WHEEL_DELTA_WPARAM(w), msg == WM_MOUSEHWHEEL);
+        return 0;
+    }
+    default:
+        break;
+    }
+    return DefWindowProcW(h, msg, w, l);
+}
+
+// Fingers, the pen and the mouse on the game's window.
+LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
+    switch (msg) {
     case WM_LBUTTONDOWN:
         // The mouse's first button is a finger: pressed, moved while pressed, lifted; held even outside the window.
         SetCapture(h);
         g_pressed = true;
+        g_last_touch = false;
         touch(0, static_cast<float>(static_cast<short>(LOWORD(l))), static_cast<float>(static_cast<short>(HIWORD(l))));
         return 0;
     case WM_MOUSEMOVE:
@@ -105,6 +698,13 @@ LRESULT CALLBACK window_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             touch(1, static_cast<float>(static_cast<short>(LOWORD(l))), static_cast<float>(static_cast<short>(HIWORD(l))));
         }
         return 0;
+    case WM_CAPTURECHANGED:
+        // The mouse taken away while pressed (another window, a system dialog): the finger lifts where it was last.
+        if (g_pressed && reinterpret_cast<HWND>(l) != h) {
+            g_pressed = false;
+            touch(3, 0, 0);
+        }
+        return 0;
     case WM_POINTERDOWN:
     case WM_POINTERUPDATE:
     case WM_POINTERUP: {
@@ -114,38 +714,25 @@ LRESULT CALLBACK window_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         if (!GetPointerType(id, &type) || type == PT_MOUSE) break;
         // A pen above the screen moves without touching it.
         if (msg == WM_POINTERUPDATE && !IS_POINTER_INCONTACT_WPARAM(w)) return 0;
-        // Screen pixels, into the window's.
+        if (msg == WM_POINTERDOWN) g_last_touch = true;
+        // Screen pixels, into the game's.
         POINT p{static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l))};
         ScreenToClient(h, &p);
-        finger(static_cast<int>(id), msg == WM_POINTERDOWN ? 0 : msg == WM_POINTERUP ? 1 : 2, static_cast<float>(p.x), static_cast<float>(p.y));
+        finger(static_cast<int>(id), msg == WM_POINTERDOWN ? 0 : msg == WM_POINTERUP ? 1 : 2, static_cast<float>(p.x), static_cast<float>(p.y),
+               contact_time(id));
         return 0;
     }
     case WM_POINTERCAPTURECHANGED:
         // The system took the fingers away (a gesture of its own): the game's gesture is cancelled.
         finger(static_cast<int>(GET_POINTERID_WPARAM(w)), 3, 0, 0);
         return 0;
-    case WM_CHAR:
-        // Text while the game asks for it: printable characters only; the keys that end or edit it come as keys.
-        if (typing() && w >= 0x20) typed(static_cast<wchar_t>(w));
+    case WM_MOUSEWHEEL:
+    case WM_MOUSEHWHEEL: {
+        // Sent here when Windows scrolls the window under the pointer.
+        POINT p{static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l))};
+        wheel_at(p, GET_WHEEL_DELTA_WPARAM(w), msg == WM_MOUSEHWHEEL);
         return 0;
-    case WM_SYSKEYDOWN:
-        // Alt+Enter: full screen, as Windows games switch.
-        if (w == VK_RETURN && (HIWORD(l) & KF_ALTDOWN)) {
-            toggle_fullscreen(h);
-            return 0;
-        }
-        break;
-    case WM_KEYDOWN:
-        if (w == VK_F11) {
-            toggle_fullscreen(h);
-            return 0;
-        }
-        if (typing()) {
-            if (w == VK_RETURN) type_key(kKeyEnter);
-            else if (w == VK_ESCAPE) type_key(kKeyEscape);
-            else if (w == VK_BACK) type_key(kKeyBackspace);
-        }
-        return 0;
+    }
     case WM_ERASEBKGND:
         // The game draws every pixel: no flash of the background between frames.
         return 1;
@@ -164,53 +751,80 @@ bool open_window(const std::string& title) {
         if (auto set = reinterpret_cast<SetContext>(GetProcAddress(user, "SetProcessDpiAwarenessContext"))) set(reinterpret_cast<HANDLE>(-4));
     }
     HINSTANCE instance = GetModuleHandleW(nullptr);
-    if (app().fit_screen) {
-        // Three quarters of the screen's height left by the taskbar, at 16:9, and no wider than nine tenths of it: a
-        // window that fits whatever the screen and its scaling (the pixels are the screen's own).
-        RECT work{};
-        if (SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0)) {
-            int w = work.right - work.left, h = work.bottom - work.top;
-            app().height = h * 3 / 4;
-            app().width = app().height * 16 / 9;
-            if (app().width > w * 9 / 10) {
-                app().width = w * 9 / 10;
-                app().height = app().width * 9 / 16;
-            }
-        }
-    }
-    WNDCLASSEXW wc{};
-    wc.cbSize = sizeof wc;
-    wc.style = CS_OWNDC;
-    wc.lpfnWndProc = window_proc;
-    wc.hInstance = instance;
-    // The system's arrow (IDC_ARROW is its number as a narrow-string name, which LoadCursorA takes).
-    wc.hCursor = LoadCursorA(nullptr, IDC_ARROW);
-    // The program's own icon (player.rc), in the title bar and the taskbar.
-    wc.hIcon = LoadIconW(instance, MAKEINTRESOURCEW(1));
-    wc.hbrBackground = static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
-    wc.lpszClassName = L"OpenDMTQPlayer";
-    RegisterClassExW(&wc);
-    // The client area is the game's size; the frame goes around it.
-    RECT r{0, 0, app().width, app().height};
-    AdjustWindowRectEx(&r, WS_OVERLAPPEDWINDOW, FALSE, 0);
+    // The frame: the program's icon, the system's arrow (IDC_ARROW is its number as a narrow-string name, which
+    // LoadCursorA takes), black around the game.
+    WNDCLASSEXW frame{};
+    frame.cbSize = sizeof frame;
+    frame.lpfnWndProc = frame_proc;
+    frame.hInstance = instance;
+    frame.hCursor = LoadCursorA(nullptr, IDC_ARROW);
+    frame.hIcon = LoadIconW(instance, MAKEINTRESOURCEW(1));
+    frame.hbrBackground = static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
+    frame.lpszClassName = L"OpenDMTQPlayer";
+    RegisterClassExW(&frame);
+    // The game's window: a device context of its own for the surface, the arrow, no background of its own.
+    WNDCLASSEXW game{};
+    game.cbSize = sizeof game;
+    game.style = CS_OWNDC;
+    game.lpfnWndProc = game_proc;
+    game.hInstance = instance;
+    game.hCursor = LoadCursorA(nullptr, IDC_ARROW);
+    game.lpszClassName = L"OpenDMTQGame";
+    RegisterClassExW(&game);
     int n = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
     std::wstring wtitle(static_cast<std::size_t>(n > 0 ? n - 1 : 0), L'\0');
     if (n > 1) MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wtitle.data(), n);
-    g_window = CreateWindowExW(0, wc.lpszClassName, wtitle.c_str(), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, nullptr,
-                               nullptr, instance, nullptr);
-    if (!g_window) {
+    // Made hidden, where Windows places a new window (or where the program that started this one asked), and sized for
+    // its display before it shows.
+    g_frame = CreateWindowExW(0, frame.lpszClassName, wtitle.c_str(), WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, CW_USEDEFAULT, CW_USEDEFAULT,
+                              app().width, app().height, nullptr, nullptr, instance, nullptr);
+    if (!g_frame) {
         jvm::log("player: cannot make a window (error %lu)", GetLastError());
         return false;
     }
-    ShowWindow(g_window, SW_SHOW);
-    UpdateWindow(g_window);
-    // The size Windows gave the client area, which the scaling of the screen may have changed.
-    RECT client;
-    if (GetClientRect(g_window, &client)) {
-        app().width = client.right - client.left;
-        app().height = client.bottom - client.top;
+    if (app().fit_screen) {
+        fit_display();
+    } else {
+        // The size asked for is the game's area.
+        const SIZE outer = frame_size(app().width, app().height);
+        SetWindowPos(g_frame, nullptr, 0, 0, outer.cx, outer.cy, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
     }
+    g_window = CreateWindowExW(0, game.lpszClassName, L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS, 0, 0, app().width, app().height, g_frame,
+                               nullptr, instance, nullptr);
+    if (!g_window) {
+        jvm::log("player: cannot make the game's window (error %lu)", GetLastError());
+        return false;
+    }
+    place_game();
+    // A touch screen's fingers are the game's alone, up to its edges in full screen.
+    quiet_touch(g_frame);
+    quiet_touch(g_window);
+    // No input method on the game itself: keys in a Hangul mode stay keys (no composition box over a song); the text
+    // field keeps its own.
+    ImmAssociateContextEx(g_frame, nullptr, 0);
+    ImmAssociateContextEx(g_window, nullptr, 0);
+    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    keep_edges(g_frame);
+    // The text field for the game's text input: one pixel under the game's window (place_game), which it never paints
+    // over, focused only while the game asks for text.
+    g_edit = CreateWindowExW(0, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | ES_AUTOHSCROLL, 0, 0, 1, 1, g_frame, nullptr, instance, nullptr);
+    if (g_edit) {
+        place_game();
+        g_edit_default = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(g_edit, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(edit_proc)));
+    }
+    // This thread waits for window messages and its looper's jobs together: a job posted wakes it.
+    g_ui_thread = GetCurrentThreadId();
+    main_looper().wake = [] { PostThreadMessageW(g_ui_thread, WM_NULL, 0, 0); };
+    // The display it is on, and its refreshes from a thread of their own.
+    watch_display(false);
+    std::thread(refresh_loop).detach();
+    ShowWindow(g_frame, SW_SHOW);
+    UpdateWindow(g_frame);
+    // The size the game's area has once shown (the frame's scaling may have changed it).
+    place_game();
+    jvm::log("player: the game draws at %dx%d", app().width, app().height);
     g_surface = jvm::Ref<jvm::Object>(new Surface(&jvm::define("android/view/Surface"), g_window));
+    g_started = true;
     return true;
 }
 
@@ -228,6 +842,47 @@ bool pump_window() {
         DispatchMessageW(&m);
     }
     return !g_closed;
+}
+
+void wait_for_events(Looper::Clock::time_point until) {
+    // Until the next job, at most a tenth of a second (the time limit is looked at then); a window message or a posted
+    // job (its wake) ends the wait at once. The time on a high-resolution timer of the thread's: a plain wait rounds
+    // to the system's 15.6 ms tick, which a wheel's 8 ms steps would wait for.
+    const auto now = Looper::Clock::now();
+    const auto cap = now + std::chrono::milliseconds(100);
+    const auto end = until <= now ? now : std::min(until, cap);
+    const auto left = std::chrono::duration_cast<std::chrono::nanoseconds>(end - now).count();
+    static HANDLE timer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+    if (left <= 0) {
+        MsgWaitForMultipleObjectsEx(0, nullptr, 0, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+        return;
+    }
+    LARGE_INTEGER due;
+    // Relative, in 100 ns units.
+    due.QuadPart = -std::max<long long>(1, left / 100);
+    if (timer && SetWaitableTimer(timer, &due, 0, nullptr, nullptr, FALSE)) {
+        MsgWaitForMultipleObjectsEx(1, &timer, 200, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+    } else {
+        MsgWaitForMultipleObjectsEx(0, nullptr, static_cast<DWORD>((left + 999999) / 1000000), QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+    }
+}
+
+void soft_keyboard(bool open) {
+    // On the UI thread, which owns the windows: the text field focused while the game asks for text, the frame after.
+    main_looper().post([open] {
+        if (!g_edit || !g_frame) return;
+        if (open) {
+            SetWindowTextW(g_edit, L"");
+            SetFocus(g_edit);
+            // Asked by a touch: the touch keyboard comes up for it.
+            if (g_last_touch) touch_keyboard(true);
+        } else {
+            // What an input method was still composing the game has already (type_composing): it goes from the field.
+            ime_cancel(g_edit);
+            if (GetFocus() == g_edit) SetFocus(g_frame);
+            if (g_last_touch) touch_keyboard(false);
+        }
+    });
 }
 
 }  // namespace player

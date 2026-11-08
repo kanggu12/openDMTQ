@@ -487,7 +487,12 @@ void define_context() {
     a.method("getWindow", "()Landroid/view/Window;", [](Call&) { return Value(g_window); });
     a.method("getApplication", "()Landroid/app/Application;", [](Call&) { return Value(g_application); });
     a.method("getIntent", "()Landroid/content/Intent;", [](Call&) { return Value(g_intent); });
-    a.method("isFinishing", "()Z", [](Call&) { return Value::Z(false); });
+    a.method("isFinishing", "()Z", [](Call&) { return Value::Z(game_quit()); });
+    // The activity finished: the game's only one, so the game is done (main.cpp).
+    a.method("finish", "()V", [](Call&) {
+        quit_game("Activity.finish");
+        return Value();
+    });
     a.method("getRequestedOrientation", "()I", [](Call&) { return Value::I(6); });  // sensorLandscape, as the manifest asks
     a.method("setRequestedOrientation", "(I)V", [](Call&) { return Value(); });
     a.method("getWindowManager", "()Landroid/view/WindowManager;", [](Call&) { return service("window"); });

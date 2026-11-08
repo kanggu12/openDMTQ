@@ -39,6 +39,8 @@ struct App {
     std::string title = "OpenDMTQ";
     bool fit_screen = false;
     float refresh = 60, density = 2;
+    // Whether --refresh named the rate: then the game is told that one, and the display's own is not looked up.
+    bool refresh_set = false;
     // What the package declares (PackageInfo).
     std::string version_name = "1.0";
     int version_code = 1;
@@ -86,12 +88,32 @@ jvm::Object* activity();
 jvm::Object* application();
 jvm::Object* unity_player();
 
-// The window (window_x11.cpp): opened at the App's size; the android.view.Surface that names it; the window behind a
-// Surface (0 for anything else); and its events, handled until the window is closed (false then).
+// The window (window_x11.cpp, window_win32.cpp): opened at the App's size; the android.view.Surface that names it; the
+// window behind a Surface (0 for anything else); and its events, handled until the window is closed (false then).
 bool open_window(const std::string& title);
 jvm::Object* surface();
 std::uintptr_t window_of(jvm::Object* surface);
 bool pump_window();
+// The UI thread's wait between turns: until `until`, a job posted to its looper, or a window event, whichever comes
+// first, so that a touch reaches the game as soon as it comes (window_win32.cpp; X11 looks again every 4 ms).
+void wait_for_events(std::chrono::steady_clock::time_point until);
+// The game opened or closed its text input: on Windows the focus goes to a text field of the window's while it is open,
+// so that Windows' touch keyboard offers itself on a PC without a keyboard, and an input method composes into it.
+void soft_keyboard(bool open);
+// The game's part of the window changed size (the window resized, full screen, another display's scaling): the game is
+// told as Android tells it, SurfaceHolder's surfaceChanged on the Unity thread (main.cpp). Calls that come while one is
+// on its way are one.
+void surface_changed();
+// The game is done (it chose to quit: its last frame, System.exit, Process.killProcess, Activity.finish): the player
+// leaves as an app's process ends on a phone, from the UI thread's next turn (main.cpp). `how` goes to the log.
+void quit_game(const char* how);
+// True once the game has quit.
+bool game_quit();
+// The refresh rate of the display the window is on, as the game asks for it (Display.getRefreshRate): the display's own
+// once the window has read it (pacing.h's g_display_interval), the App's until then.
+float display_rate();
+// The first refresh of that display at or after `ns` on the monotonic clock, for the frame callbacks (Choreographer).
+std::int64_t refresh_at_or_after(std::int64_t ns);
 
 // android.os.Looper (android_os.cpp): a thread's queue of jobs, each due at a time, run by that thread in time order
 // (then in the order they were posted). Handlers, Choreographer and runOnUiThread post to one.
@@ -110,6 +132,9 @@ public:
     // Waits until `until` or until a job is posted.
     void wait(Clock::time_point until);
     std::atomic<bool> quitting{false};
+    // Called after each job posted, for a thread that waits on more than its jobs (the UI thread on Windows waits for
+    // window messages too, and a posted job has to wake it there). Set once by that thread; read by every poster.
+    std::atomic<void (*)()> wake{nullptr};
 
 private:
     struct Job {
@@ -181,15 +206,27 @@ void define_input();
 
 // Touch input (input.cpp): finger `id` (the system's own number for it) put down (0), lifted (1), moved (2) or taken
 // away by the system (3, the gesture cancelled) at window pixels, given to the game as Android's MotionEvents on the
-// calling thread, which is the UI thread. touch() is one finger of its own: the mouse, and the taps a check planned by
+// calling thread, which is the UI thread; `at_ns` is when the touch screen saw it, on the monotonic clock (-1: now). touch() is one finger of its own: the mouse, and the taps a check planned by
 // frame, through the hook the frame counter calls after each frame shown.
-void finger(int id, int what, float x, float y);
+void finger(int id, int what, float x, float y, std::int64_t at_ns = -1);
 void touch(int action, float x, float y);
 void frame_shown(std::uint64_t n);
+// The mouse wheel at window pixels x,y, turned by notches (positive: away from the user; sideways: to the right), as a
+// finger's drag that scrolls what is under it; on the UI thread.
+void wheel(float x, float y, float notches_x, float notches_y);
+// A key of the computer's keyboard as the phone's key `code` (Android's KEYCODE_ numbers), down or up, its repeat count
+// while held, and its character (0 for none); on the UI thread.
+void key(int code, bool down, int repeat, int unicode);
+// Android's key codes that the computer's keys stand for.
+constexpr int kKeycodeBack = 4, kKeycode0 = 7, kKeycodeDpadUp = 19, kKeycodeDpadDown = 20, kKeycodeDpadLeft = 21,
+              kKeycodeDpadRight = 22, kKeycodeA = 29, kKeycodeTab = 61, kKeycodeSpace = 62, kKeycodeEnter = 66, kKeycodeDel = 67,
+              kKeycodePageUp = 92, kKeycodePageDown = 93, kKeycodeForwardDel = 112, kKeycodeHome = 122, kKeycodeEnd = 123;
 // The soft keyboard (input.cpp): whether the game asked for text, the text the keyboard types, and its keys.
 constexpr int kKeyEnter = 1, kKeyEscape = 2, kKeyBackspace = 3;
 bool typing();
 void type_text(const std::string& utf8);
+// What an input method is composing now ("" when nothing): shown to the game after the text, as on a phone.
+void type_composing(const std::string& utf8);
 void type_key(int key);
 
 }  // namespace player

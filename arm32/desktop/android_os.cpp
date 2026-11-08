@@ -134,7 +134,7 @@ void define_display() {
     d.method("getDisplayId", "()I", [](Call&) { return Value::I(0); })
         .method("getWidth", "()I", [](Call&) { return Value::I(app().width); })
         .method("getHeight", "()I", [](Call&) { return Value::I(app().height); })
-        .method("getRefreshRate", "()F", [](Call&) { return Value::F(app().refresh); })
+        .method("getRefreshRate", "()F", [](Call&) { return Value::F(display_rate()); })
         .method("getRotation", "()I", [](Call&) { return Value::I(0); })
         .method("getName", "()Ljava/lang/String;", [](Call&) { return Value(jvm::string("Built-in Screen")); })
         .method("getMetrics", "(Landroid/util/DisplayMetrics;)V", [](Call& c) {
@@ -149,7 +149,7 @@ void define_display() {
         .method("getRealSize", "(Landroid/graphics/Point;)V", size)
         .method("getSupportedRefreshRates", "()[F", [](Call&) {
             Ref<jvm::Array> a = jvm::new_array(jvm::array_class(jvm::primitive_class('F')), 1);
-            a->data<jfloat>()[0] = app().refresh;
+            a->data<jfloat>()[0] = display_rate();
             return Value(a);
         });
     g_display = jvm::new_object(d, "()V");

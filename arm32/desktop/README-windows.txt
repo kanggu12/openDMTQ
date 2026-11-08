@@ -22,8 +22,15 @@ Playing
 -------
 
 - Full screen: F11, or Alt+Enter.
-- The mouse's left button touches the screen. So do a pen and a touch screen's fingers, several at once.
-- The keyboard types where the game asks for text: Enter to finish, Esc to cancel.
+- A touch screen is the game's screen: as many fingers at once as it takes, and Windows' touch feedback and edge
+  swipes (in full screen) stay out of the way. A pen is one finger, and so is the mouse's left button.
+- The mouse wheel scrolls what is under the pointer; with Shift, across.
+- Esc is the phone's Back key: it pauses a song and closes what is open. On the game's first screen it asks whether to
+  quit, and quitting there closes the player.
+- The keyboard types where the game asks for text, Hangul too: Enter to finish, Esc to cancel. When a touch opens the
+  text, Windows' touch keyboard comes up for it.
+- The game runs at your display's refresh rate (60 Hz, 144 Hz, 240 Hz or another) and at its own pixels, in a window
+  of any size.
 
 Good to know
 ------------

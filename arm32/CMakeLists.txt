@@ -95,7 +95,8 @@ if(NOT ANDROID)
     set(PLAYER_OUTPUT_LIBS ole32 avrt ksuser)
     # Media Foundation itself is loaded when a video plays (decoder_mf.cpp); its GUIDs are mfuuid's.
     set(PLAYER_DECODER_LIBS mfuuid ole32)
-    set(PLAYER_LIBS ${WIN_DEPS}/lib/libzlib1.dll.a user32 gdi32 shell32 ${PLAYER_OUTPUT_LIBS} ${PLAYER_DECODER_LIBS})
+    # DXGI waits for the display's refreshes, IMM is the text field's input method (window_win32.cpp).
+    set(PLAYER_LIBS ${WIN_DEPS}/lib/libzlib1.dll.a user32 gdi32 shell32 dxgi imm32 ${PLAYER_OUTPUT_LIBS} ${PLAYER_DECODER_LIBS})
     # The POSIX calls in the player's own files (open, pread, the clocks) are the runtime's Windows layer's, which
     # arm32core carries: the tests of those files need it as the player does.
     set(PLAYER_POSIX arm32core)

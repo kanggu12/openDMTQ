@@ -5,7 +5,9 @@
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/XKBlib.h>
 #include <X11/keysym.h>
+#include <algorithm>
 #include <cstdlib>
 
 namespace player {
@@ -18,6 +20,8 @@ Window g_window = 0;
 Atom g_delete = 0;
 // Whether the mouse's first button is down (a finger on the screen).
 bool g_pressed = false;
+// Escape held as the phone's Back key (pump_window).
+bool g_back_down = false;
 
 // android.view.Surface: the window it stands for.
 class Surface : public jvm::Object {
@@ -74,15 +78,27 @@ std::uintptr_t window_of(jvm::Object* surface) {
     return s ? s->window : 0;
 }
 
+void wait_for_events(Looper::Clock::time_point until) {
+    // Window events come in through no queue of ours: looked at again within 4 ms whatever is due.
+    main_looper().wait(std::min(until, Looper::Clock::now() + std::chrono::milliseconds(4)));
+}
+
+// The keyboard types into the game's text as it is (pump_window): nothing to open.
+void soft_keyboard(bool) {}
+
 bool pump_window() {
+    // A held key gives presses only, not a release before each (its release then means it was let go).
+    static const bool detectable = XkbSetDetectableAutoRepeat(g_display, True, nullptr);
+    (void)detectable;
     while (XPending(g_display)) {
         XEvent e;
         XNextEvent(g_display, &e);
         if (e.type == ClientMessage && static_cast<Atom>(e.xclient.data.l[0]) == g_delete) return false;
-        // The size ANativeWindow reports follows the window's.
-        if (e.type == ConfigureNotify) {
+        // The size ANativeWindow reports follows the window's, and the game hears of a new one as on a phone.
+        if (e.type == ConfigureNotify && (e.xconfigure.width != app().width || e.xconfigure.height != app().height)) {
             app().width = e.xconfigure.width;
             app().height = e.xconfigure.height;
+            surface_changed();
         }
         // Keys type into the soft keyboard while the game asks for text: text as text, and the keys that end or edit it.
         if (e.type == KeyPress && typing()) {
@@ -93,6 +109,22 @@ bool pump_window() {
             else if (sym == XK_Escape) type_key(kKeyEscape);
             else if (sym == XK_BackSpace) type_key(kKeyBackspace);
             else if (n > 0 && static_cast<unsigned char>(text[0]) >= 0x20) type_text(std::string(text, static_cast<std::size_t>(n)));
+        } else if ((e.type == KeyPress || e.type == KeyRelease) && XLookupKeysym(&e.xkey, 0) == XK_Escape) {
+            // Otherwise Escape is the phone's Back key, as on Windows (window_win32.cpp): down once, up only after a down
+            // of its own (not after the Escape that ended a text), however long it is held.
+            if (e.type == KeyPress && !g_back_down) {
+                g_back_down = true;
+                key(kKeycodeBack, true, 0, 0);
+            } else if (e.type == KeyRelease && g_back_down) {
+                g_back_down = false;
+                key(kKeycodeBack, false, 0, 0);
+            }
+        }
+        // The wheel's buttons (4 and 5 up and down, 6 and 7 sideways) are a finger's drag that scrolls, a notch each.
+        if (e.type == ButtonPress && e.xbutton.button >= 4 && e.xbutton.button <= 7 && !g_pressed) {
+            const unsigned b = e.xbutton.button;
+            const float notch = b == 4 || b == 7 ? 1.0f : -1.0f;
+            wheel(static_cast<float>(e.xbutton.x), static_cast<float>(e.xbutton.y), b >= 6 ? notch : 0.0f, b >= 6 ? 0.0f : notch);
         }
         // The mouse's first button is a finger: pressed, moved while pressed, lifted.
         if (e.type == ButtonPress && e.xbutton.button == Button1) {

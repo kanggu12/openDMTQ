@@ -167,6 +167,19 @@ refresh rate or the highest whole fraction of it not above that (72 fps on a pan
 those are paced). The phone's own word that it is hot (thermal status SEVERE or worse) takes a step
 too, every half minute while it lasts.
 
+On a computer the display keeps its own rate whatever a window asks, and its compositor gives no frame
+times. The player reads the rate of the display its window is on and that display's refreshes from the
+system (the display configuration and DXGI on Windows) and hands them to the runtime (`g_display_interval`,
+`g_display_vblank`). The frame rate starts at every refresh, whatever the rate (240 Hz, 180 Hz, 59.94 Hz),
+and the steps down are every second refresh, every third, while that stays at 57 fps or more. Each frame
+goes out on its refresh: the swap interval holds it for its share, and after the swap the thread waits for
+the refresh the frame goes on screen at, so that no frame waits in the swap queue. The pace check counts the
+frames that missed their refresh. 15 s after a step down the faster rate is tried again (a song's load holds
+the frames up for some seconds, after which every refresh holds again), and each try that falls short doubles
+the wait, up to four minutes: a step on a computer's display shows nothing, where a phone's panel switch can.
+A computer gives up its resolution only at 60 fps: a frame that misses 240 Hz there is the processor's, which
+fewer pixels do not help.
+
 **Resolution** (`src/pacing.cpp`, `debug.arm32.lowres`, unset). The game draws at the panel's own resolution (an edit to the game:
 it used to write its low resolution option on at every start, 960 lines on a 1440 line panel), in 32-bit colour and with its
 textures at full size. With all that a Galaxy S26 Ultra keeps 120 fps with no frame late in a song. Frames come before sharpness, so
@@ -294,8 +307,10 @@ On a computer the runtime takes its switches from the environment only, logs to 
 properties of an Android 9 phone of no particular make. In place of Android's Java side, the player hosts the game in a
 small Java VM of its own (`jvm/`) with the classes the game calls. On Windows a thin layer (`src/win`) gives the core
 Linux's system calls (files, memory, threads and futexes, signals as interruptions, sockets); the player draws through
-ANGLE (OpenGL ES on Direct3D 11), plays its sound through WASAPI and decodes video with Media Foundation. CI runs the
-Windows tests under Wine and on Windows itself (`test_windows.ps1`).
+ANGLE (OpenGL ES on Direct3D 11), plays its sound through WASAPI and decodes video with Media Foundation. The game's
+window sits in a frame that keeps it between 4:3 and 21:9, the shapes the game lays itself out for, and tells the game of
+a new size as Android does (`surfaceChanged`). The mouse is a finger, its wheel a finger's drag, and Escape the phone's
+Back key. CI runs the Windows tests under Wine and on Windows itself (`test_windows.ps1`).
 
 `build.sh` fetches Dynarmic at a fixed commit and the 32-bit system libraries from Google's AOSP
 system image (checksum checked) into `_work/arm32`, which is not tracked. Those libraries are open source and unchanged, and

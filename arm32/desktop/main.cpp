@@ -8,8 +8,8 @@
 // --sysroot is the guest's system (bin/linker, lib/*.so, from the Android build), --agent the runtime's agent program,
 // --package the app's package name, --apk the app's APK, --libs its 32-bit libraries (the APK's lib/armeabi-v7a, unpacked)
 // and --data the folder for what the app keeps (its internal and external storage); --size the window (1920x1080),
-// --refresh the display's rate (60), --seconds a time to leave after (none). ARM32_TRACE=1 logs every registration and
-// every class and method the VM makes up.
+// --refresh the display's rate (60, else the display's own where the window can read it), --seconds a time to leave
+// after (none). ARM32_TRACE=1 logs every registration and every class and method the VM makes up.
 #include "gl_bridge.h"
 #include "guest.h"
 #include "host.h"
@@ -17,6 +17,7 @@
 #include "player.h"
 #include "tweaks.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -29,6 +30,7 @@
 #include <sys/stat.h>
 #include <thread>
 #include <unistd.h>
+#include <vector>
 
 namespace player {
 
@@ -117,6 +119,42 @@ bool load_library(const std::string& guest_path) {
     return true;
 }
 
+namespace {
+
+// A size change on its way to the Unity thread (surface_changed): later ones while it waits are the same call.
+std::atomic<bool> g_resize_posted{false};
+// The game has quit (quit_game).
+std::atomic<bool> g_quit{false};
+
+}  // namespace
+
+void quit_game(const char* how) {
+    if (g_quit.exchange(true)) return;
+    jvm::log("player: the game quits (%s)", how);
+    // The UI thread's wait ends at a posted job (its looper's wake), and its loop sees the flag.
+    main_looper().post([] {});
+}
+
+bool game_quit() { return g_quit.load(); }
+
+void surface_changed() {
+    // Before the game has its surface (the start makes it with the window's size) there is nothing to tell.
+    jvm::Object* surface = player::surface();
+    if (!surface || g_resize_posted.exchange(true)) return;
+    // What UnityPlayer's surfaceChanged does on a phone: the graphics state again for the same surface, on the Unity
+    // thread, which then reads the window's new size and draws at it.
+    unity_looper().post([surface] {
+        g_resize_posted.store(false);
+        jvm::Env& e = jvm::attach();
+        e.call(unity_player(), "nativeRecreateGfxState", "(ILandroid/view/Surface;)V", {jvm::Value::I(0), jvm::Value(surface)});
+        if (e.pending) {
+            jvm::log("player: nativeRecreateGfxState threw on a size change");
+            e.pending = {};
+        }
+        jvm::log("player: the game's surface is now %dx%d", app().width, app().height);
+    });
+}
+
 }  // namespace player
 
 namespace {
@@ -137,6 +175,23 @@ bool step_ok(jvm::Env& env, const char* what) {
 
 // --seconds: how long the player runs before it reports and leaves (0: until the window closes).
 int g_seconds = 0;
+
+// With stats on: how long each of the game's frames took on its main thread (nativeRender, its wait for the render thread
+// included), in the log every five seconds, so that a frame that came late shows which thread it lost its time on. On the
+// Unity main thread only.
+void note_game_frame(std::chrono::steady_clock::duration took) {
+    static std::vector<float> frames;
+    static auto since = std::chrono::steady_clock::now();
+    frames.push_back(std::chrono::duration<float, std::milli>(took).count());
+    const auto now = std::chrono::steady_clock::now();
+    if (now - since < std::chrono::seconds(5)) return;
+    std::sort(frames.begin(), frames.end());
+    auto at = [](float q) { return frames[static_cast<std::size_t>(q * static_cast<float>(frames.size() - 1))]; };
+    arm32::log("stats: the game's frames on its main thread ms p50 %.2f p95 %.2f p99 %.2f max %.2f, %zu frames", at(0.5f), at(0.95f),
+               at(0.99f), frames.back(), frames.size());
+    frames.clear();
+    since = now;
+}
 
 // mkdir -p.
 void make_dirs(const std::string& path) {
@@ -160,7 +215,10 @@ int main(int argc, char** argv) {
         else if (k == "--data") app().host_data = v;
         else if (k == "--seconds") g_seconds = std::atoi(v.c_str());
         else if (k == "--size") std::sscanf(v.c_str(), "%dx%d", &app().width, &app().height);
-        else if (k == "--refresh") app().refresh = std::strtof(v.c_str(), nullptr);
+        else if (k == "--refresh") {
+            app().refresh = std::strtof(v.c_str(), nullptr);
+            app().refresh_set = true;
+        }
     }
     player::App& a = app();
     // No arguments: a double click, the app from the player's own folder as the server's download lays it out.
@@ -297,20 +355,22 @@ int main(int argc, char** argv) {
         player::prepare_looper(&player::unity_looper());
         for (;;) {
             player::unity_looper().run_due();
+            const auto frame_start = std::chrono::steady_clock::now();
             jvm::Value more = e.call(view, "nativeRender", "()Z");
+            if (arm32::g_stats) note_game_frame(std::chrono::steady_clock::now() - frame_start);
             step_ok(e, "nativeRender");
             if (!more.z()) {
-                log("player: nativeRender returned false: the game quits");
+                player::quit_game("its last frame");
                 break;
             }
         }
     }).detach();
     // The UI thread: window events and the main looper's jobs, until the window closes or the time is up.
     const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(g_seconds);
-    while (player::pump_window()) {
+    while (player::pump_window() && !player::game_quit()) {
         auto next = player::main_looper().run_due();
-        // Window events come in through no queue of ours: looked at again within 4 ms whatever is due.
-        player::main_looper().wait(std::min(next, std::chrono::steady_clock::now() + std::chrono::milliseconds(4)));
+        // Until the next job, a job posted, or a window event (a touch goes to the game as it comes).
+        player::wait_for_events(next);
         if (g_seconds && std::chrono::steady_clock::now() >= until) break;
     }
     jvm::report_unimplemented();

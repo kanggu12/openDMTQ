@@ -1,6 +1,7 @@
 // What the runtime's EGL bridge hands live view on a phone (live.h), on the desktop: each frame just before it is
 // shown. Live view itself is not here yet; the frames are counted, the first one logged, and the ones asked for
-// (PLAYER_SHOTS="60,600", frame numbers) saved as PNG files in the data folder's shots/, for checks to look at.
+// (PLAYER_SHOTS="60,600,@12.5": frame numbers, and seconds from the first frame, which hold whatever the frame rate)
+// saved as PNG files in the data folder's shots/, for checks to look at.
 #include "live.h"
 #include "player.h"
 
@@ -11,6 +12,7 @@
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <dlfcn.h>
 #include <fstream>
 #include <set>
@@ -25,21 +27,40 @@ namespace {
 // a lookup from inside namespace arm32 would find first.
 std::atomic<std::uint64_t> g_shown{0};
 
-// The frame numbers to save, from PLAYER_SHOTS.
-const std::set<std::uint64_t>& shots() {
-    static const std::set<std::uint64_t> s = [] {
-        std::set<std::uint64_t> out;
+// The frames to save, from PLAYER_SHOTS: by number, and by seconds from the first frame (the times still to come, in
+// order).
+struct Shots {
+    std::set<std::uint64_t> frames;
+    std::set<double> times;
+};
+Shots& shots() {
+    static Shots s = [] {
+        Shots out;
         const char* list = std::getenv("PLAYER_SHOTS");
         for (const char* p = list; p && *p;) {
+            const bool timed = *p == '@';
             char* end = nullptr;
-            unsigned long long n = std::strtoull(p, &end, 10);
-            if (end == p) break;
-            out.insert(n);
+            if (timed) {
+                const double at = std::strtod(p + 1, &end);
+                if (end == p + 1) break;
+                out.times.insert(at);
+            } else {
+                const unsigned long long n = std::strtoull(p, &end, 10);
+                if (end == p) break;
+                out.frames.insert(n);
+            }
             p = *end == ',' ? end + 1 : end;
         }
         return out;
     }();
     return s;
+}
+
+// The monotonic clock in seconds, for the shots by time.
+double now_seconds() {
+    timespec ts{};
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return static_cast<double>(ts.tv_sec) + static_cast<double>(ts.tv_nsec) / 1e9;
 }
 
 // One PNG chunk: its length, type, data, and the CRC of type and data.
@@ -82,7 +103,7 @@ bool write_png(const std::string& path, int w, int h, const std::vector<unsigned
 
 // The frame about to be shown, read from the window's back buffer (the default framebuffer), whatever the game has
 // bound for reading, which is put back after.
-void save_frame(EGLDisplay display, EGLSurface surface, std::uint64_t n) {
+void save_frame(EGLDisplay display, EGLSurface surface, std::uint64_t n, const std::string& name) {
     static void* egl = dlopen(arm32::kHostEgl, RTLD_NOW | RTLD_LOCAL);
     auto query = reinterpret_cast<EGLBoolean (*)(EGLDisplay, EGLSurface, EGLint, EGLint*)>(egl ? dlsym(egl, "eglQuerySurface") : nullptr);
     auto get_int = reinterpret_cast<void (*)(GLenum, GLint*)>(arm32::gl_proc("glGetIntegerv"));
@@ -102,8 +123,42 @@ void save_frame(EGLDisplay display, EGLSurface surface, std::uint64_t n) {
     bind(GL_READ_FRAMEBUFFER, static_cast<GLuint>(was_bound));
     std::string dir = player::app().host_data + "/shots";
     mkdir(dir.c_str(), 0755);
-    std::string path = dir + "/frame-" + std::to_string(n) + ".png";
+    std::string path = dir + "/" + name + ".png";
     if (write_png(path, w, h, rgba)) arm32::log("player: frame %llu saved to %s (%dx%d)", static_cast<unsigned long long>(n), path.c_str(), w, h);
+}
+
+// With stats on, every five seconds: what the display itself counted, where the host's EGL says it
+// (EGL_CHROMIUM_sync_control, ANGLE's on Windows): its refreshes and the frames that reached it in that time. One frame
+// per refresh is a refresh of its own for every frame; fewer frames than refreshes is a frame shown twice somewhere.
+void present_stats(EGLDisplay display, EGLSurface surface) {
+    using SyncValues = EGLBoolean (*)(EGLDisplay, EGLSurface, std::uint64_t*, std::uint64_t*, std::uint64_t*);
+    static void* egl = dlopen(arm32::kHostEgl, RTLD_NOW | RTLD_LOCAL);
+    static auto get_proc = reinterpret_cast<void* (*)(const char*)>(egl ? dlsym(egl, "eglGetProcAddress") : nullptr);
+    static auto sync_values = reinterpret_cast<SyncValues>(get_proc ? get_proc("eglGetSyncValuesCHROMIUM") : nullptr);
+    static auto get_error = reinterpret_cast<EGLint (*)()>(egl ? dlsym(egl, "eglGetError") : nullptr);
+    static double last_report = 0;
+    static std::uint64_t last_msc = 0, last_sbc = 0;
+    static bool said = false;
+    if (!sync_values) return;
+    const double now = now_seconds();
+    if (now - last_report < 5) return;
+    std::uint64_t ust = 0, msc = 0, sbc = 0;
+    if (sync_values(display, surface, &ust, &msc, &sbc) != EGL_TRUE) {
+        // Its error is ours to clear, not the game's to read.
+        if (get_error) get_error();
+        if (!said) arm32::log("stats: the display does not say what it showed (no sync values for this window)");
+        said = true;
+        last_report = now;
+        return;
+    }
+    if (last_report > 0 && last_msc && msc >= last_msc && sbc >= last_sbc) {
+        const double span = now - last_report;
+        arm32::log("stats: the display: %llu refreshes and %llu frames shown in %.1f s",
+                   static_cast<unsigned long long>(msc - last_msc), static_cast<unsigned long long>(sbc - last_sbc), span);
+    }
+    last_report = now;
+    last_msc = msc;
+    last_sbc = sbc;
 }
 
 }  // namespace
@@ -115,7 +170,20 @@ void live_load(JavaVM*, JNIEnv*, const std::string&) {}
 void live_frame(EGLDisplay display, EGLSurface surface) {
     std::uint64_t n = g_shown.fetch_add(1, std::memory_order_relaxed) + 1;
     if (n == 1) log("player: the game's first frame");
-    if (shots().count(n)) save_frame(display, surface, n);
+    if (g_stats) present_stats(display, surface);
+    Shots& s = shots();
+    if (s.frames.count(n)) save_frame(display, surface, n, "frame-" + std::to_string(n));
+    if (!s.times.empty()) {
+        // Seconds from the first frame: a time that has come is saved once, as time-<seconds>.png.
+        static const double first = now_seconds();
+        const double at = *s.times.begin();
+        if (now_seconds() - first >= at) {
+            s.times.erase(s.times.begin());
+            char name[32];
+            std::snprintf(name, sizeof name, "time-%06.1f", at);
+            save_frame(display, surface, n, name);
+        }
+    }
     player::frame_shown(n);
 }
 
