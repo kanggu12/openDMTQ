@@ -14,19 +14,33 @@ start it: nothing is installed, and the game plays against the server as it does
    signed by a publisher Windows knows. Windows 11's Smart App Control, when it is on, blocks unsigned programs, this
    one among them, and has no **Run anyway**.
 
-| Input                    | What it does in the game                         |
-| :----------------------- | :----------------------------------------------- |
-| The mouse's left button  | One finger on the screen                         |
-| A touch screen or a pen  | Fingers, several at once                         |
-| The keyboard             | Text where the game asks for it: Enter, Esc      |
-| F11, or Alt+Enter        | Full screen, and back                            |
+| Input                    | What it does in the game                                                    |
+| :----------------------- | :-------------------------------------------------------------------------- |
+| The mouse's left button  | One finger on the screen: tap, hold and drag                                |
+| The mouse wheel          | Scrolls what is under the pointer, as a finger's drag; with Shift, across   |
+| A touch screen           | Fingers, as many at once as the screen takes, each with the time it saw it  |
+| A pen                    | One finger                                                                  |
+| Esc                      | The phone's Back key: pauses a song, closes what is open, asks to quit      |
+| The keyboard             | Text where the game asks for it (Enter ends it, Esc cancels it), Hangul too |
+| The touch keyboard       | Comes up when a touch opens the game's text, and types into it              |
+| F11, or Alt+Enter        | Full screen, and back                                                       |
 
 - **What it needs:** 64-bit Windows 10 or 11 on an x64 PC (Intel or AMD), and a graphics card with Direct3D 11. About
   500 MB of disk to start: the zip is about 120 MB, the folder it unpacks, with the app, about 130 MB, and the app's
   libraries about 40 MB. The game's data takes more with each song it downloads: 111 MB after a first start and one
   song.
-- **The window** is three quarters of the screen's height, at 16:9. The game draws at the screen's own pixels,
-  whatever its display scaling.
+- **The window** opens at three quarters of the height of the display it starts on, at 16:9. The game draws at the
+  display's own pixels, whatever its scaling, and fills the window while its shape is between 4:3 and 21:9; a window of
+  another shape, such as a display turned upright in full screen, has black around the game. Resized, in full screen or
+  moved to a display with other scaling, the game draws at the new size.
+- **A touch screen** is the player's first input, as a phone's screen is the game's. Windows' own touch feedback stays
+  off the game (no circles under the fingers, no square for a press and hold, no right click for it), and in full screen
+  a finger that comes in from the screen's edge stays the game's instead of opening Windows' panels. Each touch reaches
+  the game as Windows takes it in.
+- **The frame rate** is the refresh rate of the display the window is on, 60 Hz, 144 Hz, 240 Hz or another, with a
+  refresh of its own for every frame. A PC that does not keep up takes every second refresh (120 frames a second on a
+  240 Hz display), then every third, and tries the faster rate again after a while: a song's load holds the frames up
+  for some seconds. Moved to another display, the window takes that display's rate.
 - **The videos** need Windows' Media Foundation. The N and KN editions of Windows come without it: there, install the
   Media Feature Pack, under Settings, Optional features (in Apps or in System, by the version of Windows). Without it
   the videos are black and silent, and the game goes on.

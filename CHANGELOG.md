@@ -6,6 +6,35 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+### Added
+
+- The player for Windows takes a computer's keyboard and mouse as a phone's: Esc is the phone's Back key (it pauses a
+  song, closes what is open and asks before the game quits, and quitting there closes the player), and the mouse wheel
+  scrolls what is under the pointer as a finger's drag, across with Shift. The other keys reach the game as the phone's
+  keys. Text goes in through an input method as well, Hangul with its syllable still being composed, and Windows' touch
+  keyboard comes up when a touch opens the game's text.
+
+### Changed
+
+- The player for Windows makes a touch screen the game's own: Windows' touch feedback is off over the game (no circles
+  under the fingers, no press-and-hold square or right click), a finger from the screen's edge stays the game's in full
+  screen, each touch reaches the game as Windows takes it in instead of at the window's next look up to 4 ms later, and
+  it carries the time the screen saw it.
+- The player for Windows runs the game at the refresh rate of the display its window is on, 60 Hz, 144 Hz, 240 Hz or
+  another, with a refresh of its own for every frame, where it ran at 60 frames a second on every display. A PC that does
+  not keep up takes every second refresh (120 frames a second on a 240 Hz display), then every third, and tries the
+  faster rate again after a while. Moved to another display, the window takes that display's rate.
+- The player for Windows fits the game to its window on any display: the game fills the window while its shape is
+  between 4:3 and 21:9, the shapes the game lays itself out for, and has black around it beyond, as on a display turned
+  upright. The first window is sized for the display it opens on.
+
+### Fixed
+
+- The player for Windows tells the game when its window changes size, as Android does: in full screen, after a resize and
+  on a display with other scaling, the game draws at the window's new size.
+- Text typed into the player for computers reaches the game, a nickname for one: the player closed the game's keyboard in
+  the same turn as it gave it the text, and the game's field kept the text it had.
+
 ## [0.6.0] - 2026-11-08
 
 ### Added
