@@ -20,6 +20,8 @@ $in_app = in_app_browser();
 $ready = $apk && !$stale && !$failed && !$in_app;
 // Just signed in from a download link: this page starts the download (once; see dl_take_start).
 $start = dl_take_start() && $apk && !$stale && !$in_app && !on_ios();
+// The player for Windows with the same app, when this server has one for the app on offer.
+$win = $apk && !$stale && !$failed ? windows_player() : null;
 
 // The download starts after a second, so the page that says so is on screen first. While the
 // builder is still working (no app yet, or one for the old address), check again on its own.
@@ -99,4 +101,14 @@ page_header(t('dl.title'), 'download', $start ? '1;url=/apk' : ((!$apk || $stale
         </details>
     </div>
   </section>
+  <?php if ($win): ?>
+    <?php // A computer plays too: the same app, in the player for Windows. ?>
+    <section class="card" id="computer">
+      <h2><?= t('pc.title') ?></h2>
+      <a class="button" href="/windows"><?= t('pc.button') ?></a>
+      <p class="meta"><?= t('dl.meta', ['size' => number_format($win['size'] / 1048576, 1), 'date' => substr((string)$win['built_at'], 0, 10)]) ?></p>
+      <p><?= t('pc.steps') ?></p>
+      <p class="meta"><?= t('pc.needs') ?></p>
+    </section>
+  <?php endif; ?>
 <?php page_footer();

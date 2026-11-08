@@ -114,6 +114,25 @@ function apk_manifest(): ?array
     return ($m && is_file(APK_DIR . '/' . basename($m['file']))) ? $m : null;
 }
 
+/* The player for Windows with the app on offer in it, as tools/opendmtq_tools/player_windows.py describes it in
+   windows.json beside the app; null when there is none (a server without the player) or it holds another app. */
+function windows_player(): ?array
+{
+    $m = apk_manifest();
+    if (!$m) {
+        return null;
+    }
+    $raw = @file_get_contents(APK_DIR . '/windows.json');
+    $w = $raw === false ? null : json_decode($raw, true);
+    // The app's file name and its hash: a build again on the same day for the same address keeps the name, and the zip
+    // made before it holds the earlier app until the builder makes it again (player_windows.matches() reads it so too).
+    if (!is_array($w) || ($w['apk'] ?? '') !== $m['file'] || (string)($w['apk_sha256'] ?? '') !== (string)($m['sha256'] ?? '')
+        || !is_file(APK_DIR . '/' . basename((string)($w['file'] ?? '')))) {
+        return null;
+    }
+    return $w;
+}
+
 /* True when the builder gave up on the app for this address (data/apk/out/build.json says failed,
    or still says building long after any build ends): waiting for it is pointless. With no such
    file (an older builder) the portal keeps waiting as before. */

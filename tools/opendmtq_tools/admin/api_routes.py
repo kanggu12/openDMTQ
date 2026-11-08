@@ -221,7 +221,16 @@ SHAPES = {
         Field("says", "string", "The same in words.", nullable=True),
         Field("build_error", "string", "Why the last build for this address failed.", nullable=True),
         Field("icon", "boolean", "True when its icon is kept (GET /app/icon)."),
+        Field("windows", "WindowsPlayer", "The player for Windows with this app in it, which the site offers computers "
+              "(GET /app/windows); null on a server without the player, and while no zip holds the app on offer (by its file "
+              "name and its hash).", nullable=True),
         Field("building", "Job", "A build running now.", nullable=True)]),
+    "WindowsPlayer": Shape("The player for Windows with the app on offer in it, as the builder made it.", [
+        Field("file", "string", "Its file name: the app's, ending in -windows.zip."),
+        Field("size", "integer", "Its size (bytes)."),
+        Field("sha256", "string", "Its SHA-256."),
+        Field("built_at", "string", "When the builder made it (YYYY-MM-DDTHH:MM:SS)."),
+        Field("player", "string", "The version of the player in it.")]),
     "Build": Shape("A build of the app.", [
         Field("file", "string", "Its file name."),
         Field("address", "string", "The address it is built for."),
@@ -638,6 +647,8 @@ ROUTES = [
     # The App page (apps.py): the build on offer, every build, the invite link.
     Route("GET", "/app", "read", "app_get", "App", "The app players get: its build, whether it is right for this server, a build running now.",
           answer="AppOnOffer"),
+    Route("GET", "/app/windows", "read", "app_windows", "App", "The player for Windows with the app on offer in it, as the site hands "
+          "it to computers.", download="application/zip", errors=[(404, "not_found", "No player for Windows is kept for the app on offer.")]),
     Route("GET", "/app/icon", "read", "app_icon", "App", "The launcher icon of the app on offer, as the builder kept it.",
           download="image/png", errors=[(404, "not_found", "No icon is kept.")]),
     Route("GET", "/builds", "read", "builds_list", "App", "Every build of the app, newest first.", answer="BuildList"),

@@ -88,6 +88,15 @@ jobs:
           python3 tools/opendmtq_tools/runtime.py --pack data/apk/arm32 dist/opendmtq-arm32-runtime.zip
           cp dist/opendmtq-arm32-runtime.zip tools/opendmtq_tools/
 
+      # The player for Windows without an app: with the release, for a server that fetches it; in the tools image and the
+      # Windows bundle, beside the code that adds each server's app to it for the site (tools/opendmtq_tools/player_windows.py).
+      # It is built from the same guest system and Dynarmic as the runtime above.
+      - name: The player for Windows
+        run: |
+          arm32/build_windows.sh player
+          arm32/bundle_windows.sh dist/opendmtq-player-windows.zip
+          cp dist/opendmtq-player-windows.zip tools/opendmtq_tools/
+
       # The Windows bundle for this version, and its SHA-256, with the release. Before anything is pushed: its downloads are the
       # likeliest thing to fail (some sites drop old files), and a failure here must not leave half a release published.
       - name: Windows bundle
@@ -140,5 +149,6 @@ jobs:
         # The notes are this version's section of CHANGELOG.md; --generate-notes adds the compare link under them.
         run: |
           python3 .github/release_notes.py "$GITHUB_REF_NAME" > dist/release-notes.md
-          gh release create "$GITHUB_REF_NAME" dist/opendmtq-*.tgz dist/opendmtq-arm32-runtime.zip dist/OpenDMTQ-windows.zip dist/OpenDMTQ-windows.zip.sha256 \
+          gh release create "$GITHUB_REF_NAME" dist/opendmtq-*.tgz dist/opendmtq-arm32-runtime.zip dist/opendmtq-player-windows.zip \
+            dist/OpenDMTQ-windows.zip dist/OpenDMTQ-windows.zip.sha256 \
             --notes-file dist/release-notes.md --generate-notes --verify-tag

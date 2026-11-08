@@ -17,7 +17,7 @@ if (isset($_GET['logout'])) {
 // Already signed in (this form sent again, a back button): on to the page, but not into a second
 // download; the install box has the button.
 if (dl_signed_in()) {
-    header('Location: ' . ($next === '/apk' ? '/opendmtq/download.php' : $next));
+    header('Location: ' . ($next === '/apk' ? '/opendmtq/download.php' : ($next === '/windows' ? '/opendmtq/download.php#computer' : $next)));
     exit;
 }
 
@@ -41,6 +41,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($next === '/apk') {
             dl_request_start();
             $next = '/opendmtq/download.php';
+        }
+        // From the link for computers: the download page's part for them, where its button is.
+        if ($next === '/windows') {
+            $next = '/opendmtq/download.php#computer';
         }
         dl_sign_in($who);
         header('Location: ' . $next, true, 303);

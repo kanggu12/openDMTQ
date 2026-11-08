@@ -377,7 +377,24 @@ def app_get(args):
     return {"name": core.app_name(), "address": core.PUBLIC_HOST, "on_offer": build_view(offer) if offer else None,
             "state": {"on": "fits", "wait": "rebuild_failed", "bad": "other_address"}[state[0]] if state else None,
             "says": plain(state[1]) if state else None, "build_error": plain(failed) if failed else None,
-            "icon": os.path.isfile(os.path.join(core.APK, "out", "app-icon.png")), "building": jobs.view(running) if running else None}
+            "icon": os.path.isfile(os.path.join(core.APK, "out", "app-icon.png")), "windows": windows_view(apps.windows_offer(offer)),
+            "building": jobs.view(running) if running else None}
+
+
+def windows_view(made):
+    """The player for Windows as the API shows it (WindowsPlayer), or None."""
+    if not made:
+        return None
+    return {"file": made["file"], "size": made["size"], "sha256": made["sha256"], "built_at": made["built_at"], "player": made["player"]}
+
+
+@handler
+def app_windows(args):
+    """GET /app/windows: the App page's Download for Windows (apps.windows_download), as the site hands it out."""
+    made = apps.windows_offer(apps.offer_state()[0])
+    if not made:
+        raise Refused(404, "not_found", message="No player for Windows is kept for the app on offer.")
+    return apps.windows_download()
 
 
 def kept_file(*parts, mimetype):

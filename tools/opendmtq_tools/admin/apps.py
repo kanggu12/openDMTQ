@@ -1,5 +1,5 @@
-"""The App page: the builds of the phone app, the one on offer, what the last build said, and the QR code. Each form's work
-is a function (start_build, prune, delete) that the API calls as well (api.py)."""
+"""The App page: the builds of the phone app, the one on offer, the player for Windows with it, what the last build said,
+and the QR code. Each form's work is a function (start_build, prune, delete) that the API calls as well (api.py)."""
 
 import datetime
 import json
@@ -11,6 +11,7 @@ import time
 from flask import abort, flash, redirect, render_template, request, send_file, url_for
 from werkzeug.exceptions import NotFound
 
+from .. import player_windows
 from . import core, jobs
 from .core import Refused, app, BASE, changed, human, safe_name, t, tp
 
@@ -218,7 +219,7 @@ def app_page():
     listed = builds()
     offer, state, _ = offer_state(listed)
     typed = job.get("host") or request.args.get("host") or ""
-    return render_template("app.html", offer=offer, state=state, others=[b for b in listed if not b["current"]],
+    return render_template("app.html", offer=offer, state=state, windows=windows_offer(offer), others=[b for b in listed if not b["current"]],
                            job=wanted or None, running=jobs.running_build(), host=typed if typed != core.PUBLIC_HOST else "",
                            icon=os.path.isfile(os.path.join(core.APK, "out", "app-icon.png")))
 
@@ -280,6 +281,35 @@ def download(name):
 @app.route(BASE + "/app/download/<name>")
 def app_download(name):
     return download(name)
+
+
+def windows_offer(offer):
+    """The player for Windows with the app on offer in it, as the builder describes it in windows.json beside the app
+    (tools/opendmtq_tools/player_windows.py), or None: no app on offer, a server without the player, or a player made for
+    another app. By the app's hash as well as its file name: a build again on the same day for the same address keeps the
+    name, and the zip made before it holds the earlier app until the builder makes it again. The API's GET /app and
+    GET /app/windows ask here too (api.py)."""
+    if not offer:
+        return None
+    out = os.path.join(core.APK, "out")
+    made = player_windows.current(out)
+    # offer has the file and the hash latest.json gives the app on offer (builds()).
+    if not player_windows.matches(made, offer) or not os.path.isfile(os.path.join(out, os.path.basename(str(made.get("file", ""))))):
+        return None
+    return made
+
+
+def windows_download():
+    """The player for Windows with the app on offer, as the site hands it to computers (404 when there is none)."""
+    made = windows_offer(offer_state()[0])
+    if not made:
+        abort(404)
+    return send_file(os.path.join(core.APK, "out", os.path.basename(made["file"])), as_attachment=True, mimetype="application/zip")
+
+
+@app.route(BASE + "/app/windows")
+def app_windows():
+    return windows_download()
 
 
 @app.route(BASE + "/app/delete/<name>", methods=["POST"])

@@ -232,6 +232,36 @@ class AppPageTest(unittest.TestCase):
             self.assertIn('class="lamp wait"', page)
             self.assertIn("The last build failed (no base APK). Players still get this one.", page)
 
+    def test_the_player_for_windows_shows_with_the_app_it_holds(self):
+        with Install() as inst:
+            self.build(inst, "OpenDMTQ-new.apk", HOST, "2026-11-01T08:00:00", offered=True)
+            # The app's hash, as the patcher writes it in latest.json: the zip is matched by it too.
+            with open(inst.path("apk/out/latest.json"), encoding="utf-8") as f:
+                latest = json.load(f)
+            inst.write("apk/out/latest.json", json.dumps({**latest, "sha256": "new"}))
+            # None made yet: no line and no button, and its address answers 404.
+            self.assertNotIn("/opendmtq/admin/app/windows", self.page(inst))
+            self.assertEqual(inst.client.get("/opendmtq/admin/app/windows").status_code, 404)
+            # One made for an older app is not this app's.
+            inst.write("apk/out/OpenDMTQ-old-windows.zip", "old")
+            inst.write("apk/out/windows.json", json.dumps({"file": "OpenDMTQ-old-windows.zip", "size": 3, "sha256": "0", "apk": "OpenDMTQ-old.apk",
+                                                           "apk_sha256": "old", "player": "v1", "built_at": "2026-10-01T08:00:00"}))
+            self.assertNotIn("/opendmtq/admin/app/windows", self.page(inst))
+            # Nor one with this app's name made before the app was built again on the same day: it holds the earlier app.
+            inst.write("apk/out/OpenDMTQ-new-windows.zip", "zip")
+            inst.write("apk/out/windows.json", json.dumps({"file": "OpenDMTQ-new-windows.zip", "size": 3, "sha256": "0", "apk": "OpenDMTQ-new.apk",
+                                                           "apk_sha256": "earlier", "player": "v1", "built_at": "2026-11-01T07:01:00"}))
+            self.assertNotIn("/opendmtq/admin/app/windows", self.page(inst))
+            self.assertEqual(inst.client.get("/opendmtq/admin/app/windows").status_code, 404)
+            # The builder's, for the app on offer: the line, the button, and the zip.
+            inst.write("apk/out/windows.json", json.dumps({"file": "OpenDMTQ-new-windows.zip", "size": 3, "sha256": "0", "apk": "OpenDMTQ-new.apk",
+                                                           "apk_sha256": "new", "player": "v1", "built_at": "2026-11-01T08:01:00"}))
+            page = self.page(inst)
+            self.assertIn("With it, the player for Windows that the site offers for computers", page)
+            self.assertIn("/opendmtq/admin/app/windows", page)
+            r = inst.client.get("/opendmtq/admin/app/windows")
+            self.assertEqual((r.status_code, r.mimetype, r.data), (200, "application/zip", b"zip"))
+
     def test_the_icon_shows_only_when_the_builder_kept_one_and_only_signed_in(self):
         with Install() as inst:
             self.build(inst, "OpenDMTQ-new.apk", HOST, "2026-11-01T08:00:00", offered=True)

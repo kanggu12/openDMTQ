@@ -337,6 +337,22 @@ def CASES():
         os.remove(inst.path("apk/out/app-icon.png"))
         return []
 
+    def with_windows(inst, apk_sha256="0"):
+        # The player for Windows beside the app on offer, as the builder leaves it (player_windows.py), made from the app
+        # latest.json names, its hash included.
+        with open(inst.path("apk/out/latest.json"), encoding="utf-8") as f:
+            latest = json.load(f)
+        inst.write("apk/out/latest.json", json.dumps({**latest, "sha256": "0"}))
+        inst.write("apk/out/OpenDMTQ-x-windows.zip", "zip")
+        inst.write("apk/out/windows.json", json.dumps({"file": "OpenDMTQ-x-windows.zip", "size": 3, "sha256": "0", "apk": "OpenDMTQ-x.apk",
+                                                       "apk_sha256": apk_sha256, "player": "v1-test", "built_at": "2026-11-08T12:00:00"}))
+        return []
+
+    def with_windows_for_the_earlier_app(inst):
+        # The app built again on the same day for the same address: its name, and the zip made before still holding the
+        # earlier app until the builder makes it again.
+        return with_windows(inst, apk_sha256="earlier")
+
     def no_qr(inst):
         os.remove(inst.path("apk/out/download-qr.svg"))
         return []
@@ -366,6 +382,13 @@ def CASES():
         C("job_get", "GET", "/jobs/{job}", 200, setup=a_job),
         C("job_get", "GET", "/jobs/nope", 404, "job_not_found"),
         C("app_get", "GET", "/app", 200, check=lambda t, inst, r: t.assertEqual(r.get_json()["state"], "fits")),
+        C("app_get", "GET", "/app", 200, setup=with_windows,
+          check=lambda t, inst, r: t.assertEqual(r.get_json()["windows"]["file"], "OpenDMTQ-x-windows.zip")),
+        C("app_get", "GET", "/app", 200, setup=with_windows_for_the_earlier_app,
+          check=lambda t, inst, r: t.assertIsNone(r.get_json()["windows"])),
+        C("app_windows", "GET", "/app/windows", 200, setup=with_windows, check=lambda t, inst, r: t.assertEqual(r.data, b"zip")),
+        C("app_windows", "GET", "/app/windows", 404, "not_found"),
+        C("app_windows", "GET", "/app/windows", 404, "not_found", setup=with_windows_for_the_earlier_app),
         C("app_icon", "GET", "/app/icon", 200),
         C("app_icon", "GET", "/app/icon", 404, "not_found", setup=no_icon),
         C("builds_list", "GET", "/builds", 200, check=lambda t, inst, r: t.assertEqual(len(r.get_json()["items"]), 2)),
@@ -1316,6 +1339,7 @@ PAGE_ACTIONS = {
     "app_icon": ["app_icon"],
     "app_prune": ["builds_prune"],
     "app_download": ["build_download"],
+    "app_windows": ["app_windows"],
     "app_delete": ["build_delete"],
     "job_status": ["job_get"],
     "songs_page": ["songs_list"],
@@ -1404,6 +1428,7 @@ SITE_PAGES = {
     "index.php": ["site_home", "site_live"],
     "download.php": ["site_home", "invite_get", "invite_qr", "app_icon"],
     "apk.php": ["build_download"],
+    "windows.php": ["app_windows"],
     "icon.php": ["app_icon"],
     "qr.php": ["invite_qr"],
     "songs.php": ["site_songs"],

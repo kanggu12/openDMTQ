@@ -4,7 +4,8 @@ Runs whenever the stack starts (compose service `builder`, Helm hook Job). Build
 when there is none yet, or the newest one was made for another address, another base APK, an
 older patcher, another signing key or another arm32 runtime bundle, or its file is damaged.
 Otherwise it exits at once. The runtime for newer phones comes first, when it is not in place yet (runtime.py). Each run leaves its outcome in data/apk/out/build.json for the portal,
-the admin pages and the command line.
+the admin pages and the command line. The player for Windows, with the app in it, follows the app (player_windows.py), once
+build.json says the app is done: what becomes of it changes nothing for phones.
 
 Usage (inside the tools container): python3 -m opendmtq_tools.builder [--force]
 """
@@ -19,7 +20,7 @@ import sys
 import threading
 import time
 
-from . import patch_apk, runtime
+from . import patch_apk, player_windows, runtime
 
 OUT = os.path.join(patch_apk.APK_DIR, "out")
 # A status still saying "building" after this long belongs to a run that was cut off (its container
@@ -67,7 +68,8 @@ def short_reason(err):
 
 
 def stopped(signum, frame):
-    """SIGTERM handler: end the run like an error, so that build.json says what happened."""
+    """SIGTERM handler: end the run like an error, so that build.json says what happened. Once the app is done, it ends
+    only the player for Windows (windows_player), and build.json stays done."""
     raise SystemExit("stopped part-way (the builder was stopped)")
 
 
@@ -113,6 +115,24 @@ def reason_to_build(host, base):
     return None
 
 
+def windows_player():
+    """The player for Windows beside the app, made when the app or the player changed (player_windows.py), after build.json
+    says the app is done. Its failure stops nothing: phones get their app all the same. A stop while it runs (docker stop's
+    SIGTERM, through stopped(); Ctrl-C) ends it there, its half-made zip removed, and the app stays done: the next run
+    makes the zip."""
+    try:
+        name = player_windows.keep(OUT, current_manifest())
+    except Exception as e:  # noqa: BLE001 - a full disk, a damaged zip: the app is still good
+        print(f"builder: no player for Windows: {short_reason(e)}", flush=True)
+        return
+    # Not an error of the builder's: the run was asked to end, and it does, saying where.
+    except (SystemExit, KeyboardInterrupt) as e:
+        print(f"builder: the player for Windows {short_reason(e)}", flush=True)
+        return
+    if name:
+        print(f"builder: player for Windows {name}", flush=True)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--host", default=os.environ.get("PUBLIC_HOST"))
@@ -129,32 +149,43 @@ def main(argv=None):
     if handled:
         previous = signal.signal(signal.SIGTERM, stopped)
     try:
+        return run(args)
+    finally:
+        # Put back what was there (tests run this in a process that goes on).
+        if handled:
+            signal.signal(signal.SIGTERM, previous if previous is not None else signal.SIG_DFL)
+
+
+def run(args):
+    """The run, with the SIGTERM handler in place: the app when it needs building, its outcome in build.json, then the
+    player for Windows."""
+    try:
         host = patch_apk.validate_host(args.host)
         base = patch_apk.find_base(os.path.join(patch_apk.APK_DIR, "base"), args.base)
         # Before the question whether to build: a runtime that has just come is a reason to. Its failure stops nothing, as
         # the app still runs on phones that run 32-bit apps; it is noted for the owner's pages.
         runtime.add_or_note(patch_apk.APK_DIR)
         why = "forced" if args.force else reason_to_build(host, base)
+        # Up to date: no new app, and no "file" in build.json.
+        name = None
         if why is None:
             print(f"builder: app for http://{host}/ is up to date", flush=True)
-            write_status("done", host)
-            return 0
-        print(f"builder: building ({why})", flush=True)
-        write_status("building", host, reason=why)
-        name = patch_apk.main(["--host", host, "--base", base,
-                               "--stamp", datetime.date.today().strftime("%Y.%m.%d")])
+        else:
+            print(f"builder: building ({why})", flush=True)
+            write_status("building", host, reason=why)
+            name = patch_apk.main(["--host", host, "--base", base,
+                                   "--stamp", datetime.date.today().strftime("%Y.%m.%d")])
     except BaseException as e:  # noqa: BLE001 - the patcher stops with SystemExit, a tool's error, Ctrl-C or SIGTERM
         # Players are told the app could not be built; the owner finds why on the admin pages and
         # with ./opendmtq doctor.
         if not (isinstance(e, SystemExit) and e.code in (None, 0)):
             write_status("failed", args.host or "", error=short_reason(e))
         raise
-    finally:
-        # Put back what was there (tests run this in a process that goes on).
-        if handled:
-            signal.signal(signal.SIGTERM, previous if previous is not None else signal.SIG_DFL)
-    # "file": this run made a new app (the command line reports it as built, not up to date).
-    write_status("done", host, file=name)
+    # The app is done, said before the player for Windows: phones can have it now, and that step can take a while. "file":
+    # this run made a new app (the command line reports a run with one as built).
+    write_status("done", host, **({"file": name} if name else {}))
+    # Still under the SIGTERM handler: a docker stop ends this step at once, and build.json goes on saying done.
+    windows_player()
     return 0
 
 

@@ -146,6 +146,68 @@ jobs:
           DISTRO: ${{ matrix.distro }}
         run: tests/host/run.sh
 
+  # The runtime and the desktop player for Windows, cross-built with llvm-mingw from the same guest system, their tests under
+  # Wine (arm32/test_windows.sh), and the player packed as a release packs it; the programs go to the job below.
+  arm32-windows:
+    runs-on: ubuntu-24.04
+    # The Android build, Dynarmic for Windows and the Wine image take most of it: several times that is a stalled job.
+    timeout-minutes: 75
+    env:
+      ANDROID_NDK: ""
+      ANDROID_HOME: /nonexistent
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: The guest system and test programs (the Android build)
+        run: arm32/build.sh
+
+      - name: The Windows programs
+        run: arm32/build_windows.sh arm32run jvmtest audiotest mediatest player
+
+      - name: Their tests under Wine
+        run: arm32/test_windows.sh
+
+      - name: The player as a release packs it
+        run: arm32/bundle_windows.sh _work/arm32/opendmtq-player-windows.zip
+
+      # The video test's file for Windows itself: a red picture and a 1000 Hz tone, as arm32/test_windows.sh makes it.
+      - name: The video test's file
+        run: |
+          docker run --rm --network none -u "$(id -u):$(id -g)" -v "$PWD/_work/arm32:/o" opendmtq-arm32-wine \
+            ffmpeg -loglevel error -y -f lavfi -i color=c=red:s=320x240:r=30 -f lavfi -i sine=frequency=1000:sample_rate=48000 -t 2 \
+            -c:v libx264 -pix_fmt yuv420p -c:a aac -ac 2 -shortest /o/media-test.mp4
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: arm32-windows
+          path: |
+            _work/arm32/build-windows-x86_64/*.exe
+            _work/arm32/sysroot/
+            _work/arm32/guest/
+            _work/arm32/media-test.mp4
+            _work/arm32/opendmtq-player-windows.zip
+          retention-days: 14
+
+  # The same tests on Windows itself: the layer under Windows' own kernel, and Media Foundation's own decoders
+  # (arm32/test_windows.ps1).
+  arm32-windows-real:
+    needs: arm32-windows
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: arm32-windows
+          path: arm32-windows
+
+      - name: The tests on Windows
+        shell: pwsh
+        run: arm32/test_windows.ps1 -Folder arm32-windows
+
   # The Windows bundle: built on Linux from pinned downloads (host/windows/build.sh), every program's DLLs checked, run under
   # Wine as a first smoke test (tests/windows/wine.sh), and handed to the next job.
   windows-bundle:

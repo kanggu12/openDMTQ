@@ -147,6 +147,12 @@ APP=OpenDMTQ-127.0.0.1-$SITE_PORT-v2026.11.02.apk
 head -c 1048576 /dev/zero > "$DATA/apk/out/$APP"
 printf '{"file": "%s", "host": "%s", "built_at": "2026-11-02T09:28:08", "sha256": "0", "size": 1048576, "patcher": "1.8.0", "runtime": "test", "label": "TECHNIKA Q (%s)", "package": "com.test.opendmtq"}' \
   "$APP" "$HOST" "$HOST" | tee "$DATA/apk/out/latest.json" > "$DATA/apk/out/$APP.json"
+# The player for Windows beside it, as the builder leaves it (tools/opendmtq_tools/player_windows.py): the download page's
+# part for computers.
+WIN=${APP%.apk}-windows.zip
+head -c 2097152 /dev/zero > "$DATA/apk/out/$WIN"
+printf '{"file": "%s", "size": 2097152, "sha256": "0", "apk": "%s", "apk_sha256": "0", "player": "test", "built_at": "2026-11-02T09:29:00"}' \
+  "$WIN" "$APP" > "$DATA/apk/out/windows.json"
 # And one for another address, kept for download: the App page lists it with why players do not get it.
 OTHER=OpenDMTQ-10.0.0.5-8080-v2026.11.01.apk
 head -c 524288 /dev/zero > "$DATA/apk/out/$OTHER"

@@ -289,6 +289,18 @@ async function portalFlows(contexts) {
   check('the front page offers the app and the broadcasts first',
     await front.$eval('.stage-acts .button', a => new URL(a.href).pathname).catch(() => '') === '/apk' && await visible(front, '#watch-live') && await visible(front, '.stage-meta a[href="download.php"]'));
   await front.close();
+  // The download page's part for computers: the player for Windows with the same app, its button the site's /windows,
+  // which hands a signed-in visitor the zip and sends a stranger to the sign-in page first.
+  const dl = await contexts.signed.newPage();
+  await dl.goto(`${P}/download.php`, { waitUntil: 'domcontentloaded' });
+  check('the download page offers the player for Windows', await dl.$eval('#computer .button', a => new URL(a.href).pathname).catch(() => '') === '/windows');
+  const zip = await dl.evaluate(async () => { const r = await fetch('/windows'); return [r.status, r.headers.get('content-type')]; });
+  check('and /windows hands a signed-in visitor the zip', zip[0] === 200 && /application\/zip/.test(zip[1] || ''), JSON.stringify(zip));
+  await dl.close();
+  const stranger = await contexts.anon.newPage();
+  await stranger.goto(`${SITE}/windows`, { waitUntil: 'domcontentloaded' });
+  check('a stranger asking for /windows gets the sign-in first', new URL(stranger.url()).pathname === '/opendmtq/login.php' && new URL(stranger.url()).searchParams.get('next') === '/windows', stranger.url());
+  await stranger.close();
 
   // A wrong password says so and keeps the form.
   const login = await contexts.anon.newPage();

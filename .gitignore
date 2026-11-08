@@ -12,6 +12,8 @@ __pycache__/
 
 # The runtime for newer phones as a release job or a Windows build leaves it beside its code: a release's, not the source's.
 /tools/opendmtq_tools/opendmtq-arm32-runtime.zip
+# The player for Windows, likewise (arm32/bundle_windows.sh).
+/tools/opendmtq_tools/opendmtq-player-windows.zip
 
 # A host install's own programs and run files (host/install.sh).
 /.host/

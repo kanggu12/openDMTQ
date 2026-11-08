@@ -12,6 +12,7 @@
       <span class="offer-file">{{ offer.file }}</span>
       <span class="offer-meta">{{ offer.size|human }} · {{ t('app.built_on', when=offer.built_at[:16].replace('T', ' ')) }} · {{ t('app.runtime', v=offer.runtime) if offer.runtime else t('app.no_runtime') }}</span>
       <span class="offer-state"><span class="lamp {{ state[0] }}"></span>{{ state[1] }}</span>
+      {% if windows %}<span class="offer-meta">{{ t('app.windows', size=windows.size|human) }}</span>{% endif %}
     </div>
   </div>
   {% else %}
@@ -21,6 +22,7 @@
   <div class="btn-line">
     <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="host" value="{{ public_host }}"><button class="btn btn-primary" {% if running %}disabled{% endif %}>{{ t('app.building') if running else (t('app.rebuild') if offer else t('app.build')) }}</button></form>
     {% if offer %}<a class="btn" href="{{ url_for('app_download', name=offer.file) }}">{{ t('btn.download') }}</a>{% endif %}
+    {% if windows %}<a class="btn" href="{{ url_for('app_windows') }}">{{ t('app.windows_download') }}</a>{% endif %}
   </div>
   {% if job %}
     <pre class="log" id="log">{{ t('app.starting') }}</pre>
