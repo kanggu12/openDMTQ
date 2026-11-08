@@ -11,6 +11,10 @@
 #include <sched.h>
 #include <unistd.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 namespace arm32 {
 
 namespace {
@@ -26,6 +30,19 @@ thread_local std::chrono::steady_clock::time_point t_adopt_retry{};
 // guest code would leave its guest thread behind for good: an 8 MB guest stack, one of the
 // monitor's 256 processor slots, a stale entry under a thread id the kernel hands out again, and,
 // when it ran managed code, a registration the garbage collector keeps stopping and waiting for.
+#ifdef _WIN32
+// Windows runs thread-local destructors under its loader lock, which a thread that starts or
+// ends takes too: guest code there that waits for such a thread (a lock, a join) never returns.
+// Fiber-local storage callbacks run as the thread ends before that lock, with the thread's
+// thread-local objects still there: the retirement runs from one. The main thread only ends
+// with the process: no guest code then (static initialisation runs on the main thread).
+const DWORD g_main_thread = GetCurrentThreadId();
+const DWORD g_retire_slot = FlsAlloc([](void* thread) {
+    if (thread && GetCurrentThreadId() != g_main_thread) Guest::get().retire(static_cast<Thread*>(thread));
+});
+// This host thread's guest thread is ended with it.
+void retire_with_host_thread(Thread* t) { FlsSetValue(g_retire_slot, t); }
+#else
 struct Retirement {
     Thread* thread = nullptr;
     ~Retirement() {
@@ -35,6 +52,9 @@ struct Retirement {
     }
 };
 thread_local Retirement t_retirement;
+// This host thread's guest thread is ended with it.
+void retire_with_host_thread(Thread* t) { t_retirement.thread = t; }
+#endif
 
 // Kinds of request the agent's main thread serves.
 constexpr std::uint32_t kRequestAdopt = 1;
@@ -207,9 +227,10 @@ Thread* Guest::try_current() {
     // Ended with this host thread. Thread-local objects are destroyed in the reverse order of
     // their construction: the bridges' per-thread state (JNI local references and the like) is
     // constructed first, so that it is still there when the guest code that retires the thread
-    // (its TLS destructors) calls JNI functions.
+    // (its TLS destructors) calls JNI functions. On Windows the retirement comes before every
+    // thread-local destructor.
     if (thread_init) thread_init();
-    t_retirement.thread = t;
+    retire_with_host_thread(t);
     return t;
 }
 

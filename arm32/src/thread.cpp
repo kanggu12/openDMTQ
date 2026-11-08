@@ -653,7 +653,10 @@ void Thread::fault(const char* kind, std::uint32_t vaddr) {
 
 void Thread::fatal(const char* what, std::uint32_t addr) {
     auto& r = jit_->Regs();
-    log("arm32: thread %d: %s at 0x%08x (pc 0x%08x lr 0x%08x sp 0x%08x)", tid, what, addr, r[15], r[14], r[13]);
+    // Where pc and lr are when they are in code: the library and the offset readelf and objdump use.
+    const std::string pc_at = proc.mem.code_location(r[15]), lr_at = proc.mem.code_location(r[14]);
+    log("arm32: thread %d: %s at 0x%08x (pc 0x%08x%s%s lr 0x%08x%s%s sp 0x%08x)", tid, what, addr, r[15], pc_at.empty() ? "" : " ",
+        pc_at.c_str(), r[14], lr_at.empty() ? "" : " ", lr_at.c_str(), r[13]);
     // No guest signal delivery for faults yet: end the process like an unhandled SIGSEGV would.
     proc.exit_code = 128 + 11;
     proc.exiting = true;

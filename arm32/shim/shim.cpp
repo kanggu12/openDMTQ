@@ -73,6 +73,12 @@ bool requested(const char* /*env*/, const char* property, bool fallback) {
     return fallback;
 }
 
+std::string setting(const char* /*env*/, const char* property) {
+    char value[PROP_VALUE_MAX] = "";
+    __system_property_get(property, value);
+    return value;
+}
+
 void note_frame() { g_frames.fetch_add(1, std::memory_order_relaxed); }
 void note_shown(float, bool) {}
 

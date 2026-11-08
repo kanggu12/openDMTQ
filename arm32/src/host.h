@@ -4,6 +4,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <string>
 
 namespace arm32 {
 
@@ -12,6 +13,23 @@ extern bool g_stats;
 // A switch from the environment (command line) or a system property (apps): "1" on, "0" off,
 // fallback when neither is set.
 bool requested(const char* env, const char* property, bool fallback = false);
+// A setting's text the same way: the environment variable when set, else the system property (a
+// desktop host has none); "" when neither is.
+std::string setting(const char* env, const char* property);
+
+// The host's EGL and GLES libraries: the phone's own on Android; on Windows ANGLE's, which the player carries beside
+// it (OpenGL ES on Direct3D 11); on a desktop Linux host the GL vendor-neutral dispatch's (Mesa's, or the graphics
+// vendor's behind it), by their run-time names.
+#ifdef __ANDROID__
+inline constexpr const char* kHostEgl = "libEGL.so";
+inline constexpr const char* kHostGles = "libGLESv3.so";
+#elif defined(_WIN32)
+inline constexpr const char* kHostEgl = "libEGL.dll";
+inline constexpr const char* kHostGles = "libGLESv2.dll";
+#else
+inline constexpr const char* kHostEgl = "libEGL.so.1";
+inline constexpr const char* kHostGles = "libGLESv2.so.2";
+#endif
 
 // Frames the app has presented (eglSwapBuffers); the hang watch looks for it standing still.
 extern std::atomic<std::uint64_t> g_frames;

@@ -17,7 +17,6 @@
 #include <climits>
 #include <cstdlib>
 #include <mutex>
-#include <sys/system_properties.h>
 #include <dlfcn.h>
 
 namespace arm32 {

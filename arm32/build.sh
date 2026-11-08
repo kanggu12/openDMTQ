@@ -63,6 +63,20 @@ if [ ! -f "$work/sysroot/lib/libc.so" ] || [ ! -f "$work/sysroot/NOTICE.html.gz"
       rm -rf armeabi-v7a image.zip"
 fi
 
+# The time zones for the desktop players (a phone has its own): a release of the tz database at a fixed hash, built into
+# the file the guest's C library reads (arm32/tools/tzdata.py). Built again when the release named here changes.
+tz_version=2026f
+tz_sha256=01b4a91cec5167ed48c11e8ab78f2048cead78ce94b0cafcad0ae8c5a3044d3d
+if [ "$(head -c 11 "$work/sysroot/usr/share/zoneinfo/tzdata" 2>/dev/null)" != "tzdata$tz_version" ]; then
+    run "
+      cd _work/arm32
+      curl -fsSL --retry 3 --retry-delay 5 --connect-timeout 30 -o tzdata.tar.gz.part \
+        https://data.iana.org/time-zones/releases/tzdata$tz_version.tar.gz
+      echo '$tz_sha256  tzdata.tar.gz.part' | sha256sum -c --quiet - || { rm -f tzdata.tar.gz.part; exit 1; }
+      python3 /r/arm32/tools/tzdata.py tzdata.tar.gz.part sysroot/usr/share/zoneinfo/tzdata
+      rm -f tzdata.tar.gz.part"
+fi
+
 # Bridge sources generated from the NDK headers and the stub lists, and the guest's stub
 # libraries built from them (they join the guest system libraries).
 run "
@@ -110,6 +124,8 @@ run "
   \$cc -O2 -o \$out/coherence \$t/coherence.c
   \$cc -O2 -o \$out/memory \$t/memory.c
   \$cc -O2 -o \$out/calls \$t/calls.c
+  \$cc -O2 -o \$out/descriptors \$t/descriptors.c
+  \$cc -O2 -o \$out/zones \$t/zones.c
   \$cc -O2 -o \$out/guard \$t/guard.c
   \${cc}++ -O2 -static-libstdc++ -o \$out/cxx \$t/cxx.cpp
   \$cc -O2 -mfpu=neon -o \$out/neon \$t/neon.c -lm

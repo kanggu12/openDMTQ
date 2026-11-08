@@ -39,7 +39,9 @@
 #include <sys/statfs.h>
 #include <sys/syscall.h>
 #include <sys/sysinfo.h>
+#ifdef __ANDROID__
 #include <sys/system_properties.h>
+#endif
 #include <sys/time.h>
 #include <sys/times.h>
 #include <sys/uio.h>
@@ -180,7 +182,9 @@ static_assert(sizeof(std::atomic<std::uint64_t>) == 8 && std::atomic<std::uint64
 }  // namespace
 }  // namespace arm32
 
-extern "C" long arm32_isys(long a0, long a1, long a2, long a3, long a4, long a5, const arm32::IsysGate* gate);
+// Arguments as the host passes system call arguments: as wide as a pointer (Windows' long is not).
+extern "C" std::intptr_t arm32_isys(std::intptr_t a0, std::intptr_t a1, std::intptr_t a2, std::intptr_t a3, std::intptr_t a4, std::intptr_t a5,
+                                   const arm32::IsysGate* gate);
 extern "C" char arm32_isys_begin[], arm32_isys_end[], arm32_isys_cancel[];
 
 namespace arm32 {
@@ -196,16 +200,17 @@ namespace {
 // it can still cut short a call that was asleep in the kernel. With restart set, such a call is
 // made again, as the kernel would never have interrupted it; for the others (futex waits, epoll
 // waits, connect) the caller sees EINTR, which they allow for.
-long blocking(Thread& t, bool restart, long nr, long a0 = 0, long a1 = 0, long a2 = 0, long a3 = 0, long a4 = 0, long a5 = 0) {
+long blocking(Thread& t, bool restart, long nr, std::intptr_t a0 = 0, std::intptr_t a1 = 0, std::intptr_t a2 = 0, std::intptr_t a3 = 0,
+              std::intptr_t a4 = 0, std::intptr_t a5 = 0) {
     for (;;) {
         IsysGate gate{&t.pending, t.sigmask, nr};
-        long r = arm32_isys(a0, a1, a2, a3, a4, a5, &gate);
+        std::intptr_t r = arm32_isys(a0, a1, a2, a3, a4, a5, &gate);
         if (r == -EINTR && restart && !t.signal_ready()) continue;
         if (r < 0 && r > -4096) {
             errno = static_cast<int>(-r);
             return -1;
         }
-        return r;
+        return static_cast<long>(r);
     }
 }
 constexpr bool kRestart = true, kNoRestart = false;
@@ -311,10 +316,16 @@ int text_fd(const std::string& text, int flags) {
     return fd;
 }
 
-// /proc/cpuinfo as a 32-bit ARMv7 kernel would show it, one entry per host CPU.
-std::string cpuinfo_text() {
-    std::string out;
+// The CPUs the guest is told of: the host's, or fewer when the process says so (Process::max_cpus).
+long guest_cpus(const Process& p) {
     long cpus = sysconf(_SC_NPROCESSORS_CONF);
+    return p.max_cpus > 0 && p.max_cpus < cpus ? p.max_cpus : cpus;
+}
+
+// /proc/cpuinfo as a 32-bit ARMv7 kernel would show it, one entry per CPU the guest is told of.
+std::string cpuinfo_text(const Process& p) {
+    std::string out;
+    long cpus = guest_cpus(p);
     for (long i = 0; i < cpus; ++i) {
         out += "processor\t: " + std::to_string(i) + "\n";
         out += "model name\t: ARMv7 Processor rev 1 (v7l)\n";
@@ -484,6 +495,45 @@ private:
     std::vector<std::uint8_t> data_;
 };
 
+#ifndef __ANDROID__
+// The host's time zone by its tz database name, for the guest's persist.sys.timezone: TZ when it is set (":Asia/Seoul"
+// and a path into a zoneinfo folder name one too, and a POSIX rule such as "KST-9" goes as it is, which the guest's C
+// library reads as well), else Debian's /etc/timezone, else the zone /etc/localtime links to. Empty when none says,
+// and the guest keeps to GMT.
+std::string host_time_zone() {
+#ifdef _WIN32
+    // Windows has no /etc: the layer asks Windows (src/win/sys.cpp).
+    return arm32::posix::host_zone();
+#endif
+    auto zone_of = [](std::string s) {
+        // A leading colon only says "a file", and a path into a zoneinfo folder ends in the zone's name.
+        if (!s.empty() && s[0] == ':') s.erase(0, 1);
+        std::size_t at = s.rfind("zoneinfo/");
+        if (at != std::string::npos) s.erase(0, at + 9);
+        // A line from a file ends at its line break; a zone's name has no spaces.
+        s.erase(std::find_if(s.begin(), s.end(), [](char c) { return c == '\n' || c == '\r' || c == ' ' || c == '\t'; }), s.end());
+        return s;
+    };
+    if (const char* tz = std::getenv("TZ"); tz && *tz) return zone_of(tz);
+    // Debian's file: one line, the zone's name.
+    int fd = open("/etc/timezone", O_RDONLY | O_CLOEXEC);
+    if (fd >= 0) {
+        char line[128];
+        ssize_t n = read(fd, line, sizeof line);
+        close(fd);
+        if (n > 0) {
+            std::string zone = zone_of(std::string(line, static_cast<std::size_t>(n)));
+            if (!zone.empty()) return zone;
+        }
+    }
+    // systemd's way: /etc/localtime is a link into the zoneinfo folder.
+    char link[PATH_MAX];
+    ssize_t n = readlink("/etc/localtime", link, sizeof link);
+    if (n > 0) return zone_of(std::string(link, static_cast<std::size_t>(n)));
+    return "";
+}
+#endif
+
 // The guest's property file, built on first use: a memfd that stays open, and its identity, so
 // that fstat on a guest's copy of it can say what the library checks (owned by root, not
 // writable by others). -1 when the host has no memfd_create.
@@ -510,10 +560,27 @@ const Properties& properties() {
             "ro.debuggable", "ro.secure", "persist.sys.timezone", "persist.sys.locale", "dalvik.vm.heapsize",
             "dalvik.vm.heapgrowthlimit", "gsm.sim.operator.iso-country", "gsm.operator.iso-country",
         };
+#ifdef __ANDROID__
         for (const char* key : kHost) {
             char value[PROP_VALUE_MAX] = "";
             if (__system_property_get(key, value) > 0) area.add(key, value);
         }
+#else
+        // A desktop host has no device to ask: an Android 9 phone of no particular make, as the game would see one.
+        (void)kHost;
+        static const char* const kDesktop[][2] = {
+            {"ro.build.version.sdk", "28"}, {"ro.build.version.release", "9"}, {"ro.build.version.codename", "REL"},
+            {"ro.build.type", "user"}, {"ro.build.tags", "release-keys"}, {"ro.product.model", "OpenDMTQ"},
+            {"ro.product.brand", "OpenDMTQ"}, {"ro.product.manufacturer", "OpenDMTQ"}, {"ro.product.name", "opendmtq"},
+            {"ro.product.device", "opendmtq"}, {"ro.hardware", "opendmtq"}, {"ro.opengles.version", "196610"},
+            {"ro.sf.lcd_density", "320"}, {"ro.debuggable", "0"}, {"ro.secure", "1"}, {"ro.kernel.qemu", "0"},
+            {"dalvik.vm.heapsize", "512m"},
+        };
+        for (const auto& kv : kDesktop) area.add(kv[0], kv[1]);
+        // The host's time zone where a phone keeps its own, which the guest's C library reads when TZ is unset; a name
+        // too long for a property's 92 bytes would be cut into another, and stays out.
+        if (std::string zone = host_time_zone(); !zone.empty() && zone.size() < 92) area.add("persist.sys.timezone", zone);
+#endif
         Properties p;
         std::vector<std::uint8_t> bytes = area.file();
         int fd = static_cast<int>(syscall(__NR_memfd_create, "arm32-properties", 1u /* MFD_CLOEXEC */));
@@ -553,6 +620,10 @@ void property_owner(struct stat& st) {
 struct CloneStart {
     Process* proc;
     CloneState state;
+#ifdef _WIN32
+    // The creating thread's name, which a Linux thread inherits from its creator and a Windows thread does not.
+    char name[16] = {};
+#endif
     // Filled in by the child before the parent's clone returns.
     std::mutex lock;
     std::condition_variable ready;
@@ -563,6 +634,9 @@ void* clone_main(void* arg) {
     auto* cs = static_cast<CloneStart*>(arg);
     Process& proc = *cs->proc;
     int tid = static_cast<int>(gettid());
+#ifdef _WIN32
+    if (cs->name[0]) prctl(PR_SET_NAME, cs->name);
+#endif
     auto* t = new Thread(proc, tid);
     const CloneState& st = cs->state;
     // Same registers as the parent at its next instruction, but clone returns 0 here.
@@ -606,6 +680,9 @@ std::uint32_t do_clone(Thread& t) {
     }
     auto cs = std::make_unique<CloneStart>();
     cs->proc = &t.proc;
+#ifdef _WIN32
+    prctl(PR_GET_NAME, cs->name);
+#endif
     CloneState& st = cs->state;
     st.regs = r;
     if (r[1]) st.regs[13] = r[1];
@@ -643,6 +720,11 @@ std::uint32_t do_clone(Thread& t) {
 
 // ---------------------------------------------------------------------------------------------
 
+#ifdef _WIN32
+// Windows has no signals to interrupt a call with: the layer's waits wait on the thread's own event as well, which
+// posix::interrupt sets (src/win), and arm32_isys checks the gate before it waits.
+void install_interrupt_handler() {}
+#else
 void install_interrupt_handler() {
     struct sigaction sa {};
     sa.sa_sigaction = [](int, siginfo_t*, void* context) {
@@ -676,6 +758,7 @@ void install_interrupt_handler() {
     sa.sa_flags = SA_SIGINFO;  // no SA_RESTART: a blocked system call must return EINTR
     sigaction(kInterruptSignal, &sa, nullptr);
 }
+#endif
 
 int Process::send_signal(int tid, int sig) {
     if (sig < 1 || sig > 64) return -EINVAL;
@@ -720,14 +803,53 @@ int Process::send_signal(int tid, int sig) {
         if (target->tid != static_cast<int>(gettid())) {
             // Blocked in a host system call: interrupt it. Not in guest code at all (in Java
             // between native calls): a helper runs the handler.
+#ifdef _WIN32
+            if (target->attached()) arm32::posix::interrupt(target->tid);
+#else
             if (target->attached()) pthread_kill(target->host_thread, kInterruptSignal);
+#endif
             else target->wake_detached();
         }
     }
     return 0;
 }
 
-std::string Process::host_path(const std::string& path) const {
+// Where the guest's C library looks for the time zones: where Android 6.0 kept them ($ANDROID_ROOT/usr/share/zoneinfo,
+// and ANDROID_ROOT is /system).
+constexpr const char* kGuestTzdata = "/system/usr/share/zoneinfo/tzdata";
+
+// Where this host keeps them: on a phone the tzdata module's file (Android 11 on), the runtime module's (10), or the
+// system's, where the guest finds it as it is (before 10); on a desktop host, the copy the build put in the sysroot
+// (arm32/tools/tzdata.py).
+static std::string tzdata_file(const Process& p) {
+#ifdef __ANDROID__
+    (void)p;
+    // Looked for once: a module's file stays where it is while the phone runs.
+    static const std::string file = [] {
+        for (const char* f : {"/apex/com.android.tzdata/etc/tz/tzdata", "/apex/com.android.runtime/etc/tz/tzdata"})
+            if (access(f, R_OK) == 0) return std::string(f);
+        return std::string(kGuestTzdata);
+    }();
+    return file;
+#else
+    return p.sysroot + "/usr/share/zoneinfo/tzdata";
+#endif
+}
+
+std::string Process::host_path(const std::string& given) const {
+    // Repeated slashes are one, as the kernel reads them, so that every mapping below sees each spelling of a name: the
+    // guest's C library asks for the time zones as "/system//usr/share/zoneinfo/tzdata" ($ANDROID_ROOT, "/", then its
+    // own "/usr/...").
+    std::string path;
+    if (given.find("//") == std::string::npos) {
+        path = given;
+    } else {
+        path.reserve(given.size());
+        for (char c : given)
+            if (c != '/' || path.empty() || path.back() != '/') path += c;
+    }
+    // The time zones from where this host keeps them, before any other mapping: every host has them somewhere else.
+    if (path == kGuestTzdata) return tzdata_file(*this);
     if (path_hook) return path_hook(path);
     // The guest's own system libraries and linker live in the sysroot, not in the host /system.
     if (path.rfind("/system/lib/", 0) == 0) return sysroot + "/lib/" + path.substr(12);
@@ -735,6 +857,24 @@ std::string Process::host_path(const std::string& path) const {
     // There are no vendor libraries for the guest.
     if (path.rfind("/vendor/lib/", 0) == 0) return sysroot + "/vendor-lib/" + path.substr(12);
     return path;
+}
+
+// The address a guest Unix socket binds or connects to, with its file name where host_path puts the guest's files (the
+// desktop player's log socket stands in for the phone's logd this way); other addresses, abstract names and names
+// host_path leaves alone come back as they are. `len` is the address length, changed with the name.
+const sockaddr* unix_address(const Process& p, const sockaddr* a, socklen_t& len, sockaddr_un& moved) {
+    if (!a || len <= offsetof(sockaddr_un, sun_path) || a->sa_family != AF_UNIX) return a;
+    const auto* u = reinterpret_cast<const sockaddr_un*>(a);
+    // An abstract name (a zero first byte) is no file.
+    if (!u->sun_path[0]) return a;
+    std::string name(u->sun_path, strnlen(u->sun_path, std::min<std::size_t>(len - offsetof(sockaddr_un, sun_path), sizeof u->sun_path)));
+    std::string host = p.host_path(name);
+    if (host == name || host.size() >= sizeof moved.sun_path) return a;
+    std::memset(&moved, 0, sizeof moved);
+    moved.sun_family = AF_UNIX;
+    std::memcpy(moved.sun_path, host.c_str(), host.size() + 1);
+    len = static_cast<socklen_t>(offsetof(sockaddr_un, sun_path) + host.size() + 1);
+    return reinterpret_cast<const sockaddr*>(&moved);
 }
 
 // With stats on: each place the guest connects to, once, with the outcome (`error` an errno, 0
@@ -765,7 +905,7 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
     auto& r = t.regs();
     std::uint32_t a0 = r[0], a1 = r[1], a2 = r[2], a3 = r[3], a4 = r[4], a5 = r[5];
     auto H = [&](gaddr g) -> void* { return g ? m.host(g) : nullptr; };
-    auto P = [&](gaddr g) -> long { return reinterpret_cast<long>(H(g)); };
+    auto P = [&](gaddr g) -> std::intptr_t { return reinterpret_cast<std::intptr_t>(H(g)); };
     auto path_arg = [&](gaddr g, std::string& host) -> bool {
         std::string s;
         if (!guest_str(p, g, s)) return false;
@@ -804,7 +944,12 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
         int hflags = open_flags_to_host(flags);
         // Generated files describing the guest rather than the host.
         if (is_self_proc(p, guest, "maps") || is_self_proc(p, guest, "smaps")) return res(text_fd(m.maps_text(), hflags));
-        if (guest == "/proc/cpuinfo") return res(text_fd(cpuinfo_text(), hflags));
+        if (guest == "/proc/cpuinfo") return res(text_fd(cpuinfo_text(p), hflags));
+        // With fewer CPUs than the host's, the lists the C library counts them by say so too.
+        if (p.max_cpus > 0 && (guest == "/sys/devices/system/cpu/possible" || guest == "/sys/devices/system/cpu/present" || guest == "/sys/devices/system/cpu/online")) {
+            long cpus = guest_cpus(p);
+            return res(text_fd(cpus > 1 ? "0-" + std::to_string(cpus - 1) + "\n" : "0\n", hflags));
+        }
         if (is_self_proc(p, guest, "exe")) return res(openat(AT_FDCWD, p.host_path(p.exe_path).c_str(), hflags, mode));
         // The guest's own system properties (a copy of the file shares its memfd's identity).
         if (guest == "/dev/__properties__" && properties().fd >= 0) {
@@ -826,14 +971,14 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
         return 0;
     }
     case 180:  // pread64(fd, buf, count, pad, off_lo, off_hi)
-        return res(blocking(t, kRestart, __NR_pread64, sint(a0), P(a1), a2, static_cast<long>((std::uint64_t{a5} << 32) | a4)));
+        return res(blocking(t, kRestart, __NR_pread64, sint(a0), P(a1), a2, static_cast<std::intptr_t>((std::uint64_t{a5} << 32) | a4)));
     case 181:  // pwrite64
-        return res(blocking(t, kRestart, __NR_pwrite64, sint(a0), P(a1), a2, static_cast<long>((std::uint64_t{a5} << 32) | a4)));
+        return res(blocking(t, kRestart, __NR_pwrite64, sint(a0), P(a1), a2, static_cast<std::intptr_t>((std::uint64_t{a5} << 32) | a4)));
     case 145:    // readv
     case 146: {  // writev
         std::vector<iovec> v;
         if (!get_iovecs(p, a1, a2, v)) return err(EFAULT);
-        return res(blocking(t, kRestart, nr == 145 ? __NR_readv : __NR_writev, sint(a0), reinterpret_cast<long>(v.data()), static_cast<long>(v.size())));
+        return res(blocking(t, kRestart, nr == 145 ? __NR_readv : __NR_writev, sint(a0), reinterpret_cast<std::intptr_t>(v.data()), static_cast<long>(v.size())));
     }
     case 106:    // stat: the old 64-byte struct stat
     case 107:    // lstat
@@ -1036,7 +1181,7 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
             h.l_start = g.start;
             h.l_len = g.len;
             h.l_pid = g.pid;
-            long rc = a1 == F_SETLKW ? blocking(t, kRestart, __NR_fcntl, fd, F_SETLKW, reinterpret_cast<long>(&h))
+            long rc = a1 == F_SETLKW ? blocking(t, kRestart, __NR_fcntl, fd, F_SETLKW, reinterpret_cast<std::intptr_t>(&h))
                                      : fcntl(fd, static_cast<int>(a1), &h);
             if (rc < 0) return err(errno);
             if (a1 == F_GETLK) {
@@ -1382,7 +1527,7 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
             // A call arm32_isys skipped for a ready signal never ran, and the kernel did not write
             // rem: all of req is left then.
             rem = req;
-            rc = blocking(t, kNoRestart, __NR_nanosleep, reinterpret_cast<long>(&req), reinterpret_cast<long>(&rem));
+            rc = blocking(t, kNoRestart, __NR_nanosleep, reinterpret_cast<std::intptr_t>(&req), reinterpret_cast<std::intptr_t>(&rem));
             // A late interrupt meant for no signal: sleep the rest.
             if (!(rc < 0 && errno == EINTR && !t.signal_ready())) break;
             req = rem;
@@ -1401,7 +1546,7 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
         for (;;) {
             // As for nanosleep: a skipped call leaves all of req.
             rem = req;
-            rc = blocking(t, kNoRestart, __NR_clock_nanosleep, sint(a0), sint(a1), reinterpret_cast<long>(&req), reinterpret_cast<long>(&rem));
+            rc = blocking(t, kNoRestart, __NR_clock_nanosleep, sint(a0), sint(a1), reinterpret_cast<std::intptr_t>(&req), reinterpret_cast<std::intptr_t>(&rem));
             // A late interrupt meant for no signal: sleep the rest (an absolute end stays as it is).
             if (!(rc < 0 && errno == EINTR && !t.signal_ready())) break;
             if (!(a1 & TIMER_ABSTIME)) req = rem;
@@ -1436,7 +1581,7 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
         // asleep for good. It never blocks, so it needs no interruptible path.
         if (!waits) return res(syscall(__NR_futex, H(a0), op, a2, arg4, H(a4), sint(a5)));
         // A wait may last for good; a signal for the thread still gets it out.
-        return res(blocking(t, kNoRestart, __NR_futex, P(a0), op, a2, reinterpret_cast<long>(arg4), P(a4), sint(a5)));
+        return res(blocking(t, kNoRestart, __NR_futex, P(a0), op, a2, reinterpret_cast<std::intptr_t>(arg4), P(a4), sint(a5)));
     }
     case 158:  // sched_yield
         return res(sched_yield());
@@ -1450,6 +1595,10 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
         std::vector<std::uint8_t> mask(std::max<std::size_t>(8, (std::size_t{a1} + 7) & ~std::size_t{7}), 0);
         long n = syscall(__NR_sched_getaffinity, static_cast<pid_t>(a0), mask.size(), mask.data());
         if (n < 0) return err(errno);
+        // Only the CPUs the guest is told of.
+        if (p.max_cpus > 0) {
+            for (std::size_t bit = static_cast<std::size_t>(guest_cpus(p)); bit < mask.size() * 8; ++bit) mask[bit / 8] &= static_cast<std::uint8_t>(~(1u << (bit % 8)));
+        }
         std::uint32_t copy = std::min<std::uint32_t>(a1, static_cast<std::uint32_t>(n));
         // Bits beyond the guest's length must be clear, or the guest's set misses CPUs it may use.
         for (std::size_t i = copy; i < static_cast<std::size_t>(n); ++i) {
@@ -1611,7 +1760,7 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
         auto ms = static_cast<std::int32_t>(a2);
         timespec ts{ms / 1000, (ms % 1000) * 1'000'000L};
         // The kernel counts the timeout down in ts, so a restart waits only for the rest.
-        return res(blocking(t, kRestart, __NR_ppoll, P(a0), a1, ms < 0 ? 0 : reinterpret_cast<long>(&ts), 0, 8));
+        return res(blocking(t, kRestart, __NR_ppoll, P(a0), a1, ms < 0 ? 0 : reinterpret_cast<std::intptr_t>(&ts), 0, 8));
     }
     case 336: {  // ppoll(fds, n, timeout, sigmask, sigsetsize): the guest's mask is not applied
         timespec ts{};
@@ -1621,7 +1770,7 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
             ts = to_host(*m.ptr<Timespec32>(a2));
             tp = &ts;
         }
-        return res(blocking(t, kRestart, __NR_ppoll, P(a0), a1, reinterpret_cast<long>(tp), 0, 8));
+        return res(blocking(t, kRestart, __NR_ppoll, P(a0), a1, reinterpret_cast<std::intptr_t>(tp), 0, 8));
     }
     case 142: {  // _newselect: fd_set bit layout matches on little-endian hosts
         // pselect6 is the call both hosts have; like select it leaves the time not slept.
@@ -1633,7 +1782,7 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
             ts = timespec{g->tv_sec, g->tv_usec * 1000L};
             tp = &ts;
         }
-        long rc = blocking(t, kRestart, __NR_pselect6, sint(a0), P(a1), P(a2), P(a3), reinterpret_cast<long>(tp), 0);
+        long rc = blocking(t, kRestart, __NR_pselect6, sint(a0), P(a1), P(a2), P(a3), reinterpret_cast<std::intptr_t>(tp), 0);
         if (rc >= 0 && a4) {
             Timeval32 o{static_cast<std::int32_t>(ts.tv_sec), static_cast<std::int32_t>(ts.tv_nsec / 1000)};
             std::memcpy(m.host(a4), &o, sizeof o);
@@ -1649,7 +1798,7 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
             ts = to_host(*m.ptr<Timespec32>(a4));
             tp = &ts;
         }
-        long rc = blocking(t, kRestart, __NR_pselect6, sint(a0), P(a1), P(a2), P(a3), reinterpret_cast<long>(tp), 0);
+        long rc = blocking(t, kRestart, __NR_pselect6, sint(a0), P(a1), P(a2), P(a3), reinterpret_cast<std::intptr_t>(tp), 0);
         // The kernel counts the timeout down; select() turns what is left back into its timeval.
         if (rc >= 0 && a4) {
             Timespec32 o = to_arm(ts);
@@ -1678,7 +1827,7 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
         if (max <= 0 || max > 4096) return err(EINVAL);
         if (!mem_ok(a1, static_cast<std::uint32_t>(max) * sizeof(EpollEventArm))) return err(EFAULT);
         std::vector<epoll_event> evs(static_cast<std::size_t>(max));
-        long n = blocking(t, kNoRestart, __NR_epoll_pwait, sint(a0), reinterpret_cast<long>(evs.data()), max, sint(a3), 0, 8);
+        long n = blocking(t, kNoRestart, __NR_epoll_pwait, sint(a0), reinterpret_cast<std::intptr_t>(evs.data()), max, sint(a3), 0, 8);
         if (n < 0) return err(errno);
         for (int i = 0; i < n; ++i) {
             EpollEventArm g{evs[static_cast<std::size_t>(i)].events, 0, evs[static_cast<std::size_t>(i)].data.u64};
@@ -1707,10 +1856,18 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
         return res(socket(static_cast<int>(a0), static_cast<int>(a1), static_cast<int>(a2)));
     case 288:  // socketpair
         return res(socketpair(static_cast<int>(a0), static_cast<int>(a1), static_cast<int>(a2), static_cast<int*>(H(a3))));
-    case 282:  // bind
-        return res(bind(static_cast<int>(a0), static_cast<sockaddr*>(H(a1)), a2));
+    case 282: {  // bind
+        // A Unix socket's name is a file name: it goes where the guest's files go (host_path).
+        sockaddr_un moved;
+        socklen_t len = a2;
+        const sockaddr* at = unix_address(p, static_cast<const sockaddr*>(H(a1)), len, moved);
+        return res(bind(static_cast<int>(a0), at, len));
+    }
     case 283: {  // connect
-        const auto* to = static_cast<const sockaddr*>(H(a1));
+        sockaddr_un moved;
+        socklen_t moved_len = a2;
+        const auto* to = unix_address(p, static_cast<const sockaddr*>(H(a1)), moved_len, moved);
+        const bool was_moved = to == reinterpret_cast<const sockaddr*>(&moved);
         // Setting a system property: apps may not since Android 8, and the host refuses it with an
         // SELinux denial written to the log each time; Technika Q tries once a frame. After the
         // host's first refusal the same answer comes from here.
@@ -1720,7 +1877,7 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
                               to->sa_family == AF_UNIX &&
                               std::strcmp(reinterpret_cast<const sockaddr_un*>(to)->sun_path, kPropertyService) == 0;
         const int refused = property ? property_refused.load(std::memory_order_relaxed) : 0;
-        long r = refused ? -1 : blocking(t, kNoRestart, __NR_connect, sint(a0), P(a1), a2);
+        long r = refused ? -1 : blocking(t, kNoRestart, __NR_connect, sint(a0), was_moved ? reinterpret_cast<std::intptr_t>(&moved) : P(a1), moved_len);
         const int e = refused ? refused : r < 0 ? errno : 0;
         if (property && r < 0 && !refused && e != EINTR) property_refused.store(e, std::memory_order_relaxed);
         if (g_stats) note_connect(to, a2, e);
@@ -1783,7 +1940,7 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
         h.msg_namelen = g.namelen;
         h.msg_iov = v.data();
         h.msg_iovlen = v.size();
-        long n = blocking(t, kRestart, nr == 296 ? __NR_sendmsg : __NR_recvmsg, sint(a0), reinterpret_cast<long>(&h), sint(a2));
+        long n = blocking(t, kRestart, nr == 296 ? __NR_sendmsg : __NR_recvmsg, sint(a0), reinterpret_cast<std::intptr_t>(&h), sint(a2));
         if (n < 0) return err(errno);
         if (nr == 297) {
             *m.ptr<std::uint32_t>(a1 + 4) = h.msg_namelen;

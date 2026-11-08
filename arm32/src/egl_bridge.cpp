@@ -9,6 +9,7 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <dlfcn.h>
+#include <type_traits>
 
 namespace arm32 {
 
@@ -16,7 +17,7 @@ namespace {
 
 // Host EGL entry points, looked up once (extensions through eglGetProcAddress).
 void* egl_proc(const char* name) {
-    static void* lib = dlopen("libEGL.so", RTLD_NOW | RTLD_LOCAL);
+    static void* lib = dlopen(kHostEgl, RTLD_NOW | RTLD_LOCAL);
     void* f = lib ? dlsym(lib, name) : nullptr;
     if (!f && lib) {
         static auto get = reinterpret_cast<void* (*)(const char*)>(dlsym(lib, "eglGetProcAddress"));
@@ -141,14 +142,23 @@ std::uint64_t egl_GetConfigAttrib(Thread& t) {
     return fn ? fn(d, c, attr, ptr<EGLint>(w.u32())) : 0;
 }
 
+// A host window handle as EGL takes it: an ANativeWindow pointer on Android; an integer on a desktop
+// host (an X11 window there, which the desktop player's ANativeWindow handles are).
+// A template, so that the branch the platform's type rules out is never compiled.
+template <class W>
+W native_window(void* handle) {
+    if constexpr (std::is_pointer_v<W>) return static_cast<W>(handle);
+    else return reinterpret_cast<W>(handle);
+}
+
 std::uint64_t egl_CreateWindowSurface(Thread& t) {
     FN(EGLSurface (*)(EGLDisplay, EGLConfig, EGLNativeWindowType, const EGLint*), eglCreateWindowSurface);
     Words w{t};
     void* d = dpy(w.u32());
     void* c = cfg(w.u32());
-    auto win = static_cast<EGLNativeWindowType>(handles().get(HandleKind::kWindow, w.u32()));
-    EGLSurface s = fn ? fn(d, c, win, ptr<const EGLint>(w.u32())) : nullptr;
-    if (g_trace) log("trace: eglCreateWindowSurface(window %p) -> %p, error %#x", static_cast<void*>(win), s, host_error());
+    void* win = handles().get(HandleKind::kWindow, w.u32());
+    EGLSurface s = fn ? fn(d, c, native_window<EGLNativeWindowType>(win), ptr<const EGLint>(w.u32())) : nullptr;
+    if (g_trace) log("trace: eglCreateWindowSurface(window %p) -> %p, error %#x", win, s, host_error());
     // The window the game renders to: the one asked for the frame rate.
     if (s) game_window_surface(static_cast<ANativeWindow*>(win));
     return put(HandleKind::kEglSurface, s);

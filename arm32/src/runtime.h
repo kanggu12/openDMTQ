@@ -167,6 +167,10 @@ struct Process {
     bool fast_atomics = false;
     // Guest memory accesses without the page table lookup.
     bool fastmem = false;
+    // The most CPUs the guest is told of (/proc/cpuinfo, /sys/devices/system/cpu, its affinity); 0 for the host's own.
+    // A game sizes its worker threads by them: on a computer with many cores, Unity's job system made thirty-one, and
+    // the main thread spent most of its time waking them all (on a virtual machine each wake-up is costly).
+    int max_cpus = 0;
     std::atomic<int> exit_code{0};
 
     // Signal dispositions set by rt_sigaction (handler, flags, restorer, mask), per signal 1..64.

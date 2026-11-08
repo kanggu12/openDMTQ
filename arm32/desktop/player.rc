@@ -1,0 +1,30 @@
+// The player's icon and the details Windows shows in the file's properties (the icon is the server launcher's,
+// host/windows/opendmtq.ico).
+#include <winver.h>
+
+1 ICON "opendmtq.ico"
+
+// The manifest Windows reads before the program starts (24 is RT_MANIFEST, 1 a program's own).
+1 24 "player.manifest"
+
+VS_VERSION_INFO VERSIONINFO
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName", "OpenDMTQ"
+      VALUE "FileDescription", "OpenDMTQ player"
+      VALUE "InternalName", "OpenDMTQ-Player"
+      VALUE "LegalCopyright", "MIT License, see the licenses folder"
+      VALUE "OriginalFilename", "OpenDMTQ-Player.exe"
+      VALUE "ProductName", "OpenDMTQ"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END

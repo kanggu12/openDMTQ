@@ -18,9 +18,9 @@
 #include "pacing.h"
 
 #include <atomic>
-#include <fstream>
+#include <fcntl.h>
 #include <sstream>
-#include <sys/system_properties.h>
+#include <unistd.h>
 
 namespace arm32 {
 
@@ -59,9 +59,8 @@ gaddr g_target_setter = 0;
 // debug.arm32.framerate, read once; negative when unset.
 float set_frame_rate() {
     static const float rate = [] {
-        char value[PROP_VALUE_MAX] = "";
-        __system_property_get("debug.arm32.framerate", value);
-        return value[0] ? std::strtof(value, nullptr) : -1.0f;
+        std::string value = setting("ARM32_FRAMERATE", "debug.arm32.framerate");
+        return !value.empty() ? std::strtof(value.c_str(), nullptr) : -1.0f;
     }();
     return rate;
 }
@@ -166,7 +165,15 @@ float app_frame_rate() {
 int game_target_frame_rate() { return g_game_target.load(std::memory_order_relaxed); }
 
 void tweaks_load(const std::string& lib_dir) {
-    std::ifstream f(lib_dir + "/libarm32t-tweaks.so");
+    // Read through open and read: on Windows the runtime's layer opens the path as UTF-8, which the C++ library's file
+    // streams would not.
+    std::string text;
+    if (int fd = open((lib_dir + "/libarm32t-tweaks.so").c_str(), O_RDONLY | O_CLOEXEC); fd >= 0) {
+        char buf[4096];
+        for (ssize_t n; (n = read(fd, buf, sizeof buf)) > 0;) text.append(buf, static_cast<std::size_t>(n));
+        close(fd);
+    }
+    std::istringstream f(text);
     std::string line;
     while (std::getline(f, line)) {
         if (line.empty() || line[0] == '#') continue;

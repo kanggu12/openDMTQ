@@ -810,17 +810,24 @@ struct NativeMethod {
     bool focus = false;
 };
 
-#if defined(__aarch64__)
-constexpr int kHostIntRegs = 8;
+#if defined(_WIN32)
+// Microsoft's x64 convention: four registers, each argument's position taking an integer one or a vector one.
+constexpr int kHostIntRegs = 4, kHostFpRegs = 4;
+constexpr bool kPositional = true;
+#elif defined(__aarch64__)
+constexpr int kHostIntRegs = 8, kHostFpRegs = 8;
+constexpr bool kPositional = false;
 #elif defined(__x86_64__)
-constexpr int kHostIntRegs = 6;
+constexpr int kHostIntRegs = 6, kHostFpRegs = 8;
+constexpr bool kPositional = false;
 #else
 #error "unsupported host architecture"
 #endif
 
+// What arm32_jni_entry saved: the integer argument registers, then the vector ones (jni_entry_*.S lays them out so).
 struct SavedRegs {
     std::uint64_t gpr[kHostIntRegs];
-    std::uint64_t fpr[8];
+    std::uint64_t fpr[kHostFpRegs];
 };
 
 struct DispatchResult {
@@ -1540,17 +1547,26 @@ extern "C" DispatchResult arm32_jni_dispatch(NativeMethod* m, SavedRegs* r, std:
     std::vector<std::uint32_t> words;
     words.push_back(g_guest_env);
     words.push_back(local(reinterpret_cast<jobject>(r->gpr[1])));
-    int gi = 2, fi = 0;
+    // JNIEnv and the object took the first two registers; on Windows they took the first two positions of either kind.
+    int gi = 2, fi = kPositional ? 2 : 0;
     std::uint8_t* sp = stack;
     auto next_int = [&]() -> std::uint64_t {
-        if (gi < kHostIntRegs) return r->gpr[gi++];
+        if (gi < kHostIntRegs) {
+            std::uint64_t v = r->gpr[gi++];
+            if (kPositional) fi = gi;
+            return v;
+        }
         std::uint64_t v;
         std::memcpy(&v, sp, 8);
         sp += 8;
         return v;
     };
     auto next_fp = [&]() -> std::uint64_t {
-        if (fi < 8) return r->fpr[fi++];
+        if (fi < kHostFpRegs) {
+            std::uint64_t v = r->fpr[fi++];
+            if (kPositional) gi = fi;
+            return v;
+        }
         std::uint64_t v;
         std::memcpy(&v, sp, 8);
         sp += 8;

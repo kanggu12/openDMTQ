@@ -13,7 +13,9 @@
 #include <chrono>
 #include <thread>
 
+#ifdef __ANDROID__
 #include <android/log.h>
+#endif
 #include <csignal>
 #include <dlfcn.h>
 #include <cstdarg>

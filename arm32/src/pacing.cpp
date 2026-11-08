@@ -67,7 +67,6 @@
 #include <cstring>
 #include <mutex>
 #include <string>
-#include <sys/system_properties.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -103,7 +102,7 @@ float ms(Nanos n) { return static_cast<float>(static_cast<double>(n) / 1e6); }
 
 // Host EGL entry points; the frame timestamp ones are extensions.
 void* egl_fn(const char* name) {
-    static void* lib = dlopen("libEGL.so", RTLD_NOW | RTLD_LOCAL);
+    static void* lib = dlopen(kHostEgl, RTLD_NOW | RTLD_LOCAL);
     static auto get = reinterpret_cast<void* (*)(const char*)>(lib ? dlsym(lib, "eglGetProcAddress") : nullptr);
     void* f = lib ? dlsym(lib, name) : nullptr;
     return f || !get ? f : get(name);
@@ -518,10 +517,9 @@ bool low_resolution_wanted() {
     int known = g_low_resolution.load(std::memory_order_relaxed);
     if (known < 0) {
         // The property decides when it is set, for trying both out. Otherwise the file.
-        char value[PROP_VALUE_MAX] = "";
-        __system_property_get("debug.arm32.lowres", value);
-        const std::string mark = value[0] ? "" : low_resolution_mark();
-        known = value[0] ? value[0] != '0' : (!mark.empty() && access(mark.c_str(), F_OK) == 0);
+        std::string value = setting("ARM32_LOWRES", "debug.arm32.lowres");
+        const std::string mark = !value.empty() ? "" : low_resolution_mark();
+        known = !value.empty() ? value[0] != '0' : (!mark.empty() && access(mark.c_str(), F_OK) == 0);
         g_low_resolution.store(known, std::memory_order_relaxed);
     }
     return known != 0;
@@ -564,9 +562,7 @@ EGLBoolean paced_swap(EGLDisplay d, EGLSurface s) {
     if (!s) return e.swap(d, s);
     // Test aid (see the top of the file).
     static const long slow = [] {
-        char value[PROP_VALUE_MAX] = "";
-        __system_property_get("debug.arm32.slowframe", value);
-        return std::strtol(value, nullptr, 10);
+        return std::strtol(setting("ARM32_SLOWFRAME", "debug.arm32.slowframe").c_str(), nullptr, 10);
     }();
     if (slow > 0) sleep_until(now_ns() + slow * 1000000);
     const bool pace = pacing_enabled() && e.compositor_timing && e.presentation_time;

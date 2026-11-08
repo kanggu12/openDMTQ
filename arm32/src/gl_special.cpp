@@ -105,8 +105,8 @@ HandleTable& handles() {
 }
 
 void* gl_proc(const char* name) {
-    static void* gles = dlopen("libGLESv3.so", RTLD_NOW | RTLD_LOCAL);
-    static void* egl = dlopen("libEGL.so", RTLD_NOW | RTLD_LOCAL);
+    static void* gles = dlopen(kHostGles, RTLD_NOW | RTLD_LOCAL);
+    static void* egl = dlopen(kHostEgl, RTLD_NOW | RTLD_LOCAL);
     static auto get_proc = egl ? reinterpret_cast<void* (*)(const char*)>(dlsym(egl, "eglGetProcAddress")) : nullptr;
     void* f = gles ? dlsym(gles, name) : nullptr;
     if (!f && get_proc) f = get_proc(name);

@@ -278,6 +278,25 @@ arm32/build.sh arm64-v8a    # or x86_64 for the emulator
 arm32/test.sh [adb-serial]  # pushes the runner and tests, runs them over adb
 ```
 
+The core also builds for computers, a desktop Linux host (x86-64, glibc) and Windows x64, with the player that runs the
+game there (`desktop/`; [the player for Windows](../docs/windows-player.md)). After `build.sh` has fetched Dynarmic and
+built the guest programs:
+
+```sh
+arm32/build_desktop.sh      # Linux: the runner, the player and their tests, in _work/arm32/build-desktop-x86_64
+arm32/test_desktop.sh       # the same guest programs and checks on this machine, and the player's parts
+arm32/build_windows.sh arm32run jvmtest audiotest mediatest player    # Windows, cross-built with llvm-mingw
+arm32/test_windows.sh       # the Windows programs' tests under Wine
+arm32/bundle_windows.sh     # the player for Windows as a release ships it
+```
+
+On a computer the runtime takes its switches from the environment only, logs to stderr, and gives the guest the system
+properties of an Android 9 phone of no particular make. In place of Android's Java side, the player hosts the game in a
+small Java VM of its own (`jvm/`) with the classes the game calls. On Windows a thin layer (`src/win`) gives the core
+Linux's system calls (files, memory, threads and futexes, signals as interruptions, sockets); the player draws through
+ANGLE (OpenGL ES on Direct3D 11), plays its sound through WASAPI and decodes video with Media Foundation. CI runs the
+Windows tests under Wine and on Windows itself (`test_windows.ps1`).
+
 `build.sh` fetches Dynarmic at a fixed commit and the 32-bit system libraries from Google's AOSP
 system image (checksum checked) into `_work/arm32`, which is not tracked. Those libraries are open source and unchanged, and
 their licenses go with them (`NOTICES.txt`, `libc++-LICENSE.txt`, and the image's own notices): see

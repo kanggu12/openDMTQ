@@ -18,7 +18,7 @@
 #include <csignal>
 #include <cstdio>
 #include <cstring>
-#include <fstream>
+#include <fcntl.h>
 #include <thread>
 #include <unistd.h>
 #include <vector>
@@ -133,12 +133,21 @@ void note_signal(int sig) {
 
 namespace {
 
+// The first line of a file of /proc, through open and read: on Windows the layer makes these files, which the C
+// library's own file functions would not find.
+std::string proc_read(const std::string& path) {
+    int fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return {};
+    char buf[1024];
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    return n > 0 ? std::string(buf, static_cast<std::size_t>(n)) : std::string();
+}
+
 // The host thread's name (guest threads name themselves with prctl, which reaches the host).
 std::string thread_name(int tid) {
-    std::ifstream f("/proc/self/task/" + std::to_string(tid) + "/comm");
-    std::string name;
-    std::getline(f, name);
-    return name;
+    std::string name = proc_read("/proc/self/task/" + std::to_string(tid) + "/comm");
+    return name.substr(0, name.find('\n'));
 }
 
 void dump_thread(Process& p, Thread& t) {
@@ -185,12 +194,10 @@ std::uint64_t cpu_ticks(int tid) {
     char path[64];
     if (tid) std::snprintf(path, sizeof path, "/proc/self/task/%d/stat", tid);
     else std::snprintf(path, sizeof path, "/proc/self/stat");
-    std::FILE* f = std::fopen(path, "re");
-    if (!f) return 0;
+    const std::string text = proc_read(path);
+    if (text.empty()) return 0;
     char buf[1024];
-    std::size_t n = std::fread(buf, 1, sizeof buf - 1, f);
-    std::fclose(f);
-    buf[n] = '\0';
+    std::snprintf(buf, sizeof buf, "%s", text.c_str());
     // The fields after the name in parentheses (which may hold spaces): state, then ten
     // numbers, then utime and stime.
     const char* p = std::strrchr(buf, ')');
