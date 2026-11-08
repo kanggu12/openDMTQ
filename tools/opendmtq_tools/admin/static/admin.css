@@ -531,6 +531,8 @@ table.accounts .account-id { white-space: nowrap; }
   table.accounts td.actions { grid-column: 1 / -1; width: auto; padding: 0 0 12px; }
   table.accounts .btns { display: flex; justify-content: flex-end; }
 }
+/* The API's tokens: under each name the start of the token, its id, in the code's face as the token is written. */
+table.tokens .token-id { font: 12px/1.4 var(--mono); }
 /* A button whose word changes from row to row (Disable or Enable, Give or Remove admin rights) as wide as the longer of
    its two words, so that every row's buttons stand in the same columns: the other word is laid out unseen under it. */
 .btn.twin { flex-direction: column; }

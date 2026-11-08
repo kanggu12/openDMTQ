@@ -1,5 +1,6 @@
-"""The Accounts page: the sign-ins of the site and of these pages, and each new password shown once. Each form's work is
-a function of its own (create, change, link), apart from the page that calls it."""
+"""The Accounts page: the sign-ins of the site and of these pages, and each new password shown once; the API's tokens too.
+Each form's work is a function of its own (create, change, link, and tokens.make and tokens.revoke), which the API calls
+as well (api.py): the page and the API cannot differ."""
 
 import secrets
 import sqlite3
@@ -8,11 +9,12 @@ import time
 
 from flask import flash, redirect, render_template, request, session, url_for
 
-from . import apps, auth, core
+from . import apps, auth, core, tokens
 from .core import Refused, ago, app, BASE, changed, db, t, why
 
 # A new account's password, or a new password, shown on the next page only: never in the session's cookie (the browser
-# keeps that) and never twice. Waits ten minutes at most. In memory: the service runs one process.
+# keeps that) and never twice. Waits ten minutes at most. In memory: the service runs one process. A new API token waits
+# here the same way.
 _shown = {}
 _shown_lock = threading.Lock()
 
@@ -37,7 +39,7 @@ def _keep(key, shown):
 
 
 def take_once(key="shown"):
-    """What keep_once kept for this page under key, once and for ten minutes at most, or None."""
+    """The account keep_once kept for this page (or the token kept under key), once and for ten minutes at most, or None."""
     with _shown_lock:
         shown = _shown.pop(session.pop(key, ""), None)
     return shown if shown and time.time() - shown["at"] <= 600 else None
@@ -55,7 +57,9 @@ def accounts_page():
     if request.method == "POST":
         return accounts_action()
     shown = take_once()
-    rows, broken, players = [], False, []
+    # A token just made: shown here once, as a new password is.
+    shown_token = take_once("shown_token")
+    rows, broken, players, listed_tokens = [], False, [], []
     try:
         with db() as con:
             auth.account_table(con)
@@ -64,10 +68,13 @@ def accounts_page():
             # When each last signed in, as long ago as that was; the moment itself under the pointer.
             rows = [dict(r, last=ago(r["signed_in_at"]) if r["signed_in_at"] else "")
                     for r in con.execute("SELECT name, note, admin, created_at, signed_in_at, off, guid FROM SiteUser ORDER BY name COLLATE NOCASE")]
+        # The API's tokens, with when each was last used, as long ago as that was.
+        listed_tokens = [dict(r, last=ago(r["used_at"]) if r["used_at"] else "") for r in tokens.listing()]
     except sqlite3.Error:
         broken = True
     message = apps.invite_text(apps.friends_address(core.server_health()), shown["name"], shown["password"]) if shown else ""
-    return render_template("accounts.html", accounts=rows, broken=broken, shown=shown, message=message, owner=core.ADMIN_USER, players=players)
+    return render_template("accounts.html", accounts=rows, broken=broken, shown=shown, message=message, owner=core.ADMIN_USER, players=players,
+                           tokens=listed_tokens, shown_token=shown_token, scopes=tokens.SCOPES)
 
 
 def accounts_action():
@@ -75,6 +82,21 @@ def accounts_action():
     said so; nothing that changes nothing goes into the log of changes."""
     action = request.form.get("action", "")
     name = request.form.get("name", "").strip()
+    # The API's tokens: made for the admin signed in, shown once; revoked by their id.
+    if action == "token":
+        try:
+            row, token = tokens.make(request.form.get("token_name", ""), request.form.get("scope", ""), tokens.acting_admin())
+        except Refused as e:
+            flash(e.words, e.tone)
+            return redirect(url_for("accounts_page"))
+        _keep("shown_token", {"name": row["name"], "scope": row["scope"], "token": token})
+        return redirect(url_for("accounts_page"))
+    if action == "revoke":
+        try:
+            flash(t("tok.revoked", name=tokens.revoke(request.form.get("token", ""))), "ok")
+        except Refused as e:
+            flash(e.words, e.tone)
+        return redirect(url_for("accounts_page"))
     if action == "create":
         note = request.form.get("note", "").strip()[:40]
         try:
@@ -164,6 +186,8 @@ def change(name, action, acting):
                 con.execute("UPDATE SiteUser SET pass = ? WHERE name = ?", (stored, name))
             elif action == "delete":
                 con.execute("DELETE FROM SiteUser WHERE name = ?", (name,))
+                # Its API tokens with it: the ID may go to someone else later.
+                tokens.drop_for(con, name)
             elif action in ("admin", "player"):
                 con.execute("UPDATE SiteUser SET admin = ? WHERE name = ?", (1 if action == "admin" else 0, name))
             else:

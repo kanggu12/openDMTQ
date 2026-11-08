@@ -104,6 +104,11 @@ curl -sf -m 10 -b "$JAR" -o /dev/null --data-urlencode "csrf=$CSRF" --data-urlen
 # longest buttons (Remove admin rights) beside the list's longest word (Not linked).
 curl -sf -m 10 -b "$JAR" -o /dev/null --data-urlencode "csrf=$CSRF" --data-urlencode action=create --data-urlencode name=manager \
   --data-urlencode admin=1 --data-urlencode "note=runs the server too" "http://127.0.0.1:$ADMIN_PORT/opendmtq/admin/accounts"
+# Two API tokens, made as the owner makes them on the same page: one to write, one to read with a name as long as one may be.
+curl -sf -m 10 -b "$JAR" -o /dev/null --data-urlencode "csrf=$CSRF" --data-urlencode action=token --data-urlencode "token_name=nightly backup" \
+  --data-urlencode scope=write "http://127.0.0.1:$ADMIN_PORT/opendmtq/admin/accounts"
+curl -sf -m 10 -b "$JAR" -o /dev/null --data-urlencode "csrf=$CSRF" --data-urlencode action=token \
+  --data-urlencode "token_name=health monitor on the living-room PC" --data-urlencode scope=read "http://127.0.0.1:$ADMIN_PORT/opendmtq/admin/accounts"
 rm -f "$JAR"
 
 # One stage in the browser; goes on after a failure, so that the report has everything. No network of its own beyond the

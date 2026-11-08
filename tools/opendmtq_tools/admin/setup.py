@@ -30,8 +30,7 @@ from .. import importer, patch_apk, songs
 from . import accounts, apps, auth, core, jobs
 from .core import Refused, app, BASE, changed, same_text, t
 
-# What a caller other than the pages is told where only a host install can do a thing (the pages answer 404 there, and
-# name the command instead).
+# What the API says where only a host install can do a thing (the pages answer 404 there, and name the command instead).
 HOST_ONLY = "Only a host install (or the Windows bundle) does this from its pages. With Docker Compose and Kubernetes it is a command on the server PC."
 
 # ------------------------------------------------------------------------------ where these pages run
@@ -222,33 +221,51 @@ def entries(path):
         return None
 
 
+def network_refusal():
+    """What a path on another computer gets: refused before anything looks at it. A look at a network share (even a
+    stat) makes Windows sign in to that computer with this PC's own credentials."""
+    return Refused(400, "network_path", t("setup.network_path"))
+
+
 def clean_path(text):
     """A path as people paste it, made one the system takes: spaces and quotes around it gone (Windows' Copy as path puts
-    it in quotes), a file:// address made a path, %USERPROFILE% or ~ worked out, a drive letter alone made its top folder,
-    and a path from no drive's top or root taken from the home folder (Downloads/DMTQ). Empty when nothing is left."""
+    it in quotes), a file:// address made a path, ~ made the home folder, a drive letter alone made its top folder, and a
+    path from no drive's top or root taken from the home folder (Downloads/DMTQ). Empty when nothing is left. $NAME and
+    %NAME% stay as they are written: a path never brings out a value of this program's environment (its passwords are
+    there). Refused (network_refusal): a path on another computer, on any system."""
     # No system's paths hold a NUL, and the calls that read folders raise ValueError on one rather than OSError.
     text = (text or "").replace("\0", "").strip()
     while len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
         text = text[1:-1].strip()
     if not text:
         return ""
-    # A file's address, as a browser's address bar shows it: file:///C:/Users/..., file://nas/share/..., file:///home/...
+    # A file's address, as a browser's address bar shows it: file:///C:/Users/..., file:///home/...
     if text.lower().startswith("file:"):
         url = urllib.parse.urlparse(text)
+        # A host before the path (file://nas/share/...) is another computer's share.
+        if url.netloc and url.netloc.lower() != "localhost":
+            raise network_refusal()
         text = urllib.parse.unquote(url.path)
-        if os.name == "nt":
-            # The drive comes after the address's own slash; a host before the path is a network share.
-            if re.match(r"/[A-Za-z]:", text):
-                text = text[1:]
-            elif url.netloc and url.netloc.lower() != "localhost":
-                text = "//" + url.netloc + text
-    text = os.path.expanduser(os.path.expandvars(text))
+        # On Windows the drive comes after the address's own slash.
+        if os.name == "nt" and re.match(r"/[A-Za-z]:", text):
+            text = text[1:]
+    # Two slashes or backslashes first: a share (\\server\share, //server/share) or Windows' long forms of one
+    # (\\?\UNC\server\share), refused on every system, as the same text means the same on all of them.
+    if re.match(r"[\\/]{2}", text):
+        raise network_refusal()
+    # The home folder: ~ alone or before a separator. Nothing else in the text is worked out (~name included).
+    if text == "~" or re.match(r"~[\\/]", text):
+        text = os.path.expanduser("~") + text[1:]
     if os.name == "nt" and len(text) == 2 and text[1] == ":":
         text += "\\"
     # Relative to the server program's own folder it would mean nothing to the person: their home is where they start.
     if not os.path.isabs(text):
         text = os.path.join(os.path.expanduser("~"), text)
-    return os.path.normpath(text)
+    text = os.path.normpath(text)
+    # Once more on what came out: no way of writing it may end on another computer.
+    if re.match(r"[\\/]{2}", text):
+        raise network_refusal()
+    return text
 
 
 def too_wide(path):
@@ -500,7 +517,7 @@ def drives():
 
 def places():
     """Where the folder picker goes in one step: the folders people keep files in (home_folders), then the drives. The
-    setup page shows them as buttons above the picker; a function apart from the page, as its other actions are."""
+    setup page shows them as buttons above the picker, and the API lists them with each folder."""
     return home_folders() + drives()
 
 
@@ -765,7 +782,11 @@ def setup_page():
         if HOST_INSTALL:
             view["found"] = found_on_this_pc()
             asked = request.args.get("dir", "")
-            browse = clean_path(asked) or default_folder()
+            try:
+                browse = clean_path(asked) or default_folder()
+            except Refused as e:
+                # A path on another computer: said why, above the picker, which opens where it opens by default.
+                view["path_refused"], browse = e.words, default_folder()
             view["picked"] = None
             # A file's path opens its folder, with the file marked to import.
             if os.path.isfile(browse):
@@ -781,7 +802,7 @@ def setup_page():
                 view["listing"] = listing(browse)
             if view["listing"] is not None:
                 view["crumbs"] = crumbs(browse)
-            # The places to go in one step.
+            # The places to go in one step, as the API lists them too.
             view["places"] = places()
             view["path_example"] = ("C:\\Users\\you\\Downloads\\DMTQ" if os.name == "nt"
                                     else os.path.join(os.path.expanduser("~"), "Downloads", "DMTQ"))
@@ -834,6 +855,9 @@ def setup_what():
     try:
         w = what_is(clean_path(request.args.get("path", "")))
         return jsonify(ok=bool(w and w["ok"]), text=what_words(w))
+    except Refused as e:
+        # A path on another computer: never looked at, and said so in the list's own words.
+        return jsonify(ok=False, text=e.words)
     except Exception:  # noqa: BLE001 - a file nobody foresaw (7-Zip missing, a device, a name the system refuses)
         app.logger.exception("setup/what")
         return jsonify(ok=False, text=t("setup.what_error"))

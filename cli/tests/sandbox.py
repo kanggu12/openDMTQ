@@ -16,7 +16,7 @@ import tarfile
 import tempfile
 from unittest import mock
 
-from opendmtq_cli import app, backup, checks, env, system
+from opendmtq_cli import app, backup, checks, env, keep_tokens, system
 
 # The real repository, for files a command reads from it (the firewall script).
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -53,6 +53,8 @@ class Sandbox:
         self.built = False
         self.compose_calls, self.tool_calls, self.urls, self.scripts = [], [], [], []
         self.tool_services = []
+        # How many API tokens the last restore's job kept (keep_tokens.keep), None before one ran.
+        self.tokens_kept = None
         # Tool module -> function(args, extra_env) run in its place, returning its exit code.
         self.tools = {}
         # Program name prefix -> result, for the programs a command may run.
@@ -118,16 +120,9 @@ class Sandbox:
     def _compose(self, *args, extra_env=None, check=True, capture=False):
         self.compose_calls.append(args)
         words = " ".join(args)
-        if "cp /in/dmtq.db3 /data/state/dmtq.db3" in words:
-            # The restore's copy job.
-            os.makedirs(os.path.join(self.data, "state"), exist_ok=True)
-            # What the job's own shell line says it removes first, removed here too.
-            for end in ("-wal", "-shm", "-journal"):
-                if f"/data/state/dmtq.db3{end}" in words:
-                    with contextlib.suppress(FileNotFoundError):
-                        os.remove(os.path.join(self.data, "state", "dmtq.db3" + end))
-            shutil.copyfile(os.path.join(extra_env["IMPORT_FROM"], "dmtq.db3"),
-                            os.path.join(self.data, "state", "dmtq.db3"))
+        if "cp /in/dmtq.db3 " in words:
+            # The restore's copy job: its shell line, step by step, on this sandbox's folders.
+            self._restore_job(args[-1], extra_env["IMPORT_FROM"])
         elif args[0] == "down":
             self.state = None
         elif args[0] == "stop":
@@ -135,6 +130,37 @@ class Sandbox:
         elif args[0] == "start" or (args[0] == "up" and "server" in args):
             self.state = "running"
         return done()
+
+    def _restore_job(self, line, folder):
+        """The restore's shell line in the tools container, as the container would run it: /data is this sandbox's data
+        folder, /in the folder the restore unpacked the archive into. Each step its own way here: mkdir -p, cp, rm -f, mv,
+        and python3 of keep_tokens.py (the module itself, called with the same paths)."""
+        def here(path):
+            # A container path on this machine.
+            if path.startswith("/data/"):
+                return os.path.join(self.data, path[len("/data/"):])
+            if path.startswith("/in/"):
+                return os.path.join(folder, path[len("/in/"):])
+            raise AssertionError(f"the restore's line names a path outside /data and /in: {path}")
+
+        for step in line.split("&&"):
+            words = step.split()
+            if words[:2] == ["mkdir", "-p"]:
+                for path in words[2:]:
+                    os.makedirs(here(path), exist_ok=True)
+            elif words[0] == "cp":
+                shutil.copyfile(here(words[1]), here(words[2]))
+            elif words[:2] == ["rm", "-f"]:
+                for path in words[2:]:
+                    with contextlib.suppress(FileNotFoundError):
+                        os.remove(here(path))
+            elif words[0] == "mv":
+                os.replace(here(words[1]), here(words[2]))
+            elif words[:2] == ["python3", "/in/keep_tokens.py"]:
+                # The script the restore put beside the archive's files: the package's own module.
+                self.tokens_kept = keep_tokens.keep(here(words[2]), here(words[3]))
+            else:
+                raise AssertionError(f"the restore's line has a step this sandbox does not know: {step.strip()}")
 
     def _tool(self, module, *args, extra_env=None, as_invoker=False, service="tools"):
         self.tool_calls.append((module, args, dict(extra_env or {})))

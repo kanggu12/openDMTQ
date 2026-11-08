@@ -12,6 +12,7 @@ import sqlite3
 import tempfile
 import time
 import unittest
+import urllib.parse
 from unittest import mock
 
 from tests.test_admin import HAVE_FLASK, HOST, Install, old_game_database
@@ -421,16 +422,19 @@ class FilesOnThisPcTest(unittest.TestCase):
             self.assertIn("patch/phone_new", page)
 
     def test_a_path_is_taken_as_people_paste_it(self):
+        home = os.path.expanduser("~")
         with mock.patch.dict(os.environ, {"DMTQ_TEST_HOME": "/home/x"}):
             self.assertEqual(setup.clean_path('  "/home/x/Downloads/DMTQ"  '), "/home/x/Downloads/DMTQ")
             self.assertEqual(setup.clean_path("'/home/x/a b/'"), "/home/x/a b")
-            self.assertEqual(setup.clean_path("$DMTQ_TEST_HOME/Downloads"), "/home/x/Downloads")
+            # The name of a setting stays as it is written, never its value: a path from no top, from the home folder.
+            for typed in ("$DMTQ_TEST_HOME/Downloads", "${DMTQ_TEST_HOME}/Downloads", "%DMTQ_TEST_HOME%/Downloads"):
+                self.assertEqual(setup.clean_path(typed), os.path.join(home, typed.split("/")[0], "Downloads"), typed)
             self.assertEqual(setup.clean_path('""'), "")
             self.assertEqual(setup.clean_path("   "), "")
             # A browser's address for a file, its spaces written as %20.
             self.assertEqual(setup.clean_path("file:///home/x/my%20files/DMTQ"), "/home/x/my files/DMTQ")
-        home = os.path.expanduser("~")
         self.assertEqual(setup.clean_path("~/Downloads"), os.path.join(home, "Downloads"))
+        self.assertEqual(setup.clean_path("~"), home)
         # From no top: from the home folder, not from wherever the server program runs.
         self.assertEqual(setup.clean_path("Downloads/DMTQ"), os.path.join(home, "Downloads", "DMTQ"))
         # Windows' own forms, as its paths work.
@@ -439,8 +443,36 @@ class FilesOnThisPcTest(unittest.TestCase):
             self.assertEqual(setup.clean_path('"C:\\Users\\me\\Downloads\\"'), "C:\\Users\\me\\Downloads")
             self.assertEqual(setup.clean_path("D:"), "D:\\")
             self.assertEqual(setup.clean_path("Downloads\\DMTQ"), "C:\\Users\\me\\Downloads\\DMTQ")
+            self.assertEqual(setup.clean_path("~\\Downloads"), "C:\\Users\\me\\Downloads")
             self.assertEqual(setup.clean_path("file:///C:/Users/me/My%20Files"), "C:\\Users\\me\\My Files")
-            self.assertEqual(setup.clean_path("file://nas/share/DMTQ"), "\\\\nas\\share\\DMTQ")
+            # %USERPROFILE% stays as it is written too, as any other.
+            self.assertEqual(setup.clean_path("%USERPROFILE%\\Downloads"), "C:\\Users\\me\\%USERPROFILE%\\Downloads")
+
+    def test_a_path_on_another_computer_is_refused_on_every_system(self):
+        # A look at a network share makes Windows sign in there with this PC's own credentials.
+        for typed in ("\\\\nas\\share\\DMTQ", "//nas/share/DMTQ", "\\\\?\\UNC\\nas\\share", "file://nas/share/DMTQ", "'\\\\nas\\share'"):
+            with self.assertRaises(setup.Refused, msg=typed) as caught:
+                setup.clean_path(typed)
+            self.assertEqual((caught.exception.status, caught.exception.code), (400, "network_path"))
+            with mock.patch("os.path", ntpath), mock.patch.object(setup.os, "name", "nt"):
+                with self.assertRaises(setup.Refused, msg=typed):
+                    setup.clean_path(typed)
+        # This PC's own file:// addresses stay.
+        self.assertEqual(setup.clean_path("file://localhost/home/x"), "/home/x")
+
+    def test_the_picker_says_why_it_will_not_open_a_network_path(self):
+        with HostInstall() as inst:
+            # The home's Downloads, where the picker opens (HostInstall makes it).
+            os.makedirs(inst.path("home/Downloads"), exist_ok=True)
+            inst.sign_in()
+            with mock.patch.object(setup.os, "scandir", wraps=setup.os.scandir) as looked:
+                page = inst.page(BASE + "/setup?step=files&dir=" + urllib.parse.quote("\\\\nas\\share"))
+            self.assertIn("Only folders on this PC open here. Find the folder below.", page)
+            # Never looked at; the picker opens where it opens by default.
+            self.assertFalse([c for c in looked.call_args_list if "nas" in str(c)])
+            self.assertIn('aria-current="location">Downloads</b>', page)
+            answer = inst.client.get(BASE + "/setup/what?path=" + urllib.parse.quote("//nas/share/game.apk")).get_json()
+            self.assertEqual(answer, {"ok": False, "text": "Only folders on this PC open here. Find the folder below."})
 
     def test_a_whole_drive_or_the_home_is_too_wide_to_import(self):
         with HostInstall() as inst:

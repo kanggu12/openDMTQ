@@ -44,11 +44,11 @@ if [ -n "${TZ:-}" ] && php -r 'exit(in_array(getenv("TZ"), timezone_identifiers_
 fi
 export PHP_INI_SCAN_DIR="/usr/local/etc/php/conf.d:$PHP_EXTRA"
 
-# The admin pages (/opendmtq/admin, and /admin, their address until 2026-11, which leads there) go to the admin service
-# (compose service "admin", or a sidecar in Kubernetes).
+# The admin pages (/opendmtq/admin, and /admin, their address until 2026-11, which leads there) and their API
+# (/opendmtq/api) go to the admin service (compose service "admin", or a sidecar in Kubernetes).
 PROXY=/var/opendmtq/run/admin-proxy.conf
 rm -f "$PROXY"
-# Exposed to the internet, the admin pages stay off the public port unless ADMIN_ON_PUBLIC_PORT=yes:
+# Exposed to the internet, the admin pages and the API stay off the public port unless ADMIN_ON_PUBLIC_PORT=yes:
 # they are reachable on this machine instead (compose publishes the admin service on loopback).
 if [ -n "${ADMIN_URL:-}" ] && [ "${ADMIN_ON_PUBLIC_PORT:-yes}" = yes ]; then
     cat > "$PROXY" <<CONF
@@ -65,6 +65,9 @@ ProxyPassReverse "/opendmtq/admin" "$ADMIN_URL/opendmtq/admin"
 # Their address until 2026-11: the admin service answers it with a permanent redirect to the same page here.
 ProxyPass "/admin" "$ADMIN_URL/admin" disablereuse=On
 ProxyPassReverse "/admin" "$ADMIN_URL/admin"
+# The API, on the same terms as the pages: its uploads and downloads (song packages, backups) take as long.
+ProxyPass "/opendmtq/api" "$ADMIN_URL/opendmtq/api" timeout=900 disablereuse=On
+ProxyPassReverse "/opendmtq/api" "$ADMIN_URL/opendmtq/api"
 CONF
 fi
 
@@ -99,10 +102,13 @@ export OPENDMTQ_NAME OPENDMTQ_PORT
 # only it sets (visitors reach this door through it). So there the test is that header, on the one door.
 https_works='RewriteCond /srv/https/ca.crt -f
 RewriteCond /srv/https/edge-plain !-f'
+# The same test as an expression, for an <If>: the API's refusals on a plain door say which way in works.
+https_expr="-f '/srv/https/ca.crt' && ! -f '/srv/https/edge-plain'"
 ROUTER_TLS_CONF=/var/opendmtq/run/router-tls.conf
 rm -f "$ROUTER_TLS_CONF"
 if [ "${ROUTER_TLS:-no}" = yes ]; then
     https_works='RewriteCond %{HTTP:X-Forwarded-Proto} =http'
+    https_expr="%{HTTP:X-Forwarded-Proto} == 'http'"
     # shellcheck disable=SC2016  # Apache's own $1.
     cat > "$ROUTER_TLS_CONF" <<'CONF'
 # The visit is HTTPS even though it reaches Apache decrypted: PHP sees so, and the admin session cookie stays on HTTPS.
@@ -134,6 +140,11 @@ CONF
 fi
 PLAIN_ADMIN=/var/opendmtq/run/plain-admin.conf
 rm -f "$PLAIN_ADMIN"
+# A refusal of the API as the API itself words one ({"error": {"code", "message"}}), for an ErrorDocument: its quotes
+# escaped for Apache, which takes the text between the outer ones. The words hold no quote or backslash of their own.
+api_refusal() {
+    printf '{\\"error\\": {\\"code\\": \\"%s\\", \\"message\\": \\"%s\\"}}' "$1" "$2"
+}
 if [ -f "$PROXY" ]; then
     case "$OPENDMTQ_NAME" in
         10.*|192.168.*|127.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*|localhost) lan=yes ;;
@@ -144,22 +155,43 @@ if [ -f "$PROXY" ]; then
         echo "$https_works"
         # The old address (/admin) straight to the new one there.
         echo "RewriteRule ^/(?:opendmtq/)?admin(/.*)?\$ https://$OPENDMTQ_NAME:$OPENDMTQ_PORT/opendmtq/admin\$1 [R=302,L]"
+        # The API is refused here while HTTPS works (403 use_https, with the address to use). Its token has gone out in
+        # clear already: a redirect would have a script send it again, and curl -L would do so without a word. (Each
+        # rule needs the test again: a condition only holds for the rule right after it.)
+        echo "$https_works"
+        echo "RewriteRule ^/opendmtq/api(/.*)?\$ - [F]"
+        # Its refusals on this door are worded as the API words them: JSON, with the reason. use_https while HTTPS
+        # works; no_https where it is needed and is not working (an internet address, below).
+        cat <<CONF
+<LocationMatch "^/opendmtq/api(/|\$)">
+    Header always set Content-Type "application/json" "expr=%{REQUEST_STATUS} == 403"
+    <If "$https_expr">
+        ErrorDocument 403 "$(api_refusal use_https "This address takes the API over HTTPS only: https://$OPENDMTQ_NAME:$OPENDMTQ_PORT/opendmtq/api/v1/")"
+    </If>
+    <Else>
+        ErrorDocument 403 "$(api_refusal no_https "The API needs HTTPS on this address, and it is not working. With Docker Compose, run ./opendmtq up (or ./opendmtq doctor) on the server PC, or use http://localhost:8791/opendmtq/api/v1/ there. In Kubernetes, use kubectl port-forward to port 8000 of the api pod.")"
+    </Else>
+</LocationMatch>
+CONF
         if [ "$lan" = yes ] || [ "${ROUTER_TLS:-no}" = yes ]; then
             # Otherwise, on a local network address: proxied in clear, as it was before HTTPS. Behind the chart's
             # router this door also takes the visits it decrypted, which the line above lets through.
             echo "Include $PROXY"
         else
-            # Otherwise, on an internet address: refused, with the ways in that still work.
+            # Otherwise, on an internet address: refused, with the ways in that still work (the API's words above).
             cat <<'CONF'
 <LocationMatch "^/(opendmtq/)?admin(/|$)">
     Require all denied
     ErrorDocument 403 "The admin pages need HTTPS on this address, and it is not working. With Docker Compose, run ./opendmtq up (or ./opendmtq doctor) on the server PC, or open http://localhost:8791/opendmtq/admin/ there. In Kubernetes, use kubectl port-forward to port 8000 of the api pod and open http://localhost:8000/admin/."
 </LocationMatch>
+<LocationMatch "^/opendmtq/api(/|$)">
+    Require all denied
+</LocationMatch>
 CONF
         fi
     } > "$PLAIN_ADMIN"
     if [ -f /srv/https/ca.crt ]; then
-        echo "opendmtq: HTTPS on the public port too (own certificate); /opendmtq/admin over HTTPS only"
+        echo "opendmtq: HTTPS on the public port too (own certificate); /opendmtq/admin and /opendmtq/api over HTTPS only"
     fi
 fi
 

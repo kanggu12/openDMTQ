@@ -23,6 +23,7 @@ Admin pages, ID {{ .Values.admin.user | default "admin" }}; the password:
   On the machine with kubectl:
   kubectl -n {{ .Release.Namespace }} port-forward deploy/{{ include "opendmtq.fullname" . }}-api 8791:8000
   then open http://localhost:8791/opendmtq/admin/
+  The API is beside them, at /opendmtq/api/v1/, with a token made on the Accounts page (docs/api.md).
 {{- end }}
 {{- if not .Values.litestream.enabled }}
 

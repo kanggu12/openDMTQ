@@ -1,5 +1,5 @@
 """Backups: made by hand or every day, kept to a limit, downloaded, brought in and restored. Each form's work is a function
-(create, upload, delete, restore_backup, set_auto), apart from the page that calls it."""
+(create, upload, delete, restore_backup, set_auto) that the API calls as well (api.py)."""
 
 import datetime
 import hashlib
@@ -16,7 +16,7 @@ from flask import flash, redirect, render_template, request, send_file, url_for
 from werkzeug.exceptions import NotFound
 
 from .. import songs
-from . import auth, core, recordings, status
+from . import auth, core, recordings, status, tokens
 from .core import Refused, ago, app, BASE, changed, db, private_file, safe_name, t, tp, why
 
 # Backups made here are kept up to this many, like the CLI's.
@@ -142,6 +142,7 @@ def bring_schema_up_to_date(con):
     """A database restored while the server runs: what the server would do with it at its next start."""
     con.executescript("BEGIN IMMEDIATE;" + PLAY_MERGE + "COMMIT;" + SCHEMA)
     auth.account_table(con)
+    tokens.token_table(con)
 
 
 def database_is_damaged():
@@ -367,9 +368,20 @@ def delete(name):
     changed("backup_action:delete", name)
 
 
+def swap_in(restored):
+    """The restored database in the live one's place. SQLite's online backup copies it into the live one, so the server
+    keeps running and sees the restored data on its next request."""
+    src, dst = sqlite3.connect(restored), sqlite3.connect(core.DB, timeout=10)
+    with dst:
+        src.backup(dst)
+    src.close()
+    dst.close()
+
+
 def restore_backup(name, path):
     """Puts an archive's database and added songs in place, as the page's Restore does. Returns what to say of it, in the
-    page's words, [(tone, words)], and whether it was restored: the caller notes the change. The caller holds _restoring."""
+    page's words, [(tone, words)], and whether it was restored: the caller notes the change (a page in its request, the
+    API's job when it ends). The caller holds _restoring."""
     with tempfile.TemporaryDirectory() as tmp:
         try:
             with tarfile.open(path) as tar:
@@ -400,19 +412,26 @@ def restore_backup(name, path):
             kept = set_damaged_aside()
         try:
             # Who is shown live is today's decision, not the backup's: an old backup must not start
-            # broadcasting anyone. The switches as they are now go back in below.
-            switches = []
-            if not kept:
-                with db() as con:
-                    con.execute(recordings.LIVE_TABLE)
-                    switches = con.execute("SELECT * FROM LiveSwitch").fetchall()
-            # SQLite's online backup copies the archive's database into the live one, so the
-            # server keeps running and sees the restored data on its next request.
-            src, dst = sqlite3.connect(restored), sqlite3.connect(core.DB, timeout=10)
-            with dst:
-                src.backup(dst)
-            src.close()
-            dst.close()
+            # broadcasting anyone. The switches as they are now go back in below. So are the API's tokens: an old backup
+            # must not bring back one that was revoked, nor end one made since (the one that asked for this restore).
+            # Tokens are made and revoked under tokens.LOCK: none comes or goes between this look and the swap.
+            with tokens.LOCK:
+                switches, kept_tokens = [], []
+                if not kept:
+                    with db() as con:
+                        con.execute(recordings.LIVE_TABLE)
+                        switches = con.execute("SELECT * FROM LiveSwitch").fetchall()
+                        tokens.token_table(con)
+                        kept_tokens = con.execute("SELECT * FROM ApiToken").fetchall()
+                # Today's tokens go into the restored copy while it is still apart from the server: the database that
+                # takes the live one's place has them from its first moment (a damaged one set aside leaves none).
+                copy = sqlite3.connect(restored)
+                try:
+                    with copy:
+                        tokens.put(copy, kept_tokens)
+                finally:
+                    copy.close()
+                swap_in(restored)
             with db() as con:
                 bring_schema_up_to_date(con)
                 con.execute(recordings.LIVE_TABLE)

@@ -140,8 +140,8 @@ def kind_of(path):
         return "app"
     if path.startswith("/live") or path.startswith("/opendmtq/live"):
         return "live"
-    # The admin pages, at their address and at the old one that leads there.
-    if path.startswith(("/opendmtq/admin", "/admin")):
+    # The admin pages, at their address and at the old one that leads there, and their API.
+    if path.startswith(("/opendmtq/admin", "/admin", "/opendmtq/api")):
         return "admin"
     if path == "/" or path.startswith("/opendmtq"):
         return "site"

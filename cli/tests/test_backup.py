@@ -3,6 +3,7 @@ and that the server stops and comes back."""
 
 import io
 import os
+import re
 import sqlite3
 import stat
 import tarfile
@@ -10,9 +11,9 @@ import tempfile
 import unittest
 from unittest import mock
 
-from opendmtq_cli import app, backup
+from opendmtq_cli import app, backup, keep_tokens
 
-from .sandbox import Sandbox, done
+from .sandbox import REPO, Sandbox, done
 
 
 # The sandbox replaces it (its archives hold a few bytes for a database); the real one, for the tests of it.
@@ -94,6 +95,79 @@ class RealDatabaseTest(unittest.TestCase):
             self.assertEqual(sb.read("data/state/dmtq.db3"), b"old")
             for end in ("-wal", "-shm", "-journal"):
                 self.assertFalse(os.path.exists(backup.DB + end), end)
+
+    def with_tokens(self, con, *ids):
+        """API tokens in a database, as the admin pages keep them (their ids only matter here)."""
+        con.execute(keep_tokens.TOKEN_TABLE)
+        con.executemany("INSERT INTO ApiToken (id, name, scope, hash, admin, owner, created_at) VALUES (?, 'n', 'read', 'h', 'admin', 1, 1)",
+                        [(i,) for i in ids])
+        con.commit()
+
+    def archived(self, sb, tokens=None):
+        """A backup archive of an older database, with these API tokens (None: from before their table)."""
+        with tempfile_folder() as tmp:
+            old = self.database(os.path.join(tmp, "old.db3"))
+            if tokens is not None:
+                self.with_tokens(old, *tokens)
+            # Its last connection closed: everything is in the file itself.
+            old.close()
+            with open(os.path.join(tmp, "old.db3"), "rb") as f:
+                content = f.read()
+        return sb.archive("data/backups/opendmtq-20260101-120000-manual.tar.gz", {"dmtq.db3": content})
+
+    def tokens_in(self, path):
+        """The ids of the API tokens in a database."""
+        con = sqlite3.connect(path)
+        try:
+            return sorted(r[0] for r in con.execute("SELECT id FROM ApiToken"))
+        finally:
+            con.close()
+
+    def test_a_restore_keeps_todays_api_tokens(self):
+        # A token revoked since the backup stays revoked, one made since keeps working: as the admin pages' restore does.
+        with Sandbox() as sb:
+            # Five plays now, against the backup's one.
+            live = self.database(backup.DB, rows=5)
+            # Made since, and still only in the live database's log: the newest is read from there.
+            self.with_tokens(live, "made_since")
+            name = self.archived(sb, tokens=["revoked_since"])
+            self.assertEqual(sb.call(app.cmd_restore, name=name, with_key=False), 0, sb.output())
+            live.close()
+            self.assertEqual(self.tokens_in(backup.DB), ["made_since"])
+            self.assertEqual(sb.tokens_kept, 1)
+            # The restored database itself, its plays, is the backup's.
+            con = sqlite3.connect(backup.DB)
+            self.assertEqual(con.execute("SELECT COUNT(*) FROM Play").fetchone()[0], 1)
+            con.close()
+            # Nothing of the job is left beside the database.
+            self.assertFalse(os.path.exists(os.path.join(sb.data, "state", ".restoring.db3")))
+
+    def test_a_backup_from_before_the_tokens_gets_their_table(self):
+        with Sandbox() as sb:
+            live = self.database(backup.DB)
+            self.with_tokens(live, "today")
+            live.close()
+            name = self.archived(sb, tokens=None)
+            self.assertEqual(sb.call(app.cmd_restore, name=name, with_key=False), 0, sb.output())
+            self.assertEqual(self.tokens_in(backup.DB), ["today"])
+
+    def test_a_restore_on_a_new_machine_brings_no_tokens_back(self):
+        # Nothing live to keep: the backup's tokens are not this server's tokens of now.
+        with Sandbox() as sb:
+            name = self.archived(sb, tokens=["from_the_backup"])
+            self.assertEqual(sb.call(app.cmd_restore, name=name, with_key=False), 0, sb.output())
+            self.assertEqual(self.tokens_in(backup.DB), [])
+
+    def test_the_tokens_table_is_the_one_the_server_makes(self):
+        # Three copies of one statement: the server's start, the admin pages, and this restore.
+        def words(text):
+            return " ".join(text.split())
+        with open(os.path.join(REPO, "tools", "opendmtq_tools", "admin", "tokens.py"), encoding="utf-8") as f:
+            pages = re.search(r'TOKEN_TABLE = """(.*?)"""', f.read(), re.S).group(1)
+        with open(os.path.join(REPO, "server", "game", "bin", "setup-db.php"), encoding="utf-8") as f:
+            server = re.search(r"\$db->exec\('(CREATE TABLE IF NOT EXISTS ApiToken .*?)'\);", f.read(), re.S).group(1)
+        self.assertEqual(words(keep_tokens.TOKEN_TABLE), words(pages))
+        self.assertEqual(words(keep_tokens.TOKEN_TABLE), words(server))
 
     def problem_of(self, content):
         with Sandbox() as sb:

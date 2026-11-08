@@ -23,7 +23,7 @@ import urllib.parse
 import urllib.request
 import zlib
 
-from flask import Flask, Request, abort, flash, g, has_request_context, redirect, render_template, request, session, url_for
+from flask import Flask, Request, abort, flash, g, has_request_context, jsonify, redirect, render_template, request, session, url_for
 from markupsafe import Markup
 
 from .. import songs, strings
@@ -71,6 +71,28 @@ MAX_SIGNED_OUT = 16 * 1024
 # the connection simply closes.
 MAX_DISCARD = 8 * 1024 * 1024 * 1024
 
+# The API (api.py): its address, beside these pages' own, and the version in it. A later version that changes what a route
+# answers would come in beside this one.
+API = "/opendmtq/api"
+API_V1 = API + "/v1"
+
+# What one request to the API may send: a JSON body is a few hundred bytes. The routes that take a file have their own
+# limit, the page's for the same file: api.py names them here (endpoint: bytes), with the ones whose file waits on the
+# backups disk.
+API_MAX_JSON = 1024 * 1024
+API_LIMITS = {}
+API_TO_BACKUPS = set()
+
+
+def is_api(path):
+    """True for an address of the API: the pages' rules (sign-in, form tokens, the page's language) are not its rules."""
+    return path == API or path.startswith(API + "/")
+
+
+def in_api():
+    """True while a request to the API is answered."""
+    return has_request_context() and is_api(request.path)
+
 
 class AdminRequest(Request):
     """Upload limits per page: the backup upload takes more than a song package, and nothing big
@@ -79,23 +101,27 @@ class AdminRequest(Request):
 
     @property
     def max_content_length(self):
+        # The API: a caller whose token has not passed sends nothing big either; past it, each route's own limit.
+        if is_api(self.path):
+            return API_LIMITS.get(self.endpoint, API_MAX_JSON) if g.get("api_token") else MAX_SIGNED_OUT
         if not auth.signed_in():
             return MAX_SIGNED_OUT
         return MAX_BACKUP if self.endpoint == "backups_page" else songs.MAX_PACKAGE
 
     def _get_file_stream(self, total_content_length, content_type, filename=None, content_length=None):
-        # A backup waits on the backups disk, not in this container's /tmp (memory, shared with builds).
-        if self.endpoint == "backups_page":
+        # A backup waits on the backups disk, not in this container's /tmp (memory, shared with builds). The API's upload
+        # of one too.
+        if self.endpoint == "backups_page" or self.endpoint in API_TO_BACKUPS:
             os.makedirs(BACKUPS, exist_ok=True)
             return tempfile.TemporaryFile(dir=BACKUPS)
         return super()._get_file_stream(total_content_length, content_type, filename, content_length)
 
 
 class Refused(Exception):
-    """An action that did not happen, and why: each action is one function, apart from the page that calls it. words:
-    what the page says, made in the page's language, or None where the page says nothing (it was so already). status and
-    code: what another caller is told (an HTTP status and a short code). message: the sentence for them where the page has
-    no words. tone: the page's colour for the words ("bad", or "ok" where nothing went wrong). extra: what a page needs to
+    """An action that did not happen, and why, for a page and the API alike (each action is one function both call).
+    words: what the page says, made in the page's language (English on the API), or None where the page says nothing
+    (it was so already). status and code: what the API answers. message: the API's own sentence where the page has no
+    words. tone: the page's colour for the words ("bad", or "ok" where nothing went wrong). extra: what a page needs to
     answer it (the address typed, limits waiting for a yes)."""
 
     def __init__(self, status, code, words=None, message=None, tone="bad", **extra):
@@ -103,13 +129,23 @@ class Refused(Exception):
         self.status, self.code, self.words, self.message, self.tone, self.extra = status, code, words, message, tone, extra
 
     def sentence(self):
-        """The sentence for another caller: its own, else the page's words as plain text."""
+        """The API's message: its own sentence, else the page's words as plain text."""
         return self.message or plain(self.words)
 
 
 def plain(words):
     """Words made for a page as plain text: their markup out, what it escaped back (a name with a < in it stays one)."""
     return html.unescape(re.sub(r"<[^>]+>", "", str(words or "")))
+
+
+def json_error(status, code, message, headers=None, extra=None):
+    """The API's answer to what it cannot do: {"error": {"code", "message"}} with its status, and extra's fields beside
+    them where an error has more to say (the folder the setup's picker opens instead, say)."""
+    response = jsonify(error={"code": code, "message": message, **(extra or {})})
+    response.status_code = status
+    for name, value in (headers or {}).items():
+        response.headers[name] = value
+    return response
 
 # Where these pages live: under the players' site's own address, so that the server has one tree (/opendmtq for the
 # players, /opendmtq/admin for the owner). Until 2026-11 they were at /admin, which now leads here (old_address()).
@@ -158,8 +194,8 @@ LANG_DAYS = 365
 
 def lang():
     """The page language: what the visitor chose in the switch, else English. The browser's language does not decide:
-    the switch is on every page. Outside a request (a test, a job), English."""
-    if not has_request_context():
+    the switch is on every page. Outside a request (a test, a job), English. The API speaks English to every caller."""
+    if not has_request_context() or in_api():
         return "en"
     return "ko" if request.cookies.get(LANG_COOKIE) == "ko" else "en"
 
@@ -335,8 +371,10 @@ def waiting_for_files(health):
 
 
 def safe_name(name, folder, suffix):
-    """A plain file name inside folder, or 404."""
-    if "/" in name or name.startswith(".") or not name.endswith(suffix):
+    """A plain file name inside folder, or 404. Only the letters, digits and signs the names made here have (backups and
+    builds alike): no separator of any system (a backslash and a drive's colon lead out of the folder on Windows), no
+    leading dot and no "..", so that a name always stays in folder."""
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", name or "") or name.startswith(".") or ".." in name or not name.endswith(suffix):
         abort(404)
     path = os.path.join(folder, name)
     if not os.path.isfile(path):
@@ -384,6 +422,11 @@ def discard_body():
 
 @app.errorhandler(413)
 def too_large(_err):
+    # The API: in its own words, the rest of the body read first only for a caller whose token passed (as for a page).
+    if in_api():
+        if g.get("api_token"):
+            discard_body()
+        return json_error(413, "too_large", plain(t("err.too_large", max=human(request.max_content_length))))
     # The upload pages check the size before sending; this catches the rest.
     if request.endpoint == "login":
         return tp("err.too_large_signin"), 413
@@ -409,25 +452,44 @@ def why(e):
 def database_failed(e):
     # The database is missing, damaged or not this game's. The dashboard and the backups stay reachable from here.
     app.logger.exception("database failure on %s", request.path)
+    if in_api():
+        return json_error(503, "database_unavailable", plain(t("err.db_text")))
     return render_template("error.html", title=t("err.db_title"), text=t("err.db_text")), 503
 
 
 @app.errorhandler(500)
 def internal_error(_err):
+    if in_api():
+        return json_error(500, "internal_error", plain(t("err.text")))
     return render_template("error.html", title=t("err.title"), text=t("err.text")), 500
 
 
 @app.errorhandler(405)
-def wrong_method(_err):
+def wrong_method(err):
+    # The API: which methods the address has, as HTTP says (the Allow header).
+    if in_api():
+        allowed = ", ".join(sorted(m for m in (getattr(err, "valid_methods", None) or []) if m not in ("HEAD", "OPTIONS")))
+        return json_error(405, "method_not_allowed", f"This address takes {allowed or 'other methods'}.", {"Allow": allowed})
     # An address for a form's button, opened as a page (from the history, or typed): the same page, with the way back.
     return render_template("notfound.html"), 405
 
 
 @app.errorhandler(404)
-def not_found(_err):
+def not_found(err):
+    # The API: a route it does not have, or a thing it does not know (abort(404) where a file is not there).
+    if in_api():
+        return json_error(404, "not_found", "There is nothing at this address.")
     # An address that leads nowhere gets the admin's own page (styled, readable on a phone), with the
     # way back. Visitors who are not signed in never get here: guard() sends them to the sign-in page.
     return render_template("notfound.html"), 404
+
+
+@app.errorhandler(400)
+def bad_request(err):
+    # A body that cannot be read (a broken upload): the API says so in its own shape; a page keeps Flask's own answer.
+    if in_api():
+        return json_error(400, "bad_request", "The request could not be read.")
+    return err
 
 
 def ago(when):
@@ -462,8 +524,12 @@ def save_settings(**changes):
 # the answer: a refused form, a failed upload or a question back to the owner also come back as a page or a redirect.
 def changed(what, target=""):
     """Notes a change that has happened, at the end of the request: what is the page and the form's action, target the words
-    for who or what it was about, as they are now. No values beyond those: no passwords, no messages."""
-    who = str(session.get("who", "")) if session.get("ok") else ""
+    for who or what it was about, as they are now. No values beyond those: no passwords, no messages. Through the API the
+    same page and action, by the admin whose token it was, with the token's name (api.py sets api_who)."""
+    if in_api():
+        who = g.get("api_who", "")
+    else:
+        who = str(session.get("who", "")) if session.get("ok") else ""
     g.changes = getattr(g, "changes", []) + [(what, target[:100], who)]
 
 

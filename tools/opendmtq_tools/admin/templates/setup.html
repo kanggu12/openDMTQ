@@ -108,6 +108,8 @@
     </div>
     {# A path that could not be opened: why, above the picker, which opened the nearest folder that can be. #}
     {% if cannot_open %}<p class="flash bad setup-cannot" role="status">{{ t('setup.not_there', path=cannot_open) if not_there else t('setup.cannot_open_path', path=cannot_open) }}</p>{% endif %}
+    {# A path on another computer: never looked at; why, in the same place. #}
+    {% if path_refused %}<p class="flash bad setup-cannot" role="status">{{ path_refused }}</p>{% endif %}
     {% if listing %}
     <div class="setup-picker">
       {# Where it is, each folder on the way a link back to it. #}

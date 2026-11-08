@@ -1,5 +1,5 @@
 """The App page: the builds of the phone app, the one on offer, what the last build said, and the QR code. Each form's work
-is a function (start_build, prune, delete), apart from the page that calls it."""
+is a function (start_build, prune, delete) that the API calls as well (api.py)."""
 
 import datetime
 import json
@@ -128,9 +128,22 @@ def invite_qr():
 
 def start_build(typed):
     """Starts a build of the app, as the App page's form does: for the address typed (as pasted from a browser's address
-    bar too), or this server's when it is empty. Returns (the job's id, the address)."""
-    if jobs.running_build():
-        raise Refused(409, "build_running", t("app.already"))
+    bar too), or this server's when it is empty. Returns (the job's id, the address). Refused: a build running already,
+    or an import (it may be bringing the client in) or the server's own build at its start, as the setup refuses them.
+    The look and the start are one step under the setup's lock: two at once cannot start two builders on one output."""
+    # The setup's lock and its words for what runs (setup imports this module: it is asked for here, once it is there).
+    from . import setup
+    with setup._busy_lock:
+        if jobs.running_build():
+            raise Refused(409, "build_running", t("app.already"))
+        why = setup.busy()
+        if why:
+            raise Refused(409, "busy", why)
+        return _start_build(typed)
+
+
+def _start_build(typed):
+    """start_build's own work, once nothing else runs (the caller holds the setup's lock)."""
     # What was pasted from a browser's address bar is meant the same.
     host = re.sub(r"^https?://", "", (typed or "").strip()).rstrip("/") or core.PUBLIC_HOST
     if not re.fullmatch(r"[A-Za-z0-9.-]{1,74}(:[0-9]{1,5})?", host):

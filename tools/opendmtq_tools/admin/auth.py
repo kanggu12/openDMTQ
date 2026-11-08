@@ -127,6 +127,10 @@ def note_failure(ip):
 @app.before_request
 def guard():
     """Sign-in required everywhere but the sign-in page; CSRF token on every POST."""
+    # The API has no sign-in, no session and no forms: a token on every request, which api.py checks (its own
+    # before_request, after this one). No session cookie is read or made for it.
+    if core.is_api(request.path):
+        return None
     # The old address leads to the new one before anything else (old_address()): a redirect, nothing read or shown.
     # The setup's one-time key (it signs in by itself) and its look at which process answers during a restart, too.
     if request.endpoint in ("login", "static", "public_css", "public_font", "public_favicon", "public_hls", "set_lang", "old_address",

@@ -24,9 +24,10 @@ def recent_plays(con, limit=6):
                                ORDER BY l.played_at DESC, l.id DESC LIMIT ?""", (core.CHECK_UDID, limit)).fetchall()
     except sqlite3.OperationalError:
         return []
+    # The moment as well as how long ago: the API gives the time.
     return [{"id": r["user_id"], "who": (r["nickname"] or "").strip() or tp("player.fallback", id=r["user_id"]),
              "song": names.get(r["pattern_id"], ("", ""))[0], "chart": names.get(r["pattern_id"], ("", ""))[1],
-             "score": r["score"], "grade": r["grade"], "new": r["is_record"], "ago": ago(r["played_at"])} for r in rows]
+             "score": r["score"], "grade": r["grade"], "new": r["is_record"], "ago": ago(r["played_at"]), "at": r["played_at"]} for r in rows]
 
 
 def attention(health, counts, saved, backup_age, on, build, failed, usage):
@@ -278,6 +279,38 @@ def machine_view(usage):
                                       [(state, tp(words[state])) for state in ("ok", "warn", "bad", "none")])
     view["answered"] = round(100 * answered / asked, 1) if asked else None
     return view
+
+def machine_figures(usage):
+    """The machine's resources as the status page reads them, as numbers: processors, how long it has been up (seconds),
+    the processors' use now and the share waiting for the disk (percent, None while measuring), memory and swap and the
+    disk (bytes), the load (1, 5 and 15 minutes), and the last day's points (one every five minutes: average and peak
+    processor use, waiting, memory in use, and how the game server answered: ok, warn or bad), since when they are kept."""
+    with _machine_lock:
+        now = dict(_machine["now"])
+        points = [dict(p) for p in _machine["points"]]
+        since = _machine["since"]
+    try:
+        memory = read_memory()
+    except (OSError, ValueError):
+        memory = {}
+    try:
+        with open("/proc/loadavg", encoding="ascii") as f:
+            load = [float(v) for v in f.read().split()[:3]]
+    except (OSError, ValueError):
+        load = None
+    try:
+        with open("/proc/uptime", encoding="ascii") as f:
+            up = int(float(f.read().split()[0]))
+    except (OSError, ValueError, IndexError):
+        up = None
+    total, avail = memory.get("MemTotal"), memory.get("MemAvailable", 0)
+    swap = memory.get("SwapTotal")
+    return {"cores": os.cpu_count() or 1, "uptime": up, "cpu": now.get("cpu"), "cpu_wait": now.get("wait"),
+            "memory": {"total": total, "used": total - avail} if total else None,
+            "swap": {"total": swap, "used": swap - memory.get("SwapFree", 0)} if swap else None,
+            "disk": {"total": usage.total, "used": usage.used, "free": usage.free}, "load": load,
+            "since": int(since), "points": points}
+
 
 threading.Thread(target=_machine_loop, name="machine", daemon=True).start()
 

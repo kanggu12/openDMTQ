@@ -43,6 +43,9 @@ CHANGE_WORDS = {
     "accounts_page:create": "change.acc_create", "accounts_page:password": "change.acc_password",
     "accounts_page:off": "change.acc_off", "accounts_page:on": "change.acc_on", "accounts_page:delete": "change.acc_delete",
     "accounts_page:admin": "change.acc_admin", "accounts_page:player": "change.acc_player", "accounts_page:link": "change.acc_link",
+    "accounts_page:token": "change.token_make", "accounts_page:revoke": "change.token_revoke",
+    # A token the API refused, as a failed sign-in is noted: by "API", with the address it came from.
+    "api:refused": "change.api_refused",
     "login:ok": "change.login_ok", "login:failed": "change.login_failed", "logout:": "change.logout",
 }
 
@@ -300,21 +303,23 @@ def plays_page_number(text):
         return 1
 
 
-def plays_file(con, wanted):
+def plays_file(con, wanted, strict=False):
     """Every play the filter leaves as a file (plays_csv), named for what it holds: the player and the days it was
-    narrowed to. Someone without plays (an old address) counts as no player."""
+    narrowed to. Someone without plays (an old address) counts as no player on the page. strict (the API): that player
+    stays asked for, and the file holds their plays, which are none."""
     people = plays_players(con)
-    if wanted["player"] not in {guid for guid, _ in people}:
+    if not strict and wanted["player"] not in {guid for guid, _ in people}:
         wanted["player"] = None
     parts = ["opendmtq-plays"] + ([f"player{wanted['player']}"] if wanted["player"] is not None else []) \
         + [d.date().isoformat() for d in (wanted["from"], wanted["to"]) if d]
     return plays_csv(plays_found(con, wanted), "-".join(parts) + ".csv")
 
 
-def plays_found_page(wanted, page):
+def plays_found_page(wanted, page, strict=False):
     """One page of the plays the filter leaves, with what all of them add up to: {plays (this page's, each with at, its
     time in words), people (who has plays), total, last_page, broken (the database could not be read), summed (a
-    PlaysSum)}. Someone without plays (an old address) counts as no player: the whole list, not an empty one."""
+    PlaysSum)}. Someone without plays (an old address) counts as no player on the page, which then lists every play.
+    strict (the API): that player stays asked for, and their plays are found, which are none."""
     rows, people = [], []
     total = 0
     broken = False
@@ -322,8 +327,9 @@ def plays_found_page(wanted, page):
     try:
         with db() as con:
             people = plays_players(con)
-            # Someone without plays (an old address): the whole list, not an empty one with no name picked in the form.
-            if wanted["player"] not in {guid for guid, _ in people}:
+            # Someone without plays (an old address): on the page the whole list, with no name picked in the form; a program
+            # that asked for that player (strict) gets what they played.
+            if not strict and wanted["player"] not in {guid for guid, _ in people}:
                 wanted["player"] = None
             first = (page - 1) * PLAYS_PAGE
             if wanted["q"]:

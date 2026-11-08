@@ -650,6 +650,38 @@ async function adminFlows(contexts) {
   // Back to the width and the language the rest of these steps expect.
   await page.setViewport({ width: 1280, height: 900 });
 
+  // An API token: made on the Accounts page and shown once, measured at every width while it is there (the list itself is
+  // in every sweep of the page), in both languages; it works against the API at once, and is revoked there. The width
+  // alone changes: a viewport that changes to a phone's would load the page again, and the token is shown only once.
+  for (const lang of ['ko', 'en']) {
+    await page.goto(`${A}/lang?to=${lang}&next=%2Fopendmtq%2Fadmin%2Faccounts`, { waitUntil: 'domcontentloaded' });
+    await page.type('#tokens input[name=token_name]', `flow token ${lang}`);
+    await page.select('#tokens select[name=scope]', 'write');
+    await press(page, '#tokens form button');
+    const secret = await textOf(page, '#token-secret');
+    // The report names the token by its id alone (odq_<id>_), as the list does: none of its secret goes into a report.
+    check(`a token is made on the Accounts page and shown once (${lang})`, /^odq_[0-9a-f]{12}_[A-Za-z0-9_-]{43}$/.test(secret), secret.slice(0, 17));
+    for (const w of ALL_WIDTHS) {
+      await page.setViewport({ width: w, height: 900 });
+      await noFindings(page, `the accounts page with a new token at ${w} px, ${lang}`);
+    }
+    await page.setViewport({ width: 1280, height: 900 });
+    if (lang !== 'en') continue;
+    // Asked as a program with the token asks: from here, not from the page. The page's own failed requests are what this
+    // stage counts, and a revoked token's 401 is the answer wanted.
+    const ask = async sent => {
+      const r = await fetch(`${ADMIN}/opendmtq/api/v1/status`, { headers: { Authorization: `Bearer ${sent}` } });
+      return [r.status, (await r.json()).address || ''];
+    };
+    const works = await ask(secret);
+    check('and works against the API at once', works[0] === 200 && works[1] !== '', String(works));
+    await page.goto(`${A}/accounts`, { waitUntil: 'domcontentloaded' });
+    check('and is not shown again', !(await page.$('#token-secret')));
+    await pressAndConfirm(page, `table.tokens form:has(input[name=token][value="${secret.split('_')[1]}"]) button`);
+    const revoked = await ask(secret);
+    check('a revoked token no longer works', revoked[0] === 401 && /revoked/.test(await textOf(page, '.flash')), String(revoked));
+  }
+
   // A backup at the press of a button; the list and the status page show it.
   await page.goto(`${A}/backups`, { waitUntil: 'domcontentloaded' });
   await press(page, 'form:has(input[name=action][value=create]) button');

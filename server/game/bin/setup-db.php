@@ -152,6 +152,11 @@ $db->exec('CREATE TABLE IF NOT EXISTS LiveSwitch (guid INTEGER PRIMARY KEY, live
 $db->exec("CREATE TABLE IF NOT EXISTS SiteUser (name TEXT PRIMARY KEY COLLATE NOCASE, pass TEXT NOT NULL,
            note TEXT NOT NULL DEFAULT '', admin INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL,
            signed_in_at INTEGER, off INTEGER NOT NULL DEFAULT 0)");
+// The admin pages' API tokens, made on their Accounts page: only a hash of each, with whose it is. The game and the site
+// never read it. The same statement as TOKEN_TABLE in the admin pages (tokens.py).
+$db->exec('CREATE TABLE IF NOT EXISTS ApiToken (id TEXT PRIMARY KEY, name TEXT NOT NULL, scope TEXT NOT NULL,
+           hash TEXT NOT NULL, admin TEXT NOT NULL COLLATE NOCASE, owner INTEGER NOT NULL DEFAULT 0,
+           admin_since INTEGER, created_at INTEGER NOT NULL, used_at INTEGER)');
 // Earlier versions logged through triggers (best score only); the save code does it now.
 $db->exec('DROP TRIGGER IF EXISTS PlayLog_insert');
 $db->exec('DROP TRIGGER IF EXISTS PlayLog_update');

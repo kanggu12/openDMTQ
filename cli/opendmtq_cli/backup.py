@@ -25,6 +25,9 @@ KEEP = 30
 # Past this many bytes of added songs a backup is stored without compression (their music and video hardly shrink):
 # the same limit as STORE_ONLY_FROM in tools/opendmtq_tools/admin.
 STORE_ONLY_FROM = 64 * 1024 * 1024
+# Where a restore makes the restored database ready, in the container, beside the live one: on the same disk, so that it
+# takes the live one's place in one rename.
+RESTORING = "/data/state/.restoring.db3"
 
 
 def _snapshot_db(dest):
@@ -210,15 +213,21 @@ def restore(name, with_key=False):
         db = os.path.join(tmp, "dmtq.db3")
         if not os.path.isfile(db):
             system.die(f"{path} holds no database")
-        # The copying container runs unprivileged; let it read the extracted file.
+        # The API's tokens of now go into the restored database (keep_tokens.py), run by the container from here.
+        shutil.copyfile(os.path.join(os.path.dirname(os.path.abspath(__file__)), "keep_tokens.py"), os.path.join(tmp, "keep_tokens.py"))
+        # The copying container runs unprivileged; let it read the extracted files.
         os.chmod(tmp, 0o755)
         os.chmod(db, 0o644)
-        # Written through a container so it works whoever owns data/state.
+        os.chmod(os.path.join(tmp, "keep_tokens.py"), 0o644)
+        # Written through a container so it works whoever owns data/state. The restored file is made ready beside the
+        # live one first: today's API tokens read from the live database (through its log, which holds the newest) and
+        # put in it. Then the old database's own log and journal go, as SQLite would apply them to the restored file and
+        # damage it, and the restored file takes the live one's place in one step.
         system.compose("--profile", "tools", "run", "--rm", "--no-deps", "--entrypoint", "sh",
-                       # The old database's own log and journal go first: SQLite would apply them to the
-                       # restored file and damage it.
-                       "tools", "-c", "mkdir -p /data/state && rm -f /data/state/dmtq.db3-wal /data/state/dmtq.db3-shm "
-                       "/data/state/dmtq.db3-journal && cp /in/dmtq.db3 /data/state/dmtq.db3",
+                       "tools", "-c", f"mkdir -p /data/state && cp /in/dmtq.db3 {RESTORING} "
+                       f"&& python3 /in/keep_tokens.py /data/state/dmtq.db3 {RESTORING} "
+                       "&& rm -f /data/state/dmtq.db3-wal /data/state/dmtq.db3-shm /data/state/dmtq.db3-journal "
+                       f"&& mv {RESTORING} /data/state/dmtq.db3",
                        extra_env={"IMPORT_FROM": tmp}, capture=True)
         # Added songs travel with the records that refer to them.
         custom = os.path.join(tmp, "custom")

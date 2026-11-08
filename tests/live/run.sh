@@ -318,6 +318,23 @@ expect_location localhost:8790 "$here_sign_in"
 expect_location 172.32.1.5 "https://172.32.1.5:80/opendmtq/"
 expect_location 10.example.com "https://10.example.com:80/opendmtq/"
 expect_door GET "/live/state?ids=nobody" Chrome "200 *"
+# The API is refused on the plain door while HTTPS works: its token went out in clear already, and a redirect would have a
+# script send it again. A 403 in the API's own JSON, with the address to use (use_https), and nothing passed on.
+expect_door GET "/opendmtq/api/v1/status" curl "403 "
+expect_door POST "/opendmtq/api/v1/builds" curl "403 "
+got=$(docker exec "$SITE-tls" php -r '
+  $s = fsockopen("127.0.0.1", 8081);
+  fwrite($s, "PROXY TCP4 203.0.113.9 127.0.0.1 1234 8081\r\nGET /opendmtq/api/v1/status HTTP/1.0\r\nHost: live-test.example.net:8790\r\nUser-Agent: curl\r\n\r\n");
+  $all = stream_get_contents($s);
+  preg_match("#Content-Type: ([^;\r\n]+)#i", $all, $c);
+  $e = json_decode(substr($all, strpos($all, "\r\n\r\n") + 4), true)["error"] ?? [];
+  echo $c[1] ?? "-", " ", $e["code"] ?? "-", " ", $e["message"] ?? "-";')
+if [ "$got" != "application/json use_https This address takes the API over HTTPS only: $to_https/opendmtq/api/v1/" ]; then
+  echo "FAIL the API's refusal on the plain door: $got" >&2
+  docker rm -f "$SITE-tls" >/dev/null
+  exit 1
+fi
+echo "PASS the API's refusal on the plain door: $got"
 # Behind the Helm chart's router, which ends HTTPS and says how each visit came (router.tls): the one door takes both.
 # In place of the admin service, something that answers with the visitor's address as the server passed it on.
 docker run -d --name "$SITE-echo" --network "$NET" --entrypoint python3 "opendmtq-tools:$TAG" -c '
@@ -364,6 +381,16 @@ expect_routed game.example.com:8790 https /opendmtq "301 https://game.example.co
 expect_routed game.example.com:8790 http /opendmtq/admin/login "302 https://game.example.com:8790/opendmtq/admin/login"
 # Their address until 2026-11 goes straight to the new one there.
 expect_routed game.example.com:8790 http /admin/login "302 https://game.example.com:8790/opendmtq/admin/login"
+# The API is refused on a plain visit, as on the edge's plain door (403 use_https, in JSON).
+expect_routed game.example.com:8790 http /opendmtq/api/v1/status "403 "
+got=$(curl -s -m 10 -H "Host: game.example.com:8790" -H "X-Forwarded-Proto: http" "http://127.0.0.1:$((SITE_PORT + 4))/opendmtq/api/v1/status" \
+  | python3 -c 'import json, sys; e = json.load(sys.stdin)["error"]; print(e["code"], e["message"])')
+if [ "$got" != "use_https This address takes the API over HTTPS only: https://game.example.com:8790/opendmtq/api/v1/" ]; then
+  echo "FAIL behind the router, the API's refusal: $got" >&2
+  docker rm -f "$SITE-router" "$SITE-echo" "$SITE-tls" >/dev/null
+  exit 1
+fi
+echo "PASS behind the router, the API's refusal: $got"
 # A health check, or anything else in the cluster, says nothing about how it came and is left alone.
 # (It may go to the site's sign-in, on the same door; not to HTTPS.)
 got=$(curl -s -m 10 -o /dev/null -w '%{http_code} %{redirect_url}' -A Chrome "http://127.0.0.1:$((SITE_PORT + 4))/opendmtq/")
@@ -381,6 +408,14 @@ if [ "$got" != "198.51.100.7" ]; then
   exit 1
 fi
 echo "PASS the admin service is told the visitor's address"
+# So are the API's requests: a wrong token counts against the visitor's own address in the same throttle.
+got=$(curl -s -m 10 -H "X-Forwarded-Proto: https" -H "X-Forwarded-For: 198.51.100.7" "http://127.0.0.1:$((SITE_PORT + 4))/opendmtq/api/v1/who")
+if [ "$got" != "198.51.100.7" ]; then
+  echo "FAIL the API is told the visitor's address: $got" >&2
+  docker rm -f "$SITE-router" "$SITE-echo" "$SITE-tls" >/dev/null
+  exit 1
+fi
+echo "PASS the API is told the visitor's address"
 docker rm -f "$SITE-router" "$SITE-echo" >/dev/null
 # The portal's footer leads to the admin pages only where they are on this port.
 # (A stranger sees the footer on the sign-in page the site sends them to.)
@@ -395,6 +430,14 @@ if curl -sL "http://127.0.0.1:$SITE_PORT/opendmtq/" | grep -q 'href="/opendmtq/a
   exit 1
 fi
 echo "PASS the footer links to the admin pages only when they are on the public port"
+# With the admin pages off the public port, the API is not there either.
+got=$(curl -s -m 10 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$SITE_PORT/opendmtq/api/v1/status")
+if [ "$got" != 404 ]; then
+  echo "FAIL the API answers on a public port the admin pages are kept off: $got" >&2
+  docker rm -f "$SITE-tls" >/dev/null
+  exit 1
+fi
+echo "PASS the API is off the public port with the admin pages"
 # The admin pages' address until 2026-11 (/admin) leads to the same page at /opendmtq/admin through the server too: here
 # straight to HTTPS, which this server has.
 got=$(curl -s -m 10 -o /dev/null -w '%{http_code} %{redirect_url}' "http://127.0.0.1:$((SITE_PORT + 3))/admin/players")

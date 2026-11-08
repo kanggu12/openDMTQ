@@ -32,11 +32,12 @@ location ~ ^/(?:DMQ/(?:Songs|Patterns)|patch|viewImg)/ {
   proxy_next_upstream_tries 3;
 }
 
-# Admin pages (/opendmtq/admin, and /admin, their address until 2026-11, which leads there): song packages (up to 300 MB) and backups (up to 1 GB) go up, backups come
+# Admin pages (/opendmtq/admin, and /admin, their address until 2026-11, which leads there) and their API (/opendmtq/api):
+# song packages (up to 300 MB) and backups (up to 1 GB) go up, backups come
 # down, and an upload is checked before the answer comes: the limits are the admin's own
-# (it refuses more per page) and the time is the server's (ProxyPass timeout=900). Streamed
+# (it refuses more per page and per route) and the time is the server's (ProxyPass timeout=900). Streamed
 # both ways: buffered, they would go to temporary files on the node's disk.
-location ~ ^/(?:opendmtq/)?admin(?:/|$) {
+location ~ ^/(?:(?:opendmtq/)?admin|opendmtq/api)(?:/|$) {
   proxy_pass http://api;
   client_max_body_size 1100m;
   proxy_request_buffering off;

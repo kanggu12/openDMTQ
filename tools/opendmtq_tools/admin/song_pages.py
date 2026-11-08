@@ -1,5 +1,5 @@
 """The Songs and Maintenance pages: the song list with its plays, song packages, what is hidden, the notice. Each form's work
-is a function (add_package, set_hidden, remove, set_notice), apart from the page that calls it."""
+is a function (add_package, set_hidden, remove, set_notice) that the API calls as well (api.py)."""
 
 import collections
 import json
@@ -107,7 +107,7 @@ def songs_page():
 
 
 def failed(e):
-    """What a song's action that failed for a reason of its own says (the page and any other caller alike): the reason, which the
+    """What a song's action that failed for a reason of its own says (the page and the API alike): the reason, which the
     log has in full. Called while the exception is being handled."""
     app.logger.exception("song action failed")
     return Refused(500, "song_action_failed", t("songs.failed", detail=why(e)))

@@ -133,18 +133,18 @@ objectStore:
   nodeSelector: {}
   tolerations: []
 
-# Admin pages at /opendmtq/admin (app builds, songs, players, backups, maintenance), as a sidecar of the api
-# pod because they work on its database. Password from a Secret with key ADMIN_PASSWORD, or one is
-# generated and kept in "<release>-opendmtq-admin".
+# Admin pages at /opendmtq/admin (app builds, songs, players, backups, maintenance), and their API at /opendmtq/api,
+# as a sidecar of the api pod because they work on its database. Password from a Secret with key ADMIN_PASSWORD, or
+# one is generated and kept in "<release>-opendmtq-admin".
 admin:
   enabled: true
   # The owner's admin account: this ID (ADMIN_USER) and the password in the Secret. Every other account is made on the
   # Accounts page.
   user: admin
   existingSecret: ""
-  # The admin pages through the router: "yes", "no", or empty for automatic: yes with router.tls (over HTTPS), or when publicHost
-  # is a private IPv4 address (the pages and their password then travel in plain HTTP on the local network), no
-  # otherwise. Without it, use kubectl port-forward (NOTES.txt).
+  # The admin pages and their API through the router: "yes", "no", or empty for automatic: yes with router.tls (over
+  # HTTPS), or when publicHost is a private IPv4 address (the pages and their password then travel in plain HTTP on
+  # the local network), no otherwise. Without it, use kubectl port-forward (NOTES.txt).
   onPublicPort: ""
   resources:
     requests: {cpu: 20m, memory: 96Mi}

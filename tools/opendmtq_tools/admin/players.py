@@ -1,5 +1,5 @@
 """The Players page: everyone who has played, with what they did, and what the owner can do about a player. The list
-(player_rows) and a row's actions (act) are functions, apart from the page that calls them."""
+(player_rows) and a row's actions (act) are functions the API calls as well (api.py)."""
 
 import collections
 import datetime

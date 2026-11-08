@@ -198,6 +198,31 @@ class HostServiceTest(unittest.TestCase):
         self.assertIn("<string>/Users/a/R&amp;D &lt;1&gt;/openDMTQ/host</string>", plist)
 
 
+class HostAdminConfTest(unittest.TestCase):
+    """The admin pages' part of a host install's Apache settings (host/opendmtq_host/apache.py): the API goes where the pages
+    go, and nowhere they do not."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, os.path.join(ROOT, "host"))
+        from opendmtq_host import apache
+        cls.apache = apache
+
+    def test_on_a_local_network_address_the_pages_and_the_api_are_passed_on(self):
+        conf = self.apache.admin_conf({"PUBLIC_HOST": "192.168.0.10", "ADMIN_PORT": "8791"})
+        self.assertIn('ProxyPass "/opendmtq/admin" "http://127.0.0.1:8791/opendmtq/admin" timeout=900', conf)
+        self.assertIn('ProxyPass "/opendmtq/api" "http://127.0.0.1:8791/opendmtq/api" timeout=900', conf)
+        self.assertNotIn("Require all denied", conf)
+
+    def test_on_an_internet_address_or_kept_off_the_port_both_are_refused(self):
+        for values in ({"PUBLIC_HOST": "game.example.com:8790"}, {"PUBLIC_HOST": "192.168.0.10", "ADMIN_ON_PUBLIC_PORT": "no"}):
+            conf = self.apache.admin_conf(dict(values, ADMIN_PORT="8791"))
+            self.assertNotIn("ProxyPass", conf, values)
+            self.assertIn('<LocationMatch "^/(opendmtq/)?admin(/|$)">', conf)
+            self.assertIn('<LocationMatch "^/opendmtq/api(/|$)">', conf)
+            self.assertEqual(conf.count("Require all denied"), 2, values)
+
+
 class VirtualInterfacesTest(unittest.TestCase):
     def test_the_command_line_and_the_admin_pages_skip_the_same_ones(self):
         # Two packages that do not import each other: an interface on one list only gives an address on one screen only.

@@ -125,8 +125,9 @@ def httpd_conf(values, found):
 
 
 def admin_conf(values):
-    """The admin pages on the public port (/opendmtq/admin): passed to the admin service on a local network address,
-    refused on an internet one, where this install has no HTTPS to keep the password safe."""
+    """The admin pages (/opendmtq/admin) and their API (/opendmtq/api) on the public port: passed to the admin service on a
+    local network address, refused on an internet one, where this install has no HTTPS to keep the password and the
+    tokens safe."""
     port = admin_port(values)
     target = f"http://127.0.0.1:{port}"
     if values.get("ADMIN_ON_PUBLIC_PORT", "yes") == "yes" and env.is_lan_only(values["PUBLIC_HOST"]):
@@ -142,12 +143,20 @@ def admin_conf(values):
             # Their address until 2026-11, which the admin service sends on to the new one.
             f'ProxyPass "/admin" "{target}/admin"',
             f'ProxyPassReverse "/admin" "{target}/admin"',
+            # The API, on the same terms as the pages: its uploads and downloads take as long.
+            f'ProxyPass "/opendmtq/api" "{target}/opendmtq/api" timeout=900',
+            f'ProxyPassReverse "/opendmtq/api" "{target}/opendmtq/api"',
         ]) + "\n"
     return "\n".join([
         '<LocationMatch "^/(opendmtq/)?admin(/|$)">',
         "    Require all denied",
         f'    ErrorDocument 403 "The admin pages are on the server PC only: open '
         f'http://localhost:{port}/opendmtq/admin/ there."',
+        "</LocationMatch>",
+        # The API with them.
+        '<LocationMatch "^/opendmtq/api(/|$)">',
+        "    Require all denied",
+        f'    ErrorDocument 403 "The API is on the server PC only: use http://localhost:{port}/opendmtq/api/v1/ there."',
         "</LocationMatch>",
     ]) + "\n"
 
