@@ -6,6 +6,87 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-10
+
+### Added
+
+- The player for Windows takes a computer's settings for the picture and the sound, which the PC client chooses before a
+  start (`--settings`): full screen from the start, the window's size, vsync on or off, a frame limit, a render scale,
+  the sound device, the device alone or shared, how much sound is kept ahead of it, and the volume. With vsync on, a
+  frame limit that is a whole fraction of the display's rate, or up to 10 % above one, keeps every frame on the same
+  number of refreshes (120 frames a second on a 240 Hz display, every second refresh); another limit is held by the
+  clock, each frame still on a refresh (144 on a 240 Hz display). With vsync off, frames go out as soon as drawn, evenly
+  at the limit, which may be above the display's rate or none at all. A render scale draws the game at a share of the
+  window's pixels, stretched to the window. The device alone (WASAPI's exclusive mode) plays with buffers of the
+  device's own period, 3 ms on a device that has it, and gives way to the shared mode when Windows does not allow it; a
+  low buffer in the shared mode takes Windows' low-latency mode where the device has a shorter period than its standard
+  one.
+- `player --audio-devices` lists the computer's sound devices, for the PC client.
+- The player for Windows broadcasts, as phones do, while the server's owner has broadcasting on for its player: the same
+  stream (H.264 at the server's size, frame rate and bitrate, AAC sound, two-second MPEG-TS segments), made by Windows'
+  own encoders from the game's frames and its whole mix. The frames are scaled and turned into the encoder's format on
+  the graphics card and read back without the game waiting for them; on a 240 Hz display the game keeps every refresh
+  with the broadcast on. The server's notice that broadcasting went on or off shows as a card at the top of the game's
+  window, with the LIVE mark while it is on.
+- A menu in the player for Windows, over the game: back to the game, full screen or a window, and quitting the game. It
+  comes up from a round button at the top right, from Esc held, from a finger drawn down from the top edge of the game,
+  and from Alt+F4 or the window's close button. The button shows while the mouse moves in the top quarter of the game
+  with its button up, not while a song is played with the mouse. The game holds still while the menu is open, as a
+  phone's game does when its owner leaves it, a broadcast with it, and the arrow keys and Enter choose in it. Minimised,
+  the game holds still behind the menu, which is there when the game comes back.
+- Over the game, the player for Windows shows its own pointer: a dart in the logo's chrome and lime, all lime while the
+  button is down, sized for the display's scaling.
+- `client.php` on the site answers the PC client: whether the address is an OpenDMTQ server, a sign-in that gives the
+  site's cookie, and the app on offer for a signed-in player.
+- The PC client for Windows (`OpenDMTQ-Setup.exe`): an installer, and a launcher between the player and the game. It
+  connects to a server, signs in, downloads the server's app and keeps it up to date, sets the picture and the sound up
+  for the computer before PLAY, and starts the player. It updates itself from the project's releases. Downloaded from a
+  server's site, it comes with that server already set; from the releases, it asks for the address on first start.
+  Downloaded over HTTPS, it keeps the address with its port, and the server's own certificate authority where the
+  server has one, which the launcher trusts for that server alone. The installer and the launcher speak English or
+  Korean, as Windows does, and the launcher can be set to either. `OpenDMTQ-cmd.exe` does the same from the command
+  line.
+- A switch for broadcasts on the whole server, off on a new server: while off, nothing of broadcasts reaches a phone,
+  the PC player or the site (no LIVE menu, no home box, no LIVE marks, no recordings to watch), and uploads are refused.
+  The players' own switches are kept for when it is on again. The settings are kept in the database, so they go with
+  its backups and with its copy on Kubernetes; a restore on the admin pages keeps today's.
+- The admin pages' Broadcasts page has the server's switch, whether new players start switched on, and the stream's
+  quality: Light (480p30, 1 Mbit/s), Standard (720p30, 2 Mbit/s), Smooth (720p60, 4 Mbit/s) or Sharp (1080p60, 8
+  Mbit/s), each with what an hour takes on the disk. Phones and the PC player follow a change within 15 seconds.
+  Turned to start new players on, it leaves every player already there as they are: only those who come after start
+  on.
+- `GET /broadcasts` and `PUT /broadcasts` in the admin API read and change those settings.
+
+### Changed
+
+- Alt+F4 and the window's close button open the player's menu instead of ending the game, so that no key pressed by
+  mistake ends a song; the menu's Quit ends it.
+- The site hands computers the installer for Windows, set up for the server (its address on the installer's end), in
+  place of a zip with the player and the app in it. The installer is the same for every server: the builder keeps it
+  beside the app (`windows.json`), from the release, from `data/apk`, or fetched from the latest release, and removes
+  the zips of 0.6 and 0.7 and what they kept in `data/apk` for their player.
+- `player --refresh` sets the display's rate that the frame pacing follows too, for a display that gives none.
+- The notice in the game when a broadcast starts or ends reads as two lines: what happened, then where the broadcast and
+  its replay can be watched (the site's LIVE page, by the server's name). Phones show it for longer. A player on air
+  when the owner turns broadcasts off for the server is told that the broadcast ended and that broadcasts are off on
+  the server for now.
+- Upgrading: a server that broadcast before the switch existed (a player switched on, or `LIVE_DEFAULT=on`) starts with
+  broadcasts on; any other starts with them off. With `LIVE_DEFAULT=on`, new players also start switched on until the
+  owner chooses on the Broadcasts page.
+- The admin pages' Recordings page is now the Broadcasts page: the server's switch and settings at its top, the
+  recordings under them.
+- In the admin API: `GET /app/windows` gives the installer for Windows, set up for this server, in place of the zip
+  with the player and the app; `AppOnOffer.windows` is a `WindowsInstaller` (`file`, `size`, `sha256`, `version`,
+  `copied_at`) in place of a `WindowsPlayer`; a player's `broadcast` can be `held` (switched on while broadcasts are
+  off for the server); `SiteLive` has `on`; the status page's `Counts` has `broadcasts`, and its `live` counts nobody
+  while broadcasts are off.
+
+### Fixed
+
+- The player for Windows could stay behind after the game ended, frozen with its memory, when Windows' way out stopped
+  in a DLL's own clean-up waiting for a thread it had already ended (the graphics driver's or Media Foundation's). It
+  now ends at once, leaving the clean-up to Windows.
+
 ## [0.7.0] - 2026-11-08
 
 ### Added
@@ -233,7 +314,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 - Four ways to run it: the Windows bundle, one command on Linux or macOS, Docker Compose, and a Helm chart for
   Kubernetes.
 
-[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/kanggu12/openDMTQ/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/kanggu12/openDMTQ/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/kanggu12/openDMTQ/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/kanggu12/openDMTQ/compare/v0.4.1...v0.5.0
