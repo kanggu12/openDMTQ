@@ -26,8 +26,9 @@ one that only fixes raises the patch number. Each release's section here is its 
   stream (H.264 at the server's size, frame rate and bitrate, AAC sound, two-second MPEG-TS segments), made by Windows'
   own encoders from the game's frames and its whole mix. The frames are scaled and turned into the encoder's format on
   the graphics card and read back without the game waiting for them; on a 240 Hz display the game keeps every refresh
-  with the broadcast on. The server's notice that broadcasting went on or off shows as a card at the top of the game's
-  window, with the LIVE mark while it is on.
+  with the broadcast on. A PC whose encoder does not keep up steps the stream down (its frame rate, then its size), as a
+  slow network does, and back up after a minute with time to spare. The server's notice that broadcasting went on or
+  off shows as a card at the top of the game's window, with the LIVE mark while it is on.
 - A menu in the player for Windows, over the game: back to the game, full screen or a window, and quitting the game. It
   comes up from a round button at the top right, from Esc held, from a finger drawn down from the top edge of the game,
   and from Alt+F4 or the window's close button. The button shows while the mouse moves in the top quarter of the game

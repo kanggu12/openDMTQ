@@ -106,7 +106,10 @@ same stream: H.264 at the owner's quality, AAC sound at 128 kbit/s, two-second M
 (Media Foundation's, on the processor) make it, on threads of their own. The frame the game draws is scaled
 to the stream's size and turned into the encoder's picture format on the graphics card, and read back a frame or two
 later, so the game never waits for it; the sound is the game's whole mix, before the volume the player set. The stream
-says its colours are BT.709, as the picture is.
+says its colours are BT.709, as the picture is. A PC whose encoder cannot keep up (its time near all a picture has, or
+pictures left out for it) steps the stream down as a slow network does, its frame rate first, then its size, and back
+up after a minute with time to spare: a 1080p60 stream encoded 20 ms slower than this PC does went to 1080p40, then to
+1440 by 808 at 30 frames a second, and kept up there.
 
 The notice that a broadcast started or ended shows as a card at the top of the game's window, with the LIVE mark while
 it is on, and leaves after six seconds. While the player's menu holds the game still, the broadcast stops too; it goes
