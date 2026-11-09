@@ -297,7 +297,10 @@ table.players td.primary { font-weight: 600; overflow-wrap: anywhere; }
 }
 /* A player's broadcast: how it is, in a word with its light, and the switch beside it. */
 .live-row { display: flex; align-items: center; gap: 10px; }
-.live-state { display: inline-flex; align-items: center; gap: 7px; min-width: 7.6em; font-size: 13px; color: var(--ash); white-space: nowrap; }
+.live-state { display: inline-flex; align-items: center; gap: 7px; min-width: 5.6em; font-size: 13px; color: var(--ash); white-space: nowrap; }
+/* Where the players are a table with columns, the state takes the width of its longest ("Switched on"), so that the
+   buttons beside it keep one line down the column; on a phone each row is its own, and the buttons need the room. */
+@media (min-width: 701px) { .live-state { min-width: 7.6em; } }
 .live-state.on { color: var(--bad); font-weight: 700; }
 .live-state.wait { color: var(--warn); }
 /* Switched on, held while broadcasts are off for the server: the waiting colour's ring, not lit. */
