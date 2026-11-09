@@ -37,6 +37,16 @@ has_marker() { rpc "[{\"id\":3,\"method\":\"user.getUsersByPuid\",\"params\":[[\
 # Seconds since the epoch, with fractions.
 now() { date +%s.%N; }
 api_pod() { "${KC[@]}" get pod -l app.kubernetes.io/component=api -o jsonpath='{.items[0].metadata.name}'; }
+# The owner's broadcast settings (LiveSetting in the game database, docs/live.md): written in the api pod before the
+# failures, as the Broadcasts page writes them, and read in each replacement, which has the database back from the
+# object store. A setting that came back as the first look's default would mean it was lost.
+SQL_PHP='$d = new SQLite3("/data/dmtq.db3"); '
+set_settings() {
+  "${KC[@]}" exec "$1" -c server -- php -r "$SQL_PHP"'$d->exec("INSERT OR REPLACE INTO LiveSetting (name, value) VALUES (\x27on\x27, \x271\x27), (\x27quality\x27, \x27sharp\x27)");' >/dev/null
+}
+has_settings() {
+  [[ "$("${KC[@]}" exec "$1" -c server -- php -r "$SQL_PHP"'echo $d->querySingle("SELECT group_concat(name || \x27=\x27 || value, \x27,\x27) FROM (SELECT * FROM LiveSetting ORDER BY name)");' 2>/dev/null)" == *"on=1"*"quality=sharp"* ]]
+}
 
 # Background probe: one asset download and one game RPC every 0.5 s, logging HTTP codes.
 probe() {
@@ -83,7 +93,9 @@ TOKEN=$(curl -s -m 5 -X POST "$URL/api/accounts/v3/global/login_dmq" -d "udid=$M
 GUID=$(rpc "[{\"id\":1,\"method\":\"user.loginV2\",\"params\":[\"$TOKEN\",\" \",\"\",\"1.3.5\",\"ANDROID\",\"KR\"]}]" | jget '[0]["result"]["guid"]')
 rpc "[{\"id\":2,\"method\":\"user.setNickname\",\"params\":[$GUID,\"$MARK\"]}]" > /dev/null
 has_marker || { echo "player $MARK not visible after writing it"; exit 1; }
-echo "   player $MARK (guid $GUID) written; waiting 3 s for replication"
+set_settings "$(api_pod)"
+has_settings "$(api_pod)" || { echo "the broadcast settings not readable after writing them"; exit 1; }
+echo "   player $MARK (guid $GUID) and the broadcast settings (on, sharp) written; waiting 3 s for replication"
 sleep 3
 
 echo "== 1. kill the api pod"
@@ -95,6 +107,8 @@ OUT=$(wait_recovered "$T0" "$POD") || exit 1
 read -r RTO1 _ NODE1 <<< "$OUT"
 kill "$PROBE_PID"; PROBE_PID=
 echo "   api back with the player after ${RTO1}s on $NODE1"
+has_settings "$(api_pod)" || { echo "FAIL: the broadcast settings did not come back with the replacement pod" >&2; exit 1; }
+echo "   the broadcast settings came back with it"
 echo "   failed probes during the outage: assets $(tally 1), api $(tally 2)"
 P1A=$(tally 1); P1R=$(tally 2)
 
@@ -109,6 +123,8 @@ OUT=$(wait_recovered "$T0" "$POD") || exit 1
 read -r RTO2 NEWPOD NEW <<< "$OUT"
 kill "$PROBE_PID"; PROBE_PID=
 echo "   node $NODE stopped; api back with the player after ${RTO2}s ($NEWPOD on $NEW)"
+has_settings "$NEWPOD" || { echo "FAIL: the broadcast settings did not come back on the other node" >&2; exit 1; }
+echo "   the broadcast settings came back with it"
 echo "   failed probes during the outage: assets $(tally 1), api $(tally 2)"
 P2A=$(tally 1); P2R=$(tally 2)
 
@@ -122,5 +138,5 @@ cat <<SUMMARY
 result                       recovery   failed probes (assets / api)
 api pod killed               ${RTO1}s      ${P1A} / ${P1R}
 api node stopped             ${RTO2}s      ${P2A} / ${P2R}
-player $MARK present after both recoveries (checked through the replacement pods)
+player $MARK and the broadcast settings present after both recoveries (checked in the replacement pods)
 SUMMARY

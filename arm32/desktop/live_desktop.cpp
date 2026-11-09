@@ -151,9 +151,13 @@ std::atomic<int> g_failures{0};      // encoder start-ups that failed; three end
 // What the server asks for (the top step), and the step the network has taken it down to.
 std::atomic<int> g_fps{30}, g_height{720}, g_bitrate{2000000}, g_segment{2};
 std::atomic<int> g_network_step{0};
+// The step this PC's encoder keeps up at: Windows' H.264 encoder runs on the processor, and a slower PC may not encode
+// 1080p60 in time. Kept apart from the network's, and kept across streams (the processor stays the same).
+std::atomic<int> g_encoder_step{0};
 constexpr int kLastStep = 3;
 
-int step() { return g_network_step.load(std::memory_order_relaxed); }
+// The step in use: the lower quality of what the network and the encoder can take.
+int step() { return std::max(g_network_step.load(std::memory_order_relaxed), g_encoder_step.load(std::memory_order_relaxed)); }
 int step_fps(int s) { return s == 0 ? g_fps.load() : s == 1 ? std::max(g_fps.load() * 2 / 3, 1) : std::max(g_fps.load() / 2, 1); }
 int step_height(int s) { return s <= 1 ? g_height.load() : s == 2 ? g_height.load() * 3 / 4 : g_height.load() / 2; }
 int step_bitrate(int s) {
@@ -170,6 +174,8 @@ std::atomic<std::uint64_t> g_captures{0}, g_capture_ns{0}, g_capture_max_ns{0}, 
 // The other half of a picture's cost on the render thread: taking it out of its pixel buffer for the encoder, a frame or
 // two after it was taken.
 std::atomic<std::uint64_t> g_handed{0}, g_hand_ns{0}, g_hand_max_ns{0};
+// Pictures left out because the encoder had not taken the ones before (its queue full), for its own step.
+std::atomic<std::uint64_t> g_encoder_behind{0};
 // Where a picture's taking goes, with stats on: the hook's own looks before it, saving the game's state, the scaled copy,
 // the two conversion draws, the two reads into the pixel buffers, the fence, putting the state back.
 constexpr int kPhases = 7;
@@ -967,6 +973,11 @@ void encoder_main() {
     mf()->startup(MF_VERSION, MFSTARTUP_LITE);
     Nanos next_stats = now_ns() + 60 * kSecond;
     std::unique_ptr<Encoder> encoder;
+    // How hard the encoder works, over five seconds at a time: its time on pictures against the time it had, and the
+    // pictures it took. Twice behind, a step down (g_encoder_step); a minute with time to spare, a step back up.
+    Nanos window_start = now_ns(), busy = 0;
+    std::uint64_t pictures = 0;
+    int heavy = 0, light = 0;
     for (;;) {
         Frame f;
         bool have = false;
@@ -1007,7 +1018,19 @@ void encoder_main() {
             }
         }
         if (!encoder) continue;
-        const bool sent = !have || encoder->picture(f);
+        bool sent = true;
+        if (have) {
+            const Nanos began = now_ns();
+            sent = encoder->picture(f);
+            // Checks stand in for a slower PC (PLAYER_LIVE_ENCODE_DELAY: milliseconds more for each picture).
+            static const long slower = [] {
+                const char* v = std::getenv("PLAYER_LIVE_ENCODE_DELAY");
+                return v ? std::strtol(v, nullptr, 10) : 0L;
+            }();
+            if (slower > 0) sleep_ns(slower * 1000000);
+            busy += now_ns() - began;
+            ++pictures;
+        }
         // The picture is in the encoder's own sample now: its buffer goes back for the render thread's next one.
         if (have) {
             std::lock_guard<std::mutex> l(g_frame_lock);
@@ -1020,6 +1043,34 @@ void encoder_main() {
         encoder->sound(now_ns());
         encoder->apply_bitrate();
         log_stats_if_due(&next_stats);
+        const Nanos now = now_ns();
+        if (now - window_start >= 5 * kSecond) {
+            const double load = static_cast<double>(busy) / static_cast<double>(now - window_start);
+            const std::uint64_t behind = g_encoder_behind.exchange(0);
+            if (pictures > 0 && (load > 0.9 || behind * 20 > pictures)) {
+                // Its time near all it had, or one picture in twenty left out for it: twice so, a step down.
+                light = 0;
+                if (++heavy >= 2 && g_encoder_step.load() < kLastStep) {
+                    heavy = 0;
+                    g_encoder_step.fetch_add(1);
+                    log("player: live: the encoder does not keep up (%.0f %% busy, %llu pictures left out): a step down", load * 100,
+                        static_cast<unsigned long long>(behind));
+                }
+            } else if (pictures > 0 && load < 0.4) {
+                heavy = 0;
+                if (++light >= 12 && g_encoder_step.load() > 0) {
+                    light = 0;
+                    g_encoder_step.fetch_sub(1);
+                    log("player: live: the encoder has time to spare (%.0f %% busy): a step back up", load * 100);
+                }
+            } else {
+                heavy = 0;
+                light = 0;
+            }
+            window_start = now;
+            busy = 0;
+            pictures = 0;
+        }
     }
 }
 
@@ -1552,6 +1603,7 @@ void collect(Capture& c) {
                 recycle(std::move(g_frames.front().nv12));
                 g_frames.pop_front();
                 g_skipped.fetch_add(1, std::memory_order_relaxed);
+                g_encoder_behind.fetch_add(1, std::memory_order_relaxed);
             }
             g_frames.push_back(std::move(f));
             g_frame_wake.notify_one();

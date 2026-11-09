@@ -67,6 +67,9 @@ Latest figures, ten runs:
 | API pod force-deleted | 4.5 to 6.9 s | 0 in every run | Player intact |
 | Worker node running the api stopped | 42.6 to 48.4 s | 0 to 3 of 45-49 probes | Player intact |
 
+From 0.8 the drill also writes the owner's broadcast settings, kept in the database, and finds them in each
+replacement: in its run for 0.8.0, 5.9 s and 44.4 s with 2 of 47 downloads failed, within the figures above.
+
 Earlier figures, four runs on the first version of the Helm chart: 3.1 to 5.0 s; 41.4 to 47.4 s with 0 to 6 of 43-62
 failed. The game RPC fails for the whole outage in both drills, as nothing else can answer it.
 

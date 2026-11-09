@@ -52,6 +52,11 @@ jobs:
       - name: Broadcast colours
         run: c++ -std=c++20 -Wall -Wextra -Iarm32/src arm32/tests/host/live_sps_test.cpp arm32/src/live_sps.cpp -o /tmp/live_sps_test && /tmp/live_sps_test
 
+      # The frame limit on a computer's display (arm32/src/pacing_math.h): which displays and limits keep every frame on
+      # the same number of refreshes, and which go by the clock.
+      - name: Frame limits on computer displays
+        run: c++ -std=c++20 -Wall -Wextra -Iarm32/src arm32/tests/host/pacing_math_test.cpp -o /tmp/pacing_math_test && /tmp/pacing_math_test
+
       - name: Shell scripts
         run: |
           shellcheck --severity=warning server/entrypoint.sh server/edge/start.sh cli/install.sh host/get.sh host/install.sh host/windows/build.sh tests/closed/run.sh tests/closed/game.sh tests/ha/failover.sh tests/qa.sh tests/ui/run.sh tests/game/tour.sh tests/game/protocol.sh tests/host/run.sh tests/windows/wine.sh tests/live/run.sh tests/live/sound/run.sh tests/live/sound/card.sh deploy/kind/up.sh
@@ -239,6 +244,51 @@ jobs:
       - name: The tests on Windows
         shell: pwsh
         run: arm32/test_windows.ps1 -Folder arm32-windows
+
+  # The PC client's installer as a release builds it (PyInstaller under Wine, Velopack), on Linux, with the player the
+  # arm32-windows job packed; handed to the next job.
+  client-build:
+    needs: arm32-windows
+    runs-on: ubuntu-24.04
+    # Wine's Python, PyInstaller and .NET for Velopack take most of it: several times that is a stalled job.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: arm32-windows
+          path: arm32-windows
+
+      - name: The installer and Velopack's packages
+        env:
+          PLAYER_ZIP: arm32-windows/opendmtq-player-windows.zip
+        run: client/packaging/windows/build.sh "$PWD/_work/client-ci"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: client-windows
+          path: _work/client-ci/releases
+          retention-days: 14
+
+  # The installer on Windows itself: installed silently for the runner's user, its command line, the player it brought
+  # (found by the ready check, its sound devices), and the same installer again as a repair
+  # (client/tests/windows/install.ps1).
+  client-windows:
+    needs: client-build
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: client-windows
+          path: client-windows
+
+      - name: Install it and run what it installed
+        shell: pwsh
+        run: client/tests/windows/install.ps1 -Folder client-windows
 
   # The Windows bundle: built on Linux from pinned downloads (host/windows/build.sh), every program's DLLs checked, run under
   # Wine as a first smoke test (tests/windows/wine.sh), and handed to the next job.

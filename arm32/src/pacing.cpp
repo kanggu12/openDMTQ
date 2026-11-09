@@ -63,6 +63,7 @@
 // debug.arm32.pacing 0 turns the pacing off, debug.arm32.adpf 0 the performance hints, and
 // debug.arm32.slowframe <ms> stretches every frame, to try the fallback out as on a slower phone.
 #include "pacing.h"
+#include "pacing_math.h"
 
 #include "framerate.h"
 #include "host.h"
@@ -222,7 +223,7 @@ std::atomic<EGLint> g_game_interval{1};
 std::atomic<EGLint> g_paced_interval{0};
 // A computer's display: the longest swap interval it is paced with (Direct3D's longest, four refreshes),
 // and how long after a refresh the GPU may still be finishing a frame swapped before it.
-constexpr EGLint kMaxHostInterval = 4;
+constexpr EGLint kMaxHostInterval = kHostIntervalMost;
 constexpr Nanos kHostGpu = 250000;
 // A computer's display: after a step down, the wait before a step back up is tried (a song's load can hold the frames
 // up for some seconds, after which the display's best holds again), doubled after each try that falls short, up to
@@ -500,19 +501,7 @@ void step_up_host(Nanos now) {
 
 bool pace_check(Nanos now, Nanos gap, double hz, bool host);
 
-// The fewest refreshes per frame of a display at `hz` that keep the frame rate at the player's cap or below (a 3 %
-// margin: 120.04 fps on a 240.08 Hz display is a cap of 120): 1 without a cap. 0 when no whole fraction comes near the
-// cap (120 on a 144 Hz display would be 72, 60 on it 48) or the swap cannot hold a frame for that many (30 on a 240 Hz
-// display): the frames are then paced to the cap by the clock, off the refreshes (swap_window).
-int host_top(double hz, float cap) {
-    if (cap <= 0) return 1;
-    for (int n = 1; n <= kMaxHostInterval; ++n) {
-        if (hz / n > static_cast<double>(cap) * 1.03) continue;
-        // A fraction under 90 % of the cap is not what the player chose: the cap by the clock instead.
-        return n == 1 || hz / n >= static_cast<double>(cap) * 0.9 ? n : 0;
-    }
-    return 0;
-}
+// The frame limit's fraction of the display's rate, host_top(), is in pacing_math.h, tested on the build machine.
 
 // One swap of the window while following the display: `interval` is the display's refresh
 // interval (0 when the compositor gave no timing), `gap` the time since the last swap (0 for the
