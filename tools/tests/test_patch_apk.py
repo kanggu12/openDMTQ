@@ -96,6 +96,10 @@ class Workshop:
             mock.patch.object(patch_apk, "patch_target"),
             mock.patch.object(patch_apk.qr, "write", create=True),
             mock.patch.object(builder, "OUT", self.path("out")),
+            # The installer for Windows only where a test puts one, and no release to fetch it from: no test reaches the
+            # internet.
+            mock.patch.object(builder.windows_client, "HERE", self.path("no-code")),
+            mock.patch.object(builder.windows_client, "RELEASE_URL", "file:///nowhere/" + builder.windows_client.SETUP_NAME),
             mock.patch("subprocess.run", self.run),
         ]
         for p in self._patches:
@@ -311,23 +315,23 @@ class StatusTest(unittest.TestCase):
             return builder.main(["--host", HOST])
 
     @staticmethod
-    def with_a_player(w):
-        """A player for Windows beside the code, as a release's tools image has one (player_windows.py), and a stand-in for
-        the patcher that leaves the app and latest.json as it does: (the patch for the player's place, the stand-in)."""
+    def with_an_installer(w):
+        """An installer for Windows beside the code, as a release's tools image has one (windows_client.py), and a stand-in
+        for the patcher that leaves the app and latest.json as it does: (the patch for the installer's place, the
+        stand-in)."""
         code = w.path("code")
         os.makedirs(code, exist_ok=True)
-        # The smallest player the builder takes: one file in its folder, and the version beside it.
-        with zipfile.ZipFile(os.path.join(code, builder.player_windows.ZIP_NAME), "w", zipfile.ZIP_DEFLATED) as z:
-            z.writestr("OpenDMTQ-Player/OpenDMTQ-Player.exe", b"MZ the player")
-            z.writestr("bundle.json", json.dumps({"version": "v1-test"}))
+        # The smallest installer the builder takes: a Windows program's first bytes at a believable size, and its version.
+        w.write("code/" + builder.windows_client.SETUP_NAME, b"MZ" + bytes(builder.windows_client.SMALLEST))
+        w.write("code/" + builder.windows_client.VERSION_NAME, "0.8.0\n")
 
         def patcher(argv):
-            # The app, and latest.json naming it with its hash and package, which the zip's player.conf needs.
+            # The app, and latest.json naming it, as the patcher leaves them.
             w.write("out/OpenDMTQ-new.apk", b"PK an app")
             w.write("out/latest.json", json.dumps({"file": "OpenDMTQ-new.apk", "host": HOST, "sha256": sha256(b"PK an app"),
                                                    "label": "TECHNIKA Q (test)", "package": "com.example.app.s1234"}))
             return "OpenDMTQ-new.apk"
-        return mock.patch.object(builder.player_windows, "HERE", code), patcher
+        return mock.patch.object(builder.windows_client, "HERE", code), patcher
 
     def test_the_runtime_for_newer_phones_comes_before_the_question_whether_to_build(self):
         # A runtime that has just come is a reason to build: asked the other way round, the app would go without it until
@@ -360,51 +364,51 @@ class StatusTest(unittest.TestCase):
             self.run_builder(w, lambda argv: "OpenDMTQ-new.apk")
             self.assertEqual((w.status()["state"], w.status()["file"]), ("done", "OpenDMTQ-new.apk"))
 
-    def test_a_failing_player_for_windows_leaves_the_app_done(self):
-        # The player for Windows follows the app, and whatever goes wrong with it (a full disk, a damaged zip, anything at
-        # all) leaves phones their app: build.json says done, as it said before the step, for a new app and one up to date.
+    def test_a_failing_installer_for_windows_leaves_the_app_done(self):
+        # The installer for Windows comes after the app, and whatever goes wrong with it (a full disk, a damaged file,
+        # anything at all) leaves phones their app: build.json says done, as it said before the step, for a new app and
+        # one up to date.
         for err in (OSError(errno.ENOSPC, "No space left on device"), ValueError("anything"), RuntimeError("anything else")):
             for why in ("no app built yet", None):
                 with self.subTest(err=err, why=why), Workshop() as w, \
-                        mock.patch.object(builder.player_windows, "keep", side_effect=err):
+                        mock.patch.object(builder.windows_client, "keep", side_effect=err):
                     # The run ends as a run that worked: the app is what it is for.
                     self.assertEqual(self.run_builder(w, lambda argv: "OpenDMTQ-new.apk", why), 0)
                     self.assertEqual(w.status()["state"], "done")
                     # "file" only for a new app: the command line tells built from up to date by it.
                     self.assertEqual(w.status().get("file"), "OpenDMTQ-new.apk" if why else None)
 
-    def test_the_app_is_done_before_the_player_for_windows_is_made(self):
-        # Phones can have the app while the zip is made, which takes a while: build.json says so first, on both paths.
+    def test_the_app_is_done_before_the_installer_for_windows_is_put_beside_it(self):
+        # Phones can have the app while the installer is copied: build.json says so first, on both paths.
         for why in ("no app built yet", None):
             with self.subTest(why=why), Workshop() as w:
                 # What build.json said when the step began.
                 seen = []
-                with mock.patch.object(builder.player_windows, "keep", lambda out, manifest: seen.append(w.status()["state"])):
+                with mock.patch.object(builder.windows_client, "keep", lambda out: seen.append(w.status()["state"])):
                     self.run_builder(w, lambda argv: "OpenDMTQ-new.apk", why)
                 self.assertEqual(seen, ["done"])
 
-    def test_docker_stop_while_the_player_for_windows_is_made_leaves_the_app_done(self):
-        # docker stop waits ten seconds, then kills: the step ends at once under the builder's handler, with its zip half
-        # made removed, and the app stays done. The next run makes the zip.
+    def test_docker_stop_while_the_installer_is_copied_leaves_the_app_done(self):
+        # docker stop waits ten seconds, then kills: the step ends at once under the builder's handler, with its file half
+        # copied removed, and the app stays done. The next run puts the installer there.
         with Workshop() as w:
-            here, patcher = self.with_a_player(w)
+            here, patcher = self.with_an_installer(w)
 
             def stopped(*args, **kwargs):
-                # SIGTERM as docker stop sends it, while the app goes into the zip.
+                # SIGTERM as docker stop sends it, while the installer is copied.
                 handler = signal.getsignal(signal.SIGTERM)
-                self.assertTrue(callable(handler), "no SIGTERM handler while the player for Windows is made")
+                self.assertTrue(callable(handler), "no SIGTERM handler while the installer for Windows is copied")
                 handler(signal.SIGTERM, None)
-            # ZipFile.write puts the app into the zip: the stop comes half-way through the step.
-            with here, mock.patch.object(zipfile.ZipFile, "write", stopped):
+            with here, mock.patch.object(builder.windows_client.shutil, "copyfile", stopped):
                 self.assertEqual(self.run_builder(w, patcher), 0)
             self.assertEqual((w.status()["state"], w.status()["file"]), ("done", "OpenDMTQ-new.apk"))
-            # Nothing half made, and no windows.json for a zip that is not there.
+            # Nothing half made, and no windows.json for an installer that is not there.
             self.assertEqual(sorted(os.listdir(w.path("out"))), ["OpenDMTQ-new.apk", "build.json", "latest.json"])
-            # The next run, with the app up to date, makes the zip from it.
+            # The next run, with the app up to date, puts the installer beside it.
             with here:
                 self.run_builder(w, patcher, None)
-            self.assertIn("OpenDMTQ-new-windows.zip", os.listdir(w.path("out")))
-            self.assertEqual(builder.player_windows.current(w.path("out"))["apk_sha256"], sha256(b"PK an app"))
+            self.assertIn(builder.windows_client.SETUP_NAME, os.listdir(w.path("out")))
+            self.assertEqual(builder.windows_client.current(w.path("out"))["version"], "0.8.0")
 
     def test_ctrl_c_is_recorded(self):
         # Without it build.json said "building" until the portal gave up on it fifteen minutes later.

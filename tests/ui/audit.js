@@ -6,6 +6,7 @@
 //   node audit.js maint    the owner turns maintenance on: the notice, whole, on every page that shows it; then off again
 //   node audit.js down     the game server stopped: the owner's pages keep their look and say what is wrong
 //   node audit.js flows    what people do: signing in, searching, the replay player, the owner's forms
+//   node audit.js quiet    broadcasts off for the server with everything in place: nothing of them on the site
 // Exit status 1 when anything failed. Reads SITE, ADMIN (addresses), PASSWORD and OUT from the environment.
 const puppeteer = require('puppeteer');
 const fs = require('fs');
@@ -116,6 +117,19 @@ const MAINT = [
   ['live', `${P}/live.php`, { settle: 800 }],
   ['admin-maintenance', `${A}/maintenance`],
   ['admin-status', `${A}/`],
+];
+// Broadcasts off for the server, with players, records and recordings: the pages that showed broadcasts, whole without
+// them, and the owner's pages that say they are off.
+const QUIET = [
+  ['home', `${P}/`],
+  ['rankings', `${P}/ranking.php`],
+  ['player', `${P}/player.php?id=1`],
+  ['player-long-name', `${P}/player.php?id=5`],
+  ['live', `${P}/live.php`],
+  ['download', `${P}/download.php`],
+  ['admin-status', `${A}/`],
+  ['admin-players', `${A}/players`],
+  ['admin-recordings', `${A}/recordings`],
 ];
 // The owner's pages, with the game server gone: run.sh stops it for this stage and starts it again afterwards.
 const DOWN = [
@@ -231,6 +245,33 @@ async function sweep(contexts, pages, widths, langs = ['en', 'ko']) {
   check(`${views} views, ${keys.length} findings`, keys.length === 0, keys.slice(0, 30).map(k => `\n  ${k.slice(0, 170)} @${found[k].slice(0, 4).join(',')}`).join(''));
 }
 
+// Broadcasts off for the server: the site shows nothing of them, its live page says so in the site's own way, and the
+// owner's Broadcasts page has the way to turn them on. held: a player's switch is on underneath, which the owner's
+// Players page shows as kept for then.
+async function broadcastsOff(contexts, held) {
+  const page = await contexts.signed.newPage();
+  await page.setViewport({ width: 1280, height: 900 });
+  await page.goto(`${P}/`, { waitUntil: 'domcontentloaded' });
+  check('with broadcasts off the menu has no LIVE', (await page.$$('.nav a[href="/opendmtq/live.php"], .tabbar a[href="/opendmtq/live.php"]')).length === 0);
+  check('nor the home page a way to watch, or a box of broadcasts', (await page.$('#watch-live')) === null && (await page.$('.broadcasts')) === null);
+  await page.goto(`${P}/player.php?id=1`, { waitUntil: 'domcontentloaded' });
+  check('nor a player page their past broadcasts', !(await page.$$eval('.card h2', hs => hs.some(h => /Past broadcasts/.test(h.textContent)))));
+  const answer = await page.goto(`${P}/live.php?p=1`, { waitUntil: 'domcontentloaded' });
+  check('a link to the live page says broadcasts are off', answer.status() === 200 && /Broadcasts are off/.test(await textOf(page, '.live-off')), await textOf(page, 'main'));
+  const listed = await page.evaluate(async () => (await fetch('/opendmtq/live.php?list=1')).json());
+  check("and the live page's own look says so too", listed.off === true && listed.live.length === 0, JSON.stringify(listed));
+  const media = await page.evaluate(async () => (await fetch('/opendmtq/live-media.php/1/index.m3u8')).status);
+  check('no broadcast is served', media === 404, String(media));
+  await page.goto(`${A}/recordings`, { waitUntil: 'domcontentloaded' });
+  check("the owner's Broadcasts page says they are off, with the way to turn them on",
+    /Broadcasts are off/.test(await textOf(page, '#broadcasts')) && (await page.$('#broadcasts button[value="broadcasts-on"]')) !== null);
+  if (held) {
+    await page.goto(`${A}/players`, { waitUntil: 'domcontentloaded' });
+    check("and the Players page that the switches wait for them", /Broadcasts are off for the whole server/.test(await textOf(page, 'main')) && /Switched on/.test(await textOf(page, 'main')));
+  }
+  await page.close();
+}
+
 // The checker itself: one of each thing it looks for must be seen.
 async function self(contexts) {
   const page = await contexts.anon.newPage();
@@ -289,18 +330,55 @@ async function portalFlows(contexts) {
   check('the front page offers the app and the broadcasts first',
     await front.$eval('.stage-acts .button', a => new URL(a.href).pathname).catch(() => '') === '/apk' && await visible(front, '#watch-live') && await visible(front, '.stage-meta a[href="download.php"]'));
   await front.close();
-  // The download page's part for computers: the player for Windows with the same app, its button the site's /windows,
-  // which hands a signed-in visitor the zip and sends a stranger to the sign-in page first.
+  // The download page's part for computers: the installer for Windows (the PC client), its button the site's /windows,
+  // which hands a signed-in visitor the installer with this server's address on its end and sends a stranger to the
+  // sign-in page first.
   const dl = await contexts.signed.newPage();
   await dl.goto(`${P}/download.php`, { waitUntil: 'domcontentloaded' });
-  check('the download page offers the player for Windows', await dl.$eval('#computer .button', a => new URL(a.href).pathname).catch(() => '') === '/windows');
-  const zip = await dl.evaluate(async () => { const r = await fetch('/windows'); return [r.status, r.headers.get('content-type')]; });
-  check('and /windows hands a signed-in visitor the zip', zip[0] === 200 && /application\/zip/.test(zip[1] || ''), JSON.stringify(zip));
+  check('the download page offers the installer for Windows', await dl.$eval('#computer .button', a => new URL(a.href).pathname).catch(() => '') === '/windows');
+  const setup = await dl.evaluate(async () => {
+    const r = await fetch('/windows');
+    const body = new Uint8Array(await r.arrayBuffer());
+    // The installer's last bytes: the server's details, their length and the mark.
+    return [r.status, r.headers.get('content-type'), r.headers.get('content-disposition'), new TextDecoder().decode(body.slice(-300))];
+  });
+  check('and /windows hands a signed-in visitor the installer set up for this server',
+    setup[0] === 200 && /portable-executable/.test(setup[1] || '') && /OpenDMTQ-Setup-/.test(setup[2] || '') &&
+    setup[3].endsWith('OPENDMTQ-PRESET1') && setup[3].includes(`"url":"${SITE}"`), JSON.stringify(setup.slice(0, 3)));
+  // What the PC client asks the site (client.php): whether it is an OpenDMTQ server, then the app on offer, which only a
+  // signed-in visitor gets.
+  const asked = await dl.evaluate(async () => {
+    const about = await (await fetch('/opendmtq/client.php?about')).json();
+    const app = await fetch('/opendmtq/client.php?app');
+    return [about, app.status, await app.json()];
+  });
+  check('the PC client finds the server and, signed in, the app on offer',
+    asked[0].app === true && typeof asked[0].address === 'string' && asked[1] === 200 && /\.apk$/.test(asked[2].file || ''), JSON.stringify(asked));
   await dl.close();
   const stranger = await contexts.anon.newPage();
   await stranger.goto(`${SITE}/windows`, { waitUntil: 'domcontentloaded' });
   check('a stranger asking for /windows gets the sign-in first', new URL(stranger.url()).pathname === '/opendmtq/login.php' && new URL(stranger.url()).searchParams.get('next') === '/windows', stranger.url());
+  // The client's sign-in: a wrong password says so as JSON, and the app stays closed to a stranger.
+  const refused = await stranger.evaluate(async () => {
+    const wrong = await fetch('/opendmtq/client.php?signin', { method: 'POST', body: new URLSearchParams({ user: 'dmtq', password: 'wrong' }) });
+    const app = await fetch('/opendmtq/client.php?app');
+    return [wrong.status, await wrong.json(), app.status];
+  });
+  check("the PC client's sign-in refuses a wrong password, and the app needs a sign-in",
+    refused[0] === 401 && refused[1].error === 'wrong' && refused[2] === 403, JSON.stringify(refused));
   await stranger.close();
+  // The right password, in a browser of its own: the site's cookie, which the client keeps in place of the password.
+  const clientSide = await contexts.browser.createBrowserContext();
+  const client = await clientSide.newPage();
+  await client.goto(`${P}/client.php?about`, { waitUntil: 'domcontentloaded' });
+  const signedIn = await client.evaluate(async password => {
+    const r = await fetch('/opendmtq/client.php?signin', { method: 'POST', body: new URLSearchParams({ user: 'dmtq', password }) });
+    const app = await fetch('/opendmtq/client.php?app');
+    return [r.status, await r.json(), app.status];
+  }, PASSWORD);
+  check("the PC client's sign-in gives the site's cookie, and with it the app", signedIn[0] === 200 && signedIn[1].account === 'dmtq' && signedIn[2] === 200,
+    JSON.stringify(signedIn));
+  await clientSide.close();
 
   // A wrong password says so and keeps the form.
   const login = await contexts.anon.newPage();
@@ -752,6 +830,7 @@ async function adminFlows(contexts) {
   if (stage === 'self') {
     await self(contexts);
   } else if (stage === 'empty') {
+    await broadcastsOff(contexts, false);
     await sweep(contexts, EMPTY, FEW_WIDTHS);
   } else if (stage === 'full') {
     await sweep(contexts, FULL, ALL_WIDTHS);
@@ -795,6 +874,9 @@ async function adminFlows(contexts) {
     await portalFlows(contexts);
     await replayFlows(contexts);
     await adminFlows(contexts);
+  } else if (stage === 'quiet') {
+    await broadcastsOff(contexts, true);
+    await sweep(contexts, QUIET, ALL_WIDTHS);
   } else {
     throw new Error(`no stage ${stage}`);
   }

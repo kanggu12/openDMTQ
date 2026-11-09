@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # The pages' tests on a throwaway server, with no game files: builds the images from this working tree, makes stand-in game
 # files (make_content.php), starts the server and the admin service by their real start paths on loopback, and takes them
-# through a server's life with a real browser (audit.js): empty, full of players and recordings, players on air, under
-# maintenance, and what people do on the pages. Layout findings, screenshots and the list of results go to the report folder.
+# through a server's life with a real browser (audit.js): empty (broadcasts off, as a server starts), full of players and
+# recordings, players on air, under maintenance, what people do on the pages, and broadcasts off again with all of that. Layout findings, screenshots and the list of results go to the report folder.
 #
 # Usage: tests/ui/run.sh [report folder, default _work/ui-report]
 # ONLY="full flows" runs those stages (the checker's own, self, and the setup always run first). KEEP=1 leaves the stack up afterwards.
@@ -147,12 +147,11 @@ APP=OpenDMTQ-127.0.0.1-$SITE_PORT-v2026.11.02.apk
 head -c 1048576 /dev/zero > "$DATA/apk/out/$APP"
 printf '{"file": "%s", "host": "%s", "built_at": "2026-11-02T09:28:08", "sha256": "0", "size": 1048576, "patcher": "1.8.0", "runtime": "test", "label": "TECHNIKA Q (%s)", "package": "com.test.opendmtq"}' \
   "$APP" "$HOST" "$HOST" | tee "$DATA/apk/out/latest.json" > "$DATA/apk/out/$APP.json"
-# The player for Windows beside it, as the builder leaves it (tools/opendmtq_tools/player_windows.py): the download page's
-# part for computers.
-WIN=${APP%.apk}-windows.zip
-head -c 2097152 /dev/zero > "$DATA/apk/out/$WIN"
-printf '{"file": "%s", "size": 2097152, "sha256": "0", "apk": "%s", "apk_sha256": "0", "player": "test", "built_at": "2026-11-02T09:29:00"}' \
-  "$WIN" "$APP" > "$DATA/apk/out/windows.json"
+# The installer for Windows beside it, as the builder leaves it (tools/opendmtq_tools/windows_client.py): the download
+# page's part for computers.
+{ printf 'MZ'; head -c 2097150 /dev/zero; } > "$DATA/apk/out/OpenDMTQ-Setup.exe"
+printf '{"file": "OpenDMTQ-Setup.exe", "size": 2097152, "sha256": "0", "version": "0.8.0", "copied_at": "2026-11-02T09:29:00"}' \
+  > "$DATA/apk/out/windows.json"
 # And one for another address, kept for download: the App page lists it with why players do not get it.
 OTHER=OpenDMTQ-10.0.0.5-8080-v2026.11.01.apk
 head -c 524288 /dev/zero > "$DATA/apk/out/$OTHER"
@@ -185,6 +184,13 @@ fi
 
 stage maint
 stage flows
+
+# Broadcasts off again, as most servers have them, with the players, records and recordings in place: nothing of
+# broadcasts on the site, every page whole without them, and the owner's pages saying they are off.
+if wanted quiet; then
+  python3 "$UI/feed.py" quiet
+  stage quiet
+fi
 
 # The game server gone: the owner's pages are what is left. Last, as the other stages need it.
 if wanted down; then

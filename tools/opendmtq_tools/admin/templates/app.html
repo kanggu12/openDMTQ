@@ -17,6 +17,8 @@
   </div>
   {% else %}
   <p class="empty">{{ t('app.offer_none') }}</p>
+  {# The installer for Windows is kept apart from the app: its size shows here too when there is no app yet. #}
+  {% if windows %}<p class="meta">{{ t('app.windows', size=windows.size|human) }}</p>{% endif %}
   {% endif %}
   <p class="meta">{{ t('app.offer_rule', host=public_host) }}</p>
   <div class="btn-line">

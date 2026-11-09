@@ -382,18 +382,18 @@ def app_get(args):
 
 
 def windows_view(made):
-    """The player for Windows as the API shows it (WindowsPlayer), or None."""
+    """The installer for Windows as the API shows it (WindowsInstaller), or None."""
     if not made:
         return None
-    return {"file": made["file"], "size": made["size"], "sha256": made["sha256"], "built_at": made["built_at"], "player": made["player"]}
+    return {"file": made["file"], "size": made["size"], "sha256": made["sha256"], "version": made.get("version") or None,
+            "copied_at": made.get("copied_at")}
 
 
 @handler
 def app_windows(args):
     """GET /app/windows: the App page's Download for Windows (apps.windows_download), as the site hands it out."""
-    made = apps.windows_offer(apps.offer_state()[0])
-    if not made:
-        raise Refused(404, "not_found", message="No player for Windows is kept for the app on offer.")
+    if not apps.windows_offer():
+        raise Refused(404, "not_found", message="This server keeps no installer for Windows.")
     return apps.windows_download()
 
 
@@ -581,6 +581,8 @@ def server_stop(args):
 def player_views(only=None):
     """The players as the Players page lists them (only: one number's)."""
     rows, live, seen, activity, phones = players.player_rows()
+    # Broadcasts off for the server: a switch that is on is held for then (the Players page's "held").
+    held = not recordings.live_settings()["on"]
     out = []
     for p in rows:
         if only is not None and p["id"] != only:
@@ -588,7 +590,8 @@ def player_views(only=None):
         a = activity[p["id"]]
         out.append({"id": p["id"], "name": p["nickname"].strip() or tp("player.fallback", id=p["id"]), "nickname": p["nickname"].strip(),
                     "charts": p["charts"], "total": p["total"], "last_played": a["last"], "plays_30_days": a["recent"], "days": list(a["days"]),
-                    "phones": phones.get(p["id"], 0), "broadcast": "on_air" if live.get(p["id"]) else "waiting" if p["id"] in live else "off",
+                    "phones": phones.get(p["id"], 0),
+                    "broadcast": "held" if held and p["id"] in live else "on_air" if live.get(p["id"]) else "waiting" if p["id"] in live else "off",
                     "seen": seen.get(p["id"], "")})
     return out
 
@@ -820,14 +823,48 @@ def limits_view():
     cap = int(limits["cap_gb"] * 1024 ** 3)
     free = shutil.disk_usage(os.path.dirname(core.DB)).free
     room = min(cap - used, free)
+    # An hour of broadcast at the quality the phones are asked for now.
+    hour = recordings.per_hour(recordings.live_settings()["quality"])
     return {"cap_gb": limits["cap_gb"], "days": limits["days"], "used": used, "cap": cap, "free": free,
-            "hours_left": int(room / recordings.REC_PER_HOUR) if room >= recordings.REC_PER_HOUR else 0}
+            "hours_left": int(room / hour) if room >= hour else 0}
 
 
 @handler
 def recordings_limits(args):
     """GET /recordings/limits: the Recordings page's limits, and what still fits."""
     return limits_view()
+
+
+def broadcasts_view():
+    """The Broadcasts page's settings, as it shows them: on or off, what new players start with, the quality and each
+    quality's costs, and who is switched on and on air."""
+    settings = recordings.live_settings()
+    try:
+        with db() as con:
+            counts = recordings.live_counts(con)
+    except sqlite3.Error:
+        counts = {"switched_on": 0, "on_air": 0}
+    qualities = [{"key": key, **values, "segment": 2, "hour_bytes": recordings.per_hour(key),
+                  "viewer_bits": int((values["bitrate"] + recordings.AUDIO_BITRATE) * recordings.TS_OVERHEAD)}
+                 for key, values in recordings.LIVE_PRESETS.items()]
+    return {"on": settings["on"], "new_players": settings["new_players"], "quality": settings["quality"], "qualities": qualities,
+            "switched_on": counts["switched_on"], "on_air": counts["on_air"] if settings["on"] else 0}
+
+
+@handler
+def broadcasts_get(args):
+    """GET /broadcasts: the Broadcasts page's settings (broadcasts_view)."""
+    return broadcasts_view()
+
+
+@handler
+def broadcasts_set(args):
+    """PUT /broadcasts: turns broadcasts on or off for the server, sets what new players start with and the quality, as the
+    Broadcasts page's two forms do (recordings.live_settings_save). What is left out stays as it is."""
+    if not any(name in args for name in ("on", "new_players", "quality")):
+        raise bad("bad_body", "Send on, new_players or quality.")
+    recordings.live_settings_save(on=args.get("on"), new_players=args.get("new_players"), quality=args.get("quality"))
+    return broadcasts_view()
 
 
 @handler
@@ -1297,7 +1334,8 @@ def site_plays_recent(args):
 def site_live(args):
     """GET /site/live: the site's broadcasts (live.php): who is on air now, and the past ones players may watch."""
     with db() as con:
-        return {"live": site.live_now(con), "past": site.live_past(con)}
+        # With broadcasts off for the server the site shows none, and says why.
+        return {"on": recordings.live_settings()["on"], "live": site.live_now(con), "past": site.live_past(con)}
 
 
 @handler
@@ -1313,9 +1351,10 @@ def site_live_file(args):
             on = con.execute("SELECT live FROM LiveSwitch WHERE guid = ?", (guid,)).fetchone()
         except sqlite3.OperationalError:
             on = None
-    # Once the owner switches the broadcast off, nothing more is shown, also of what is still on disk.
+    # Once the owner switches the broadcast off, or broadcasts for the whole server, nothing more is shown, also of what is
+    # still on disk.
     path = os.path.join(recordings.live_folder(guid), part)
-    if not (on and on[0]) or not os.path.isfile(path):
+    if not (on and on[0]) or not recordings.live_settings()["on"] or not os.path.isfile(path):
         raise Refused(404, "not_found", message="That broadcast is off, or the file is not there.")
     if part != "index.m3u8":
         return send_file(path, mimetype="video/mp2t", max_age=60)

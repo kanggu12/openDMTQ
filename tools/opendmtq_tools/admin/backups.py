@@ -412,15 +412,17 @@ def restore_backup(name, path):
             kept = set_damaged_aside()
         try:
             # Who is shown live is today's decision, not the backup's: an old backup must not start
-            # broadcasting anyone. The switches as they are now go back in below. So are the API's tokens: an old backup
-            # must not bring back one that was revoked, nor end one made since (the one that asked for this restore).
-            # Tokens are made and revoked under tokens.LOCK: none comes or goes between this look and the swap.
+            # broadcasting anyone. The switches and the broadcast settings as they are now go back in below. So are the
+            # API's tokens: an old backup must not bring back one that was revoked, nor end one made since (the one that
+            # asked for this restore). Tokens are made and revoked under tokens.LOCK: none comes or goes between this look
+            # and the swap.
             with tokens.LOCK:
-                switches, kept_tokens = [], []
+                switches, settings, kept_tokens = [], [], []
                 if not kept:
                     with db() as con:
                         con.execute(recordings.LIVE_TABLE)
                         switches = con.execute("SELECT * FROM LiveSwitch").fetchall()
+                        settings = sorted(recordings.setting_rows(con).items())
                         tokens.token_table(con)
                         kept_tokens = con.execute("SELECT * FROM ApiToken").fetchall()
                 # Today's tokens go into the restored copy while it is still apart from the server: the database that
@@ -440,6 +442,10 @@ def restore_backup(name, path):
                                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                                 [(r["guid"], r["live"], r["token"], r["toast"], r["changed_at"], r["playing"],
                                   r["pattern_id"], r["play_at"]) for r in switches])
+                # The settings as they were today, the backup's gone: a restore never turns broadcasts on.
+                con.execute(recordings.SETTING_TABLE)
+                con.execute("DELETE FROM LiveSetting")
+                con.executemany("INSERT INTO LiveSetting (name, value) VALUES (?, ?)", settings)
         except (sqlite3.Error, OSError) as e:
             app.logger.exception("restore of %s failed", name)
             return [("bad", t("bak.restore_failed", detail=why(e), saved=saved or kept))], False

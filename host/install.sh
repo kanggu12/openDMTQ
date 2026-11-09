@@ -201,11 +201,15 @@ main() {
   elif [[ -n $KIT ]]; then
     printf '  note  opendmtq-arm32-runtime.zip is not in %s: without it the app runs only on phones that run 32-bit apps\n' "$KIT"
   fi
-  # The player for Windows, which the site hands to players with the app in it (tools/opendmtq_tools/player_windows.py).
-  if [[ -f $KIT/opendmtq-player-windows.zip ]]; then
+  # The installer for Windows (the PC client), which the site hands to players set up for this server
+  # (tools/opendmtq_tools/windows_client.py), with its version when the kit has it.
+  if [[ -f $KIT/OpenDMTQ-Setup.exe ]]; then
     mkdir -p "$REPO/data/apk"
-    cp "$KIT/opendmtq-player-windows.zip" "$REPO/data/apk/"
-    ok "the player for Windows, for the site"
+    cp "$KIT/OpenDMTQ-Setup.exe" "$REPO/data/apk/"
+    if [[ -f $KIT/OpenDMTQ-Setup.exe.version ]]; then
+      cp "$KIT/OpenDMTQ-Setup.exe.version" "$REPO/data/apk/"
+    fi
+    ok "the installer for Windows, for the site"
   fi
 
   step "The opendmtq command"

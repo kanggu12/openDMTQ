@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% block title %}{{ t('rec.title') }}{% endblock %}
+{% extends "base.html" %}{% block title %}{{ t('live.page_title') }}{% endblock %}
 {% block body %}
 {% if watch %}
 <section class="card">
@@ -49,6 +49,44 @@
 </script>
 {% endif %}
 
+{# The server's broadcasts as a whole: on or off, with what that means now, then what new players start with and the
+   stream's quality. Each player's own switch is on the Players page. #}
+<section class="card live-settings" id="broadcasts">
+  <h2>{{ t('live.heading') }}</h2>
+  <p class="lead">{{ t('live.lead') }}</p>
+  <form method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <p class="auto-line big"><span class="lamp {{ 'on' if settings.on else 'off' }}"></span><b>{{ t('live.is_on') if settings.on else t('live.is_off') }}</b></p>
+    <p class="meta">{{ t('live.counts_on', n=counts.switched_on, m=counts.on_air) if settings.on else t('live.counts_off', n=counts.switched_on) }} <a href="{{ url_for('players_page') }}">{{ t('live.to_players') }}</a></p>
+    {# Turning them on is what one comes here for while they are off. Turning them off ends whatever is on air: with
+       someone on air, it asks first. #}
+    <div class="btn-line">
+      {% if settings.on %}
+      <button class="btn" name="action" value="broadcasts-off"{% if counts.on_air %} data-ask="{{ tp('live.confirm_off_one' if counts.on_air == 1 else 'live.confirm_off', n=counts.on_air) }}" data-yes="{{ tp('live.turn_off') }}"{% endif %}>{{ t('live.turn_off') }}</button>
+      {% else %}
+      <button class="btn btn-primary" name="action" value="broadcasts-on">{{ t('live.turn_on') }}</button>
+      {% endif %}
+    </div>
+  </form>
+  <form method="post">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="settings">
+    <fieldset class="choices pair">
+      <legend>{{ t('live.new_players') }}</legend>
+      <label class="choice"><input type="radio" name="new_players" value="off"{% if not settings.new_players %} checked{% endif %}><b>{{ t('live.new_off') }}</b><span>{{ t('live.new_off_hint') }}</span></label>
+      <label class="choice"><input type="radio" name="new_players" value="on"{% if settings.new_players %} checked{% endif %}><b>{{ t('live.new_on') }}</b><span>{{ t('live.new_on_hint') }}</span></label>
+    </fieldset>
+    {# Each quality with what it is and what it costs: the disk for an hour recorded, and each viewer's connection. #}
+    <fieldset class="choices">
+      <legend>{{ t('live.quality') }}</legend>
+      {% for p in presets %}
+      <label class="choice"><input type="radio" name="quality" value="{{ p.key }}"{% if p.key == settings.quality %} checked{% endif %}><b>{{ t(p.word) }}</b><span class="choice-spec">{{ p.height }}p · {{ p.fps }} fps · {{ '%g'|format(p.bitrate / 1000000) }} Mbit/s</span><span>{{ t('live.q_cost', size=p.per_hour|human, mbit='%.1f'|format(p.viewer / 1000000)) }}</span></label>
+      {% endfor %}
+    </fieldset>
+    <p class="meta">{{ t('live.quality_note') }}</p>
+    <div class="btn-line"><button class="btn">{{ t('live.save') }}</button></div>
+  </form>
+</section>
+
 <section class="card">
   <h2>{{ t('rec.disk') }}</h2>
   <p>{{ t('rec.use', used=used|human, cap=cap|human, free=free|human) }}</p>
@@ -56,7 +94,7 @@
   <div class="rec-meter" role="img" aria-label="{{ t('rec.use_label', used=used|human, cap=cap|human) }}"><span{% if used %} class="some"{% endif %} style="width: {{ [100 * used / cap, 100]|min }}%"></span></div>
   {# How long the room left lasts: up to the limit, or the disk's free space if that is less (it counts as a limit too). #}
   {% set room = [cap - used, free]|min %}
-  <p class="meta">{{ t('rec.room', h=(room / per_hour)|int) if room >= per_hour else t('rec.room_short') }} {{ t('rec.about') }}</p>
+  <p class="meta">{{ t('rec.room', h=(room / per_hour)|int, size=per_hour|human) if room >= per_hour else t('rec.room_short', size=per_hour|human) }} {{ t('rec.about') }}</p>
   <form method="post" class="rec-limits">
     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="limits">
     <label class="field">{{ t('rec.total') }} <input class="input" name="cap_gb" type="number" min="0.001" step="any" value="{{ '%g'|format(pending.cap_gb if pending else limits.cap_gb) }}" required></label>

@@ -35,6 +35,8 @@ CHANGE_WORDS = {
     "player_action:live-on": "change.live_on", "player_action:live-off": "change.live_off",
     "recordings_page:limits": "change.rec_limits", "recordings_page:delete": "change.rec_delete", "recordings_page:delete-player": "change.rec_delete_player",
     "recordings_page:hide": "change.rec_hide", "recordings_page:show": "change.rec_show",
+    "recordings_page:broadcasts-on": "change.live_all_on", "recordings_page:broadcasts-off": "change.live_all_off",
+    "recordings_page:settings": "change.live_settings",
     "backups_auto:on": "change.backup_auto_on", "backups_auto:off": "change.backup_auto_off",
     "backups_page:create": "change.backup_make", "backups_page:upload": "change.backup_upload",
     "backup_action:delete": "change.backup_delete", "backup_action:restore": "change.backup_restore",

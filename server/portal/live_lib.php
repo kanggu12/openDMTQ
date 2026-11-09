@@ -28,6 +28,23 @@ define('LIVE_DIR', odq_state_dir() . '/live');
 define('LIVE_DB', odq_db_path());
 // The server's own check account never goes live, as it is never ranked.
 const LIVE_CHECK_UDID = 'opendmtq-check';
+// The owner's settings for broadcasts as a whole, which the admin pages' Broadcasts page writes
+// (tools/opendmtq_tools/admin/recordings.py): a row each of LiveSetting in the game database (server/game/bin/setup-db.php
+// makes the table), its value as text. "on": "1" or "0", broadcasts at all; "new_players": "1" or "0", a new player's
+// switch starts on (no row: as LIVE_DEFAULT says); "quality": a key of LIVE_QUALITY. The admin pages change them in one
+// transaction, so a request reads the old settings or the new ones. In the database they go where it goes: its replica
+// on Kubernetes, and every backup.
+// What a stream may be, by name, as the phones' encoders take it (fps 5 to 60, height 144 to 1080, 100 kbit/s to 20 Mbit/s):
+// the same table as LIVE_PRESETS in tools/opendmtq_tools/admin/recordings.py, which the tests compare.
+const LIVE_QUALITY = [
+    'light' => ['height' => 480, 'fps' => 30, 'bitrate' => 1000000],
+    'standard' => ['height' => 720, 'fps' => 30, 'bitrate' => 2000000],
+    'smooth' => ['height' => 720, 'fps' => 60, 'bitrate' => 4000000],
+    'sharp' => ['height' => 1080, 'fps' => 60, 'bitrate' => 8000000],
+];
+// The quality until the owner picks one, and the length of a segment in seconds, the same for every quality.
+const LIVE_QUALITY_DEFAULT = 'standard';
+const LIVE_SEGMENT = 2;
 // One segment at most: what the Apache limit in site.conf allows as well.
 const LIVE_MAX_BODY = 4194304;
 // One segment at least: ten MPEG-TS packets. A real segment is far above this (every video frame takes
@@ -80,6 +97,76 @@ function live_db(bool $write = false): ?SQLite3
     } catch (Exception $e) {
         return null;
     }
+}
+
+/*
+ * The owner's settings for broadcasts (LiveSetting), read once per request: ['on', 'new_players', 'quality']. The first
+ * look at a server decides once whether broadcasts are on, and writes it down (recordings.py live_settings() does the
+ * same, and whichever looks first, the answer is one): on when it broadcast before the switch existed (live_used_before()),
+ * off on a new one, so that a player switched on later never turns broadcasts on for the server. What new players start
+ * with is the owner's choice once made, and LIVE_DEFAULT=on before that. A quality the table does not know is the
+ * default one. Without a database to read: off.
+ */
+function live_settings(): array
+{
+    static $settings = null;
+    if ($settings === null) {
+        $rows = live_setting_rows();
+        if (!isset($rows['on'])) {
+            // The one first decision; a look at the same moment from the admin pages writes the same, and only one stays.
+            $rw = live_db(true);
+            $q = $rw ? @$rw->prepare("INSERT OR IGNORE INTO LiveSetting (name, value) VALUES ('on', :v)") : false;
+            if ($q) {
+                $q->bindValue(':v', live_used_before() ? '1' : '0', SQLITE3_TEXT);
+                @$q->execute();
+            }
+            $rows = live_setting_rows();
+        }
+        $quality = (string)($rows['quality'] ?? '');
+        $settings = [
+            'on' => ($rows['on'] ?? '0') === '1',
+            'new_players' => isset($rows['new_players']) ? $rows['new_players'] === '1' : getenv('LIVE_DEFAULT', true) === 'on',
+            'quality' => isset(LIVE_QUALITY[$quality]) ? $quality : LIVE_QUALITY_DEFAULT,
+        ];
+    }
+    return $settings;
+}
+
+/* The settings' rows as name => value: none while the database or its table cannot be read. */
+function live_setting_rows(): array
+{
+    $db = live_db();
+    $r = $db ? @$db->query('SELECT name, value FROM LiveSetting') : false;
+    $rows = [];
+    while ($r && ($row = $r->fetchArray(SQLITE3_ASSOC))) {
+        $rows[(string)$row['name']] = (string)$row['value'];
+    }
+    return $rows;
+}
+
+/* True when a server whose settings say nothing yet already broadcast: LIVE_DEFAULT=on, or a player's switch on
+   (recordings.py used_before() decides the same). */
+function live_used_before(): bool
+{
+    if (getenv('LIVE_DEFAULT', true) === 'on') {
+        return true;
+    }
+    $db = live_db();
+    // No database or no table yet: a new server.
+    $n = $db ? @$db->querySingle('SELECT COUNT(*) FROM LiveSwitch WHERE live = 1') : false;
+    return (int)$n > 0;
+}
+
+/* True while broadcasts are on for the server: only then does anything of them reach a phone or a page. */
+function live_enabled(): bool
+{
+    return live_settings()['on'];
+}
+
+/* The stream the phones are asked for, by the owner's quality: ['fps', 'height', 'bitrate', 'segment']. */
+function live_stream_settings(): array
+{
+    return LIVE_QUALITY[live_settings()['quality']] + ['segment' => LIVE_SEGMENT];
 }
 
 /* The device ids in a request's ids=a,b,c: only plausible ones, and not too many of them. */
@@ -148,6 +235,11 @@ function live_in_song(array $row): bool
  */
 function live_authorize(): array
 {
+    // Broadcasts off for the whole server: every upload is refused, which stops the phone, whatever its switch says.
+    if (!live_enabled()) {
+        http_response_code(403);
+        exit;
+    }
     $db = live_db();
     $row = $db ? live_player($db, live_ids((string)($_GET['ids'] ?? ''))) : null;
     $sent = (string)($_SERVER['HTTP_X_LIVE_TOKEN'] ?? '');
@@ -679,6 +771,10 @@ function live_on_air(SQLite3 $db): array
     }
     $on = [];
     live_sweep();
+    // Broadcasts off for the whole server: nobody is on air, whatever is left on the disk.
+    if (!live_enabled()) {
+        return $on;
+    }
     // No such table in a database from before the live view: nobody is on air.
     $r = @$db->query("SELECT guid FROM LiveSwitch WHERE live = 1");
     while ($r && ($row = $r->fetchArray(SQLITE3_NUM))) {

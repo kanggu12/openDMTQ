@@ -1,4 +1,5 @@
-"""Live broadcasts and the Recordings page: each player's switch, what is on air, the limits and the files."""
+"""Live broadcasts and their page: the server's switch and settings, each player's switch, what is on air, the
+recordings' limits and the files."""
 
 import datetime
 import json
@@ -15,7 +16,7 @@ from . import core, players, status
 from .core import Refused, app, BASE, changed, db, t
 
 # The live view: the owner's switch per player, the phone's upload key, the notice waiting to be shown
-# ("on" or "off") and whether the player is in a song. The server makes this table at start
+# ("on", "off" or "end", which server/game/live/state.php words) and whether the player is in a song. The server makes this table at start
 # (server/game/bin/setup-db.php, the same statement); a database restored from before it needs it here too.
 LIVE_TABLE = """CREATE TABLE IF NOT EXISTS LiveSwitch (guid INTEGER PRIMARY KEY, live INTEGER NOT NULL DEFAULT 0,
                    token TEXT, toast TEXT, changed_at INTEGER, playing INTEGER NOT NULL DEFAULT 0,
@@ -30,8 +31,155 @@ REC_LIMITS_DEFAULT = {"cap_gb": 20, "days": 30}
 # server/portal/live_lib.php).
 LIVE_LISTED = 15
 
-# What an hour of broadcast takes on the disk, about (rec.about says so): for how long the recordings' room lasts.
-REC_PER_HOUR = 1024 ** 3
+# The owner's settings for broadcasts as a whole, a row each in the game database (live_settings() in
+# server/portal/live_lib.php reads them for the phones, the PCs and the site): "on" ("1" or "0": broadcasts at all),
+# "new_players" ("1" or "0": a new player's switch starts on; no row: as LIVE_DEFAULT says) and "quality" (a key of
+# LIVE_PRESETS). In the database they go wherever it goes: its replica on Kubernetes, and every backup. The server makes
+# the table at start (server/game/bin/setup-db.php, the same statement); a database restored from before it needs it here.
+SETTING_TABLE = "CREATE TABLE IF NOT EXISTS LiveSetting (name TEXT PRIMARY KEY, value TEXT NOT NULL)"
+# What a stream may be, by name, within what the phones' encoders take (LIVE_QUALITY in live_lib.php: the tests compare
+# the two). The segment is two seconds whatever the quality.
+LIVE_PRESETS = {
+    "light": {"height": 480, "fps": 30, "bitrate": 1000000},
+    "standard": {"height": 720, "fps": 30, "bitrate": 2000000},
+    "smooth": {"height": 720, "fps": 60, "bitrate": 4000000},
+    "sharp": {"height": 1080, "fps": 60, "bitrate": 8000000},
+}
+QUALITY_DEFAULT = "standard"
+# Each quality's name on the page, in the page's language.
+QUALITY_WORDS = {"light": "live.q_light", "standard": "live.q_standard", "smooth": "live.q_smooth", "sharp": "live.q_sharp"}
+# The sound that goes with the picture (kAudioBitrate in arm32/src/live.cpp), and the transport stream's own share of a
+# segment, about: what an hour of broadcast takes on the disk, and each viewer's connection, at each quality.
+AUDIO_BITRATE = 128000
+TS_OVERHEAD = 1.06
+
+
+def per_hour(quality):
+    """The bytes an hour of broadcast takes at a quality: its picture and sound, with the transport stream's share."""
+    return int((LIVE_PRESETS[quality]["bitrate"] + AUDIO_BITRATE) * TS_OVERHEAD * 3600 / 8)
+
+
+def used_before(con):
+    """True when a server whose settings say nothing yet already broadcast: LIVE_DEFAULT=on, or a player's switch on
+    (live_used_before() in live_lib.php decides the same)."""
+    if os.environ.get("LIVE_DEFAULT") == "on":
+        return True
+    try:
+        return con.execute("SELECT COUNT(*) FROM LiveSwitch WHERE live = 1").fetchone()[0] > 0
+    except sqlite3.OperationalError:
+        # No table of switches yet: a new server.
+        return False
+
+
+def setting_rows(con):
+    """The settings' rows as {name: value}; the table is made first where a restored database lacks it."""
+    con.execute(SETTING_TABLE)
+    return {name: value for name, value in con.execute("SELECT name, value FROM LiveSetting")}
+
+
+def write_settings(con, values):
+    """Rows for the settings given ({"on": True, "quality": "sharp"}, ...), each as its text, over what was there."""
+    text = {k: (("1" if v else "0") if isinstance(v, bool) else str(v)) for k, v in values.items()}
+    con.executemany("INSERT INTO LiveSetting (name, value) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET value = excluded.value",
+                    sorted(text.items()))
+
+
+def settings_from(rows):
+    """The settings the rows say: {"on", "new_players", "quality"}. No row for new players: as LIVE_DEFAULT says (as the
+    server reads it); a quality there is not: the default one."""
+    quality = rows.get("quality")
+    return {"on": rows.get("on") == "1",
+            "new_players": rows["new_players"] == "1" if "new_players" in rows else os.environ.get("LIVE_DEFAULT") == "on",
+            "quality": quality if quality in LIVE_PRESETS else QUALITY_DEFAULT}
+
+
+def live_settings():
+    """The owner's settings: {"on", "new_players", "quality"}. The first look at a server decides once whether broadcasts
+    are on, and writes it down (as live_settings() in live_lib.php does; whichever looks first, the same answer): on when it
+    broadcast before the switch existed (used_before()), off on a new one, so that a player switched on later never turns
+    broadcasts on for the server. Without a database yet: off, with nothing written."""
+    try:
+        with db() as con:
+            rows = setting_rows(con)
+            if "on" not in rows:
+                # The one first decision; a look at the same moment from the server writes the same, and only one stays.
+                con.execute("INSERT OR IGNORE INTO LiveSetting (name, value) VALUES ('on', ?)", ("1" if used_before(con) else "0",))
+                rows = setting_rows(con)
+    except sqlite3.Error:
+        # No database to look in (before the server's first start): nothing of broadcasts.
+        rows = {}
+    return settings_from(rows)
+
+
+def live_settings_save(on=None, new_players=None, quality=None):
+    """Changes the settings given and keeps the others, in one transaction with what goes with them: the players'
+    notices, and their switches when new players start on from now. Broadcasts turned on: each player switched on hears
+    of it once, between songs, as when their own switch is flipped. Turned off: whoever is on air hears once that the
+    broadcast ended, every live window goes at once and the recordings are closed, as each switch off does; the switches
+    stay for when broadcasts are on again. New players turned to start on: everyone who has played so far counts as
+    chosen for (off, unless switched on), so that it reaches only those who come after."""
+    if quality is not None and quality not in LIVE_PRESETS:
+        raise Refused(400, "bad_quality", t("live.bad_quality"))
+    con = db()
+    try:
+        with con:
+            # One change at a time, whole: two forms or API calls at once wait for each other, and none sees half of one.
+            con.execute("BEGIN IMMEDIATE")
+            rows = setting_rows(con)
+            # A save before any look: the first decision is part of it.
+            first = "on" not in rows
+            if first:
+                rows["on"] = "1" if used_before(con) else "0"
+            was = settings_from(rows)
+            given = {k: v for k, v in (("on", on), ("new_players", new_players), ("quality", quality)) if v is not None}
+            now = {**was, **{k: bool(v) if k != "quality" else v for k, v in given.items()}}
+            # Only what was given, and the first decision: new players follow LIVE_DEFAULT until the owner chooses.
+            write_settings(con, {**({"on": was["on"]} if first else {}), **{k: now[k] for k in given}})
+            con.execute(LIVE_TABLE)
+            switched = [r[0] for r in con.execute("SELECT guid FROM LiveSwitch WHERE live = 1")]
+            if now["on"] != was["on"]:
+                # Who is on air as broadcasts end: they hear that it ended, and that broadcasts are off for now.
+                on_air = [guid for guid in switched if live_streaming(guid)] if not now["on"] else []
+                # The notices: "on" for those switched on as broadcasts begin; "end" for those on air as they end, the
+                # rest have none waiting while broadcasts are off.
+                con.execute("UPDATE LiveSwitch SET toast = CASE WHEN live = 1 AND ? THEN 'on' ELSE '' END", (int(now["on"]),))
+                con.executemany("UPDATE LiveSwitch SET toast = 'end' WHERE guid = ?", [(g,) for g in on_air])
+            if now["new_players"] and not was["new_players"]:
+                touch_everyone(con)
+    finally:
+        con.close()
+    if now["on"] != was["on"]:
+        if not now["on"]:
+            for guid in switched:
+                shutil.rmtree(live_folder(guid), ignore_errors=True)
+            for rec in rec_all():
+                if rec["open"]:
+                    with open(os.path.join(rec["dir"], ".close-now"), "a", encoding="utf-8"):
+                        pass
+            rec_sweep_now()
+        changed("recordings_page:broadcasts-on" if now["on"] else "recordings_page:broadcasts-off")
+    if now["new_players"] != was["new_players"] or now["quality"] != was["quality"]:
+        # What new players start with, and the quality's name, as the log of changes shows them.
+        changed("recordings_page:settings", f"{'on' if now['new_players'] else 'off'}, {now['quality']}")
+    return now
+
+
+def touch_everyone(con):
+    """Every player there is counts as chosen for by the owner, as the Players page's switch leaves them (changed_at): the
+    server switches on only the players it finds untouched (server/game/live/state.php), and with new players starting
+    on, those are the ones who come after. A switch already set keeps its state and its time."""
+    when = int(time.time())
+    con.execute("UPDATE LiveSwitch SET changed_at = ? WHERE changed_at IS NULL", (when,))
+    # A player without a row yet gets one, off; a database without players' table has nobody to mark.
+    if con.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'Member'").fetchone():
+        con.execute(f"INSERT INTO LiveSwitch (guid, live, changed_at) SELECT guid, 0, ? FROM ({core.PLAYER_ROWS}) WHERE guid > 0 "
+                    "ON CONFLICT (guid) DO NOTHING", (when, core.CHECK_UDID))
+
+
+def live_counts(con):
+    """How many players are switched on, and how many of them are on air now (with broadcasts on)."""
+    rows = live_rows(con)
+    return {"switched_on": len(rows), "on_air": sum(1 for streaming in rows.values() if streaming)}
 
 
 def live_folder(guid):
@@ -227,14 +375,44 @@ def recordings_view(pending=None):
     limits = rec_limits()
     # The one to watch in the page: closed ones only, the open one has no playlist yet.
     watch = next((r for r in recs if f"{r['guid']}/{r['id']}" == request.args.get("watch") and not r["open"]), None)
+    # The server's switch and settings, with who is switched on and on air, at the top of the page.
+    settings = live_settings()
+    try:
+        with db() as con:
+            counts = live_counts(con)
+    except sqlite3.Error:
+        counts = {"switched_on": 0, "on_air": 0}
+    # Nobody is on air while broadcasts are off, whatever a phone left on the disk a moment before.
+    if not settings["on"]:
+        counts["on_air"] = 0
+    presets = [dict(LIVE_PRESETS[k], key=k, word=QUALITY_WORDS[k], per_hour=per_hour(k),
+                    viewer=int((LIVE_PRESETS[k]["bitrate"] + AUDIO_BITRATE) * TS_OVERHEAD)) for k in LIVE_PRESETS]
     return render_template("recordings.html", groups=groups, names=names, limits=limits, watch=watch, pending=pending,
-                           used=sum(r["size"] for r in recs), cap=limits["cap_gb"] * 1024 ** 3, per_hour=REC_PER_HOUR,
-                           free=shutil.disk_usage(os.path.dirname(core.DB)).free)
+                           used=sum(r["size"] for r in recs), cap=limits["cap_gb"] * 1024 ** 3, per_hour=per_hour(settings["quality"]),
+                           free=shutil.disk_usage(os.path.dirname(core.DB)).free, settings=settings, counts=counts, presets=presets)
 
 
 def recordings_action():
     """The forms of the recordings page. Unknown or malformed names are ignored."""
     action = request.form.get("action", "")
+    # The server's switch: on or off, with what that does said on the page.
+    if action in ("broadcasts-on", "broadcasts-off"):
+        on = action == "broadcasts-on"
+        if live_settings()["on"] != on:
+            live_settings_save(on=on)
+        flash(t("live.now_on" if on else "live.now_off"), "ok")
+        return redirect(url_for("recordings_page"))
+    # What new players start with, and the stream's quality, in one form.
+    if action == "settings":
+        before = live_settings()["quality"]
+        try:
+            after = live_settings_save(new_players=request.form.get("new_players") == "on", quality=request.form.get("quality", ""))
+        except Refused as e:
+            flash(e.words, e.tone)
+            return redirect(url_for("recordings_page"))
+        # Only a new quality reaches the phones and the PC player: then the page says when.
+        flash(t("live.saved_quality" if after["quality"] != before else "live.saved"), "ok")
+        return redirect(url_for("recordings_page"))
     if action == "limits":
         try:
             removed = set_limits(request.form.get("cap_gb", ""), request.form.get("days", ""), request.form.get("confirmed") == "1")

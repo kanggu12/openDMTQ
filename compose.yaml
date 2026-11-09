@@ -27,7 +27,8 @@ services:
       OPENDMTQ_VERSION: ${OPENDMTQ_VERSION:-}
       # The name after the game's title on phones: TECHNIKA Q (name). Empty: the whole address, port included.
       SERVER_NAME: ${SERVER_NAME:-}
-      # on: every player's broadcast is on until turned off in the admin pages. Default: off until turned on.
+      # on: a new player's broadcast starts on, until the owner chooses on the admin pages' Broadcasts page (which also turns
+      # broadcasts on for the server at all). Default: off.
       LIVE_DEFAULT: ${LIVE_DEFAULT:-off}
       # Whole backend in one container (the Helm chart also runs separate "assets" replicas).
       ROLE: api
@@ -126,6 +127,8 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       SERVER_URL: http://server:8080
       BASE_APK: ${BASE_APK:-}
+      # What new players start with until the owner chooses on the Broadcasts page, as the server reads it.
+      LIVE_DEFAULT: ${LIVE_DEFAULT:-off}
       HOME: /tmp
       TZ: ${TZ:-UTC}
     volumes:
@@ -134,6 +137,9 @@ services:
       - ./data/custom:/custom
       - ./data/backups:/backups
       - ./data/content:/srv/content:ro
+      # The certificate authority's certificate, as the server has it: the installer the admin pages hand out carries it
+      # for an address over HTTPS, so the PC client trusts the server's own certificate. No key.
+      - ./data/https/public:/srv/https:ro
     entrypoint: ["gunicorn"]
     command: ["-w", "1", "--threads", "8", "-b", "0.0.0.0:8000", "--timeout", "120", "--access-logfile", "-",
               "opendmtq_tools.admin:app"]

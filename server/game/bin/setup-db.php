@@ -147,6 +147,10 @@ $db->exec('CREATE INDEX IF NOT EXISTS Member_udid ON Member (udid)');
 $db->exec('CREATE TABLE IF NOT EXISTS LiveSwitch (guid INTEGER PRIMARY KEY, live INTEGER NOT NULL DEFAULT 0,
            token TEXT, toast TEXT, changed_at INTEGER, playing INTEGER NOT NULL DEFAULT 0,
            pattern_id INTEGER, play_at INTEGER)');
+// The owner's settings for broadcasts as a whole (whether there are any, what new players start with, the quality): a
+// name and its value per row, which the admin pages' Broadcasts page writes and portal/live_lib.php reads. The same
+// statement as SETTING_TABLE in the admin pages.
+$db->exec('CREATE TABLE IF NOT EXISTS LiveSetting (name TEXT PRIMARY KEY, value TEXT NOT NULL)');
 // The accounts of the site, made on the Accounts page of the admin pages and checked by the site's sign-in:
 // every page of it is behind that. The same statement as ACCOUNT_TABLE there (which also adds guid).
 $db->exec("CREATE TABLE IF NOT EXISTS SiteUser (name TEXT PRIMARY KEY COLLATE NOCASE, pass TEXT NOT NULL,

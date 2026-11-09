@@ -114,23 +114,82 @@ function apk_manifest(): ?array
     return ($m && is_file(APK_DIR . '/' . basename($m['file']))) ? $m : null;
 }
 
-/* The player for Windows with the app on offer in it, as tools/opendmtq_tools/player_windows.py describes it in
-   windows.json beside the app; null when there is none (a server without the player) or it holds another app. */
-function windows_player(): ?array
+/* The installer for Windows (the PC client) the site hands out, as tools/opendmtq_tools/windows_client.py describes it in
+   windows.json beside the app; null when there is none (a server without it) or its file is not there whole. */
+function windows_client(): ?array
 {
-    $m = apk_manifest();
-    if (!$m) {
-        return null;
-    }
     $raw = @file_get_contents(APK_DIR . '/windows.json');
     $w = $raw === false ? null : json_decode($raw, true);
-    // The app's file name and its hash: a build again on the same day for the same address keeps the name, and the zip
-    // made before it holds the earlier app until the builder makes it again (player_windows.matches() reads it so too).
-    if (!is_array($w) || ($w['apk'] ?? '') !== $m['file'] || (string)($w['apk_sha256'] ?? '') !== (string)($m['sha256'] ?? '')
-        || !is_file(APK_DIR . '/' . basename((string)($w['file'] ?? '')))) {
+    // The installer itself, at the size windows.json gives it: a file half copied or gone is no installer to hand out.
+    $path = is_array($w) ? APK_DIR . '/' . basename((string)($w['file'] ?? '')) : '';
+    if (!is_array($w) || !preg_match('/\.exe$/', $path) || !is_file($path) || filesize($path) !== (int)($w['size'] ?? -1)) {
         return null;
     }
     return $w;
+}
+
+/* The address players reach this site by, as the installer and the launcher keep it: the scheme of this visit (the edge
+   proxy says HTTPS) and the server's public address, port included (site_url_for()). */
+function site_url(): string
+{
+    return site_url_for(visit_is_https(), public_host());
+}
+
+/* An address of the site (windows_client.py's site_url() makes the same): the scheme and the public address. An address
+   without a port is on port 80 (entrypoint.sh), and HTTPS answers on that same port: over HTTPS the port is named, or the
+   address would mean 443, where nothing answers. */
+function site_url_for(bool $https, string $host): string
+{
+    if ($https && !preg_match('/:\d+$/', $host)) {
+        $host .= ':80';
+    }
+    return ($https ? 'https' : 'http') . '://' . $host;
+}
+
+/* The server's own certificate authority as PEM text (windows_client.py's own_ca() reads the same): what signs the
+   certificate this site's HTTPS answers with, which the launcher trusts for this server alone. '' without one, or with a
+   file that is no whole certificate. */
+function server_ca(): string
+{
+    $f = @fopen(odq_https_dir() . '/ca.crt', 'rb');
+    if (!$f) {
+        return '';
+    }
+    // A certificate is two kilobytes or so: anything far larger is no certificate.
+    $data = (string)fread($f, 16 * 1024 + 1);
+    fclose($f);
+    $text = trim($data);
+    if (strlen($data) > 16 * 1024 || !str_starts_with($text, '-----BEGIN CERTIFICATE-----')
+        || !str_ends_with($text, '-----END CERTIFICATE-----')) {
+        return '';
+    }
+    return $text;
+}
+
+/* The end that goes on the installer as this site hands it out: this visit's address, the server's name and, over
+   HTTPS, the server's own certificate authority (windows_preset_for()). */
+function windows_preset(): string
+{
+    return windows_preset_for(site_url(), server_name(), visit_is_https() ? server_ca() : '');
+}
+
+/* The end for an address, a name and a certificate authority ('' leaves it out), as windows_client.py's preset() makes
+   it, byte for byte (tests/game/protocol.sh compares the two): the details as JSON, their length in 4 bytes
+   (little-endian), and the mark the installer looks for at its file's end. */
+function windows_preset_for(string $url, string $name, string $ca = ''): string
+{
+    $details = ['version' => 1, 'url' => $url, 'name' => $name];
+    if ($ca !== '') {
+        $details['ca'] = $ca;
+    }
+    $json = json_encode($details, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    return $json . pack('V', strlen($json)) . 'OPENDMTQ-PRESET1';
+}
+
+/* The file name the installer is handed out under, with the server's address in it as the app's own name has it. */
+function windows_download_name(): string
+{
+    return 'OpenDMTQ-Setup-' . preg_replace('/[^A-Za-z0-9.-]/', '-', public_host()) . '.exe';
 }
 
 /* True when the builder gave up on the app for this address (data/apk/out/build.json says failed,
@@ -545,10 +604,9 @@ function page_header(string $title, string $active = '', string $refresh = '', s
     $on_air = $db ? count(live_on_air($db)) : 0;
     $live_label = 'LIVE' . ($on_air ? ' <span class="onair" title="' . h(t('live.count', ['n' => $on_air])) . '">' . $on_air . '</span>' : '');
     // The sections stay in the display face's English, as in the game's menus.
-    // What the site is for comes first, watching and getting the app; then the rest.
-    $sections = [
-        'home' => ['HOME', '/opendmtq/'],
-        'live' => [$live_label, '/opendmtq/live.php'],
+    // What the site is for comes first, watching and getting the app; then the rest. With broadcasts off for the server
+    // there is nothing to watch, and no LIVE in the menu.
+    $sections = ['home' => ['HOME', '/opendmtq/']] + (live_enabled() ? ['live' => [$live_label, '/opendmtq/live.php']] : []) + [
         'download' => ['DOWNLOAD', '/opendmtq/download.php'],
         'ranking' => ['RANKINGS', '/opendmtq/ranking.php'],
         'songs' => ['SONGS', '/opendmtq/songs.php'],
@@ -699,6 +757,10 @@ function live_cards(?SQLite3 $db): array
    the next look on. */
 function live_past(?SQLite3 $db): array
 {
+    // Broadcasts off for the server: no recording is shown to players either (the admin pages still have them).
+    if (!live_enabled()) {
+        return [];
+    }
     $recs = array_filter(live_rec_all(), fn($r) => !$r['open'] && !$r['hidden']);
     if (!$db || !$recs) {
         return [];
@@ -832,7 +894,8 @@ function on_ios(): bool
    page itself to an iPad that says it is a Mac (its touch screen gives it away). */
 function android_only(): string
 {
-    return '<p class="warn ios-note"' . (on_ios() ? '' : ' hidden') . '>' . t('ios') . '</p>'
+    // What works on an iPhone: the rankings, and the broadcasts while the server has them on.
+    return '<p class="warn ios-note"' . (on_ios() ? '' : ' hidden') . '>' . t(live_enabled() ? 'ios' : 'ios.nolive') . '</p>'
         . '<script>if (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) {'
         . ' for (const e of document.querySelectorAll(".get-app")) e.hidden = true;'
         . ' for (const e of document.querySelectorAll(".ios-note")) e.hidden = false; }</script>';

@@ -13,6 +13,9 @@ $parts = [
     ['fmt, mcl, oaknut, robin-map', t('lic.use.cpu_libs'), 'MIT'],
     ['xbyak, Zydis, Zycore', t('lic.use.cpu_x86'), 'BSD 3-Clause (xbyak), MIT (Zydis, Zycore)'],
     ['Android linker, libc, libm, libdl, libstdc++, libc++, libz, liblog', t('lic.use.android'), t('lic.android')],
+    // The installer for Windows the download page hands out: the PC client, with the player for Windows in it.
+    ['Python, Tcl/Tk, OpenSSL, libffi, zlib, Pillow, Velopack, PyInstaller', t('lic.use.pc'), t('lic.pc')],
+    ['ANGLE, zlib, GCC runtime, winpthreads, LLVM runtime libraries', t('lic.use.pc_player'), t('lic.pc_player')],
 ];
 ?>
   <?= masthead('LICENSE') ?>
@@ -37,6 +40,7 @@ $parts = [
       </table>
     </div>
     <p><?= t('lic.app') ?></p>
+    <p><?= t('lic.pc_texts') ?></p>
     <?php foreach (['Saira' => 'OFL-Saira.txt', 'Pretendard' => 'OFL-Pretendard.txt'] as $name => $file): ?>
       <details class="license-fold">
         <summary><?= t('lic.text', ['name' => 'SIL Open Font License 1.1, ' . $name]) ?></summary>

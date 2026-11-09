@@ -54,7 +54,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
     # A stalled download fails after 60 minutes, not GitHub's six hours: several times what this job takes.
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
       - uses: docker/setup-qemu-action@v4
@@ -88,10 +88,9 @@ jobs:
           python3 tools/opendmtq_tools/runtime.py --pack data/apk/arm32 dist/opendmtq-arm32-runtime.zip
           cp dist/opendmtq-arm32-runtime.zip tools/opendmtq_tools/
 
-      # The player for Windows without an app: with the release, for a server that fetches it; in the tools image and the
-      # Windows bundle, beside the code that adds each server's app to it for the site (tools/opendmtq_tools/player_windows.py).
-      # It is built from the same guest system and Dynarmic as the runtime above, and its Java VM against the same NDK's
-      # jni.h (arm32/ndk.sh's jni_headers).
+      # The player for Windows without an app: what the PC client's installer carries below, and with the release for the
+      # servers of 0.6 and 0.7, which fetch it. It is built from the same guest system and Dynarmic as the runtime above,
+      # and its Java VM against the same NDK's jni.h (arm32/ndk.sh's jni_headers).
       - name: The player for Windows
         env:
           ANDROID_NDK: ""
@@ -99,7 +98,20 @@ jobs:
         run: |
           arm32/build_windows.sh player
           arm32/bundle_windows.sh dist/opendmtq-player-windows.zip
-          cp dist/opendmtq-player-windows.zip tools/opendmtq_tools/
+
+      # The PC client: its installer, OpenDMTQ-Setup.exe, with the release for players and for servers that fetch it, and in
+      # the tools image and the Windows bundle beside the code that hands it out set up for each server
+      # (tools/opendmtq_tools/windows_client.py), with its version; and Velopack's packages, from which installed clients
+      # update themselves (this repository's releases).
+      - name: The PC client
+        env:
+          OPENDMTQ_UPDATE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
+          PLAYER_ZIP: dist/opendmtq-player-windows.zip
+        run: |
+          client/packaging/windows/build.sh _work/client-release
+          mkdir -p dist/client
+          cp _work/client-release/releases/* dist/client/
+          cp _work/client-release/releases/OpenDMTQ-Setup.exe _work/client-release/releases/OpenDMTQ-Setup.exe.version tools/opendmtq_tools/
 
       # The Windows bundle for this version, and its SHA-256, with the release. Before anything is pushed: its downloads are the
       # likeliest thing to fail (some sites drop old files), and a failure here must not leave half a release published.
@@ -154,5 +166,5 @@ jobs:
         run: |
           python3 .github/release_notes.py "$GITHUB_REF_NAME" > dist/release-notes.md
           gh release create "$GITHUB_REF_NAME" dist/opendmtq-*.tgz dist/opendmtq-arm32-runtime.zip dist/opendmtq-player-windows.zip \
-            dist/OpenDMTQ-windows.zip dist/OpenDMTQ-windows.zip.sha256 \
+            dist/OpenDMTQ-windows.zip dist/OpenDMTQ-windows.zip.sha256 dist/client/* \
             --notes-file dist/release-notes.md --generate-notes --verify-tag

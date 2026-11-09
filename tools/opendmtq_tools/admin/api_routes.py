@@ -143,7 +143,8 @@ SHAPES = {
         Field("plays_today", "integer", "Plays in the last 24 hours."),
         Field("plays_week", "integer", "Plays in the last 7 days."),
         Field("active_week", "integer", "Players who played in the last 7 days."),
-        Field("live", "integer", "Players on air now.")]),
+        Field("live", "integer", "Players on air now (none while broadcasts are off)."),
+        Field("broadcasts", "boolean", "True while broadcasts are on for the server (GET /broadcasts).")]),
     "DashPlay": Shape("A play on the status page.", [
         Field("player", "integer", "The player's number."),
         Field("name", "string", "The player's name."),
@@ -221,16 +222,16 @@ SHAPES = {
         Field("says", "string", "The same in words.", nullable=True),
         Field("build_error", "string", "Why the last build for this address failed.", nullable=True),
         Field("icon", "boolean", "True when its icon is kept (GET /app/icon)."),
-        Field("windows", "WindowsPlayer", "The player for Windows with this app in it, which the site offers computers "
-              "(GET /app/windows); null on a server without the player, and while no zip holds the app on offer (by its file "
-              "name and its hash).", nullable=True),
+        Field("windows", "WindowsInstaller", "The installer for Windows (the PC client) that the site offers computers "
+              "(GET /app/windows); null on a server without it.", nullable=True),
         Field("building", "Job", "A build running now.", nullable=True)]),
-    "WindowsPlayer": Shape("The player for Windows with the app on offer in it, as the builder made it.", [
-        Field("file", "string", "Its file name: the app's, ending in -windows.zip."),
-        Field("size", "integer", "Its size (bytes)."),
-        Field("sha256", "string", "Its SHA-256."),
-        Field("built_at", "string", "When the builder made it (YYYY-MM-DDTHH:MM:SS)."),
-        Field("player", "string", "The version of the player in it.")]),
+    "WindowsInstaller": Shape("The installer for Windows (the PC client) as the builder keeps it, before the server's address "
+                              "goes on its end as it is handed out.", [
+        Field("file", "string", "Its file name as kept: OpenDMTQ-Setup.exe."),
+        Field("size", "integer", "Its size as kept (bytes); handed out, it is longer by the server's address."),
+        Field("sha256", "string", "Its SHA-256 as kept."),
+        Field("version", "string", "The OpenDMTQ version it is from; null for a copy put on the server by hand.", nullable=True),
+        Field("copied_at", "string", "When the builder put it beside the app (YYYY-MM-DDTHH:MM:SS).")]),
     "Build": Shape("A build of the app.", [
         Field("file", "string", "Its file name."),
         Field("address", "string", "The address it is built for."),
@@ -282,7 +283,8 @@ SHAPES = {
         Field("plays_30_days", "integer", "Plays over the last 30 days."),
         Field("days", "[integer]", "Plays on each of the last 14 days, oldest first."),
         Field("phones", "integer", "Phones they have played on."),
-        Field("broadcast", "string", "Their broadcast: off, switched on and waiting for video, or on air.", enum=["off", "waiting", "on_air"]),
+        Field("broadcast", "string", "Their broadcast: off, switched on and waiting for video, on air, or switched on and held while "
+              "broadcasts are off for the server.", enum=["off", "waiting", "on_air", "held"]),
         Field("seen", "string", "Who the number belongs to now: send it as ?seen= with a change.")]),
     "PlayerList": Shape("The players.", [Field("items", "[Player]", "Every player, by number.")]),
     "PlayerAnswer": Shape("A player.", [Field("player", "Player", "The player.")]),
@@ -580,7 +582,21 @@ SHAPES = {
         Field("score", "integer", "The score."), Field("grade", "string", "The grade."), Field("all_combo", "boolean", "An all combo (AC)."),
         Field("perfect_play", "boolean", "A perfect play (PP)."), Field("accuracy", "number", "The accuracy (percent)."),
         Field("set_at", "integer", "When it was set (null for a record older than the play log).", nullable=True)]),
+    "BroadcastSettings": Shape("The server's broadcasts as a whole (the Broadcasts page).", [
+        Field("on", "boolean", "True while broadcasts are on: only then do phones and PCs send video and does the site show broadcasts."),
+        Field("new_players", "boolean", "True when a new player's switch starts on, from their first play."),
+        Field("quality", "string", "The stream's quality the phones and the PC player are asked for.", enum=["light", "standard", "smooth", "sharp"]),
+        Field("qualities", "[BroadcastQuality]", "Every quality, with what it costs."),
+        Field("switched_on", "integer", "Players whose own switch is on."),
+        Field("on_air", "integer", "Players on air now (none while broadcasts are off).")]),
+    "BroadcastQuality": Shape("A quality of the stream.", [
+        Field("key", "string", "Its name: light, standard, smooth or sharp."),
+        Field("height", "integer", "The picture's height in pixels."), Field("fps", "integer", "Frames a second."),
+        Field("bitrate", "integer", "The picture's bitrate (bit/s)."), Field("segment", "integer", "A segment's length (seconds)."),
+        Field("hour_bytes", "integer", "What an hour of broadcast takes on the disk, about (bytes)."),
+        Field("viewer_bits", "integer", "Each viewer's connection, about (bit/s), picture and sound.")]),
     "SiteLive": Shape("The site's broadcasts.", [
+        Field("on", "boolean", "True while broadcasts are on for the server; while off, the site shows none of them."),
         Field("live", "[LiveNow]", "Who is on air now."),
         Field("past", "[PastBroadcast]", "The recordings players may watch, newest first (300 at most).")]),
     "LiveNow": Shape("A player on air.", [
@@ -619,7 +635,8 @@ TAGS = [
     ("Players", "The Players page."),
     ("Accounts", "The Accounts page: the site's accounts."),
     ("Tokens", "The Accounts page: the API's tokens."),
-    ("Recordings", "The Recordings page."),
+    ("Broadcasts", "The Broadcasts page's top: broadcasts on or off for the server, and their settings."),
+    ("Recordings", "The Broadcasts page's recordings."),
     ("Backups", "The Backups page."),
     ("Logs", "The Logs page: requests, plays, changes."),
     ("Setup", "The setup's four steps."),
@@ -647,8 +664,9 @@ ROUTES = [
     # The App page (apps.py): the build on offer, every build, the invite link.
     Route("GET", "/app", "read", "app_get", "App", "The app players get: its build, whether it is right for this server, a build running now.",
           answer="AppOnOffer"),
-    Route("GET", "/app/windows", "read", "app_windows", "App", "The player for Windows with the app on offer in it, as the site hands "
-          "it to computers.", download="application/zip", errors=[(404, "not_found", "No player for Windows is kept for the app on offer.")]),
+    Route("GET", "/app/windows", "read", "app_windows", "App", "The installer for Windows as the site hands it to computers, set up "
+          "for this server (its address on the installer's end).", download="application/vnd.microsoft.portable-executable",
+          errors=[(404, "not_found", "This server keeps no installer for Windows.")]),
     Route("GET", "/app/icon", "read", "app_icon", "App", "The launcher icon of the app on offer, as the builder kept it.",
           download="image/png", errors=[(404, "not_found", "No icon is kept.")]),
     Route("GET", "/builds", "read", "builds_list", "App", "Every build of the app, newest first.", answer="BuildList"),
@@ -785,7 +803,21 @@ ROUTES = [
           errors=[(400, "bad_name", "No name, or one over 40 characters.")]),
     Route("DELETE", "/tokens/{token}", "write", "token_revoke", "Tokens", "Revokes a token for good. It may be the token that asks.",
           answer="Deleted", errors=[(404, "token_not_found", "No such token.")]),
-    # The Recordings page (recordings.py).
+    # The Broadcasts page's top: the server's switch, what new players start with, the quality (recordings.py).
+    Route("GET", "/broadcasts", "read", "broadcasts_get", "Broadcasts", "The server's broadcasts: on or off, what new players start with, the "
+          "quality, and who is switched on and on air.", answer="BroadcastSettings"),
+    Route("PUT", "/broadcasts", "write", "broadcasts_set", "Broadcasts", "Turns broadcasts on or off for the server, sets what new players "
+          "start with and the quality.",
+          "What is left out stays as it is. Off: phones and PCs send nothing and the site shows nothing of broadcasts; each player's switch "
+          "is kept, whoever is on air is told once in the game that the broadcast ended, every live window goes at once and running "
+          "recordings are closed. On: each player switched on is told in the game, between songs. New players turned to start on: "
+          "every player already there counts as chosen for, so only those who come after start on. Phones and the PC player follow "
+          "a new quality within 15 seconds.",
+          body=[Field("on", "boolean", "Broadcasts on or off for the server.", optional=True),
+                Field("new_players", "boolean", "Whether a new player's switch starts on.", optional=True),
+                Field("quality", "string", "light, standard, smooth or sharp.", optional=True, enum=["light", "standard", "smooth", "sharp"])],
+          answer="BroadcastSettings", errors=[(400, "bad_body", "None of the three was sent."), (400, "bad_field", "A quality there is not.")]),
+    # The Broadcasts page's recordings (recordings.py).
     Route("GET", "/recordings", "read", "recordings_list", "Recordings", "Every recording of a broadcast, newest first.", answer="RecordingList"),
     Route("GET", "/recordings/limits", "read", "recordings_limits", "Recordings", "The limits the recordings are kept to, and how much of the disk they take.",
           answer="Limits"),

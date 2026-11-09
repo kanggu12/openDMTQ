@@ -4,6 +4,8 @@
   <h2>{{ t('players.title') }} <span class="meta-inline" id="player-count">{{ players|length }}</span><a class="more" href="{{ url_for('players_page', csv=1) }}">{{ t('players.csv') }}</a></h2>
   {# Said once, above the switches it is about. #}
   <p class="lead">{{ t('players.devices') }}</p>
+  {# Broadcasts off for the whole server: the switches below wait for them, and the way to turn them on. #}
+  {% if not broadcasts_on %}<p class="flash note">{{ t('players.live_master_off', url=url_for('recordings_page') ~ '#broadcasts') }}</p>{% endif %}
   {% if not players %}<p class="empty">{{ t('players.none') }}</p>{% else %}
   <input class="search list-search" id="player-search" type="search" placeholder="{{ t('players.search') }}" aria-label="{{ t('players.search') }}">
   <p class="empty" id="player-none" role="status" hidden>{{ t('players.nomatch') }}</p>
@@ -20,10 +22,11 @@
         <td data-label="{{ t('players.th_last') }}" class="player-last" data-v="{{ played[p.id].last or 0 }}">{{ played[p.id].spark }}<span>{{ played[p.id].ago or t('players.never') }}</span></td>
         <td data-label="{{ t('players.th_charts') }}" class="r wide-only" data-v="{{ p.charts }}">{{ p.charts }}</td>
         <td data-label="{{ t('players.th_total') }}" class="r wide-only" data-v="{{ p.total }}">{{ '{:,}'.format(p.total) }}</td>
-        {# How it is first: off, on and waiting for their next song, or on air. Then the switch, and the way to watch. #}
-        {% set state = 'on' if live.get(p.id) else 'wait' if p.id in live else 'off' %}
+        {# How it is first: off, on and waiting for their next song, or on air; with broadcasts off for the server, switched
+           on and kept for then. Then the switch, and the way to watch. #}
+        {% set state = 'held' if p.id in live and not broadcasts_on else 'on' if live.get(p.id) else 'wait' if p.id in live else 'off' %}
         <td data-label="{{ t('players.th_broadcast') }}" class="live-cell"><div class="live-row">
-          <span class="live-state {{ state }}"><span class="lamp {{ state }}"></span>{{ t('players.broadcasting') if state == 'on' else t('players.waiting') if state == 'wait' else t('state.off_word') }}</span>
+          <span class="live-state {{ state }}"><span class="lamp {{ state }}"></span>{{ t('players.broadcasting') if state == 'on' else t('players.waiting') if state == 'wait' else t('players.held') if state == 'held' else t('state.off_word') }}</span>
           <div class="btns">
             <form method="post" action="{{ url_for('player_action', pid=p.id) }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="seen" value="{{ seen[p.id] }}"><input type="hidden" name="action" value="{{ 'live-off' if p.id in live else 'live-on' }}"><button class="btn btn-sm">{{ t('btn.turn_off') if p.id in live else t('btn.turn_on') }}</button></form>
             {% if state == 'on' %}<a class="btn btn-sm" href="{{ public_url }}/opendmtq/live.php?p={{ p.id }}">{{ t('btn.watch') }}</a>{% endif %}

@@ -61,6 +61,36 @@ for var in OPENDMTQ_APK_OUT APK_DIR; do
     failed=1
   fi
 done
+# The installer's end as the site makes it (portal/lib.php) and as the admin pages make it (tools/opendmtq_tools/
+# windows_client.py): the same bytes, for an address over plain HTTP, one over HTTPS on port 80 (its port named) with the
+# server's own authority and a name in Korean, and one over HTTPS on a port of its own without an authority.
+ca=$(printf -- '-----BEGIN CERTIFICATE-----\nMIIBszCCAVmgAwIBAgIUmadeup+/=\n-----END CERTIFICATE-----')
+while IFS='|' read -r https host name with_ca; do
+  given=""
+  [ "$with_ca" = 1 ] && given=$ca
+  # shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
+  site=$(docker run --rm --network none -e "ODQ_HTTPS=$https" -e "ODQ_HOST=$host" -e "ODQ_NAME=$name" -e "ODQ_CA=$given" \
+    --entrypoint php "opendmtq-server:$TAG" -r 'require "/opt/opendmtq/portal/lib.php";
+      echo bin2hex(windows_preset_for(site_url_for(getenv("ODQ_HTTPS") === "1", getenv("ODQ_HOST")), getenv("ODQ_NAME"),
+                                      (string)getenv("ODQ_CA")));')
+  admin=$(ODQ_HTTPS=$https ODQ_HOST=$host ODQ_NAME=$name ODQ_CA=$given PYTHONPATH="$ROOT/tools" python3 -c '
+import os
+from opendmtq_tools import windows_client as w
+e = os.environ
+print(w.preset(w.site_url(e["ODQ_HTTPS"] == "1", e["ODQ_HOST"]), e["ODQ_NAME"], e["ODQ_CA"]).hex())')
+  if [ -n "$site" ] && [ "$site" = "$admin" ]; then
+    echo "PASS the installer's end is the same from the site and from the admin pages ($https $host)"
+  else
+    echo "FAIL the installer's end differs between the site and the admin pages ($https $host):"
+    echo "  site:  $site"
+    echo "  admin: $admin"
+    failed=1
+  fi
+done <<'CASES'
+0|127.0.0.1:8080|127.0.0.1:8080|0
+1|game.example.net|우리 서버|1
+1|game.example.net:8790|game.example.net:8790|0
+CASES
 # Whatever PHP said in the server's log during all of the above: a warning there is a bug, even when the reply was right.
 if docker logs "$NAME" 2>&1 | grep -E "PHP (Warning|Notice|Deprecated|Fatal error|Parse error)"; then
   echo "FAIL PHP complained in the server's log (above)"

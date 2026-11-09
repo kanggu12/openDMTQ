@@ -77,7 +77,9 @@ def players_page():
     played = {p["id"]: {"last": activity[p["id"]]["last"], "ago": ago(activity[p["id"]]["last"]) if activity[p["id"]]["last"] else "",
                         "recent": activity[p["id"]]["recent"],
                         "spark": charts.days(activity[p["id"]]["days"], busiest, day_tips(activity[p["id"]]["days"]), tp("players.days_label"))} for p in rows}
-    return render_template("players.html", players=rows, live=live, seen=seen, played=played, phones=phones)
+    # Broadcasts off for the server: the switches are kept, and the page says so above them.
+    return render_template("players.html", players=rows, live=live, seen=seen, played=played, phones=phones,
+                           broadcasts_on=recordings.live_settings()["on"])
 
 
 def csv_text(value):
@@ -121,8 +123,11 @@ def player_action(pid):
         flash(t("players.renamed", who=who, name=done["name"]), "ok")
     elif action in ("reset", "delete"):
         flash(t("players.deleted", who=who) if action == "delete" else t("players.reset_done", who=who), "ok")
-    elif action in ("live-on", "live-off"):
-        flash(t("players.live_on" if action == "live-on" else "players.live_off", who=who), "ok")
+    elif action == "live-on":
+        # With broadcasts off for the server, the switch waits for them, and the notice with it.
+        flash(t("players.live_on" if recordings.live_settings()["on"] else "players.live_on_held", who=who), "ok")
+    elif action == "live-off":
+        flash(t("players.live_off", who=who), "ok")
     return redirect(url_for("players_page"))
 
 

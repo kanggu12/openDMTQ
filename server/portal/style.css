@@ -1430,6 +1430,8 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
 /* REPLAY in metal: a section's red is for what is live. */
 #mast.is-replay .word { background: linear-gradient(180deg, #fff 8%, #8d97a2 72%); -webkit-background-clip: text; background-clip: text; }
 .live-empty-head { font-size: var(--t-lg); font-weight: 700; color: #fff; }
+/* The live page with broadcasts off for the server: the box with the way home under its words, a little apart. */
+.live-off .btn-line { justify-content: center; margin-top: 12px; }
 .live-empty p { margin: 0 0 6px; }
 .live-empty p:last-child { margin-bottom: 0; }
 

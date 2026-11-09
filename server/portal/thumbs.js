@@ -255,7 +255,14 @@
     draw(cards);
     setInterval(() => {
       if (document.hidden) return;
-      fetch('/opendmtq/?live=1').then(r => r.ok ? r.json() : Promise.reject()).then(draw).catch(() => {});
+      fetch('/opendmtq/?live=1').then(r => {
+        // Broadcasts turned off for the server meanwhile: the page again, without anything of them (as the live page does).
+        if (r.ok && r.headers.get('X-Live') === 'off') {
+          location.reload();
+          return Promise.reject();
+        }
+        return r.ok ? r.json() : Promise.reject();
+      }).then(draw).catch(() => {});
     }, 15000);
   }
 

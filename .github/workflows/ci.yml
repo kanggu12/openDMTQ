@@ -48,6 +48,9 @@ jobs:
 
       - name: Live view's transport stream writer
         run: c++ -std=c++20 -Wall -Wextra -Iarm32/src arm32/tests/host/live_ts_test.cpp arm32/src/live_ts.cpp -o /tmp/live_ts_test && /tmp/live_ts_test
+      # The colours of a computer's broadcast in its stream's sequence header (arm32/src/live_sps.cpp).
+      - name: Broadcast colours
+        run: c++ -std=c++20 -Wall -Wextra -Iarm32/src arm32/tests/host/live_sps_test.cpp arm32/src/live_sps.cpp -o /tmp/live_sps_test && /tmp/live_sps_test
 
       - name: Shell scripts
         run: |
@@ -128,6 +131,35 @@ jobs:
           path: _work/ui-report
           retention-days: 14
 
+  # The PC client's launcher: its unit tests (a stand-in server and player, no screen, no network), then every page, the
+  # first-start guide, the installer's dialogs and the launcher's dialogs on a virtual screen, in both languages at three
+  # window sizes, with the layout check (client/tests/ui/run.sh). The installer under Wine against a test server needs the
+  # game's files: tests/qa.sh's client step and client/tests/windows/e2e.sh.
+  client:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: The launcher's test machine
+        run: docker build -q -t opendmtq-client-ui:local client/tests/ui
+
+      - name: Unit tests
+        run: >-
+          docker run --rm --network none -e PYTHONDONTWRITEBYTECODE=1 -v "$PWD:/src:ro" -w /src/client
+          opendmtq-client-ui:local python -m unittest discover -s tests -t .
+
+      - name: Every screen, with the layout check
+        run: client/tests/ui/run.sh "$PWD/_work/client-ui"
+
+      # What the screens looked like, for looking through: also when it passed.
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: client-ui
+          path: _work/client-ui
+          retention-days: 14
+
   # Without containers: host/install.sh on a clean system (a container stands in for the computer), the server run by
   # ./opendmtq on stand-in game files, the game server's contract, the pages, a stop and a start (tests/host/run.sh).
   host:
@@ -164,7 +196,7 @@ jobs:
         run: arm32/build.sh
 
       - name: The Windows programs
-        run: arm32/build_windows.sh arm32run jvmtest audiotest mediatest player
+        run: arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest player
 
       - name: Their tests under Wine
         run: arm32/test_windows.sh

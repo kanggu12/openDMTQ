@@ -154,12 +154,36 @@ check("upload refused while off", upload("0" * 32, 0) == 403)
 check("end refused while off", end("0" * 32) == 403)
 check("the players page offers the switch", "Turn on" in admin_page("/opendmtq/admin/players"))
 
+
+def broadcasts_post(**fields):
+    """A form of the Broadcasts page's top (the server's switch, or its settings), with that page's token."""
+    page = admin_page("/opendmtq/admin/recordings")
+    csrf = re.search(r'name="csrf" value="([^"]+)"', page).group(1)
+    request(admin, ADMIN + "/opendmtq/admin/recordings", urllib.parse.urlencode({"csrf": csrf, **fields}).encode())
+
+
+# Broadcasts are off for the whole server until the owner turns them on: a player switched on meanwhile gets no key and no
+# notice, and the switch is kept for then.
+check("broadcasts off for the server at first", "Broadcasts are off" in admin_page("/opendmtq/admin/recordings"))
+switch("live-on")
+s = state("ko")
+check("off for the server: a player switched on gets no key and no notice", s["on"] is False and "token" not in s and s["toast"] == "", s)
+check("and the players page holds the switch for then", "Switched on" in admin_page("/opendmtq/admin/players"))
+switch("live-off")
+# The stream's quality, as the phones are asked for it: a named one, then the default again.
+broadcasts_post(action="settings", new_players="off", quality="smooth")
+s = state()
+check("the quality the owner picks is the one the phones are asked for", (s["fps"], s["height"], s["bitrate"], s["segment"]) == (60, 720, 4000000, 2), s)
+broadcasts_post(action="settings", new_players="off", quality="standard")
+broadcasts_post(action="broadcasts-on")
+check("the owner turns broadcasts on", "Broadcasts are on" in admin_page("/opendmtq/admin/recordings"))
+
 # On: the notice comes once, in the phone's language.
 switch("live-on")
 s = state("ko")
 token = s.get("token", "")
 check("on: a token", s["on"] is True and re.fullmatch(r"[0-9a-f]{32}", token) is not None, s)
-check("the notice in Korean", s["toast"] == "웹에서 이 플레이를 방송합니다", s)
+check("the notice in Korean", s["toast"].startswith("지금 이 플레이를 라이브로 방송하고 있어요\n") and "사이트의 LIVE에서" in s["toast"], s)
 check("the notice only once", state("ko")["toast"] == "")
 check("the admin says it waits for the phone", "live-state wait" in admin_page("/opendmtq/admin/players"))
 
@@ -178,7 +202,7 @@ switch("live-off")
 check("off: no more token", "token" not in state())
 check("the notice waits during a song", state()["toast"] == "")
 call("game.savePlayResult", [guid, 1, [0, 0] + [0] * 10 + [50], 50, 0, [0, 0, 0], [0, 0, 0], "smoke"])
-check("the notice comes after the result", state()["toast"] == "Your broadcast is off")
+check("the notice comes after the result", state()["toast"].startswith("Your broadcast has ended\n"))
 
 # A quit song sends no result: the next menu request after the start's own ends it.
 call("game.getPreviewPlayInfo", [guid, 1])
@@ -189,7 +213,7 @@ call("game.getUserAsset", [guid])
 check("a menu request in the start's batch does not end the song", state()["toast"] == "")
 time.sleep(11)
 call("game.getUserAsset", [guid])
-check("a later menu request does", state()["toast"] == "Your play is now broadcast on the web")
+check("a later menu request does", state()["toast"].startswith("Your play is live now\nWatch it live or later under LIVE on "))
 
 # Flipping back before the phone read the notice leaves nothing to say.
 switch("live-off")
@@ -704,6 +728,21 @@ rec_post(action="limits", cap_gb="20", days="30", confirmed="1")
 rec_post(action="delete-player " + str(second_guid))
 switch("live-off")
 check("the disk line against the limit", re.search(r"Recordings use <b>[\d.]+ \w+</b> of 20 GB", admin_page("/opendmtq/admin/recordings")) is not None)
+
+# Broadcasts turned off for the whole server while a player is on air: told once that the broadcast ended and that
+# broadcasts are off on this server for now (the site no longer shows its replays), between songs; then on again.
+switch("live-on")
+token = state()["token"]
+check("on air as the owner turns broadcasts off", upload(token, 0) == 204)
+broadcasts_post(action="broadcasts-off")
+s = state()
+check("the player on air is told it ended, and that broadcasts are off for now",
+      s["on"] is False and s["toast"] == "Your broadcast has ended\nBroadcasts are off on this server for now", s)
+check("that notice only once", state()["toast"] == "")
+switch("live-off")
+broadcasts_post(action="broadcasts-on")
+check("and nothing waits once broadcasts are on again", state()["toast"] == "")
+rec_post(action="delete-player " + str(guid))
 
 # A real stream for the browser check (tests/live/browser.js), left in place.
 media = os.environ.get("LIVE_TS_DIR")

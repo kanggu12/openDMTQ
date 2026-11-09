@@ -92,9 +92,19 @@ shell_tests() {
     arm32/bundle_windows.sh arm32/test_desktop.sh arm32/test_windows.sh
 }
 
+# The PC client's launcher, as CI's client job runs it: its unit tests, then every screen on a virtual screen with the
+# layout check, the screenshots kept with the report.
+client_tests() {
+  docker build -q -t opendmtq-client-ui:local client/tests/ui >/dev/null || return 1
+  docker run --rm --network none -e PYTHONDONTWRITEBYTECODE=1 -v "$ROOT:/src:ro" -w /src/client opendmtq-client-ui:local \
+    python -m unittest discover -s tests -t . -v || return 1
+  client/tests/ui/run.sh "$REPORT/client-ui"
+}
+
 step shell shell_tests
 step tools tools_tests
 step cli cli_tests
+step client client_tests
 # The game server's contract with the game, on stand-in game files: every reply the client reads, and its quirks.
 step game tests/game/protocol.sh
 # The server on the real game files: the game's own requests, broadcasts, recordings, and a real video in Chromium.

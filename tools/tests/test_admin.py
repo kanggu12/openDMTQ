@@ -232,35 +232,55 @@ class AppPageTest(unittest.TestCase):
             self.assertIn('class="lamp wait"', page)
             self.assertIn("The last build failed (no base APK). Players still get this one.", page)
 
-    def test_the_player_for_windows_shows_with_the_app_it_holds(self):
+    def test_the_installer_for_windows_shows_when_the_builder_kept_one(self):
         with Install() as inst:
             self.build(inst, "OpenDMTQ-new.apk", HOST, "2026-11-01T08:00:00", offered=True)
-            # The app's hash, as the patcher writes it in latest.json: the zip is matched by it too.
-            with open(inst.path("apk/out/latest.json"), encoding="utf-8") as f:
-                latest = json.load(f)
-            inst.write("apk/out/latest.json", json.dumps({**latest, "sha256": "new"}))
-            # None made yet: no line and no button, and its address answers 404.
+            # None kept yet: no line and no button, and its address answers 404.
             self.assertNotIn("/opendmtq/admin/app/windows", self.page(inst))
             self.assertEqual(inst.client.get("/opendmtq/admin/app/windows").status_code, 404)
-            # One made for an older app is not this app's.
-            inst.write("apk/out/OpenDMTQ-old-windows.zip", "old")
-            inst.write("apk/out/windows.json", json.dumps({"file": "OpenDMTQ-old-windows.zip", "size": 3, "sha256": "0", "apk": "OpenDMTQ-old.apk",
-                                                           "apk_sha256": "old", "player": "v1", "built_at": "2026-10-01T08:00:00"}))
-            self.assertNotIn("/opendmtq/admin/app/windows", self.page(inst))
-            # Nor one with this app's name made before the app was built again on the same day: it holds the earlier app.
-            inst.write("apk/out/OpenDMTQ-new-windows.zip", "zip")
-            inst.write("apk/out/windows.json", json.dumps({"file": "OpenDMTQ-new-windows.zip", "size": 3, "sha256": "0", "apk": "OpenDMTQ-new.apk",
-                                                           "apk_sha256": "earlier", "player": "v1", "built_at": "2026-11-01T07:01:00"}))
+            # A copy cut off (windows.json says another size) is not handed out.
+            inst.write("apk/out/OpenDMTQ-Setup.exe", "MZ!")
+            inst.write("apk/out/windows.json", json.dumps({"file": "OpenDMTQ-Setup.exe", "size": 4, "sha256": "0", "version": "0.8.0",
+                                                           "copied_at": "2026-11-09T08:01:00"}))
             self.assertNotIn("/opendmtq/admin/app/windows", self.page(inst))
             self.assertEqual(inst.client.get("/opendmtq/admin/app/windows").status_code, 404)
-            # The builder's, for the app on offer: the line, the button, and the zip.
-            inst.write("apk/out/windows.json", json.dumps({"file": "OpenDMTQ-new-windows.zip", "size": 3, "sha256": "0", "apk": "OpenDMTQ-new.apk",
-                                                           "apk_sha256": "new", "player": "v1", "built_at": "2026-11-01T08:01:00"}))
+            # The builder's: the line, the button, and the installer set up for this server.
+            inst.write("apk/out/windows.json", json.dumps({"file": "OpenDMTQ-Setup.exe", "size": 3, "sha256": "0", "version": "0.8.0",
+                                                           "copied_at": "2026-11-09T08:01:00"}))
             page = self.page(inst)
-            self.assertIn("With it, the player for Windows that the site offers for computers", page)
+            self.assertIn("The site also offers the installer for Windows, set up for this server", page)
             self.assertIn("/opendmtq/admin/app/windows", page)
             r = inst.client.get("/opendmtq/admin/app/windows")
-            self.assertEqual((r.status_code, r.mimetype, r.data), (200, "application/zip", b"zip"))
+            self.assertEqual((r.status_code, r.mimetype), (200, "application/vnd.microsoft.portable-executable"))
+            self.assertTrue(r.data.startswith(b"MZ!") and r.data.endswith(b"OPENDMTQ-PRESET1"))
+            # Under a name that says which server it is for, and as long as it is.
+            self.assertIn("OpenDMTQ-Setup-", r.headers["Content-Disposition"])
+            self.assertEqual(int(r.headers["Content-Length"]), len(r.data))
+
+    def test_over_https_the_installer_carries_the_address_with_its_port_and_the_servers_own_authority(self):
+        ca = "-----BEGIN CERTIFICATE-----\nMIIBmadeup/+=\n-----END CERTIFICATE-----"
+        with Install() as inst, tempfile.TemporaryDirectory() as https:
+            self.build(inst, "OpenDMTQ-new.apk", HOST, "2026-11-01T08:00:00", offered=True)
+            inst.write("apk/out/OpenDMTQ-Setup.exe", "MZ!")
+            inst.write("apk/out/windows.json", json.dumps({"file": "OpenDMTQ-Setup.exe", "size": 3, "sha256": "0", "version": "0.8.0",
+                                                           "copied_at": "2026-11-09T08:01:00"}))
+            with open(os.path.join(https, "ca.crt"), "w", encoding="utf-8") as f:
+                f.write(ca + "\n")
+            # An internet address on port 80 whose server has HTTPS of its own.
+            with mock.patch.object(admin.core, "PUBLIC_HOST", "game.example.net"), \
+                    mock.patch.object(admin.core, "server_health", lambda fresh=False: {"ok": True, "https": True}), \
+                    mock.patch.dict(os.environ, {"OPENDMTQ_HTTPS": https}):
+                inst.sign_in()
+                r = inst.client.get("/opendmtq/admin/app/windows")
+                details = json.loads(r.data[3:-20].decode())
+                self.assertEqual(details, {"version": 1, "url": "https://game.example.net:80", "name": "game.example.net", "ca": ca})
+            # Over plain HTTP the authority stays out: there is nothing for it to vouch for.
+            with mock.patch.object(admin.core, "PUBLIC_HOST", "game.example.net"), \
+                    mock.patch.object(admin.core, "server_health", lambda fresh=False: {"ok": True, "https": False}), \
+                    mock.patch.dict(os.environ, {"OPENDMTQ_HTTPS": https}):
+                r = inst.client.get("/opendmtq/admin/app/windows")
+                self.assertEqual(json.loads(r.data[3:-20].decode()), {"version": 1, "url": "http://game.example.net",
+                                                                      "name": "game.example.net"})
 
     def test_the_icon_shows_only_when_the_builder_kept_one_and_only_signed_in(self):
         with Install() as inst:
@@ -372,6 +392,188 @@ class LiveSwitchTest(unittest.TestCase):
             con = sqlite3.connect(inst.path("state/dmtq.db3"))
             self.assertEqual(admin.recordings.live_rows(con), {})
             con.close()
+
+
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class BroadcastsTest(unittest.TestCase):
+    """The server's broadcasts on the Broadcasts page: off until turned on, what turning them on and off does to the
+    players' switches, their notices, the live windows and the recordings, and the settings the phones are asked for."""
+
+    def _token(self, inst):
+        inst.sign_in()
+        # As a browser gets it: from a page's form.
+        page = inst.client.get("/opendmtq/admin/recordings").get_data(as_text=True)
+        return re.search(r'name="csrf" value="([^"]+)"', page).group(1)
+
+    def _switched_on(self, inst, *guids):
+        """Players switched on, as the Players page leaves them."""
+        with sqlite3.connect(inst.path("state/dmtq.db3")) as con:
+            con.row_factory = sqlite3.Row
+            for guid in guids:
+                admin.recordings.live_set(con, guid, True)
+
+    def _settings(self, **values):
+        """Broadcast settings as the owner left them (rows of LiveSetting), in a database made for it when there is none."""
+        with sqlite3.connect(admin.core.DB) as con:
+            admin.recordings.setting_rows(con)
+            admin.recordings.write_settings(con, values)
+
+    def _settings_off(self):
+        """Broadcasts off as the owner left them."""
+        self._settings(on=False)
+
+    def _rows(self):
+        """The settings' rows as they are in the database."""
+        with sqlite3.connect(admin.core.DB) as con:
+            return dict(con.execute("SELECT name, value FROM LiveSetting").fetchall())
+
+    def _toasts(self, inst):
+        """Each player's notice waiting for the phone."""
+        with sqlite3.connect(inst.path("state/dmtq.db3")) as con:
+            return dict(con.execute("SELECT guid, toast FROM LiveSwitch ORDER BY guid").fetchall())
+
+    def test_off_until_turned_on_and_the_page_says_so(self):
+        with Install() as inst:
+            self.assertEqual(admin.recordings.live_settings(), {"on": False, "new_players": False, "quality": "standard"})
+            self._token(inst)
+            page = inst.client.get("/opendmtq/admin/recordings").get_data(as_text=True)
+            self.assertIn("Broadcasts are off", page)
+            self.assertIn('value="broadcasts-on"', page)
+            # Every quality with what it costs, the one in use chosen.
+            self.assertEqual(len(re.findall(r'name="quality"', page)), 4)
+            self.assertIn('value="standard" checked', page)
+
+    def test_live_default_on_is_what_new_players_start_with_until_the_owner_chooses(self):
+        with Install(), mock.patch.dict(os.environ, {"LIVE_DEFAULT": "on"}):
+            old_game_database(admin.core.DB, [])
+            self.assertTrue(admin.recordings.live_settings()["new_players"])
+            # The first look writes whether broadcasts are on, not what new players start with.
+            self.assertEqual(self._rows(), {"on": "1"})
+            # The owner's choice comes first once made.
+            self._settings(new_players=False)
+            self.assertFalse(admin.recordings.live_settings()["new_players"])
+
+    def test_a_server_from_before_the_switch_stays_on_when_it_broadcast(self):
+        with Install() as inst:
+            # A player switched on before the switch existed: on, and written down in the database.
+            self._switched_on(inst, 7)
+            self.assertTrue(admin.recordings.live_settings()["on"])
+            self.assertEqual(self._rows(), {"on": "1"})
+        with Install() as inst:
+            # Nobody switched on, no LIVE_DEFAULT: a new server, off; a player switched on later leaves it off.
+            old_game_database(admin.core.DB, [])
+            self.assertFalse(admin.recordings.live_settings()["on"])
+            self._switched_on(inst, 7)
+            self.assertFalse(admin.recordings.live_settings()["on"])
+        with Install(), mock.patch.dict(os.environ, {"LIVE_DEFAULT": "on"}):
+            # LIVE_DEFAULT=on is a server that broadcast too.
+            old_game_database(admin.core.DB, [])
+            self.assertTrue(admin.recordings.live_settings()["on"])
+        with Install():
+            # No database yet (before the server's first start): off, and nothing made.
+            self.assertFalse(admin.recordings.live_settings()["on"])
+            self.assertFalse(os.path.exists(admin.core.DB))
+
+    def test_turning_on_tells_those_switched_on_and_off_takes_every_window_down(self):
+        with Install() as inst:
+            # The owner's settings exist and say off (a server from before the switch would be on with players on).
+            self._settings_off()
+            self._switched_on(inst, 7, 8)
+            csrf = self._token(inst)
+            r = inst.client.post("/opendmtq/admin/recordings", data={"csrf": csrf, "action": "broadcasts-on"}, follow_redirects=True)
+            self.assertIn("Broadcasts are on.", r.get_data(as_text=True))
+            self.assertTrue(admin.recordings.live_settings()["on"])
+            # Each player switched on is told, once, between songs.
+            self.assertEqual(self._toasts(inst), {7: "on", 8: "on"})
+            # A live window and a recording running when broadcasts go off: the window goes, the recording is closed.
+            folder = admin.recordings.live_folder(7)
+            os.makedirs(folder, exist_ok=True)
+            # Player 7 on air now: an upload a moment ago, not ended.
+            with open(os.path.join(folder, "stream.json"), "w", encoding="utf-8") as f:
+                json.dump({"ended": False, "updated": time.time()}, f)
+            rec = admin.recordings.rec_folder(7, 1800000000)
+            os.makedirs(rec)
+            open(os.path.join(rec, ".open"), "w", encoding="utf-8").close()
+            r = inst.client.post("/opendmtq/admin/recordings", data={"csrf": csrf, "action": "broadcasts-off"}, follow_redirects=True)
+            self.assertIn("Broadcasts are off.", r.get_data(as_text=True))
+            self.assertFalse(admin.recordings.live_settings()["on"])
+            self.assertFalse(os.path.exists(folder))
+            self.assertTrue(os.path.exists(os.path.join(rec, ".close-now")))
+            # The player on air hears once that the broadcast ended and that broadcasts are off for now; no other notice
+            # waits while broadcasts are off, and the switches stay.
+            self.assertEqual(self._toasts(inst), {7: "end", 8: ""})
+            with sqlite3.connect(inst.path("state/dmtq.db3")) as con:
+                self.assertEqual(con.execute("SELECT COUNT(*) FROM LiveSwitch WHERE live = 1").fetchone()[0], 2)
+
+    def test_the_settings_form_saves_both_and_refuses_a_quality_there_is_not(self):
+        with Install() as inst:
+            old_game_database(admin.core.DB, [])
+            csrf = self._token(inst)
+            inst.client.post("/opendmtq/admin/recordings", data={"csrf": csrf, "action": "settings", "new_players": "on", "quality": "sharp"})
+            self.assertEqual(admin.recordings.live_settings(), {"on": False, "new_players": True, "quality": "sharp"})
+            r = inst.client.post("/opendmtq/admin/recordings", data={"csrf": csrf, "action": "settings", "new_players": "off", "quality": "ultra"},
+                                 follow_redirects=True)
+            self.assertIn("No such quality.", r.get_data(as_text=True))
+            self.assertEqual(admin.recordings.live_settings(), {"on": False, "new_players": True, "quality": "sharp"})
+            # The change in the log of changes, in words, with what it set.
+            page = inst.client.get("/opendmtq/admin/logs?tab=changes").get_data(as_text=True)
+            self.assertIn("Changed the broadcast settings", page)
+            self.assertIn("on, sharp", page)
+
+    def test_the_players_page_and_the_status_page_say_when_broadcasts_are_off(self):
+        with Install() as inst:
+            old_game_database(admin.core.DB, [])
+            member_rows(admin.core.DB, [(7, "Sena", "phone-a")])
+            self._settings_off()
+            self._switched_on(inst, 7)
+            inst.sign_in()
+            page = inst.client.get("/opendmtq/admin/players").get_data(as_text=True)
+            self.assertIn("Broadcasts are off for the whole server", page)
+            self.assertIn("Switched on", page)
+            dash = inst.client.get("/opendmtq/admin/").get_data(as_text=True)
+            self.assertIn("Broadcasts are off", dash)
+            self._settings(on=True)
+            page = inst.client.get("/opendmtq/admin/players").get_data(as_text=True)
+            self.assertNotIn("Broadcasts are off for the whole server", page)
+            self.assertIn("Waiting", page)
+
+    def test_new_players_starting_on_leaves_everyone_there_as_they_are(self):
+        with Install() as inst:
+            old_game_database(admin.core.DB, [])
+            member_rows(admin.core.DB, [(7, "Sena", "phone-a"), (8, "Yuna", "phone-b"), (9, "Check", admin.core.CHECK_UDID)])
+            self._settings_off()
+            # Player 8 has a row from song tracking only (no choice of the owner): as untouched as player 7.
+            with sqlite3.connect(admin.core.DB) as con:
+                admin.recordings.setting_rows(con)
+                con.execute(admin.recordings.LIVE_TABLE)
+                con.execute("INSERT INTO LiveSwitch (guid, playing) VALUES (8, 0)")
+            csrf = self._token(inst)
+            inst.client.post("/opendmtq/admin/recordings", data={"csrf": csrf, "action": "settings", "new_players": "on", "quality": "standard"})
+            self.assertTrue(admin.recordings.live_settings()["new_players"])
+            # Both count as chosen for now, off: the server switches on only those who come after. The check account
+            # is no player.
+            with sqlite3.connect(admin.core.DB) as con:
+                rows = con.execute("SELECT guid, live, changed_at IS NOT NULL FROM LiveSwitch ORDER BY guid").fetchall()
+            self.assertEqual(rows, [(7, 0, 1), (8, 0, 1)])
+            # The same form again changes nobody's time: only the turn to "start on" marks them.
+            with sqlite3.connect(admin.core.DB) as con:
+                before = con.execute("SELECT guid, changed_at FROM LiveSwitch ORDER BY guid").fetchall()
+            member_rows(admin.core.DB, [(10, "New", "phone-c")])
+            inst.client.post("/opendmtq/admin/recordings", data={"csrf": csrf, "action": "settings", "new_players": "on", "quality": "sharp"})
+            with sqlite3.connect(admin.core.DB) as con:
+                self.assertEqual(con.execute("SELECT guid, changed_at FROM LiveSwitch ORDER BY guid").fetchall(), before)
+
+    def test_the_qualities_are_the_servers(self):
+        # LIVE_QUALITY in server/portal/live_lib.php, which serves them to the phones: the same names and numbers.
+        with open(os.path.join(os.path.dirname(__file__), "..", "..", "server", "portal", "live_lib.php"), encoding="utf-8") as f:
+            php = f.read()
+        found = {m.group(1): {"height": int(m.group(2)), "fps": int(m.group(3)), "bitrate": int(m.group(4))}
+                 for m in re.finditer(r"'(\w+)' => \['height' => (\d+), 'fps' => (\d+), 'bitrate' => (\d+)\]", php)}
+        self.assertEqual(found, admin.recordings.LIVE_PRESETS)
+        self.assertIn("const LIVE_QUALITY_DEFAULT = '%s';" % admin.recordings.QUALITY_DEFAULT, php)
+        # Within what the phones' encoders take (arm32/src/live.cpp clamps to these).
+        for q in admin.recordings.LIVE_PRESETS.values():
+            self.assertTrue(5 <= q["fps"] <= 60 and 144 <= q["height"] <= 1080 and 100000 <= q["bitrate"] <= 20000000, q)
 
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
@@ -608,6 +810,30 @@ class RestoreSchemaTest(unittest.TestCase):
         return inst.client.post("/opendmtq/admin/backups/opendmtq-20200101-000000-manual.tar.gz",
                                 data={"csrf": token, "action": "restore"})
 
+    def test_the_broadcast_settings_stay_as_they_are_today(self):
+        # A backup made while broadcasts were on, at another quality: restored on the admin pages, the settings stay
+        # today's, as the switches do. A restore never turns broadcasts on.
+        with Install() as inst:
+            snap = inst.path("old.db3")
+            old_game_database(snap, [])
+            with sqlite3.connect(snap) as con:
+                admin.recordings.setting_rows(con)
+                admin.recordings.write_settings(con, {"on": True, "quality": "light"})
+            with tarfile.open(inst.path("backups/opendmtq-20200101-000000-manual.tar.gz"), "w:gz") as tar:
+                tar.add(snap, arcname="dmtq.db3")
+            old_game_database(admin.core.DB, [])
+            with sqlite3.connect(admin.core.DB) as con:
+                admin.recordings.setting_rows(con)
+                admin.recordings.write_settings(con, {"on": False, "quality": "sharp"})
+            inst.sign_in()
+            inst.client.get("/opendmtq/admin/backups")
+            with inst.client.session_transaction(path="/opendmtq/admin/") as sess:
+                token = sess["csrf"]
+            r = inst.client.post("/opendmtq/admin/backups/opendmtq-20200101-000000-manual.tar.gz",
+                                 data={"csrf": token, "action": "restore"})
+            self.assertEqual(r.status_code, 302)
+            self.assertEqual(admin.recordings.live_settings(), {"on": False, "new_players": False, "quality": "sharp"})
+
     def test_an_older_backup_gets_what_the_server_needs(self):
         # The server keeps running, so what its start would add must not wait for a restart: plays
         # went unlogged, and duplicates stayed in every ranking's sum.
@@ -617,7 +843,7 @@ class RestoreSchemaTest(unittest.TestCase):
             self.assertEqual(con.execute("SELECT pattern_id, score, grade, isAllCombo, judgement FROM Play ORDER BY 1").fetchall(),
                              [(1, 300, "A", "Y", 900), (2, 50, "C", "N", 700)])
             names = {r[0] for r in con.execute("SELECT name FROM sqlite_master")}
-            self.assertLessEqual({"PlayLog", "Play_one", "Play_board", "LiveSwitch", "AchievementDate"}, names)
+            self.assertLessEqual({"PlayLog", "Play_one", "Play_board", "LiveSwitch", "LiveSetting", "AchievementDate"}, names)
             self.assertEqual(con.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             con.close()
 
@@ -1082,7 +1308,8 @@ class RecordingLimitsAskFirstTest(unittest.TestCase):
             self._rec(int(time.time()) - 3600)
             inst.sign_in()
             page = inst.client.get("/opendmtq/admin/recordings").get_data(as_text=True)
-            form = page[page.index('<form method="post">'):]
+            # The list's own form: the first plain one after the limits' (the broadcasts' settings come before both).
+            form = page[page.index('<form method="post">', page.index('class="rec-limits"')):]
             self.assertIn("disabled", form[:form.index("</button>")])
 
 

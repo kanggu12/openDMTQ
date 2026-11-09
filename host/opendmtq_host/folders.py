@@ -70,6 +70,9 @@ def tools_env(values, found):
         "OPENDMTQ_BACKUPS": os.path.join(DATA, "backups"),
         "OPENDMTQ_CONTENT": os.path.join(DATA, "content"),
         "OPENDMTQ_CUSTOM": os.path.join(DATA, "custom"),
+        # The server's certificate authority's public folder, as the server reads it (server_env): the installer the admin
+        # pages hand out carries the authority where there is one.
+        "OPENDMTQ_HTTPS": os.path.join(DATA, "https", "public"),
         # The programs the app builder and the import call.
         "OPENDMTQ_JAVA": found.get("java") or "java",
         "OPENDMTQ_KEYTOOL": found.get("keytool") or "keytool",
@@ -82,6 +85,8 @@ def tools_env(values, found):
         "PUBLIC_HOST": values.get("PUBLIC_HOST", ""),
         "SERVER_NAME": values.get("SERVER_NAME", ""),
         "BASE_APK": values.get("BASE_APK", ""),
+        # What new players start with until the owner chooses on the Broadcasts page, as the server reads it.
+        "LIVE_DEFAULT": values.get("LIVE_DEFAULT", "off"),
         "ADMIN_USER": values.get("ADMIN_USER", ""),
         "ADMIN_PASSWORD": values.get("ADMIN_PASSWORD", ""),
         "OPENDMTQ_VERSION": version(),

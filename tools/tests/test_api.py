@@ -315,8 +315,32 @@ def CASES():
     """Every route's usual answer, and its refusals."""
     closed, opened, backup = Server.names["closed"], Server.names["open"], Server.names["backup"]
 
+    def everyone_touched():
+        # (new players start on, the players with no choice of the owner on record): none left after the turn.
+        with sqlite3.connect(admin.core.DB) as con:
+            players = {r[0] for r in con.execute(admin.core.PLAYER_ROWS, (admin.core.CHECK_UDID,))}
+            chosen = {r[0] for r in con.execute("SELECT guid FROM LiveSwitch WHERE changed_at IS NOT NULL")}
+        return admin.recordings.live_settings()["new_players"], players - chosen
+
+    def settings(**values):
+        # The broadcast settings as the Broadcasts page leaves them: rows of LiveSetting in the database.
+        with sqlite3.connect(admin.core.DB) as con:
+            admin.recordings.setting_rows(con)
+            admin.recordings.write_settings(con, values)
+        return []
+
+    def broadcasts_on(inst):
+        # Broadcasts on for the server, as the Broadcasts page leaves them (off until then).
+        return settings(on=True)
+
+    def broadcasts_off(inst):
+        # Broadcasts off for the server, as the owner left them: a server with a player switched on and settings that say
+        # nothing yet is one from before the switch, on.
+        return settings(on=False)
+
     def on_air(inst):
-        # Yuna's switch on, with a live window that has video.
+        # Yuna's switch on, with a live window that has video, while broadcasts are on.
+        broadcasts_on(inst)
         with sqlite3.connect(admin.core.DB) as con:
             con.row_factory = sqlite3.Row
             admin.recordings.live_set(con, 8, True)
@@ -337,21 +361,17 @@ def CASES():
         os.remove(inst.path("apk/out/app-icon.png"))
         return []
 
-    def with_windows(inst, apk_sha256="0"):
-        # The player for Windows beside the app on offer, as the builder leaves it (player_windows.py), made from the app
-        # latest.json names, its hash included.
-        with open(inst.path("apk/out/latest.json"), encoding="utf-8") as f:
-            latest = json.load(f)
-        inst.write("apk/out/latest.json", json.dumps({**latest, "sha256": "0"}))
-        inst.write("apk/out/OpenDMTQ-x-windows.zip", "zip")
-        inst.write("apk/out/windows.json", json.dumps({"file": "OpenDMTQ-x-windows.zip", "size": 3, "sha256": "0", "apk": "OpenDMTQ-x.apk",
-                                                       "apk_sha256": apk_sha256, "player": "v1-test", "built_at": "2026-11-08T12:00:00"}))
+    def with_windows(inst, size=3):
+        # The installer for Windows beside the app, as the builder leaves it (windows_client.py): the file, and windows.json
+        # describing it at `size`.
+        inst.write("apk/out/OpenDMTQ-Setup.exe", "MZ!")
+        inst.write("apk/out/windows.json", json.dumps({"file": "OpenDMTQ-Setup.exe", "size": size, "sha256": "0", "version": "0.8.0",
+                                                       "copied_at": "2026-11-09T12:00:00"}))
         return []
 
-    def with_windows_for_the_earlier_app(inst):
-        # The app built again on the same day for the same address: its name, and the zip made before still holding the
-        # earlier app until the builder makes it again.
-        return with_windows(inst, apk_sha256="earlier")
+    def with_windows_half_copied(inst):
+        # windows.json says another size than the file has: a copy cut off, which is not handed out.
+        return with_windows(inst, size=4)
 
     def no_qr(inst):
         os.remove(inst.path("apk/out/download-qr.svg"))
@@ -383,12 +403,15 @@ def CASES():
         C("job_get", "GET", "/jobs/nope", 404, "job_not_found"),
         C("app_get", "GET", "/app", 200, check=lambda t, inst, r: t.assertEqual(r.get_json()["state"], "fits")),
         C("app_get", "GET", "/app", 200, setup=with_windows,
-          check=lambda t, inst, r: t.assertEqual(r.get_json()["windows"]["file"], "OpenDMTQ-x-windows.zip")),
-        C("app_get", "GET", "/app", 200, setup=with_windows_for_the_earlier_app,
+          check=lambda t, inst, r: t.assertEqual((r.get_json()["windows"]["file"], r.get_json()["windows"]["version"]), ("OpenDMTQ-Setup.exe", "0.8.0"))),
+        C("app_get", "GET", "/app", 200, setup=with_windows_half_copied,
           check=lambda t, inst, r: t.assertIsNone(r.get_json()["windows"])),
-        C("app_windows", "GET", "/app/windows", 200, setup=with_windows, check=lambda t, inst, r: t.assertEqual(r.data, b"zip")),
+        # The installer as the site hands it out: the file, then this server's address on its end.
+        C("app_windows", "GET", "/app/windows", 200, setup=with_windows,
+          check=lambda t, inst, r: (t.assertTrue(r.data.startswith(b"MZ!")), t.assertTrue(r.data.endswith(b"OPENDMTQ-PRESET1")),
+                                    t.assertIn(b'"url":"http://', r.data))),
         C("app_windows", "GET", "/app/windows", 404, "not_found"),
-        C("app_windows", "GET", "/app/windows", 404, "not_found", setup=with_windows_for_the_earlier_app),
+        C("app_windows", "GET", "/app/windows", 404, "not_found", setup=with_windows_half_copied),
         C("app_icon", "GET", "/app/icon", 200),
         C("app_icon", "GET", "/app/icon", 404, "not_found", setup=no_icon),
         C("builds_list", "GET", "/builds", 200, check=lambda t, inst, r: t.assertEqual(len(r.get_json()["items"]), 2)),
@@ -449,7 +472,11 @@ def CASES():
         C("player_reset", "POST", "/players/99/reset", 404, "player_not_found"),
         C("player_delete", "DELETE", "/players/8", 200),
         C("player_delete", "DELETE", "/players/99", 404, "player_not_found"),
-        C("player_live_on", "POST", "/players/7/live", 200, check=lambda t, inst, r: t.assertEqual(r.get_json()["player"]["broadcast"], "waiting")),
+        C("player_live_on", "POST", "/players/7/live", 200, setup=broadcasts_on,
+          check=lambda t, inst, r: t.assertEqual(r.get_json()["player"]["broadcast"], "waiting")),
+        # With broadcasts off for the server, the switch is kept for then.
+        C("player_live_on", "POST", "/players/7/live", 200, setup=broadcasts_off,
+          check=lambda t, inst, r: t.assertEqual(r.get_json()["player"]["broadcast"], "held")),
         C("player_live_on", "POST", "/players/99/live", 404, "player_not_found"),
         C("player_live_off", "DELETE", "/players/7/live", 200),
         C("player_live_off", "DELETE", "/players/7/live?seen=0123456789abcdef", 409, "stale"),
@@ -486,6 +513,17 @@ def CASES():
         C("tokens_create", "POST", "/tokens", 400, "bad_name", json={"name": " ", "scope": "read"}),
         C("token_revoke", "DELETE", "/tokens/{token:reader}", 200),
         C("token_revoke", "DELETE", "/tokens/000000000000", 404, "token_not_found"),
+        # The server's broadcasts: off until turned on, then on with a quality the phones are asked for.
+        C("broadcasts_get", "GET", "/broadcasts", 200,
+          check=lambda t, inst, r: t.assertEqual((r.get_json()["on"], r.get_json()["quality"], len(r.get_json()["qualities"])), (False, "standard", 4))),
+        C("broadcasts_get", "GET", "/broadcasts", 401, "no_token", token=None),
+        C("broadcasts_set", "PUT", "/broadcasts", 200, json={"on": True, "quality": "smooth"},
+          check=lambda t, inst, r: t.assertEqual((r.get_json()["on"], r.get_json()["quality"], r.get_json()["new_players"]), (True, "smooth", False))),
+        # New players starting on from now: everyone there counts as chosen for, off, as on the Broadcasts page.
+        C("broadcasts_set", "PUT", "/broadcasts", 200, json={"new_players": True}, check=lambda t, inst, r: t.assertEqual(
+            everyone_touched(), (True, set()))),
+        C("broadcasts_set", "PUT", "/broadcasts", 400, "bad_body", json={}),
+        C("broadcasts_set", "PUT", "/broadcasts", 400, "bad_field", json={"quality": "ultra"}),
         C("recordings_list", "GET", "/recordings", 200, check=lambda t, inst, r: t.assertEqual([x["open"] for x in r.get_json()["items"]], [True, False])),
         C("recordings_limits", "GET", "/recordings/limits", 200, check=lambda t, inst, r: t.assertEqual(r.get_json()["cap_gb"], 20)),
         C("recordings_set_limits", "PUT", "/recordings/limits", 200, json={"cap_gb": 50, "days": 90}),
@@ -1370,7 +1408,10 @@ PAGE_ACTIONS = {
     "accounts_page:delete": ["account_delete"],
     "accounts_page:token": ["tokens_create"],
     "accounts_page:revoke": ["token_revoke"],
-    "recordings_page": ["recordings_list", "recordings_limits"],
+    "recordings_page": ["recordings_list", "recordings_limits", "broadcasts_get"],
+    "recordings_page:broadcasts-on": ["broadcasts_set"],
+    "recordings_page:broadcasts-off": ["broadcasts_set"],
+    "recordings_page:settings": ["broadcasts_set"],
     "recordings_page?watch": ["recording_get", "recording_file"],
     "recordings_page:limits": ["recordings_set_limits"],
     "recordings_page:hide": ["recording_hide"],
@@ -1440,6 +1481,7 @@ SITE_PAGES = {
     "health.php": ["status_health"],
     "licenses.php": "the license texts, which are in the repository",
     "login.php": "the site's sign-in: the API takes a token instead",
+    "client.php": "the PC client's sign-in by the site's cookie and its look at the app on offer: the API takes a token, and GET /app has the app",
     "lang.php": "the site's language switch: the API answers in English",
     "notfound.php": "the site's page for an address that leads nowhere",
 }
@@ -1503,6 +1545,9 @@ GET_ARGS = {
     "live_lib.php?ids": "a phone's upload of its broadcast, which only the phone sends, with its own key",
     "login.php?next": "the page a browser goes back to after the site's sign-in: the API has no sign-in",
     "login.php?logout": "the site's sign-out: a token is revoked instead",
+    "client.php?about": ("view", "status_health"),
+    "client.php?signin": "the PC client's sign-in by the site's cookie: the API takes a token instead",
+    "client.php?app": ("view", "app_get"),
     "lang.php?to": "the site's language: the API answers in English",
     "lang.php?next": "the page a browser goes back to after the language switch",
 }

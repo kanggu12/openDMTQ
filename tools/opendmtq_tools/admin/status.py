@@ -10,7 +10,7 @@ import time
 
 from flask import render_template, url_for
 
-from .. import songs
+from .. import songs, windows_client
 from . import apps, auth, backups, charts, core, insights, recordings, song_pages
 from .core import ago, app, BASE, db, human, t, tp
 
@@ -333,7 +333,9 @@ def counts_of(con):
             "SELECT COUNT(DISTINCT user_id) FROM PlayLog WHERE played_at > strftime('%s','now') - 604800").fetchone()[0]
     except sqlite3.OperationalError:
         counts["plays_today"] = counts["plays_week"] = counts["active_week"] = 0
-    counts["live"] = sum(recordings.live_rows(con).values())
+    # On air now, and whether broadcasts are on at all: nobody is on air while they are off.
+    counts["broadcasts"] = recordings.live_settings()["on"]
+    counts["live"] = sum(recordings.live_rows(con).values()) if counts["broadcasts"] else 0
     return counts
 
 
@@ -409,6 +411,6 @@ def dashboard():
                            disk_own_total=human(own_total) if own_total else "", machine=machine_view(usage),
                            attention=attention(health, counts, saved, backup_age, on, build, failed, usage),
                            invite_url=invite_url,
-                           site_scheme=core.site_scheme(health),
+                           site_url=windows_client.site_url(core.site_scheme(health) == "https", core.PUBLIC_HOST),
                            qr=os.path.isfile(os.path.join(core.APK, "out", "download-qr.svg")) and bool(build) and (health or {}).get("apk_matches_host") is not False,
                            version=(os.environ.get("OPENDMTQ_VERSION") or ""))

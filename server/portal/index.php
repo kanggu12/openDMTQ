@@ -1,6 +1,6 @@
 <?php
 /* Home, for those signed in: what the site is for first, the app (one press away) and the broadcasts (who is on air, the
-   newest recordings), then who leads and the newest records. */
+   newest recordings) while the server has them on, then who leads and the newest records. */
 require __DIR__ . '/lib.php';
 // A stranger goes to the sign-in page; the page's own look at who is on answers them nothing.
 require_sign_in(isset($_GET['live']));
@@ -11,6 +11,10 @@ $db = db();
 if (isset($_GET['live'])) {
     header('Content-Type: application/json');
     header('Cache-Control: no-store');
+    // Broadcasts turned off since the page came: it says so, and the page reloads without them (thumbs.js).
+    if (!live_enabled()) {
+        header('X-Live: off');
+    }
     echo json_encode(live_cards($db), JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -41,6 +45,8 @@ $records = ($db && has_playlog($db)) ? rows($db,
 $live = live_cards($db);
 // The newest recordings, a row of them under it.
 $past = array_slice(live_past($db), 0, 4);
+// Broadcasts off for the server: nothing of them on the page, neither the way to watch nor the box for them.
+$casting = live_enabled();
 
 // The front page's stage: the wall of jackets under the game's playfield, and over it the name and the two things the
 // site is for, getting the app and watching the others play. The notes stand where the timeline crosses them (--x, part of the way across).
@@ -65,8 +71,11 @@ ob_start();
             // Watching works on any phone or computer: lit, with the count, while someone is on air (thumbs.js keeps it so). ?>
       <div class="stage-acts">
         <a class="button get-app" href="<?= $ready ? '/apk' : 'download.php' ?>"<?= hidden_on_ios() ?>><?= t('dl.button') ?></a>
-        <?php // Live while someone is on air, the broadcasts otherwise; nothing at all with neither (the box under it says so). ?>
+        <?php // Live while someone is on air, the broadcasts otherwise; nothing at all with neither (the box under it says so),
+              // nor with broadcasts off for the server. ?>
+        <?php if ($casting): ?>
         <a class="watch-live<?= $live ? ' on' : '' ?>" id="watch-live" href="live.php" data-past="<?= $past ? '1' : '0' ?>"<?= $live || $past ? '' : ' hidden' ?>><i aria-hidden="true"></i><span class="when-on"><?= t('home.watch') ?></span><span class="when-off"><?= t('home.broadcasts') ?></span><span class="watch-count" id="watch-count"<?= $live ? '' : ' hidden' ?>><?= count($live) ?></span></a>
+        <?php endif; ?>
       </div>
       <?php if ($ready): ?>
         <p class="meta stage-meta get-app"<?= hidden_on_ios() ?>><?= t('dl.meta', ['size' => number_format($apk['size'] / 1048576, 1), 'date' => substr($apk['built_at'], 0, 10)]) ?> · <a href="download.php"><?= t('home.howto') ?></a></p>
@@ -87,6 +96,8 @@ ob_start();
 $stage = ob_get_clean();
 page_header('OpenDMTQ', 'home', '', $stage);
 ?>
+  <?php // Only while the server has broadcasts on. ?>
+  <?php if ($casting): ?>
   <?php // The broadcasts, in one box under one heading. Who is on air now comes first, only then: a picture of each,
         // leading to their broadcast, the pictures taken from the stream itself for those signed in to watch (thumbs.js),
         // the others seeing the same cards with no picture. Then the newest recordings to watch again. Before there are
@@ -112,6 +123,7 @@ page_header('OpenDMTQ', 'home', '', $stage);
   </section>
   <script src="/opendmtq/thumbs.js"></script>
   <script>liveThumbs.home(<?= json_encode($live, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>, <?= dl_signed_in() ? 'true' : 'false' ?>, <?= json_encode(['count' => t('live.count', ['n' => '{n}']), 'nav' => t('live.nav')], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>);</script>
+  <?php endif; ?>
 
   <?php // The rest of what goes on: who leads, and the newest records. One box with two lists, each as long as it is. ?>
   <section class="card home-lists">

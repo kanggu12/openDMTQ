@@ -13,6 +13,11 @@ if (!dl_signed_in()) {
     http_response_code(403);
     exit;
 }
+// Broadcasts off for the whole server: none is shown, live or recorded, whatever is on the disk.
+if (!live_enabled()) {
+    http_response_code(404);
+    exit;
+}
 // A recording: exactly these shapes as well. Gone as soon as the owner hides or deletes it.
 if (preg_match('#^/rec/(\d{1,12})/(\d{1,12})/(index\.m3u8|\d{1,12}\.ts)$#', (string)($_SERVER['PATH_INFO'] ?? ''), $m)) {
     $rec = live_rec_path((int)$m[1], (int)$m[2]);

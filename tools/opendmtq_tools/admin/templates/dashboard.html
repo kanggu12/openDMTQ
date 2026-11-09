@@ -16,7 +16,12 @@
   <a class="stat" href="{{ url_for('logs_page') }}"><span class="lbl">{{ t('dash.game_server') }}</span><span class="num {{ 'okc' if health and health.ok else ('warnc' if server_waiting else 'badc') }}">{{ t('dash.online') if health and health.ok else (t('dash.no_files') if server_waiting else t('dash.no_answer')) }}</span><span class="tile-sub">{% if health %}{{ t('dash.patch_songs', patch=health.patch, n=health.songs) }}{% endif %}</span></a>
   <a class="stat" href="{{ url_for('players_page') }}"><span class="lbl">{{ t('dash.players') }}</span><span class="num">{{ counts.players if counts else '?' }}</span><span class="tile-sub">{{ t('dash.records_n', n=counts.records) if counts else t('dash.db_short') }}{% if counts %}<br>{{ t('dash.active_week', n=counts.active_week) }}{% endif %}</span></a>
   <a class="stat" href="{{ url_for('logs_page', tab='plays') }}"><span class="lbl">{{ t('dash.plays') }}</span><span class="num">{{ counts.plays_today if counts else '?' }}</span><span class="tile-row">{{ chart.spark }}<span class="tile-sub">{{ t('dash.plays_week', n=counts.plays_week) if counts else '' }}</span></span></a>
+  {# Who is on air, or that broadcasts are off for the server, which the tile leads to. #}
+  {% if counts and not counts.broadcasts %}
+  <a class="stat" href="{{ url_for('recordings_page') }}#broadcasts"><span class="lbl">{{ t('dash.live') }}</span><span class="num">{{ t('state.off') }}</span><span class="tile-sub">{{ t('dash.live_off') }}</span></a>
+  {% else %}
   <a class="stat" href="{{ url_for('recordings_page') }}"><span class="lbl">{{ t('dash.live') }}</span><span class="num{% if counts and counts.live %} livec{% endif %}">{{ counts.live if counts else '?' }}</span><span class="tile-sub">{{ t('dash.recordings_n', n=recordings) }}</span></a>
+  {% endif %}
   {% set used = 100 * (usage.total - usage.free) / usage.total %}
   <a class="stat" href="{{ url_for('recordings_page') }}"><span class="lbl">{{ t('dash.disk') }}</span><span class="num{% if used > 90 %} badc{% endif %}">{{ usage.free|human }}</span><span class="tile-meter{% if used > 90 %} over{% endif %}"><span style="width: {{ used }}%"></span></span><span class="tile-sub">{{ t('dash.of_total', total=usage.total|human) }}</span></a>
   <a class="stat" href="{{ url_for('backups_page') }}"><span class="lbl">{{ t('dash.backups') }}</span><span class="num{% if not last_backup or backup_old %} warnc{% endif %}">{{ backup_ago or t('dash.never') }}</span><span class="tile-sub file-name">{{ last_backup or t('dash.no_backup') }}</span></a>
@@ -106,7 +111,7 @@
     {% if build_failed %}<p class="warn">{{ t('dash.build_failed', reason=build_failed) }}</p>{% endif %}
     {% if app_other_host %}<p class="warn">{{ t('dash.app_other') }}</p>{% endif %}
     <table class="compact kv"><tbody>
-      <tr><td>{{ t('dash.addr') }}</td><td><code>{{ site_scheme }}://{{ public_host }}/</code></td></tr>
+      <tr><td>{{ t('dash.addr') }}</td><td><code>{{ site_url }}/</code></td></tr>
       <tr><td>{{ t('app.name_label') }}</td><td>{{ app_name_html() }}</td></tr>
       {% if build %}
       <tr><td>{{ t('th.file') }}</td><td class="file-name">{{ build.file }}</td></tr>

@@ -21,6 +21,25 @@ if (!dl_signed_in()) {
     exit;
 }
 
+// Broadcasts off for the whole server: the page says so in the site's own way, with the way home. Its own look at who is
+// on says it too, and the page then loads again to show this.
+if (!live_enabled()) {
+    if (isset($_GET['list'])) {
+        header('Content-Type: application/json');
+        header('Cache-Control: no-store');
+        echo json_encode(['live' => [], 'off' => true]);
+        exit;
+    }
+    // No section: LIVE is not in the menu while broadcasts are off. The same box as for a live page with nobody on air,
+    // with what is off and the way home.
+    page_header(t('live.off_title'));
+    echo '<section class="card live-empty off-air live-off"><span class="off-air-word" aria-hidden="true">OFF AIR</span>'
+        . '<p class="live-empty-head">' . t('live.off_title') . '</p><p class="meta">' . t('live.off_text') . '</p>'
+        . way_out([['/opendmtq/', t('go.home')]]) . '</section>';
+    page_footer();
+    exit;
+}
+
 $db = db();
 $cards = live_cards($db);
 if (isset($_GET['list'])) {
@@ -1094,6 +1113,8 @@ page_header($replay !== '' ? t('live.replay') : t('live.title'), 'live');
         if (r.status === 401 || r.status === 403) { location.reload(); return Promise.reject(); }
         return r.ok ? r.json() : Promise.reject();
       }).then(l => {
+        // Broadcasts turned off for the server meanwhile: the page as it is now says so.
+        if (l.off) { location.reload(); return; }
         cards = l.live;
         if (l.past) past = l.past;
         show();

@@ -1,5 +1,6 @@
-"""The App page: the builds of the phone app, the one on offer, the player for Windows with it, what the last build said,
-and the QR code. Each form's work is a function (start_build, prune, delete) that the API calls as well (api.py)."""
+"""The App page: the builds of the phone app, the one on offer, the installer for Windows that the site hands out, what the
+last build said, and the QR code. Each form's work is a function (start_build, prune, delete) that the API calls as well
+(api.py)."""
 
 import datetime
 import json
@@ -8,10 +9,10 @@ import re
 import threading
 import time
 
-from flask import abort, flash, redirect, render_template, request, send_file, url_for
+from flask import Response, abort, flash, redirect, render_template, request, send_file, url_for
 from werkzeug.exceptions import NotFound
 
-from .. import player_windows
+from .. import windows_client
 from . import core, jobs
 from .core import Refused, app, BASE, changed, human, safe_name, t, tp
 
@@ -99,8 +100,9 @@ def invite_text(url, name, password):
 
 
 def friends_address(health):
-    """The download page by the address all phones use (localhost or a link without a host is no use to a friend)."""
-    return f"{core.site_scheme(health)}://{core.PUBLIC_HOST}/opendmtq/download.php"
+    """The download page by the address all phones use (localhost or a link without a host is no use to a friend), with its
+    port over HTTPS (windows_client.site_url)."""
+    return windows_client.site_url(core.site_scheme(health) == "https", core.PUBLIC_HOST) + "/opendmtq/download.php"
 
 
 def icon_for_the_app_on_offer():
@@ -283,28 +285,61 @@ def app_download(name):
     return download(name)
 
 
-def windows_offer(offer):
-    """The player for Windows with the app on offer in it, as the builder describes it in windows.json beside the app
-    (tools/opendmtq_tools/player_windows.py), or None: no app on offer, a server without the player, or a player made for
-    another app. By the app's hash as well as its file name: a build again on the same day for the same address keeps the
-    name, and the zip made before it holds the earlier app until the builder makes it again. The API's GET /app and
+def windows_offer(offer=None):
+    """The installer for Windows (the PC client) the site hands out, as the builder describes it in windows.json beside the
+    app (tools/opendmtq_tools/windows_client.py), or None: a server without it, or its file not there whole. It is the same
+    for every app, so `offer` (the app on offer, which the App page passes) changes nothing. The API's GET /app and
     GET /app/windows ask here too (api.py)."""
-    if not offer:
-        return None
-    out = os.path.join(core.APK, "out")
-    made = player_windows.current(out)
-    # offer has the file and the hash latest.json gives the app on offer (builds()).
-    if not player_windows.matches(made, offer) or not os.path.isfile(os.path.join(out, os.path.basename(str(made.get("file", ""))))):
-        return None
-    return made
+    return windows_client.offered(os.path.join(core.APK, "out"))
+
+
+def installer_scheme():
+    """How the installer reaches the site: as the server's health says (core.site_scheme). A health check that gave no
+    answer is asked again; still none, the site is taken to have HTTPS when the server's own authority is there and the
+    edge has not said it runs without HTTPS (as the health check itself decides), when the router serves it
+    (ROUTER_TLS=yes) or when this admin page itself came over HTTPS, so that a moment's miss never sends players'
+    passwords over plain HTTP."""
+    health = core.server_health()
+    if not health or "https" not in health:
+        health = core.server_health(fresh=True)
+    if health and "https" in health:
+        return core.site_scheme(health)
+    # No answer from the server: what this side knows of how it is reached.
+    folder = os.environ.get("OPENDMTQ_HTTPS") or "/srv/https"
+    own = bool(windows_client.own_ca(folder)) and not os.path.isfile(os.path.join(folder, "edge-plain"))
+    tls = own or os.environ.get("ROUTER_TLS") == "yes" or request.headers.get("X-Forwarded-Proto") == "https" or request.is_secure
+    return "https" if tls and not core.lan_only(core.PUBLIC_HOST) else "http"
 
 
 def windows_download():
-    """The player for Windows with the app on offer, as the site hands it to computers (404 when there is none)."""
-    made = windows_offer(offer_state()[0])
+    """The installer for Windows as the site hands it to computers, set up for this server: the server's address on its end
+    (windows_client.preset), under a file name that says which server it is for (404 when there is none)."""
+    made = windows_offer()
     if not made:
         abort(404)
-    return send_file(os.path.join(core.APK, "out", os.path.basename(made["file"])), as_attachment=True, mimetype="application/zip")
+    path = os.path.join(core.APK, "out", os.path.basename(made["file"]))
+    https = installer_scheme() == "https"
+    # Over HTTPS, the server's own authority goes with the address: the launcher trusts it for this server alone.
+    tail = windows_client.preset(windows_client.site_url(https, core.PUBLIC_HOST), core.server_name(),
+                                 windows_client.own_ca() if https else "")
+
+    # Opened now: the length said and the bytes sent are the same file's, even if the builder swaps it meanwhile.
+    try:
+        f = open(path, "rb")
+    except OSError:
+        abort(404)
+    size = os.fstat(f.fileno()).st_size
+
+    def body():
+        # The installer a megabyte at a time, then its end.
+        with f:
+            for block in iter(lambda: f.read(1 << 20), b""):
+                yield block
+        yield tail
+
+    name = windows_client.download_name(core.PUBLIC_HOST)
+    return Response(body(), mimetype="application/vnd.microsoft.portable-executable",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"', "Content-Length": str(size + len(tail))})
 
 
 @app.route(BASE + "/app/windows")

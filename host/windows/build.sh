@@ -56,11 +56,13 @@ if [ -z "${IN_BUILD_IMAGE:-}" ]; then
   if [ -f "$bundle/bundle.json" ]; then
     python3 "$ROOT/tools/opendmtq_tools/runtime.py" --pack "$bundle" "$OUT/opendmtq-arm32-runtime.zip"
   fi
-  # The player for Windows, likewise, when this PC has made it (arm32/bundle_windows.sh; a release's job does, first): the
-  # site then hands players a player with the server's app in it (tools/opendmtq_tools/player_windows.py).
-  rm -f "$OUT/opendmtq-player-windows.zip"
-  if [ -f "$ROOT/tools/opendmtq_tools/opendmtq-player-windows.zip" ]; then
-    cp "$ROOT/tools/opendmtq_tools/opendmtq-player-windows.zip" "$OUT/"
+  # The installer for Windows (the PC client), likewise, when this PC has made it (client/packaging/windows/build.sh; a
+  # release's job does, first): the site then hands it to players set up for the server
+  # (tools/opendmtq_tools/windows_client.py).
+  rm -f "$OUT/OpenDMTQ-Setup.exe" "$OUT/OpenDMTQ-Setup.exe.version"
+  if [ -f "$ROOT/tools/opendmtq_tools/OpenDMTQ-Setup.exe" ]; then
+    cp "$ROOT/tools/opendmtq_tools/OpenDMTQ-Setup.exe" "$OUT/"
+    [ -f "$ROOT/tools/opendmtq_tools/OpenDMTQ-Setup.exe.version" ] && cp "$ROOT/tools/opendmtq_tools/OpenDMTQ-Setup.exe.version" "$OUT/"
   fi
   docker build -q -t opendmtq-winbuild:local "$ROOT/host/windows" >/dev/null
   exec docker run --rm -e IN_BUILD_IMAGE=1 -e VERSION="$VERSION" -u "$(id -u):$(id -g)" -e HOME=/tmp \
@@ -174,9 +176,10 @@ tar -xf "$OUT/app.tar" -C "$STAGE/app"
 if [ -f "$OUT/opendmtq-arm32-runtime.zip" ]; then
   cp "$OUT/opendmtq-arm32-runtime.zip" "$STAGE/app/tools/opendmtq_tools/"
 fi
-# The player for Windows beside the same code (tools/opendmtq_tools/player_windows.py).
-if [ -f "$OUT/opendmtq-player-windows.zip" ]; then
-  cp "$OUT/opendmtq-player-windows.zip" "$STAGE/app/tools/opendmtq_tools/"
+# The installer for Windows beside the same code, with its version (tools/opendmtq_tools/windows_client.py).
+if [ -f "$OUT/OpenDMTQ-Setup.exe" ]; then
+  cp "$OUT/OpenDMTQ-Setup.exe" "$STAGE/app/tools/opendmtq_tools/"
+  [ -f "$OUT/OpenDMTQ-Setup.exe.version" ] && cp "$OUT/OpenDMTQ-Setup.exe.version" "$STAGE/app/tools/opendmtq_tools/"
 fi
 # Not the test folders: the bundle runs the code, CI tests it.
 rm -rf "$STAGE/app/tools/tests" "$STAGE/app/cli/tests" "$STAGE/app/host/windows"
@@ -222,9 +225,10 @@ rows = [
     ("The arm32 runtime: Dynarmic with OpenDMTQ's changes and the libraries it brings, and Android's 32-bit linker and system libraries, unchanged",
      "0BSD, MIT, Apache License 2.0, BSD, ISC, zlib and NCSA licenses",
      "notices/ in app/tools/opendmtq_tools/opendmtq-arm32-runtime.zip"),
-    ("The player for Windows that the site hands players: the arm32 runtime above, ANGLE, zlib, the GCC runtime and winpthreads",
-     "MIT, 0BSD, BSD, zlib, GPL 3 with the GCC Runtime Library Exception, Apache License 2.0 with LLVM Exceptions",
-     "OpenDMTQ-Player/licenses/ in app/tools/opendmtq_tools/opendmtq-player-windows.zip"),
+    ("The installer for Windows that the site hands players: the PC client (Python, Tk, Velopack) and the player (the arm32 "
+     "runtime above, ANGLE, zlib, the GCC runtime and winpthreads)",
+     "MIT, PSF, BSD, 0BSD, zlib, GPL 3 with the GCC Runtime Library Exception, Apache License 2.0 with LLVM Exceptions",
+     "the licenses folder of the program it installs (app/tools/opendmtq_tools/OpenDMTQ-Setup.exe)"),
 ]
 text = ["OpenDMTQ for Windows brings these programs and parts, unchanged, each under its own license. The full texts",
         "are in the folders named. OpenDMTQ's own code is under the MIT License (LICENSE.txt).", ""]

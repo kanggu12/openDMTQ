@@ -391,7 +391,10 @@ def recent_plays(con, limit, records_only=False, player=None):
 
 def live_now(con):
     """Who is on air now, as the site's cards show them (live_cards() in lib.php): the switch on and video coming in, with
-    what they are doing (a song and its chart while in one) and for how long the broadcast has run (seconds)."""
+    what they are doing (a song and its chart while in one) and for how long the broadcast has run (seconds). Nobody while
+    broadcasts are off for the server."""
+    if not recordings.live_settings()["on"]:
+        return []
     try:
         rows = con.execute(f"""SELECT l.guid, l.playing, l.pattern_id, l.play_at, m.nickname
                                  FROM LiveSwitch l JOIN ({core.PLAYER_ROWS}) m ON m.guid = l.guid
@@ -422,7 +425,9 @@ def live_now(con):
 def live_past(con):
     """The recordings players may watch, newest first (live_past() in lib.php): closed and not hidden, each with its
     player, start, length and songs (the moment each begins, in seconds from the start; -1 for an older recording that
-    did not note it)."""
+    did not note it). None while broadcasts are off for the server, as the site shows none."""
+    if not recordings.live_settings()["on"]:
+        return []
     names = {int(r["guid"]): r["nickname"] for r in con.execute(core.PLAYER_ROWS, (core.CHECK_UDID,))}
     jackets = {song_title(s): jacket(s) for s in song_list()}
     out = []

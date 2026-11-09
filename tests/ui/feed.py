@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Broadcasts for the pages' tests, by the real routes: the owner's switch in the admin pages, the phone's upload and end.
 
-feed.py record       closed recordings: with songs, without, under a long name.
+feed.py record       closed recordings: with songs, without, under a long name. Turns broadcasts on for the server first.
 feed.py air <secs>   two players on air until the time is up: one in a song, one between songs. Ends both broadcasts.
+feed.py quiet        broadcasts off for the server again, with one player's switch on underneath (held for then).
 
 Reads SITE_URL, ADMIN_URL, ADMIN_PASSWORD, SITE_CONTAINER and SEGMENTS (a folder of 0.ts, 1.ts ... two seconds each).
 """
@@ -54,6 +55,15 @@ def switch(guid, on):
     seen = re.search(rf'action="/opendmtq/admin/players/{guid}"[^>]*>\s*<input type="hidden" name="csrf" value="[^"]+"><input type="hidden" name="seen" value="([^"]*)"', page)
     fields = {"csrf": csrf, "action": "live-on" if on else "live-off", "seen": seen.group(1) if seen else ""}
     status, _ = request(SIGNED_IN, f"{ADMIN}/opendmtq/admin/players/{guid}", urllib.parse.urlencode(fields).encode())
+    assert status == 200, status
+
+
+def broadcasts(on):
+    """Broadcasts on or off for the whole server, as the Broadcasts page's switch sends it."""
+    page = request(SIGNED_IN, ADMIN + "/opendmtq/admin/recordings")[1].decode()
+    csrf = re.search(r'name="csrf" value="([^"]+)"', page).group(1)
+    fields = {"csrf": csrf, "action": "broadcasts-on" if on else "broadcasts-off"}
+    status, _ = request(SIGNED_IN, ADMIN + "/opendmtq/admin/recordings", urllib.parse.urlencode(fields).encode())
     assert status == 200, status
 
 
@@ -116,6 +126,8 @@ def recording(guid, charts, pieces):
 
 
 def record():
+    # Off until the owner turns them on: without that every upload is refused.
+    broadcasts(True)
     pieces = segments()
     # Three songs, the last chart being of the song with the longest name; none; one, under the longest player names.
     recording(1, [FIRST_CHART, SECOND_SONG_CHART, LONG_NAME_CHART], pieces)
@@ -125,6 +137,7 @@ def record():
 
 
 def air(seconds):
+    broadcasts(True)
     pieces = segments()
     who = (1, 5)
     tokens = {}
@@ -155,5 +168,9 @@ if __name__ == "__main__":
     sign_in()
     if sys.argv[1] == "record":
         record()
+    elif sys.argv[1] == "quiet":
+        # Off again, as most servers are: the site with everything else in place, and a switch held underneath.
+        broadcasts(False)
+        switch(1, True)
     else:
         air(int(sys.argv[2]))

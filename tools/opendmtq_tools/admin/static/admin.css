@@ -640,6 +640,23 @@ th.r.can-sort::after, th.rank.can-sort::after { position: absolute; margin-left:
 @media (max-width: 600px) { .ask .btn-line > *, .ask .btn-line .btn { flex: 1 1 40%; } }
 .prune { justify-content: flex-end; margin: -6px 0 10px; }
 
+/* The Broadcasts page's settings: one choice among a few named ones (what new players start with, the stream's quality),
+   each a box with its name and what it means, in rows that wrap. The boxes are the panels' own; the chosen one has the
+   page's accent round it, the only colour, as the choice is what it marks. Real radio buttons are inside, for the
+   keyboard and screen readers, out of sight. */
+.live-settings form + form { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--seam); }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(176px, 1fr)); gap: 8px; min-width: 0; margin: 0 0 14px; padding: 0; border: 0; }
+.choices.pair { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.choices legend { margin: 0 0 8px; padding: 0; font-size: 13px; font-weight: 600; color: var(--ash); }
+.choice { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 11px 12px 12px; background: var(--deck); box-shadow: inset 0 0 0 1px var(--seam); cursor: pointer; }
+.choice input { position: absolute; opacity: 0; pointer-events: none; }
+.choice b { font: 700 14.5px/1.25 var(--text-face); color: var(--chalk); }
+.choice span { font-size: 12.5px; line-height: 1.4; color: var(--ash); }
+.choice .choice-spec { font-variant-numeric: tabular-nums; color: var(--chalk); }
+.choice:hover { box-shadow: inset 0 0 0 1px #56616d; }
+.choice:has(input:checked) { box-shadow: inset 0 0 0 2px var(--accent); }
+.choice:has(input:focus-visible) { outline: 2px solid var(--chalk); outline-offset: 2px; }
+
 /* Ready-made messages for the maintenance notice: what they are, then the same small buttons as everywhere. */
 .presets { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 14px 0 0; }
 @media (max-width: 600px) { .presets-label { flex: 0 0 100%; } .presets .btn { flex: 1 1 0; } }

@@ -98,7 +98,7 @@ spec:
             # The admin pages through the router or not (admin.onPublicPort; see _helpers.tpl).
             - {name: ADMIN_ON_PUBLIC_PORT, value: {{ $adminPublic | quote }}}
             {{- end }}
-            # on: broadcasts on for every player until turned off (docs/live.md).
+            # on: a new player's broadcast starts on, until the owner chooses on the Broadcasts page (docs/live.md).
             - {name: LIVE_DEFAULT, value: {{ include "opendmtq.liveDefault" . | quote }}}
           ports: [{name: http, containerPort: 8080}]
           startupProbe:
@@ -143,6 +143,8 @@ spec:
             - {name: SERVER_NAME, value: {{ .Values.serverName | quote }}}
             - {name: SERVER_URL, value: "http://127.0.0.1:8080"}
             - {name: HOME, value: /tmp}
+            # What new players start with until the owner chooses, as the server container reads it.
+            - {name: LIVE_DEFAULT, value: {{ include "opendmtq.liveDefault" . | quote }}}
             {{- with .Values.baseApk }}
             - {name: BASE_APK, value: {{ . | quote }}}
             {{- end }}

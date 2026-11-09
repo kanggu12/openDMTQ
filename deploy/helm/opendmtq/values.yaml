@@ -50,7 +50,8 @@ songs:
 # With a claim the size limit is the smaller of the Recordings page's cap (20 GB by default) and
 # what fits on the claim, so keep it above the cap.
 live:
-  # "on": every player broadcasts until the owner turns them off; "off": until turned on.
+  # "on": a new player's broadcast starts on until the owner chooses on the admin pages' Broadcasts page, where broadcasts
+  # are also turned on for the server at all; "off": new players start off.
   default: "off"
   recordings:
     persistence:
