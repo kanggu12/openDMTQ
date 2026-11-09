@@ -10,6 +10,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <unistd.h>  // _exit
+
+#ifdef _WIN32
+// The two calls exit_now needs, declared here: the runtime's files have Linux's names, and windows.h stays in src/win.
+extern "C" __declspec(dllimport) void* __stdcall GetCurrentProcess();
+extern "C" __declspec(dllimport) int __stdcall TerminateProcess(void* process, unsigned code);
+#endif
 
 namespace arm32 {
 
@@ -42,6 +49,19 @@ std::string setting(const char* env, const char* property) {
 
 bool g_trace = requested("ARM32_TRACE", "debug.arm32.trace");
 bool g_stats = requested("ARM32_STATS", "debug.arm32.stats");
+
+void exit_now(int code) {
+    std::fflush(stdout);
+    std::fflush(stderr);
+#ifdef _WIN32
+    // ExitProcess, which _exit calls on Windows, stops the other threads wherever they are (in the graphics driver mid
+    // frame, in Media Foundation mid picture) and then runs every DLL's detach code, which can wait forever for a lock
+    // one of those threads held: the process then stays, frozen, with its memory and its files. TerminateProcess runs
+    // none of it, and Windows frees what the process had.
+    TerminateProcess(GetCurrentProcess(), static_cast<unsigned>(code));
+#endif
+    _exit(code);
+}
 
 void log(const char* fmt, ...) {
     char buf[1024];

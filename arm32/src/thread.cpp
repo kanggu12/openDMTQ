@@ -510,7 +510,7 @@ bool Thread::deliver_signal() {
         // Default action: ignored for these, fatal for the rest.
         if (sig == SIGCHLD || sig == SIGURG || sig == SIGWINCH || sig == SIGCONT) return true;
         log("arm32: guest killed by signal %d", sig);
-        _exit(128 + sig);
+        exit_now(128 + sig);
     }
     auto& r = jit_->Regs();
     gaddr sp = r[13];
@@ -660,7 +660,7 @@ void Thread::fatal(const char* what, std::uint32_t addr) {
     // No guest signal delivery for faults yet: end the process like an unhandled SIGSEGV would.
     proc.exit_code = 128 + 11;
     proc.exiting = true;
-    _exit(proc.exit_code);
+    exit_now(proc.exit_code);
 }
 
 // Page-table misses: the page is unmapped or has no access. Re-check under the current table

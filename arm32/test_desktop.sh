@@ -55,6 +55,12 @@ out=$(_work/arm32/build-desktop-x86_64/audiotest 2>&1 || true)
 if echo "$out" | grep -q "ALL CHECKS PASSED"; then echo "PASS audio ($(echo "$out" | grep " checks$"))"
 else echo "FAIL audio"; echo "$out" | grep -v "^ok" | tail -n 15 | sed "s/^/    /"; failed=1
 fi
+# The PC settings file of the desktop player, as the PC client writes it (arm32/desktop/settingstest.cpp), in a folder it may
+# write its file in.
+out=$(cd /tmp && /r/_work/arm32/build-desktop-x86_64/settingstest 2>&1 || true)
+if echo "$out" | grep -q "ALL CHECKS PASSED"; then echo "PASS settings ($(echo "$out" | grep " checks$"))"
+else echo "FAIL settings"; echo "$out" | grep -v "^player: settings" | tail -n 15 | sed "s/^/    /"; failed=1
+fi
 # The video path of the desktop player: its MP4 reader and decoders, on a file made here by FFmpeg (a red picture, a tone).
 ffmpeg -loglevel error -y -f lavfi -i color=c=red:s=320x240:r=30 -f lavfi -i sine=frequency=1000:sample_rate=48000 -t 2 \
   -c:v libx264 -pix_fmt yuv420p -c:a aac -ac 2 -shortest /tmp/media-test.mp4

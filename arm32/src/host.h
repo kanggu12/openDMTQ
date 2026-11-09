@@ -10,6 +10,9 @@ namespace arm32 {
 
 // Performance counters logged every five seconds, on with ARM32_STATS or debug.arm32.stats.
 extern bool g_stats;
+// Ends the process at once with `code`, its output flushed, running nothing else: no destructors, and on Windows no
+// DLL's detach code either (the runtime's log.cpp; the shim has its own way out).
+[[noreturn]] void exit_now(int code);
 // A switch from the environment (command line) or a system property (apps): "1" on, "0" off,
 // fallback when neither is set.
 bool requested(const char* env, const char* property, bool fallback = false);

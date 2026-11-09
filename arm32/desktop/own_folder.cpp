@@ -257,27 +257,33 @@ void log_to(const std::string& folder) {
 
 }  // namespace
 
-bool use_own_folder(std::string& error) {
+bool use_own_folder(const std::string& folder, std::string& error) {
     g_own_folder = true;
     App& a = app();
-    const std::string here = program_folder();
+    // The runtime is the player's own; the app is beside it, or in the folder the PC client names (with "/" between its
+    // parts, as the runtime joins paths).
+    const std::string mine_dir = program_folder();
+    std::string here = folder.empty() ? mine_dir : folder;
+    for (char& c : here)
+        if (c == '\\') c = '/';
+    while (here.size() > 1 && here.back() == '/') here.pop_back();
     std::string text;
     if (!read_text(here + "/player.conf", text)) {
-        error = say("player.conf is not beside the player: download the player again from your OpenDMTQ server's site, and unzip it whole.",
-                    "플레이어 옆에 player.conf가 없습니다. OpenDMTQ 서버 사이트에서 플레이어를 다시 받아 통째로 압축을 푸세요.");
+        error = say("The app's folder is missing player.conf: download the app again in the OpenDMTQ launcher (Online).",
+                    "앱 폴더에 player.conf가 없습니다. OpenDMTQ 런처의 온라인에서 앱을 다시 받으세요.");
         return false;
     }
     std::map<std::string, std::string> conf = settings(text);
     if (conf["package"].empty() || conf["apk"].empty()) {
-        error = say("player.conf names no app: download the player again from your OpenDMTQ server's site.",
-                    "player.conf에 앱이 적혀 있지 않습니다. OpenDMTQ 서버 사이트에서 플레이어를 다시 받으세요.");
+        error = say("player.conf names no app: download the app again in the OpenDMTQ launcher (Online).",
+                    "player.conf에 앱이 적혀 있지 않습니다. OpenDMTQ 런처의 온라인에서 앱을 다시 받으세요.");
         return false;
     }
     a.package = conf["package"];
     if (!conf["name"].empty()) a.title = conf["name"];
     a.host_apk = here + "/" + conf["apk"];
-    a.host_sysroot = here + "/runtime/sysroot";
-    a.host_agent = here + "/runtime/arm32-agent";
+    a.host_sysroot = mine_dir + "/runtime/sysroot";
+    a.host_agent = mine_dir + "/runtime/arm32-agent";
     // The app's own folder, its log first: what follows may fail, and its reason belongs in the log.
     const std::string mine = user_folder() + "/" + kVendor + "/" + a.package;
     if (!make_folder(mine + "/lib") || !make_folder(mine + "/data")) {
@@ -287,8 +293,6 @@ bool use_own_folder(std::string& error) {
     log_to(mine);
     a.host_libs = mine + "/lib";
     a.host_data = mine + "/data";
-    // The window fits the screen the first time: no size was asked for.
-    a.fit_screen = true;
     return unpack_libraries(conf["apk"], a.host_libs, error);
 }
 

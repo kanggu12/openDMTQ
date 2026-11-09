@@ -151,17 +151,69 @@ W native_window(void* handle) {
     else return reinterpret_cast<W>(handle);
 }
 
+// ANGLE's window surface of a fixed size (EGL_ANGLE_window_fixed_size), stretched to its window when shown.
+#ifndef EGL_FIXED_SIZE_ANGLE
+#define EGL_FIXED_SIZE_ANGLE 0x3201
+#endif
+
+// The window surface made at a fixed size for a computer player's render scale (pacing.h's g_window_fixed_size), and the
+// size it has now: a resized window gives it a new one at the next swap. The game makes, swaps and destroys its window
+// surface on its render thread; the lock keeps another thread's surface calls in order with it.
+std::mutex g_fixed_lock;
+void* g_fixed_surface = nullptr;
+std::int64_t g_fixed_now = 0;
+
 std::uint64_t egl_CreateWindowSurface(Thread& t) {
     FN(EGLSurface (*)(EGLDisplay, EGLConfig, EGLNativeWindowType, const EGLint*), eglCreateWindowSurface);
     Words w{t};
     void* d = dpy(w.u32());
     void* c = cfg(w.u32());
     void* win = handles().get(HandleKind::kWindow, w.u32());
-    EGLSurface s = fn ? fn(d, c, native_window<EGLNativeWindowType>(win), ptr<const EGLint>(w.u32())) : nullptr;
+    const EGLint* asked = ptr<const EGLint>(w.u32());
+    // A computer player's render scale: the game's attributes, then a fixed size, the one the player told the game.
+    const std::int64_t fixed = g_window_fixed_size.load(std::memory_order_relaxed);
+    std::vector<EGLint> attribs;
+    if (fixed) {
+        for (const EGLint* a = asked; a && *a != EGL_NONE; a += 2) {
+            if (a[0] == EGL_FIXED_SIZE_ANGLE || a[0] == EGL_WIDTH || a[0] == EGL_HEIGHT) continue;
+            attribs.push_back(a[0]);
+            attribs.push_back(a[1]);
+        }
+        attribs.insert(attribs.end(), {EGL_FIXED_SIZE_ANGLE, EGL_TRUE, EGL_WIDTH, static_cast<EGLint>(fixed >> 32),
+                                       EGL_HEIGHT, static_cast<EGLint>(fixed & 0xffffffff), EGL_NONE});
+    }
+    EGLSurface s = fn ? fn(d, c, native_window<EGLNativeWindowType>(win), fixed ? attribs.data() : asked) : nullptr;
+    if (!s && fixed && fn) {
+        // An EGL without fixed sizes: the window's own, with the picture in a corner of it until the scale is 100 %.
+        log("arm32: render scale: no surface of a fixed size here (error %#x); the window's own size", host_error());
+        s = fn(d, c, native_window<EGLNativeWindowType>(win), asked);
+    } else if (s && fixed) {
+        std::lock_guard<std::mutex> lock(g_fixed_lock);
+        g_fixed_surface = s;
+        g_fixed_now = fixed;
+        log("arm32: render scale: the window's surface drawn at %dx%d", static_cast<int>(fixed >> 32), static_cast<int>(fixed & 0xffffffff));
+    }
     if (g_trace) log("trace: eglCreateWindowSurface(window %p) -> %p, error %#x", win, s, host_error());
     // The window the game renders to: the one asked for the frame rate.
     if (s) game_window_surface(static_cast<ANativeWindow*>(win));
     return put(HandleKind::kEglSurface, s);
+}
+
+// Before a swap of the surface of a fixed size: the size the player asks for now, when that changed (the window was
+// resized, and the game was told the new size), from this frame on.
+void follow_fixed_size(void* d, void* s) {
+    const std::int64_t want = g_window_fixed_size.load(std::memory_order_relaxed);
+    // No fixed size wanted (every phone): no lock either.
+    if (!want) return;
+    std::lock_guard<std::mutex> lock(g_fixed_lock);
+    if (s != g_fixed_surface || want == g_fixed_now) return;
+    FN(EGLBoolean (*)(EGLDisplay, EGLSurface, EGLint, EGLint), eglSurfaceAttrib);
+    const auto width = static_cast<EGLint>(want >> 32), height = static_cast<EGLint>(want & 0xffffffff);
+    const bool ok = fn && fn(d, s, EGL_WIDTH, width) == EGL_TRUE && fn(d, s, EGL_HEIGHT, height) == EGL_TRUE;
+    // Asked once either way: a refusal would be the same at every frame.
+    g_fixed_now = want;
+    if (ok) log("arm32: render scale: the surface now drawn at %dx%d", width, height);
+    else log("arm32: render scale: the surface keeps its size (error %#x)", host_error());
 }
 
 std::uint64_t egl_CreatePbufferSurface(Thread& t) {
@@ -197,6 +249,9 @@ std::uint64_t egl_DestroySurface(Thread& t) {
     if (ok) {
         pacing_surface_destroyed(surface);
         handles().drop(HandleKind::kEglSurface, s);
+        // A new surface at the same address is not the one of a fixed size.
+        std::lock_guard<std::mutex> lock(g_fixed_lock);
+        if (g_fixed_surface == surface) g_fixed_surface = nullptr;
     }
     return ok;
 }
@@ -316,6 +371,8 @@ std::uint64_t egl_SwapBuffers(Thread& t) {
     void* s = srf(w.u32());
     // The finished frame, for live view when it is on.
     live_frame(d, s);
+    // A render scale's surface: its size as the window's is now.
+    follow_fixed_size(d, s);
     EGLBoolean ok = paced_swap(d, s);
     note_frame();
     unsigned n = static_cast<unsigned>(g_frames.load());

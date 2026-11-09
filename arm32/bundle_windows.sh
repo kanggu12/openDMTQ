@@ -1,17 +1,17 @@
 #!/bin/sh
-# Packs the player for Windows as the OpenDMTQ server hands it to players, without an app: opendmtq-player-windows.zip.
-# The server's builder adds the app it built for its address (the APK) and player.conf, which names it
-# (tools/opendmtq_tools/player_windows.py); arm32/desktop/own_folder.cpp says what the player expects beside it.
+# Packs the player for Windows without an app: opendmtq-player-windows.zip, which the PC client's installer carries
+# (client/packaging/windows/build.sh). The client starts it with a server's app (player --app, the APK and player.conf
+# naming it); arm32/desktop/own_folder.cpp says what the player expects there.
 #
-#   arm32/bundle_windows.sh [out zip]      (default tools/opendmtq_tools/opendmtq-player-windows.zip)
+#   arm32/bundle_windows.sh [out zip]      (default _work/arm32/opendmtq-player-windows.zip)
 #
 # Needs the guest's system and the agent (arm32/build.sh) and the player (arm32/build_windows.sh player). The zip holds
-# one folder, OpenDMTQ-Player, and bundle.json beside it with the version the builder compares.
+# one folder, OpenDMTQ-Player, and bundle.json beside it with its version.
 set -eu
 # The repository, wherever this script is called from.
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(dirname "$here")
-out=${1:-$root/tools/opendmtq_tools/opendmtq-player-windows.zip}
+out=${1:-$root/_work/arm32/opendmtq-player-windows.zip}
 work=$root/_work/arm32
 build=$work/build-windows-x86_64
 deps=$work/win-deps

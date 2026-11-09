@@ -165,9 +165,16 @@ void present_stats(EGLDisplay display, EGLSurface surface) {
 
 namespace arm32 {
 
+// The broadcast of a computer's player (live_desktop.cpp).
+void desktop_live_frame(EGLDisplay display, EGLSurface surface);
+void desktop_live_context_destroyed(EGLContext context);
+
+// The phone's start of live view: the computer's starts at its first swap, from the player's own files.
 void live_load(JavaVM*, JNIEnv*, const std::string&) {}
 
 void live_frame(EGLDisplay display, EGLSurface surface) {
+    // The broadcast first, while the frame is the one that goes to the screen.
+    desktop_live_frame(display, surface);
     std::uint64_t n = g_shown.fetch_add(1, std::memory_order_relaxed) + 1;
     if (n == 1) log("player: the game's first frame");
     if (g_stats) present_stats(display, surface);
@@ -187,7 +194,8 @@ void live_frame(EGLDisplay display, EGLSurface surface) {
     player::frame_shown(n);
 }
 
-void live_context_destroyed(EGLContext) {}
+void live_context_destroyed(EGLContext context) { desktop_live_context_destroyed(context); }
+// The phone's sound for live view: a computer's broadcast takes the player's whole mix instead (mixer.h's tap).
 void live_audio_source(const void*, int, int, int) {}
 void live_audio(const void*, const void*, std::size_t) {}
 

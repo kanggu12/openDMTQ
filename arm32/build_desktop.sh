@@ -27,6 +27,6 @@ docker run --rm -v "$root:/r" -w /r opendmtq-arm32-desktop sh -c '
   cmake -S arm32 -B _work/arm32/build-desktop-x86_64 -G Ninja -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DDYNARMIC_DIR=/r/_work/arm32/dynarmic \
     -DJNI_INCLUDE_DIR=/r/_work/arm32/jni-include -DARM32_GEN_DIR=/r/_work/arm32/gen >/dev/null
-  cmake --build _work/arm32/build-desktop-x86_64 --target arm32run jvmtest audiotest mediatest player
+  cmake --build _work/arm32/build-desktop-x86_64 --target arm32run jvmtest audiotest mediatest settingstest player
 '
 echo "built _work/arm32/build-desktop-x86_64/arm32run"

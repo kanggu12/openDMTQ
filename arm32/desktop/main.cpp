@@ -4,16 +4,23 @@
 // constructor starts it (initJni, nativeFile, nativeInitWWW, nativeInitWebRequest).
 //
 //   player --sysroot DIR --agent FILE --package NAME --apk FILE --libs DIR --data DIR [--size WxH] [--refresh HZ] [--seconds N]
+//   player --app DIR [--settings FILE]     the PC client's start
+//   player                                 a double click: the app from the player's own folder
+//   player --audio-devices                 the computer's sound devices, for the PC client
 //
 // --sysroot is the guest's system (bin/linker, lib/*.so, from the Android build), --agent the runtime's agent program,
 // --package the app's package name, --apk the app's APK, --libs its 32-bit libraries (the APK's lib/armeabi-v7a, unpacked)
 // and --data the folder for what the app keeps (its internal and external storage); --size the window (1920x1080),
 // --refresh the display's rate (60, else the display's own where the window can read it), --seconds a time to leave
-// after (none). ARM32_TRACE=1 logs every registration and every class and method the VM makes up.
+// after (none). --app names a folder with player.conf and the APK in place of all those (own_folder.cpp), and --settings
+// the PC's settings for the picture and the sound (settings.cpp). ARM32_TRACE=1 logs every registration and every class
+// and method the VM makes up.
 #include "gl_bridge.h"
 #include "guest.h"
 #include "host.h"
 #include "jni_bridge.h"
+#include "mixer.h"
+#include "pacing.h"
 #include "player.h"
 #include "tweaks.h"
 
@@ -125,6 +132,9 @@ namespace {
 std::atomic<bool> g_resize_posted{false};
 // The game has quit (quit_game).
 std::atomic<bool> g_quit{false};
+// The game is held still (pause_game): asked for by the UI thread, and as the Unity thread last told the game.
+std::atomic<bool> g_pause_wanted{false};
+bool g_paused = false;
 
 }  // namespace
 
@@ -136,6 +146,32 @@ void quit_game(const char* how) {
 }
 
 bool game_quit() { return g_quit.load(); }
+
+void pause_game(bool paused) {
+    if (g_pause_wanted.exchange(paused) == paused) return;
+    // On the Unity thread, in the order a phone's activity calls them: focus, then the life cycle, and back.
+    unity_looper().post([] {
+        const bool want = g_pause_wanted.load();
+        // Several quick changes: only the last one counts, and none twice.
+        if (want == g_paused) return;
+        g_paused = want;
+        jvm::Env& e = jvm::attach();
+        if (want) {
+            e.call(unity_player(), "nativeFocusChanged", "(Z)V", {jvm::Value::Z(false)});
+            e.call(unity_player(), "nativePause", "()Z");
+        } else {
+            e.call(unity_player(), "nativeResume", "()V");
+            e.call(unity_player(), "nativeFocusChanged", "(Z)V", {jvm::Value::Z(true)});
+        }
+        if (e.pending) {
+            jvm::log("player: the game threw on %s", want ? "pause" : "resume");
+            e.pending = {};
+        }
+        jvm::log("player: the game %s", want ? "is paused" : "goes on");
+    });
+}
+
+bool game_paused() { return g_paused; }
 
 void surface_changed() {
     // Before the game has its surface (the start makes it with the window's size) there is nothing to tell.
@@ -205,30 +241,59 @@ void make_dirs(const std::string& path) {
 int main(int argc, char** argv) {
     using namespace arm32;
     using player::app;
+    // The sound devices this computer has, for the PC client's choice, as JSON lines: nothing else starts.
+    if (argc == 2 && std::string(argv[1]) == "--audio-devices") {
+        std::fputs(player::audio::list_devices().c_str(), stdout);
+        return 0;
+    }
+    std::string settings_path, app_folder;
+    bool size_given = false;
     for (int i = 1; i + 1 < argc; i += 2) {
         std::string k = argv[i], v = argv[i + 1];
-        if (k == "--sysroot") app().host_sysroot = v;
+        if (k == "--settings") settings_path = v;
+        else if (k == "--app") app_folder = v;
+        else if (k == "--sysroot") app().host_sysroot = v;
         else if (k == "--agent") app().host_agent = v;
         else if (k == "--package") app().package = v;
         else if (k == "--apk") app().host_apk = v;
         else if (k == "--libs") app().host_libs = v;
         else if (k == "--data") app().host_data = v;
         else if (k == "--seconds") g_seconds = std::atoi(v.c_str());
-        else if (k == "--size") std::sscanf(v.c_str(), "%dx%d", &app().width, &app().height);
+        else if (k == "--size") size_given = std::sscanf(v.c_str(), "%dx%d", &app().width, &app().height) == 2;
         else if (k == "--refresh") {
             app().refresh = std::strtof(v.c_str(), nullptr);
             app().refresh_set = true;
         }
     }
     player::App& a = app();
-    // No arguments: a double click, the app from the player's own folder as the server's download lays it out.
-    if (argc == 1) {
+    // No arguments: a double click, the app from the player's own folder as the server's download lays it out; --app:
+    // the PC client's start, the app from the folder it keeps for a server. Its log goes to the user's folder from here.
+    const bool from_folder = argc == 1 || !app_folder.empty();
+    if (from_folder) {
         std::string why;
-        if (!player::use_own_folder(why)) {
+        if (!player::use_own_folder(app_folder, why)) {
             player::show_error(why);
             return 1;
         }
     }
+    // The PC's settings, from the client's file (in that log): the frame pacing's choices for the runtime, the sound's for
+    // the mixer, and the window's size. A size on the command line comes first, then the settings' own; without either a
+    // start from a folder or with settings fits the window to the display, and a test's start keeps 1920x1080.
+    if (!settings_path.empty()) player::load_settings(settings_path);
+    const player::Settings& st = player::settings();
+    if (!size_given && st.window_w) {
+        a.width = st.window_w;
+        a.height = st.window_h;
+    } else if (!size_given && (from_folder || !settings_path.empty())) {
+        a.fit_screen = true;
+    }
+    g_host_vsync.store(st.vsync);
+    g_host_fps_cap.store(st.fps);
+    player::audio::Options& sound = player::audio::options();
+    sound.device = st.audio_device;
+    sound.exclusive = st.audio_exclusive;
+    sound.buffer = st.audio_buffer;
+    sound.volume = st.volume;
     if (a.host_sysroot.empty() || a.host_agent.empty() || a.package.empty() || a.host_apk.empty() || a.host_libs.empty() || a.host_data.empty()) {
         std::fprintf(stderr, "usage: %s --sysroot DIR --agent FILE --package NAME --apk FILE --libs DIR --data DIR\n", argv[0]);
         return 2;
@@ -354,7 +419,13 @@ int main(int argc, char** argv) {
         jvm::Env& e = jvm::attach();
         player::prepare_looper(&player::unity_looper());
         for (;;) {
-            player::unity_looper().run_due();
+            const auto next = player::unity_looper().run_due();
+            // Paused: no frames, as a phone's Unity thread draws none while its app is away; only its jobs, until the
+            // resume among them.
+            if (player::game_paused()) {
+                player::unity_looper().wait(std::min(next, std::chrono::steady_clock::now() + std::chrono::milliseconds(100)));
+                continue;
+            }
             const auto frame_start = std::chrono::steady_clock::now();
             jvm::Value more = e.call(view, "nativeRender", "()Z");
             if (arm32::g_stats) note_game_frame(std::chrono::steady_clock::now() - frame_start);
@@ -376,6 +447,6 @@ int main(int argc, char** argv) {
     jvm::report_unimplemented();
     player::report_audio();
     std::fflush(stdout);
-    // Guest threads are still running: leave without destructors, as the runner does.
-    _exit(0);
+    // Guest threads are still running: leave without destructors or DLLs' detach code, as the runner does (log.cpp).
+    arm32::exit_now(0);
 }

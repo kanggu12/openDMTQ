@@ -236,11 +236,28 @@ void Stream::mix_into(float* out, std::size_t frames) {
 
 // ---------------------------------------------------------------------------------------------------------------------
 
+Options& options() {
+    static Options o;
+    return o;
+}
+
+namespace {
+// The mix's other taker (set_mix_tap), read once each period.
+std::atomic<MixTap> g_tap{nullptr};
+}  // namespace
+
+void set_mix_tap(MixTap tap) { g_tap.store(tap, std::memory_order_release); }
+
 Mixer::Mixer(std::unique_ptr<Output> output)
     : output_(std::move(output)), rate_(output_->rate()),
-      period_(static_cast<std::size_t>(rate_) * kPeriodMs / 1000) {
-    jvm::log("player: sound out through %s at %d Hz, %zu ms a period, %.0f ms buffered", output_->name(), rate_, kPeriodMs,
-             output_->buffer_ms());
+      period_(output_->period() ? output_->period() : static_cast<std::size_t>(rate_) * kPeriodMs / 1000),
+      gain_([] {
+          // The square of the share: amplitude falls faster than the slider, as loudness is heard.
+          const float share = static_cast<float>(std::clamp(options().volume, 0, 100)) / 100.0f;
+          return share * share;
+      }()) {
+    jvm::log("player: sound out through %s at %d Hz, %.2f ms a period, %.1f ms buffered, volume %d%%", output_->name(), rate_,
+             1000.0 * static_cast<double>(period_) / rate_, output_->buffer_ms(), std::clamp(options().volume, 0, 100));
     thread_ = std::thread([this] { run(); });
 }
 
@@ -304,8 +321,9 @@ void Mixer::close(const std::shared_ptr<Stream>& stream) {
 
 void Mixer::report() {
     std::lock_guard<std::mutex> l(lock_);
-    jvm::log("audio: %s at %d Hz: %.1f s in periods of %zu ms, %llu late", output_->name(), rate_,
-             static_cast<double>(periods_.load() * period_) / rate_, kPeriodMs, static_cast<unsigned long long>(late_.load()));
+    jvm::log("audio: %s at %d Hz: %.1f s in periods of %.2f ms, %llu late", output_->name(), rate_,
+             static_cast<double>(periods_.load() * period_) / rate_, 1000.0 * static_cast<double>(period_) / rate_,
+             static_cast<unsigned long long>(late_.load()));
     // Seconds, whatever each stream's rate.
     auto line = [](const Stream& s, const char* state) {
         jvm::log("audio: %s at %d Hz (%s): %.1f s written, %.1f s played, %llu underruns (%.1f ms short)", s.name().c_str(), s.rate(),
@@ -336,7 +354,12 @@ void Mixer::run() {
             std::lock_guard<std::mutex> l(lock_);
             for (const auto& s : streams_) s->mix_into(buf.data(), period_);
         }
-        // A sum louder than full scale is held at full scale, as a phone's mixer holds it.
+        // The broadcast takes the mix as the game made it, whatever the player's volume.
+        if (MixTap tap = g_tap.load(std::memory_order_acquire)) tap(buf.data(), period_, rate_);
+        // The game's volume, then a sum louder than full scale held at full scale, as a phone's mixer holds it.
+        if (gain_ != 1.0f) {
+            for (float& v : buf) v *= gain_;
+        }
         for (float& v : buf) v = std::clamp(v, -1.0f, 1.0f);
         // Away from the output longer than its buffer lasts: it ran dry.
         Clock::time_point now = Clock::now();

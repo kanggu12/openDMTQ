@@ -17,7 +17,7 @@
 // - The upload thread: posts the segments, a few at a time at most; a slow network drops segments
 //   rather than holding on to them, and turns the quality down (below).
 // - The control thread: asks the server about every 15 seconds, while the game is on screen, whether
-//   live view is on for this player, and shows the server's one-line notice as a toast.
+//   live view is on for this player, and shows the server's two-line notice as a toast.
 //
 // Quality steps down by itself, on a slow upload or a warm phone: frame rate and bitrate first, then
 // the picture's height. A height change means a new encoder, so its segments restart at 0, which is
@@ -1258,8 +1258,8 @@ void toast_thread(std::string text) {
         jobject mine = e->CallStaticObjectMethod(looper, e->GetStaticMethodID(looper, "myLooper", "()Landroid/os/Looper;"));
         jmethodID make = e->GetStaticMethodID(toast, "makeText", "(Landroid/content/Context;Ljava/lang/CharSequence;I)Landroid/widget/Toast;");
         jstring message = e->NewStringUTF(text.c_str());
-        // LENGTH_SHORT: two seconds or so.
-        jobject shown = make && message ? e->CallStaticObjectMethod(toast, make, context, message, 0) : nullptr;
+        // LENGTH_LONG (1): three and a half seconds, for the notice's two lines; its loop runs for six.
+        jobject shown = make && message ? e->CallStaticObjectMethod(toast, make, context, message, 1) : nullptr;
         if (shown && mine && !e->ExceptionCheck()) {
             e->CallVoidMethod(shown, e->GetMethodID(toast, "show", "()V"));
             {

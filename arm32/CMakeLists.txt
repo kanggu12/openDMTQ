@@ -88,7 +88,7 @@ if(NOT ANDROID)
   # PulseAudio and FFmpeg on Linux; Win32, WASAPI and Media Foundation on Windows), and the libraries those need.
   if(WIN32)
     set(WIN_DEPS "" CACHE PATH "Folder with ANGLE's DLLs, the EGL and GLES headers and zlib (arm32/build_windows.sh)")
-    set(PLAYER_WINDOW desktop/window_win32.cpp desktop/player.rc)
+    set(PLAYER_WINDOW desktop/window_win32.cpp desktop/overlay_win32.cpp desktop/player.rc)
     set(PLAYER_OUTPUT desktop/output_wasapi.cpp)
     set(PLAYER_DECODER desktop/decoder_mf.cpp)
     set(PLAYER_SYSTEM_INCLUDE ${WIN_DEPS}/include)
@@ -96,7 +96,8 @@ if(NOT ANDROID)
     # Media Foundation itself is loaded when a video plays (decoder_mf.cpp); its GUIDs are mfuuid's.
     set(PLAYER_DECODER_LIBS mfuuid ole32)
     # DXGI waits for the display's refreshes, IMM is the text field's input method (window_win32.cpp).
-    set(PLAYER_LIBS ${WIN_DEPS}/lib/libzlib1.dll.a user32 gdi32 shell32 dxgi imm32 ${PLAYER_OUTPUT_LIBS} ${PLAYER_DECODER_LIBS})
+    # oleaut32: the broadcast's encoder settings come as VARIANTs (live_desktop.cpp); GDI+ draws the overlay (overlay_win32.cpp).
+    set(PLAYER_LIBS ${WIN_DEPS}/lib/libzlib1.dll.a user32 gdi32 shell32 dxgi imm32 oleaut32 gdiplus ${PLAYER_OUTPUT_LIBS} ${PLAYER_DECODER_LIBS})
     # The POSIX calls in the player's own files (open, pread, the clocks) are the runtime's Windows layer's, which
     # arm32core carries: the tests of those files need it as the player does.
     set(PLAYER_POSIX arm32core)
@@ -117,6 +118,11 @@ if(NOT ANDROID)
   target_include_directories(mediatest PRIVATE desktop)
   target_compile_options(mediatest PRIVATE -Wall -Wextra -Wno-unused-parameter)
   target_link_libraries(mediatest PRIVATE jvm ${PLAYER_POSIX} ${PLAYER_DECODER_LIBS})
+  # The desktop player's PC settings file, as the PC client writes it (arm32/desktop/settings.cpp).
+  add_executable(settingstest desktop/settingstest.cpp desktop/settings.cpp)
+  target_include_directories(settingstest PRIVATE desktop src)
+  target_compile_options(settingstest PRIVATE -Wall -Wextra -Wno-unused-parameter)
+  target_link_libraries(settingstest PRIVATE jvm ${PLAYER_POSIX})
   # The desktop player's mixer and its tests, on the host alone (arm32/desktop/mixer.h).
   add_executable(audiotest desktop/audiotest.cpp desktop/mixer.cpp ${PLAYER_OUTPUT})
   target_include_directories(audiotest PRIVATE desktop)
@@ -129,7 +135,7 @@ if(NOT ANDROID)
   add_executable(player desktop/main.cpp desktop/logd.cpp desktop/java_lang.cpp desktop/threads.cpp desktop/android_os.cpp desktop/unity.cpp
                  desktop/android_app.cpp desktop/audio.cpp desktop/mixer.cpp ${PLAYER_OUTPUT} desktop/media.cpp desktop/mp4.cpp desktop/decoder.cpp
                  ${PLAYER_DECODER} desktop/sdk.cpp desktop/web.cpp desktop/pmangplus.cpp desktop/input.cpp desktop/ndk.cpp ${PLAYER_WINDOW} desktop/frames.cpp
-                 desktop/own_folder.cpp
+                 desktop/own_folder.cpp desktop/settings.cpp desktop/live_desktop.cpp src/live_ts.cpp src/live_sps.cpp
                  src/jni_bridge.cpp ${ARM32_JNI_ENTRY} src/android_bridge.cpp src/egl_bridge.cpp src/gl_special.cpp ${ARM32_GEN_DIR}/gl_thunks.cpp
                  src/opensl_bridge.cpp src/pacing.cpp src/window_rate.cpp src/tweaks.cpp)
   target_include_directories(player PRIVATE src desktop ${ARM32_GEN_DIR})

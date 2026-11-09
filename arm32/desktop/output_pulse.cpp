@@ -21,16 +21,20 @@ struct Pulse {
 };
 
 // The server's buffer for the player's stream: how far ahead of what plays the mixer writes. Short, for a rhythm game's
-// sounds, and four of the mixer's periods, so that a late period has three more to come in time.
-constexpr double kBufferMs = 20;
+// sounds: normally four of the mixer's periods, so that a late period has three more to come in time; two for a low
+// buffer, ten for a safe one (Options::buffer).
+double chosen_buffer_ms() {
+    const int choice = options().buffer;
+    return choice == 0 ? 10 : choice == 2 ? 50 : 20;
+}
 
 class PulseOutput : public Output {
 public:
-    PulseOutput(const Pulse& api, pa_simple* stream, int rate) : api_(api), stream_(stream), rate_(rate) {}
+    PulseOutput(const Pulse& api, pa_simple* stream, int rate, double buffer) : api_(api), stream_(stream), rate_(rate), buffer_(buffer) {}
     ~PulseOutput() override { api_.simple_free(stream_); }
     const char* name() const override { return "PulseAudio"; }
     int rate() const override { return rate_; }
-    double buffer_ms() const override { return kBufferMs; }
+    double buffer_ms() const override { return buffer_; }
     bool write(const float* data, std::size_t frames) override {
         int error = 0;
         // Waits while the server's buffer for the stream is full.
@@ -45,11 +49,17 @@ private:
     Pulse api_;
     pa_simple* stream_;
     int rate_;
+    double buffer_;
 };
 
 }  // namespace
 
+// The sound server keeps its own list and picks the device: none of the player's.
+std::string list_devices() { return ""; }
+
 std::unique_ptr<Output> open_pulse(int rate) {
+    // A device by its id and the device alone are Windows' (WASAPI): the server here has its own default and mixes.
+    if (!options().device.empty() || options().exclusive) jvm::log("player: PulseAudio: the sound server's own device, shared (the settings' device and mode are Windows')");
     // pa_strerror is in libpulse itself, which libpulse-simple uses.
     void* simple = dlopen("libpulse-simple.so.0", RTLD_NOW | RTLD_LOCAL);
     void* pulse = simple ? dlopen("libpulse.so.0", RTLD_NOW | RTLD_LOCAL) : nullptr;
@@ -69,7 +79,8 @@ std::unique_ptr<Output> open_pulse(int rate) {
     pa_buffer_attr attr{};
     // The server's defaults for what the simple API leaves to it; the target fill and the smallest request ours.
     attr.maxlength = static_cast<std::uint32_t>(-1);
-    attr.tlength = bytes(kBufferMs);
+    const double buffer = chosen_buffer_ms();
+    attr.tlength = bytes(buffer);
     attr.prebuf = static_cast<std::uint32_t>(-1);
     attr.minreq = bytes(static_cast<double>(Mixer::kPeriodMs));
     attr.fragsize = static_cast<std::uint32_t>(-1);
@@ -79,7 +90,7 @@ std::unique_ptr<Output> open_pulse(int rate) {
         jvm::log("player: PulseAudio: %s", api.error_text(error));
         return nullptr;
     }
-    return std::make_unique<PulseOutput>(api, stream, rate);
+    return std::make_unique<PulseOutput>(api, stream, rate, buffer);
 }
 
 }  // namespace player::audio

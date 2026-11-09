@@ -926,7 +926,7 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
     case 248:  // exit_group
         p.exit_code = static_cast<int>(a0 & 0xff);
         p.exiting = true;
-        _exit(static_cast<int>(a0 & 0xff));
+        exit_now(static_cast<int>(a0 & 0xff));
 
     // ----------------------------------------------------------------- files
     case 3:  // read

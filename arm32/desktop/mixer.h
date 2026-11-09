@@ -21,6 +21,24 @@ namespace player::audio {
 // The output's channels: everything is mixed to stereo.
 constexpr int kChannels = 2;
 
+// A computer's choices for its sound (the player's settings file; a phone's app has its own): which device, the device
+// alone or shared with the computer's other sound, how much is kept ahead of it, and how loud the game is. Set before the
+// game's first sound, when the output starts.
+struct Options {
+    // A device's id as list_devices gives it ("": the system's default output).
+    std::string device;
+    // The device alone (WASAPI's exclusive mode: no other program's sound meanwhile, less latency); shared when it cannot.
+    bool exclusive = false;
+    // How much is kept ahead of the device: 0 low (less latency), 1 normal, 2 safe (fewer breaks on a busy computer).
+    int buffer = 1;
+    // The game's sound in percent, its amplitude the square of that share (half way is about half as loud).
+    int volume = 100;
+};
+Options& options();
+// The sound devices this computer has, one JSON object a line, {"id": ..., "name": ..., "default": true or false}, for
+// the PC client's choice; empty where the output has no list of its own (on Linux, the sound server picks).
+std::string list_devices();
+
 // Turns stereo frames at one rate into stereo frames at another with a windowed-sinc filter: a Kaiser window over 32
 // zero crossings each side of the centre, the cutoff a little below the lower rate's Nyquist frequency so that what is
 // above it (the images of upsampling, what downsampling would fold back) is gone; the filter comes from a table of 256
@@ -123,6 +141,9 @@ public:
     virtual int rate() const = 0;
     // How much the output holds ahead of what is playing, in milliseconds: a mixer away longer than that let it run dry.
     virtual double buffer_ms() const = 0;
+    // The frames the output takes at a time, which the mixer then makes a period of (0: the mixer's own 5 ms): a device
+    // held alone plays whole buffers of its own size.
+    virtual std::size_t period() const { return 0; }
     // Plays `frames` stereo float frames, waiting while the output's buffer is full: this is what paces the mixer. False
     // when the output failed and is gone.
     virtual bool write(const float* data, std::size_t frames) = 0;
@@ -151,16 +172,19 @@ public:
     int rate() const { return rate_; }
     // The counters in the log: the output's, and each stream's.
     void report();
-    // Frames in one period: what the mixer makes at a time.
+    // A period's length, unless the output takes another (Output::period): what the mixer makes at a time.
     static constexpr std::size_t kPeriodMs = 5;
 
 private:
     void run();
 
     std::unique_ptr<Output> output_;
-    // The output's rate, and its name and buffer, which stay when a failed output is replaced by the null one.
+    // The output's rate, and its name and buffer, which stay when a failed output is replaced by the null one; the
+    // frames of a period.
     const int rate_;
     std::size_t period_;
+    // The game's volume as a gain on every sample (Options::volume).
+    const float gain_;
     std::mutex lock_;
     std::vector<std::shared_ptr<Stream>> streams_;
     // Streams closed, kept for the report.
@@ -169,6 +193,11 @@ private:
     std::atomic<std::uint64_t> periods_{0}, late_{0};
     std::thread thread_;
 };
+
+// Another taker of the mix, the computer's broadcast (live_desktop.cpp): each period on the mixer's thread, before the
+// player's volume, as interleaved stereo floats at the output's rate. It must not block. Null: none.
+using MixTap = void (*)(const float* stereo, std::size_t frames, int rate);
+void set_mix_tap(MixTap tap);
 
 // The outputs this host has, by name: nullptr when that one cannot start here. WASAPI takes the device's own rate.
 std::unique_ptr<Output> open_null(int rate);

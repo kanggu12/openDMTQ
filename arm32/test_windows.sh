@@ -8,14 +8,14 @@
 #   arm32/test_windows.sh
 #
 # The guest programs and the guest's system libraries come from the Android build (arm32/build.sh) in _work/arm32; the
-# Windows programs from arm32/build_windows.sh arm32run jvmtest audiotest mediatest.
+# Windows programs from arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest.
 set -eu
 # The repository, wherever this script is called from.
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(dirname "$here")
 # Both builds must be there: the Windows programs, and the guest programs the runner runs.
-for exe in arm32run jvmtest audiotest mediatest; do
-  [ -f "$root/_work/arm32/build-windows-x86_64/$exe.exe" ] || { echo "no $exe.exe: run arm32/build_windows.sh arm32run jvmtest audiotest mediatest" >&2; exit 1; }
+for exe in arm32run jvmtest audiotest mediatest settingstest; do
+  [ -f "$root/_work/arm32/build-windows-x86_64/$exe.exe" ] || { echo "no $exe.exe: run arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest" >&2; exit 1; }
 done
 [ -f "$root/_work/arm32/guest/basic" ] || { echo "no guest programs: run arm32/build.sh" >&2; exit 1; }
 # The test image, made again only when its file changed (Docker's cache).
@@ -64,6 +64,12 @@ fi
 out=$(timeout 300 wine $b/audiotest.exe 2>&1 | tr -d "\r" || true)
 if echo "$out" | grep -q "ALL CHECKS PASSED"; then echo "PASS audio ($(echo "$out" | grep " checks$"))"
 else echo "FAIL audio"; echo "$out" | grep -v "^ok" | tail -n 15 | sed "s/^/    /"; failed=1
+fi
+# The PC settings file of the desktop player, as the PC client writes it (arm32/desktop/settingstest.cpp), from /tmp, where it
+# may write its file.
+out=$(timeout 120 wine $b/settingstest.exe 2>&1 | tr -d "\r" || true)
+if echo "$out" | grep -q "ALL CHECKS PASSED"; then echo "PASS settings ($(echo "$out" | grep " checks$"))"
+else echo "FAIL settings"; echo "$out" | grep -v "^player: settings" | tail -n 15 | sed "s/^/    /"; failed=1
 fi
 # The video path of the desktop player with Media Foundation decoding, on a file made here by FFmpeg (a red picture,
 # a tone): the same file and checks as on Linux.

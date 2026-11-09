@@ -16,6 +16,14 @@ namespace arm32 {
 // display or the display's mode changes.
 extern std::atomic<std::int64_t> g_display_interval;
 extern std::atomic<std::int64_t> g_display_vblank;
+// A computer player's choices for its frames (its PC settings; a phone keeps the defaults): on the display's refreshes
+// (vsync) or as soon as drawn, and the most frames a second (0: the display's own rate; with vsync, a whole fraction of
+// that rate when one is within 10 % below this, else this held by the clock, pacing.cpp host_top).
+extern std::atomic<bool> g_host_vsync;
+extern std::atomic<float> g_host_fps_cap;
+// The size a computer player has the game's window surface made at, below the window's own pixels (its render scale:
+// ANGLE stretches the picture to the window), as width << 32 | height; 0 for the window's own size, as on a phone.
+extern std::atomic<std::int64_t> g_window_fixed_size;
 
 // Whether frames are to be paced: debug.arm32.pacing (on unless "0") and an app frame rate.
 bool pacing_enabled();

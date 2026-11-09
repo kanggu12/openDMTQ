@@ -47,6 +47,28 @@ struct App {
 };
 App& app();
 
+// The PC's own settings for the picture and the sound (settings.cpp has the file's keys), which the PC client chooses
+// before a start: a phone's app sets these for itself, a computer's are the player's to apply.
+struct Settings {
+    // Full screen from the start, and the game's area in a window (0: fitted to the display).
+    bool fullscreen = false;
+    int window_w = 0, window_h = 0;
+    // Frames on the display's refreshes, and the most a second (0: the display's own rate).
+    bool vsync = true;
+    float fps = 0;
+    // The share of the game's area the game draws at, in percent: the picture is stretched to the area.
+    int render_scale = 100;
+    // The sound's device ("" Windows' default output), the device alone, how much is kept ahead (0 low, 1 normal,
+    // 2 safe) and the game's volume in percent.
+    std::string audio_device;
+    bool audio_exclusive = false;
+    int audio_buffer = 1;
+    int volume = 100;
+};
+Settings& settings();
+// Reads a settings file into settings(); false when there is none (the defaults stay).
+bool load_settings(const std::string& path);
+
 // The host path of a guest path (the runtime's path_hook), and the guest name of a host file.
 std::string host_of(const std::string& guest);
 std::string guest_of(const std::string& host);
@@ -59,9 +81,10 @@ std::vector<std::string> apk_names(const std::string& prefix);
 // hold the same bytes ("" for none).
 std::string apk_stamp(const std::string& name);
 
-// A start with no arguments (own_folder.cpp): the app from the player's own folder (player.conf, the APK, runtime/), its
+// A start with no arguments, or with --app (own_folder.cpp): the app from the player's own folder or from the folder named
+// (player.conf and the APK; the PC client keeps one for each server), the runtime from the player's own (runtime/), its
 // libraries unpacked and its data and log in the user's folder for programs; false with `error` when that cannot be.
-bool use_own_folder(std::string& error);
+bool use_own_folder(const std::string& folder, std::string& error);
 // A reason the player cannot go on, in the log and, on Windows, in a message box: a double click has no console.
 void show_error(const std::string& what);
 // A name for the calling thread, which the stats and a debugger show (threads.cpp).
@@ -100,6 +123,9 @@ void wait_for_events(std::chrono::steady_clock::time_point until);
 // The game opened or closed its text input: on Windows the focus goes to a text field of the window's while it is open,
 // so that Windows' touch keyboard offers itself on a PC without a keyboard, and an input method composes into it.
 void soft_keyboard(bool open);
+// The server's notice about this player's broadcast ("title\ndetail") over the game's window for a few seconds, as a
+// phone shows its toast; `live` while broadcasting. From any thread.
+void show_notice(const std::string& text, bool live);
 // The game's part of the window changed size (the window resized, full screen, another display's scaling): the game is
 // told as Android tells it, SurfaceHolder's surfaceChanged on the Unity thread (main.cpp). Calls that come while one is
 // on its way are one.
@@ -109,6 +135,13 @@ void surface_changed();
 void quit_game(const char* how);
 // True once the game has quit.
 bool game_quit();
+// The game held still while the player's menu is open, as a phone's app is when its owner leaves it (focus away, then
+// paused) and goes on as it comes back (resumed, then focus): the song stops where it was, and the game's own pause
+// screen is there on return. The Unity thread draws nothing meanwhile (main.cpp). Repeated calls with the same value
+// are one.
+void pause_game(bool paused);
+// True while the Unity thread holds the game still (on that thread).
+bool game_paused();
 // The refresh rate of the display the window is on, as the game asks for it (Display.getRefreshRate): the display's own
 // once the window has read it (pacing.h's g_display_interval), the App's until then.
 float display_rate();

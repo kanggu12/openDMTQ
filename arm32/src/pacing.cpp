@@ -251,6 +251,7 @@ struct Follow {
     int shown_late = 0;         // of those, frames that stayed for more than one refresh
     double host_hz = 0;         // a computer's display: the rate followed from (0: none yet)
     int host_n = 1;             // and the refreshes per frame now (0: 60 fps, off its refreshes)
+    int host_top = 1;           // the fewest refreshes per frame the player's frame cap allows (0: none, off them)
     Nanos host_retry_at = 0;    // when to try a step back up (0: at the top, or no try due)
     Nanos host_retry_wait = 0;  // the wait before the try after the next step down
     int host_held = -1;         // check windows passed since a step back up (-1: no step up to hold)
@@ -478,7 +479,8 @@ void step_up_host(Nanos now) {
             if (hz / k >= 57) next = k;
         }
     }
-    if (next < 1) {
+    // Never above the player's frame cap (host_top: 1 without one).
+    if (next < f.host_top) {
         f.host_retry_at = 0;
         return;
     }
@@ -497,6 +499,20 @@ void step_up_host(Nanos now) {
 }
 
 bool pace_check(Nanos now, Nanos gap, double hz, bool host);
+
+// The fewest refreshes per frame of a display at `hz` that keep the frame rate at the player's cap or below (a 3 %
+// margin: 120.04 fps on a 240.08 Hz display is a cap of 120): 1 without a cap. 0 when no whole fraction comes near the
+// cap (120 on a 144 Hz display would be 72, 60 on it 48) or the swap cannot hold a frame for that many (30 on a 240 Hz
+// display): the frames are then paced to the cap by the clock, off the refreshes (swap_window).
+int host_top(double hz, float cap) {
+    if (cap <= 0) return 1;
+    for (int n = 1; n <= kMaxHostInterval; ++n) {
+        if (hz / n > static_cast<double>(cap) * 1.03) continue;
+        // A fraction under 90 % of the cap is not what the player chose: the cap by the clock instead.
+        return n == 1 || hz / n >= static_cast<double>(cap) * 0.9 ? n : 0;
+    }
+    return 0;
+}
 
 // One swap of the window while following the display: `interval` is the display's refresh
 // interval (0 when the compositor gave no timing), `gap` the time since the last swap (0 for the
@@ -520,22 +536,41 @@ bool follow_display(Nanos now, Nanos interval, Nanos gap, bool host) {
     if (host) {
         // A computer's display keeps its own rate, which the player read from the system: no second of waiting for it to
         // settle, as for a phone's panel that switches. The frame rate starts at every refresh, whatever its rate (240 Hz,
-        // 180 Hz, 59.94 Hz), and the steps down take its whole fractions. Another display, or a new mode, starts over there.
+        // 180 Hz, 59.94 Hz), or at the fraction of it the player's frame cap allows, and the steps down take its whole
+        // fractions. Another display, or a new mode, starts over there.
         const double own = 1e9 / static_cast<double>(interval);
         if (std::fabs(own - f.host_hz) > own * 0.002) {
+            const bool vsync = g_host_vsync.load(std::memory_order_relaxed);
+            const float cap = g_host_fps_cap.load(std::memory_order_relaxed);
             f.host_hz = own;
-            f.host_n = 1;
+            // Vsync off: no refreshes to keep to (0, as for a cap the swap cannot hold).
+            f.host_top = vsync ? host_top(own, cap) : 0;
+            f.host_n = f.host_top;
             f.host_retry_at = 0;
             f.host_retry_wait = kHostFirstRetry;
             f.host_held = -1;
             f.short_windows = f.drawing_short = 0;
             follow_restart();
-            g_followed_rate.store(static_cast<float>(own), std::memory_order_relaxed);
-            g_window_rate.store(static_cast<float>(own), std::memory_order_relaxed);
+            // On the refreshes, their fraction; off them, the cap, or the display's own rate without one.
+            const float rate = f.host_n ? static_cast<float>(own / f.host_n) : cap > 0 ? cap : static_cast<float>(own);
+            g_followed_rate.store(rate, std::memory_order_relaxed);
+            g_window_rate.store(rate, std::memory_order_relaxed);
             g_active_until.store(0, std::memory_order_relaxed);
-            log("arm32: frame rate %.2f fps: every refresh of the display at %.3f Hz", own, own);
+            if (!vsync) {
+                log("arm32: frame rate %.2f fps: vsync off, frames as soon as drawn (the display at %.3f Hz)", static_cast<double>(rate), own);
+            } else if (!f.host_n) {
+                log("arm32: frame rate %.2f fps: the frame cap, off the refreshes of the display at %.3f Hz", static_cast<double>(rate), own);
+            } else if (f.host_n == 1) {
+                log("arm32: frame rate %.2f fps: every refresh of the display at %.3f Hz", static_cast<double>(rate), own);
+            } else {
+                // More than one refresh per frame from the start: the cap's doing.
+                log("arm32: frame rate %.2f fps: every %d refreshes of the display at %.3f Hz, for the frame cap", static_cast<double>(rate), f.host_n, own);
+            }
             return false;
         }
+        // Off the refreshes by the player's choice (vsync off, or a cap the swap cannot hold): the game's own limiter keeps
+        // the cap, and a frame that falls short is late by its own time alone, with no whole fraction to step down to.
+        if (f.host_top == 0) return false;
         // The wait after a step down is over, and the last check window did not fall short: a step back up.
         if (f.host_retry_at && now >= f.host_retry_at && f.short_windows == 0) {
             step_up_host(now);
@@ -634,10 +669,8 @@ bool pace_check(Nanos now, Nanos gap, double hz, bool host) {
     }
     // The resolution of a song that has begun cannot change under it, so that waits for the next start. Until then the frame rate
     // gives way, as far as it can. At 60 fps, with no step to take first, it takes a little longer to be sure. A computer's
-    // display gives up its resolution only at 60 fps: there a frame that misses 240 Hz is the processor's, which fewer pixels
-    // do not help, and its steps down to 120 and 80 fps come first.
-    // A computer's display keeps its resolution: a frame that misses there is the processor's, which fewer pixels do not help,
-    // and its steps down come first (nor could the runtime keep the mark there).
+    // display keeps its resolution: there it is the player's own choice (the render scale of the PC's settings), and the frame
+    // rate's steps down are what the runtime does (nor could it keep the mark there).
     if (!host && f.drawing_short >= kShortWindows + (rate > 60 ? 0 : 2)) {
         log("arm32: frame rate: %.0f fps not kept while drawing (last 2 s: %.1f fps, %d of %d frames shown late)",
             static_cast<double>(rate), fps, late, shown);
@@ -658,6 +691,9 @@ bool pace_check(Nanos now, Nanos gap, double hz, bool host) {
 
 std::atomic<std::int64_t> g_display_interval{0};
 std::atomic<std::int64_t> g_display_vblank{0};
+std::atomic<bool> g_host_vsync{true};
+std::atomic<float> g_host_fps_cap{0};
+std::atomic<std::int64_t> g_window_fixed_size{0};
 
 bool pacing_enabled() {
     static const bool wanted = requested("ARM32_PACING", "debug.arm32.pacing", true);
@@ -697,7 +733,8 @@ void pacing_thermal_tick() {
 EGLint pacing_swap_interval(EGLint asked) {
     g_game_interval.store(asked, std::memory_order_relaxed);
     const EGLint paced = g_paced_interval.load(std::memory_order_relaxed);
-    return paced ? paced : asked;
+    // -1 stands for vsync off on a computer's display: 0 whatever the game asks.
+    return paced > 0 ? paced : paced < 0 ? 0 : asked;
 }
 
 void pacing_surface_destroyed(EGLSurface s) {
@@ -722,6 +759,8 @@ EGLBoolean paced_swap(EGLDisplay d, EGLSurface s) {
     if (slow > 0) sleep_until(now_ns() + slow * 1000000);
     // A computer's display, as its player gave it (pacing.h): 0 on a phone.
     const Nanos host = g_display_interval.load(std::memory_order_relaxed);
+    // Frames on its refreshes, unless its player turned vsync off; a phone's always are.
+    const bool vsync = host <= 0 || g_host_vsync.load(std::memory_order_relaxed);
     const bool pace = pacing_enabled() && ((e.compositor_timing && e.presentation_time) || host > 0);
     const bool count = g_stats && e.next_frame_id && e.frame_timestamps;
     // Following the display's refresh rate takes the compositor's timing too, or the player's.
@@ -775,7 +814,8 @@ EGLBoolean paced_swap(EGLDisplay d, EGLSurface s) {
         // display's own, whatever frame times its EGL may offer.
         interval = host;
         if (follow) ask_again = follow_display(now, interval, gap, true);
-        if (pace) {
+        // Vsync off: no refreshes per frame, the game's limiter keeps the rate and the swap waits for none.
+        if (pace && vsync) {
             const double ratio = 1e9 / (static_cast<double>(app_frame_rate()) * static_cast<double>(interval));
             host_n = std::llround(ratio);
             if (host_n < 1 || std::fabs(ratio - static_cast<double>(host_n)) > 0.1 || host_n > kMaxHostInterval) host_n = 0;
@@ -880,13 +920,14 @@ EGLBoolean paced_swap(EGLDisplay d, EGLSurface s) {
         if (e.presentation_time(d, s, kAutoTimestamp) != EGL_TRUE) take_error(e);
         p.timed = false;
     }
-    // The swap interval in place while pacing: 1 on a phone, the refreshes per frame on a computer's display.
-    const EGLint want = host_n ? static_cast<EGLint>(host_n) : paced ? 1 : 0;
+    // The swap interval in place while pacing: 1 on a phone, the refreshes per frame on a computer's display; there with
+    // vsync off 0 for good (-1 stands for that), whatever the game asks.
+    const EGLint want = !vsync ? -1 : host_n ? static_cast<EGLint>(host_n) : paced ? 1 : 0;
     if (want != g_paced_interval.load(std::memory_order_relaxed) && e.swap_interval) {
-        const EGLint use = want ? want : g_game_interval.load(std::memory_order_relaxed);
+        const EGLint use = want > 0 ? want : want < 0 ? 0 : g_game_interval.load(std::memory_order_relaxed);
         if (e.swap_interval(d, use) == EGL_TRUE) {
             g_paced_interval.store(want, std::memory_order_relaxed);
-            log("arm32: pacing: swap interval %d (%s)", use, want ? "paced" : "the game's");
+            log("arm32: pacing: swap interval %d (%s)", use, want > 0 ? "paced" : want < 0 ? "vsync off" : "the game's");
         } else {
             take_error(e);
         }
@@ -942,6 +983,27 @@ EGLBoolean paced_swap(EGLDisplay d, EGLSurface s) {
         // When the next frame's work starts, for the stats.
         lock.lock();
         if (p.surface == s) p.host_resumed = now_ns();
+        return ok;
+    }
+    if (host > 0 && (!vsync || !host_n) && pace) {
+        // Vsync off on a computer's display, or a frame cap that is no whole fraction of its rate (the swap then still
+        // waits for a refresh, the frames as near the cap as the refreshes allow): no refreshes per frame to keep to,
+        // and the game's own limiter holds the cap only roughly
+        // (246.6 frames a second for 240, in uneven steps). Each frame goes out one frame's time after the one before, by
+        // the clock, while the game's limiter stays above the cap (tweaks.cpp, as pacing_active() says); a frame late by
+        // more than a frame's time starts the count again from itself, so that no burst follows it.
+        const float rate = followed_frame_rate();
+        Nanos due = 0;
+        if (rate > 0) {
+            const auto period = static_cast<Nanos>(1e9 / static_cast<double>(rate));
+            const Nanos done = now_ns();
+            due = p.target ? p.target + period : done;
+            if (due < done - period) due = done;
+            p.target = due;
+            g_active_until.store(done + kSecond, std::memory_order_relaxed);
+        }
+        lock.unlock();
+        if (due > now_ns()) sleep_until(due);
         return ok;
     }
     if (tracked) {

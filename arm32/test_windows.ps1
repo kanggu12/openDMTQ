@@ -95,8 +95,8 @@ Write-Result 'bridge' (([regex]::Matches($run.Text, 'returned 1005')).Count -eq 
 # Eight host threads become guest threads 5 ms apart while the running ones create and join guest threads.
 $run = Invoke-Program $runner @('--sysroot', $sysroot, '--agent', (Join-Path $guest 'arm32-agent'), '--call', "$guestDir/libplugin.so", 'plugin_spawn', '--threads', '8', '--stagger', '5', '100') 120
 Write-Result 'bridge-spawn' (([regex]::Matches($run.Text, '(?m)returned 100$')).Count -eq 8) $run
-# The Java VM the desktop player hosts the game in, and the player's mixer.
-foreach ($program in @('jvmtest', 'audiotest')) {
+# The Java VM the desktop player hosts the game in, the player's mixer, and its PC settings file.
+foreach ($program in @('jvmtest', 'audiotest', 'settingstest')) {
     $run = Invoke-Program (Join-Path $bin "$program.exe") @() 300
     Write-Result $program ($run.Text -match 'ALL CHECKS PASSED') $run
 }
