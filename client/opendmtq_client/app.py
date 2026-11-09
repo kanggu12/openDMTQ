@@ -1,0 +1,740 @@
+"""The launcher window: the menu column, the page header, the page, and the bottom bar with PLAY.
+
+Slow work (asking the server, downloading its app, listing the sound devices, update checks) runs on worker threads;
+they hand results back through a queue the window empties every 50 ms, because Tk may only be touched from the thread
+that created it.
+"""
+
+import logging
+import queue
+import threading
+import tkinter as tk
+
+from PIL import ImageTk
+
+from opendmtq_client import __version__, actions, art, i18n, player, safety, theme, widgets
+from opendmtq_client import server as srv
+
+log = logging.getLogger("opendmtq_client")
+
+# The menu, top to bottom.
+NAV = ("play", "screen", "sound", "controls", "online", "help", "about")
+NAV_ICON = {"play": "play", "screen": "screen", "sound": "sound", "controls": "controls", "online": "online",
+            "help": "help", "about": "about"}
+# Each page gets its own arrangement of shards, so moving between pages feels like moving.
+SEEDS = {"play": 7, "screen": 11, "sound": 23, "controls": 31, "online": 13, "help": 17, "about": 41}
+# The menu column's width and the logo's place in it, the same in the guide (logical pixels).
+SIDE_WIDTH, LOGO_PAD = 232, 20
+# The bottom bar's height inside its padding: PLAY's slab and its keyboard ring, on every page and every guide step.
+BAR_HEIGHT = 54
+# How often the window looks for a server an installer left while it is open, in turns of the 50 ms task pump (2 s).
+PRESET_EVERY = 40
+
+
+class LauncherApp:
+    """The whole launcher: owns the Tk root, the remembered state and the game while it runs."""
+
+    def __init__(self, state, root=None):
+        # The launcher's own window: never on a real screen from a test.
+        safety.refuse_windows_in_tests("the launcher window")
+        self.state = state
+        # Fonts must be registered before Tk measures any text.
+        theme.register_fonts()
+        self.root = root or tk.Tk()
+        self.root.title("OpenDMTQ")
+        self.root.configure(bg=theme.BG)
+        # The mark in the title bar and on the taskbar, in place of Tk's feather.
+        from opendmtq_client import dialogs
+        dialogs.set_icon(self.root)
+        self.tasks = queue.Queue()      # functions from worker threads, run on the Tk thread
+        self.session = None             # the running game, while it runs
+        self.checks = None              # the last ready check (None: being made)
+        self.page = "play"              # the page on show
+        self.busy = False               # PLAY is getting ready (asking the server, downloading its app)
+        self.status_text, self.status_tone = "", "normal"
+        self.status_sticky = False      # a message that stays until the player does something (an update's outcome, a
+        #                                 sign-in that ended, a stopped download): the ready check does not replace it
+        self._header_job = None
+        self.quit_after_game = False    # the window was closed while the game ran
+        self.dialog = None              # the dialog on show (dialogs.py), while one is
+        self.devices = None             # the sound devices the player lists (None: not asked yet)
+        self.download = None            # the app's download under way: {"done", "total", "cancel"}
+        self.download_bar = None        # the page's progress bar for it, while one is on show
+        self.download_error = None      # (words, tone) of the last download that did not end well (the page shows it)
+        self.app_note = None            # what the last look for a newer app found when it found none (the page shows it)
+        self.status_transient = False   # the status line says something passing, which the ready check may replace
+        self.status_action = None       # (words, function): a link after the status line, or None
+        self.updating = False           # the launcher's own update is downloading (the window stays until it is done)
+        self.play_offline = False       # PLAY went on with this PC's app because the server did not answer
+        self.server_check = None        # the last time a server was asked in this run: {"url", "state", "text"}
+        self.pumps = 0                  # turns of the task pump, for the slower look for an installer's server
+        self._setup_fonts()
+        self._size_window()
+        self.root.protocol("WM_DELETE_WINDOW", self.close)
+        # Shown again while a game runs (the window was closed, then OpenDMTQ started again): it stays after the game.
+        self.root.bind("<Map>", self._mapped, add="+")
+        self.root.after(50, self._pump)
+        self.show()
+        self._update_outcome()
+
+    # --------------------------------------------------------------------------------------- frame
+
+    def _setup_fonts(self):
+        """Fonts, words and DPI scale for the current language (a language change rebuilds them)."""
+        self.scale = theme.scale_of(self.root)
+        self.words = i18n.Words(self.state.language)
+        self.fonts = theme.Fonts(self.root, self.state.language)
+        self.ui = widgets.Ui(self.root, self.fonts, self.scale, self.words)
+        widgets.style_ttk(self.ui)
+
+    def _size_window(self):
+        """1180x760 at 100 % scaling, never more than 92 % of the screen, centred."""
+        px = self.ui.px
+        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        w, h = min(px(1180), int(sw * 0.92)), min(px(760), int(sh * 0.92))
+        self.root.geometry("%dx%d+%d+%d" % (w, h, (sw - w) // 2, max(0, (sh - h) // 3)))
+        self.root.minsize(min(px(960), w), min(px(640), h))
+
+    def show(self):
+        """Build the guide on a first start, else the launcher itself."""
+        for child in self.root.winfo_children():
+            child.destroy()
+        # The page's progress bar went with the widgets: the download's progress waits for the next one.
+        self.download_bar = None
+        if not self.state.guide_done:
+            from opendmtq_client import guide
+            self.guide = guide.Guide(self)
+            self.guide.build()
+            return
+        self.guide = None
+        self._build_main()
+        self.go(self.page)
+        self.refresh_checks()
+
+    def _build_main(self):
+        ui, px = self.ui, self.ui.px
+        # ---- the menu column
+        side = tk.Frame(self.root, bg=theme.SIDEBAR, width=px(SIDE_WIDTH))
+        side.pack(side="left", fill="y")
+        side.pack_propagate(False)
+        # The name as the site draws it (art.logo): OPEN, a splinter, DMTQ in leaning chrome with the lime Q.
+        self.make_logo(side).pack(anchor="w", padx=px(LOGO_PAD), pady=(px(LOGO_PAD), px(20)))
+        self.nav = {}
+        for key in NAV:
+            self.nav[key] = self._nav_item(side, key)
+        # ---- the right side: header, page, bottom bar
+        right = tk.Frame(self.root, bg=theme.BG)
+        right.pack(side="left", fill="both", expand=True)
+        self.header = tk.Canvas(right, height=px(176), bg=theme.BG, highlightthickness=0, bd=0)
+        self.header.pack(fill="x")
+        self.header.bind("<Configure>", lambda e: self._queue_header())
+        bottom = tk.Frame(right, bg=theme.PANEL)
+        bottom.pack(side="bottom", fill="x")
+        tk.Frame(bottom, bg=theme.LINE, height=1).pack(fill="x", side="top")
+        # One height whatever it holds, as the guide's bar.
+        bar = tk.Frame(bottom, bg=theme.PANEL, height=px(BAR_HEIGHT))
+        bar.pack(fill="x", padx=px(24), pady=px(12))
+        bar.pack_propagate(False)
+        self.play_button = self._make_play(bar)
+        self.play_button.pack(side="right")
+        self.status_glyph = tk.Label(bar, text="", font=self.fonts.icon_small, fg=theme.MUTED, bg=theme.PANEL)
+        self.status_glyph.pack(side="left")
+        self.status_label = tk.Label(bar, text="", font=self.fonts.body, fg=theme.MUTED, bg=theme.PANEL,
+                                     justify="left", anchor="w", wraplength=px(560))
+        self.status_label.pack(side="left", padx=(px(6), px(12)))
+        # A link after the words when there is something to open (the player's log after a crash): the words and the
+        # chevron come with the message (_paint_status).
+        self.status_link = widgets.link(bar, ui, "", lambda: self.status_link.odq_action and self.status_link.odq_action(),
+                                        fg=theme.TEXT, bg=theme.PANEL, chevron=False)
+        self.status_link.odq_action = None
+        self.body = widgets.ScrollArea(right, ui)
+        self.body.pack(fill="both", expand=True)
+        self._paint_status()
+
+    def make_logo(self, parent):
+        """The name as the site draws it (art.logo), with the version in a small plate at the end of its top line: the
+        same picture in the launcher's menu column and in the guide's."""
+        px = self.ui.px
+        picture = art.logo(px(SIDE_WIDTH) - 2 * px(LOGO_PAD), self.scale, version="v" + __version__)
+        image = ImageTk.PhotoImage(picture, master=self.root)
+        brand = tk.Label(parent, image=image, bg=theme.SIDEBAR, bd=0)
+        # Kept on the label: Tk drops a picture the moment Python forgets it. A dialog draws the window from it.
+        brand.odq_image, brand.odq_picture = image, picture
+        return brand
+
+    def user_acted(self):
+        """The player did something: a message kept until then (status_sticky) may give way now."""
+        self.status_sticky = False
+
+    def nav_go(self, page):
+        """A page chosen from the menu (a click, or Enter or Space)."""
+        self.user_acted()
+        self.go(page)
+
+    def _nav_item(self, parent, key):
+        """One menu entry: a bar in the section's colour when chosen, the glyph and the name."""
+        px = self.ui.px
+        # Reached with Tab too: a cyan ring while it has the keyboard, Enter or Space opens the page.
+        row = tk.Frame(parent, bg=theme.SIDEBAR, cursor="hand2", takefocus=1, highlightthickness=max(1, px(2)),
+                       highlightbackground=theme.SIDEBAR, highlightcolor=theme.CYAN)
+        row.pack(fill="x", padx=px(12), pady=px(1))
+        for key_name in ("<Return>", "<space>"):
+            row.bind(key_name, lambda e, k=key: self.nav_go(k))
+        bar = tk.Frame(row, bg=theme.SIDEBAR, width=px(3))
+        bar.pack(side="left", fill="y")
+        glyph = tk.Label(row, text=theme.ICON[NAV_ICON[key]], font=self.fonts.icon, bg=theme.SIDEBAR, fg=theme.MUTED)
+        glyph.pack(side="left", padx=(px(12), px(10)), pady=px(9))
+        words = self.words("nav." + key)
+        name = tk.Label(row, text=words.upper() if self.state.language == "en" else words, font=self.fonts.nav,
+                        bg=theme.SIDEBAR, fg=theme.MUTED)
+        name.pack(side="left")
+        parts = (row, bar, glyph, name)
+        for part in parts:
+            part.bind("<Button-1>", lambda e, k=key: self.nav_go(k))
+            part.bind("<Enter>", lambda e, k=key: self._paint_nav(k, hover=True))
+            part.bind("<Leave>", lambda e, k=key: self._paint_nav(k))
+        return parts
+
+    def _paint_nav(self, key, hover=False):
+        """The page on show is lit in its section's colour: the bar at its edge and its glyph."""
+        row, bar, glyph, name = self.nav[key]
+        on = key == self.page
+        accent = theme.section_colours(key)["accent"]
+        bg = theme.PANEL_HI if (on or hover) else theme.SIDEBAR
+        for part in (row, glyph, name):
+            part.configure(bg=bg)
+        bar.configure(bg=accent if on else bg)
+        glyph.configure(fg=accent if on else (theme.TEXT if hover else theme.MUTED))
+        name.configure(fg=theme.TEXT if (on or hover) else theme.MUTED)
+
+    # -------------------------------------------------------------------------------------- PLAY
+
+    def _make_play(self, parent):
+        """PLAY: the lime slab, its word in the site's wide letters, in the dark ink that reads on lime."""
+        px = self.ui.px
+        size = (px(212), px(50))
+        self._play_pictures = {s: art.play_button(*size, state=s)
+                               for s in ("normal", "hover", "pressed", "disabled", "playing")}
+        self._play_images = {s: ImageTk.PhotoImage(p, master=self.root) for s, p in self._play_pictures.items()}
+        button = tk.Label(parent, image=self._play_images["normal"], text=self.words("bottom.play"),
+                          compound="center", font=self.fonts.display_big, fg=theme.SECTION_COLOURS["home"]["ink"],
+                          bg=theme.PANEL, cursor="hand2", bd=0)
+        button.bind("<Enter>", lambda e: self._paint_play("hover"))
+        button.bind("<Leave>", lambda e: self._paint_play())
+        button.bind("<Button-1>", lambda e: self._paint_play("pressed"))
+        # Only a release over the slab counts, like a real button (drag off to cancel).
+        button.bind("<ButtonRelease-1>", lambda e: self._released(e))
+        # The keyboard's way to it: Tab reaches it (a cyan ring), Enter or Space presses it.
+        button.configure(takefocus=1, highlightthickness=max(1, px(2)), highlightbackground=theme.PANEL,
+                         highlightcolor=theme.CYAN)
+        button.bind("<Return>", lambda e: self.play())
+        button.bind("<space>", lambda e: self.play())
+        return button
+
+    def _released(self, event):
+        """The mouse's button came up: PLAY when it is still over the slab, else only its look back."""
+        widget = event.widget
+        if 0 <= event.x < widget.winfo_width() and 0 <= event.y < widget.winfo_height():
+            self.play()
+        else:
+            self._paint_play()
+
+    def _paint_play(self, mouse=None):
+        """The button's look follows the state first (busy, playing), then the mouse."""
+        if not hasattr(self, "play_button") or not self.play_button.winfo_exists():
+            # The guide is on show: it has no PLAY bar.
+            return
+        if self.session is not None and self.session.running():
+            look, text = "playing", self.words("bottom.playing")
+        elif self.busy or self.download is not None or not self.ready():
+            # Getting ready, downloading or something to fix first: PLAY waits, and looks it.
+            look, text = "disabled", self.words("bottom.play")
+        else:
+            look, text = mouse or "normal", self.words("bottom.play")
+        lit = look not in ("disabled", "playing")
+        # PLAYING is read (4.5:1 and more); a PLAY that waits is the dimmest text.
+        ink = theme.SECTION_COLOURS["home"]["ink"] if lit else theme.MUTED if look == "playing" else theme.FAINT
+        self.play_button.odq_picture = self._play_pictures[look]
+        self.play_button.configure(image=self._play_images[look], text=text, fg=ink, cursor="hand2" if lit else "arrow")
+
+    def ready(self):
+        """True when nothing stops PLAY (the player, a server, its app or a sign-in to get it, no game running)."""
+        if not self.checks:
+            return self.state.server() is not None
+        return actions.can_play(self.checks)
+
+    def play(self):
+        """Get the newest app on a worker thread when the server can be asked, then start the game."""
+        if self.busy or self.download is not None or (self.session is not None and self.session.running()):
+            return
+        self.user_acted()
+        if not self.ready():
+            self.set_status(self.words("status.fix_first"), "warn")
+            self._paint_play()
+            return
+        self.busy = True
+        self.play_offline = False
+        self._paint_play()
+        self.set_status(self.words("status.app_check"), "normal")
+        # PLAY's own download is the app's download like any other: its bar and Cancel on the Online page.
+        cancel = threading.Event()
+
+        def report(step, done=None, total=None):
+            # Each step in order through the window's queue, so "offline" is known before "starting" is shown.
+            if step == "download":
+                self.post(lambda: self._play_downloading(done, total, cancel))
+            elif step == "offline":
+                self.post(lambda: setattr(self, "play_offline", True))
+            else:
+                self.post(lambda: self._play_step(step))
+
+        def work():
+            try:
+                session = actions.play(self.state, report=report, cancel=cancel)
+                self.post(lambda: self._started(session))
+            except srv.Cancelled:
+                log.info("PLAY's download was stopped")
+                self.post(self._play_cancelled)
+            except srv.SignedOut:
+                log.info("the server no longer takes the sign-in, and this PC has no app")
+                self.post(self._signed_out)
+            except Exception as e:  # noqa: BLE001  (any failure is shown, never swallowed)
+                log.exception("PLAY failed")
+                # Python forgets e when the except block ends; the message is taken now, the window shows it later.
+                self.post(lambda error=e: self._failed(error))
+
+        threading.Thread(target=work, daemon=True, name="play").start()
+
+    def _play_step(self, step):
+        """What PLAY is doing now, on the status line."""
+        if step == "app":
+            self.set_status(self.words("status.app_check"), "normal")
+        else:
+            # Starting: with this PC's app, said so, when the server did not answer.
+            self.set_status(self.words("status.offline" if self.play_offline else "status.starting"),
+                            "warn" if self.play_offline else "normal")
+
+    def _play_downloading(self, done, total, cancel):
+        """PLAY is downloading the app: the same download state as Online's button, so its page shows the bar and
+        Cancel, and the status line its progress."""
+        if self.download is None:
+            self.download = {"done": 0, "total": total, "cancel": cancel, "before": None}
+            self.download_error, self.app_note = None, None
+            self._paint_play()
+            if self.guide is None and self.page == "online":
+                # The page draws the bar and Cancel for it.
+                self.go("online")
+        self._download_moved(done, total)
+
+    def _play_cancelled(self):
+        """PLAY's download was stopped: nothing started, and the page and the status line say so alike."""
+        self.busy = False
+        self.download = None
+        self.download_error = (self.words("status.download_cancelled"), "warn")
+        self.set_status(self.download_error[0], "warn", sticky=True)
+        self._paint_play()
+        self.refresh_checks()
+        if self.guide is None and self.page in ("online", "play"):
+            self.go(self.page)
+
+    def _started(self, session):
+        from opendmtq_client import playing
+        self.busy = False
+        self.session = session
+        # A download PLAY made is over and in place.
+        self.download, self.download_error = None, None
+        self.state.save()
+        # The installer waits while this is held: replacing the player's files now would pull them from under the game.
+        playing.hold()
+        if self.play_offline:
+            # Said until the game ends: the app may be older than the server's.
+            self.set_status(self.words("status.offline"), "warn", sticky=True)
+        else:
+            self.set_status(self.words("status.playing"), "ok")
+        self._paint_play()
+        # Out of the way while the game has the screen; it comes back when the game closes.
+        self.root.iconify()
+        self.root.after(1000, self._watch)
+
+    def _watch(self):
+        if self.session is not None and self.session.running():
+            self.root.after(1000, self._watch)
+            return
+        from opendmtq_client import playing
+        playing.release()
+        record = actions.finish(self.state, self.session)
+        self.state.save()
+        self.session = None
+        if self.quit_after_game:
+            # The window was closed while the game ran: it goes now.
+            self.root.destroy()
+            return
+        self.root.deiconify()
+        minutes = record["seconds"] // 60
+        span = self.words("common.minutes", m=minutes) if minutes else self.words("common.seconds", s=record["seconds"])
+        crashed, failed = record["crashed"], record.get("failed_start")
+        if crashed or failed:
+            # What went wrong is in the player's log: the status line opens it.
+            self.set_status(self.words("status.failed_start" if failed else "status.crashed"), "bad",
+                            action=(self.words("status.open_log"), self.open_player_log), sticky=True)
+        else:
+            self.set_status(self.words("status.ended", time=span), "ok")
+        self.refresh_checks()
+        if self.page == "play":
+            self.go("play")
+
+    def open_player_log(self):
+        """Show the player's log for the current server's app (Explorer, the file selected); the Help page when there
+        is no app yet to have one."""
+        from opendmtq_client import apps
+        server = self.state.server()
+        have = apps.local(server["url"]) if server else None
+        if have is None:
+            self.go("help")
+            return
+        actions.open_folder(player.log_path(have["package"]))
+
+    def _mapped(self, event):
+        """The window came back on screen: a close while the game ran is taken back."""
+        if event.widget is self.root and self.root.state() == "normal":
+            self.quit_after_game = False
+
+    def _failed(self, error):
+        self.busy = False
+        self.download = None
+        self.set_status(self.words("status.error", error=self.words.error(error)), "bad", sticky=True)
+        self._paint_play()
+        self.refresh_checks()
+
+    def _signed_out(self):
+        """The server stopped taking the sign-in before this PC had its app: sign in again (Online)."""
+        self.busy = False
+        self.download = None
+        self.state.save()
+        # Kept until the player does something: the ready check that follows does not replace it.
+        self.set_status(self.words("status.signed_out"), "warn", sticky=True)
+        self.refresh_checks()
+        self._paint_play()
+
+    def _update_outcome(self):
+        """Say whether the update handed to Velopack at the last close went in (a silent update says nothing)."""
+        from opendmtq_client import updates
+        try:
+            outcome = updates.outcome()
+        except Exception:  # noqa: BLE001  (a note that cannot be read is no reason to stop the launcher)
+            log.exception("could not read the update note")
+            return
+        if outcome is None:
+            return
+        if outcome[0] == "updated":
+            self.set_status(self.words("status.updated", v=outcome[1]), "ok", sticky=True)
+        else:
+            log.warning("the update to %s was not installed (this is %s)", outcome[1], outcome[2])
+            self.set_status(self.words("status.not_updated", v=outcome[1], now=outcome[2]), "warn", sticky=True)
+
+    # ----------------------------------------------------------------------------------- pages
+
+    def go(self, page):
+        """Show a page: its header picture and titles, and its content."""
+        from opendmtq_client import pages
+        self.page = page
+        # The page's widgets take its section's colour.
+        self.ui.use_section(page)
+        for key in self.nav:
+            self._paint_nav(key)
+        for child in self.body.inner.winfo_children():
+            child.destroy()
+        self.download_bar = None
+        content = tk.Frame(self.body.inner, bg=theme.BG)
+        content.pack(fill="both", expand=True, padx=self.ui.px(32), pady=(self.ui.px(22), self.ui.px(28)))
+        pages.BUILDERS[page](self, content)
+        self.body.to_top()
+        self._queue_header()
+
+    def _queue_header(self):
+        """Redraw the header once the size settles (a drag fires many resize events)."""
+        if self._header_job is not None:
+            self.root.after_cancel(self._header_job)
+        self._header_job = self.root.after(90, self._draw_header)
+
+    def _draw_header(self):
+        from opendmtq_client import pages
+        self._header_job = None
+        if not hasattr(self, "header") or not self.header.winfo_exists():
+            # The guide is on show; it draws its own header.
+            return
+        c = self.header
+        width, height = c.winfo_width(), c.winfo_height()
+        if width < 50:
+            return
+        px = self.ui.px
+        kicker, title, sub = pages.HEADERS[self.page](self)
+        colours = theme.section_colours(self.page)
+        words = title.upper() if self.state.language == "en" else title
+        # The title is part of the picture: leaning chrome letters, the lime Q of TECHNIKA Q on PLAY.
+        picture = art.header(width, height, seed=SEEDS.get(self.page, 7), colours=colours, title=words,
+                             title_tail="Q" if words.endswith(" Q") else None, scale=self.scale)
+        self._header_img = ImageTk.PhotoImage(picture, master=self.root)
+        # A dialog draws the window behind it from the widgets (snapshot.py); this is the header's part.
+        c.odq_picture = picture
+        c.delete("all")
+        c.create_image(0, 0, image=self._header_img, anchor="nw")
+        x = px(32)
+        c.create_text(x, px(46), text=kicker, font=self.fonts.kicker, fill=colours["accent"], anchor="w")
+        c.create_text(x, px(118), text=sub, font=self.fonts.body, fill=theme.MUTED, anchor="nw",
+                      width=max(px(300), int(width * 0.56)))
+
+    # ------------------------------------------------------------------------------ background
+
+    def post(self, fn):
+        """Run fn on the Tk thread (the only thread that may touch the window)."""
+        self.tasks.put(fn)
+
+    def _pump(self):
+        """Run what the worker threads handed over. One failing task is logged and the rest still run: without this the
+        window would stop taking results for good (PLAY stuck as busy, nothing shown)."""
+        self.pumps += 1
+        if self.pumps % PRESET_EVERY == 0:
+            try:
+                self._take_preset()
+            except Exception:  # noqa: BLE001  (a server file that cannot be taken is no reason to stop the window)
+                log.exception("could not take the server an installer left")
+        while True:
+            try:
+                task = self.tasks.get_nowait()
+            except queue.Empty:
+                break
+            try:
+                task()
+            except Exception:  # noqa: BLE001
+                log.exception("a task for the window failed")
+        self.root.after(50, self._pump)
+
+    def _take_preset(self):
+        """A server an installer left while this window is open (its "Open OpenDMTQ" with a launcher already open):
+        taken now, as a start would take it, and said on the status line."""
+        from opendmtq_client import preset
+        brought = preset.take()
+        if brought is None:
+            return
+        try:
+            url = srv.normalize(brought["url"])
+        except srv.ServerError:
+            log.warning("the installer left an address that is none: %r", brought["url"])
+            return
+        busy = self.busy or self.download is not None or (self.session is not None and self.session.running())
+        before = self.state.current
+        self.state.add_server(url, brought["name"])
+        if busy and before:
+            # The game or a download uses the current server: the new one waits on the Online page.
+            self.state.current = before
+        self.state.save()
+        log.info("took the server %s an installer left", url)
+        key = "status.preset.later" if busy and before else "status.preset"
+        self.set_status(self.words(key, name=brought["name"]), "ok", sticky=True)
+        self.refresh_checks()
+        if self.guide is not None:
+            self.guide.redraw()
+        elif self.page in ("play", "online"):
+            self.go(self.page)
+
+    def refresh_checks(self):
+        """Make the ready check again on a worker thread; the PLAY page and button follow it."""
+        self.checks = None
+
+        def work():
+            try:
+                checks = actions.readiness(self.state)
+            except Exception as e:  # noqa: BLE001
+                log.exception("ready check failed")
+                checks = [actions.Check("server", False, str(e), page="online")]
+            self.post(lambda: self._checked(checks))
+
+        threading.Thread(target=work, daemon=True, name="check").start()
+
+    def _checked(self, checks):
+        self.checks = checks
+        # A message kept until the player does something (a sign-in that ended, a stopped download) stays.
+        quiet = self.status_sticky
+        if not quiet and not self.busy and self.download is None and not (self.session and self.session.running()):
+            if self.state.server() is None:
+                self.set_status(self.words("status.no_server"), "warn")
+            elif not self.ready():
+                self.set_status(self.words("status.fix_first"), "warn")
+            elif self.status_transient or self.status_tone not in ("ok", "bad"):
+                # Nothing to say beyond being ready (a passing "the app is here" included).
+                self.set_status(self.words("status.ready"), "normal")
+        self._paint_play()
+        # The PLAY page, the Help page and the guide's last step each show the check when they are on screen.
+        from opendmtq_client import pages
+        pages.refresh_checks(self)
+        if self.guide is not None:
+            # The guide's last step: its PLAY follows the check.
+            self.guide.checks_changed()
+
+    def load_devices(self, then=None):
+        """Ask the player for the sound devices once, on a worker thread; then() runs on the window's thread after."""
+        if self.devices is not None:
+            if then:
+                then()
+            return
+
+        def work():
+            found = player.audio_devices()
+            self.post(lambda: self._devices_loaded(found, then))
+
+        threading.Thread(target=work, daemon=True, name="devices").start()
+
+    def _devices_loaded(self, found, then):
+        self.devices = found
+        if then:
+            then()
+
+    # ---------------------------------------------------------------------------- the app's download
+
+    def get_app(self, done_then=None):
+        """Download the current server's app on a worker thread, its progress on the page and in the status line."""
+        if self.download is not None or self.busy:
+            return
+        self.user_acted()
+        from opendmtq_client import apps
+        server = self.state.server()
+        # The app this PC had before: the same one after means the server had nothing newer.
+        before = apps.local(server["url"]) if server else None
+        cancel = threading.Event()
+        self.download = {"done": 0, "total": None, "cancel": cancel, "before": before}
+        self.download_error = None
+        self.app_note = None
+        self.set_status(self.words("status.app_check"), "normal")
+        self._paint_play()
+
+        def progress(done, total):
+            self.post(lambda: self._download_moved(done, total))
+
+        def work():
+            try:
+                actions.get_app(self.state, progress=progress, cancel=cancel)
+                self.post(lambda: self._download_ended(None, done_then))
+            except srv.Cancelled:
+                self.post(lambda: self._download_ended("cancelled", done_then))
+            except Exception as e:  # noqa: BLE001  (shown, never swallowed)
+                log.exception("the app's download failed")
+                self.post(lambda error=e: self._download_ended(error, done_then))
+
+        threading.Thread(target=work, daemon=True, name="download").start()
+
+    def _download_moved(self, done, total):
+        if self.download is None:
+            return
+        self.download.update(done=done, total=total)
+        # Stopping: said until the download has stopped, whatever pieces still come in.
+        text = (self.words("status.stopping") if self.download.get("stopping") else
+                self.words("status.downloading", done=_mb(done), total=_mb(total)))
+        self.set_status(text, "normal")
+        if self.download_bar is not None and self.download_bar.winfo_exists():
+            self.download_bar.set(done / float(total) if total else None, text)
+
+    def _download_ended(self, error, done_then):
+        from opendmtq_client import apps
+        before = (self.download or {}).get("before")
+        self.download = None
+        self.state.save()
+        if error is None:
+            self.download_error = None
+            server = self.state.server()
+            after = apps.local(server["url"]) if server else None
+            if before and after and before.get("sha256") == after.get("sha256"):
+                # Nothing newer: the page says so where the button was pressed (the guide has no status line).
+                self.app_note = self.words("online.app.newest")
+                self.set_status(self.words("status.newest"), "normal", transient=True)
+            else:
+                self.set_status(self.words("status.app_ready"), "ok", transient=True)
+        else:
+            # The page and the status line say it alike, in the same tone: a stop or a sign-in that ended in the
+            # warning colour, a failure in the error colour. Kept until the player does something.
+            if error == "cancelled":
+                self.download_error = (self.words("status.download_cancelled"), "warn")
+            elif isinstance(error, srv.SignedOut):
+                self.download_error = (self.words("status.signed_out"), "warn")
+            else:
+                self.download_error = (self.words("status.error", error=self.words.error(error)), "bad")
+            self.set_status(self.download_error[0], self.download_error[1], sticky=True)
+        self.refresh_checks()
+        if done_then:
+            done_then(error)
+        elif self.guide is None and self.page in ("online", "play"):
+            self.go(self.page)
+
+    def cancel_download(self):
+        """Stop the download under way: said at once, done as soon as the next piece is in."""
+        if self.download is not None and not self.download.get("stopping"):
+            self.download["cancel"].set()
+            self.download["stopping"] = True
+            self.set_status(self.words("status.stopping"), "normal")
+
+    # ---------------------------------------------------------------------------------- status
+
+    def set_status(self, text, tone="normal", action=None, transient=False, sticky=False):
+        """The bottom line: words in a tone, an optional link after them (words, function). A transient line gives way
+        to the ready check's own words when it comes back; a sticky one stays until the player does something."""
+        self.status_text, self.status_tone = text, tone
+        self.status_action, self.status_transient, self.status_sticky = action, transient, sticky
+        self._paint_status()
+
+    def _paint_status(self):
+        if not hasattr(self, "status_label") or not self.status_label.winfo_exists():
+            return
+        glyph, colour = {"normal": ("info", theme.MUTED), "ok": ("ok", theme.OK), "warn": ("warn", theme.WARN),
+                         "bad": ("error", theme.BAD)}[self.status_tone]
+        self.status_glyph.configure(text=theme.ICON[glyph], fg=colour)
+        self.status_label.configure(text=self.status_text, fg=theme.TEXT if self.status_tone != "normal" else theme.MUTED)
+        # The link after the words: shown with an action, gone without one.
+        if self.status_action:
+            words, function = self.status_action
+            self.status_link.configure(text=words + "  " + theme.ICON["chevron"])
+            self.status_link.odq_action = function
+            if not self.status_link.winfo_manager():
+                self.status_link.pack(side="left", after=self.status_label, padx=(0, self.ui.px(12)))
+        elif self.status_link.winfo_manager():
+            self.status_link.pack_forget()
+
+    # ------------------------------------------------------------------------------- changes
+
+    def changed(self, name, value):
+        """A PC setting changed on a page: remember it (the player reads it at the next PLAY)."""
+        self.state.set_value(name, value)
+        self.state.save()
+        self.user_acted()
+        self.set_status(self.words("status.saved"), "normal")
+
+    def set_language(self, language):
+        """Switch the words and fonts: the whole window is rebuilt in the other language. "system" follows Windows'
+        display language again (the state keeps no choice then)."""
+        self.state.language = None if language == "system" else language
+        self.state.save()
+        self._setup_fonts()
+        self.show()
+
+    def close(self):
+        """Close the launcher. A game playing keeps going: the launcher hides until it ends, then goes."""
+        if self.updating:
+            # The update is downloading: the launcher closes by itself once it is in Velopack's hands.
+            return
+        if self.dialog is not None:
+            # Closing the window answers an open question with Cancel.
+            self.dialog.close(self.dialog.cancel_value)
+        self.cancel_download()
+        self.state.save()
+        if self.session is not None and self.session.running():
+            self.quit_after_game = True
+            self.root.withdraw()
+            return
+        self.root.destroy()
+
+    def run(self):
+        self.root.mainloop()
+
+
+def _mb(n):
+    """Bytes as megabytes, one decimal ('103.2'); '?' when not known."""
+    return "?" if n is None else "%.1f" % (n / 1048576.0)

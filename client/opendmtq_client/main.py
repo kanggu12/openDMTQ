@@ -1,0 +1,468 @@
+"""Start the launcher, or do one of its jobs from the command line.
+
+  OpenDMTQ.exe                          the launcher window (the first-start guide the first time)
+  OpenDMTQ.exe --status                 print the server, the sign-in, the app and the ready check (exit 0: PLAY can go)
+  OpenDMTQ.exe --server URL             connect to a server and play on it from now on
+  OpenDMTQ.exe --sign-in ID             sign in to the server (the password from standard input, or asked for)
+  OpenDMTQ.exe --sign-out               forget the sign-in
+  OpenDMTQ.exe --app                    download the server's app, or a newer one
+  OpenDMTQ.exe --set name=value ...     change a PC setting (values.py names them)
+  OpenDMTQ.exe --audio-devices          list the sound devices the player can play on
+  OpenDMTQ.exe --language en|ko|system  the launcher's language (system: Windows' display language)
+  OpenDMTQ.exe --guide                  open the first-start guide again at the next start of the window
+  OpenDMTQ.exe --open-log player|launcher   show the player's or the launcher's log in Explorer
+  OpenDMTQ.exe --play                   get ready and start the game, no window; returns when the game ends
+  OpenDMTQ.exe --forget URL [--yes]     forget a server, its sign-in and its app on this PC
+  OpenDMTQ.exe --reset [--yes]          start over: forget the servers, the sign-ins, the apps and the settings
+  OpenDMTQ.exe --update [--yes]         look for a newer launcher and install it (it restarts)
+
+The console copy OpenDMTQ-cmd.exe takes the same arguments and prints to the terminal. Several jobs in one command run
+in the order above (--server, then --sign-in, then --app, then --play). While the launcher's window is open, the jobs
+that change what it keeps (--set, --reset, --forget, --language, --guide, --server, --sign-in, --sign-out) are refused:
+the window would write its own copy over them.
+"""
+
+import argparse
+import getpass
+import logging
+import logging.handlers
+import os
+import sys
+
+from opendmtq_client import __version__, actions, apps, dpi, player, preset
+from opendmtq_client import server as srv
+from opendmtq_client import state as st
+from opendmtq_client import values as choices
+
+log = logging.getLogger("opendmtq_client")
+
+
+def _velopack_hooks(argv):
+    """Let Velopack handle its install, update and uninstall events; it exits the process for those.
+
+    OpenDMTQ registers nothing to do in them. So when Velopack itself fails in one, the failure is logged and the
+    process ends as a finished hook would: the installer does not report a partly failed install over a step OpenDMTQ
+    never needed.
+    """
+    try:
+        import velopack
+    except ImportError:
+        # Run from source or a copied folder: there is no installer around.
+        return
+    try:
+        velopack.App().run()
+    except SystemExit:
+        raise
+    except BaseException:  # noqa: BLE001  (a Rust panic arrives as a BaseException, which Exception misses)
+        log.exception("Velopack start-up hook failed")
+        if any(a.startswith("--veloapp-") for a in argv):
+            sys.exit(0)
+
+
+def _logging():
+    """One log file with a size cap: 1 MB, the two previous ones kept, nothing older."""
+    folder = os.path.join(st.config_dir(), "logs")
+    os.makedirs(folder, exist_ok=True)
+    handler = logging.handlers.RotatingFileHandler(os.path.join(folder, "launcher.log"), maxBytes=1_000_000,
+                                                   backupCount=2, encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(threadName)s %(message)s"))
+    handler.odq_log = True
+    root = logging.getLogger("opendmtq_client")
+    root.setLevel(logging.INFO)
+    # One file handler at a time, even when main() runs more than once in a process (the tests do).
+    for old in [h for h in root.handlers if getattr(h, "odq_log", False)]:
+        root.removeHandler(old)
+        old.close()
+    root.addHandler(handler)
+
+
+def _single_instance():
+    """True when no other launcher window is open; otherwise bring that one forward and return False."""
+    if sys.platform != "win32":
+        return True
+    import ctypes
+    # A named mutex lives as long as the first launcher; a second one sees it already exists.
+    ctypes.windll.kernel32.CreateMutexW(None, False, "Local\\OpenDMTQ.launcher")
+    if ctypes.windll.kernel32.GetLastError() != 183:   # ERROR_ALREADY_EXISTS
+        return True
+    hwnd = ctypes.windll.user32.FindWindowW(None, "OpenDMTQ")
+    if hwnd:
+        ctypes.windll.user32.ShowWindow(hwnd, 9)        # SW_RESTORE
+        ctypes.windll.user32.SetForegroundWindow(hwnd)
+    return False
+
+
+def _say(text, error=False):
+    """Print for the console copy; the window copy has no console, so everything also goes to the log."""
+    stream = sys.stderr if error else sys.stdout
+    if stream is not None:
+        # Flushed at once: --update hands the process to Velopack, which ends it without Python's own exit.
+        print(text, file=stream, flush=True)
+    (log.error if error else log.info)(text)
+
+
+def _windowed():
+    """True for the window copy (OpenDMTQ.exe): it has no console, so a printed error is never seen."""
+    return sys.stdout is None or sys.stderr is None
+
+
+def _cannot_start(error):
+    """The window copy cannot read its settings: say so in a dialog instead of closing without a word.
+
+    A broken file can be set aside (kept next to it, with the time in its name) to start again from the guide; a file
+    from a newer launcher is left alone, because only that launcher reads it right.
+    """
+    from opendmtq_client import dialogs
+    # The settings that would say the player's language cannot be read: Windows' display language.
+    language = st.system_language()
+    asked = cannot_start_dialog(error, language)
+    if error.newer:
+        dialogs.standalone(*asked, language=language)
+        return False
+    answer = dialogs.standalone(*asked, language=language)
+    if answer != "reset":
+        return False
+    import time
+    aside = "%s.broken-%s" % (error.path, time.strftime("%Y%m%d-%H%M%S"))
+    try:
+        os.replace(error.path, aside)
+        log.info("set the unreadable settings aside as %s", aside)
+    except FileNotFoundError:
+        # Another start of the launcher set it aside a moment ago.
+        log.info("the unreadable settings were already set aside")
+    return True
+
+
+def cannot_start_dialog(error, language):
+    """The dialog for settings the launcher cannot read, as standalone()'s arguments: (kind, title, message, detail,
+    buttons, default, cancel). A newer launcher's file is left alone; a broken one can be set aside to start over."""
+    from opendmtq_client import i18n
+    w = i18n.Words(language)
+    if error.newer:
+        return ("error", w("start.title"), w("start.newer"), w("start.newer.detail", path=error.path),
+                [(w("start.close"), "close", "home")], 0, "close")
+    return ("error", w("start.title"), w("start.broken"), w("start.broken.detail", path=error.path),
+            [(w("start.close"), "close", "neutral"), (w("start.over"), "reset", "warn")], 1, "close")
+
+
+def _ask(question, yes):
+    """y/N before something that cannot be undone; --yes answers for the player."""
+    if yes:
+        return True
+    try:
+        answer = input(question + " [y/N] ") if sys.stdin else "n"
+    except EOFError:
+        answer = "n"
+    return answer.strip().lower() in ("y", "yes")
+
+
+def _update(yes):
+    """--update: the same check as the Launcher page, then the same update (the launcher restarts into it)."""
+    from opendmtq_client import updates
+    result = updates.check()
+    if result.kind != "available":
+        said = {"not_installed": "Updates work in the launcher installed by OpenDMTQ-Setup.exe.",
+                "no_source": "No update address is set for this build.",
+                "uptodate": "This is the newest version (%s)." % (updates.current_version() or __version__),
+                "failed": "Could not check for updates: %s" % result.error}
+        _say(said.get(result.kind, result.kind), error=result.kind == "failed")
+        return 0 if result.kind == "uptodate" else 2
+    _say("OpenDMTQ %s is available (this is %s)." % (result.version, updates.current_version() or __version__))
+    from opendmtq_client import playing
+    if playing.running():
+        # The update replaces the player's files: a game playing from them would lose them mid-song.
+        _say("Close the game first: the update replaces the player's files.", error=True)
+        return 2
+    if not _ask("Update now? The launcher closes and starts again.", yes):
+        _say("Nothing changed.")
+        return 1
+    try:
+        # Downloads, then hands over to Velopack, which waits for this process to end, puts the update in and starts
+        # the new launcher.
+        updates.apply(result)
+    except Exception as e:  # noqa: BLE001  (shown and logged, never swallowed)
+        log.exception("--update failed")
+        _say("The update failed: %s" % e, error=True)
+        return 2
+    _say("Updating: the launcher starts again in a few seconds.")
+    return 0
+
+
+def _status(state):
+    """--status: where PLAY plays, what it has, and the ready check; 0 when PLAY can go."""
+    server = state.server()
+    if server is None:
+        _say("server: none (connect with --server URL)")
+    else:
+        _say("server: %s (%s)" % (server["name"], server["url"]))
+        signed = state.signed_in(server)
+        _say("signed in: %s" % (server["account"] if signed else "no" + (" (%s, ended)" % server["account"]
+                                                                          if server.get("account") else "")))
+        have = apps.local(server["url"])
+        _say("app: %s" % ("%s (%s)" % (have["file"], have.get("built_at") or "?") if have else "none on this PC"))
+    _say("settings: " + ", ".join("%s=%s" % (k, state.values[k]) for k in choices.ORDER))
+    _say("language: %s%s" % (state.language, "" if state.picked_language else " (Windows' display language)"))
+    # Where the logs are, as Help's Open buttons show them.
+    for name, path in _log_paths(state).items():
+        _say("%s log: %s" % (name, path or "none yet (no app on this PC)"))
+    checks = actions.readiness(state)
+    for c in checks:
+        mark = "ok  " if c.ok else ("play" if c.play_fixes else "todo")
+        _say("  [%s] %s: %s" % (mark, c.key, c.detail))
+    return 0 if actions.can_play(checks) else 1
+
+
+def _log_paths(state):
+    """The launcher's log, and the player's for the current server's app (None while there is no app)."""
+    server = state.server()
+    have = apps.local(server["url"]) if server else None
+    return {"launcher": os.path.join(st.config_dir(), "logs", "launcher.log"),
+            "player": player.log_path(have["package"]) if have else None}
+
+
+def _password(prompt):
+    """The password: a line from standard input when it is not a terminal (a script's pipe), else asked for unseen."""
+    if sys.stdin is not None and not sys.stdin.isatty():
+        return sys.stdin.readline().rstrip("\r\n")
+    return getpass.getpass(prompt)
+
+
+def _get_app(state):
+    """--app: the server's app on this PC, downloaded when it lacks it or the server has a newer one."""
+    seen = {"step": -1}
+
+    def progress(done, total):
+        # A line every tenth of the way: the output may well be a log file.
+        step = int(10 * done / total) if total else 0
+        if step != seen["step"]:
+            seen["step"] = step
+            _say("  downloading: %.1f of %.1f MB" % (done / 1048576.0, total / 1048576.0))
+
+    info = actions.check_app(state)
+    if apps.current(state.server()["url"], info):
+        _say("The app of %s is on this PC already." % actions.when(info))
+        return
+    have = actions.get_app(state, info, progress)
+    _say("Downloaded the app of %s: %s" % (actions.when(have), have["file"]))
+
+
+def _play(state):
+    """--play: as the window's PLAY, with the game's end waited for (the installer waits for it meanwhile)."""
+    from opendmtq_client import playing
+
+    def report(step, done=None, total=None):
+        if step == "download":
+            if done == total or done % (8 << 20) < (1 << 20):
+                _say("  downloading: %.1f of %.1f MB" % (done / 1048576.0, total / 1048576.0))
+        else:
+            _say("  " + {"app": "asking the server for its app", "starting": "starting the game",
+                         "offline": "the server did not answer: the game starts with the app on this PC"}.get(step, step))
+
+    session = actions.play(state, report=report)
+    state.save()
+    _say("The game is running (process %d)." % session.process.pid)
+    # The installer waits while a game runs (playing.py); held until it ends.
+    playing.hold()
+    record = actions.finish(state, session)
+    playing.release()
+    state.save()
+    if record.get("failed_start"):
+        # The player's own "could not start": its log says why.
+        _say("The game could not start. The player's log says why: %s" % _log_paths(state)["player"], error=True)
+        return 1
+    _say("The game ended after %d s%s." % (record["seconds"], " (it closed by itself, code %s)" % record["exit_code"]
+                                           if record["crashed"] else ""))
+    return 0 if not record["crashed"] else 1
+
+
+def parse(argv):
+    p = argparse.ArgumentParser(prog="OpenDMTQ", description="The OpenDMTQ launcher for PCs.")
+    p.add_argument("--version", action="version", version="OpenDMTQ " + __version__)
+    p.add_argument("--status", action="store_true", help="print the server, the sign-in, the app and the ready check")
+    p.add_argument("--server", metavar="URL", help="connect to the server at this address and play on it")
+    p.add_argument("--sign-in", metavar="ID", help="sign in to the server (the password from standard input)")
+    p.add_argument("--sign-out", action="store_true", help="forget the sign-in")
+    p.add_argument("--app", action="store_true", help="download the server's app, or a newer one")
+    p.add_argument("--set", metavar="NAME=VALUE", action="append", default=[],
+                   help="change a PC setting: " + ", ".join(choices.ORDER))
+    p.add_argument("--audio-devices", action="store_true", help="list the sound devices the player can play on")
+    p.add_argument("--language", choices=st.LANGUAGES + ("system",),
+                   help="the launcher's language (system: Windows' display language)")
+    p.add_argument("--guide", action="store_true", help="open the first-start guide again at the next start")
+    p.add_argument("--open-log", choices=("player", "launcher"), help="show the player's or the launcher's log")
+    p.add_argument("--play", action="store_true", help="get ready and start the game")
+    p.add_argument("--forget", metavar="URL", help="forget a server, its sign-in and its app")
+    p.add_argument("--reset", action="store_true", help="forget the servers, the sign-ins, the apps and the settings")
+    p.add_argument("--update", action="store_true", help="look for a newer launcher and install it")
+    p.add_argument("--yes", action="store_true", help="do not ask before --forget, --reset or --update")
+    # Velopack passes its own --veloapp-* arguments (each with its value); they are handled before this parser runs and
+    # are let through here. Anything else unknown is a mistake, said as argparse says it (exit code 2).
+    args, unknown = p.parse_known_args(argv)
+    rest, after_velopack = [], False
+    for item in unknown:
+        if item.startswith("--veloapp-"):
+            after_velopack = True
+        elif after_velopack and not item.startswith("-"):
+            # The value of the --veloapp-* argument before it.
+            after_velopack = False
+        else:
+            rest.append(item)
+            after_velopack = False
+    if rest:
+        p.error("unrecognized arguments: %s" % " ".join(rest))
+    return args
+
+
+def _writes(args):
+    """Whether the command line changes what the launcher keeps (refused while its window is open)."""
+    return any((args.set, args.reset, args.forget, args.language, args.guide, args.server, args.sign_in,
+                args.sign_out))
+
+
+def window_open():
+    """True while a launcher window is open (the mutex _single_instance makes); False off Windows."""
+    from opendmtq_client import installer
+    return installer.launcher_open()
+
+
+def _jobs(args):
+    """Whether the command line asks for any job (none: the window)."""
+    return any((args.status, args.server, args.sign_in, args.sign_out, args.app, args.set, args.audio_devices,
+                args.language, args.guide, args.open_log, args.play, args.forget, args.reset, args.update))
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    # The log first, so a failure in Velopack's own start-up handling is written down too.
+    _logging()
+    # The arguments as given: the password never is one (it comes from standard input).
+    log.info("OpenDMTQ %s started%s", __version__, (": " + " ".join(argv)) if argv else "")
+    _velopack_hooks(argv)
+    args = parse(argv)
+    jobs = _jobs(args)
+    if jobs and _writes(args) and window_open():
+        # The window keeps its own copy of the settings and writes it back: a change made here would be lost.
+        _say("The launcher's window is open: make this change there, or close the window first.", error=True)
+        return 2
+    if not jobs:
+        # The window copy: sharp at any scaling and only once, settled before any window (a dialog too) opens.
+        dpi.aware()
+        if not _single_instance():
+            return 0
+    try:
+        state = st.LauncherState.load()
+    except st.StateError as e:
+        _say(str(e), error=True)
+        if not (_windowed() and not jobs and _cannot_start(e)):
+            return 2
+        state = st.LauncherState.load()
+    # A server an installer brought: the one to play on from now on (the guide's server step checks it). With the
+    # window open, the window takes it (app._take_preset).
+    brought = None if jobs and window_open() else preset.take()
+    if brought is not None:
+        try:
+            # Written as the launcher writes every address, so that connecting to it later finds this same entry.
+            url = srv.normalize(brought["url"])
+        except srv.ServerError:
+            # An address the launcher cannot read: the guide asks for one instead.
+            url = None
+            log.warning("the installer brought an address that is none: %r", brought["url"])
+        if url:
+            state.add_server(url, brought["name"])
+            state.save()
+            log.info("the installer brought the server %s", url)
+    try:
+        return _run(state, args, jobs)
+    except (srv.ServerError, choices.ChoiceError, actions.NotReady, FileNotFoundError) as e:
+        _say(str(e), error=True)
+        return 2
+    finally:
+        # Whatever a job changed stays, also after a failure further on (a server added, a sign-in that ended).
+        if jobs:
+            state.save()
+
+
+def _run(state, args, jobs):
+    """The jobs the command line asked for, in order; else the window."""
+    if args.update:
+        return _update(args.yes)
+    if args.reset:
+        if not _ask("Forget every server, sign-in, downloaded app and setting?", args.yes):
+            _say("Nothing changed.")
+            return 1
+        for s in list(state.servers):
+            apps.remove(s["url"])
+        # The language stays as it was, chosen or Windows'.
+        picked = state.picked_language
+        state.__dict__.update(st.LauncherState().__dict__)
+        state.picked_language = picked
+        _say("Started over: the launcher opens its first-start guide next time.")
+        return 0
+    if args.forget:
+        url = srv.normalize(args.forget)
+        if state.server(url) is None:
+            _say("This launcher does not know %s." % url, error=True)
+            return 2
+        if not _ask("Forget %s, its sign-in and its app on this PC?" % url, args.yes):
+            _say("Nothing changed.")
+            return 1
+        state.remove_server(url)
+        apps.remove(url)
+        _say("Forgot %s." % url)
+    for item in args.set:
+        name, _, value = item.partition("=")
+        state.set_value(name.strip(), value.strip())
+        _say("%s=%s" % (name.strip(), state.values[name.strip()]))
+    if args.language:
+        # "system": no choice kept, Windows' display language from now on.
+        state.language = None if args.language == "system" else args.language
+        _say("language=%s" % (state.picked_language or "system (%s now)" % state.language))
+    if args.guide:
+        # The window opens on the guide next time, as Launcher's "Show it again" does.
+        state.guide_done = False
+        _say("The window opens the first-start guide next time.")
+    if args.server:
+        try:
+            found = actions.connect(state, args.server)
+            _say("Connected to %s (%s)." % (found["name"], state.current))
+        except srv.ServerError:
+            known = state.server(srv.normalize(args.server))
+            if known is None:
+                raise
+            # A server this launcher knows plays without asking it, as Online's "Play here" does.
+            state.current = known["url"]
+            _say("%s did not answer; playing on it as known (%s)." % (known["name"], known["url"]))
+    if args.sign_out:
+        actions.sign_out(state)
+        _say("Signed out.")
+    if args.sign_in:
+        answer = actions.sign_in(state, args.sign_in, _password("Password for %s: " % args.sign_in))
+        _say("Signed in as %s." % answer["account"])
+    if args.app:
+        _get_app(state)
+    if args.audio_devices:
+        devices = player.audio_devices()
+        if not devices:
+            _say("The player listed no sound devices (the game plays through Windows' default output).")
+        for d in devices:
+            _say("%s%s\n    %s" % (d["name"], "  (default)" if d["default"] else "", d["id"]))
+    if args.open_log:
+        path = _log_paths(state)[args.open_log]
+        if path is None:
+            _say("There is no player's log yet: the current server's app is not on this PC.", error=True)
+            return 2
+        _say(path)
+        actions.open_folder(path)
+    if args.status:
+        return _status(state)
+    if args.play:
+        return _play(state)
+    if jobs:
+        return 0
+    from opendmtq_client.app import LauncherApp
+    LauncherApp(state).run()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
