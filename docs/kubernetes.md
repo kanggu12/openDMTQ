@@ -32,8 +32,9 @@ The Helm chart in `deploy/helm/opendmtq` splits the server by what each part nee
   `kubectl port-forward` (the release notes print the command). Password from
   `admin.existingSecret`, or generated into `<release>-opendmtq-admin`. An init container creates the
   shared folders as uid 33 first.
-- **Broadcasts.** `live.default` is `LIVE_DEFAULT` of the compose setup: `on` starts each player's switch on
-  ([live.md](live.md)).
+- **Broadcasts.** `live.default` is `LIVE_DEFAULT` of the compose setup: `on` starts a new player's switch on until the
+  owner chooses on the Broadcasts page, where broadcasts are also turned on for the server at all ([live.md](live.md)).
+  Those settings are rows of the database, so they come back with it when the api pod is replaced.
 - **Time zone and base APK.** `timeZone` sets the servers' zone (the in-game daily ranking's date);
   `baseApk` names the client in the base folder when it holds more than one.
 - **Locked down.** Every pod runs unprivileged with a read-only root filesystem, no capabilities and
@@ -103,11 +104,12 @@ What happens when the api pod is replaced (measured on kind):
 |---|---|---|
 | Live window | Gone; the next uploads rebuild it | The same |
 | Switch and upload token (database) | Kept; the phone's uploads go on with no new sign-in | The same |
+| Broadcast settings (database) | Kept: on or off, new players, the quality | The same |
 | Recordings | **Lost** | Kept |
 
 Without a claim, recordings count against the node's disk, and no limit of the pod applies, so the 20 GB default cap is
 checked against the node's free space. The `state` volume has no `sizeLimit` for that reason; if you add one, keep it
-above the cap (Recordings page), or the kubelet may evict the pod.
+above the cap (Broadcasts page), or the kubelet may evict the pod.
 
 With a claim, recordings stay when the pod goes, and the server copies segments into it rather than
 linking them. Make it ReadWriteMany (the default), or storage that reattaches quickly: a claim tied

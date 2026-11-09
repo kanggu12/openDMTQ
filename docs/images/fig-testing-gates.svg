@@ -1,66 +1,72 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 596" width="956" height="596" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="Testing. A push or a pull request runs ci.yml on GitHub, without the game's files: the arm32 build, the unit tests and checks, a host install on Ubuntu and Debian, the images, and the contract and pages. tests/qa.sh runs on a machine with the game's files: tools, cli, game, live, ui and host, and the tour on an emulator with EMULATOR=1; it sets the commit status qa/local. With both passed, a tag v* runs release.yml, and ./opendmtq deploy updates a server">
-<rect x="-28" y="-28" width="956" height="596" rx="16" fill="#11151a"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 676" width="956" height="676" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="Testing. A push or a pull request runs ci.yml on GitHub, without the game's files: the arm32 build, the unit tests and checks, a host install on Ubuntu and Debian, the images, the contract and pages, and the PC client's tests and screens. tests/qa.sh runs on a machine with the game's files: tools, cli, client, game, live, ui and host, and the tour on an emulator with EMULATOR=1; it sets the commit status qa/local. With both passed, a tag v* runs release.yml, and ./opendmtq deploy updates a server">
+<rect x="-28" y="-28" width="956" height="676" rx="16" fill="#11151a"/>
 <path d="M0,0 H208 L220,12 V60 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
 <text x="14" y="25.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,206">git push</text>
 <text x="14" y="44.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,206">or a pull request</text>
-<rect x="0" y="100" width="420" height="300" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
+<rect x="0" y="100" width="420" height="370" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
 <text x="14" y="122" font-size="13" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,406">ci.yml on GitHub, without the game's files</text>
 <path d="M14,134 H394 L406,146 V178 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
 <text x="28" y="160.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,392">arm32: the runtime, the shim</text>
-<path d="M14,186 H394 L406,198 V230 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="28" y="212.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,392">test: CLI, scripts, PHP, Helm</text>
-<path d="M14,238 H394 L406,250 V282 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="28" y="264.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,392">host: Ubuntu and Debian</text>
-<path d="M14,290 H394 L406,302 V334 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="28" y="316.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,392">images: tools' tests, the edge</text>
-<path d="M14,342 H394 L406,354 V386 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="28" y="368.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,392">ui: the contract, the pages</text>
+<path d="M14,188 H394 L406,200 V232 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="28" y="214.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,392">test: CLI, scripts, PHP, Helm</text>
+<path d="M14,242 H394 L406,254 V286 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="28" y="268.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,392">host: Ubuntu and Debian</text>
+<path d="M14,296 H394 L406,308 V340 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="28" y="322.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,392">images: tools' tests, the edge</text>
+<path d="M14,350 H394 L406,362 V394 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="28" y="376.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,392">ui: the contract, the pages</text>
+<path d="M14,404 H394 L406,416 V448 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="28" y="430.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,392">client: the PC client, its screens</text>
 <path d="M110,60.5 L110,92" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
 <path d="M110,99 L105.5,90.0 L114.5,90.0 Z" fill="#7b8794" data-tip="110,99"/>
-<rect x="480" y="0" width="420" height="400" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
+<rect x="480" y="0" width="420" height="470" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
 <text x="494" y="22" font-size="13" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="494,886">tests/qa.sh, with the game's files</text>
 <path d="M494,34 H782 L794,46 V74 H494 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
 <text x="508" y="58.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="508,780">tools: with the real client</text>
-<path d="M494,88 H782 L794,100 V128 H494 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="508" y="112.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="508,780">cli</text>
-<path d="M644,74.5 L644,80" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
-<path d="M644,87 L639.5,78.0 L648.5,78.0 Z" fill="#7b8794" data-tip="644,87"/>
-<path d="M494,142 H782 L794,154 V182 H494 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="508" y="166.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="508,780">game: the contract</text>
-<path d="M644,128.5 L644,134" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
-<path d="M644,141 L639.5,132.0 L648.5,132.0 Z" fill="#7b8794" data-tip="644,141"/>
-<path d="M494,196 H782 L794,208 V236 H494 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="508" y="220.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="508,780">live: real files, broadcasts</text>
-<path d="M644,182.5 L644,188" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
-<path d="M644,195 L639.5,186.0 L648.5,186.0 Z" fill="#7b8794" data-tip="644,195"/>
-<path d="M494,250 H782 L794,262 V290 H494 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="508" y="274.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="508,780">ui: the pages</text>
-<path d="M644,236.5 L644,242" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
-<path d="M644,249 L639.5,240.0 L648.5,240.0 Z" fill="#7b8794" data-tip="644,249"/>
-<path d="M494,304 H782 L794,316 V344 H494 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="508" y="328.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="508,780">host: the app built</text>
-<path d="M644,290.5 L644,296" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
-<path d="M644,303 L639.5,294.0 L648.5,294.0 Z" fill="#7b8794" data-tip="644,303"/>
-<path d="M494,358 H732 L744,370 V392 H494 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="508" y="379.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="508,730">tour: on an emulator</text>
-<path d="M794.5,324 L806,324 L806,375 L752,375" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
-<path d="M745,375 L754.0,370.5 L754.0,379.5 Z" fill="#7b8794" data-tip="745,375"/>
-<text x="814" y="354" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="812,900">EMULATOR=1</text>
-<path d="M300,430 H588 L600,442 V490 H300 Z" fill="#1a1f25" stroke="#7b8794" stroke-width="1.2" stroke-dasharray="4 3"/>
-<text x="312" y="455" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="312,590">CI and qa/local passed</text>
-<text x="312" y="473" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="312,590">on the commit?</text>
-<path d="M210,400.5 L210,460 L292,460" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
-<path d="M299,460 L290.0,464.5 L290.0,455.5 Z" fill="#7b8794" data-tip="299,460"/>
-<text x="255" y="452" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="214,296">checks</text>
-<path d="M690,400.5 L690,460 L608,460" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
-<path d="M601,460 L610.0,455.5 L610.0,464.5 Z" fill="#7b8794" data-tip="601,460"/>
-<text x="645" y="452" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="604,686">qa/local</text>
-<path d="M0,500 H388 L400,512 V540 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="14" y="524.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,386">release.yml: a tag v*, then the release</text>
-<path d="M500,500 H888 L900,512 V540 H500 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="514" y="524.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="514,886">./opendmtq deploy: a backup, then checks</text>
-<path d="M380,490.5 L306.961,498.26" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
-<path d="M300,499 L308.5,493.6 L309.4,502.5 Z" fill="#7b8794" data-tip="300,499"/>
-<path d="M520,490.5 L593.039,498.26" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
-<path d="M600,499 L590.6,502.5 L591.5,493.6 Z" fill="#7b8794" data-tip="600,499"/>
+<path d="M494,86 H782 L794,98 V126 H494 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="508" y="110.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="508,780">cli</text>
+<path d="M644,74.5 L644,78" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M644,85 L639.5,76.0 L648.5,76.0 Z" fill="#7b8794" data-tip="644,85"/>
+<path d="M494,138 H782 L794,150 V178 H494 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="508" y="162.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="508,780">client: the launcher</text>
+<path d="M644,126.5 L644,130" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M644,137 L639.5,128.0 L648.5,128.0 Z" fill="#7b8794" data-tip="644,137"/>
+<path d="M494,190 H782 L794,202 V230 H494 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="508" y="214.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="508,780">game: the contract</text>
+<path d="M644,178.5 L644,182" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M644,189 L639.5,180.0 L648.5,180.0 Z" fill="#7b8794" data-tip="644,189"/>
+<path d="M494,242 H782 L794,254 V282 H494 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="508" y="266.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="508,780">live: real files, broadcasts</text>
+<path d="M644,230.5 L644,234" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M644,241 L639.5,232.0 L648.5,232.0 Z" fill="#7b8794" data-tip="644,241"/>
+<path d="M494,294 H782 L794,306 V334 H494 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="508" y="318.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="508,780">ui: the pages</text>
+<path d="M644,282.5 L644,286" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M644,293 L639.5,284.0 L648.5,284.0 Z" fill="#7b8794" data-tip="644,293"/>
+<path d="M494,346 H782 L794,358 V386 H494 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="508" y="370.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="508,780">host: the app built</text>
+<path d="M644,334.5 L644,338" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M644,345 L639.5,336.0 L648.5,336.0 Z" fill="#7b8794" data-tip="644,345"/>
+<path d="M494,424 H732 L744,436 V458 H494 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="508" y="445.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="508,730">tour: on an emulator</text>
+<path d="M794.5,366 L806,366 L806,441 L752,441" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M745,441 L754.0,436.5 L754.0,445.5 Z" fill="#7b8794" data-tip="745,441"/>
+<text x="814" y="420" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="812,900">EMULATOR=1</text>
+<path d="M300,500 H588 L600,512 V560 H300 Z" fill="#1a1f25" stroke="#7b8794" stroke-width="1.2" stroke-dasharray="4 3"/>
+<text x="312" y="525" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="312,590">CI and qa/local passed</text>
+<text x="312" y="543" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="312,590">on the commit?</text>
+<path d="M210,470.5 L210,530 L292,530" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M299,530 L290.0,534.5 L290.0,525.5 Z" fill="#7b8794" data-tip="299,530"/>
+<text x="255" y="522" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="214,296">checks</text>
+<path d="M690,470.5 L690,530 L608,530" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M601,530 L610.0,525.5 L610.0,534.5 Z" fill="#7b8794" data-tip="601,530"/>
+<text x="645" y="522" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="604,686">qa/local</text>
+<path d="M0,580 H388 L400,592 V620 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="604.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,386">release.yml: a tag v*, then the release</text>
+<path d="M500,580 H888 L900,592 V620 H500 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="514" y="604.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="514,886">./opendmtq deploy: a backup, then checks</text>
+<path d="M380,560.5 L306.82,577.423" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M300,579 L307.8,572.6 L309.8,581.4 Z" fill="#7b8794" data-tip="300,579"/>
+<path d="M520,560.5 L593.18,577.423" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M600,579 L590.2,581.4 L592.2,572.6 Z" fill="#7b8794" data-tip="600,579"/>
 </svg>

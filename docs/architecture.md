@@ -8,7 +8,7 @@ How the parts of OpenDMTQ fit together, for anyone who wants to change them. The
 With Docker Compose:
 
 <p align="center">
-  <img src="images/fig-parts-docker.svg" alt="The parts with Docker Compose. Phones (plain HTTP) and browsers (HTTPS) reach the edge, nginx on the one public port, which ends HTTPS and passes each connection to one of Apache's two doors; site.conf sends it to the game server, the players' site or, for /opendmtq/admin, the admin pages, which the owner also opens at localhost:8791. The game server, the site and the admin pages work on data/; the builder puts the app, and the player for Windows with it, in data/apk/out at every start" width="100%">
+  <img src="images/fig-parts-docker.svg" alt="The parts with Docker Compose. Phones (plain HTTP) and browsers (HTTPS) reach the edge, nginx on the one public port, which ends HTTPS and passes each connection to one of Apache's two doors; site.conf sends it to the game server, the players' site or, for /opendmtq/admin, the admin pages, which the owner also opens at localhost:8791. The game server, the site and the admin pages work on data/; the builder puts the app, and the PC client's installer beside it, in data/apk/out at every start" width="100%">
 </p>
 
 | Part | What it does | Code | With Docker Compose | Without containers |
@@ -38,9 +38,14 @@ collide:
 | `static.pmangplus.com` | `/inspection` | The maintenance notice |
 
 OpenDMTQ adds `/` (sends a visitor to the site), `/opendmtq/` (the site and `health.php`), `/thumbs` (small jackets for
-the site), `/apk` (the newest app), `/windows` (the player for Windows with it), `/ca.crt` (the server's own certificate authority), `/live/` (the phones' live
-view uploads), `/opendmtq/admin/` (passed to the admin pages; the old `/admin/` leads there) and `/opendmtq/api/` (their
+the site), `/apk` (the newest app), `/windows` (the PC client's installer, set up for this server), `/ca.crt` (the server's own certificate authority), `/live/` (the live view's
+uploads from phones and PCs), `/opendmtq/admin/` (passed to the admin pages; the old `/admin/` leads there) and `/opendmtq/api/` (their
 API, passed on with them).
+
+The PC client talks to the site through `/opendmtq/client.php`: `?about` says whether the address is an OpenDMTQ server
+(its version, name and address, and whether its app is built; no sign-in), `?signin` signs in with a site ID and password as the sign-in page
+does (the same throttle, and the site's cookie back), and `?app` describes the app on offer to a signed-in player, which
+the client then downloads from `/apk`.
 
 ## How a request is answered
 
@@ -410,14 +415,14 @@ A host install (`host/install.sh`, then `./opendmtq setup`) and the Windows bund
 | Path | Contents | Backed up |
 | :--- | :--- | :--- |
 | `data/content/` | What was imported: the client data and the song data, read only | No (import again) |
-| `data/state/dmtq.db3` (and its `-wal`, `-shm`) | Accounts and scores | Yes |
+| `data/state/dmtq.db3` (and its `-wal`, `-shm`) | Accounts and scores; the players' broadcast switches and the server's broadcast settings (the admin Broadcasts page) | Yes (a restore on the admin pages keeps today's switches and settings) |
 | `data/state/live/` | The live view's window: the last segments of each broadcast. Cleared at start | No |
-| `data/state/live-rec/` | Recordings of broadcasts, up to the limits on the admin Recordings page | No |
+| `data/state/live-rec/` | Recordings of broadcasts, up to the limits on the admin Broadcasts page | No |
 | `data/state/logs/` | The request log the admin Logs page reads (three files of 10 MB), and a host install's other logs | No |
 | `data/state/admin-cache/` | The admin pages' copies of the site's stylesheet, fonts and icon | No (fetched again) |
 | `data/apk/base/` | The owner's APK | No (import again) |
-| `data/apk/out/` | Patched apps with a manifest each, `latest.json` (the one the site offers), `build.json` (the builder's last run), the QR code, and the player for Windows with the app on offer (`<the app's name>-windows.zip`, described in `windows.json`) | No (rebuilt) |
-| `data/apk/opendmtq-player-windows.zip` | The player for Windows without an app, where a server without one beside its code keeps it: fetched from the latest release, or put there by hand | No (the app builder fetches it again) |
+| `data/apk/out/` | Patched apps with a manifest each, `latest.json` (the one the site offers), `build.json` (the builder's last run), the QR code, and the PC client's installer (`OpenDMTQ-Setup.exe`, described in `windows.json`) | No (rebuilt) |
+| `data/apk/OpenDMTQ-Setup.exe` | The PC client's installer, where a server without one beside its code keeps it, with `OpenDMTQ-Setup.exe.version`: fetched from the latest release, or put there by hand | No (the app builder fetches it again) |
 | `data/apk/keystore/` | The signing key and its password | Yes |
 | `data/apk/arm32/` | The arm32 runtime bundle | No (the app builder brings it back) |
 | `data/custom/` | Added songs (`songs/`, `ids.json`) and hidden flags (`hidden.json`); the song list, `catalog.json`, the overlay and the site's jackets made from them | The songs and flags; the rest is rebuilt |

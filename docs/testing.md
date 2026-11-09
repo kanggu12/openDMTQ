@@ -8,7 +8,7 @@ in CI on every push, without them, and what runs on a machine that has them (`te
 both.
 
 <p align="center">
-  <img src="images/fig-testing-gates.svg" alt="Testing. A push or a pull request runs ci.yml on GitHub, without the game's files: the arm32 build, the unit tests and checks, a host install on Ubuntu and Debian, the images, and the contract and pages. tests/qa.sh runs on a machine with the game's files: tools, cli, game, live, ui and host, and the tour on an emulator with EMULATOR=1; it sets the commit status qa/local. With both passed, a tag v* runs release.yml, and ./opendmtq deploy updates a server" width="100%">
+  <img src="images/fig-testing-gates.svg" alt="Testing. A push or a pull request runs ci.yml on GitHub, without the game's files: the arm32 build, the unit tests and checks, a host install on Ubuntu and Debian, the images, the contract and pages, and the PC client's tests and screens. tests/qa.sh runs on a machine with the game's files: tools, cli, client, game, live, ui and host, and the tour on an emulator with EMULATOR=1; it sets the commit status qa/local. With both passed, a tag v* runs release.yml, and ./opendmtq deploy updates a server" width="100%">
 </p>
 
 ## What runs where
@@ -21,6 +21,9 @@ both.
 | Scripts | ShellCheck on every script, at the version GitHub's runners have | see `ci.yml`, `shell_tests` in `tests/qa.sh` | CI, `qa.sh` | no |
 | Build | The arm32 runtime and shim, both images, the Helm chart against Kubernetes' schemas, a start without game files | see `ci.yml` | CI | no |
 | Windows player | The runtime's guest programs with the Windows runner, the player's Java VM, mixer and video reader: under Wine, then on Windows itself | `arm32/test_windows.sh` (Wine), `arm32/test_windows.ps1` (Windows) | CI (`arm32-windows`, `arm32-windows-real`) | no |
+| PC client | The launcher's logic on a stand-in server and player (`client/tests`), then every page, the first-start guide and the dialogs on a virtual screen, in both languages at three window sizes, with a layout check | `(cd client && python3 -m unittest discover -s tests -t .)`, `client/tests/ui/run.sh <folder>` | CI (`client`), `qa.sh` | no |
+| PC client, end to end | The installer as the site hands it out, under Wine against a throwaway server: installed through its own dialog, the first-start guide, the sign-in, the app's download, PLAY, Alt+F4 opening the menu that pauses the game, the menu's Quit, the launcher back | `client/tests/windows/e2e.sh` | by hand, with a change to the client or the player | yes |
+| Broadcast colours | The colours a broadcast from Windows says it has (`arm32/tests/host/live_sps_test.cpp`) | see `ci.yml` | CI | no |
 | Contract | Every reply of the game server the client depends on, its quirks, a save under a held lock, and not one PHP warning | `tests/game/protocol.sh` (`protocol.py`, `lock.php`) | CI, `qa.sh` | no |
 | Pages | All pages at five screen widths in both languages, empty and full, on air and under maintenance; the replay player and the owner's forms | `tests/ui/run.sh` | CI, `qa.sh` | no |
 | Server | The real game files: every request the game makes, broadcasts, recordings, sign-ins | `tests/live/run.sh` (`BROWSER=1` adds a real video) | `qa.sh` | yes |

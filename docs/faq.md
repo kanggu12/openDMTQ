@@ -54,10 +54,10 @@ Android 5.0 or newer, phones and tablets. Newer ones without 32-bit support (Pix
 work too: the server adds what they need to the app. iPhones do not ([why](game-files.md#iphones)).
 
 **Can I play on a computer?**
-On a PC with 64-bit Windows 10 or 11: the site's Download page has a player for Windows with the server's app in it.
-Unzip it and start `OpenDMTQ-Player.exe` in its `OpenDMTQ-Player` folder; nothing is installed. The PC is a player of
-its own, apart from your phone, and the game's account transfer carries a player from one to the other
-([the player for Windows](windows-player.md)).
+On a PC with 64-bit Windows 10 or 11: the site's Download page has the PC client, an installer set up for the server.
+It installs for your Windows account without administrator rights; sign in there with your site ID, and it downloads the
+game and keeps it up to date. The PC is a player of its own, apart from your phone, and the game's account transfer
+carries a player from one to the other ([the PC client](windows-player.md)).
 
 **Does it need the internet?**
 Only to get its programs onto the server. The server's Windows bundle (`OpenDMTQ-windows.zip`) already has them all.

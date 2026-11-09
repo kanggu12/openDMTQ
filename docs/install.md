@@ -110,6 +110,16 @@ Each player needs an account: make them in the setup, or later on the admin page
    Android asks.
 3. Start the game and allow storage access. It downloads its data from the server on the first start.
 
+## On a Windows PC
+
+The same accounts play on a PC ([the PC client](windows-player.md)).
+
+1. On the server's site, sign in and open **Download**. Under **On a computer (Windows)**, download the installer.
+2. Run it and choose **Install**: no administrator rights, set up for the server. If Windows says it protected your
+   PC: **More info**, then **Run anyway**.
+3. The launcher signs in with the player's account, downloads the game, and asks about the picture and the sound once.
+   Then **PLAY**.
+
 ## Everyday use
 
 | To | Windows | Linux or macOS | Docker |
@@ -129,6 +139,7 @@ Everything else is on the admin pages: the app, songs, players, accounts, record
 | **Server** | 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker; 2 GB of memory | 2 cores, 4 GB |
 | **Disk** | 1 GB without the songs | 7 GB with every song |
 | **Phones** | Android 5.0 | Android 8 or newer to broadcast |
+| **PCs** | 64-bit Windows 10 or 11 on an x64 processor, Direct3D 11, 350 MB of disk | A touch screen |
 
 At rest the server takes about 170 MB of memory, and up to 1.6 GB for half a minute while it builds the app. The client
 data takes about 120 MB and the song data 4.5 GB; each app build about 110 MB, the last ten kept. Broadcast recordings

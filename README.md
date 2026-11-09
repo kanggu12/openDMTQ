@@ -79,7 +79,7 @@ cd openDMTQ
 
 The setup takes you through your files, the address, an account for each player and the app: in the browser on
 Windows, Linux and macOS, in the terminal with Docker. On each Android phone, open the address it shows, sign in and
-install the app.
+install the app; on a Windows PC, download the installer from the same page.
 
 [Installing, step by step](docs/install.md).
 
@@ -90,21 +90,22 @@ install the app.
 | **Server** | 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker; 2 GB of memory | 2 cores, 4 GB |
 | **Disk** | 1 GB without the songs | 7 GB with every song |
 | **Phones** | Android 5.0 | Android 8 or newer to broadcast |
-| **PCs** | The player for Windows: 64-bit Windows 10 or 11 on an x64 processor (Intel or AMD), Direct3D 11, 500 MB of disk | A touch screen, for several fingers at once |
+| **PCs** | The PC client: 64-bit Windows 10 or 11 on an x64 processor (Intel or AMD), Direct3D 11, 350 MB of disk | A touch screen, for several fingers at once |
 
 ## Features
 
 - **Nothing to set on a phone.** No hosts file, proxy app or certificate: one app from the server's page.
 - **The game's online side.** Accounts, scores, the monthly and per-song rankings, achievements and the maintenance
   notice.
-- **A site for players.** Rankings, songs, profiles, and live broadcasts of players in a song with their recordings, in
-  English and Korean.
-- **Admin pages.** A setup in the browser, the app, songs, players, accounts, recordings, backups.
+- **A site for players.** Rankings, songs, profiles, and live broadcasts of players in a song with their recordings
+  (off until you turn them on), in English and Korean.
+- **Admin pages.** A setup in the browser, the app, songs, players, accounts, broadcasts and their recordings, backups.
 - **Your own songs.** Add songs as packages or hide others; phones get what changed at their next start.
 - **Newer phones too.** Phones without 32-bit support run the game through OpenDMTQ's runtime
   ([below](#newer-phones-too)).
-- **On a PC too.** The site offers a player for Windows with the server's app in it: unzip it and play, nothing to
-  install ([the player for Windows](docs/windows-player.md)).
+- **On a PC too.** The site offers an installer for Windows set up for the server: its launcher signs in, downloads the
+  game and keeps it up to date, and sets the picture and the sound up for the PC, from VSync to the sound device
+  ([the PC client](docs/windows-player.md)).
 - **No internet needed** once the files are in ([without internet](docs/closed-network.md)).
 
 ### Newer phones too
@@ -144,7 +145,7 @@ scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#pr
 | [Questions and answers](docs/faq.md) | What it needs, which phones, playing with friends, privacy |
 | [The site and the admin pages](docs/admin.md) | The setup, the app, songs, players, backups |
 | [The API](docs/api.md) | All the admin pages show and do, and what the players' site shows, as JSON |
-| [The player for Windows](docs/windows-player.md) | Playing on a PC, from the server's site |
+| [The PC client](docs/windows-player.md) | Playing on a Windows PC: the installer, the launcher, the picture and the sound |
 | [Songs](docs/songs.md) | Importing songs, adding your own |
 | [Playing from outside your home](docs/internet.md) | A host name, one forwarded port, HTTPS |
 | [Live broadcasts](docs/live.md) | Watching players in a song, recordings |

@@ -40,7 +40,7 @@ before making anything and names the file of the client it could not change.
 ### iPhones
 
 OpenDMTQ serves the Android app: on Android phones and tablets, and on Windows PCs through the
-[player for Windows](windows-player.md), which runs the same app. The iPhone app cannot be pointed at another server the
+[PC client](windows-player.md), which runs the same app. The iPhone app cannot be pointed at another server the
 way the Android app is:
 
 - An `.ipa` from the App Store has its code encrypted for the Apple account that downloaded it. Any change means

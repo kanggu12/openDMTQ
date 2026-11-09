@@ -314,7 +314,7 @@ The App page: the app on offer, its builds, the way friends get it.
 | Route | Scope | What it does |
 |:---|:---:|:---|
 | [`GET /app`](#get-app) | read | The app players get: its build, whether it is right for this server, a build running now. |
-| [`GET /app/windows`](#get-appwindows) | read | The player for Windows with the app on offer in it, as the site hands it to computers. |
+| [`GET /app/windows`](#get-appwindows) | read | The installer for Windows as the site hands it to computers, set up for this server (its address on the installer's end). |
 | [`GET /app/icon`](#get-appicon) | read | The launcher icon of the app on offer, as the builder kept it. |
 | [`GET /builds`](#get-builds) | read | Every build of the app, newest first. |
 | [`POST /builds`](#post-builds) | write | Starts a build of the app, as the App page's buttons do. |
@@ -333,13 +333,13 @@ Answer: `200` with [AppOnOffer](#apponoffer).
 
 #### `GET /app/windows`
 
-The player for Windows with the app on offer in it, as the site hands it to computers.
+The installer for Windows as the site hands it to computers, set up for this server (its address on the installer's end).
 
-Answer: `200` with the file itself (`application/zip`).
+Answer: `200` with the file itself (`application/vnd.microsoft.portable-executable`).
 
 Refusals:
 
-- `404 not_found`: No player for Windows is kept for the app on offer.
+- `404 not_found`: This server keeps no installer for Windows.
 
 #### `GET /app/icon`
 
@@ -927,9 +927,41 @@ Refusals:
 
 - `404 token_not_found`: No such token.
 
+### Broadcasts
+
+The Broadcasts page's top: broadcasts on or off for the server, and their settings.
+
+| Route | Scope | What it does |
+|:---|:---:|:---|
+| [`GET /broadcasts`](#get-broadcasts) | read | The server's broadcasts: on or off, what new players start with, the quality, and who is switched on and on air. |
+| [`PUT /broadcasts`](#put-broadcasts) | write | Turns broadcasts on or off for the server, sets what new players start with and the quality. |
+
+#### `GET /broadcasts`
+
+The server's broadcasts: on or off, what new players start with, the quality, and who is switched on and on air.
+
+Answer: `200` with [BroadcastSettings](#broadcastsettings).
+
+#### `PUT /broadcasts`
+
+Turns broadcasts on or off for the server, sets what new players start with and the quality. What is left out stays as it is. Off: phones and PCs send nothing and the site shows nothing of broadcasts; each player's switch is kept, whoever is on air is told once in the game that the broadcast ended, every live window goes at once and running recordings are closed. On: each player switched on is told in the game, between songs. New players turned to start on: every player already there counts as chosen for, so only those who come after start on. Phones and the PC player follow a new quality within 15 seconds.
+
+Body (JSON):
+
+- `on` (boolean, optional): Broadcasts on or off for the server.
+- `new_players` (boolean, optional): Whether a new player's switch starts on.
+- `quality` (string, optional): light, standard, smooth or sharp. One of `light`, `standard`, `smooth`, `sharp`.
+
+Answer: `200` with [BroadcastSettings](#broadcastsettings).
+
+Refusals:
+
+- `400 bad_body`: None of the three was sent.
+- `400 bad_field`: A quality there is not.
+
 ### Recordings
 
-The Recordings page.
+The Broadcasts page's recordings.
 
 | Route | Scope | What it does |
 |:---|:---:|:---|
@@ -1631,7 +1663,8 @@ The status page's numbers.
 - `plays_today` (integer): Plays in the last 24 hours.
 - `plays_week` (integer): Plays in the last 7 days.
 - `active_week` (integer): Players who played in the last 7 days.
-- `live` (integer): Players on air now.
+- `live` (integer): Players on air now (none while broadcasts are off).
+- `broadcasts` (boolean): True while broadcasts are on for the server (GET /broadcasts).
 
 #### DashPlay
 
@@ -1790,18 +1823,18 @@ The app players get.
 - `says` (string, or null): The same in words.
 - `build_error` (string, or null): Why the last build for this address failed.
 - `icon` (boolean): True when its icon is kept (GET /app/icon).
-- `windows` ([WindowsPlayer](#windowsplayer), or null): The player for Windows with this app in it, which the site offers computers (GET /app/windows); null on a server without the player, and while no zip holds the app on offer (by its file name and its hash).
+- `windows` ([WindowsInstaller](#windowsinstaller), or null): The installer for Windows (the PC client) that the site offers computers (GET /app/windows); null on a server without it.
 - `building` ([Job](#job), or null): A build running now.
 
-#### WindowsPlayer
+#### WindowsInstaller
 
-The player for Windows with the app on offer in it, as the builder made it.
+The installer for Windows (the PC client) as the builder keeps it, before the server's address goes on its end as it is handed out.
 
-- `file` (string): Its file name: the app's, ending in -windows.zip.
-- `size` (integer): Its size (bytes).
-- `sha256` (string): Its SHA-256.
-- `built_at` (string): When the builder made it (YYYY-MM-DDTHH:MM:SS).
-- `player` (string): The version of the player in it.
+- `file` (string): Its file name as kept: OpenDMTQ-Setup.exe.
+- `size` (integer): Its size as kept (bytes); handed out, it is longer by the server's address.
+- `sha256` (string): Its SHA-256 as kept.
+- `version` (string, or null): The OpenDMTQ version it is from; null for a copy put on the server by hand.
+- `copied_at` (string): When the builder put it beside the app (YYYY-MM-DDTHH:MM:SS).
 
 #### Build
 
@@ -1911,7 +1944,7 @@ A player on the Players page.
 - `plays_30_days` (integer): Plays over the last 30 days.
 - `days` (list of integer): Plays on each of the last 14 days, oldest first.
 - `phones` (integer): Phones they have played on.
-- `broadcast` (string): Their broadcast: off, switched on and waiting for video, or on air. One of `off`, `waiting`, `on_air`.
+- `broadcast` (string): Their broadcast: off, switched on and waiting for video, on air, or switched on and held while broadcasts are off for the server. One of `off`, `waiting`, `on_air`, `held`.
 - `seen` (string): Who the number belongs to now: send it as ?seen= with a change.
 
 #### PlayerList
@@ -2523,10 +2556,34 @@ A best record.
 - `accuracy` (number): The accuracy (percent).
 - `set_at` (integer, or null): When it was set (null for a record older than the play log).
 
+#### BroadcastSettings
+
+The server's broadcasts as a whole (the Broadcasts page).
+
+- `on` (boolean): True while broadcasts are on: only then do phones and PCs send video and does the site show broadcasts.
+- `new_players` (boolean): True when a new player's switch starts on, from their first play.
+- `quality` (string): The stream's quality the phones and the PC player are asked for. One of `light`, `standard`, `smooth`, `sharp`.
+- `qualities` (list of [BroadcastQuality](#broadcastquality)): Every quality, with what it costs.
+- `switched_on` (integer): Players whose own switch is on.
+- `on_air` (integer): Players on air now (none while broadcasts are off).
+
+#### BroadcastQuality
+
+A quality of the stream.
+
+- `key` (string): Its name: light, standard, smooth or sharp.
+- `height` (integer): The picture's height in pixels.
+- `fps` (integer): Frames a second.
+- `bitrate` (integer): The picture's bitrate (bit/s).
+- `segment` (integer): A segment's length (seconds).
+- `hour_bytes` (integer): What an hour of broadcast takes on the disk, about (bytes).
+- `viewer_bits` (integer): Each viewer's connection, about (bit/s), picture and sound.
+
 #### SiteLive
 
 The site's broadcasts.
 
+- `on` (boolean): True while broadcasts are on for the server; while off, the site shows none of them.
 - `live` (list of [LiveNow](#livenow)): Who is on air now.
 - `past` (list of [PastBroadcast](#pastbroadcast)): The recordings players may watch, newest first (300 at most).
 
