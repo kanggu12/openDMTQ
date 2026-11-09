@@ -297,9 +297,11 @@ table.players td.primary { font-weight: 600; overflow-wrap: anywhere; }
 }
 /* A player's broadcast: how it is, in a word with its light, and the switch beside it. */
 .live-row { display: flex; align-items: center; gap: 10px; }
-.live-state { display: inline-flex; align-items: center; gap: 7px; min-width: 5.6em; font-size: 13px; color: var(--ash); white-space: nowrap; }
+.live-state { display: inline-flex; align-items: center; gap: 7px; min-width: 7.6em; font-size: 13px; color: var(--ash); white-space: nowrap; }
 .live-state.on { color: var(--bad); font-weight: 700; }
 .live-state.wait { color: var(--warn); }
+/* Switched on, held while broadcasts are off for the server: the waiting colour's ring, not lit. */
+.live-state.held { color: var(--ash); }
 /* More: what is not done every day, out of the row until asked for. A narrow panel over the rows, kept inside the card: the
    last rows open it upwards. On a phone it opens in place. */
 table.players td.actions { position: relative; }
@@ -630,6 +632,7 @@ th.r.can-sort::after, th.rank.can-sort::after { position: absolute; margin-left:
 .lamp { flex: none; width: 9px; height: 9px; border-radius: 50%; background: #5a6571; }
 .lamp.on { background: var(--ok); box-shadow: 0 0 7px var(--ok); }
 .lamp.wait { background: var(--warn); box-shadow: 0 0 7px var(--warn); }
+.lamp.held { background: transparent; box-shadow: inset 0 0 0 1.5px var(--warn); }
 .live-state .lamp.on { background: var(--bad); box-shadow: 0 0 7px var(--bad); }
 .auto-line.big { font-size: 16px; margin-bottom: 14px; }
 /* The one question before what cannot be undone. */
