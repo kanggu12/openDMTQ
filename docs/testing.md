@@ -27,6 +27,7 @@ both.
 | Broadcast colours | The colours a broadcast from Windows says it has (`arm32/tests/host/live_sps_test.cpp`) | see `ci.yml` | CI | no |
 | Contract | Every reply of the game server the client depends on, its quirks, a save under a held lock, and not one PHP warning | `tests/game/protocol.sh` (`protocol.py`, `lock.php`) | CI, `qa.sh` | no |
 | Pages | All pages at five screen widths in both languages, empty and full, on air and under maintenance; the replay player and the owner's forms | `tests/ui/run.sh` | CI, `qa.sh` | no |
+| Upgrade | The last release's images used as people use them (players and plays, a site account, an API token, the recordings' limits, a broadcast with its recording, a backup), then this tree's images on the same data: nothing lost, every route of the API and what it answers, the backup restored; then the same from this tree's own images, as a restart | `tests/upgrade/run.sh` (`FROM=<version>` for another release) | CI, `qa.sh` | no |
 | Server | The real game files: every request the game makes, broadcasts, recordings, sign-ins | `tests/live/run.sh` (`BROWSER=1` adds a real video) | `qa.sh` | yes |
 | Host install | The README's one command (`host/get.sh`, `host/install.sh`) on a clean system in a container, `./opendmtq setup`, then its setup in the browser (the one-time link, the files found and imported, an account, the app, another address and the restart), the contract, the pages, stop and start | `tests/host/run.sh` (`DISTRO=debian:12`; `APK=<file>` also builds the app) | CI (Ubuntu 24.04, Debian 12), `qa.sh` (with the app) | no (yes with `APK`) |
 | Windows bundle | The bundle built from its pinned downloads, every program's DLLs found, then run: under Wine on Linux (a first start with no settings, then started as a double-click starts it, through the setup's sign-in, what it says of each file, import and restart, and with `APK=<client>` the phone app's build), and on Windows itself in a folder with a space; the import, the contract, the admin pages, nothing left running after its window | `host/windows/build.sh`, `tests/windows/wine.sh`, `tests/windows/run.ps1` | CI | no |
@@ -75,6 +76,20 @@ request or a script error also counts. The findings, the list of results and scr
 (`_work/ui-report`), and in CI as the workflow's `ui-report` artifact.
 
 A rule that fits a page on purpose goes on that page's element as `data-layout-ok`, with the reason in a comment, not in the checker.
+
+`tests/upgrade/run.sh` starts the last release's published images on the same stand-in files and an empty data folder, and
+`tests/upgrade/upgrade.py` uses them the way people do: two phones play, the owner makes a site account and an API token, sets
+the recordings' limits, turns the daily backup off and a player's broadcast on, the phone broadcasts a song, and the Backups
+page makes a backup. Both services are stopped, this tree's images start on that data folder, and everything is asked for
+again: the phones are the players they were and read what they read, every route of the API is still there, each answer that
+holds the data folder's data is the same value for value, the account signs in, the recording plays, new plays and
+broadcasts are saved, and the backup restores. A second server, which nobody broadcast on, must keep broadcasts off. Each
+server is upgraded once more on a copy of its data with the admin service up first and alone, so that either service may be
+the first to look at the old data. Then all of it runs from this tree's own images, which is a restart. A PHP warning or an
+error in the upgraded services' logs fails it too.
+
+It takes the newest release in CHANGELOG.md whose images there are: pulled from the registry, or loaded beforehand with
+`docker load` on a machine with no way out.
 
 ## The gates
 

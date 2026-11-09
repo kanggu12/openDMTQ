@@ -59,7 +59,7 @@ jobs:
 
       - name: Shell scripts
         run: |
-          shellcheck --severity=warning server/entrypoint.sh server/edge/start.sh cli/install.sh host/get.sh host/install.sh host/windows/build.sh tests/closed/run.sh tests/closed/game.sh tests/ha/failover.sh tests/qa.sh tests/ui/run.sh tests/game/tour.sh tests/game/protocol.sh tests/host/run.sh tests/windows/wine.sh tests/live/run.sh tests/live/sound/run.sh tests/live/sound/card.sh deploy/kind/up.sh
+          shellcheck --severity=warning server/entrypoint.sh server/edge/start.sh cli/install.sh host/get.sh host/install.sh host/windows/build.sh tests/closed/run.sh tests/closed/game.sh tests/ha/failover.sh tests/qa.sh tests/ui/run.sh tests/game/tour.sh tests/game/protocol.sh tests/upgrade/run.sh tests/host/run.sh tests/windows/wine.sh tests/live/run.sh tests/live/sound/run.sh tests/live/sound/card.sh deploy/kind/up.sh
           # The runtime's build scripts: warnings and errors (they keep two style notes).
           shellcheck --severity=warning -x -P arm32 arm32/build.sh arm32/bundle.sh arm32/test.sh arm32/ndk.sh arm32/build_desktop.sh arm32/build_windows.sh arm32/bundle_windows.sh arm32/test_desktop.sh arm32/test_windows.sh
 
@@ -92,7 +92,8 @@ jobs:
 
   # The pages in a real browser: every page at five widths in both languages, a server empty and full, players on air, under
   # maintenance, and what people do on them. On stand-in game files, by the real start script (tests/ui/run.sh). Before
-  # them, the game server's contract with the game on the same stand-in files (tests/game/protocol.sh).
+  # them, the game server's contract with the game on the same stand-in files (tests/game/protocol.sh), and an upgrade: the
+  # last release's published images used as people use them, then these images on the same data (tests/upgrade/run.sh).
   ui:
     runs-on: ubuntu-24.04
     # A stalled download fails after 45 minutes, not GitHub's six hours: several times what this job takes.
@@ -122,6 +123,12 @@ jobs:
 
       - name: The game server's contract
         run: tests/game/protocol.sh
+
+      - name: An upgrade from the last release
+        env:
+          TAG: uitest
+          NO_BUILD: "1"
+        run: tests/upgrade/run.sh
 
       - name: The pages' tests
         env:

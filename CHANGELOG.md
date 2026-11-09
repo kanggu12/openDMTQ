@@ -57,6 +57,8 @@ one that only fixes raises the patch number. Each release's section here is its 
   Turned to start new players on, it leaves every player already there as they are: only those who come after start
   on.
 - `GET /broadcasts` and `PUT /broadcasts` in the admin API read and change those settings.
+- An upgrade is tested on every push: the last release's images are used as people use them, then the new ones start on
+  the same data and must have lost nothing (`tests/upgrade/run.sh`).
 
 ### Changed
 

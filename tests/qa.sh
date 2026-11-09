@@ -111,6 +111,8 @@ step game tests/game/protocol.sh
 step live env BROWSER=1 tests/live/run.sh
 # The pages in a real browser. In CI too; here also for what the screenshots show.
 step ui tests/ui/run.sh "$REPORT/ui"
+# An upgrade: the last release's images used as people use them, then this tree's on the same data. In CI too.
+step upgrade tests/upgrade/run.sh
 # Without containers: host/install.sh on a clean Ubuntu, the server run by ./opendmtq, and the phone app built from the
 # game client here (CI runs the same without a client).
 host_tests() {
