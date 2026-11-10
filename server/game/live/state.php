@@ -20,12 +20,6 @@ const TOASTS = [
              'end' => "Your broadcast has ended\nBroadcasts are off on this server for now"],
 ];
 
-/* The server's name as the site shows it (portal/lib.php's server_name()): SERVER_NAME, or the public address. */
-function live_server_name(): string
-{
-    return trim((string)getenv('SERVER_NAME', true)) ?: (getenv('PUBLIC_HOST') ?: ($_SERVER['PUBLIC_HOST'] ?? ''));
-}
-
 // What the stream should be, for the phone's encoder, by the owner's quality; the same whether on or off.
 $reply = ['on' => false] + live_stream_settings() + ['toast' => ''];
 
@@ -49,7 +43,10 @@ function live_take_toast(array $row, ?string $only = null): string
         return '';
     }
     $lang = ($_GET['lang'] ?? '') === 'ko' ? 'ko' : 'en';
-    return isset(TOASTS[$lang][$row['toast']]) ? sprintf(TOASTS[$lang][$row['toast']], live_server_name()) : '';
+    // The server's name as the site shows it, from the site's own server_name(): its library is loaded for a notice
+    // handed out alone, which is rare, and not for every poll.
+    require_once __DIR__ . '/../../portal/lib.php';
+    return isset(TOASTS[$lang][$row['toast']]) ? sprintf(TOASTS[$lang][$row['toast']], server_name()) : '';
 }
 
 // Broadcasts off for the whole server: off for everyone, and nothing else written. The switches stay as they are. A
