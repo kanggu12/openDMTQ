@@ -196,6 +196,26 @@ class Actions(Folder):
         # Nothing to remove for a server this PC never had an app from, and nothing said.
         apps.remove("http://127.0.0.1:2")
 
+    def test_forget_and_start_over(self):
+        # Online's Forget and --forget, Help's Start over and --reset: the same steps, from actions.
+        first, second = "http://127.0.0.1:1", "http://127.0.0.1:2"
+        for url in (first, second):
+            self.state.add_server(url, url)
+            os.makedirs(apps.folder(url))
+            open(os.path.join(apps.folder(url), "app.apk"), "wb").close()
+        self.state.current, self.state.picked_language, self.state.guide_done = first, "ko", True
+        actions.forget(self.state, first)
+        self.assertIsNone(self.state.server(first))
+        self.assertFalse(os.path.exists(apps.folder(first)))
+        # The next one known is the one PLAY plays on, its app kept.
+        self.assertEqual(self.state.current, second)
+        self.assertTrue(os.path.isdir(apps.folder(second)))
+        actions.reset(self.state)
+        self.assertEqual((self.state.servers, self.state.guide_done), ([], False))
+        self.assertFalse(os.path.exists(apps.folder(second)))
+        # The language stays as it was chosen: the guide that follows speaks it.
+        self.assertEqual(self.state.picked_language, "ko")
+
     def test_sign_in_needs_a_server(self):
         with self.assertRaises(srv.ServerError):
             actions.sign_in(self.state, stub.ACCOUNT, stub.PASSWORD)

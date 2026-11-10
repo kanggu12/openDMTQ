@@ -67,11 +67,6 @@ def _columns(parent, ui, weights=(3, 2)):
     return columns
 
 
-def _busy(app):
-    """True while the game runs or PLAY or a download is under way: the server and its app stay as they are then."""
-    return app.busy or app.download is not None or (app.session is not None and app.session.running())
-
-
 # ---------------------------------------------------------------------------------------------- PLAY
 
 
@@ -399,7 +394,7 @@ def connect_panel(app, parent, rerender, bg=theme.BG, forget=False):
     answer.pack(fill="x", pady=(ui.px(8), 0))
 
     def connect():
-        if _busy(app):
+        if app.busy_now():
             answer.configure(text=w("online.busy"), fg=theme.WARN)
             return
         check_server(app, address.get(), then=rerender)
@@ -432,7 +427,7 @@ def signin_panel(app, parent, rerender, bg=theme.BG):
         widgets.lamp(signed, ui, theme.OK, bg=bg).pack(side="left")
 
         def sign_out():
-            if _busy(app):
+            if app.busy_now():
                 # The download or the game uses the sign-in now: it stays until they are over.
                 app.set_status(w("online.busy"), "warn")
                 return
@@ -573,7 +568,7 @@ def _date(details):
 
 def _get(app, rerender):
     """Ask the server for its app and download it when this PC lacks it; the page shows the progress."""
-    if _busy(app):
+    if app.busy_now():
         app.set_status(app.words("online.busy"), "warn")
         return
     app.get_app(done_then=lambda error: rerender())
@@ -595,7 +590,7 @@ def known_servers(app, parent, rerender):
         line.pack(fill="x")
 
         def pick(url=s["url"]):
-            if _busy(app):
+            if app.busy_now():
                 app.set_status(w("online.busy"), "warn")
                 return
             app.state.current = url
@@ -618,16 +613,15 @@ def forget_server(app, server, rerender):
     """Forget a server, its sign-in and its app on this PC, after a question that names it."""
     w = app.words
     in_use = server["url"] == app.state.current
-    if in_use and _busy(app):
-        # Its app is downloading or playing.
+    if in_use and app.files_in_use():
+        # Its app is downloading or playing, from this window or the command line.
         app.set_status(w("online.busy"), "warn")
         return
     # The question short, the server it is about named in the line under it.
     if not dialogs.ask(app, "danger", w("online.forget.title"), w("online.forget.ask"),
                        w("online.forget.detail", name=server["name"]), w("online.forget")):
         return
-    app.state.remove_server(server["url"])
-    apps.remove(server["url"])
+    actions.forget(app.state, server["url"])
     if in_use:
         # What the last download and the last look said was about the server that is gone.
         app.download_error, app.app_note = None, None
@@ -703,26 +697,8 @@ def build_help(app, parent):
                         w("help.clear.hint")).pack(fill="x")
     widgets.divider(card.body, ui)
 
-    def start_over():
-        if _busy(app):
-            app.set_status(w("help.reset.busy"), "warn")
-            return
-        if not dialogs.ask(app, "danger", w("help.reset.title"), w("help.reset.ask"), w("help.reset.detail"),
-                           w("help.reset.confirm"), glyph="restore"):
-            return
-        for s in list(app.state.servers):
-            apps.remove(s["url"])
-        fresh = st.LauncherState()
-        # The language stays as it was, chosen or Windows': the guide that follows speaks it.
-        fresh.picked_language = app.state.picked_language
-        app.state.__dict__.update(fresh.__dict__)
-        app.state.save()
-        app.devices = None
-        app.page = "play"
-        app.show()
-
     widgets.setting_row(card.body, ui, w("help.reset"),
-                        lambda p: widgets.Button(p, ui, w("help.reset"), start_over, kind="danger"),
+                        lambda p: widgets.Button(p, ui, w("help.reset"), lambda: start_over(app), kind="danger"),
                         w("help.reset.hint")).pack(fill="x")
     if root and installed.updater(root):
         # Velopack's uninstaller is what takes the program; a copied folder is deleted as any folder.
@@ -760,13 +736,28 @@ def _in_background(app, message, glyph, job, then):
 
 
 def _not_now(app):
-    """True, said on the status line, while the game runs or PLAY or a download is under way: the files these tools
-    change are in use then. A game started from the command line counts too."""
-    from opendmtq_client import playing
-    if _busy(app) or playing.running():
+    """True, said on the status line, while the files these tools change are in use (app.files_in_use): the game runs,
+    from this window or the command line, or PLAY or a download is under way."""
+    if app.files_in_use():
         app.set_status(app.words("help.reset.busy"), "warn")
         return True
     return False
+
+
+def start_over(app):
+    """Start over: after a question, every server's app goes and the launcher is as at a first start, the guide next
+    in the language it speaks now (actions.reset)."""
+    w = app.words
+    if _not_now(app):
+        return
+    if not dialogs.ask(app, "danger", w("help.reset.title"), w("help.reset.ask"), w("help.reset.detail"),
+                       w("help.reset.confirm"), glyph="restore"):
+        return
+    actions.reset(app.state)
+    app.state.save()
+    app.devices = None
+    app.page = "play"
+    app.show()
 
 
 def repair_program(app):
@@ -948,9 +939,8 @@ def build_about(app, parent):
                            kind="primary").pack(anchor="w", pady=(ui.px(10), 0))
 
     def update(result):
-        from opendmtq_client import playing
         # A game from this window or from the command line: the update replaces the player's files under it.
-        if _busy(app) or playing.running():
+        if app.files_in_use():
             # The update replaces the player's files: a game playing from them would lose them mid-song.
             answer.configure(text=w("about.update_busy"), fg=theme.WARN)
             return

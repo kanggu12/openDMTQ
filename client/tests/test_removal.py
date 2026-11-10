@@ -272,7 +272,7 @@ class WindowFlow(Folder):
         state.add_server("http://127.0.0.1:1", "Somewhere")
         state.save()
         write(os.path.join(removal.data_root(), "com.example.game"), GAME)
-        app = types.SimpleNamespace(words=i18n.Words("en"), state=state, busy=False, download=None, session=None,
+        app = types.SimpleNamespace(words=i18n.Words("en"), state=state, files_in_use=lambda: False,
                                     set_status=lambda *a, **k: None)
         said = []
 
@@ -288,6 +288,27 @@ class WindowFlow(Folder):
         self.assertEqual(said, [app.words("help.uninstall.failed")])
         self.assertFalse(os.path.exists(removal.data_root()))
 
+    def test_start_over_and_forget_wait_for_a_game_from_the_command_line(self):
+        # Every tool that deletes waits while a game runs, also one the command line started (app.files_in_use), which
+        # the page's own busy state (PLAY, a download, this window's game) does not know of.
+        from opendmtq_client import app as launcher, dialogs, i18n, pages, playing
+        state = st.LauncherState()
+        state.add_server("http://127.0.0.1:1", "Somewhere")
+        os.makedirs(apps.folder("http://127.0.0.1:1"))
+        said = []
+        app = types.SimpleNamespace(words=i18n.Words("en"), state=state, busy=False, download=None, session=None,
+                                    set_status=lambda text, tone="normal", **kw: said.append(text))
+        for name in ("_game_open", "busy_now", "files_in_use"):
+            setattr(app, name, getattr(launcher.LauncherApp, name).__get__(app))
+        with mock.patch.object(playing, "running", return_value=True), \
+                mock.patch.object(dialogs, "ask", side_effect=AssertionError("asked")):
+            self.assertEqual((app.busy_now(), app.files_in_use()), (False, True))
+            pages.start_over(app)
+            pages.forget_server(app, state.server(), lambda: None)
+        self.assertEqual(said, [app.words("help.reset.busy"), app.words("online.busy")])
+        self.assertIsNotNone(state.server("http://127.0.0.1:1"))
+        self.assertTrue(os.path.isdir(apps.folder("http://127.0.0.1:1")))
+
     def test_clear_counts_in_the_background_then_asks_with_the_size(self):
         # The count is work in the background like the clearing (through a game's thousands of files the window would
         # stop answering), and the question after it says what it found.
@@ -295,8 +316,8 @@ class WindowFlow(Folder):
         os.environ.pop("OPENDMTQ_CLIENT_DIR", None)
         game = os.path.join(removal.data_root(), "com.example.game")
         write(game, GAME)
-        app = types.SimpleNamespace(words=i18n.Words("en"), state=st.LauncherState(), busy=False, download=None,
-                                    session=None, page="online", set_status=lambda *a, **k: None)
+        app = types.SimpleNamespace(words=i18n.Words("en"), state=st.LauncherState(), files_in_use=lambda: False,
+                                    page="online", set_status=lambda *a, **k: None)
         jobs, asked = [], []
 
         def background(app, words, glyph, job, then):

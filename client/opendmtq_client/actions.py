@@ -108,6 +108,24 @@ def sign_out(state):
     state.forget_sign_in()
 
 
+def forget(state, url):
+    """Forget a server, its sign-in and its app on this PC (Online's Forget, --forget); the next server known becomes
+    the one PLAY plays on when it was this one. The caller asks first, and saves."""
+    state.remove_server(url)
+    apps.remove(url)
+
+
+def reset(state):
+    """Start over (Help's Start over, --reset): every server's app on this PC goes, and the state is a first start's,
+    the guide next; the language stays as it was, chosen or Windows'. The caller asks first, and saves."""
+    from opendmtq_client import state as st
+    for server in list(state.servers):
+        apps.remove(server["url"])
+    picked = state.picked_language
+    state.__dict__.update(st.LauncherState().__dict__)
+    state.picked_language = picked
+
+
 def check_app(state):
     """The app the current server offers now, kept with the server; SignedOut forgets the sign-in."""
     server = state.server()

@@ -94,6 +94,16 @@ class CommandLine(Folder):
         self.assertEqual(code, 0)
         self.assertEqual(st.LauncherState.load().servers, [])
 
+    def test_reset_and_forget_wait_for_the_game(self):
+        # A game from the window or another command plays from the server's app, which both delete.
+        self.run_main(["--server", self.site.url])
+        with mock.patch.object(playing, "running", return_value=True):
+            for args in (["--reset", "--yes"], ["--forget", self.site.url, "--yes"]):
+                code, said = self.run_main(args)
+                self.assertEqual(code, 2, args)
+                self.assertIn("Close the game first", said)
+        self.assertIsNotNone(st.LauncherState.load().server(self.site.url))
+
     def test_the_installers_server_is_taken_at_start(self):
         # Written with a path after it: the launcher keeps it as it writes every address, so connecting finds the same one.
         preset.hand_over({"url": self.site.url + "/opendmtq/", "name": "From the site"})

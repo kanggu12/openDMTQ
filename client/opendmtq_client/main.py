@@ -226,7 +226,8 @@ def _maintain(args):
 
 
 def _started_meanwhile(window=False):
-    """A game started while the y/N waited (or, for the uninstall, the launcher's window opened): said, and True."""
+    """A game running, before the y/N or one started while it waited (or, for the uninstall, the launcher's window
+    opened): said, and True."""
     from opendmtq_client import playing
     if playing.running():
         _say("Close the game first: it uses the files this changes.", error=True)
@@ -535,15 +536,15 @@ def _run(state, args, jobs):
     if args.update:
         return _update(args.yes)
     if args.reset:
+        # Every server's app goes: refused while a game plays from one, as the window's Start over is.
+        if _started_meanwhile():
+            return 2
         if not _ask("Forget every server, sign-in, downloaded app and setting?", args.yes):
             _say("Nothing changed.")
             return 1
-        for s in list(state.servers):
-            apps.remove(s["url"])
-        # The language stays as it was, chosen or Windows'.
-        picked = state.picked_language
-        state.__dict__.update(st.LauncherState().__dict__)
-        state.picked_language = picked
+        if _started_meanwhile():
+            return 2
+        actions.reset(state)
         _say("Started over: the launcher opens its first-start guide next time.")
         return 0
     if args.forget:
@@ -551,11 +552,16 @@ def _run(state, args, jobs):
         if state.server(url) is None:
             _say("This launcher does not know %s." % url, error=True)
             return 2
+        # The server in use: a game may be playing from its app, which goes too (Online's Forget waits as well).
+        in_use = url == state.current
+        if in_use and _started_meanwhile():
+            return 2
         if not _ask("Forget %s, its sign-in and its app on this PC?" % url, args.yes):
             _say("Nothing changed.")
             return 1
-        state.remove_server(url)
-        apps.remove(url)
+        if in_use and _started_meanwhile():
+            return 2
+        actions.forget(state, url)
         _say("Forgot %s." % url)
     for item in args.set:
         name, _, value = item.partition("=")

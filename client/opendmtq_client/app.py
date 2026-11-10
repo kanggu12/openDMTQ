@@ -178,12 +178,28 @@ class LauncherApp:
         if not hasattr(self, "play_button") or not self.play_button.winfo_exists():
             # The guide is on show: it has no PLAY bar.
             return
-        if self.session is not None and self.session.running():
+        if self._game_open():
             self.play_button.set("playing", self.words("bottom.playing"))
-        elif self.busy or self.download is not None or not self.ready():
+        elif self.busy_now() or not self.ready():
             self.play_button.set("waiting", self.words("bottom.play"))
         else:
             self.play_button.set("ready", self.words("bottom.play"))
+
+    def _game_open(self):
+        """The game this window started is running."""
+        return self.session is not None and self.session.running()
+
+    def busy_now(self):
+        """True while PLAY gets ready, the app downloads or the game this window started runs: the server, its sign-in
+        and its app stay as they are until then."""
+        return self.busy or self.download is not None or self._game_open()
+
+    def files_in_use(self):
+        """True while busy_now(), and while a game started from the command line runs (playing.py): the player's
+        files, the servers' apps and the game's data, which Repair, Clear game data, Uninstall, Start over and Forget
+        change or delete, are in use then."""
+        from opendmtq_client import playing
+        return self.busy_now() or playing.running()
 
     def ready(self):
         """True when nothing stops PLAY (the player, a server, its app or a sign-in to get it, no game running)."""
@@ -193,7 +209,7 @@ class LauncherApp:
 
     def play(self):
         """Get the newest app on a worker thread when the server can be asked, then start the game."""
-        if self.busy or self.download is not None or (self.session is not None and self.session.running()):
+        if self.busy_now():
             return
         self.user_acted()
         if not self.ready():
@@ -285,7 +301,7 @@ class LauncherApp:
         self.root.after(1000, self._watch)
 
     def _watch(self):
-        if self.session is not None and self.session.running():
+        if self._game_open():
             self.root.after(1000, self._watch)
             return
         from opendmtq_client import playing
@@ -415,7 +431,7 @@ class LauncherApp:
         except srv.ServerError:
             log.warning("the installer left an address that is none: %r", brought["url"])
             return
-        busy = self.busy or self.download is not None or (self.session is not None and self.session.running())
+        busy = self.busy_now()
         before = self.state.current
         self.state.add_server(url, brought["name"])
         if busy and before:
@@ -449,7 +465,7 @@ class LauncherApp:
         self.checks = checks
         # A message kept until the player does something (a sign-in that ended, a stopped download) stays.
         quiet = self.status_sticky
-        if not quiet and not self.busy and self.download is None and not (self.session and self.session.running()):
+        if not quiet and not self.busy_now():
             if self.state.server() is None:
                 self.set_status(self.words("status.no_server"), "warn")
             elif not self.ready():
@@ -635,7 +651,7 @@ class LauncherApp:
             self.dialog.close(self.dialog.cancel_value)
         self.cancel_download()
         self.state.save()
-        if self.session is not None and self.session.running():
+        if self._game_open():
             self.quit_after_game = True
             self.root.withdraw()
             return
