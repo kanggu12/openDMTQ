@@ -45,12 +45,13 @@
 <section class="card">
   <h2>{{ t('bak.upload') }}</h2>
   <p class="lead">{{ t('bak.upload_lead') }}</p>
-  <form method="post" enctype="multipart/form-data" class="upload">
+  {# Without a file the button waits (admin.js); the page's own check (novalidate) says so in its words if it is sent. #}
+  <form method="post" enctype="multipart/form-data" class="upload" novalidate>
     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="upload">
     {# Like the song upload box: the whole box opens the file picker, the button in it shows where,
        and the form's own button sends the file (the same main button as there). #}
     <label class="drop" data-max="{{ max_backup }}">
-      <input type="file" name="file" accept=".gz" required>
+      <input type="file" name="file" accept=".gz" required data-bad="{{ tp('bak.choose') }}">
       <span class="drop-text"><span class="drop-title">{{ t('bak.file') }}</span><span class="drop-hint">{{ t('drop.upto', size=max_backup|human) }}<span class="drop-only">{{ t('drop.or') }}</span></span></span>
       <span class="btn btn-sm drop-pick" aria-hidden="true">{{ t('drop.choose') }}</span>
     </label>

@@ -95,10 +95,11 @@
   {# How long the room left lasts, as the API says it (recordings.rec_room): up to the limit, or the disk's free space if
      that is less (it counts as a limit too). Under an hour, the page says so. #}
   <p class="meta">{{ t('rec.room', h=room.hours_left, size=per_hour|human) if room.hours_left else t('rec.room_short', size=per_hour|human) }} {{ t('rec.about') }}</p>
-  <form method="post" class="rec-limits">
+  {# Checked on the page first (admin.js, novalidate), in the server's own words for these limits: it checks them again. #}
+  <form method="post" class="rec-limits" novalidate>
     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="limits">
-    <label class="field">{{ t('rec.total') }} <input class="input" name="cap_gb" type="number" min="0.001" step="any" value="{{ '%g'|format(pending.cap_gb if pending else room.cap_gb) }}" required></label>
-    <label class="field">{{ t('rec.days') }} <input class="input" name="days" type="number" min="1" step="1" value="{{ pending.days if pending else room.days }}" required></label>
+    <label class="field">{{ t('rec.total') }} <input class="input" name="cap_gb" type="number" min="0.001" step="any" value="{{ '%g'|format(pending.cap_gb if pending else room.cap_gb) }}" required data-bad="{{ tp('rec.bad_limits') }}"></label>
+    <label class="field">{{ t('rec.days') }} <input class="input" name="days" type="number" min="1" step="1" value="{{ pending.days if pending else room.days }}" required data-bad="{{ tp('rec.bad_limits') }}"></label>
     <button class="btn">{{ t('rec.save') }}</button>
   </form>
   {# Lower limits delete recordings at once and for good: what they would delete, and the yes for it. #}

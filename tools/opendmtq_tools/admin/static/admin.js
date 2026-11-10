@@ -60,6 +60,43 @@ for (const box of document.querySelectorAll('textarea')) {
   addEventListener('resize', fit);
 }
 
+// A form the page checks itself (novalidate): what is wrong is said in the page's own look and language, not in the
+// browser's bubble in the browser's. A field with a rule carries the words for it (data-bad): the server's own for the same
+// check, which the server still makes. The first field that breaks its rule is said just above its form and gets the
+// focus, and nothing is sent. In the capture phase: before the question of what cannot be undone and the busy button.
+document.addEventListener('submit', e => {
+  const form = e.target;
+  if (!form.noValidate) return;
+  // The first field that breaks its rule: empty, too short, not the pattern, out of range, a date typed in part.
+  const wrong = [...form.elements].find(f => f.willValidate && !f.validity.valid);
+  if (!wrong) return;
+  e.preventDefault();
+  // Nothing else hears of this press: no question opens, no button says it is busy.
+  e.stopPropagation();
+  // One message per form, said again for the next field. On the sign-in, in place of the server's last one.
+  let says = form.previousElementSibling;
+  if (!says || !says.matches('.form-says, .signin .error, .signin .done')) {
+    says = document.createElement('p');
+    form.before(says);
+  }
+  // The sign-in box's own error look, as its server message has; the message look of the other pages.
+  says.className = form.closest('.signin') ? 'form-says error' : 'form-says flash bad';
+  says.setAttribute('role', 'alert');
+  // The rule's words; the browser's own only for a field that has none.
+  says.textContent = wrong.dataset.bad || wrong.validationMessage;
+  // The field itself, marked and in reach of the keyboard.
+  wrong.setAttribute('aria-invalid', 'true');
+  wrong.focus();
+}, true);
+// A field put right: its mark and its form's message go.
+document.addEventListener('input', e => {
+  const field = e.target;
+  if (!field.form || field.getAttribute('aria-invalid') !== 'true' || !field.validity.valid) return;
+  field.removeAttribute('aria-invalid');
+  const says = field.form.previousElementSibling;
+  if (says && says.classList.contains('form-says')) says.remove();
+});
+
 // A job a page started (the app's build, the setup's import), followed in its log box until it ends. The box says where to
 // ask (data-job), where to go once the job is done (data-done), and where once this service no longer knows it
 // (data-gone: it started again). A look that fails, on the network or in a reply that does not read, is tried again 3

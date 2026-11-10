@@ -187,9 +187,10 @@
 <section class="card">
   <h2>{{ t('setup.players_title') }}</h2>
   <p class="lead">{{ t('setup.players_lead') }}</p>
-  <form method="post" action="{{ url_for('setup_player') }}" class="form-row">
+  {# Checked on the page first (admin.js, novalidate), in the server's own words: the server checks it again. #}
+  <form method="post" action="{{ url_for('setup_player') }}" class="form-row" novalidate>
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label class="field grow">{{ t('acc.id') }} <input class="input" name="name" required pattern="[A-Za-z0-9._\-]{3,20}" maxlength="20" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" lang="en" placeholder="{{ t('acc.id_hint') }}"></label>
+    <label class="field grow">{{ t('acc.id') }} <input class="input" name="name" required pattern="[A-Za-z0-9._\-]{3,20}" maxlength="20" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" lang="en" placeholder="{{ t('acc.id_hint') }}" data-bad="{{ tp('acc.bad_id') }}"></label>
     <button class="btn btn-primary">{{ t('setup.make') }}</button>
   </form>
   <p class="meta">{{ t('setup.players_count', n=accounts) }} <a href="{{ url_for('accounts_page') }}">{{ t('nav.accounts') }}</a></p>

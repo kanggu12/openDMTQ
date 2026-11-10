@@ -2206,3 +2206,49 @@ class AccountsTest(unittest.TestCase):
             self.assertIn("Accounts for the players", inst.client.get("/opendmtq/admin/setup").get_data(as_text=True))
             self.make(inst, name="Sena", password="hunter22")
             self.assertNotIn("The server is not set up yet", inst.client.get("/opendmtq/admin/").get_data(as_text=True))
+
+
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class FormChecksTest(unittest.TestCase):
+    """A form's own checks are the page's (admin.js), in its look and its language: the browser's bubble would show in the
+    browser's language, outside the design. The server checks the same again."""
+
+    # A field the browser would check: one it must have, a pattern, a least value or length, a date or a number.
+    RULE = re.compile(r'\brequired\b|\bpattern="|\bmin="|\bminlength="|type="(?:date|number)"')
+
+    def test_every_field_with_a_rule_is_checked_by_the_page_in_its_words(self):
+        templates = os.path.join(os.path.dirname(admin.__file__), "templates")
+        checked = 0
+        for name in sorted(os.listdir(templates)):
+            with open(os.path.join(templates, name), encoding="utf-8") as f:
+                text = f.read()
+            for form in re.finditer(r"<form\b([^>]*)>(.*?)</form>", text, re.S):
+                for field in re.findall(r"<(?:input|select|textarea)\b[^>]*>", form.group(2)):
+                    if 'type="hidden"' in field or not self.RULE.search(field):
+                        continue
+                    checked += 1
+                    # The form leaves the check to the page, and the field has the words for it, as plain text.
+                    self.assertIn("novalidate", form.group(1), f"{name}: {field}")
+                    self.assertRegex(field, r"""data-bad="\{\{ tp\('[\w.]+'\) \}\}\"""", f"{name}: {field}")
+        # The sign-in's two, the account's ID and passwords, a token's name, the setup's ID, the other address, the two
+        # files, the recordings' limits and the plays' days: none of them left out.
+        self.assertEqual(checked, 14)
+
+    def test_the_words_are_in_the_pages_language(self):
+        with Install() as inst:
+            old_game_database(admin.core.DB, [])
+            inst.client.set_cookie("opendmtq_lang", "ko")
+            self.assertIn('data-bad="아이디와 비밀번호를 입력하세요."', inst.client.get("/opendmtq/admin/login").get_data(as_text=True))
+            inst.sign_in()
+            page = inst.client.get("/opendmtq/admin/accounts").get_data(as_text=True)
+            self.assertIn('data-bad="아이디는 영문, 숫자, 점(.), 하이픈(-), 밑줄(_)로 3~20자입니다."', page)
+            self.assertIn('data-bad="토큰 이름은 1~40자입니다."', page)
+
+    def test_the_server_still_refuses_what_the_page_would_not_send(self):
+        # A browser without the page's script, or a request of another program: the server's own words, as before.
+        with Install() as inst:
+            old_game_database(admin.core.DB, [])
+            inst.sign_in()
+            page = inst.client.post("/opendmtq/admin/accounts", data={"csrf": page_token(inst), "action": "create", "name": "x"},
+                                    follow_redirects=True).get_data(as_text=True)
+            self.assertIn("An ID is 3 to 20 Latin letters, digits, dots, dashes or underscores.", page)

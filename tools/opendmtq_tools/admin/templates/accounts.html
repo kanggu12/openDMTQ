@@ -28,13 +28,15 @@
 <section class="card">
   <h2>{{ t('acc.make') }}</h2>
   <p class="lead">{{ t('acc.lead', owner=owner) }}</p>
-  <form method="post" class="account-form">
+  {# Checked on the page first (admin.js, novalidate), in the server's own words for each rule (data-bad): the server checks
+     the same again. #}
+  <form method="post" class="account-form" novalidate>
     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="create">
     {# The ID as people type it on a phone: Latin letters, no capitals or corrections. #}
-    <label class="field">{{ t('acc.id') }} <input class="input" name="name" required pattern="[A-Za-z0-9._\-]{3,20}" maxlength="20" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" lang="en" placeholder="{{ t('acc.id_hint') }}"></label>
+    <label class="field">{{ t('acc.id') }} <input class="input" name="name" required pattern="[A-Za-z0-9._\-]{3,20}" maxlength="20" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" lang="en" placeholder="{{ t('acc.id_hint') }}" data-bad="{{ tp('acc.bad_id') }}"></label>
     {# A typed password twice, so that a slip of the finger is caught here; both empty: one is made and shown once. #}
-    <label class="field">{{ t('acc.password') }} <input class="input" name="password" type="password" minlength="6" maxlength="64" autocomplete="new-password" placeholder="{{ t('acc.password_hint') }}"></label>
-    <label class="field">{{ t('acc.password2') }} <input class="input" name="password2" type="password" minlength="6" maxlength="64" autocomplete="new-password"></label>
+    <label class="field">{{ t('acc.password') }} <input class="input" name="password" type="password" minlength="6" maxlength="64" autocomplete="new-password" placeholder="{{ t('acc.password_hint') }}" data-bad="{{ tp('acc.bad_password') }}"></label>
+    <label class="field">{{ t('acc.password2') }} <input class="input" name="password2" type="password" minlength="6" maxlength="64" autocomplete="new-password" data-bad="{{ tp('acc.bad_password') }}"></label>
     <label class="field">{{ t('acc.note') }} <input class="input" name="note" maxlength="40" placeholder="{{ t('acc.note_hint') }}"></label>
     {# The game player the account is, when known: the site then shows their own name and marks their rows. #}
     <label class="field">{{ t('acc.player') }} <select class="input" name="player"><option value="">{{ t('acc.player_none') }}</option>{% for id, name in players %}<option value="{{ id }}">{{ name }}</option>{% endfor %}</select></label>
@@ -80,9 +82,10 @@
 <section class="card" id="tokens">
   <h2>{{ t('tok.title') }} <span class="meta-inline">{{ tokens|length }}</span></h2>
   <p class="lead">{{ t('tok.lead') }}</p>
-  <form method="post" class="form-row">
+  {# A name it needs, checked on the page first (admin.js, novalidate) in the server's words, and by the server again. #}
+  <form method="post" class="form-row" novalidate>
     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="token">
-    <label class="field grow">{{ t('tok.name') }} <input class="input" name="token_name" required maxlength="40" autocomplete="off" placeholder="{{ t('tok.name_hint') }}"></label>
+    <label class="field grow">{{ t('tok.name') }} <input class="input" name="token_name" required maxlength="40" autocomplete="off" placeholder="{{ t('tok.name_hint') }}" data-bad="{{ tp('tok.bad_name') }}"></label>
     {# Read first: a token that changes nothing is the one to give a script that only looks. #}
     <label class="field">{{ t('tok.scope') }} <select class="input" name="scope">{% for s in scopes %}<option value="{{ s }}">{{ t('tok.scope_write') if s == 'write' else t('tok.scope_read') }}</option>{% endfor %}</select></label>
     <button class="btn btn-primary">{{ t('tok.create') }}</button>

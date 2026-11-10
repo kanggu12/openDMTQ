@@ -65,15 +65,16 @@
   {# Whose plays these are, in words: a long name may not fit the list's own box on a phone. #}
   {% if whose %}<p class="meta plays-of">{{ t('logs.plays_of', name=whose) }}</p>{% endif %}
   {% if people or filtered %}
-  <form class="log-filters plays-filters" method="get">
+  {# A day typed in part is said on the page (admin.js, novalidate); the server leaves out a day it cannot read. #}
+  <form class="log-filters plays-filters" method="get" novalidate>
     <input type="hidden" name="tab" value="plays">
     <input class="input" name="q" value="{{ shown.q or '' }}" placeholder="{{ t('logs.plays_search') }}" type="search" aria-label="{{ t('logs.plays_search') }}">
     <select class="input" name="player" aria-label="{{ t('logs.plays_player') }}">
       <option value="">{{ t('logs.any_player') }}</option>
       {% for id, name in people %}<option value="{{ id }}"{% if shown.player == id %} selected{% endif %}>{{ name }}</option>{% endfor %}
     </select>
-    <label class="log-day">{{ t('logs.plays_from') }}<input class="input" type="date" name="from" value="{{ shown['from'] or '' }}"></label>
-    <label class="log-day">{{ t('logs.plays_to') }}<input class="input" type="date" name="to" value="{{ shown['to'] or '' }}"></label>
+    <label class="log-day">{{ t('logs.plays_from') }}<input class="input" type="date" name="from" value="{{ shown['from'] or '' }}" data-bad="{{ tp('logs.bad_day') }}"></label>
+    <label class="log-day">{{ t('logs.plays_to') }}<input class="input" type="date" name="to" value="{{ shown['to'] or '' }}" data-bad="{{ tp('logs.bad_day') }}"></label>
     <button class="btn">{{ t('logs.find') }}</button>
     {% if filtered %}<a class="btn" href="{{ url_for('logs_page', tab='plays') }}">{{ t('logs.clear') }}</a>{% endif %}
   </form>

@@ -9,10 +9,12 @@
     {% for cat, msg in get_flashed_messages(with_categories=true) %}
       <p class="{{ 'done' if cat == 'ok' else 'error' }}" role="{{ 'status' if cat == 'ok' else 'alert' }}">{{ msg }}</p>
     {% endfor %}
-    <form method="post" class="signin-form">
+    {# Checked on the page (admin.js, novalidate): an empty field is said in the page's language and look, and sends nothing
+       that would count as a failed sign-in. #}
+    <form method="post" class="signin-form" novalidate>
       {# The ID in Latin letters: the keyboard that has them, no capitals or corrections. Back after a wrong password. #}
-      <label class="field">{{ t('login.id') }} <input name="name" value="{{ name or '' }}" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" lang="en" required{% if not name %} autofocus{% endif %}></label>
-      <label class="field">{{ t('login.password') }} <input type="password" name="password"{% if name %} autofocus{% endif %} autocomplete="current-password" required></label>
+      <label class="field">{{ t('login.id') }} <input name="name" value="{{ name or '' }}" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" lang="en" required data-bad="{{ tp('login.need') }}"{% if not name %} autofocus{% endif %}></label>
+      <label class="field">{{ t('login.password') }} <input type="password" name="password"{% if name %} autofocus{% endif %} autocomplete="current-password" required data-bad="{{ tp('login.need') }}"></label>
       <button class="button" type="submit">{{ t('login.button') }}</button>
     </form>
   {% endif %}
