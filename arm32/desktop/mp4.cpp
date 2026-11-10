@@ -198,7 +198,8 @@ void read_stsd(const std::uint8_t* p, std::size_t n, std::uint32_t handler, Trac
 }  // namespace
 
 bool Mp4::read_at(std::int64_t at, void* buf, std::size_t n) const {
-    if (at < 0 || at + static_cast<std::int64_t>(n) > source_.length) return false;
+    // Within the source, compared without a sum that could overflow.
+    if (at < 0 || at > source_.length || n > static_cast<std::uint64_t>(source_.length - at)) return false;
     auto* p = static_cast<std::uint8_t*>(buf);
     std::size_t done = 0;
     while (done < n) {
@@ -229,7 +230,9 @@ bool Mp4::open(const Source& source, std::string& error) {
         } else if (size == 0) {
             size = static_cast<std::uint64_t>(source_.length - at);
         }
-        if (size < static_cast<std::uint64_t>(header) || static_cast<std::int64_t>(size) > source_.length - at) break;
+        // Unsigned, as the field is: a size past the file's end stops the walk. Read as signed, a size of -16 would pass
+        // and step back to a box already read, for ever.
+        if (size < static_cast<std::uint64_t>(header) || size > static_cast<std::uint64_t>(source_.length - at)) break;
         if (type == fourcc("moov")) {
             // Kilobytes in practice; a movie box of more than 64 MB is no file a game plays.
             if (size > (64u << 20)) {
@@ -301,7 +304,11 @@ bool Mp4::open(const Source& source, std::string& error) {
             Reader r(s, sn);
             r.skip(4);
             std::uint32_t uniform = r.u32(), count = r.u32();
-            if (count > (64u << 20)) return;
+            if (!r.ok() || count > (64u << 20)) return;
+            // No more samples than can be there, before anything is made for each: with one size for all, as many as the
+            // file has room for; with a size each, as many as the box lists. A count the file only states would otherwise
+            // make gigabytes of tables for a file of a few bytes.
+            if (uniform != 0 ? count > static_cast<std::uint64_t>(source_.length) / uniform : count > r.left() / 4) return;
             sizes.resize(count, uniform);
             if (uniform == 0)
                 for (auto& v : sizes) v = r.u32();
@@ -358,22 +365,28 @@ bool Mp4::open(const Source& source, std::string& error) {
                 if (number >= 1 && number <= sync.size()) sync[number - 1] = true;
             }
         }
-        // The samples: each chunk's run of samples, one after another from the chunk's offset.
+        // The samples: each chunk's run of samples, one after another from the chunk's offset. The runs come in the order
+        // of their first chunks (numbered from 1), and the one a chunk is in is the last that starts at or before it: found
+        // by walking them along with the chunks, as a look through all of them for each chunk would take chunks times
+        // runs, hours for a made-up file of a few megabytes.
         t.samples.reserve(sizes.size());
-        std::size_t k = 0;
+        std::size_t k = 0, started = 0;
         for (std::size_t c = 0; c < chunks.size() && k < sizes.size(); ++c) {
-            std::uint32_t per = 0;
-            for (const Run& run : runs)
-                if (run.first_chunk <= c + 1) per = run.per_chunk;
+            // The runs that have started by this chunk; none yet is no samples.
+            while (started < runs.size() && runs[started].first_chunk <= c + 1) ++started;
+            const std::uint32_t per = started ? runs[started - 1].per_chunk : 0;
             std::int64_t at = chunks[c];
             for (std::uint32_t s = 0; s < per && k < sizes.size(); ++s, ++k) {
                 Sample sample;
                 sample.offset = at;
                 sample.size = sizes[k];
                 sample.sync = sync[k];
+                // The largest sample that is whole in the file: one past its end is never read (read), and the decoder's
+                // input buffers are made as large as this (max_read_size), so a made-up size must not count.
+                if (at >= 0 && at <= source_.length && sizes[k] <= static_cast<std::uint64_t>(source_.length - at))
+                    t.max_sample = std::max(t.max_sample, sizes[k]);
                 at += sizes[k];
                 t.samples.push_back(sample);
-                t.max_sample = std::max(t.max_sample, sizes[k]);
             }
         }
         // Their times.
@@ -414,6 +427,9 @@ bool Mp4::read(std::size_t t, std::size_t k, std::vector<std::uint8_t>& out) con
     if (t >= tracks_.size() || k >= tracks_[t].samples.size()) return false;
     const Track& track = tracks_[t];
     const Sample& s = track.samples[k];
+    // In the file whole, or not read: the size is the file's word, and a buffer of it (up to 4 GiB, zeroed) comes after
+    // the check, not before.
+    if (s.offset < 0 || s.offset > source_.length || s.size > static_cast<std::uint64_t>(source_.length - s.offset)) return false;
     std::vector<std::uint8_t> raw(s.size);
     if (!read_at(s.offset, raw.data(), raw.size())) return false;
     if (track.nal_length == 0) {

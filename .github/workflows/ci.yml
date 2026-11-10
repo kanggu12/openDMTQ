@@ -51,6 +51,11 @@ jobs:
       - name: The guest's file names
         run: c++ -std=c++20 -Wall -Wextra -Iarm32/desktop arm32/tests/host/guest_paths_test.cpp -o /tmp/guest_paths_test && /tmp/guest_paths_test
 
+      # The video reader of the player for Windows (arm32/desktop/mp4.cpp) on files made to break it: each turned away
+      # within a second and in bounded memory.
+      - name: The player's video reader
+        run: c++ -std=c++20 -Wall -Wextra -Iarm32/desktop arm32/tests/host/mp4_test.cpp arm32/desktop/mp4.cpp -o /tmp/mp4_test && /tmp/mp4_test
+
       - name: Live view's transport stream writer
         run: c++ -std=c++20 -Wall -Wextra -Iarm32/src arm32/tests/host/live_ts_test.cpp arm32/src/live_ts.cpp -o /tmp/live_ts_test && /tmp/live_ts_test
       # The colours of a computer's broadcast in its stream's sequence header (arm32/src/live_sps.cpp).
