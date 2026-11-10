@@ -1,5 +1,7 @@
 """What the launcher remembers: reading and writing it, servers and sign-ins, and the installer's hand-over."""
 
+import contextlib
+import io
 import json
 import os
 
@@ -89,10 +91,20 @@ class State(Folder):
         self.assertEqual(s.server()["account"], "player1")
 
     def test_no_secrets_in_what_is_shown(self):
+        # --status shows what the launcher keeps, and its log keeps all it printed: the account, never the sign-in's
+        # cookie (the settings file holds it, to stay signed in).
+        from opendmtq_client import main
         s = st.LauncherState()
-        s.add_server("http://example.test").update(cookie="secret-cookie", expires=4000000000)
-        shown = json.dumps(s.without_secrets())
-        self.assertNotIn("secret-cookie", shown)
+        s.add_server("http://example.test", "Example").update(account="player1", cookie="secret-cookie",
+                                                               expires=4000000000)
+        s.save()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+            main.main(["--status"])
+        self.assertIn("signed in: player1", out.getvalue())
+        self.assertNotIn("secret-cookie", out.getvalue())
+        with open(os.path.join(st.config_dir(), "logs", "launcher.log"), encoding="utf-8") as f:
+            self.assertNotIn("secret-cookie", f.read())
 
     def test_removing_the_current_server(self):
         s = st.LauncherState()

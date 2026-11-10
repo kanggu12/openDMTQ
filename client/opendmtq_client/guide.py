@@ -37,8 +37,6 @@ class Guide:
         from opendmtq_client.app import BAR_HEIGHT, EDGE
         app, ui, px, w = self.app, self.app.ui, self.app.ui.px, self.app.words
         root = app.root
-        # The guide is PLAY's way in: the site's lime throughout.
-        ui.use_section("play")
         # The launcher's header: the wordmark and the version, leaving the guide at the other end, and the six steps
         # across under them, as the site's numbered steps.
         self.header = app.make_header(root, steps=[w("guide.%s.name" % key) for key in STEPS])

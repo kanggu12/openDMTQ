@@ -13,25 +13,18 @@ from opendmtq_client import art, theme
 
 
 class Ui:
-    """What every widget needs to draw itself: the root, the fonts, the DPI scale, the words, and the section the
-    page on show belongs to (its colour lights the page's main buttons, switches and links)."""
+    """What every widget needs to draw itself: the root, the fonts, the DPI scale and the words. Every page's main
+    buttons, switches and links are lit in the site's lime (theme.OK), the one colour for what is in use."""
 
     def __init__(self, root, fonts, scale, words):
         self.root = root
         self.fonts = fonts
         self.scale = scale
         self.words = words
-        self.section_name = "home"
-        self.section = theme.SECTION_COLOURS["home"]
 
     def px(self, n):
         """Logical pixels (at 100 % scaling) to real pixels on this screen."""
         return int(round(n * self.scale))
-
-    def use_section(self, page):
-        """Widgets made from now on take the colour of `page`'s section."""
-        self.section_name = theme.PAGE_SECTIONS.get(page, "home")
-        self.section = theme.SECTION_COLOURS[self.section_name]
 
 
 def style_ttk(ui):
@@ -526,7 +519,7 @@ def link(parent, ui, text, command, fg=None, bg=None, font=None, chevron=True):
     page's colour with a chevron after them by default; on the parent's colour unless told."""
     bg = bg or parent.cget("bg")
     words = tk.Label(parent, text=text + ("  " + theme.ICON["chevron"] if chevron else ""),
-                     font=font or ui.fonts.body_bold, fg=fg or ui.section["accent"], bg=bg, cursor="hand2")
+                     font=font or ui.fonts.body_bold, fg=fg or theme.OK, bg=bg, cursor="hand2")
     focus_ring(words, ui, bg)
     for sequence in ("<Button-1>", "<Return>", "<space>"):
         words.bind(sequence, lambda e: command())
@@ -541,14 +534,6 @@ def label(parent, ui, text, font=None, fg=theme.TEXT, bg=None, wrap_margin=None,
     if wrap_margin is not None:
         follow_width(ui, w, wrap_margin, beside)
     return w
-
-
-def section(parent, ui, text, bg=None):
-    """A heading inside a card, as the site's card titles: Pretendard Bold in chalk, nothing after it."""
-    bg = bg or parent.cget("bg")
-    row = tk.Frame(parent, bg=bg)
-    tk.Label(row, text=text, font=ui.fonts.card_title, fg=theme.TEXT, bg=bg).pack(side="left")
-    return row
 
 
 def divider(parent, ui, bg=theme.DIVIDER, pady=12):
@@ -570,22 +555,21 @@ def lamp(parent, ui, colour, bg=theme.PANEL):
 
 
 class Button(tk.Canvas):
-    """A button cut at two corners like PLAY. kind: 'primary' (filled with the section's colour, the page's main
-    action), 'secondary' (quiet metal that lights up under the pointer), 'danger' (metal tinted red, filled red
-    under the pointer: removing or starting over).
+    """A button cut at two corners like PLAY. kind: 'primary' (filled with the site's lime, the page's main action),
+    'secondary' (quiet metal that lights up under the pointer), 'danger' (metal tinted red, filled red under the
+    pointer: removing or starting over).
 
-    The face is a picture (art.button_face); the glyph and the words stay Tk text, so they are drawn as crisply as
-    every other label and can use two fonts.
+    The face is a picture (art.button_face); the words stay Tk text, so they are drawn as crisply as every other label.
     """
 
-    LOOKS = {"secondary": "neutral", "danger": "danger_quiet"}
+    # Each kind's look in art.BUTTON_LOOKS.
+    LOOKS = {"primary": "home", "secondary": "neutral", "danger": "danger_quiet"}
     # The site's control height for buttons in a page (between its 34 px and 42 px ones).
     HEIGHT = 36
 
-    def __init__(self, parent, ui, text, command, kind="secondary", icon=None):
-        # The site's buttons carry words only: `icon` is taken and not drawn.
-        self.ui, self.icon, self.bg = ui, None, parent.cget("bg")
-        self.look = art.SECTION_LOOKS[ui.section_name] if kind == "primary" else self.LOOKS[kind]
+    def __init__(self, parent, ui, text, command, kind="secondary"):
+        self.ui, self.bg = ui, parent.cget("bg")
+        self.look = self.LOOKS[kind]
         super().__init__(parent, bg=self.bg, highlightthickness=0, bd=0, cursor="hand2")
         self.command, self.enabled, self.words, self.state = command, True, None, "normal"
         self.focused = False            # the keyboard is on it: its face shows the ring
@@ -611,9 +595,8 @@ class Button(tk.Canvas):
             return
         self.words = text
         fonts, px = self.ui.fonts, self.ui.px
-        glyph_w = fonts.icon_small.measure(theme.ICON[self.icon]) if self.icon else 0
-        left = px(13) if self.icon else px(18)
-        width = left + (glyph_w + px(7) if self.icon else 0) + fonts.body_bold.measure(text) + px(18)
+        # The words with the site's room either side of them.
+        width = px(18) + fonts.body_bold.measure(text) + px(18)
         height = px(self.HEIGHT)
         self.configure(width=width, height=height)
         self.delete("all")
@@ -624,13 +607,7 @@ class Button(tk.Canvas):
                       if not (ring and state == "disabled")}
         self.images = {key: ImageTk.PhotoImage(face, master=self) for key, face in self.faces.items()}
         self.face = self.create_image(0, 0, image=self.images[("normal", False)], anchor="nw")
-        self.parts = []
-        x = left
-        if self.icon:
-            self.parts.append(self.create_text(x, height // 2, text=theme.ICON[self.icon], font=fonts.icon_small,
-                                               anchor="w"))
-            x += glyph_w + px(7)
-        self.parts.append(self.create_text(x, height // 2, text=text, font=fonts.body_bold, anchor="w"))
+        self.parts = [self.create_text(px(18), height // 2, text=text, font=fonts.body_bold, anchor="w")]
         self._paint(self.state if self.enabled else "disabled")
 
     def _paint(self, state):
@@ -687,7 +664,7 @@ class PlaySlab(tk.Label):
         self.pictures = {look: art.play_button(px(self.WIDTH), px(self.HEIGHT), state=look) for look in self.LOOKS}
         self.images = {look: ImageTk.PhotoImage(p, master=parent) for look, p in self.pictures.items()}
         super().__init__(parent, image=self.images["normal"], text=words, compound="center", font=ui.fonts.display_big,
-                         fg=theme.SECTION_COLOURS["home"]["ink"], bg=bg, cursor="hand2", bd=0, takefocus=1,
+                         fg=theme.OK_INK, bg=bg, cursor="hand2", bd=0, takefocus=1,
                          highlightthickness=max(1, px(2)), highlightbackground=bg, highlightcolor=theme.CYAN)
         self.command, self.words, self.state, self.mouse = command, words, "ready", None
         # A dialog draws the window behind it from the widgets (snapshot.py): the slab's own picture.
@@ -721,7 +698,7 @@ class PlaySlab(tk.Label):
     def _paint(self):
         """The look follows the state first, then the mouse."""
         if self.state == "ready":
-            look, ink = self.mouse or "normal", theme.SECTION_COLOURS["home"]["ink"]
+            look, ink = self.mouse or "normal", theme.OK_INK
         elif self.state == "playing":
             # PLAYING is read (4.5:1 and more on its slab).
             look, ink = "playing", theme.MUTED
@@ -813,7 +790,7 @@ class Segmented(tk.Frame):
         for i, key in enumerate(self.keys):
             state = "on" if key == self.value else ("hover" if i == self.hover else "normal")
             self.canvas.itemconfigure(self.items[i], image=self.images[(i, state)])
-            self.canvas.itemconfigure(self.words[i], fill=theme.SECTION_COLOURS["home"]["ink"] if state == "on" else
+            self.canvas.itemconfigure(self.words[i], fill=theme.OK_INK if state == "on" else
                                       (theme.TEXT if state == "hover" else theme.MUTED))
         # A dialog draws the window behind it from the widgets (snapshot.py): the row as it looks now.
         from PIL import Image
@@ -847,7 +824,7 @@ class Slider(tk.Frame):
         super().__init__(parent, bg=bg)
         self.ui, self.command, self.value = ui, command, int(value)
         self.w, self.h = ui.px(width), ui.px(26)
-        self.colour = ui.section["accent"]
+        self.colour = theme.OK
         self.knob_img = ImageTk.PhotoImage(art.knob(ui.px(18), ring=self.colour), master=parent)
         self.canvas = tk.Canvas(self, width=self.w, height=self.h, bg=bg, highlightthickness=0, cursor="hand2")
         self.canvas.pack(side="left")
@@ -1007,7 +984,7 @@ class Progress(tk.Frame):
         super().__init__(parent, bg=bg)
         self.ui, self.bg = ui, bg
         self.w, self.h = ui.px(width), ui.px(8)
-        self.colour = ui.section["accent"]
+        self.colour = theme.OK
         self.picture = tk.Label(self, bg=bg, bd=0)
         self.picture.pack(anchor="w")
         self.words = tk.Label(self, text="", font=ui.fonts.small, fg=theme.MUTED, bg=bg, anchor="w", justify="left")

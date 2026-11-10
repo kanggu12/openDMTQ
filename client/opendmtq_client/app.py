@@ -19,8 +19,6 @@ log = logging.getLogger("opendmtq_client")
 
 # The menu, left to right, in English in both languages as the site's and the game's menus are.
 NAV = ("play", "screen", "sound", "controls", "online", "help", "about")
-NAV_WORDS = {"play": "PLAY", "screen": "SCREEN", "sound": "SOUND", "controls": "CONTROLS", "online": "ONLINE",
-             "help": "HELP", "about": "LAUNCHER"}
 # The room at the window's left and right ends (logical pixels), the same in the guide.
 EDGE = 28
 # The bottom bar's height inside its padding: PLAY's slab and its keyboard ring, on every page and every guide step.
@@ -115,7 +113,9 @@ class LauncherApp:
     def _build_main(self):
         ui, px = self.ui, self.ui.px
         # ---- the header bar: the wordmark and the version, then the menu (as the site's top bar)
-        self.header = self.make_header(self.root, nav=[(key, NAV_WORDS[key]) for key in NAV], on_nav=self.nav_go)
+        # Each name in the menu as its page's title (pages.TITLES).
+        from opendmtq_client import pages
+        self.header = self.make_header(self.root, nav=[(key, pages.TITLES[key]) for key in NAV], on_nav=self.nav_go)
         # ---- the strip along the foot: what is going on at the left, PLAY at the right
         bottom = tk.Frame(self.root, bg=theme.STRIP)
         bottom.pack(side="bottom", fill="x")
@@ -381,8 +381,7 @@ class LauncherApp:
         """Show a page: its title and the line under it, and its cards."""
         from opendmtq_client import pages
         self.page = page
-        # Every page in the site's lime; the menu lights its name.
-        self.ui.use_section(page)
+        # The menu lights the page's name.
         self.header.set_current(page)
         for child in self.body.inner.winfo_children():
             child.destroy()

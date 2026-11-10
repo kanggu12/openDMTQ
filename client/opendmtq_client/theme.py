@@ -32,43 +32,19 @@ TEXT = "#eef2f6"        # body text (--chalk)
 MUTED = "#aeb8c3"       # hints under a setting (--ash: 7:1 and more on the deck)
 FAINT = "#8d98a4"       # disabled text and small labels (4.5:1 and more on every surface they sit on)
 INK = "#0b0e12"         # words on a bright colour
+OK_INK = "#0d1c04"      # words on the lime: PLAY, a chosen tab (and the lime buttons' words, art.BUTTON_LOOKS)
 
 # What the site's screens say with colour.
 OK = "#8cf23d"          # fine (--ok), and the site's own accent
 WARN = "#ffcf3d"        # something PLAY or the launcher will change, a warning (--warn)
 BAD = "#ff5f72"         # a problem, an error, removing for good (--bad)
-CYAN = "#6fd6ff"        # the keyboard's place (focus rings), and the picture and sound pages (--cyan)
-VIOLET = "#c491ff"      # online: the server, signing in, the app (the site's rankings)
-AMBER = "#ffb13d"       # the tools: help and the launcher's own page (the site's admin pages)
-
-# A section's colour lights its header's shards, its title's tail, its menu entry and its main buttons: the accent,
-# a bright and a deep shade for the shards, the fill of its main buttons and the ink that reads on that fill.
-SECTION_COLOURS = {
-    "home": {"accent": OK, "light": "#5fbf1f", "deep": "#1f3a08", "fill": OK, "ink": "#0d1c04"},
-    "songs": {"accent": CYAN, "light": "#2fa8e0", "deep": "#0a3048", "fill": CYAN, "ink": "#04202e"},
-    "ranking": {"accent": VIOLET, "light": "#9a62f0", "deep": "#2d1257", "fill": VIOLET, "ink": "#1b0a34"},
-    "admin": {"accent": AMBER, "light": "#e3961f", "deep": "#4f3306", "fill": AMBER, "ink": "#2a1700"},
-}
-# Which section each page of the launcher belongs to: all of them the site's lime, the one colour for what is in use.
-PAGE_SECTIONS = {"play": "home", "screen": "home", "sound": "home", "controls": "home", "online": "home",
-                 "help": "home", "about": "home"}
-
-
-def section_colours(page):
-    """The colours of the section a page belongs to (PLAY's lime for anything unknown)."""
-    return SECTION_COLOURS[PAGE_SECTIONS.get(page, "home")]
-
+CYAN = "#6fd6ff"        # the keyboard's place (focus rings, --cyan)
 
 # Material Icons code points used by the launcher (a test checks each against the bundled font).
 ICON = {
-    "play": "", "screen": "", "sound": "", "controls": "", "help": "", "about": "",
-    "ok": "", "warn": "", "error": "", "info": "", "folder": "", "refresh": "",
-    "restore": "", "file": "", "language": "", "update": "", "chevron": "",
-    "back": "", "next": "", "check": "", "radio_on": "", "radio_off": "",
-    "touch": "", "history": "", "online": "", "person": "", "delete": "",
-    "download": "", "server": "", "keyboard": "", "logout": "", "login": "",
-    "link": "", "lock": "", "fullscreen": "", "speed": "", "computer": "",
-    "volume_off": "", "timer": "", "account": "",
+    # The chevron after a link; the rest name a dialog's subject (dialogs.Dialog's glyph).
+    "chevron": "", "ok": "", "warn": "", "error": "", "info": "",
+    "delete": "", "restore": "", "update": "", "download": "",
 }
 
 # Bundled font files Tk uses, and the family names Windows and fontconfig give them. The leaning wide face is drawn into
@@ -119,7 +95,6 @@ class Fonts:
         self.body_bold = tkfont.Font(root, family=TEXT_BOLD, size=10)                # labels and buttons
         self.small = tkfont.Font(root, family=TEXT_FONT, size=9)                     # hints
         self.tab = tkfont.Font(root, family=TEXT_BOLD, size=10)                      # a choice in a row of tabs
-        self.icon_small = tkfont.Font(root, family=ICONS, size=12)                   # the chevron after a link
         self.dialog_title = tkfont.Font(root, family=TEXT_FONT, size=13, weight="bold")  # a dialog's question
         self.dialog_button = tkfont.Font(root, family=TEXT_BOLD, size=10)            # a dialog's buttons
         self.language = language

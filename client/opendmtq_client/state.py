@@ -233,9 +233,3 @@ class LauncherState:
         merged = dict(self.values)
         merged[name] = value
         self.values = choices.normalize(merged)
-
-    def without_secrets(self):
-        """The state as --status and a report may show it: no sign-in cookies."""
-        servers = [dict(s, cookie="<kept>" if s.get("cookie") else None) for s in self.servers]
-        return {"language": self.language, "values": self.values, "servers": servers, "current": self.current,
-                "last_session": self.last_session}

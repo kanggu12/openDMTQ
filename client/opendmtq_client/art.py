@@ -219,7 +219,7 @@ _tops = collections.OrderedDict()
 
 def backdrop(width, height, scale=1.0, accent=theme.OK, offset=0, top=None):
     """The page behind the cards, as the site's: its field with the faint perforated metal all over, two pale panes and
-    the section's light at the top (body::before), and the green shards at the left and right edges (.facets).
+    the accent's light at the top (body::before), and the green shards at the left and right edges (.facets).
 
     The picture is the part of the page from `offset` down, `height` tall: the header draws the page's top and the
     page area the rest, and they meet without a seam. `top` is how far down the page the panes and the light reach
@@ -308,7 +308,7 @@ def _whole(width, height, scale, accent, offset, top_h):
                 draw.polygon(polygon, fill=alpha)
         light = Image.composite(panes, Image.new("L", panes.size, 0), fade)
         band = Image.new("RGB", (width, top_h), (255, 255, 255))
-        # The section's light from above the middle: an ellipse 70 % wide, at 12 % in its middle.
+        # The accent's light from above the middle: an ellipse 70 % wide, at 12 % in its middle.
         glow = Image.radial_gradient("L").resize((max(1, int(width * 1.4)), max(1, int(full * 2))))
         glow = glow.point(lambda v: int(30 * max(0.0, 1 - (v / 255.0) / 0.7)))
         sheet = Image.new("L", (width, top_h), 0)
@@ -471,7 +471,7 @@ def toggle(on, width, height, enabled=True, colour=None, knob=None, bg=theme.BG)
 
 
 def knob(size, colour=theme.TEXT, ring=theme.OK):
-    """A slider knob: a light disc with a ring in the section's colour."""
+    """A slider knob: a light disc with a ring in the accent (the site's lime)."""
     s = size * SS
     img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
@@ -591,8 +591,6 @@ BUTTON_LOOKS = {
     "danger_quiet": {"normal": ("#4e3741",), "hover": (theme.BAD,), "pressed": ("#e04558",), "disabled": _OFF,
                      "text": "#ffb3bc", "hover_text": "#2b0409"},
 }
-# Every page's main buttons are lit in the site's lime.
-SECTION_LOOKS = {"home": "home", "songs": "home", "ranking": "home", "admin": "home"}
 
 
 def _fill(size, colours):

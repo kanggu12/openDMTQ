@@ -105,14 +105,13 @@ class Look(unittest.TestCase):
 
     def test_text_reads_on_every_surface(self):
         surfaces = (theme.BG, theme.SIDEBAR, theme.PANEL, theme.PANEL_HI)
-        for text in (theme.TEXT, theme.MUTED, theme.FAINT, theme.OK, theme.WARN, theme.BAD, theme.CYAN, theme.VIOLET,
-                     theme.AMBER):
+        for text in (theme.TEXT, theme.MUTED, theme.FAINT, theme.OK, theme.WARN, theme.BAD, theme.CYAN):
             for surface in surfaces:
                 self.assertGreaterEqual(contrast(text, surface), 4.5, (text, surface))
 
     def test_ink_reads_on_each_sections_fill(self):
-        for name, colours in theme.SECTION_COLOURS.items():
-            self.assertGreaterEqual(contrast(colours["ink"], colours["fill"]), 4.5, name)
+        # Every page is the site's lime: PLAY's word and a chosen tab's on it.
+        self.assertGreaterEqual(contrast(theme.OK_INK, theme.OK), 4.5)
         from opendmtq_client import art
         for look, colours in art.BUTTON_LOOKS.items():
             for state in ("normal", "hover", "pressed"):
