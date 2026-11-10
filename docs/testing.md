@@ -105,8 +105,8 @@ output, is in `_work/qa/<commit>`; the newest five are kept.
 
 **A release** (`.github/workflows/release.yml`, a tag `v*`) first checks that the tag, the chart and CHANGELOG.md name one
 version (`.github/release_notes.py`), runs CI again on the tag's commit, asks for `qa/local`, and only then publishes the
-images, the chart, the Windows bundle, the PC client (its installer, `OpenDMTQ-Setup.exe`, and the packages installed
-clients update themselves from) and the GitHub release, whose notes are that version's section of the changelog.
+images, the chart, the runtime for newer phones, the player for Windows, the Windows bundle, the PC client (its
+installer, `OpenDMTQ-Setup.exe`, and the packages installed clients update themselves from) and the GitHub release, whose notes are that version's section of the changelog.
 `gh workflow run release.yml` rehearses it on any commit: all the gates, with the chart's own version, and nothing
 published.
 

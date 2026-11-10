@@ -63,7 +63,7 @@ Debian, Ubuntu, or a Mac with [Homebrew](https://brew.sh); on another Linux, use
 curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/main/host/get.sh | sh
 ```
 
-It downloads OpenDMTQ into `~/openDMTQ`, installs Apache, PHP, Java and Python from the system's packages, starts the
+It downloads OpenDMTQ into `~/openDMTQ` (`OPENDMTQ_DIR=<folder>` before `sh` chooses another), installs Apache, PHP, Java and Python from the system's packages, starts the
 server and opens the same setup in the browser. It asks for your password (sudo) to install packages; without a screen
 it prints the setup's address instead. Running it again updates OpenDMTQ.
 
@@ -128,7 +128,8 @@ The same accounts play on a PC ([the PC client](windows-player.md)).
 | Stop | close the window | `./opendmtq stop` | `./opendmtq down` |
 | See the address | the window shows it | `./opendmtq status` | `./opendmtq status` |
 | Start with the computer | a shortcut in `shell:startup` | `./opendmtq service` | `RESTART=unless-stopped` in `.env`, or `cli/install.sh --service` |
-| Import songs | admin pages, **Songs** | admin pages, **Songs** | `./opendmtq import --songs <folder>` |
+| Import songs | admin pages, **Songs**, or a folder dropped on `OpenDMTQ.exe` (the game's files in it too) | admin pages, **Songs** | `./opendmtq import --songs <folder>` |
+| Name the app (`TECHNIKA Q (<name>)`) | `SERVER_NAME=<name>` in `.env`, restart, then build the app (admin pages, **App**) | the same | `./opendmtq name <name>` |
 | Remove it | close the window, then delete the folder | `./opendmtq stop`, `./opendmtq service --remove`, `host/install.sh --uninstall`, then delete the folder | `./opendmtq down`, `./opendmtq firewall --remove` under WSL, then delete the folder |
 
 Everything else is on the admin pages: the app, songs, players, accounts, recordings and backups.

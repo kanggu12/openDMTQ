@@ -191,7 +191,7 @@ A release, by a maintainer:
    changed for another server.
 3. Push the tag `v1.2.3`. `.github/workflows/release.yml` checks that the tag, the chart and the changelog name one
    version (`.github/release_notes.py`), runs CI again, checks the mark, and publishes the images, the Helm chart, the
-   Windows bundle, the PC client (its installer, `OpenDMTQ-Setup.exe`, and the packages installed clients update
+   runtime for newer phones, the player for Windows, the Windows bundle, the PC client (its installer, `OpenDMTQ-Setup.exe`, and the packages installed clients update
    themselves from) and a GitHub release whose notes are that version's section of the changelog. Without the mark it
    stops: run `tests/qa.sh`, then run the release again (`gh run rerun`).
 

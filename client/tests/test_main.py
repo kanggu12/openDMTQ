@@ -291,6 +291,22 @@ class Maintenance(Folder):
         popen.assert_not_called()
         self.assertEqual(listing(self.game), set(GAME))
 
+    def test_a_game_started_during_the_question_stops_it(self):
+        # Not running when the command starts, running once the player has answered y.
+        with mock.patch.object(playing, "running", side_effect=[False, True]), \
+                mock.patch.object(subprocess, "Popen") as popen:
+            code, said = self.run_main(["--clear-game-data"], stdin="y\n")
+        self.assertEqual(code, 2)
+        self.assertIn("Close the game first", said)
+        self.assertEqual(listing(self.game), set(GAME))
+        with mock.patch.object(main, "window_open", side_effect=[False, True]), \
+                mock.patch.object(subprocess, "Popen") as popen:
+            code, said = self.run_main(["--uninstall", "--delete-data"], stdin="y\n")
+        self.assertEqual(code, 2)
+        self.assertIn("window is open", said)
+        popen.assert_not_called()
+        self.assertEqual(listing(self.game), set(GAME))
+
     def test_a_copied_folder_cannot_uninstall(self):
         os.environ.pop("OPENDMTQ_INSTALL_ROOT")
         code, said = self.run_main(["--uninstall", "--yes"])

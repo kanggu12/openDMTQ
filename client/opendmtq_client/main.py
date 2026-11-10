@@ -211,6 +211,18 @@ def _maintain(args):
     return _uninstall(args.delete_data, args.yes)
 
 
+def _started_meanwhile(window=False):
+    """A game started while the y/N waited (or, for the uninstall, the launcher's window opened): said, and True."""
+    from opendmtq_client import playing
+    if playing.running():
+        _say("Close the game first: it uses the files this changes.", error=True)
+        return True
+    if window and window_open():
+        _say("The launcher's window is open: make this change there, or close the window first.", error=True)
+        return True
+    return False
+
+
 def _repair():
     """--repair: the program's files compared with the installed package, what is missing or changed put back."""
     from opendmtq_client import repair
@@ -246,6 +258,8 @@ def _clear_game_data(yes):
                 % removal.megabytes(size), yes):
         _say("Nothing changed.")
         return 1
+    if _started_meanwhile():
+        return 2
     failed = removal.clear_game_data()
     for path in failed:
         _say("  in use, left in place: %s" % path, error=True)
@@ -271,6 +285,8 @@ def _uninstall(delete_data, yes):
     if not _ask(question, yes):
         _say("Nothing changed.")
         return 1
+    if _started_meanwhile(window=True):
+        return 2
     code = 0
     if delete_data:
         failed = removal.delete_everything()
