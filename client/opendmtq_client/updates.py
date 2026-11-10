@@ -65,15 +65,17 @@ def check():
     try:
         manager = _manager()
         info = manager.check_for_updates()
+        if not info:
+            return Result("uptodate")
+        # Read here too: an answer without the release it offers is a failed check, said as one, never an error that
+        # ends the worker thread with the Launcher page still saying it is checking.
+        return Result("available", version=info.TargetFullRelease.Version, info=info)
     except Exception as e:  # noqa: BLE001
         text = str(e)
         # Velopack refuses outside an installation: a state of this copy, which the page says as such.
         if "not installed" in text.lower() or "locator" in text.lower():
             return Result("not_installed")
         return Result("failed", error=text)
-    if not info:
-        return Result("uptodate")
-    return Result("available", version=info.TargetFullRelease.Version, info=info)
 
 
 def apply(result):

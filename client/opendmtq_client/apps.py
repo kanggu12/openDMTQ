@@ -9,12 +9,17 @@ One app per server: a newer one replaces it, the older file goes once the new on
 """
 
 import json
+import logging
 import os
 import re
+import sys
 import tempfile
 
+from opendmtq_client import safety
 from opendmtq_client import server as srv
 from opendmtq_client import state as st
+
+log = logging.getLogger("opendmtq_client")
 
 CONF = "player.conf"
 DETAILS = "app.json"
@@ -97,6 +102,21 @@ def install(url, info, path):
 
 
 def remove(url):
-    """The server's folder gone: its app and what named it (the player's own data stays in its folder)."""
+    """The server's folder gone: its app and what named it (the player's own data stays in its folder). What cannot go
+    (an app a game still has open) stays, and the log says so."""
     import shutil
-    shutil.rmtree(folder(url), ignore_errors=True)
+    path = folder(url)
+    if not os.path.lexists(path):
+        # A server this PC never had an app from.
+        return
+    # A test deletes only in a folder of its own (safety.py).
+    safety.refuse_deleting_in_tests(path)
+
+    def failed(function, where, error):
+        # Python 3.12 hands the error (onexc), earlier ones its (type, value, traceback) (onerror).
+        log.warning("could not delete %s: %s", where, error[1] if isinstance(error, tuple) else error)
+
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=failed)
+    else:
+        shutil.rmtree(path, onerror=failed)

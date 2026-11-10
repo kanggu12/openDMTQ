@@ -10,6 +10,7 @@ Exit status 1 when the layout check finds a problem; the problems are printed an
 """
 
 import argparse
+import logging
 import os
 import subprocess
 import sys
@@ -22,6 +23,14 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 from opendmtq_client import safety, widgets  # noqa: E402
 from tests import stub  # noqa: E402
 from tests.base import FAKE_PLAYER  # noqa: E402
+
+# What the launcher logs in this run, line by line (its file handler is set up by main(), which the run skips).
+LOGGED = []
+
+
+class Kept(logging.Handler):
+    def emit(self, record):
+        LOGGED.append(record.getMessage())
 
 
 def widgets_of(widget):
@@ -190,6 +199,8 @@ def guide_check(app, site, out, tag, problems):
             wait_out(app.root, 1.5)
             shot(app.root, out, name + "-wrong")
             measure(app, name + "-wrong", problems)
+            if not any(line.startswith("could not sign in to %s as %s" % (site.url, stub.ACCOUNT)) for line in LOGGED):
+                problems.append("%s: the refused sign-in is not in the log" % tag)
             fields = entries(app)
             fields[1].delete(0, "end")
             fields[1].insert(0, stub.PASSWORD)
@@ -761,6 +772,9 @@ def main():
     # Help as an installed launcher shows it: with Repair and Uninstall.
     os.environ["OPENDMTQ_INSTALL_ROOT"] = fake_install(home)
     site = stub.Site().start()
+    # The launcher's log kept here, every line of it, to look for what it should say.
+    logging.getLogger("opendmtq_client").addHandler(Kept())
+    logging.getLogger("opendmtq_client").setLevel(logging.INFO)
     from opendmtq_client import state as st
     from opendmtq_client.app import LauncherApp
     problems = []

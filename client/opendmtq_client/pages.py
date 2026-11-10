@@ -475,6 +475,8 @@ def signin_panel(app, parent, rerender, bg=theme.BG):
                 actions.sign_in(app.state, user, password)
                 app.post(signed_in)
             except Exception as e:  # noqa: BLE001
+                # The server's own words for it go to the log (never the password); the form says it plainly.
+                log.info("could not sign in to %s as %s: %s", server["url"], user, e)
                 app.post(lambda text=w.error(e): refused(text))
 
         threading.Thread(target=work, daemon=True, name="sign-in").start()

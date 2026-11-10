@@ -32,6 +32,7 @@ import logging
 import logging.handlers
 import os
 import sys
+import threading
 
 from opendmtq_client import __version__, actions, apps, dpi, player, preset
 from opendmtq_client import server as srv
@@ -83,6 +84,19 @@ def _logging(make=True):
         root.removeHandler(old)
         old.close()
     root.addHandler(handler)
+    # A worker thread's error that nothing caught goes to the same log.
+    threading.excepthook = _thread_failed
+
+
+def _thread_failed(args):
+    """An error nobody caught that ended a worker thread: in the log, as the window copy has no console to print it on
+    (a page would wait for its answer with nothing said anywhere), and on the console too when there is one."""
+    if issubclass(args.exc_type, SystemExit):
+        # A thread that chose to end.
+        return
+    log.error("the %s thread failed", args.thread.name if args.thread is not None else "?",
+              exc_info=(args.exc_type, args.exc_value, args.exc_traceback))
+    threading.__excepthook__(args)
 
 
 def _single_instance():

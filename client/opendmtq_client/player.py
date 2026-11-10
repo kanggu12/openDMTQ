@@ -11,6 +11,7 @@ its own log in %LOCALAPPDATA%\\OpenDMTQ\\<package>, where a phone's app would ke
 """
 
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -19,6 +20,8 @@ import time
 from opendmtq_client import safety
 from opendmtq_client import state as st
 from opendmtq_client import values as choices
+
+log = logging.getLogger("opendmtq_client")
 
 EXE = "OpenDMTQ-Player.exe"
 SETTINGS = "player-settings.txt"
@@ -55,8 +58,15 @@ def audio_devices(path=None):
     try:
         done = subprocess.run(_command(path) + ["--audio-devices"], capture_output=True, timeout=DEVICES_TIMEOUT,
                               creationflags=NO_WINDOW if sys.platform == "win32" else 0)
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.SubprocessError) as e:
+        # The page then offers Windows' default device alone: the log says why there were no others.
+        log.warning("could not list the sound devices with %s: %s", path, e)
         return []
+    if done.returncode != 0:
+        # The devices it listed before it stopped still count; its last words say why it stopped.
+        said = done.stderr.decode("utf-8", errors="replace").strip().splitlines()
+        log.warning("the player ended with %d listing the sound devices%s", done.returncode,
+                    ": " + said[-1] if said else "")
     devices = []
     for line in done.stdout.decode("utf-8", errors="replace").splitlines():
         try:

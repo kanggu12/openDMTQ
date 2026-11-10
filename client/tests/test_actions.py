@@ -2,6 +2,7 @@
 
 import json
 import os
+from unittest import mock
 
 from opendmtq_client import actions, apps, player
 from opendmtq_client import server as srv
@@ -156,6 +157,44 @@ class Actions(Folder):
 
     def test_no_player_lists_no_devices(self):
         self.assertEqual(player.audio_devices(os.path.join(self.home, "none.py")), [])
+
+    def test_a_player_that_cannot_list_its_devices_says_why_in_the_log(self):
+        # The Sound page then offers Windows' default device alone: the log says why there are no others.
+        broken = os.path.join(self.home, "player", "OpenDMTQ-Player.exe")
+        with open(broken, "wb") as f:
+            f.write(b"MZ")
+        with self.assertLogs("opendmtq_client", level="WARNING") as said:
+            self.assertEqual(player.audio_devices(broken), [])
+        self.assertIn("could not list the sound devices", said.output[0])
+        # One that stops part way: what it listed counts, and its last words are in the log.
+        stops = os.path.join(self.home, "player", "stops.py")
+        with open(stops, "w", encoding="utf-8") as f:
+            f.write("import json, sys\nprint(json.dumps({'id': 'a', 'name': 'Speakers', 'default': True}))\n"
+                    "sys.stderr.write('the sound system went away\\n')\nsys.exit(3)\n")
+        with self.assertLogs("opendmtq_client", level="WARNING") as said:
+            self.assertEqual([d["name"] for d in player.audio_devices(stops)], ["Speakers"])
+        self.assertIn("ended with 3 listing the sound devices: the sound system went away", said.output[0])
+
+    def test_an_app_that_cannot_go_stays_and_is_logged(self):
+        # Forget and Start over remove a server's app: a file the game still has open stays, and the log names it.
+        url = "http://127.0.0.1:1"
+        held = os.path.join(apps.folder(url), "app.apk")
+        os.makedirs(os.path.dirname(held))
+        open(held, "wb").close()
+        real = os.unlink
+
+        def unlink(path, *args, **kwargs):
+            # Windows' answer for a file another program has open.
+            if os.path.basename(path) == "app.apk":
+                raise PermissionError(13, "in use", path)
+            return real(path, *args, **kwargs)
+
+        with mock.patch.object(os, "unlink", unlink), self.assertLogs("opendmtq_client", level="WARNING") as said:
+            apps.remove(url)
+        self.assertTrue(os.path.isfile(held))
+        self.assertTrue(any("could not delete" in line and "app.apk" in line for line in said.output), said.output)
+        # Nothing to remove for a server this PC never had an app from, and nothing said.
+        apps.remove("http://127.0.0.1:2")
 
     def test_sign_in_needs_a_server(self):
         with self.assertRaises(srv.ServerError):

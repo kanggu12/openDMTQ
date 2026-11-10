@@ -4,6 +4,8 @@ import contextlib
 import io
 import os
 import sys
+import threading
+import types
 import unittest
 
 import subprocess
@@ -190,6 +192,37 @@ class CommandLine(Folder):
             main.parse(["--help"])
         for name in ("vsync", "fps", "render_scale", "audio_device"):
             self.assertIn(name, out.getvalue())
+
+    def test_a_worker_threads_error_goes_to_the_log(self):
+        # The window copy has no console: an error that ends a worker thread is in the launcher's log.
+        main._logging()
+        self.addCleanup(setattr, threading, "excepthook", threading.__excepthook__)
+
+        def work():
+            raise RuntimeError("the disk went away")
+
+        thread = threading.Thread(target=work, name="updates")
+        with contextlib.redirect_stderr(io.StringIO()):
+            thread.start()
+            thread.join()
+        with open(os.path.join(st.config_dir(), "logs", "launcher.log"), encoding="utf-8") as f:
+            logged = f.read()
+        self.assertIn("the updates thread failed", logged)
+        self.assertIn("RuntimeError: the disk went away", logged)
+
+    def test_an_update_answer_without_its_release_is_a_failed_check(self):
+        # Velopack's answer read where its errors are caught: said as a check that failed, as the Launcher page says
+        # it, never an error that ends the check with the page still waiting.
+        from opendmtq_client import updates
+        answer = types.SimpleNamespace()
+        velopack = types.SimpleNamespace(UpdateManager=lambda source: types.SimpleNamespace(
+            check_for_updates=lambda: answer, get_current_version=lambda: "0.8.0"))
+        with mock.patch.dict(sys.modules, {"velopack": velopack}), \
+                mock.patch.object(updates, "UPDATE_SOURCE", "http://updates.test/"):
+            self.assertEqual(updates.check().kind, "failed")
+            code, said = self.run_main(["--update"])
+        self.assertEqual(code, 2)
+        self.assertIn("Could not check for updates", said)
 
     def test_version(self):
         out = io.StringIO()
