@@ -26,12 +26,25 @@ Nanos now_ns() {
     return static_cast<Nanos>(t.tv_sec) * kSecond + t.tv_nsec;
 }
 
+namespace {
+
+// The number the digits at `p` make, 0 without one. Held at INT_MAX: a number past what an int holds is the most there
+// is, not whatever its lowest 32 bits say (atoi's 4294967300 is 4 where a long has 64 bits, and 3000000000 negative).
+int digits(const char* p) {
+    long long v = 0;
+    // At most INT_MAX before each step: ten times that and a digit fit in a long long.
+    for (; *p >= '0' && *p <= '9'; ++p) v = std::min<long long>(v * 10 + (*p - '0'), INT_MAX);
+    return static_cast<int>(v);
+}
+
+}  // namespace
+
 Server parse_server(const std::string& text) {
     Server s;
     // The port after the last colon, 80 without one.
     const std::size_t colon = text.rfind(':');
     s.host = text.substr(0, colon);
-    if (colon != std::string::npos) s.port = std::atoi(text.c_str() + colon + 1);
+    if (colon != std::string::npos) s.port = digits(text.c_str() + colon + 1);
     // The Host header names the server as it was given.
     s.host_header = text;
     return s;
@@ -253,7 +266,7 @@ HttpResult Link::request(const char* method, const std::string& path, const std:
         const std::size_t space = in.find(' ');
         const std::size_t end = in.find("\r\n\r\n");
         if (in.rfind("HTTP/", 0) == 0 && space != std::string::npos && end != std::string::npos) {
-            r.status = std::atoi(in.c_str() + space + 1);
+            r.status = digits(in.c_str() + space + 1);
             r.body = in.substr(end + 4);
         }
     }
@@ -283,25 +296,44 @@ bool json_bool(const std::string& json, const char* key) {
 
 int json_int(const std::string& json, const char* key, int fallback) {
     std::size_t at = json_value(json, key);
-    // A number starts with a digit here: the server sends no negative ones.
+    // A number starts with a digit here: the server sends no negative ones. A fraction is its whole part.
     if (at == std::string::npos || !(json[at] >= '0' && json[at] <= '9')) return fallback;
-    return std::atoi(json.c_str() + at);
+    return digits(json.c_str() + at);
 }
 
 namespace {
 
-// A character of the Basic Multilingual Plane, as UTF-8.
-void append_utf8(std::string& out, unsigned c) {
+// A character as UTF-8, in one to four bytes. A UTF-16 half (U+D800 to U+DFFF) takes three, as modified UTF-8 has it.
+void append_utf8(std::string& out, unsigned long c) {
     if (c < 0x80) {
         out += static_cast<char>(c);
     } else if (c < 0x800) {
         out += static_cast<char>(0xC0 | (c >> 6));
         out += static_cast<char>(0x80 | (c & 0x3F));
-    } else {
+    } else if (c < 0x10000) {
         out += static_cast<char>(0xE0 | (c >> 12));
         out += static_cast<char>(0x80 | ((c >> 6) & 0x3F));
         out += static_cast<char>(0x80 | (c & 0x3F));
+    } else {
+        out += static_cast<char>(0xF0 | (c >> 18));
+        out += static_cast<char>(0x80 | ((c >> 12) & 0x3F));
+        out += static_cast<char>(0x80 | ((c >> 6) & 0x3F));
+        out += static_cast<char>(0x80 | (c & 0x3F));
     }
+}
+
+// The four hex digits at `at` as a number, or -1 when there are not four there.
+long hex4(const std::string& s, std::size_t at) {
+    if (at + 4 > s.size()) return -1;
+    long v = 0;
+    for (std::size_t i = at; i < at + 4; ++i) {
+        const char c = s[i];
+        // A digit's value, either case for the letters; anything else is no hex digit.
+        const int d = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
+        if (d < 0) return -1;
+        v = v * 16 + d;
+    }
+    return v;
 }
 
 // Only what a key or an id is made of: letters, digits, '-' and '_', at most 128 of them.
@@ -317,7 +349,9 @@ std::string json_string(const std::string& json, const char* key) {
     std::size_t at = json_value(json, key);
     // Not a string: nothing.
     if (at == std::string::npos || json[at] != '"') return out;
-    for (++at; at < json.size() && json[at] != '"'; ++at) {
+    for (++at; at < json.size(); ++at) {
+        // The string's end: all of it read.
+        if (json[at] == '"') return out;
         if (json[at] != '\\') {
             out += json[at];
             continue;
@@ -327,15 +361,76 @@ std::string json_string(const std::string& json, const char* key) {
         switch (json[at]) {
         case 'n': out += '\n'; break;
         case 't': out += '\t'; break;
-        case 'u':
-            if (at + 4 < json.size()) {
-                append_utf8(out, static_cast<unsigned>(std::strtoul(json.substr(at + 1, 4).c_str(), nullptr, 16)));
-                at += 4;
+        case 'r': out += '\r'; break;
+        case 'b': out += '\b'; break;
+        case 'f': out += '\f'; break;
+        case 'u': {
+            const long c = hex4(json, at + 1);
+            // Not four hex digits: the backslash and the u are left out, and what follows is read as it is (never a
+            // quote taken for part of an escape).
+            if (c < 0) break;
+            at += 4;
+            // A UTF-16 pair, as json_encode writes a character past U+FFFF: one character.
+            if (c >= 0xD800 && c <= 0xDBFF && at + 2 < json.size() && json[at + 1] == '\\' && json[at + 2] == 'u') {
+                const long low = hex4(json, at + 3);
+                if (low >= 0xDC00 && low <= 0xDFFF) {
+                    append_utf8(out, 0x10000 + ((static_cast<unsigned long>(c) - 0xD800) << 10) + (static_cast<unsigned long>(low) - 0xDC00));
+                    at += 6;
+                    break;
+                }
             }
+            // Half of a pair alone is no character: the replacement character. NUL would end the text where it goes
+            // as a C string: left out.
+            if (c >= 0xD800 && c <= 0xDFFF) append_utf8(out, 0xFFFD);
+            else if (c != 0) append_utf8(out, static_cast<unsigned long>(c));
             break;
+        }
         // A quote, a backslash or a slash: itself.
         default: out += json[at];
         }
+    }
+    // No end: a string cut short is none.
+    return {};
+}
+
+std::string modified_utf8(std::string_view text) {
+    std::string out;
+    out.reserve(text.size());
+    for (std::size_t i = 0; i < text.size();) {
+        const auto first = static_cast<unsigned char>(text[i]);
+        // The character's length from its first byte, and the least it may be: a longer form of a smaller one, a UTF-16
+        // half and anything past U+10FFFF are no characters.
+        std::size_t n = 0;
+        unsigned long c = 0, least = 0;
+        if (first < 0x80) n = 1, c = first;
+        else if (first >= 0xC2 && first <= 0xDF) n = 2, c = first & 0x1Fu, least = 0x80;
+        else if (first >= 0xE0 && first <= 0xEF) n = 3, c = first & 0x0Fu, least = 0x800;
+        else if (first >= 0xF0 && first <= 0xF4) n = 4, c = first & 0x07u, least = 0x10000;
+        bool ok = n > 0 && i + n <= text.size();
+        // Each byte after the first carries six more bits, and says so in its top two.
+        for (std::size_t k = 1; ok && k < n; ++k) {
+            const auto b = static_cast<unsigned char>(text[i + k]);
+            ok = (b & 0xC0) == 0x80;
+            c = (c << 6) | (b & 0x3Fu);
+        }
+        ok = ok && c >= least && c <= 0x10FFFF && !(c >= 0xD800 && c <= 0xDFFF);
+        if (!ok) {
+            // A byte that starts no character: the replacement character for it, and on with the next byte.
+            append_utf8(out, 0xFFFD);
+            ++i;
+            continue;
+        }
+        if (c == 0) {
+            // NUL in two bytes, so that the text does not end there.
+            out += "\xC0\x80";
+        } else if (c >= 0x10000) {
+            // Past U+FFFF: its two UTF-16 halves, three bytes each.
+            append_utf8(out, 0xD800 + ((c - 0x10000) >> 10));
+            append_utf8(out, 0xDC00 + ((c - 0x10000) & 0x3FF));
+        } else {
+            out.append(text.substr(i, n));
+        }
+        i += n;
     }
     return out;
 }

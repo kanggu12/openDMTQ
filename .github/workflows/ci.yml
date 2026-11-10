@@ -61,6 +61,11 @@ jobs:
       # The colours of a computer's broadcast in its stream's sequence header (arm32/src/live_sps.cpp).
       - name: Broadcast colours
         run: c++ -std=c++20 -Wall -Wextra -Iarm32/src arm32/tests/host/live_sps_test.cpp arm32/src/live_sps.cpp -o /tmp/live_sps_test && /tmp/live_sps_test
+      # The broadcast's requests to the server (arm32/src/live_net.cpp), against stand-in servers on this machine: each
+      # within its deadline whatever the server or the name's lookup does, the server's answers read as meant and odd
+      # ones as nothing, the ids that go in a URL, the upload queue and the quality steps the uploads take.
+      - name: Broadcast requests
+        run: c++ -std=c++20 -Wall -Wextra -pthread -Iarm32/src arm32/tests/host/live_net_test.cpp arm32/src/live_net.cpp -o /tmp/live_net_test && /tmp/live_net_test
 
       # The frame limit on a computer's display (arm32/src/pacing_math.h): which displays and limits keep every frame on
       # the same number of refreshes, and which go by the clock.

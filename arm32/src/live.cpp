@@ -1019,7 +1019,8 @@ void toast_thread(std::string text) {
         e->CallStaticVoidMethod(looper, e->GetStaticMethodID(looper, "prepare", "()V"));
         jobject mine = e->CallStaticObjectMethod(looper, e->GetStaticMethodID(looper, "myLooper", "()Landroid/os/Looper;"));
         jmethodID make = e->GetStaticMethodID(toast, "makeText", "(Landroid/content/Context;Ljava/lang/CharSequence;I)Landroid/widget/Toast;");
-        jstring message = e->NewStringUTF(text.c_str());
+        // The server's text, as modified UTF-8: what NewStringUTF reads on every Android (live_net.cpp).
+        jstring message = e->NewStringUTF(live::modified_utf8(text).c_str());
         // LENGTH_LONG (1): three and a half seconds, for the notice's two lines; its loop runs for six.
         jobject shown = make && message ? e->CallStaticObjectMethod(toast, make, context, message, 1) : nullptr;
         if (shown && mine && !e->ExceptionCheck()) {

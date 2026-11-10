@@ -68,8 +68,12 @@ std::size_t json_value(const std::string& json, const char* key);
 bool json_bool(const std::string& json, const char* key);
 // The value of "key" as a whole number, `fallback` when it is none.
 int json_int(const std::string& json, const char* key, int fallback);
-// A string value, with the escapes PHP's json_encode writes (\uXXXX for Korean).
+// A string value as UTF-8, with the escapes PHP's json_encode writes (\uXXXX for Korean, a pair of them for a character
+// past U+FFFF); "" for one without its end. NUL is left out, and half a pair alone is U+FFFD.
 std::string json_string(const std::string& json, const char* key);
+// UTF-8 text as JNI's NewStringUTF takes it, modified UTF-8: a character past U+FFFF as its two UTF-16 halves of three
+// bytes each, NUL as two bytes, and each byte that starts no character as U+FFFD (CheckJNI ends the app on those).
+std::string modified_utf8(std::string_view text);
 
 // What GET /live/state answered, checked.
 struct State {

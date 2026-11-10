@@ -226,7 +226,9 @@ hardware AAC encoder. Each source keeps 150 ms in hand and its speed is trimmed 
 percent to hold that: with 60 ms and no trim, one late burst left a source at empty for good, and 2 to 3 %
 of the rounds came up short, which is a click each (clicks in a lobby tune went from 7.9 to 0.9 a
 second). The mix is at 75 %: the two outputs together clipped. Both go into MPEG-TS segments of about two seconds (Android's muxer has no such
-format) posted by an upload thread, over plain HTTP like the game's own requests. A slow upload or a
+format) posted by an upload thread, over plain HTTP like the game's own requests. Each request has ten seconds in all, the lookup of
+the server's name included, which runs on a thread of its own: a server that answers a byte at a time or not at all holds a thread
+no longer (`src/live_net.cpp`, which the player for Windows shares; `tests/host/live_net_test.cpp`). A slow upload or a
 warm phone steps the quality down from what the server asks for: to two thirds of its frame rate, then to half
 with three quarters of its lines, then to half its lines, with the bitrate at 60, 35 and 20 % (the Standard
 quality's 30 fps and 720 lines go to 20 fps, then to 15 fps and 540 lines, then to 360). The network's step comes
