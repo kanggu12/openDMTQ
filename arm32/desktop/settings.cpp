@@ -12,6 +12,10 @@
 //                                            the computer makes (1000 at most)
 //   render_scale  50..100                    the share of the game's area, in percent, the game draws at; the picture
 //                                            is stretched to the area (less for the graphics card to draw)
+//   upscaler      bilinear | fsr1 | nis      below 100 %, how the picture reaches the area's size: the plain stretch,
+//                                            AMD FidelityFX Super Resolution 1 (EASU then RCAS), or NVIDIA Image Scaling
+//   anti_aliasing off | cmaa2 | smaa |       the edges of the game's shapes smoothed: not at all, by Intel's CMAA 2 or by
+//                 msaa2 | msaa4 | msaa8      SMAA 1x over the finished picture, or by drawing with 2, 4 or 8 samples
 //   audio_device  default | <endpoint id>    the sound's device: Windows' default output, or one by its id
 //                                            (player --audio-devices lists them)
 //   audio_mode    shared | exclusive         with the computer's other sound, or the device alone (less latency)
@@ -98,6 +102,19 @@ bool load_settings(const std::string& path) {
             else if ((ok = number(value, 30, 1000, n))) s.fps = static_cast<float>(n);
         } else if (key == "render_scale") {
             if ((ok = number(value, 50, 100, n))) s.render_scale = n;
+        } else if (key == "upscaler") {
+            // The three names the client writes; anything else keeps the plain stretch.
+            ok = value == "bilinear" || value == "fsr1" || value == "nis";
+            if (ok) s.upscaler = value == "fsr1" ? Settings::Upscaler::kFsr1 : value == "nis" ? Settings::Upscaler::kNis : Settings::Upscaler::kBilinear;
+        } else if (key == "anti_aliasing") {
+            // Each name to its kind, in the order of the enum; a name it does not know keeps it off.
+            static const char* const kNames[] = {"off", "cmaa2", "smaa", "msaa2", "msaa4", "msaa8"};
+            ok = false;
+            for (int i = 0; i < 6; ++i) {
+                if (value != kNames[i]) continue;
+                s.anti_aliasing = static_cast<Settings::AntiAliasing>(i);
+                ok = true;
+            }
         } else if (key == "audio_device") {
             s.audio_device = value == "default" ? "" : value;
         } else if (key == "audio_mode") {
@@ -114,11 +131,15 @@ bool load_settings(const std::string& path) {
         }
         if (!ok) jvm::log("player: settings: %s=%s cannot be read: the default stays", key.c_str(), value.c_str());
     }
-    jvm::log("player: settings: %s, %s, vsync %s, fps %s, render %d%%; sound %s, %s, %s buffer, volume %d%%",
+    // The picture's passes by the names the file uses, for the line below.
+    static const char* const kUpscalers[] = {"bilinear", "fsr1", "nis"};
+    static const char* const kAntiAliasing[] = {"off", "cmaa2", "smaa", "msaa2", "msaa4", "msaa8"};
+    jvm::log("player: settings: %s, %s, vsync %s, fps %s, render %d%% (upscaler %s), anti-aliasing %s; sound %s, %s, %s buffer, volume %d%%",
              s.fullscreen ? "full screen" : "a window",
              s.window_w ? (std::to_string(s.window_w) + "x" + std::to_string(s.window_h)).c_str() : "sized to the display",
              s.vsync ? "on" : "off", s.fps > 0 ? std::to_string(static_cast<int>(s.fps)).c_str() : "the display's",
-             s.render_scale, s.audio_device.empty() ? "the default device" : "a chosen device", s.audio_exclusive ? "exclusive" : "shared",
+             s.render_scale, kUpscalers[static_cast<int>(s.upscaler)], kAntiAliasing[static_cast<int>(s.anti_aliasing)],
+             s.audio_device.empty() ? "the default device" : "a chosen device", s.audio_exclusive ? "exclusive" : "shared",
              s.audio_buffer == 0 ? "a low" : s.audio_buffer == 1 ? "a normal" : "a safe", s.volume);
     return true;
 }

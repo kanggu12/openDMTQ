@@ -52,6 +52,14 @@ struct Settings {
     float fps = 0;
     // The share of the game's area the game draws at, in percent: the picture is stretched to the area.
     int render_scale = 100;
+    // What makes the picture of a render scale below 100 % the window's size (post_pass.cpp): the plain stretch ANGLE
+    // gives a surface of a fixed size, or a pass of our own over the game's frame drawn at the scaled size.
+    enum class Upscaler { kBilinear, kFsr1, kNis };
+    Upscaler upscaler = Upscaler::kBilinear;
+    // How the edges of the game's shapes are smoothed (post_pass.cpp): not at all, by a pass over the finished picture
+    // (CMAA 2, SMAA 1x), or by drawing the frame with that many samples a pixel (MSAA).
+    enum class AntiAliasing { kOff, kCmaa2, kSmaa, kMsaa2, kMsaa4, kMsaa8 };
+    AntiAliasing anti_aliasing = AntiAliasing::kOff;
     // The sound's device ("" Windows' default output), the device alone, how much is kept ahead (0 low, 1 normal,
     // 2 safe) and the game's volume in percent.
     std::string audio_device;

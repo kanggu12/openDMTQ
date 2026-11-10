@@ -38,13 +38,15 @@ int main() {
     // Every key, each at a value other than its default, the way the client writes them.
     const player::Settings& all = read(path,
                                        "# written by the PC client\n"
-                                       "display=fullscreen\nwindow=1600x900\nvsync=off\nfps=144\nrender_scale=75\n"
+                                       "display=fullscreen\nwindow=1600x900\nvsync=off\nfps=144\nrender_scale=75\nupscaler=fsr1\nanti_aliasing=smaa\n"
                                        "audio_device={0.0.0.00000000}.{abc}\naudio_mode=exclusive\naudio_buffer=low\nvolume=40\n");
     check(all.fullscreen, "display=fullscreen is full screen");
     check(all.window_w == 1600 && all.window_h == 900, "window=1600x900 is that size");
     check(!all.vsync, "vsync=off is off");
     check(all.fps == 144, "fps=144 is 144");
     check(all.render_scale == 75, "render_scale=75 is 75");
+    check(all.upscaler == player::Settings::Upscaler::kFsr1, "upscaler=fsr1 is AMD FSR 1");
+    check(all.anti_aliasing == player::Settings::AntiAliasing::kSmaa, "anti_aliasing=smaa is SMAA");
     check(all.audio_device == "{0.0.0.00000000}.{abc}", "audio_device keeps the id whole, braces and dots");
     check(all.audio_exclusive, "audio_mode=exclusive is the device alone");
     check(all.audio_buffer == 0, "audio_buffer=low is 0");
@@ -55,14 +57,28 @@ int main() {
     check(!words.fullscreen && words.window_w == 0 && words.vsync && words.fps == 1000, "window, auto, on, unlimited");
     check(words.audio_device.empty() && !words.audio_exclusive && words.audio_buffer == 2, "default, shared, safe");
     check(read(path, "fps=auto\n").fps == 0, "fps=auto is the display's own rate");
+    // Each upscaler and each anti-aliasing by its name, from the defaults (the plain stretch, none).
+    check(read(path, "upscaler=nis\n").upscaler == player::Settings::Upscaler::kNis, "upscaler=nis is NVIDIA NIS");
+    check(read(path, "upscaler=bilinear\n").upscaler == player::Settings::Upscaler::kBilinear, "upscaler=bilinear is the plain stretch");
+    check(player::Settings{}.upscaler == player::Settings::Upscaler::kBilinear, "the plain stretch is the default upscaler");
+    check(player::Settings{}.anti_aliasing == player::Settings::AntiAliasing::kOff, "no anti-aliasing is the default");
+    const char* const aa_names[] = {"off", "cmaa2", "smaa", "msaa2", "msaa4", "msaa8"};
+    for (int i = 0; i < 6; ++i) {
+        // Each name gives its own kind, in the enum's order.
+        const std::string text = std::string("anti_aliasing=") + aa_names[i] + "\n";
+        check(read(path, text).anti_aliasing == static_cast<player::Settings::AntiAliasing>(i), aa_names[i]);
+    }
     check(read(path, "audio_buffer=normal\n").audio_buffer == 1, "audio_buffer=normal is 1");
     // Values it cannot read keep the default, each on its own: the keys around them are still read.
-    const player::Settings& bad = read(path, "display=huge\nwindow=200x100\nvsync=maybe\nfps=20\nrender_scale=40\naudio_mode=loud\n"
+    const player::Settings& bad = read(path, "display=huge\nwindow=200x100\nvsync=maybe\nfps=20\nrender_scale=40\naudio_mode=loud\nupscaler=dlss\n"
+                                             "anti_aliasing=fxaa\nanti_aliasing=MSAA4\n"
                                              "audio_buffer=tiny\nvolume=101\nvolume2=5\nfps=120\n");
     check(!bad.fullscreen && bad.window_w == 0 && bad.vsync, "a display, window or vsync it cannot read keeps the default");
     check(bad.render_scale == 100 && !bad.audio_exclusive && bad.audio_buffer == 1 && bad.volume == 100,
           "a render scale below 50, a mode, a buffer or a volume it cannot read keeps the default");
     check(bad.fps == 120, "a frame limit below 30 is left out, and a later good one read");
+    check(bad.upscaler == player::Settings::Upscaler::kBilinear, "an upscaler it does not know keeps the plain stretch");
+    check(bad.anti_aliasing == player::Settings::AntiAliasing::kOff, "an anti-aliasing it does not know, or in capitals, keeps it off");
     check(read(path, "window=1280x720x2\n").window_w == 0, "a size with more after it is not read");
     check(read(path, "fps=1001\n").fps == 0, "a frame limit above 1000 is left out");
     check(read(path, "volume=0\n").volume == 0, "volume=0 is silence, a value of its own");
