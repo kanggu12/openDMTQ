@@ -61,7 +61,8 @@ class LauncherApp:
         self.app_note = None            # what the last look for a newer app found when it found none (the page shows it)
         self.status_transient = False   # the status line says something passing, which the ready check may replace
         self.status_action = None       # (words, function): a link after the status line, or None
-        self.updating = False           # the launcher's own update or a repair is under way (the window stays until then)
+        self.keep_open = False          # work that closing would cut short is under way (the launcher's update, a
+        #                                 repair, a count or a deletion): the window stays until it ends
         self.play_offline = False       # PLAY went on with this PC's app because the server did not answer
         self.server_check = None        # the last time a server was asked in this run: {"url", "state", "text"}
         self.pumps = 0                  # turns of the task pump, for the slower look for an installer's server
@@ -642,9 +643,9 @@ class LauncherApp:
 
     def close(self):
         """Close the launcher. A game playing keeps going: the launcher hides until it ends, then goes."""
-        if self.updating:
-            # The update is downloading (the launcher closes by itself once it is in Velopack's hands), or a repair is
-            # writing the program's files.
+        if self.keep_open:
+            # The update is downloading (the launcher closes by itself once it is in Velopack's hands), or a repair, a
+            # count or a deletion is under way: each would stop half done.
             return
         if self.dialog is not None:
             # Closing the window answers an open question with Cancel.

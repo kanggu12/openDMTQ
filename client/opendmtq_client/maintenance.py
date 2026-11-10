@@ -19,7 +19,7 @@ def _in_background(app, message, glyph, job, then):
     """Run job() on a worker thread under a dialog that says what is under way, then then(result, error) on the
     window's thread with the dialog gone. The window is not closed meanwhile: the work would stop half done."""
     app.dialog = dialogs.Dialog(app.root, app.ui, "info", message, message, progress=True, glyph=glyph)
-    app.updating = True
+    app.keep_open = True
 
     def work():
         try:
@@ -30,7 +30,7 @@ def _in_background(app, message, glyph, job, then):
         app.post(lambda: finished(result, error))
 
     def finished(result, error):
-        app.updating = False
+        app.keep_open = False
         if app.dialog is not None:
             app.dialog.close(None)
             app.dialog = None
@@ -194,7 +194,7 @@ def update_launcher(app, result):
                                 w("about.updating.message", v=result.version), w("about.updating.detail"),
                                 progress=True, glyph="update")
     # The window stays until the update is in Velopack's hands: closing it now would end the download.
-    app.updating = True
+    app.keep_open = True
 
     def work():
         try:
@@ -207,11 +207,11 @@ def update_launcher(app, result):
         app.post(done)
 
     def done():
-        app.updating = False
+        app.keep_open = False
         app.close()
 
     def failed(text):
-        app.updating = False
+        app.keep_open = False
         if app.dialog is not None:
             app.dialog.close(None)
             app.dialog = None
