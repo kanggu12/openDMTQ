@@ -1,5 +1,6 @@
 """Running things: docker compose, Windows PowerShell (from WSL), and console output."""
 
+import base64
 import os
 import shutil
 import socket
@@ -411,45 +412,52 @@ def firewall_rule_present(port, internet):
     return scope == ("Any" if internet else "LocalSubnet")
 
 
+def firewall_command(port=80, internet=False, remove=False, replaces=None):
+    """cli/firewall.ps1 as one PowerShell command, with its parameters: the script as a script block, called with them as
+    -File would pass them (its param() block takes them, its exit codes end the PowerShell that runs it). Its comment and
+    blank lines are left out, the code as it is: the command goes on the elevated PowerShell's command line, through
+    ShellExecute, whose parameters some Windows versions cut at 2,048 characters."""
+    with open(os.path.join(ROOT, "cli", "firewall.ps1"), encoding="utf-8") as f:
+        # Each line without the spaces around it (a line's ending backtick stays its last character).
+        lines = [line.strip() for line in f.read().splitlines()]
+    code = [line for line in lines if line and not line.startswith("#")]
+    # Numbers made numbers here and switches by name: nothing typed reaches the command.
+    params = ["-Port", str(int(port))]
+    if internet:
+        params.append("-Internet")
+    if remove:
+        params.append("-Remove")
+    if replaces and int(replaces) != int(port):
+        params += ["-Replaces", str(int(replaces))]
+    return "& {\n" + "\n".join(code) + "\n} " + " ".join(params)
+
+
 def run_firewall_script(port=80, internet=False, remove=False, replaces=None):
     """Run cli/firewall.ps1 elevated (Windows shows one UAC prompt). replaces: the port this server used until now.
+
+    The script goes inside the elevated PowerShell's own command (-EncodedCommand), never as a file: a copy in the
+    user's temp folder could be swapped by any program of the same user while Windows asks for permission, and the
+    swap would run as administrator.
 
     Returns None on success, else what went wrong (with the way to do it by hand).
     """
     by_hand = "run cli/firewall.ps1 as administrator yourself"
-    r = powershell("[IO.Path]::GetTempPath()")
-    if r is None or r.returncode != 0 or not r.stdout.strip():
-        return f"cannot reach Windows PowerShell from here; {by_hand}"
-    win_tmp = r.stdout.strip()
-    # Elevated PowerShell cannot always read \\wsl$ paths; hand it a copy in the Windows temp folder.
-    linux_tmp = subprocess.run(["wslpath", "-u", win_tmp], capture_output=True, text=True).stdout.strip()
     try:
-        if not linux_tmp:
-            raise OSError("wslpath could not translate it")
-        shutil.copyfile(os.path.join(ROOT, "cli", "firewall.ps1"), os.path.join(linux_tmp, "opendmtq-firewall.ps1"))
+        command = firewall_command(port, internet, remove, replaces)
     except OSError as e:
-        return f"cannot copy the firewall script to {win_tmp} ({e}); {by_hand}"
-    # Start-Process joins its arguments with spaces, unquoted: the path goes in double quotes so a
-    # profile folder with a space ("C:\Users\John Doe\...") stays one argument.
-    script_args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", f'"{win_tmp}opendmtq-firewall.ps1"',
-                   "-Port", str(int(port))]
-    if internet:
-        script_args.append("-Internet")
-    if remove:
-        script_args.append("-Remove")
-    if replaces and int(replaces) != int(port):
-        script_args += ["-Replaces", str(int(replaces))]
+        return f"cannot read cli/firewall.ps1 ({e}); {by_hand}"
+    # PowerShell takes an encoded command as Base64 of its UTF-16LE text: one argument, no quoting, nothing to read
+    # from anywhere else.
+    encoded = base64.b64encode(command.encode("utf-16-le")).decode("ascii")
+    script_args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded]
     # The exit code comes back as text: WSL keeps only its low 8 bits, and PowerShell's own failures
-    # (-196608 for a script it cannot find) would read as 0.
+    # (-196608 for a command it cannot start) would read as 0.
     r = powershell("try { $p = Start-Process powershell -Verb RunAs -Wait -PassThru -WindowStyle Hidden "
                    f"-ArgumentList {','.join(_ps_text(a) for a in script_args)}; 'exit ' + $p.ExitCode }} "
                    "catch { 'declined' }", timeout=300)
-    # The elevated run is over (-Wait), so the copy has done its job: nothing stays in the user's temp folder.
-    try:
-        os.remove(os.path.join(linux_tmp, "opendmtq-firewall.ps1"))
-    except OSError:
-        pass
-    result = r.stdout.strip().splitlines()[-1] if r is not None and r.stdout.strip() else ""
+    if r is None:
+        return f"cannot reach Windows PowerShell from here; {by_hand}"
+    result = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else ""
     if result == "exit 0":
         return None
     if result == "declined":

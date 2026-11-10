@@ -1,9 +1,11 @@
 """Tests for reaching Windows from WSL: finding PowerShell, reading its output, running the firewall
 script elevated."""
 
+import base64
 import contextlib
 import io
 import os
+import re
 import stat
 import subprocess
 import tempfile
@@ -96,56 +98,56 @@ class NoInternetBuildTest(unittest.TestCase):
 
 
 class FirewallScriptTest(unittest.TestCase):
-    def run_script(self, temp, result="exit 0\r\n", **kwargs):
-        """run_firewall_script with Windows faked; returns (its result, the elevating script)."""
+    def run_script(self, result="exit 0\r\n", **kwargs):
+        """run_firewall_script with Windows faked; returns (its result, the elevating script, the command the elevated
+        PowerShell runs, decoded)."""
         scripts = []
 
         def fake(script, timeout=60):
             scripts.append(script)
-            if "GetTempPath" in script:
-                return subprocess.CompletedProcess([], 0, temp + "\r\n", "")
             return subprocess.CompletedProcess([], 0, result, "")
 
-        with tempfile.TemporaryDirectory() as d, mock.patch.object(system, "powershell", fake), \
-                mock.patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0, d + "\n", "")):
+        with mock.patch.object(system, "powershell", fake), mock.patch("subprocess.run") as ran:
             out = system.run_firewall_script(**kwargs)
-        return out, [s for s in scripts if "Start-Process" in s][0]
+        # Nothing else is run for it: no copy of the script to put anywhere.
+        ran.assert_not_called()
+        [script] = scripts
+        encoded = re.search(r"'-EncodedCommand','([A-Za-z0-9+/=]+)'", script).group(1)
+        return out, script, base64.b64decode(encoded).decode("utf-16-le")
 
-    def test_the_copy_is_there_for_the_elevated_run_and_gone_after_it(self):
-        with tempfile.TemporaryDirectory() as d:
-            copy = os.path.join(d, "opendmtq-firewall.ps1")
-            during = []
+    def test_the_script_goes_in_the_elevated_command_not_in_a_file(self):
+        # A copy in the user's temp folder could be swapped by any program of that user while Windows asks for
+        # permission. The elevated PowerShell runs what its own command line holds: every line of the script's code.
+        _, script, command = self.run_script(port=80)
+        self.assertNotIn("-File", script)
+        with open(os.path.join(system.ROOT, "cli", "firewall.ps1"), encoding="utf-8") as f:
+            code = [line.strip() for line in f.read().splitlines() if line.strip() and not line.strip().startswith("#")]
+        self.assertEqual(command.splitlines()[1:-1], code)
+        self.assertTrue(command.startswith("& {\n"))
 
-            def fake(script, timeout=60):
-                if "GetTempPath" in script:
-                    return subprocess.CompletedProcess([], 0, "C:\\Temp\\\r\n", "")
-                # The elevated run reads the copy, so it must exist at this moment.
-                during.append(os.path.isfile(copy))
-                return subprocess.CompletedProcess([], 0, "exit 0\r\n", "")
+    def test_its_parameters_go_with_it(self):
+        _, _, command = self.run_script(port=8790, internet=True, replaces=80)
+        self.assertTrue(command.endswith("\n} -Port 8790 -Internet -Replaces 80"), command[-60:])
+        _, _, command = self.run_script(port=8790, remove=True, replaces=8790)
+        self.assertTrue(command.endswith("\n} -Port 8790 -Remove"), command[-60:])
 
-            with mock.patch.object(system, "powershell", fake), \
-                    mock.patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0, d + "\n", "")):
-                self.assertIsNone(system.run_firewall_script(port=80))
-            self.assertEqual(during, [True])
-            self.assertFalse(os.path.exists(copy), "the script must not stay in the Windows temp folder")
+    def test_the_elevated_command_line_stays_short(self):
+        # ShellExecute, which elevates it, cuts its parameters at 2,048 characters on some Windows versions.
+        _, script, _ = self.run_script(port=65535, internet=True, remove=True, replaces=65534)
+        arguments = re.search(r"-ArgumentList (.*?); 'exit '", script).group(1)
+        self.assertLess(len(" ".join(a.strip("'") for a in arguments.split(","))), 2048)
 
-    def test_temp_folder_with_a_space_is_quoted(self):
-        _, script = self.run_script("C:\\Users\\John Doe\\AppData\\Local\\Temp\\", port=8790, internet=True)
-        self.assertIn("'\"C:\\Users\\John Doe\\AppData\\Local\\Temp\\opendmtq-firewall.ps1\"'", script)
-        self.assertIn("'-Port','8790'", script)
-        self.assertIn("'-Internet'", script)
-
-    def test_temp_folder_with_a_quote_is_escaped(self):
-        _, script = self.run_script("C:\\Users\\O'Brien\\AppData\\Local\\Temp\\", port=80)
-        self.assertIn("'\"C:\\Users\\O''Brien\\AppData\\Local\\Temp\\opendmtq-firewall.ps1\"'", script)
+    def test_without_powershell_it_says_so(self):
+        with mock.patch.object(system, "powershell", lambda script, timeout=60: None):
+            self.assertIn("cannot reach Windows PowerShell", system.run_firewall_script(port=80))
 
     def test_a_failed_script_is_a_failure(self):
-        # powershell.exe -File on a missing file exits -196608; WSL keeps the low 8 bits, which are 0.
-        out, _ = self.run_script("C:\\Temp\\", result="exit -196608\r\n", port=80)
+        # powershell.exe on a command it cannot start exits -196608; WSL keeps the low 8 bits, which are 0.
+        out, _, _ = self.run_script(result="exit -196608\r\n", port=80)
         self.assertIsInstance(out, str, "a failure must not read as success")
 
     def test_success(self):
-        out, _ = self.run_script("C:\\Temp\\", port=80)
+        out, _, _ = self.run_script(port=80)
         self.assertIsNone(out)
 
 

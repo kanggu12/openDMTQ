@@ -63,8 +63,8 @@ class Sandbox:
         self.programs = {("docker", "info"): done(0, "29.0.0\n"), ("docker", "exec"): done(0),
                          # WSL in NAT mode, as the tests that pass wsl=True picture it.
                          ("wslinfo", "--networking-mode"): done(0, "nat\n")}
-        # Windows side: None while PowerShell cannot be reached (see windows_reachable).
-        self.windows_temp = None
+        # Windows side: False while PowerShell cannot be reached (see windows_reachable).
+        self.windows = False
         self.out, self.err = io.StringIO(), io.StringIO()
 
     # ------------------------------------------------------------------ files
@@ -105,10 +105,8 @@ class Sandbox:
         return self.out.getvalue() + self.err.getvalue()
 
     def windows_reachable(self):
-        """PowerShell answers, and its temp folder is a folder in the sandbox."""
-        self.windows_temp = os.path.join(self.root, "wintemp")
-        os.makedirs(self.windows_temp)
-        self.programs[("wslpath",)] = done(0, self.windows_temp + "\n")
+        """PowerShell answers."""
+        self.windows = True
 
     def call(self, fn, **args):
         """Run a command function; returns its exit status (a SystemExit's included)."""
@@ -194,10 +192,8 @@ class Sandbox:
 
     def _powershell(self, script, timeout=60):
         self.scripts.append(script)
-        if self.windows_temp is None:
+        if not self.windows:
             return None
-        if "GetTempPath" in script:
-            return done(0, "C:\\Users\\player\\AppData\\Local\\Temp\\\r\n")
         if "Get-NetFirewallRule" in script:
             return done(0, "none\r\n")
         # The elevated run of cli/firewall.ps1.
