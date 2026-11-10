@@ -3,6 +3,7 @@
 #include "egl_numbers.h"
 #include "gl_bridge.h"
 #include "live.h"
+#include "offscreen.h"
 #include "pacing.h"
 #include "tweaks.h"
 
@@ -125,6 +126,17 @@ std::uint64_t egl_ChooseConfig(Thread& t) {
     auto size = static_cast<EGLint>(w.u32());
     gaddr num = w.u32();
     if (!fn) return missing("eglChooseConfig");
+    // A computer player's compute passes want an OpenGL ES 3.1 context (offscreen.h), which a config made for OpenGL ES 2
+    // alone cannot have: a game asking for configs of ES 2 gets those of ES 3 as well, which are ES 2's too.
+    std::vector<EGLint> widened;
+    if (g_offscreen_es31.load(std::memory_order_relaxed)) {
+        for (const EGLint* a = attribs; a && *a != EGL_NONE; a += 2) {
+            widened.push_back(a[0]);
+            widened.push_back(a[0] == EGL_RENDERABLE_TYPE && (a[1] & EGL_OPENGL_ES2_BIT) ? a[1] | EGL_OPENGL_ES3_BIT : a[1]);
+        }
+        widened.push_back(EGL_NONE);
+        attribs = widened.data();
+    }
     std::vector<EGLConfig> host(static_cast<std::size_t>(size > 0 ? size : 0));
     EGLint n = 0;
     EGLBoolean ok = fn(d, attribs, configs ? host.data() : nullptr, size, &n);
@@ -151,6 +163,11 @@ W native_window(void* handle) {
     else return reinterpret_cast<W>(handle);
 }
 
+// EGL 1.5's name for a config of OpenGL ES 3, which Android's older headers know only as the KHR extension's.
+#ifndef EGL_OPENGL_ES3_BIT
+#define EGL_OPENGL_ES3_BIT 0x00000040
+#endif
+
 // ANGLE's window surface of a fixed size (EGL_ANGLE_window_fixed_size), stretched to its window when shown.
 #ifndef EGL_FIXED_SIZE_ANGLE
 #define EGL_FIXED_SIZE_ANGLE 0x3201
@@ -170,8 +187,9 @@ std::uint64_t egl_CreateWindowSurface(Thread& t) {
     void* c = cfg(w.u32());
     void* win = handles().get(HandleKind::kWindow, w.u32());
     const EGLint* asked = ptr<const EGLint>(w.u32());
-    // A computer player's render scale: the game's attributes, then a fixed size, the one the player told the game.
-    const std::int64_t fixed = g_window_fixed_size.load(std::memory_order_relaxed);
+    // A computer player's render scale: the game's attributes, then a fixed size, the one the player told the game; none
+    // when an upscaler draws the picture to the window's own size from a frame of that size (offscreen.h).
+    const std::int64_t fixed = g_offscreen_window_size.load(std::memory_order_relaxed) ? 0 : g_window_fixed_size.load(std::memory_order_relaxed);
     std::vector<EGLint> attribs;
     if (fixed) {
         for (const EGLint* a = asked; a && *a != EGL_NONE; a += 2) {
@@ -196,6 +214,8 @@ std::uint64_t egl_CreateWindowSurface(Thread& t) {
     if (g_trace) log("trace: eglCreateWindowSurface(window %p) -> %p, error %#x", win, s, host_error());
     // The window the game renders to: the one asked for the frame rate.
     if (s) game_window_surface(static_cast<ANativeWindow*>(win));
+    // The surface whose frames a computer player draws offscreen, when it does.
+    if (s) offscreen_surface_created(d, c, s);
     return put(HandleKind::kEglSurface, s);
 }
 
@@ -248,6 +268,7 @@ std::uint64_t egl_DestroySurface(Thread& t) {
     EGLBoolean ok = fn ? fn(d, surface) : EGL_FALSE;
     if (ok) {
         pacing_surface_destroyed(surface);
+        offscreen_surface_destroyed(surface);
         handles().drop(HandleKind::kEglSurface, s);
         // A new surface at the same address is not the one of a fixed size.
         std::lock_guard<std::mutex> lock(g_fixed_lock);
@@ -262,7 +283,10 @@ std::uint64_t egl_QuerySurface(Thread& t) {
     void* d = dpy(w.u32());
     void* s = srf(w.u32());
     auto attr = static_cast<EGLint>(w.u32());
-    return fn ? fn(d, s, attr, ptr<EGLint>(w.u32())) : 0;
+    auto* value = ptr<EGLint>(w.u32());
+    // A surface whose frames are drawn offscreen is the size the game draws at, as one of a fixed size would answer.
+    if (offscreen_query(s, attr, value)) return EGL_TRUE;
+    return fn ? fn(d, s, attr, value) : 0;
 }
 
 std::uint64_t egl_SurfaceAttrib(Thread& t) {
@@ -310,7 +334,54 @@ std::uint64_t egl_CreateContext(Thread& t) {
     void* d = dpy(w.u32());
     void* c = cfg(w.u32());
     void* share = ctx(w.u32());
-    return fn ? put(HandleKind::kEglContext, fn(d, c, share, ptr<const EGLint>(w.u32()))) : 0;
+    const EGLint* asked = ptr<const EGLint>(w.u32());
+    if (!fn) return 0;
+    // A computer player's compute passes want OpenGL ES 3.1 (offscreen.h): a context of 2.0 or 3.0 asked for is made 3.1,
+    // the game's other attributes as they were (ANGLE makes 3.0 for a 2.0 asked for already, and 3.1 keeps all of 3.0);
+    // refused, the context the game asked for.
+    if (g_offscreen_es31.load(std::memory_order_relaxed)) {
+        std::vector<EGLint> attribs;
+        bool three = false;
+        for (const EGLint* a = asked; a && *a != EGL_NONE; a += 2) {
+            // The version's minor part is set below; the rest is the game's.
+            if (a[0] == EGL_CONTEXT_MINOR_VERSION) continue;
+            const bool version = a[0] == EGL_CONTEXT_MAJOR_VERSION && (a[1] == 2 || a[1] == 3);
+            if (version) three = true;
+            attribs.push_back(a[0]);
+            // The major version 3, with the minor 1 below.
+            attribs.push_back(version ? 3 : a[1]);
+        }
+        const bool minor_zero = [asked] {
+            // No minor version asked is 0, as is one asked as 0.
+            for (const EGLint* a = asked; a && *a != EGL_NONE; a += 2) if (a[0] == EGL_CONTEXT_MINOR_VERSION) return a[1] == 0;
+            return true;
+        }();
+        if (three && minor_zero) {
+            attribs.insert(attribs.end(), {EGL_CONTEXT_MINOR_VERSION, 1, EGL_NONE});
+            if (EGLContext made = fn(d, c, share, attribs.data())) {
+                log("arm32: the game's OpenGL ES context made 3.1, for the player's compute passes");
+                return put(HandleKind::kEglContext, made);
+            }
+            const EGLint error = host_error();
+            // What the config can render, and what was asked, for the log.
+            static auto attrib = reinterpret_cast<EGLBoolean (*)(EGLDisplay, EGLConfig, EGLint, EGLint*)>(egl_proc("eglGetConfigAttrib"));
+            EGLint renderable = 0;
+            if (attrib) attrib(d, c, EGL_RENDERABLE_TYPE, &renderable);
+            std::string said;
+            for (std::size_t i = 0; i + 1 < attribs.size(); i += 2) said += " " + std::to_string(attribs[i]) + "=" + std::to_string(attribs[i + 1]);
+            log("arm32: no OpenGL ES 3.1 context here (error %#x; the config renders %#x; asked%s): the version the game asked for", error,
+                renderable, said.c_str());
+        } else {
+            // Another version asked for (1, or 3.1 already): the game's own.
+            EGLint major = 1, minor = 0;
+            for (const EGLint* a = asked; a && *a != EGL_NONE; a += 2) {
+                if (a[0] == EGL_CONTEXT_MAJOR_VERSION) major = a[1];
+                if (a[0] == EGL_CONTEXT_MINOR_VERSION) minor = a[1];
+            }
+            log("arm32: the game asks for an OpenGL ES %d.%d context: made as asked", major, minor);
+        }
+    }
+    return put(HandleKind::kEglContext, fn(d, c, share, asked));
 }
 
 std::uint64_t egl_DestroyContext(Thread& t) {
@@ -321,6 +392,7 @@ std::uint64_t egl_DestroyContext(Thread& t) {
     EGLBoolean ok = fn ? fn(d, ctx(c)) : EGL_FALSE;
     if (ok) {
         live_context_destroyed(ctx(c));
+        offscreen_context_destroyed(ctx(c));
         handles().drop(HandleKind::kEglContext, c);
     }
     return ok;
@@ -333,7 +405,18 @@ std::uint64_t egl_MakeCurrent(Thread& t) {
     void* draw = srf(w.u32());
     void* read = srf(w.u32());
     void* context = ctx(w.u32());
+    // The context that is current lets go of the offscreen framebuffer while it can still be reached (offscreen.h).
+    offscreen_before_make_current();
     EGLBoolean ok = fn ? fn(d, draw, read, context) : EGL_FALSE;
+    if (ok) {
+        // Drawing to the window whose frames go offscreen: framebuffer 0 is the context's offscreen one from here.
+        offscreen_made_current(d, draw, context);
+    } else {
+        // Refused, and the context before stays current: its offscreen framebuffer back where it was.
+        static auto current_context = reinterpret_cast<EGLContext (*)()>(egl_proc("eglGetCurrentContext"));
+        static auto current_surface = reinterpret_cast<EGLSurface (*)(EGLint)>(egl_proc("eglGetCurrentSurface"));
+        if (current_context && current_surface) offscreen_made_current(d, current_surface(EGL_DRAW), current_context());
+    }
     if (g_trace) log("trace: eglMakeCurrent(draw %p, ctx %p) on %d -> %d", draw, context, t.tid, ok);
     return ok;
 }
@@ -369,6 +452,9 @@ std::uint64_t egl_SwapBuffers(Thread& t) {
     Words w{t};
     void* d = dpy(w.u32());
     void* s = srf(w.u32());
+    // A frame drawn offscreen (offscreen.h): to the window's own framebuffer through the player's passes, first, so that
+    // live view and a broadcast take the picture players see.
+    offscreen_swap(d, s);
     // The finished frame, for live view when it is on.
     live_frame(d, s);
     // A render scale's surface: its size as the window's is now.

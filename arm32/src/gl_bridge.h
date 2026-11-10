@@ -102,7 +102,16 @@ extern const std::size_t kGlCount;
     X(glDeleteSync) X(glDeleteSyncAPPLE) X(glIsSync) X(glIsSyncAPPLE) X(glClientWaitSync)               \
     X(glClientWaitSyncAPPLE) X(glWaitSync) X(glWaitSyncAPPLE) X(glGetSynciv) X(glGetSyncivAPPLE)        \
     X(glDebugMessageCallback) X(glDebugMessageCallbackKHR) X(glEGLImageTargetTexture2DOES)              \
-    X(glEGLImageTargetRenderbufferStorageOES) X(glDeleteBuffers)
+    X(glEGLImageTargetRenderbufferStorageOES) X(glDeleteBuffers)                                          \
+    /* offscreen.cpp: the calls that name or read framebuffer 0 */                                     \
+    X(glBindFramebuffer) X(glGetIntegerv) X(glGetInteger64v) X(glGetFloatv) X(glGetBooleanv)             \
+    X(glReadPixels) X(glReadnPixels) X(glReadnPixelsEXT) X(glReadnPixelsKHR) X(glCopyTexImage2D)         \
+    X(glCopyTexSubImage2D) X(glCopyTexSubImage3D) X(glBlitFramebuffer) X(glInvalidateFramebuffer)        \
+    X(glInvalidateSubFramebuffer) X(glDiscardFramebufferEXT) X(glDrawBuffers) X(glDrawBuffersEXT)        \
+    X(glReadBuffer) X(glFramebufferTexture2D) X(glFramebufferRenderbuffer) X(glFramebufferTextureLayer)  \
+    X(glFramebufferTexture) X(glFramebufferTextureEXT) X(glFramebufferTextureOES)                        \
+    X(glFramebufferTexture2DMultisampleEXT) X(glFramebufferTexture3DOES) X(glFramebufferParameteri)      \
+    X(glGetFramebufferAttachmentParameteriv) X(glGetFramebufferParameteriv)
 #define ARM32_DECLARE(name) std::uint64_t gl_special_##name(Thread& t);
 ARM32_GL_SPECIALS(ARM32_DECLARE)
 #undef ARM32_DECLARE

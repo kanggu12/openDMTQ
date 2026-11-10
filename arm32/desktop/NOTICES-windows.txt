@@ -7,6 +7,12 @@ Built into OpenDMTQ-Player.exe:
 - LLVM's libc++, libc++abi, libunwind and compiler-rt, from the llvm-mingw toolchain: the Apache License 2.0 with LLVM
   Exceptions, below.
 - The mingw-w64 runtime and winpthreads: their licenses are below.
+- AMD FidelityFX Super Resolution 1 (its EASU and RCAS, ported to OpenGL ES shaders): the MIT License below.
+- NVIDIA Image Scaling SDK (its NVScaler, ported to an OpenGL ES shader, and its NIS_Config.h with the scaler's
+  coefficients): the MIT License below.
+- SMAA (its shader and its area and search textures): the MIT License below.
+- Intel's CMAA 2 (its compute shaders, ported to OpenGL ES and changed as their source says): the Apache License 2.0
+  below.
 
 Beside it:
 - ANGLE (libEGL.dll, libGLESv2.dll), OpenGL ES on Direct3D: the BSD license below.

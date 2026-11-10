@@ -45,6 +45,11 @@ notice() {
   for part in fmt/LICENSE mcl/LICENSE robin-map/LICENSE xbyak/COPYRIGHT zycore/LICENSE zydis/LICENSE; do
     notice "$(dirname "$part")" "$work/dynarmic/externals/$part"
   done
+  # The picture's passes (arm32/desktop/post_pass.cpp, cmaa2.cpp): their authors' licenses, as their sources carry them.
+  notice "AMD FidelityFX Super Resolution 1" "$here/desktop/third_party/fsr/license.txt"
+  notice "NVIDIA Image Scaling SDK" "$here/desktop/third_party/nis/licence.txt"
+  notice "SMAA" "$here/desktop/third_party/smaa/LICENSE.txt"
+  notice "CMAA 2" "$here/desktop/third_party/cmaa2/license.txt"
 } > "$dest/licenses/NOTICES.txt"
 # The toolchain's licenses come out of its image.
 docker run --rm -v "$here:/a:ro" opendmtq-arm32-windows sh -ec '

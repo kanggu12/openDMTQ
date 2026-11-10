@@ -33,6 +33,17 @@ SPECIAL = {
     "glGetSynciv", "glGetSyncivAPPLE", "glDebugMessageCallback", "glDebugMessageCallbackKHR",
     "glEGLImageTargetTexture2DOES", "glEGLImageTargetRenderbufferStorageOES", "glDeleteBuffers",
 }
+# Implemented by hand in offscreen.cpp: every call that names or reads framebuffer 0, which a computer player may
+# redirect to a framebuffer of its own (offscreen.h).
+SPECIAL |= {
+    "glBindFramebuffer", "glGetIntegerv", "glGetInteger64v", "glGetFloatv", "glGetBooleanv", "glReadPixels",
+    "glReadnPixels", "glReadnPixelsEXT", "glReadnPixelsKHR", "glCopyTexImage2D", "glCopyTexSubImage2D",
+    "glCopyTexSubImage3D", "glBlitFramebuffer", "glInvalidateFramebuffer", "glInvalidateSubFramebuffer",
+    "glDiscardFramebufferEXT", "glDrawBuffers", "glDrawBuffersEXT", "glReadBuffer", "glFramebufferTexture2D",
+    "glFramebufferRenderbuffer", "glFramebufferTextureLayer", "glFramebufferTexture", "glFramebufferTextureEXT",
+    "glFramebufferTextureOES", "glFramebufferTexture2DMultisampleEXT", "glFramebufferTexture3DOES",
+    "glFramebufferParameteri", "glGetFramebufferAttachmentParameteriv", "glGetFramebufferParameteriv",
+}
 
 # Calls that wait for the GPU: run detached from the guest (as reentrant host functions, after
 # the JIT has returned), so that a signal for the waiting thread, the garbage collector's

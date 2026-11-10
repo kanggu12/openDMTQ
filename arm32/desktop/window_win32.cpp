@@ -23,6 +23,7 @@
 #include "player.h"
 
 #include "overlay_win32.h"
+#include "post_pass.h"
 #include "pacing.h"
 
 #include <windows.h>
@@ -1166,7 +1167,14 @@ bool open_window(const std::string& title) {
     UpdateWindow(g_frame);
     // The size the game's area has once shown (the frame's scaling may have changed it).
     place_game();
-    if (g_area_w != app().width || g_area_h != app().height) {
+    // The passes over the game's frames the PC's settings ask for (post_pass.h), before the game makes its surface: an
+    // upscaler below 100 %, anti-aliasing. Neither asked for, the game's frames reach the window as they always did.
+    post_configure(static_cast<int>(settings().upscaler), static_cast<int>(settings().anti_aliasing), settings().render_scale);
+    if ((g_area_w != app().width || g_area_h != app().height) && settings().upscaler != Settings::Upscaler::kBilinear) {
+        // The upscaler's own line follows at the first frame (post_pass.cpp), with the sizes it scales between.
+        jvm::log("player: the game draws at %dx%d for an area of %dx%d (render scale %d%%), upscaled by %s", app().width, app().height, g_area_w,
+                 g_area_h, settings().render_scale, settings().upscaler == Settings::Upscaler::kFsr1 ? "AMD FSR 1" : "NVIDIA NIS");
+    } else if (g_area_w != app().width || g_area_h != app().height) {
         jvm::log("player: the game draws at %dx%d, stretched to %dx%d (render scale %d%%)", app().width, app().height, g_area_w, g_area_h,
                  settings().render_scale);
     } else {
