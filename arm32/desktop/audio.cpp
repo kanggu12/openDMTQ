@@ -9,8 +9,10 @@
 #include "mixer.h"
 #include "player.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <limits>
 #include <thread>
 
 namespace player {
@@ -157,21 +159,29 @@ void define_track() {
         return Value::I(0);
     });
     // write(byte[], offset, bytes), write(short[], offset, shorts), and write(ByteBuffer, bytes, mode) from the buffer's
-    // position, which moves on past what was taken; a range outside the array is the error a phone returns.
+    // position, which moves on past what was taken; a range outside the array is the error a phone returns. The ranges
+    // add up in 64 bits, as media.cpp's readSampleData does: two ints may add up past an int's range and wrap to a sum
+    // that passes.
     c.method("write", "([BII)I", [](Call& c) {
         auto* a = c.as<jvm::Array>(0);
-        if (!a || c.i(1) < 0 || c.i(2) < 0 || c.i(1) + c.i(2) > a->length) return Value::I(kErrorBadValue);
+        if (!a || c.i(1) < 0 || c.i(2) < 0 || static_cast<jlong>(c.i(1)) + c.i(2) > a->length) return Value::I(kErrorBadValue);
         return write(c, a->data<jbyte>() + c.i(1), c.i(2));
     });
     c.method("write", "([SII)I", [](Call& c) {
         auto* a = c.as<jvm::Array>(0);
-        if (!a || c.i(1) < 0 || c.i(2) < 0 || c.i(1) + c.i(2) > a->length) return Value::I(kErrorBadValue);
-        Value written = write(c, a->data<jshort>() + c.i(1), c.i(2) * 2);
+        if (!a || c.i(1) < 0 || c.i(2) < 0 || static_cast<jlong>(c.i(1)) + c.i(2) > a->length) return Value::I(kErrorBadValue);
+        // As bytes, no more than an int holds (an even count, whole shorts): a billion shorts and more would wrap.
+        const jint bytes = static_cast<jint>(std::min<jlong>(static_cast<jlong>(c.i(2)) * 2, std::numeric_limits<jint>::max() - 1));
+        Value written = write(c, a->data<jshort>() + c.i(1), bytes);
         return written.i() > 0 ? Value::I(written.i() / 2) : written;
     });
     c.method("write", "(Ljava/nio/ByteBuffer;II)I", [](Call& c) {
         auto* b = c.as<jvm::Buffer>(0);
-        if (!b || c.i(1) < 0 || b->position + c.i(1) > b->limit) return Value::I(kErrorBadValue);
+        // From the position to the limit at most, and within what the buffer holds: this VM's Buffer.position and limit
+        // take any int, where a phone's would have thrown, so a position below 0 or a limit past the capacity is refused
+        // here rather than read.
+        if (!b || c.i(1) < 0 || b->position < 0 || static_cast<jlong>(b->position) + c.i(1) > std::min<jlong>(b->limit, b->capacity))
+            return Value::I(kErrorBadValue);
         Value written = write(c, static_cast<std::uint8_t*>(b->address) + b->position, c.i(1));
         if (written.i() > 0) b->position += written.i();
         return written;
