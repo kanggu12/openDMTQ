@@ -15,10 +15,10 @@ from opendmtq_client import actions, dialogs, updates
 log = logging.getLogger("opendmtq_client")
 
 
-def _in_background(app, message, glyph, job, then):
+def _in_background(app, message, job, then):
     """Run job() on a worker thread under a dialog that says what is under way, then then(result, error) on the
     window's thread with the dialog gone. The window is not closed meanwhile: the work would stop half done."""
-    app.dialog = dialogs.Dialog(app.root, app.ui, "info", message, message, progress=True, glyph=glyph)
+    app.dialog = dialogs.Dialog(app.root, app.ui, "info", message, message, progress=True)
     app.keep_open = True
 
     def work():
@@ -57,7 +57,7 @@ def start_over(app):
     if _not_now(app):
         return
     if not dialogs.ask(app, "danger", w("help.reset.title"), w("help.reset.ask"), w("help.reset.detail"),
-                       w("help.reset.confirm"), glyph="restore"):
+                       w("help.reset.confirm")):
         return
     actions.reset(app.state)
     app.state.save()
@@ -89,7 +89,7 @@ def repair_program(app):
         # The player may be back.
         app.refresh_checks()
 
-    _in_background(app, w("help.repair.working"), "restore", repair.run, done)
+    _in_background(app, w("help.repair.working"), repair.run, done)
 
 
 def clear_game_data(app):
@@ -109,7 +109,7 @@ def clear_game_data(app):
             return
         said = removal.megabytes(size)
         if not dialogs.ask(app, "danger", w("help.clear"), w("help.clear.ask"), w("help.clear.detail", size=said),
-                           w("help.clear.confirm"), glyph="delete"):
+                           w("help.clear.confirm")):
             return
 
         def done(failed, error):
@@ -125,11 +125,11 @@ def clear_game_data(app):
                 # Said after the page is drawn again, whose ready check would otherwise take the line at once.
                 app.set_status(w("help.clear.done", size=said), "ok", sticky=True)
 
-        _in_background(app, w("help.clear.working"), "delete", removal.clear_game_data, done)
+        _in_background(app, w("help.clear.working"), removal.clear_game_data, done)
 
     # Counted at the press, as the game adds to its data each time it runs; on a worker thread, as a game's thousands
     # of files take a while on a disk that has not read them lately, and the window would stop answering meanwhile.
-    _in_background(app, w("help.counting"), "delete", removal.game_data_size, counted)
+    _in_background(app, w("help.counting"), removal.game_data_size, counted)
 
 
 def uninstall_program(app):
@@ -171,16 +171,16 @@ def uninstall_program(app):
         choice = dialogs.choose(app, "danger", w("help.uninstall"), w("help.uninstall.ask"),
                                 w("help.uninstall.detail", size=removal.megabytes(total)),
                                 [(w("help.uninstall.keep"), "keep", "warn"),
-                                 (w("help.uninstall.all"), "all", "danger")], glyph="delete")
+                                 (w("help.uninstall.all"), "all", "danger")])
         if choice == "keep":
             # Written before the uninstaller starts: it closes what runs from the program's folder, this window too.
             app.state.save()
             start()
         elif choice == "all":
-            _in_background(app, w("help.uninstall.working"), "delete", removal.delete_everything, deleted)
+            _in_background(app, w("help.uninstall.working"), removal.delete_everything, deleted)
 
     # What Delete all would free, counted on a worker thread first (the games' folders may hold thousands of files).
-    _in_background(app, w("help.counting"), "delete", removal.everything_size, counted)
+    _in_background(app, w("help.counting"), removal.everything_size, counted)
 
 
 def update_launcher(app, result):
@@ -192,7 +192,7 @@ def update_launcher(app, result):
         return False
     app.dialog = dialogs.Dialog(app.root, app.ui, "info", w("about.updating.title"),
                                 w("about.updating.message", v=result.version), w("about.updating.detail"),
-                                progress=True, glyph="update")
+                                progress=True)
     # The window stays until the update is in Velopack's hands: closing it now would end the download.
     app.keep_open = True
 

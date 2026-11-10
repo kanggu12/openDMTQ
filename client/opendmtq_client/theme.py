@@ -6,7 +6,7 @@ for the keyboard's place.
 
 Page titles, the menu and the guide's numerals are in the wide face, as the site's are. Fonts are bundled under open
 licences: DMTQ Wide (the site's cut of Saira) for those, Pretendard for text in both languages, Material Icons for the
-few glyphs left (assets/fonts/README.md).
+chevron after a link (assets/fonts/README.md).
 """
 
 import os
@@ -40,12 +40,9 @@ WARN = "#ffcf3d"        # something PLAY or the launcher will change, a warning 
 BAD = "#ff5f72"         # a problem, an error, removing for good (--bad)
 CYAN = "#6fd6ff"        # the keyboard's place (focus rings, --cyan)
 
-# Material Icons code points used by the launcher (a test checks each against the bundled font).
-ICON = {
-    # The chevron after a link; the rest name a dialog's subject (dialogs.Dialog's glyph).
-    "chevron": "", "ok": "", "warn": "", "error": "", "info": "",
-    "delete": "", "restore": "", "update": "", "download": "",
-}
+# Material Icons code points used by the launcher (a test checks each against the bundled font): the chevron after a
+# link, the only glyph it draws from that font.
+ICON = {"chevron": ""}
 
 # Bundled font files Tk uses, and the family names Windows and fontconfig give them. The leaning wide face is drawn into
 # pictures only (art.py), so it is not among them: two faces of one family and style would be one too many for Windows.

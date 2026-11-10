@@ -22,13 +22,13 @@ from opendmtq_client import art, safety, snapshot, theme
 
 log = logging.getLogger("opendmtq_client")
 
-# Each kind: the colour of its lamp and of the light along a progress track, the glyph (kept for callers that name
-# one), and the look of its main button (art.BUTTON_LOOKS).
+# Each kind: the colour of its lamp and of the light along a progress track, and the look of its main button
+# (art.BUTTON_LOOKS).
 KINDS = {
-    "danger": {"accent": theme.BAD, "glyph": "delete", "button": "danger"},
-    "warn": {"accent": theme.WARN, "glyph": "warn", "button": "warn"},
-    "info": {"accent": theme.OK, "glyph": "info", "button": "home"},
-    "error": {"accent": theme.BAD, "glyph": "error", "button": "home"},
+    "danger": {"accent": theme.BAD, "button": "danger"},
+    "warn": {"accent": theme.WARN, "button": "warn"},
+    "info": {"accent": theme.OK, "button": "home"},
+    "error": {"accent": theme.BAD, "button": "home"},
 }
 
 # Sizes in pixels at 100 % scaling.
@@ -109,14 +109,13 @@ class Dialog:
     (the launcher's own window by default)."""
 
     def __init__(self, root, ui, kind, title, message, detail=None, buttons=(), default=0, cancel=None,
-                 glyph=None, window=None, on_close=None, progress=False):
+                 window=None, on_close=None, progress=False):
         self.root, self.ui = root, ui
         self.style = KINDS[kind]
         self.title, self.message, self.detail = title, message, detail
         self.buttons = list(buttons)
         self.focus, self.hover, self.pressed = default, None, None
         self.cancel_value, self.result, self.closed = cancel, cancel, False
-        self.glyph = theme.ICON[glyph or self.style["glyph"]]
         self.window = window or (lambda width, height: snapshot.render(self.root))
         self.on_close = on_close
         # A dialog for work under way shows a moving light along a track where the buttons would be.
@@ -450,11 +449,11 @@ def _buttons(words, kind, confirm, cancel):
     return [(cancel or words("common.cancel"), False, "neutral"), (confirm, True, KINDS[kind]["button"])]
 
 
-def ask(app, kind, title, message, detail, confirm, cancel=None, glyph=None):
+def ask(app, kind, title, message, detail, confirm, cancel=None):
     """Ask before doing something; True when the player chose `confirm`. Removing for good starts on Cancel, so
     Enter alone never removes anything; other questions start on their main button."""
     dialog = Dialog(app.root, app.ui, kind, title, message, detail, _buttons(app.words, kind, confirm, cancel),
-                    default=0 if kind == "danger" else 1, cancel=False, glyph=glyph)
+                    default=0 if kind == "danger" else 1, cancel=False)
     app.dialog = dialog
     try:
         return bool(dialog.wait())
@@ -462,11 +461,11 @@ def ask(app, kind, title, message, detail, confirm, cancel=None, glyph=None):
         app.dialog = None
 
 
-def choose(app, kind, title, message, detail, answers, glyph=None):
+def choose(app, kind, title, message, detail, answers):
     """Ask a question with more than one way to go on: `answers` are [(words, value, look)] after Cancel. Returns the
     value chosen, or None for Cancel. It starts on Cancel, so Enter alone does nothing."""
     buttons = [(app.words("common.cancel"), None, "neutral")] + list(answers)
-    dialog = Dialog(app.root, app.ui, kind, title, message, detail, buttons, default=0, cancel=None, glyph=glyph)
+    dialog = Dialog(app.root, app.ui, kind, title, message, detail, buttons, default=0, cancel=None)
     app.dialog = dialog
     try:
         return dialog.wait()

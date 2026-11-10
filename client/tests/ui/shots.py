@@ -470,7 +470,7 @@ def dialogs_check(app, out, tag, problems):
     app.go("about")
     settle(app)
     dialog = dialogs.Dialog(app.root, app.ui, "info", w("about.updating.title"), w("about.updating.message", v="9.9.9"),
-                            w("about.updating.detail"), progress=True, glyph="update")
+                            w("about.updating.detail"), progress=True)
     wait_out(app.root, 0.6)
     shot(app.root, out, "%s_dialog-updating" % tag)
     problems.extend("%s_dialog-updating: %s" % (tag, p) for p in dialog.layout_problems())
@@ -566,9 +566,8 @@ def maintenance_check(app, out, tag, problems):
     if "dialog" not in failed or not app.root.winfo_exists():
         problems.append("%s: an uninstaller that did not start was not said" % tag)
     # The work under way, as the dialogs show it.
-    for key, glyph in (("help.repair.working", "restore"), ("help.uninstall.working", "delete"),
-                       ("help.counting", "delete")):
-        dialog = dialogs.Dialog(app.root, app.ui, "info", w(key), w(key), progress=True, glyph=glyph)
+    for key in ("help.repair.working", "help.uninstall.working", "help.counting"):
+        dialog = dialogs.Dialog(app.root, app.ui, "info", w(key), w(key), progress=True)
         wait_out(app.root, 0.6)
         shot(app.root, out, "%s_dialog-%s" % (tag, key.replace(".", "-")))
         problems.extend("%s_dialog-%s: %s" % (tag, key, p) for p in dialog.layout_problems())

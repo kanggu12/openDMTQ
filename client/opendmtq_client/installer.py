@@ -141,7 +141,7 @@ def plan(have, here, running, server=None, words=None):
     """What to ask, from the version installed (None: none), this installer's, whether a launcher is open, and the
     server this installer is set up for (None: a release's own), in `words`' language (English without).
 
-    Returns (kind, tab, question, detail, action words, glyph, action), or None for "repair or open".
+    Returns (kind, tab, question, detail, action words, action), or None for "repair or open".
     action is what the work under way is called: install, update or back.
     """
     w = words or i18n.Words("en")
@@ -150,14 +150,14 @@ def plan(have, here, running, server=None, words=None):
     on = w("setup.for", name=server["name"]) if server else ""
     if have is None:
         return ("info", w("setup.tab"), w("setup.install.ask", v=here), _sentences(w("setup.install.detail"), on),
-                w("setup.install"), "download", "install")
+                w("setup.install"), "install")
     if version_key(have) < version_key(here):
         return ("info", w("setup.tab.update"), w("setup.update.ask", v=here),
-                _sentences(w("setup.update.detail", have=have), on, closing), w("setup.update"), "update", "update")
+                _sentences(w("setup.update.detail", have=have), on, closing), w("setup.update"), "update")
     if version_key(have) > version_key(here):
         return ("warn", w("setup.tab"), w("setup.back.ask"),
                 _sentences(w("setup.back.detail", have=have, here=here), on, closing), w("setup.back", here=here),
-                "warn", "back")
+                "back")
     return None
 
 
@@ -187,14 +187,14 @@ class Installer:
         self.root.protocol("WM_DELETE_WINDOW", self._close_window)
         self.ask()
 
-    def show(self, kind, title, message, detail, buttons=(), default=0, cancel=None, glyph=None, progress=False):
+    def show(self, kind, title, message, detail, buttons=(), default=0, cancel=None, progress=False):
         """Replace the dialog on show with another, the window fitted to it."""
         from opendmtq_client import art
         if self.dialog is not None:
             self.dialog.on_close = None
             self.dialog.close(None)
         self.dialog = self.dialogs.Dialog(self.root, self.ui, kind, title, message, detail, buttons, default=default,
-                                          cancel=cancel, glyph=glyph, progress=progress,
+                                          cancel=cancel, progress=progress,
                                           window=lambda w, h: art.backdrop(w, h, self.ui.scale), on_close=self._answered)
         self.dialogs.fit(self.root, self.ui, self.dialog)
 
@@ -207,7 +207,7 @@ class Installer:
             # Velopack replaces the player's files: the game playing from them would lose them mid-song.
             self.show("warn", w("setup.tab"), w("setup.game"), w("setup.game.detail"),
                       [(w("setup.close"), "cancel", "neutral"), (w("setup.again"), "again", "home")], default=1,
-                      cancel="cancel", glyph="warn")
+                      cancel="cancel")
             return
         asked = plan(have, __version__, running, self.server, w)
         if asked is None:
@@ -215,12 +215,12 @@ class Installer:
                                 w("setup.repair.closing") if running else "")
             self.show("info", w("setup.tab"), w("setup.installed", v=__version__), detail,
                       [(w("setup.repair"), "repair", "neutral"), (w("setup.open"), "open", "home")], default=1,
-                      cancel="cancel", glyph="ok")
+                      cancel="cancel")
             return
-        kind, tab, question, detail, words, glyph, action = asked
+        kind, tab, question, detail, words, action = asked
         self.show(kind, tab, question, detail,
                   [(w("setup.cancel"), "cancel", "neutral"), (words, action, "home" if kind == "info" else kind)],
-                  default=1, cancel="cancel", glyph=glyph)
+                  default=1, cancel="cancel")
 
     def _hand_over(self):
         """The server this installer brings, left for the launcher to take at its next start."""
@@ -268,7 +268,7 @@ class Installer:
         # Before the launcher can start: it takes the server at its first start.
         self._hand_over()
         self.show("info", w("setup.work." + action), w("setup.work.%s.line" % action, v=__version__),
-                  w("setup.work.detail"), progress=True, glyph="download")
+                  w("setup.work.detail"), progress=True)
         try:
             self.process = run_setup(self.log_path)
         except OSError as e:
@@ -299,7 +299,7 @@ class Installer:
             self.failed(self.words("setup.wrong_version", found=found, here=__version__))
             return
         self.show("info", self.words("setup.tab.done"), self.words("setup.done", v=__version__),
-                  self.words("setup.starting"), progress=True, glyph="ok")
+                  self.words("setup.starting"), progress=True)
         self._start_or_say()
 
     def failed(self, why, title=None):

@@ -15,9 +15,9 @@ class Installer(unittest.TestCase):
         self.assertEqual(sorted(reversed(order), key=installer.version_key), order)
 
     def test_what_it_asks(self):
-        self.assertEqual(installer.plan(None, "0.8.0", False)[6], "install")
-        self.assertEqual(installer.plan("0.7.0", "0.8.0", True)[6], "update")
-        self.assertEqual(installer.plan("0.9.0", "0.8.0", False)[6], "back")
+        self.assertEqual(installer.plan(None, "0.8.0", False)[5], "install")
+        self.assertEqual(installer.plan("0.7.0", "0.8.0", True)[5], "update")
+        self.assertEqual(installer.plan("0.9.0", "0.8.0", False)[5], "back")
         self.assertIsNone(installer.plan("0.8.0", "0.8.0", False))
 
     def test_it_names_the_server_it_brings(self):
