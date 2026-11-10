@@ -93,13 +93,13 @@ Wrong passwords are slowed down. After five failures in ten minutes from one add
 through the server also count together, and after thirty failures in ten minutes they all wait. The admin pages' own
 address on the PC (`http://localhost:8791/opendmtq/admin/`) is never locked out that way. The address counted is the
 connection's own, never a header the client sent. Forms carry a CSRF token, and the session cookie is HttpOnly,
-SameSite=Lax, and Secure when it comes over HTTPS. No other page can frame these pages (`X-Frame-Options: DENY`), a
-browser takes each file as the type it is sent as (`X-Content-Type-Options: nosniff`), and a link to another site
-carries no address of these pages (`Referrer-Policy: same-origin`); the API's answers carry the same. Signing out ends that sign-in on the server too, so a copied cookie
-stops working; restarting the admin pages signs everyone out. Until a visitor has signed in, the pages read at most 16
-KB of any request. On the PC's own address the password travels without TLS, but only within this PC (unless
-`ADMIN_BIND` opens that address to the network). On a host install the address on the local network has no TLS either.
-To change the password, edit `.env`, then restart the server.
+SameSite=Lax, and Secure when it comes over HTTPS. No page can show these pages in a frame (`X-Frame-Options: DENY`),
+a browser takes each file as the type it is sent as (`X-Content-Type-Options: nosniff`), and a link to another site
+carries no address of these pages (`Referrer-Policy: same-origin`); the API's answers carry the same. Signing out ends
+that sign-in on the server too, so a copied cookie stops working; restarting the admin pages signs everyone out. Until
+a visitor has signed in, the pages read at most 16 KB of any request. On the PC's own address the password travels
+without TLS, but only within this PC (unless `ADMIN_BIND` opens that address to the network). On a host install the
+address on the local network has no TLS either. To change the password, edit `.env`, then restart the server.
 
 | Page | What it does |
 | :--- | :--- |
