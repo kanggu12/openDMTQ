@@ -71,8 +71,9 @@ tools_tests() {
     [ -d "$CLIENTS" ] || { echo "CLIENTS is not a folder: $CLIENTS"; return 1; }
     more=(-v "$(cd "$CLIENTS" && pwd):/clients:ro" -e OPENDMTQ_CLIENTS=/clients)
   fi
-  # server/portal and the runtime's build beside tools/, as in the repository: the tests read them too.
+  # server/portal, the game server and the runtime's build beside tools/, as in the repository: the tests read them too.
   docker run --rm -e PYTHONDONTWRITEBYTECODE=1 -v "$ROOT/tools:/t:ro" -v "$ROOT/server/portal:/server/portal:ro" \
+    -v "$ROOT/server/game:/server/game:ro" \
     -v "$ROOT/arm32:/arm32:ro" \
     -v "$ROOT/data/apk/base:/base:ro" "${more[@]}" \
     -e OPENDMTQ_BASE_APK="/base/$(basename "$base")" --entrypoint sh opendmtq-tools:qa \

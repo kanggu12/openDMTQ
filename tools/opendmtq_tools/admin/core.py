@@ -48,7 +48,7 @@ PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 CHECK_UDID = "opendmtq-check"
 
 # One row per player: scores are saved under the guid, and a transfer code gives a second phone's
-# Member row the same guid. The same pick as the public site (portal/lib.php PLAYER_ROWS); the
+# Member row the same guid. The same pick as the public site (portal/ranking_lib.php PLAYER_ROWS); the
 # check account is left out.
 PLAYER_ROWS = """SELECT guid, nickname FROM (
         SELECT CAST(guid AS INTEGER) AS guid, nickname,

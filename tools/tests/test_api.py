@@ -1795,7 +1795,7 @@ SITE_PAGES = {
     "lang.php": "the site's language switch: the API answers in English",
     "notfound.php": "the site's page for an address that leads nowhere",
 }
-SITE_LIBRARIES = {"lib.php", "live_lib.php", "auth.php", "strings.php"}
+SITE_LIBRARIES = {"lib.php", "live_lib.php", "ranking_lib.php", "auth.php", "strings.php"}
 
 # The page each template is, for its forms without an address of their own (they post to the page).
 TEMPLATE_PAGES = {"accounts.html": "accounts_page", "app.html": "app_page", "backups.html": "backups_page", "dashboard.html": "dashboard",
@@ -2018,9 +2018,13 @@ def php_constant(text, name):
             pieces.append(re.sub(r'\\([\\"$nt])', lambda m: {"n": "\n", "t": "\t"}.get(m.group(1), m.group(1)), double))
 
 
+# What the game's odq_sql_score('p.score') makes (server/game/src/util.php): the cap every ranking puts on a stored score.
+GAME_SCORE_SQL = "MIN(MAX(p.score, 0), 2147483647)"
+
+
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class SameQueriesAsTheSiteTest(unittest.TestCase):
-    """The players' site (server/portal/lib.php) and these pages and the API (core.py, site.py) keep their own copies of
+    """The players' site (server/portal/ranking_lib.php) and these pages and the API (core.py, site.py) keep their own copies of
     the queries that decide who counts as a player and what a score counts for: the copies must say the same."""
 
     @staticmethod
@@ -2029,11 +2033,16 @@ class SameQueriesAsTheSiteTest(unittest.TestCase):
         return re.sub(r"\s+", " ", sql).strip()
 
     def test_the_shared_queries_are_the_sites(self):
-        lib = os.path.join(PORTAL, "lib.php")
+        lib = os.path.join(PORTAL, "ranking_lib.php")
         if not os.path.isfile(lib):
             self.skipTest("the portal is not at hand")
         with open(lib, encoding="utf-8") as f:
             php = f.read()
+        # The site's SCORE_SQL is the game's cap of a score (odq_sql_score() in server/game/src/util.php) on p.score: put
+        # in as the string it makes, which php_constant() can read, where the site takes it from the game.
+        taken = "define('SCORE_SQL', odq_sql_score('p.score'));"
+        self.assertIn(taken, php)
+        php = php.replace(taken, f"const SCORE_SQL = '{GAME_SCORE_SQL}';")
         ours = {"PLAYER_ROWS": admin.core.PLAYER_ROWS, "SCORE_SQL": admin.site.SCORE_SQL,
                 "PLAYER_FIGURES": admin.site.PLAYER_FIGURES, "PLAYER_TOTALS": admin.site.PLAYER_TOTALS}
         for name, query in ours.items():
@@ -2042,6 +2051,105 @@ class SameQueriesAsTheSiteTest(unittest.TestCase):
                 # PHP binds the check account by name (:check), Python by place (?).
                 theirs = re.sub(r":check\b", "?", php_constant(php, name))
                 self.assertEqual(self.same(query), self.same(theirs))
+
+    def test_the_games_score_cap_is_the_one_read_above(self):
+        util = os.path.join(PORTAL, "..", "game", "src", "util.php")
+        if not os.path.isfile(util):
+            self.skipTest("the game server is not at hand")
+        with open(util, encoding="utf-8") as f:
+            text = f.read()
+        # return "MIN(MAX($column, 0), " . OPENDMTQ_INT_MAX . ')'; with const OPENDMTQ_INT_MAX = 2147483647;
+        cap = re.search(r"^const OPENDMTQ_INT_MAX = (\d+);", text, re.M)
+        shape = re.search(r"function odq_sql_score\(\$column\)\s*\{\s*return \"MIN\(MAX\(\$column, 0\), \" \. OPENDMTQ_INT_MAX \. '\)';", text)
+        self.assertTrue(cap and shape, "odq_sql_score() or OPENDMTQ_INT_MAX changed: GAME_SCORE_SQL must follow")
+        self.assertEqual(GAME_SCORE_SQL, f"MIN(MAX(p.score, 0), {cap.group(1)})")
+
+
+# The game's own monthly board (odq_month_board_sql() in server/game/src/ranking.php), which the site's months are.
+GAME_RANKING = os.path.join(PORTAL, "..", "game", "src", "ranking.php")
+
+
+def game_month_board_sql(text):
+    """The statement odq_month_board_sql(NULL) returns (every chart), read from ranking.php as PHP makes it: its quoted
+    pieces joined, the game's score cap put in as the string it makes, and no chart filter. Anything else in it fails the
+    test instead of being guessed at."""
+    found = re.search(r"function odq_month_board_sql\(\?array \$patterns\): string\s*\{(.*?)\n\}", text, re.S)
+    if not found:
+        raise AssertionError("no odq_month_board_sql() in ranking.php")
+    body = found.group(1)
+    # Its return statement alone, without the comments between its pieces.
+    returned = re.sub(r"^\s*//.*$", "", body[body.index("return ") + len("return "):], flags=re.M)
+    # The cap the game puts on a score (checked against util.php above, there on p.score), and no filter: every chart.
+    returned = returned.replace("odq_sql_score('l.score')", "'" + GAME_SCORE_SQL.replace("p.score", "l.score") + "'")
+    returned = returned.replace("$filter", "''")
+    pos, pieces = 0, []
+    while True:
+        piece = PHP_PIECE.match(returned, pos)
+        if not piece:
+            raise AssertionError(f"odq_month_board_sql(): cannot read {returned[pos:pos + 40]!r}")
+        pos = piece.end()
+        single, double, other, dot, end = piece.groups()
+        if end:
+            return "".join(pieces)
+        if dot:
+            continue
+        if single is None:
+            # A constant or a double-quoted piece: not in the statement as it is written today.
+            raise AssertionError(f"odq_month_board_sql(): a piece this test does not read: {piece.group(0)!r}")
+        # In single quotes only \' and \\ mean something.
+        pieces.append(re.sub(r"\\([\\'])", r"\1", single))
+
+
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class SameMonthAsTheGameTest(unittest.TestCase):
+    """The rankings' This month in the API (site.month_players) and the game's own board, run on one database: the same
+    players in the same order, with the same scores and chart counts. The site's months are the game's board itself
+    (ranking_lib.php), so the API's copy is the one that could drift."""
+
+    def test_the_apis_month_is_the_games_board(self):
+        if not os.path.isfile(GAME_RANKING):
+            self.skipTest("the game server is not at hand")
+        with open(GAME_RANKING, encoding="utf-8") as f:
+            board_sql = game_month_board_sql(f.read())
+        # A month of thirty days, from its first second to the one before the next month.
+        since, until = 1_700_000_000, 1_702_592_000
+        with tempfile.TemporaryDirectory() as tmp:
+            db = os.path.join(tmp, "game.db")
+            # The game's tables as an older server left them, then brought up to date as a restore does.
+            old_game_database(db, [])
+            # Players 1 to 4 (3 has no name yet) and the server's own check account (5).
+            member_rows(db, [(1, "Ann", "phone-1"), (2, "Bo", "phone-2"), (3, "", "phone-3"), (4, "Cy", "phone-4"),
+                             (5, "check", admin.core.CHECK_UDID)])
+            con = sqlite3.connect(db)
+            admin.backups.bring_schema_up_to_date(con)
+            # A transfer code gave Cy a second phone: a second Member row with the same guid.
+            con.execute("INSERT INTO Member (id, nickname, guid, udid) VALUES (6, 'Cy', '4', 'phone-6')")
+            plays = [
+                # Ann: one chart twice (the better play counts) and another on the month's last second.
+                (1, 11, 500000, since), (1, 11, 700000, since + 10), (1, 12, 300000, until - 1),
+                # Bo: Ann's total on two other charts, so the tie goes to the older account (Ann, the lower guid).
+                (2, 21, 600000, since + 5), (2, 22, 400000, since + 6),
+                # Player 3: a forged huge score counts as the cap, a negative one as nothing.
+                (3, 11, 9_000_000_000, since + 7), (3, 12, -5, since + 8),
+                # Cy, from either phone: one player.
+                (4, 11, 100000, since + 9), (4, 12, 200000, since + 11),
+                # Not this month: a second before it, and at the next month's start.
+                (1, 13, 999999, since - 1), (2, 13, 999999, until),
+                # The check account, and a guid without an account: never ranked.
+                (5, 11, 999999, since + 1), (7, 11, 999999, since + 1),
+            ]
+            con.executemany("INSERT INTO PlayLog (user_id, pattern_id, score, grade, judgement, is_record, played_at) "
+                            "VALUES (?, ?, ?, 'A', 0, 0, ?)", plays)
+            con.commit()
+            # The API's queries read their rows by column name.
+            con.row_factory = sqlite3.Row
+            game = [tuple(row) for row in con.execute(board_sql, {"since": since, "until": until, "check": admin.core.CHECK_UDID})]
+            ours = [(p["id"], p["score"], p["charts"]) for p in admin.site.month_players(con, since, until)]
+            con.close()
+        # The same board, row for row.
+        self.assertEqual(ours, game)
+        # And it is the board the plays above make, so that both cannot agree on an empty or a wrong one.
+        self.assertEqual(game, [(3, 2147483647, 2), (1, 1000000, 2), (2, 1000000, 2), (4, 300000, 2)])
 
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")

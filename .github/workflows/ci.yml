@@ -394,8 +394,8 @@ jobs:
           cache-to: type=gha,mode=max,scope=tools
 
       - name: Tools unit tests (inside the image, which has lz4, Flask and Pillow)
-        # server/portal and the runtime's build beside tools/, as in the repository: the tests read them too.
-        run: docker run --rm -v "$PWD/tools:/t:ro" -v "$PWD/server/portal:/server/portal:ro" -v "$PWD/arm32:/arm32:ro" --entrypoint sh opendmtq-tools:ci -c 'cd /t && python3 -m unittest discover -s tests -t . -v'
+        # server/portal, the game server and the runtime's build beside tools/, as in the repository: the tests read them too.
+        run: docker run --rm -v "$PWD/tools:/t:ro" -v "$PWD/server/portal:/server/portal:ro" -v "$PWD/server/game:/server/game:ro" -v "$PWD/arm32:/arm32:ro" --entrypoint sh opendmtq-tools:ci -c 'cd /t && python3 -m unittest discover -s tests -t . -v'
 
       - name: Edge proxy (its two configurations, and plain HTTP when the certificate cannot be used)
         run: |

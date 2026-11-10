@@ -53,7 +53,8 @@ ACHIEVEMENT_TABLE = """CREATE TABLE IF NOT EXISTS AchievementDate (user_id INTEG
 SCHEMA = """CREATE TABLE IF NOT EXISTS PlayLog (id INTEGER PRIMARY KEY, user_id INTEGER, pattern_id INTEGER,
         score INTEGER, grade TEXT, judgement INTEGER, is_record INTEGER, played_at INTEGER);
 CREATE INDEX IF NOT EXISTS PlayLog_time ON PlayLog (played_at);
-CREATE INDEX IF NOT EXISTS PlayLog_user ON PlayLog (user_id, played_at);
+CREATE INDEX IF NOT EXISTS PlayLog_board ON PlayLog (user_id, played_at, pattern_id, score);
+DROP INDEX IF EXISTS PlayLog_user;
 CREATE INDEX IF NOT EXISTS PlayLog_chart ON PlayLog (pattern_id, played_at);
 CREATE INDEX IF NOT EXISTS Play_pattern ON Play (pattern_id, score);
 CREATE UNIQUE INDEX IF NOT EXISTS Play_one ON Play (pattern_id, user_id);

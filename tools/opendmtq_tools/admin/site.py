@@ -1,9 +1,9 @@
 """What the players' site shows (server/portal), read the same way for the API (api.py): the songs the server serves, the
 rankings, a chart's leaderboard, a player's page, the newest plays and records, who is on air and the past broadcasts.
 
-Every query follows the portal's (lib.php, songs.php, song.php, ranking.php, player.php, index.php, live_lib.php): one row
-per player by PLAYER_ROWS (core.py, as PLAYER_ROWS in lib.php), the server's check account left out, scores capped as
-SCORE_SQL caps them. Names are the site's, in English: a player without a name is "Player <n>"."""
+Every query follows the portal's (lib.php, ranking_lib.php, songs.php, song.php, ranking.php, player.php, index.php,
+live_lib.php): one row per player by PLAYER_ROWS (core.py, as PLAYER_ROWS in ranking_lib.php), the server's check account
+left out, scores capped as SCORE_SQL caps them. Names are the site's, in English: a player without a name is "Player <n>"."""
 
 import calendar
 import datetime
@@ -17,16 +17,16 @@ import urllib.parse
 from .. import songs
 from . import core, recordings, song_pages
 
-# A stored score as the rankings sum it (SCORE_SQL in lib.php): rows saved before the game capped them, or restored from
-# an old backup, can be forged and huge, and their sum would overflow.
+# A stored score as the rankings sum it (SCORE_SQL in ranking_lib.php, the game's odq_sql_score()): rows saved before the
+# game capped them, or restored from an old backup, can be forged and huge, and their sum would overflow.
 SCORE_SQL = "MIN(MAX(p.score, 0), 2147483647)"
 
-# One player's figures in Play, as columns of a query on Play p (PLAYER_FIGURES in lib.php).
+# One player's figures in Play, as columns of a query on Play p (PLAYER_FIGURES in ranking_lib.php).
 PLAYER_FIGURES = f"""COUNT(p.pattern_id) AS charts, SUM({SCORE_SQL}) AS total, SUM(p.grade = 'S') AS s_count,
                      SUM(p.isAllCombo = 'Y') AS ac, SUM(p.isPerfectPlay = 'Y') AS perfect,
                      AVG(MIN(MAX(p.judgement, 0), 1000)) AS avg_judgement"""
 
-# Each player's total, from the index alone, only of players who have an account (PLAYER_TOTALS in lib.php).
+# Each player's total, from the index alone, only of players who have an account (PLAYER_TOTALS in ranking_lib.php).
 PLAYER_TOTALS = f"""SELECT p.user_id, SUM({SCORE_SQL}) AS total FROM Play p
                      WHERE p.user_id IN (SELECT guid FROM ({core.PLAYER_ROWS})) GROUP BY p.user_id"""
 
@@ -174,7 +174,7 @@ def month_start(back=0):
 
 def month_players(con, since, until):
     """The players of one month, best first, as the game ranks them: the sum of each one's best score per chart in that
-    month from the play log, the older account first on a tie (month_players() in lib.php)."""
+    month from the play log, the older account first on a tie (month_players() in ranking_lib.php, the game's odq_month_board())."""
     rows = con.execute(
         f"""SELECT m.guid AS id, m.nickname, b.score, b.charts FROM (
                 SELECT guid, SUM(best) AS score, COUNT(*) AS charts FROM (
