@@ -164,6 +164,10 @@ std::atomic<std::uint64_t> g_captures{0}, g_capture_ns{0}, g_capture_max_ns{0}, 
 // The other half of a picture's cost on the render thread: taking it out of its pixel buffer for the encoder, a frame or
 // two after it was taken.
 std::atomic<std::uint64_t> g_handed{0}, g_hand_ns{0}, g_hand_max_ns{0};
+// What starting a capture cost the render thread, for the stats: the starts, and the dearest. A start is its objects
+// (three textures and six pixel buffers each time, the conversion's program the first time in a context) and its first
+// picture, whose draws may be where the driver compiles that program in earnest.
+std::atomic<std::uint64_t> g_starts{0}, g_start_max_ns{0};
 // Pictures left out because the encoder had not taken the ones before (its queue full), for its own step.
 std::atomic<std::uint64_t> g_encoder_behind{0};
 // Where a picture's taking goes, with stats on: the hook's own looks before it, saving the game's state, the scaled copy,
@@ -719,10 +723,11 @@ void log_stats_if_due(Nanos* next) {
     const std::uint64_t handed = g_handed.exchange(0);
     const std::uint64_t hand_total = g_hand_ns.exchange(0);
     log("player: live: step %d, %llu pictures, %llu skipped, render thread %llu us each to take (worst %llu) and %llu us to hand over "
-        "(worst %llu), %llu segments up, %llu lost, %llu AAC frames", step(),
+        "(worst %llu), %llu starts (the dearest %llu us), %llu segments up, %llu lost, %llu AAC frames", step(),
         static_cast<unsigned long long>(n), static_cast<unsigned long long>(g_skipped.exchange(0)),
         static_cast<unsigned long long>(n ? total / n / 1000 : 0), static_cast<unsigned long long>(g_capture_max_ns.exchange(0) / 1000),
         static_cast<unsigned long long>(handed ? hand_total / handed / 1000 : 0), static_cast<unsigned long long>(g_hand_max_ns.exchange(0) / 1000),
+        static_cast<unsigned long long>(g_starts.exchange(0)), static_cast<unsigned long long>(g_start_max_ns.exchange(0) / 1000),
         static_cast<unsigned long long>(g_link.uploaded.exchange(0)), static_cast<unsigned long long>(g_link.dropped.exchange(0)),
         static_cast<unsigned long long>(g_audio_frames.exchange(0)));
     if (g_stats) log("player: live: sound: %d short rounds, %d frames in hand", g_ring.short_rounds.exchange(0), g_ring.last_have.load());
@@ -1117,6 +1122,10 @@ struct Capture {
     int next_slot = 0;
     Nanos next_due = 0, last_picture = 0, retry_at = 0;
     bool live = false;
+    // What begin_capture took on the render thread, and of it the conversion's program (0: made before), until the
+    // first picture is taken and the start's cost goes in the stats.
+    Nanos setup_ns = 0, program_ns = 0;
+    bool first = false;
 } g_capture;
 
 // The conversion's program and vertex array, kept for the context's life: made again only with another context, so a
@@ -1193,6 +1202,9 @@ bool begin_capture(Capture& c, EGLDisplay d, EGLContext context, EGLSurface s, i
         g_gave_up.store(true);
         return false;
     }
+    // From here the start's own cost on this thread, for the stats.
+    const Nanos began = now_ns();
+    Nanos program_ns = 0;
     Saved saved;
     save_state(g, saved);
     c.context = context;
@@ -1208,6 +1220,7 @@ bool begin_capture(Capture& c, EGLDisplay d, EGLContext context, EGLSurface s, i
     Conversion& v = g_conversion;
     if (ok && (v.context != context || !v.program)) {
         // The first capture in this context: the program made once (a context before this one took its own along).
+        const Nanos compile_began = now_ns();
         v = Conversion{};
         GLuint vertex = compile(g, GL_VERTEX_SHADER, kVertex);
         GLuint fragment = vertex ? compile(g, GL_FRAGMENT_SHADER, kFragment) : 0;
@@ -1232,6 +1245,7 @@ bool begin_capture(Capture& c, EGLDisplay d, EGLContext context, EGLSurface s, i
         }
         if (vertex) g.delete_shader(vertex);
         if (fragment) g.delete_shader(fragment);
+        program_ns = now_ns() - compile_began;
     }
     ok = ok && v.context == context && v.program;
     if (ok) {
@@ -1262,6 +1276,10 @@ bool begin_capture(Capture& c, EGLDisplay d, EGLContext context, EGLSurface s, i
     c.next_due = now;
     c.last_picture = now;
     c.live = true;
+    // Its cost so far; the first picture's is added when it is taken (desktop_live_frame).
+    c.setup_ns = now_ns() - began;
+    c.program_ns = program_ns;
+    c.first = true;
     return true;
 }
 
@@ -1557,6 +1575,18 @@ void desktop_live_frame(EGLDisplay d, EGLSurface s) {
     g_captures.fetch_add(1, std::memory_order_relaxed);
     g_capture_ns.fetch_add(took, std::memory_order_relaxed);
     if (took > g_capture_max_ns.load(std::memory_order_relaxed)) g_capture_max_ns.store(took, std::memory_order_relaxed);
+    if (c.first) {
+        // The start's whole cost on this thread, its objects and its first picture, in the stats and once in the log: a
+        // start can come in the middle of a song, when the server's owner turns the broadcast on.
+        c.first = false;
+        const auto cost = static_cast<std::uint64_t>(c.setup_ns) + took;
+        g_starts.fetch_add(1, std::memory_order_relaxed);
+        if (cost > g_start_max_ns.load(std::memory_order_relaxed)) g_start_max_ns.store(cost, std::memory_order_relaxed);
+        log("player: live: a capture started on the render thread: %llu us for its objects (%llu us of it the conversion's program), %llu us "
+            "for its first picture",
+            static_cast<unsigned long long>(c.setup_ns / 1000), static_cast<unsigned long long>(c.program_ns / 1000),
+            static_cast<unsigned long long>(took / 1000));
+    }
 }
 
 // The game destroyed a context (egl_bridge.cpp, through live_context_destroyed in frames.cpp).
