@@ -139,9 +139,9 @@ The site and the admin pages come in English and Korean. The site's text is in t
 of its table, and `tools/tests/test_strings.py` checks them (and the spacing of Korean particles). The PC client's words
 are in the `TEXT` table of `client/opendmtq_client/i18n.py`, both languages side by side, and `client/tests/test_words.py`
 checks them. A few Korean texts live elsewhere: the in-game notices in `server/game/live/state.php`, the help page in
-`server/game/pages/help.php`, the menu, notice card and error messages of the player for Windows in
-`arm32/desktop/overlay_win32.cpp` and `arm32/desktop/own_folder.cpp`, the error messages of the Windows bundle's
-`host/windows/launcher.c`, the dates and the language switch in
+`server/game/pages/help.php`, the menu and notice card of the player for Windows in `arm32/desktop/overlay_win32.cpp`,
+its error box in `arm32/desktop/error_box_win32.cpp` and its error messages in `arm32/desktop/own_folder.cpp`, the
+error messages of the Windows bundle's `host/windows/launcher.c`, the dates and the language switch in
 `server/portal/lib.php`, and one word each in `server/portal/player.php`, `tools/opendmtq_tools/admin/static/admin.css`,
 `admin/templates/base.html` and `client/opendmtq_client/pages.py`. `tests/ui/run.sh` checks every page at five widths in
 both languages, empty and full, and fails on text that is cut off or runs over another box. `client/tests/ui/run.sh` does

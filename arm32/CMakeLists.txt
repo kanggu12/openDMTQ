@@ -88,7 +88,7 @@ if(NOT ANDROID)
   # PulseAudio and FFmpeg on Linux; Win32, WASAPI and Media Foundation on Windows), and the libraries those need.
   if(WIN32)
     set(WIN_DEPS "" CACHE PATH "Folder with ANGLE's DLLs, the EGL and GLES headers and zlib (arm32/build_windows.sh)")
-    set(PLAYER_WINDOW desktop/window_win32.cpp desktop/overlay_win32.cpp desktop/player.rc)
+    set(PLAYER_WINDOW desktop/window_win32.cpp desktop/overlay_win32.cpp desktop/error_box_win32.cpp desktop/player.rc)
     set(PLAYER_OUTPUT desktop/output_wasapi.cpp)
     set(PLAYER_DECODER desktop/decoder_mf.cpp)
     set(PLAYER_SYSTEM_INCLUDE ${WIN_DEPS}/include)
@@ -96,7 +96,8 @@ if(NOT ANDROID)
     # Media Foundation itself is loaded when a video plays (decoder_mf.cpp); its GUIDs are mfuuid's.
     set(PLAYER_DECODER_LIBS mfuuid ole32)
     # DXGI waits for the display's refreshes, IMM is the text field's input method (window_win32.cpp).
-    # oleaut32: the broadcast's encoder settings come as VARIANTs (live_desktop.cpp); GDI+ draws the overlay (overlay_win32.cpp).
+    # oleaut32: the broadcast's encoder settings come as VARIANTs (live_desktop.cpp); GDI+ draws the overlay and the error
+    # box (overlay_win32.cpp, error_box_win32.cpp).
     set(PLAYER_LIBS ${WIN_DEPS}/lib/libzlib1.dll.a user32 gdi32 shell32 dxgi imm32 oleaut32 gdiplus ${PLAYER_OUTPUT_LIBS} ${PLAYER_DECODER_LIBS})
     # The POSIX calls in the player's own files (open, pread, the clocks) are the runtime's Windows layer's, which
     # arm32core carries: the tests of those files need it as the player does.

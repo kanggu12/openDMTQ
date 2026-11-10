@@ -30,7 +30,7 @@
 #ifdef _WIN32
 #include <windows.h>
 
-#include "overlay_win32.h"
+#include "error_box_win32.h"
 // The C runtime's descriptors for a Windows handle (its io.h is Linux's here).
 extern "C" int _open_osfhandle(intptr_t handle, int flags);
 extern "C" int _dup2(int from, int to);
@@ -320,7 +320,7 @@ void show_error(const std::string& what) {
     // Only a start by a double click has no console to say it in: a start with arguments (a test, a developer) has its
     // output, and no box that waits for a click.
     if (!g_own_folder) return;
-    // The launcher's own dialog as a window of its own (overlay_win32.cpp): what happened in the user's language, the
+    // The launcher's own dialog as a window of its own (error_box_win32.cpp): what happened in the user's language, the
     // reason as the log has it, and where the log is when it has one yet.
     const bool korean = host_locale().first == "ko";
     // The reason as a sentence: its first letter up, a full stop at its end.
