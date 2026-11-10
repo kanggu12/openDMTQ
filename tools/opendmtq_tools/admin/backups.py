@@ -16,7 +16,7 @@ from flask import flash, redirect, render_template, request, send_file, url_for
 from werkzeug.exceptions import NotFound
 
 from .. import songs
-from . import auth, core, recordings, status, tokens
+from . import auth, core, insights, recordings, status, tokens
 from .core import Refused, ago, app, BASE, changed, db, private_file, safe_name, t, tp, why
 
 # Backups made here are kept up to this many, like the CLI's.
@@ -109,7 +109,7 @@ def make_backup(reason, protect=None):
         finally:
             check.close()
         try:
-            level = 0 if status.folder_bytes(os.path.join(songs.CUSTOM, "songs")) > STORE_ONLY_FROM else 6
+            level = 0 if insights.folder_size(os.path.join(songs.CUSTOM, "songs")) > STORE_ONLY_FROM else 6
             with private_file(partial) as out, tarfile.open(fileobj=out, mode="w:gz", compresslevel=level) as tar:
                 tar.add(snap, arcname="dmtq.db3")
                 if os.path.isdir(os.path.join(core.APK, "keystore")):

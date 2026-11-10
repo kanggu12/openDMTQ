@@ -69,13 +69,9 @@ def attention(health, counts, saved, backup_age, on, build, failed, usage):
         out.append(("warn", t("alert.maintenance"), url_for("maintenance_page"), t("nav.maintenance")))
     return out
 
-# How much each kind of thing takes on the disk changes slowly, and counting it means walking folders.
+# How much each kind of thing takes on the disk changes slowly, and counting it means walking folders (a folder's bytes:
+# insights.folder_size).
 _disk_cache = {}
-
-
-def folder_bytes(path):
-    """The size of the files under path, in bytes; 0 when there is no such folder."""
-    return sum(_size_of(os.path.join(d, f)) for d, _, files in os.walk(path) for f in files)
 
 
 def _size_of(path):

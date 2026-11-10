@@ -105,7 +105,8 @@ def player_activity(con, days=14, now=None):
 
 
 def folder_size(path):
-    """All the bytes under a folder; 0 if it is not there."""
+    """All the bytes under a folder; 0 if it is not there. The one count of a folder's bytes: the status page's disk
+    figures and the backups' choice of compression both use it."""
     total = 0
     for base, _, names in os.walk(path):
         for name in names:
