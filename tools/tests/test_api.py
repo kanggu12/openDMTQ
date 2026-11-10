@@ -1155,6 +1155,72 @@ class OneRecordingTest(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class SameFiguresTest(unittest.TestCase):
+    """What the pages and the API both show is worked out once (recordings.py, status.facts): the hours of broadcast left,
+    each quality's costs, the players' names and the number of recordings."""
+
+    @staticmethod
+    def disk(free):
+        """A disk of 10 TB with this much free, in the figures shutil.disk_usage answers with."""
+        return mock.Mock(total=10 * 1024 ** 4, used=10 * 1024 ** 4 - free, free=free)
+
+    def page(self, inst, address):
+        inst.sign_in()
+        return inst.client.get(address).get_data(as_text=True)
+
+    def test_the_hours_left_are_the_same_on_the_page_and_in_the_api(self):
+        hour = admin.recordings.per_hour("standard")
+        # The server's two recordings take 7 bytes: 5 closed, 2 so far of the open one.
+        used = 7
+        # The limit is what binds (a big disk), the disk is (a small one), and not even an hour fits.
+        for cap_gb, free, hours in ((5, 1024 ** 4, (5 * 1024 ** 3 - used) // hour), (20, 3 * hour + 7, 3), (0.5, 1024 ** 4, 0)):
+            with Server() as inst, mock.patch.object(shutil, "disk_usage", return_value=self.disk(free)):
+                admin.recordings.rec_save_limits(cap_gb, 30)
+                limits = inst.ask("GET", "/recordings/limits").get_json()
+                self.assertEqual(limits["used"], used)
+                api_hours = limits["hours_left"]
+                page = self.page(inst, "/opendmtq/admin/recordings")
+                shown = re.search(r"About (\d+) h of broadcast still fit", page)
+                self.assertEqual(api_hours, hours, cap_gb)
+                # The page says the same number, or that less than an hour fits.
+                self.assertEqual(int(shown.group(1)) if shown else 0, api_hours, cap_gb)
+                self.assertEqual("Less than an hour of broadcast still fits" in page, api_hours == 0, cap_gb)
+
+    def test_each_qualitys_costs_are_the_same_on_the_page_and_in_the_api(self):
+        with Server() as inst:
+            qualities = inst.ask("GET", "/broadcasts").get_json()["qualities"]
+            page = self.page(inst, "/opendmtq/admin/recordings")
+        shown = re.findall(r"([\d.]+ [KMG]?B) an hour recorded, ([\d.]+) Mbit/s for each viewer", page)
+        self.assertEqual(shown, [(admin.core.human(q["hour_bytes"]), "%.1f" % (q["viewer_bits"] / 1000000)) for q in qualities])
+        # In the server's order, each a segment of the server's length.
+        self.assertEqual([q["key"] for q in qualities], list(admin.recordings.LIVE_PRESETS))
+        self.assertEqual({q["segment"] for q in qualities}, {admin.recordings.SEGMENT})
+
+    def test_the_players_names_are_the_same_on_the_page_and_in_the_api(self):
+        with Server() as inst:
+            items = inst.ask("GET", "/recordings").get_json()["items"]
+            page = self.page(inst, "/opendmtq/admin/recordings")
+        # A heading per player on the page, newest recording's player first, as the API lists them.
+        self.assertEqual(re.findall(r'<div class="rec-group">\s*<h3>([^<]*)</h3>', page), [r["name"] for r in items])
+        self.assertEqual([r["name"] for r in items], ["Yuna", "Sena"])
+
+    def test_the_number_of_recordings_comes_from_one_look_a_minute(self):
+        with Server() as inst, mock.patch.object(admin.recordings, "rec_all", wraps=admin.recordings.rec_all) as looks:
+            # Broadcasts on: the dashboard's tile then says how many recordings there are.
+            with sqlite3.connect(admin.core.DB) as con:
+                admin.recordings.setting_rows(con)
+                admin.recordings.write_settings(con, {"on": True})
+            dashboard = self.page(inst, "/opendmtq/admin/")
+            self.assertIn("Recordings: 2", dashboard)
+            self.assertEqual(inst.ask("GET", "/status").get_json()["recordings"], 2)
+            # The dashboard's disk figures, its count and the API's: every recording read once for all of them.
+            self.assertEqual(looks.call_count, 1)
+            # A deletion is counted at once, the minute or not.
+            inst.ask("DELETE", f"/recordings/7/{Server.names['closed']}")
+            self.assertEqual(inst.ask("GET", "/status").get_json()["recordings"], 1)
+
+
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class BuildTest(unittest.TestCase):
     """A build waits for an import, and two asked for at once start one builder."""
 

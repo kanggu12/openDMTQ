@@ -307,7 +307,7 @@ def status(args):
                     "daily": bool(core.settings().get("auto_backup")), "daily_failure": backups._auto_failure or None},
         "app": {"on_offer": build_view(build) if build else None, "build_error": plain(f["failed"]) if f["failed"] else None,
                 "other_address": (health or {}).get("apk_matches_host") is False},
-        "maintenance": f["maintenance"], "recordings": len(recordings.rec_all()),
+        "maintenance": f["maintenance"], "recordings": f["recordings"],
         "disk": {"total": usage.total, "used": usage.used, "free": usage.free,
                  "parts": {"recordings": use["recordings"], "backups": use["backups"], "builds": use["builds"], "songs": use["songs"],
                            "database": use["db"], "other": use["other"], "free": use["free"]}},
@@ -782,15 +782,6 @@ def token_revoke(args):
 
 # ------------------------------------------------------------------------------ recordings
 
-def player_names():
-    """Every player's name as the pages show it, by number."""
-    try:
-        with db() as con:
-            return {r["guid"]: (r["nickname"] or "").strip() for r in con.execute(core.PLAYER_ROWS, (core.CHECK_UDID,))}
-    except sqlite3.Error:
-        return {}
-
-
 def recording_view(r, names):
     """A recording, as the Recordings page lists it."""
     return {"key": f"{r['guid']}/{r['id']}", "player": r["guid"], "id": r["id"], "name": names.get(r["guid"]) or tp("player.fallback", id=r["guid"]),
@@ -811,22 +802,15 @@ def find_recording(guid, rid):
 
 @handler
 def recordings_list(args):
-    """GET /recordings: the Recordings page's list."""
-    names = player_names()
+    """GET /recordings: the Recordings page's list, with the page's names (recordings.player_names)."""
+    names = recordings.player_names()
     return {"items": [recording_view(r, names) for r in recordings.rec_all()]}
 
 
 def limits_view():
-    """The limits, and what the recordings take of the disk, as the Recordings page shows them."""
-    limits = recordings.rec_limits()
-    used = sum(r["size"] or 0 for r in recordings.rec_all())
-    cap = int(limits["cap_gb"] * 1024 ** 3)
-    free = shutil.disk_usage(os.path.dirname(core.DB)).free
-    room = min(cap - used, free)
-    # An hour of broadcast at the quality the phones are asked for now.
-    hour = recordings.per_hour(recordings.live_settings()["quality"])
-    return {"cap_gb": limits["cap_gb"], "days": limits["days"], "used": used, "cap": cap, "free": free,
-            "hours_left": int(room / hour) if room >= hour else 0}
+    """The limits, and what the recordings take of the disk, as the Recordings page shows them: the same function
+    (recordings.rec_room), at the quality the phones are asked for now."""
+    return recordings.rec_room()
 
 
 @handler
@@ -844,9 +828,8 @@ def broadcasts_view():
             counts = recordings.live_counts(con)
     except sqlite3.Error:
         counts = {"switched_on": 0, "on_air": 0}
-    qualities = [{"key": key, **values, "segment": 2, "hour_bytes": recordings.per_hour(key),
-                  "viewer_bits": int((values["bitrate"] + recordings.AUDIO_BITRATE) * recordings.TS_OVERHEAD)}
-                 for key, values in recordings.LIVE_PRESETS.items()]
+    # Each quality's costs, as the page lists them (the same function).
+    qualities = recordings.quality_costs()
     return {"on": settings["on"], "new_players": settings["new_players"], "quality": settings["quality"], "qualities": qualities,
             "switched_on": counts["switched_on"], "on_air": counts["on_air"] if settings["on"] else 0}
 
@@ -909,7 +892,7 @@ def recording_get(args):
                      if os.path.isfile(os.path.join(folder, n))]
         except OSError:
             files = []
-    return {"recording": recording_view(r, player_names()), "files": files}
+    return {"recording": recording_view(r, recordings.player_names()), "files": files}
 
 
 @handler
@@ -930,7 +913,7 @@ def recording_flag(verb):
         # 404 for a recording that is not there, before the page's action, which would only find nothing to do.
         find_recording(args["player"], args["recording"])
         recordings_done(*recordings.act_on(verb, [f"{args['player']}/{args['recording']}"]))
-        return {"recording": recording_view(find_recording(args["player"], args["recording"]), player_names())}
+        return {"recording": recording_view(find_recording(args["player"], args["recording"]), recordings.player_names())}
     return run
 
 

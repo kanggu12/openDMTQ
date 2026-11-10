@@ -79,7 +79,7 @@
     <fieldset class="choices">
       <legend>{{ t('live.quality') }}</legend>
       {% for p in presets %}
-      <label class="choice"><input type="radio" name="quality" value="{{ p.key }}"{% if p.key == settings.quality %} checked{% endif %}><b>{{ t(p.word) }}</b><span class="choice-spec">{{ p.height }}p · {{ p.fps }} fps · {{ '%g'|format(p.bitrate / 1000000) }} Mbit/s</span><span>{{ t('live.q_cost', size=p.per_hour|human, mbit='%.1f'|format(p.viewer / 1000000)) }}</span></label>
+      <label class="choice"><input type="radio" name="quality" value="{{ p.key }}"{% if p.key == settings.quality %} checked{% endif %}><b>{{ t(p.word) }}</b><span class="choice-spec">{{ p.height }}p · {{ p.fps }} fps · {{ '%g'|format(p.bitrate / 1000000) }} Mbit/s</span><span>{{ t('live.q_cost', size=p.hour_bytes|human, mbit='%.1f'|format(p.viewer_bits / 1000000)) }}</span></label>
       {% endfor %}
     </fieldset>
     <p class="meta">{{ t('live.quality_note') }}</p>
@@ -89,16 +89,16 @@
 
 <section class="card">
   <h2>{{ t('rec.disk') }}</h2>
-  <p>{{ t('rec.use', used=used|human, cap=cap|human, free=free|human) }}</p>
+  <p>{{ t('rec.use', used=room.used|human, cap=room.cap|human, free=room.free|human) }}</p>
   {# Full by the share used; anything at all shows as a sliver, not as nothing. #}
-  <div class="rec-meter" role="img" aria-label="{{ t('rec.use_label', used=used|human, cap=cap|human) }}"><span{% if used %} class="some"{% endif %} style="width: {{ [100 * used / cap, 100]|min }}%"></span></div>
-  {# How long the room left lasts: up to the limit, or the disk's free space if that is less (it counts as a limit too). #}
-  {% set room = [cap - used, free]|min %}
-  <p class="meta">{{ t('rec.room', h=(room / per_hour)|int, size=per_hour|human) if room >= per_hour else t('rec.room_short', size=per_hour|human) }} {{ t('rec.about') }}</p>
+  <div class="rec-meter" role="img" aria-label="{{ t('rec.use_label', used=room.used|human, cap=room.cap|human) }}"><span{% if room.used %} class="some"{% endif %} style="width: {{ [100 * room.used / room.cap, 100]|min }}%"></span></div>
+  {# How long the room left lasts, as the API says it (recordings.rec_room): up to the limit, or the disk's free space if
+     that is less (it counts as a limit too). Under an hour, the page says so. #}
+  <p class="meta">{{ t('rec.room', h=room.hours_left, size=per_hour|human) if room.hours_left else t('rec.room_short', size=per_hour|human) }} {{ t('rec.about') }}</p>
   <form method="post" class="rec-limits">
     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="limits">
-    <label class="field">{{ t('rec.total') }} <input class="input" name="cap_gb" type="number" min="0.001" step="any" value="{{ '%g'|format(pending.cap_gb if pending else limits.cap_gb) }}" required></label>
-    <label class="field">{{ t('rec.days') }} <input class="input" name="days" type="number" min="1" step="1" value="{{ pending.days if pending else limits.days }}" required></label>
+    <label class="field">{{ t('rec.total') }} <input class="input" name="cap_gb" type="number" min="0.001" step="any" value="{{ '%g'|format(pending.cap_gb if pending else room.cap_gb) }}" required></label>
+    <label class="field">{{ t('rec.days') }} <input class="input" name="days" type="number" min="1" step="1" value="{{ pending.days if pending else room.days }}" required></label>
     <button class="btn">{{ t('rec.save') }}</button>
   </form>
   {# Lower limits delete recordings at once and for good: what they would delete, and the yes for it. #}

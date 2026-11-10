@@ -38,7 +38,7 @@ LIVE_LISTED = 15
 # the table at start (server/game/bin/setup-db.php, the same statement); a database restored from before it needs it here.
 SETTING_TABLE = "CREATE TABLE IF NOT EXISTS LiveSetting (name TEXT PRIMARY KEY, value TEXT NOT NULL)"
 # What a stream may be, by name, within what the phones' encoders take (LIVE_QUALITY in live_lib.php: the tests compare
-# the two). The segment is two seconds whatever the quality.
+# the two). The segment is SEGMENT seconds whatever the quality.
 LIVE_PRESETS = {
     "light": {"height": 480, "fps": 30, "bitrate": 1000000},
     "standard": {"height": 720, "fps": 30, "bitrate": 2000000},
@@ -52,11 +52,27 @@ QUALITY_WORDS = {"light": "live.q_light", "standard": "live.q_standard", "smooth
 # segment, about: what an hour of broadcast takes on the disk, and each viewer's connection, at each quality.
 AUDIO_BITRATE = 128000
 TS_OVERHEAD = 1.06
+# A segment's length in seconds, the same for every quality (LIVE_SEGMENT in live_lib.php: the tests compare the two).
+SEGMENT = 2
 
 
 def per_hour(quality):
     """The bytes an hour of broadcast takes at a quality: its picture and sound, with the transport stream's share."""
     return int((LIVE_PRESETS[quality]["bitrate"] + AUDIO_BITRATE) * TS_OVERHEAD * 3600 / 8)
+
+
+def viewer_bits(quality):
+    """What each viewer's connection takes at a quality, in bits a second: its picture and sound, with the transport
+    stream's share."""
+    return int((LIVE_PRESETS[quality]["bitrate"] + AUDIO_BITRATE) * TS_OVERHEAD)
+
+
+def quality_costs():
+    """Each quality with what it costs, in LIVE_PRESETS' order, for the Recordings page and the API alike: its key, height,
+    fps and bitrate, the segment's length (segment, seconds), the disk an hour recorded takes (hour_bytes) and each
+    viewer's connection (viewer_bits, bits a second)."""
+    return [{"key": key, **values, "segment": SEGMENT, "hour_bytes": per_hour(key), "viewer_bits": viewer_bits(key)}
+            for key, values in LIVE_PRESETS.items()]
 
 
 def used_before(con):
@@ -254,6 +270,40 @@ def rec_save_limits(cap_gb, days):
     os.replace(path + ".tmp", path)
 
 
+def rec_room(recs=None, quality=None):
+    """The limits and what the recordings take of the disk, as the Recordings page shows them and the API gives them: the
+    limits (cap_gb, days), the bytes used, the limit in bytes (cap), the disk's free bytes, and the whole hours of
+    broadcast still left at the quality (hours_left). Up to the limit, or the disk's free space where that is less, as it
+    counts as a limit too; 0 when not even an hour fits. recs: rec_all()'s list where the caller has it already; quality:
+    the one the phones are asked for now, unless given."""
+    limits = rec_limits()
+    # The open recordings count with what they hold so far.
+    used = sum(rec["size"] or 0 for rec in (rec_all() if recs is None else recs))
+    # In whole bytes: a limit in GB need not be a whole number.
+    cap = int(limits["cap_gb"] * 1024 ** 3)
+    free = shutil.disk_usage(os.path.dirname(core.DB)).free
+    room = min(cap - used, free)
+    hour = per_hour(live_settings()["quality"] if quality is None else quality)
+    return {"cap_gb": limits["cap_gb"], "days": limits["days"], "used": used, "cap": cap, "free": free,
+            "hours_left": int(room / hour) if room >= hour else 0}
+
+
+def rec_totals():
+    """How many recordings there are and the bytes they take, from one look at them all: (count, bytes)."""
+    recs = rec_all()
+    return len(recs), sum(rec["size"] or 0 for rec in recs)
+
+
+def player_names():
+    """Every player's name as the pages show it, by number, for the Recordings page and the API alike: one per player
+    (core.PLAYER_ROWS), without the spaces around it; {} while the database cannot be read."""
+    try:
+        with db() as con:
+            return {r["guid"]: (r["nickname"] or "").strip() for r in con.execute(core.PLAYER_ROWS, (core.CHECK_UDID,))}
+    except sqlite3.Error:
+        return {}
+
+
 def rec_over_limits(cap_gb, days):
     """The closed recordings these limits would delete, the same pick as the server's sweep (live_rec_enforce in
     server/portal/live_lib.php): too old, then the oldest first until the total fits."""
@@ -397,16 +447,11 @@ def recordings_page():
 def recordings_view(pending=None):
     """The page; pending holds limits waiting for the owner's yes, because of what they would delete."""
     # The names as the players page has them; a player's recordings stay together, newest first.
-    try:
-        with db() as con:
-            names = {r["guid"]: (r["nickname"] or "").strip() for r in con.execute(core.PLAYER_ROWS, (core.CHECK_UDID,))}
-    except sqlite3.Error:
-        names = {}
+    names = player_names()
     recs = rec_all()
     groups = {}
     for rec in recs:
         groups.setdefault(rec["guid"], []).append(rec)
-    limits = rec_limits()
     # The one to watch in the page: closed ones only, the open one has no playlist yet.
     watch = next((r for r in recs if f"{r['guid']}/{r['id']}" == request.args.get("watch") and not r["open"]), None)
     # The server's switch and settings, with who is switched on and on air, at the top of the page.
@@ -419,11 +464,12 @@ def recordings_view(pending=None):
     # Nobody is on air while broadcasts are off, whatever a phone left on the disk a moment before.
     if not settings["on"]:
         counts["on_air"] = 0
-    presets = [dict(LIVE_PRESETS[k], key=k, word=QUALITY_WORDS[k], per_hour=per_hour(k),
-                    viewer=int((LIVE_PRESETS[k]["bitrate"] + AUDIO_BITRATE) * TS_OVERHEAD)) for k in LIVE_PRESETS]
-    return render_template("recordings.html", groups=groups, names=names, limits=limits, watch=watch, pending=pending,
-                           used=sum(r["size"] for r in recs), cap=limits["cap_gb"] * 1024 ** 3, per_hour=per_hour(settings["quality"]),
-                           free=shutil.disk_usage(os.path.dirname(core.DB)).free, settings=settings, counts=counts, presets=presets)
+    # Each quality's costs as the API gives them, with its name in the page's words.
+    presets = [dict(cost, word=QUALITY_WORDS[cost["key"]]) for cost in quality_costs()]
+    # The limits, the disk and the hours left as the API gives them, from the list read above.
+    room = rec_room(recs, settings["quality"])
+    return render_template("recordings.html", groups=groups, names=names, room=room, watch=watch, pending=pending,
+                           per_hour=per_hour(settings["quality"]), settings=settings, counts=counts, presets=presets)
 
 
 def recordings_action():

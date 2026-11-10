@@ -572,6 +572,8 @@ class BroadcastsTest(unittest.TestCase):
                  for m in re.finditer(r"'(\w+)' => \['height' => (\d+), 'fps' => (\d+), 'bitrate' => (\d+)\]", php)}
         self.assertEqual(found, admin.recordings.LIVE_PRESETS)
         self.assertIn("const LIVE_QUALITY_DEFAULT = '%s';" % admin.recordings.QUALITY_DEFAULT, php)
+        # A segment's length, which the API gives with each quality.
+        self.assertIn("const LIVE_SEGMENT = %d;" % admin.recordings.SEGMENT, php)
         # Within what the phones' encoders take (arm32/src/live.cpp clamps to these).
         for q in admin.recordings.LIVE_PRESETS.values():
             self.assertTrue(5 <= q["fps"] <= 60 and 144 <= q["height"] <= 1080 and 100000 <= q["bitrate"] <= 20000000, q)

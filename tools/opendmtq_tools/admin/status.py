@@ -85,19 +85,33 @@ def _size_of(path):
         return 0
 
 
+def disk_counts():
+    """The slow figures of the data disk: the bytes of the recordings, backups, builds (the app's), songs (added ones) and
+    db (the database), and how many recordings there are (recording_count), from the same look at them. Counted at most
+    every minute, and again after a backup is made or a recording deleted (they empty _disk_cache)."""
+    # A copy, taken at once: another request may empty the cache while this one reads it.
+    seen = dict(_disk_cache)
+    if time.time() - seen.get("at", 0) <= 60:
+        return seen
+    try:
+        db_size = sum(os.path.getsize(core.DB + end) for end in ("", "-wal", "-shm") if os.path.exists(core.DB + end))
+    except OSError:
+        db_size = 0
+    # The recordings' bytes and their count in one look: reading every recording is the slow part.
+    count, size = recordings.rec_totals()
+    fresh = {"at": time.time(), "recordings": size, "recording_count": count,
+             "backups": sum(_size_of(os.path.join(core.BACKUPS, f[0])) for f in backups.backup_files()),
+             "builds": sum(b["size"] for b in apps.builds()), "songs": insights.folder_size(os.path.join(songs.CUSTOM, "songs")),
+             "db": db_size}
+    _disk_cache.update(fresh)
+    return fresh
+
+
 def disk_use(usage):
     """What takes the data disk, in bytes: recordings, backups, builds (the app's), songs (added ones), db (the database),
-    other (what is not ours, still part of the whole) and free. Counted at most every minute, and again after a backup is
-    made or a recording deleted."""
-    now = time.time()
-    if now - _disk_cache.get("at", 0) > 60:
-        try:
-            db_size = sum(os.path.getsize(core.DB + end) for end in ("", "-wal", "-shm") if os.path.exists(core.DB + end))
-        except OSError:
-            db_size = 0
-        _disk_cache.update(at=now, recordings=sum(r.get("size") or 0 for r in recordings.rec_all()), backups=sum(_size_of(os.path.join(core.BACKUPS, f[0])) for f in backups.backup_files()),
-                           builds=sum(b["size"] for b in apps.builds()), songs=insights.folder_size(os.path.join(songs.CUSTOM, "songs")), db=db_size)
-    use = {name: _disk_cache[name] for name in ("recordings", "backups", "builds", "songs", "db")}
+    other (what is not ours, still part of the whole) and free (disk_counts(), with the disk's own figures)."""
+    counted = disk_counts()
+    use = {name: counted[name] for name in ("recordings", "backups", "builds", "songs", "db")}
     # The rest of what the disk holds is not ours, and still part of the whole: without it the free part reads far too big.
     return dict(use, other=max(0, usage.used - sum(use.values())), free=usage.free)
 
@@ -349,8 +363,8 @@ def activity(con):
 
 def facts():
     """What the status page says, as data: the game server's health (asked now), the numbers (None when the database
-    cannot be read), the newest plays, the charts' figures, the disk, the backups made here, the notice, the app on offer and
-    why its last build failed."""
+    cannot be read), the newest plays, the charts' figures, the disk, the backups made here, the notice, the app on offer,
+    why its last build failed and how many recordings there are."""
     health = core.server_health(fresh=True)
     try:
         with db() as con:
@@ -370,7 +384,9 @@ def facts():
     # failed rebuild is shown too, above the earlier app that phones still get.
     failed = apps.build_error()
     return {"health": health, "counts": counts, "recent": recent, "figures": figures, "usage": usage, "saved": saved,
-            "backup_age": backup_age, "maintenance": on, "build": build, "failed": failed}
+            "backup_age": backup_age, "maintenance": on, "build": build, "failed": failed,
+            # Counted with the disk's figures (disk_counts): every recording is read at most once a minute for both.
+            "recordings": disk_counts()["recording_count"]}
 
 
 @app.route(BASE + "/")
@@ -405,7 +421,7 @@ def dashboard():
     return render_template("dashboard.html", health=health, counts=counts, usage=usage,
                            last_backup=saved[0][0] if saved else None, build=build, build_failed=failed,
                            app_other_host=(health or {}).get("apk_matches_host") is False,
-                           maintenance=on, recent=recent, recordings=len(recordings.rec_all()),
+                           maintenance=on, recent=recent, recordings=f["recordings"],
                            backup_ago=ago(time.time() - backup_age) if saved else None,
                            backup_old=saved and backup_age > 7 * 86400, chart=charts_view, disk_chart=disk_chart, disk_own=disk_own,
                            disk_own_total=human(own_total) if own_total else "", machine=machine_view(usage),

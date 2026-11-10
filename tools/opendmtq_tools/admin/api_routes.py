@@ -115,7 +115,8 @@ SHAPES = {
         Field("backups", "BackupFacts", "The backups made here."),
         Field("app", "AppFacts", "The app on offer."),
         Field("maintenance", "boolean", "True while the maintenance notice is on."),
-        Field("recordings", "integer", "How many recordings are kept."),
+        Field("recordings", "integer", "How many recordings are kept, counted with the disk's figures: at most every minute, and "
+              "again after one is deleted."),
         Field("disk", "Disk", "The data disk."),
         Field("attention", "[Attention]", "What needs a look, as the status page lists it.")]),
     "GameServer": Shape("The game server's health, as the status page reads it.", [

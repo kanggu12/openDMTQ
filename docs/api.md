@@ -1623,7 +1623,7 @@ What the status page says.
 - `backups` ([BackupFacts](#backupfacts)): The backups made here.
 - `app` ([AppFacts](#appfacts)): The app on offer.
 - `maintenance` (boolean): True while the maintenance notice is on.
-- `recordings` (integer): How many recordings are kept.
+- `recordings` (integer): How many recordings are kept, counted with the disk's figures: at most every minute, and again after one is deleted.
 - `disk` ([Disk](#disk)): The data disk.
 - `attention` (list of [Attention](#attention)): What needs a look, as the status page lists it.
 
