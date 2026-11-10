@@ -415,9 +415,10 @@ def restore_backup(name, path):
             # broadcasting anyone. The switches and the broadcast settings as they are now go back in below. So are the
             # API's tokens: an old backup must not bring back one that was revoked, nor end one made since (the one that
             # asked for this restore). Tokens are made and revoked under tokens.LOCK: none comes or goes between this look
-            # and the swap.
+            # and the swap. The site's accounts too: an old backup must not bring back an account deleted since, nor an
+            # old password, nor end an account made since.
             with tokens.LOCK:
-                switches, settings, kept_tokens = [], [], []
+                switches, settings, kept_tokens, kept_accounts = [], [], [], []
                 if not kept:
                     with db() as con:
                         con.execute(recordings.LIVE_TABLE)
@@ -425,12 +426,20 @@ def restore_backup(name, path):
                         settings = sorted(recordings.setting_rows(con).items())
                         tokens.token_table(con)
                         kept_tokens = con.execute("SELECT * FROM ApiToken").fetchall()
-                # Today's tokens go into the restored copy while it is still apart from the server: the database that
-                # takes the live one's place has them from its first moment (a damaged one set aside leaves none).
+                        # The table as the pages keep it (its guid column added to an older one), then every account.
+                        auth.account_table(con)
+                        kept_accounts = con.execute(f"SELECT {', '.join(auth.ACCOUNT_COLUMNS)} FROM SiteUser").fetchall()
+                # Today's tokens and accounts go into the restored copy while it is still apart from the server: the
+                # database that takes the live one's place has them from its first moment (a damaged one set aside
+                # leaves no tokens).
                 copy = sqlite3.connect(restored)
                 try:
                     with copy:
                         tokens.put(copy, kept_tokens)
+                        # A server with no account (a new PC, or a damaged database set aside) has none to keep: the
+                        # backup's accounts come with it then, or a move to a new PC would leave every player out.
+                        if kept_accounts:
+                            auth.put_accounts(copy, kept_accounts)
                 finally:
                     copy.close()
                 swap_in(restored)

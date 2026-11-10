@@ -53,8 +53,10 @@ class Sandbox:
         self.built = False
         self.compose_calls, self.tool_calls, self.urls, self.scripts = [], [], [], []
         self.tool_services = []
-        # How many API tokens the last restore's job kept (keep_tokens.keep), None before one ran.
+        # How many API tokens the last restore's job kept (keep_tokens.keep), None before one ran; how many accounts
+        # (keep_tokens.keep_accounts), None too when the backup's stayed.
         self.tokens_kept = None
+        self.accounts_kept = None
         # Tool module -> function(args, extra_env) run in its place, returning its exit code.
         self.tools = {}
         # Program name prefix -> result, for the programs a command may run.
@@ -158,7 +160,7 @@ class Sandbox:
                 os.replace(here(words[1]), here(words[2]))
             elif words[:2] == ["python3", "/in/keep_tokens.py"]:
                 # The script the restore put beside the archive's files: the package's own module.
-                self.tokens_kept = keep_tokens.keep(here(words[2]), here(words[3]))
+                self.tokens_kept, self.accounts_kept = keep_tokens.keep_all(here(words[2]), here(words[3]))
             else:
                 raise AssertionError(f"the restore's line has a step this sandbox does not know: {step.strip()}")
 

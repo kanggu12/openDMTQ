@@ -213,16 +213,17 @@ def restore(name, with_key=False):
         db = os.path.join(tmp, "dmtq.db3")
         if not os.path.isfile(db):
             system.die(f"{path} holds no database")
-        # The API's tokens of now go into the restored database (keep_tokens.py), run by the container from here.
+        # The API's tokens and the site's accounts of now go into the restored database (keep_tokens.py), run by the
+        # container from here.
         shutil.copyfile(os.path.join(os.path.dirname(os.path.abspath(__file__)), "keep_tokens.py"), os.path.join(tmp, "keep_tokens.py"))
         # The copying container runs unprivileged; let it read the extracted files.
         os.chmod(tmp, 0o755)
         os.chmod(db, 0o644)
         os.chmod(os.path.join(tmp, "keep_tokens.py"), 0o644)
         # Written through a container so it works whoever owns data/state. The restored file is made ready beside the
-        # live one first: today's API tokens read from the live database (through its log, which holds the newest) and
-        # put in it. Then the old database's own log and journal go, as SQLite would apply them to the restored file and
-        # damage it, and the restored file takes the live one's place in one step.
+        # live one first: today's API tokens and accounts read from the live database (through its log, which holds the
+        # newest) and put in it. Then the old database's own log and journal go, as SQLite would apply them to the
+        # restored file and damage it, and the restored file takes the live one's place in one step.
         system.compose("--profile", "tools", "run", "--rm", "--no-deps", "--entrypoint", "sh",
                        "tools", "-c", f"mkdir -p /data/state && cp /in/dmtq.db3 {RESTORING} "
                        f"&& python3 /in/keep_tokens.py /data/state/dmtq.db3 {RESTORING} "

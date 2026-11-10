@@ -158,6 +158,69 @@ class RealDatabaseTest(unittest.TestCase):
             self.assertEqual(sb.call(app.cmd_restore, name=name, with_key=False), 0, sb.output())
             self.assertEqual(self.tokens_in(backup.DB), [])
 
+    def with_accounts(self, con, *accounts):
+        """Site accounts in a database, as the admin pages keep them: (ID, password hash) each."""
+        con.execute(keep_tokens.ACCOUNT_TABLE)
+        con.execute(keep_tokens.ACCOUNT_GUID)
+        con.executemany("INSERT INTO SiteUser (name, pass, created_at, guid) VALUES (?, ?, 1, 7)", accounts)
+        con.commit()
+
+    def accounts_in(self, path):
+        """The accounts of a database: (ID, password hash, guid) each."""
+        con = sqlite3.connect(path)
+        try:
+            return sorted(con.execute("SELECT name, pass, guid FROM SiteUser").fetchall())
+        finally:
+            con.close()
+
+    def test_a_restore_keeps_todays_accounts(self):
+        # An account deleted since the backup stays deleted, a password changed since stays changed, one made since
+        # stays: who may sign in is today's, as the admin pages' restore keeps it.
+        with Sandbox() as sb:
+            with tempfile_folder() as tmp:
+                old = self.database(os.path.join(tmp, "old.db3"))
+                self.with_accounts(old, ("deleted_since", "h1"), ("sena", "old password"))
+                old.close()
+                with open(os.path.join(tmp, "old.db3"), "rb") as f:
+                    name = sb.archive("data/backups/opendmtq-20260101-120000-manual.tar.gz", {"dmtq.db3": f.read()})
+            live = self.database(backup.DB, rows=5)
+            self.with_accounts(live, ("sena", "new password"), ("made_since", "h2"))
+            live.close()
+            self.assertEqual(sb.call(app.cmd_restore, name=name, with_key=False), 0, sb.output())
+            self.assertEqual(self.accounts_in(backup.DB), [("made_since", "h2", 7), ("sena", "new password", 7)])
+            self.assertEqual(sb.accounts_kept, 2)
+
+    def test_a_server_with_no_account_yet_takes_the_backups(self):
+        # A move to a new machine: nothing of its own to keep, and every player of the backup still signs in.
+        with Sandbox() as sb:
+            with tempfile_folder() as tmp:
+                old = self.database(os.path.join(tmp, "old.db3"))
+                self.with_accounts(old, ("sena", "h1"))
+                old.close()
+                with open(os.path.join(tmp, "old.db3"), "rb") as f:
+                    name = sb.archive("data/backups/opendmtq-20260101-120000-manual.tar.gz", {"dmtq.db3": f.read()})
+            live = self.database(backup.DB)
+            self.with_accounts(live)
+            live.close()
+            self.assertEqual(sb.call(app.cmd_restore, name=name, with_key=False), 0, sb.output())
+            self.assertEqual(self.accounts_in(backup.DB), [("sena", "h1", 7)])
+            self.assertIsNone(sb.accounts_kept)
+
+    def test_the_accounts_table_is_the_one_the_server_makes(self):
+        # Three copies of one statement, as for the tokens: the server's start, the admin pages, and this restore.
+        def words(text):
+            return " ".join(text.split())
+        with open(os.path.join(REPO, "tools", "opendmtq_tools", "admin", "auth.py"), encoding="utf-8") as f:
+            pages = f.read()
+        with open(os.path.join(REPO, "server", "game", "bin", "setup-db.php"), encoding="utf-8") as f:
+            server = re.search(r'\$db->exec\("(CREATE TABLE IF NOT EXISTS SiteUser .*?)"\);', f.read(), re.S).group(1)
+        self.assertEqual(words(keep_tokens.ACCOUNT_TABLE), words(server))
+        # The pages' own has the game player's column in it, which an older table gets added (ACCOUNT_GUID).
+        made = re.search(r'ACCOUNT_TABLE = """(.*?)"""', pages, re.S).group(1)
+        self.assertEqual(words(keep_tokens.ACCOUNT_TABLE)[:-1] + ", guid INTEGER)", words(made))
+        self.assertIn(f'"{keep_tokens.ACCOUNT_GUID}"', pages)
+        self.assertIn(f"ACCOUNT_COLUMNS = {keep_tokens.ACCOUNT_COLUMNS!r}".replace("'", '"'), pages)
+
     def test_the_tokens_table_is_the_one_the_server_makes(self):
         # Three copies of one statement: the server's start, the admin pages, and this restore.
         def words(text):

@@ -1193,7 +1193,7 @@ Refusals:
 
 #### `POST /backups/{backup}/restore`
 
-Restores a backup while the server runs. The current state is backed up first. Who is broadcasting, and the API's tokens, stay as they are now: they are put into the restored database before it takes the current one's place.
+Restores a backup while the server runs. The current state is backed up first. Who is broadcasting, the site's accounts and the API's tokens stay as they are now: they are put into the restored database before it takes the current one's place. A server with no account yet takes the backup's.
 
 Parameters:
 

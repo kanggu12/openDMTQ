@@ -217,6 +217,21 @@ def account_table(con):
         con.execute("ALTER TABLE SiteUser ADD COLUMN guid INTEGER")
 
 
+# The accounts' columns: what a restore copies of each (put_accounts), guid with them.
+ACCOUNT_COLUMNS = ("name", "pass", "note", "admin", "created_at", "signed_in_at", "off", "guid")
+
+
+def put_accounts(con, rows):
+    """con's accounts made exactly rows (read from another database, every column of ACCOUNT_COLUMNS): the table made
+    when that database has none, and whatever accounts it had gone. A restore gives the restored database today's
+    accounts with it, as it does the API's tokens (tokens.put): an old backup must not bring back an account deleted
+    since, nor a password changed since."""
+    account_table(con)
+    con.execute("DELETE FROM SiteUser")
+    con.executemany(f"INSERT INTO SiteUser ({', '.join(ACCOUNT_COLUMNS)}) VALUES ({', '.join('?' for _ in ACCOUNT_COLUMNS)})",
+                    [tuple(r[c] for c in ACCOUNT_COLUMNS) for r in rows])
+
+
 def game_players(con):
     """Every player of the game (not the server's own check account), by name, for linking an account to one:
     [(guid, name)]. Two with one name are told apart by their number, as on the Plays tab."""

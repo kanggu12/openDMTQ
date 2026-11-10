@@ -1045,6 +1045,32 @@ class JobTest(unittest.TestCase):
             self.assertEqual(inst.ask("GET", "/status", token="reader").get_json()["error"]["code"], "bad_token")
             self.assertEqual(inst.ask("GET", "/status", token=made["secret"]).status_code, 200)
 
+    def test_a_restore_keeps_todays_accounts(self):
+        # An account deleted since the backup stays deleted, a password made since stays the one that works, an account
+        # made since stays: who may sign in is today's, as the API's tokens are.
+        with Server() as inst:
+            self.assertEqual(inst.ask("POST", "/accounts", json={"name": "gone", "password": "hunter22"}).status_code, 201)
+            name = inst.ask("POST", "/backups").get_json()["backup"]["name"]
+            self.assertEqual(inst.ask("DELETE", "/accounts/gone").status_code, 200)
+            new = inst.ask("POST", "/accounts/friend/password").get_json()["password"]
+            self.assertEqual(inst.ask("POST", "/accounts", json={"name": "newcomer"}).status_code, 201)
+            r = inst.ask("POST", f"/backups/{name}/restore")
+            done = wait_job(inst, r.get_json()["job"]["id"])
+            self.assertEqual(done["state"], "done", done)
+            self.assertEqual([a["name"] for a in inst.ask("GET", "/accounts").get_json()["items"]], ["friend", "helper", "newcomer"])
+            self.assertTrue(admin.auth.account_pass_ok(admin.auth.account_find("friend")["pass"], new))
+            self.assertFalse(admin.auth.account_pass_ok(admin.auth.account_find("friend")["pass"], "hunter22"))
+
+    def test_a_server_with_no_account_yet_takes_the_backups(self):
+        # A move to a new PC: no account of its own yet, and every player of the backup still signs in.
+        with Server() as inst:
+            name = inst.ask("POST", "/backups").get_json()["backup"]["name"]
+            for account in ("friend", "helper"):
+                self.assertEqual(inst.ask("DELETE", f"/accounts/{account}").status_code, 200)
+            r = inst.ask("POST", f"/backups/{name}/restore")
+            self.assertEqual(wait_job(inst, r.get_json()["job"]["id"])["state"], "done")
+            self.assertEqual([a["name"] for a in inst.ask("GET", "/accounts").get_json()["items"]], ["friend", "helper"])
+
     def test_a_restore_that_fails_says_why(self):
         with Server() as inst:
             inst.write("backups/opendmtq-20200101-000000-admin.tar.gz", "not an archive")
