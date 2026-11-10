@@ -137,34 +137,66 @@ if [ "$(docker exec "$SITE" php -r '$d = new SQLite3("/data/dmtq.db3"); echo $d-
 fi
 echo "PASS the database runs in write-ahead mode"
 
+# One game RPC, signed as the game signs it: its reply.
+rpc() {
+  local body="[{\"id\":1,\"method\":\"$1\",\"params\":$2}]"
+  curl -s -H "Content-Type: application/json" -H "Fp: $(printf 'DMQGLBlive1%s' "$body" | md5sum | cut -d' ' -f1)" --data "$body" "http://127.0.0.1:$SITE_PORT/DMQ/rpc"
+}
+# A save of a play of 500 notes, all at 100 %, by player $1 on chart $2, as the result screen sends it.
+save_of() {
+  printf '[{"id":1,"method":"game.savePlayResult","params":[%s,%s,[0,0,0,0,0,0,0,0,0,0,0,0,500],500,0,[0,0,0],[0,0,0],"smoke"]}]' "$1" "$2"
+}
+# A number from the server's database, from inside the server (its user owns the file): the statement, then its values,
+# bound in order.
+db_value() {
+  # shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
+  docker exec "$SITE" php -r '$d = new SQLite3("/data/dmtq.db3"); $q = $d->prepare($argv[1]);
+    foreach (array_slice($argv, 2) as $i => $v) { $q->bindValue($i + 1, (int)$v, SQLITE3_INTEGER); }
+    echo $q->execute()->fetchArray(SQLITE3_NUM)[0];' "$@"
+}
+# Charts of this server's songs, as its song list has them: a save of any other is refused (SVC.05008) before the database
+# is asked, and would pass the checks below for that reason alone. Five for the checks on the database, and one of the
+# 4LINE tab for the achievements' check: a play there earns no clear of a line (2LINE's and 3LINE's have one).
+read -r HELD REFUSED MERGED LAST_MONTH THIS_MONTH FOUR_LINE < <(rpc game.getSongList '[]' | python3 -c '
+import json, sys
+charts = sorted((c["pattern_id"], c["line"]) for s in json.load(sys.stdin)[0]["result"]["songs"] for c in s["song_patterns"])
+four = [p for p, line in charts if line == 5][:1]
+print(*[p for p, _ in charts if p not in four][:5], *four)')
+if [ -z "$FOUR_LINE" ]; then
+  echo "FAIL the server's song list has no six charts, one of them 4LINE, for the saves below" >&2
+  exit 1
+fi
+
 # A save while something holds the database longer than a save waits: the phone must hear it failed,
 # where it used to be told it was saved with nothing stored. Then the retry goes through.
-save_body='[{"id":1,"method":"game.savePlayResult","params":['"$GUID"',920001,[0,0,0,0,0,0,0,0,0,0,0,0,500],500,0,[0,0,0],[0,0,0],"smoke"]}]'
+save_body=$(save_of "$GUID" "$HELD")
 save_fp=$(printf 'DMQGLBlive1%s' "$save_body" | md5sum | cut -d' ' -f1)
 docker exec "$SITE" php -r '$d = new SQLite3("/data/dmtq.db3"); $d->exec("BEGIN IMMEDIATE"); touch("/tmp/held"); sleep(9); $d->exec("ROLLBACK");' &
 holder=$!
 for _ in $(seq 1 50); do docker exec "$SITE" test -e /tmp/held && break; sleep 0.1; done
 reply=$(curl -s -H "Fp: $save_fp" --data-binary "$save_body" "http://127.0.0.1:$SITE_PORT/DMQ/rpc")
 wait "$holder"
-stored=$(docker exec "$SITE" php -r '$d = new SQLite3("/data/dmtq.db3"); echo $d->querySingle("SELECT COUNT(*) FROM Play WHERE pattern_id = 920001");')
+stored=$(db_value "SELECT COUNT(*) FROM Play WHERE pattern_id = ? AND user_id = ?" "$HELD" "$GUID")
 case "$reply" in
   *SVC.05099*) [ "$stored" = 0 ] || { echo "FAIL a refused save was stored: $stored" >&2; exit 1; } ;;
   *) echo "FAIL a save the database did not take answered: $reply (rows: $stored)" >&2; exit 1 ;;
 esac
 reply=$(curl -s -H "Fp: $save_fp" --data-binary "$save_body" "http://127.0.0.1:$SITE_PORT/DMQ/rpc")
-stored=$(docker exec "$SITE" php -r '$d = new SQLite3("/data/dmtq.db3"); echo $d->querySingle("SELECT COUNT(*) FROM Play WHERE pattern_id = 920001");')
+stored=$(db_value "SELECT COUNT(*) FROM Play WHERE pattern_id = ? AND user_id = ?" "$HELD" "$GUID")
 case "$reply" in
   *is_success*) [ "$stored" = 1 ] || { echo "FAIL the retry stored $stored rows" >&2; exit 1; } ;;
   *) echo "FAIL the retried save answered: $reply" >&2; exit 1 ;;
 esac
 echo "PASS a save the database cannot take says so, stores nothing, and its retry goes through"
 
-# Plays must not reach the database half: a statement failing inside a save loses all of it, and says so.
-docker exec "$SITE" php -r '$d = new SQLite3("/data/dmtq.db3"); $d->exec("CREATE TRIGGER smoke_refuse BEFORE INSERT ON Play WHEN NEW.pattern_id = 920002 BEGIN SELECT RAISE(ABORT, \"refused\"); END");'
-save_body2=${save_body/920001/920002}
+# Plays must not reach the database half: a statement failing inside a save loses all of it, and says so. (A trigger
+# takes no bound value: the chart goes in as a number.)
+docker exec "$SITE" php -r '$d = new SQLite3("/data/dmtq.db3"); $d->exec("CREATE TRIGGER smoke_refuse BEFORE INSERT ON Play WHEN NEW.pattern_id = " . (int)$argv[1] . " BEGIN SELECT RAISE(ABORT, \"refused\"); END");' "$REFUSED"
+save_body2=$(save_of "$GUID" "$REFUSED")
 save_fp2=$(printf 'DMQGLBlive1%s' "$save_body2" | md5sum | cut -d' ' -f1)
 reply=$(curl -s -H "Fp: $save_fp2" --data-binary "$save_body2" "http://127.0.0.1:$SITE_PORT/DMQ/rpc")
-logged=$(docker exec "$SITE" php -r '$d = new SQLite3("/data/dmtq.db3"); $d->exec("DROP TRIGGER smoke_refuse"); echo $d->querySingle("SELECT COUNT(*) FROM PlayLog WHERE pattern_id = 920002");')
+docker exec "$SITE" php -r '$d = new SQLite3("/data/dmtq.db3"); $d->exec("DROP TRIGGER smoke_refuse");'
+logged=$(db_value "SELECT COUNT(*) FROM PlayLog WHERE pattern_id = ? AND user_id = ?" "$REFUSED" "$GUID")
 case "$reply" in
   *SVC.05099*) [ "$logged" = 0 ] || { echo "FAIL a failed save left $logged history rows" >&2; exit 1; } ;;
   *) echo "FAIL a save whose statement failed answered: $reply" >&2; exit 1 ;;
@@ -172,10 +204,17 @@ esac
 echo "PASS a save whose statement fails keeps nothing and says so"
 
 # A database from before these rules: two rows for a player and chart become the best of each at start.
-docker exec "$SITE" php -r '$d = new SQLite3("/data/dmtq.db3"); $d->exec("DROP INDEX Play_one"); $d->exec("INSERT INTO Play VALUES (920003, 77, 100, \"B\", \"Y\", \"N\", 800), (920003, 77, 300, \"A\", \"N\", \"N\", 700);");'
+# shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
+docker exec "$SITE" php -r '$d = new SQLite3("/data/dmtq.db3"); $d->exec("DROP INDEX Play_one");
+  $q = $d->prepare("INSERT INTO Play VALUES (:p, 77, 100, \"B\", \"Y\", \"N\", 800), (:p, 77, 300, \"A\", \"N\", \"N\", 700)");
+  $q->bindValue(":p", (int)$argv[1], SQLITE3_INTEGER); $q->execute();' "$MERGED"
 docker restart "$SITE" >/dev/null
 for _ in $(seq 1 60); do curl -sf -o /dev/null "http://127.0.0.1:$SITE_PORT/opendmtq/health.php" && break; sleep 1; done
-merged=$(docker exec "$SITE" php -r '$d = new SQLite3("/data/dmtq.db3"); echo json_encode($d->querySingle("SELECT COUNT(*) || \"/\" || MAX(score) || \"/\" || MAX(grade) || \"/\" || MAX(isAllCombo) || \"/\" || MAX(judgement) FROM Play WHERE pattern_id = 920003")), $d->querySingle("SELECT COUNT(*) FROM sqlite_master WHERE name = \"Play_one\"");')
+# shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
+merged=$(docker exec "$SITE" php -r '$d = new SQLite3("/data/dmtq.db3");
+  $q = $d->prepare("SELECT COUNT(*) || \"/\" || MAX(score) || \"/\" || MAX(grade) || \"/\" || MAX(isAllCombo) || \"/\" || MAX(judgement) FROM Play WHERE pattern_id = ? AND user_id = 77");
+  $q->bindValue(1, (int)$argv[1], SQLITE3_INTEGER);
+  echo json_encode($q->execute()->fetchArray(SQLITE3_NUM)[0]), $d->querySingle("SELECT COUNT(*) FROM sqlite_master WHERE name = \"Play_one\"");' "$MERGED")
 if [ "$merged" != '"1\/300\/B\/Y\/800"1' ]; then
   echo "FAIL rows of one player and chart were not merged: $merged" >&2
   exit 1
@@ -184,16 +223,16 @@ echo "PASS a player's two rows on one chart are merged at start, the best of eac
 
 # The in-game rankings are this month's: a play from before the first of the month at midnight UTC (when the game's
 # countdown ends) is not ranked, one of this month is; the player's own best keeps both (MAX SCORE on the song).
+# shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
 docker exec "$SITE" php -r '
   $d = new SQLite3("/data/dmtq.db3");
   $start = gmmktime(0, 0, 0, (int)gmdate("n"), 1, (int)gmdate("Y"));
   $d->exec("INSERT INTO Member (id, nickname, guid, udid) VALUES (4242, \"LastMonth\", \"4242\", \"live-smoke-last-month\")");
-  $d->exec("INSERT INTO Play VALUES (920004, 4242, 999999, \"S\", \"N\", \"N\", 1000), (920005, 4242, 5, \"F\", \"N\", \"N\", 100)");
-  $d->exec("INSERT INTO PlayLog (user_id, pattern_id, score, grade, judgement, is_record, played_at) VALUES (4242, 920004, 999999, \"S\", 1000, 1, " . ($start - 3600) . "), (4242, 920005, 5, \"F\", 100, 1, " . time() . ")");'
-rpc() {
-  local body="[{\"id\":1,\"method\":\"$1\",\"params\":$2}]"
-  curl -s -H "Content-Type: application/json" -H "Fp: $(printf 'DMQGLBlive1%s' "$body" | md5sum | cut -d' ' -f1)" --data "$body" "http://127.0.0.1:$SITE_PORT/DMQ/rpc"
-}
+  $q = $d->prepare("INSERT INTO Play VALUES (:last, 4242, 999999, \"S\", \"N\", \"N\", 1000), (:this, 4242, 5, \"F\", \"N\", \"N\", 100)");
+  $q->bindValue(":last", (int)$argv[1], SQLITE3_INTEGER); $q->bindValue(":this", (int)$argv[2], SQLITE3_INTEGER); $q->execute();
+  $q = $d->prepare("INSERT INTO PlayLog (user_id, pattern_id, score, grade, judgement, is_record, played_at) VALUES (4242, :last, 999999, \"S\", 1000, 1, :before), (4242, :this, 5, \"F\", 100, 1, :now)");
+  $q->bindValue(":last", (int)$argv[1], SQLITE3_INTEGER); $q->bindValue(":this", (int)$argv[2], SQLITE3_INTEGER);
+  $q->bindValue(":before", $start - 3600, SQLITE3_INTEGER); $q->bindValue(":now", time(), SQLITE3_INTEGER); $q->execute();' "$LAST_MONTH" "$THIS_MONTH"
 ranked=$(rpc game.getLineTopRankWithLevel '[0, 1, 100, [4242]]' | python3 -c 'import json, sys; print([r["score"] for r in json.load(sys.stdin)[0]["result"]["ranks"] if r["guid"] == 4242])')
 best=$(rpc game.getOwnPatternScore '[4242]' | python3 -c 'import json, sys; print(sorted(r["score"] for r in json.load(sys.stdin)[0]["result"]))')
 if [ "$ranked" != "[5]" ] || [ "$best" != "[5, 999999]" ]; then
@@ -207,9 +246,9 @@ echo "PASS the in-game ranking counts this month's plays only; the player's own 
 # with the stored date, and a save of theirs does not name it as new.
 docker exec "$SITE" php -r '$d = new SQLite3("/data/dmtq.db3"); $d->exec("INSERT INTO AchievementDate (user_id, achievement_id, earned_at) VALUES (4242, 23, 1700000000)");'
 kept=$(rpc game.getOwnAchievementList '[4242]' | python3 -c 'import json, sys; print([a["reg_date"] for a in json.load(sys.stdin)[0]["result"]["own_achievements"] if a["achievement_id"] == 23])')
-again=$(rpc game.savePlayResult '[4242, 920006, [0,0,0,0,0,0,0,0,0,0,0,0,500], 500, 0, [0,0,0], [0,0,0], "smoke"]' | python3 -c 'import json, sys; print(sorted(a["achievement_id"] for a in json.load(sys.stdin)[0]["result"]["new_achievements"]))')
+again=$(rpc game.savePlayResult "[4242, $FOUR_LINE, [0,0,0,0,0,0,0,0,0,0,0,0,500], 500, 0, [0,0,0], [0,0,0], \"smoke\"]" | python3 -c 'import json, sys; print(sorted(a["achievement_id"] for a in json.load(sys.stdin)[0]["result"]["new_achievements"]))')
 # 1700000000 in the test server's zone (TZ=Asia/Seoul, above): 2023-11-15 07:13:20. The save earns ALL COMBO and
-# PERFECT PLAY, the first for this player, and only those.
+# PERFECT PLAY, the first for this player, and only those (its chart's line, 4LINE, has no clear of its own).
 if [ "$kept" != "['20231115071320']" ] || [ "$again" != "[13, 14]" ]; then
   echo "FAIL a stored achievement the records do not give: listed $kept, a save named $again as new" >&2
   exit 1

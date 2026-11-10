@@ -176,6 +176,11 @@ check("the player picks a name", result is True and one("user.getUsersByPuid", [
 
 songs = one("game.getSongList", [])[0]["songs"]
 check("game.getSongList gives every song with its charts", len(songs) == 26 and all(s["song_patterns"] for s in songs))
+# The song the owner hid (protocol.sh marks the last one as the tools do): still in the list, marked, with its charts.
+hidden = [s for s in songs if s["hidden_yn"] == "Y"]
+check("a hidden song stays in the list, marked hidden", [s["song_id"] for s in hidden] == [26], json.dumps([s["song_id"] for s in hidden]))
+# Every chart of the server's songs, hidden ones included: a save of any other is no play of this server's.
+listed = {c["pattern_id"] for s in songs for c in s["song_patterns"]}
 url = one("game.getSongUrl", [int(guid), 1, "ANDROID", "1.3.4"])[0]
 check("a song's music and video addresses on this server", url["pmang"] == [f"http://{host}/DMQ/Songs/1/1.fpk", f"http://{host}/DMQ/Songs/1/1.webm"]
       and url["amazon"] == url["pmang"], json.dumps(url))
@@ -259,8 +264,10 @@ check("the check account is not in TOTAL, not even as the row it asks for", boar
 
 # Signed as the game signs them, but no play gives them: a count below 0 (negative breaks made an S at 100 %), a count
 # of 1e308 (a score of 0 with PERFECT PLAY), more notes of one judgement than a save may count, a count that is no whole
-# number, a player the server has no account for. Each is answered as handled, and nothing of it is kept.
+# number, a player the server has no account for, a chart no song of this server has (it counted in the month's TOTAL).
+# Each is answered as handled, and nothing of it is kept.
 before = one("game.getOwnPatternScore", [int(guid)])[0]
+total = rows(one("game.getLineTopRankWithLevel", [0, 1, 20, []])[0]["ranks"])
 # A player id no account has: the accounts of this run are numbered from 1.
 nobody = 999999
 odd_saves = {
@@ -269,6 +276,7 @@ odd_saves = {
     "a count of 10,001": (int(guid), 2, notes(at100=10001)),
     "a count that is no whole number": (int(guid), 2, notes(at100=50.5)),
     "a player the server has no account for": (nobody, 2, notes(at100=100)),
+    "a chart no song of this server has": (int(guid), max(listed) + 1, notes(at100=100)),
 }
 for what, (who, chart, stat) in odd_saves.items():
     result, error = save(who, chart, stat)
@@ -276,6 +284,14 @@ for what, (who, chart, stat) in odd_saves.items():
           json.dumps([result, error])[:200])
 check("none of them is kept: the player's best scores are as they were, and the id without an account has none",
       one("game.getOwnPatternScore", [int(guid)])[0] == before and one("game.getOwnPatternScore", [nobody])[0] == [])
+after = rows(one("game.getLineTopRankWithLevel", [0, 1, 20, []])[0]["ranks"])
+check("nor counted: the month's TOTAL is as it was", after == total, str(after))
+# A play of a chart of the hidden song: the owner may hide a song while someone plays it, and the play is the server's.
+kept, error = save(ben, hidden[0]["song_patterns"][0]["pattern_id"], notes(at100=100))
+# Ben's TOTAL: song 2's chart before, and this one.
+bens = [score for _, who, score in rows(one("game.getLineTopRankWithLevel", [0, 1, 20, [ben]])[0]["ranks"]) if who == "Ben"]
+check("a play of a hidden song's chart is kept: the owner may hide a song while it is played",
+      error is None and kept["is_success"] and bens == [130000], json.dumps([kept, error, bens])[:200])
 # The most a save may count is still a play: 10,000 notes at 100 %, by the check account, which no ranking shows.
 result, error = save(checker, 11, notes(at100=10000))
 check("10,000 notes of one judgement are still a play", error is None and result["score"] == 10000 * 200 + 45000,

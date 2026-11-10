@@ -61,7 +61,9 @@ game code or data is in them.
 
 `tests/game/protocol.py` then goes through what the client sends, request by request, and checks each reply the client
 reads and each quirk it depends on (an empty news list closes the game, for one). Each check names the client
-behaviour it protects. A new method of the game server gets its checks there.
+behaviour it protects. A new method of the game server gets its checks there. `protocol.sh` gives that server the song
+list the tools write once the owner hides a song, the last stand-in song hidden: a play of a hidden song's chart is kept,
+one of a chart no song has is not.
 
 In `tests/ui/run.sh` a real browser then takes the server through a life, in stages (`tests/ui/audit.js`):
 

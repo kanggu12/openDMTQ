@@ -359,6 +359,12 @@ function odq_game_save_play(array $p)
     }
     $guid = (int)$guid;
     $pattern = (int)$pattern;
+    // A chart no song of this server has, imported or added: no play on this server, and the month's TOTAL would count
+    // it. A hidden song's charts are the server's (the list keeps a hidden song, marked hidden), so that a play finished
+    // while the owner hid its song is kept. The list's charts are read once a request: the achievements below read them too.
+    if (!isset(odq_chart_kinds()[$pattern])) {
+        return odq_error('SVC.05008', 'OpenDMTQ: no song of this server has this chart; the result is not stored');
+    }
     $known = odq_account_known($guid);
     // A player the server has no account for (an id made up, or a player the owner deleted): handled the same way.
     if ($known === false) {

@@ -854,6 +854,12 @@ def rpc_reply(method, params, signed=True):
 # 500 perfect notes: a real result as the phone sends it.
 RESULT = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 500]
 scorer = new_player(f"live-smoke-score-{random.randrange(10**9):09d}")
+# Charts of this server's songs, as its song list has them: a save of any other is refused (SVC.05008), and would pass
+# the checks of a refusal below for that reason alone. From the end of the list, each check a chart of its own: none of
+# the scorer's checks reads another's rows. UNSIGNED and NO_NOTES are never stored, TOGETHER and RANKED are.
+CHARTS = sorted(c["pattern_id"] for s in call("game.getSongList", [])["songs"] for c in s["song_patterns"])
+check("the server's songs have charts enough for the saves below", len(CHARTS) >= 12, len(CHARTS))
+UNSIGNED, NO_NOTES, TOGETHER, RANKED = CHARTS[-1], CHARTS[-2], CHARTS[-10:-2], CHARTS[-12:-10]
 
 
 def saves(pattern, stats=RESULT, who=None):
@@ -867,24 +873,24 @@ def records(pattern, who=None):
 
 # Any spelling PHP would still run needs the signature: a leading backslash names the same class.
 for spelling in ("game.savePlayResult", "Game.SavePlayResult", "\\game.savePlayResult"):
-    check(f"unsigned {spelling} is refused", rpc_reply(spelling, saves(910001)[1], signed=False)[0] == 403)
-check("nothing was stored by the refused saves", not records(910001))
+    check(f"unsigned {spelling} is refused", rpc_reply(spelling, saves(UNSIGNED)[1], signed=False)[0] == 403)
+check("nothing was stored by the refused saves", not records(UNSIGNED))
 
 # Two saves of one chart at the same moment each found no row and each inserted one, summed by every
 # ranking. The phone resends a result it got no answer for, so this is not only for forgers.
 # Timing decides whether one round shows it, so several charts get a round each.
-for chart in range(910100, 910108):
+for chart in TOGETHER:
     threads = [threading.Thread(target=rpc_reply, args=saves(chart)) for _ in range(24)]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
-counts = [len(records(chart)) for chart in range(910100, 910108)]
+counts = [len(records(chart)) for chart in TOGETHER]
 check("simultaneous saves of a chart leave one row", counts == [1] * 8, str(counts))
 
 # A result without notes or a player stores nothing, and answers what the client skips.
-status, reply = rpc_reply(*saves(910003, stats=[0] * 13))
-check("a result with no notes is not stored", status == 200 and reply["result"] is None and reply["error"]["code"] == "SVC.05008" and not records(910003))
+status, reply = rpc_reply(*saves(NO_NOTES, stats=[0] * 13))
+check("a result with no notes is not stored", status == 200 and reply["result"] is None and reply["error"]["code"] == "SVC.05008" and not records(NO_NOTES))
 status, reply = rpc_reply("game.savePlayResult", [])
 check("an empty save is not stored", status == 200 and reply["result"] is None and reply["error"]["code"] == "SVC.05008")
 
@@ -893,7 +899,7 @@ for i, points in enumerate((5000, 3000)):
     other = scorer if i == 0 else new_player(f"live-smoke-score-{random.randrange(10**9):09d}")
     if i == 1:
         second = other
-    rpc_reply(*saves(910010 + i, stats=[0] * 12 + [points], who=other))
+    rpc_reply(*saves(RANKED[i], stats=[0] * 12 + [points], who=other))
 scorer_page = request(portal, f"{SITE}/opendmtq/player.php?id={scorer}")[2].decode()
 second_page = request(portal, f"{SITE}/opendmtq/player.php?id={second}")[2].decode()
 board = request(portal, f"{SITE}/opendmtq/ranking.php")[2].decode()

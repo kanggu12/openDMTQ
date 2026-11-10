@@ -28,6 +28,10 @@ docker build -q -t "opendmtq-server:$TAG" "$ROOT/server" >/dev/null
 mkdir -p "$DATA/content" "$DATA/state" "$DATA/custom" "$DATA/apk"
 chmod -R a+rwX "$DATA"
 docker run --rm -u 33:33 -v "$DATA/content:/content" -v "$ROOT/tests/ui:/ui:ro" --entrypoint php "opendmtq-server:$TAG" /ui/make_content.php /content >/dev/null
+# The song list as the tools write it once the owner hides a song (songs.py rebuild()): the stand-in songs, the last one
+# kept in the list and marked hidden. A play of its charts is still a play of this server's (protocol.py).
+python3 -c 'import json, sys; songs = json.load(open(sys.argv[1], encoding="utf-8")); songs[-1]["hidden_yn"] = "Y"; json.dump(songs, open(sys.argv[2], "w", encoding="utf-8"), ensure_ascii=False)' \
+  "$DATA/content/songs.json" "$DATA/custom/songList.json"
 docker rm -f "$NAME" >/dev/null 2>&1 || true
 # As compose starts it: read-only, unprivileged, capped.
 docker run -d --name "$NAME" --cpus 2 --memory 1g -u 33:33 --read-only --tmpfs /var/opendmtq:mode=1777 --tmpfs /tmp:mode=1777 \

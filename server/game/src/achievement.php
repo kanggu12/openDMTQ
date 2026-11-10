@@ -51,10 +51,14 @@ function odq_achievement_count(array $params)
             'total_achievement_point_sum' => array_sum(array_column(OPENDMTQ_ACHIEVEMENTS, 4))];
 }
 
-/* What each chart is, for the achievements: pattern id => [line, signature], from the list the server serves. */
+/*
+ * What each chart is, for the achievements: pattern id => [line, signature], from the list the server serves, hidden songs
+ * included. A save asks first whether its chart is one of them (odq_game_save_play()).
+ */
 function odq_chart_kinds()
 {
-    // Static: a save asks twice (before it and after it), and MY PAGE asks again to date what it lists.
+    // Static: a save asks three times (its chart, the achievements before it and after it), and MY PAGE asks again to date
+    // what it lists.
     static $charts = NULL;
     if ($charts === NULL) {
         $charts = [];

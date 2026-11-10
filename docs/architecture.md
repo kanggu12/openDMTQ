@@ -114,7 +114,8 @@ What the replies rely on, as the client behaves:
   official server did. The best row (`Play`) and the log row (`PlayLog`) go in one transaction; a save the database did
   not take answers `SVC.05099`. Scores are kept within what the client reads (32-bit) and accuracies within 100 %. A
   result no play gives (a count of notes below 0, above 10,000 or not a whole number, no notes at all, a player id
-  without an account) answers `SVC.05008` and is not stored.
+  without an account, a chart no song of the server has) answers `SVC.05008` and is not stored. A hidden song's charts
+  are the server's: a play finished while the owner hid its song is kept.
 - **Everyone has everything.** Level 99, 999,999 MAX POINT, every song from 1 to the highest id, every item. No quests,
   no coupons (every code is invalid, in the client's own popup), no terms popup.
 
