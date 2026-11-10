@@ -45,6 +45,7 @@
 #include <cstring>
 #include <dlfcn.h>
 #include <fstream>
+#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -288,7 +289,7 @@ jclass g_device_class = nullptr;       // com.pmangplus.device.PPDevice
 jclass g_base_class = nullptr;         // com.pmangplus.base.PPBase
 
 std::atomic<Nanos> g_last_swap{0};     // when the game last swapped
-std::atomic<bool> g_want{false};       // pictures and sound are to be sent right now
+std::atomic<bool> g_want{false};       // pictures and sound are to be sent right now (set_want)
 std::atomic<bool> g_on{false};         // the server has live view on for this player
 std::atomic<bool> g_gave_up{false};    // this phone cannot do it: the server is still asked, for notices
 std::atomic<int> g_failures{0};        // encoders that failed in a row, to start or soon after; three end the attempts
@@ -359,6 +360,19 @@ struct Session {
 
 // From the render thread to the encoder thread.
 std::atomic<std::shared_ptr<Session>*> g_handoff{nullptr};
+
+// The encoder thread's wait while broadcasts are off, which set_want ends.
+std::mutex g_encoder_lock;
+std::condition_variable g_encoder_wake;
+
+// Pictures and sound wanted from now on, or not. Wanted, the encoder thread wakes from its wait. The notice goes under the
+// lock, after the change: the thread looks at g_want under it before it waits, so it cannot miss it. Never on the render
+// thread, which waits for nothing.
+void set_want(bool want) {
+    if (g_want.exchange(want) == want || !want) return;
+    std::lock_guard<std::mutex> l(g_encoder_lock);
+    g_encoder_wake.notify_all();
+}
 
 // ---- the encoder thread
 
@@ -807,9 +821,16 @@ void encoder_main() {
     Nanos next_stats = now_ns() + 60 * kSecond;
     for (;;) {
         std::shared_ptr<Session>* handed = g_handoff.exchange(nullptr);
+        if (!handed && g_want.load()) {
+            // Wanted: the render thread hands a session over at its next swap, which never waits to say so.
+            sleep_ns(20000000);
+            continue;
+        }
         if (!handed) {
-            // Nothing to do; the render thread starts a session at its next swap when due.
-            sleep_ns(g_want.load() ? 20000000 : 200000000);
+            // Off: nothing to do until it is wanted again, which set_want wakes this for. No timer meanwhile, so the
+            // phone's processor is left alone for as long as broadcasts are off.
+            std::unique_lock<std::mutex> l(g_encoder_lock);
+            g_encoder_wake.wait(l, [] { return g_want.load() || g_handoff.load() != nullptr; });
             continue;
         }
         std::shared_ptr<Session> session = *handed;
@@ -1137,7 +1158,7 @@ void control_main() {
         end_toast_if_due(e, now);
         const bool away = now - g_last_swap.load(std::memory_order_relaxed) > kAwayAfter;
         const bool want_now = g_on.load() && !away && !g_gave_up.load() && thermal_status() < 4;
-        if (g_want.load() != want_now) g_want.store(want_now);
+        set_want(want_now);
         // Away from the screen: nothing to send, and no reason to wake the phone's radio. The next
         // request goes out as soon as the game is back.
         if (away) {
@@ -1211,7 +1232,7 @@ void live_load(JavaVM* vm, JNIEnv* env, const std::string& lib_dir) {
     // A refused segment (403): off until the control thread's next request says otherwise.
     g_link.on_refused = [] {
         g_on.store(false);
-        g_want.store(false);
+        set_want(false);
     };
     g_vm = vm;
     auto keep_class = [&](const char* name) -> jclass {

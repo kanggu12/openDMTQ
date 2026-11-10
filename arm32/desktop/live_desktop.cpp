@@ -752,8 +752,15 @@ void encoder_main() {
         bool have = false;
         {
             std::unique_lock<std::mutex> l(g_frame_lock);
-            // A frame, or a look at the sound every 10 ms.
-            g_frame_wake.wait_for(l, std::chrono::milliseconds(10), [] { return !g_frames.empty(); });
+            if (encoder) {
+                // A frame, or a look at the sound every 10 ms: its chunks are due by the clock.
+                g_frame_wake.wait_for(l, std::chrono::milliseconds(10), [] { return !g_frames.empty(); });
+            } else {
+                // No stream: nothing to do until a picture comes, which the render thread takes only while a broadcast
+                // is wanted, and hands over with a wake (collect). No timer meanwhile, so the processor is left alone for
+                // as long as broadcasts are off.
+                g_frame_wake.wait(l, [] { return !g_frames.empty(); });
+            }
             if (!g_frames.empty()) {
                 f = std::move(g_frames.front());
                 g_frames.pop_front();
