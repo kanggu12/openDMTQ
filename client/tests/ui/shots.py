@@ -372,6 +372,13 @@ def variants_check(app, site, out, tag, problems):
     app._download_moved(47 << 20, 103 << 20)
     shot(app.root, out, tag + "_online-downloading")
     measure(app, tag + "_online-downloading", problems)
+    # Cancel, and the page drawn again before the download has stopped: its bar says what the status line says.
+    app.cancel_download()
+    app.go("online")
+    app.root.update()
+    said = app.download_bar.words.cget("text") if app.download_bar is not None else None
+    if said != w("status.stopping") or app.status_text != said:
+        problems.append("%s: the page's download bar says %r while the download stops" % (tag, said))
     app.download = None
     app._paint_play()
     app.set_status(w("status.ready"), "normal")

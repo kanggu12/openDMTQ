@@ -540,13 +540,21 @@ class LauncherApp:
 
         threading.Thread(target=work, daemon=True, name="download").start()
 
+    def download_words(self):
+        """What the download under way is doing, for the status line and the page's bar alike: stopping (said until it
+        has stopped, whatever pieces still come in), asking the server while the size is not known yet, or how far."""
+        if self.download.get("stopping"):
+            return self.words("status.stopping")
+        done, total = self.download["done"], self.download["total"]
+        if not total:
+            return self.words("status.app_check")
+        return self.words("status.downloading", done=i18n.mb(done), total=i18n.mb(total))
+
     def _download_moved(self, done, total):
         if self.download is None:
             return
         self.download.update(done=done, total=total)
-        # Stopping: said until the download has stopped, whatever pieces still come in.
-        text = (self.words("status.stopping") if self.download.get("stopping") else
-                self.words("status.downloading", done=_mb(done), total=_mb(total)))
+        text = self.download_words()
         self.set_status(text, "normal")
         if self.download_bar is not None and self.download_bar.winfo_exists():
             self.download_bar.set(done / float(total) if total else None, text)
@@ -679,8 +687,3 @@ class LauncherApp:
 
     def run(self):
         self.root.mainloop()
-
-
-def _mb(n):
-    """Bytes as megabytes, one decimal ('103.2'); '?' when not known."""
-    return "?" if n is None else "%.1f" % (n / 1048576.0)

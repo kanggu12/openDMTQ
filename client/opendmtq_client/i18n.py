@@ -501,3 +501,9 @@ class Words:
             # backslash doubled.
             return "%s: %s" % (error.strerror, error.filename) if error.filename else error.strerror
         return str(error)
+
+
+def mb(size):
+    """A size in bytes as megabytes with one decimal, as a download's progress says it ('103.2'). The words around it
+    name the unit, each language in its own place (status.downloading), and so does the command line's own line."""
+    return "%.1f" % (size / 1048576.0)

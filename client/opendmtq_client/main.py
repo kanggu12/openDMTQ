@@ -34,7 +34,7 @@ import os
 import sys
 import threading
 
-from opendmtq_client import __version__, actions, apps, dpi, player, preset
+from opendmtq_client import __version__, actions, apps, dpi, i18n, player, preset
 from opendmtq_client import server as srv
 from opendmtq_client import state as st
 from opendmtq_client import values as choices
@@ -362,6 +362,11 @@ def _password(prompt):
     return getpass.getpass(prompt)
 
 
+def _say_downloading(done, total):
+    """How far a download is, in the window's numbers (i18n.mb), for --app and --play."""
+    _say("  downloading: %s of %s MB" % (i18n.mb(done), i18n.mb(total)))
+
+
 def _get_app(state):
     """--app: the server's app on this PC, downloaded when it lacks it or the server has a newer one."""
     seen = {"step": -1}
@@ -371,7 +376,7 @@ def _get_app(state):
         step = int(10 * done / total) if total else 0
         if step != seen["step"]:
             seen["step"] = step
-            _say("  downloading: %.1f of %.1f MB" % (done / 1048576.0, total / 1048576.0))
+            _say_downloading(done, total)
 
     info = actions.check_app(state)
     if apps.current(state.server()["url"], info):
@@ -387,8 +392,9 @@ def _play(state):
 
     def report(step, done=None, total=None):
         if step == "download":
+            # A line about every 8 MB, and the last.
             if done == total or done % (8 << 20) < (1 << 20):
-                _say("  downloading: %.1f of %.1f MB" % (done / 1048576.0, total / 1048576.0))
+                _say_downloading(done, total)
         else:
             _say("  " + {"app": "asking the server for its app", "starting": "starting the game",
                          "offline": "the server did not answer: the game starts with the app on this PC"}.get(step, step))

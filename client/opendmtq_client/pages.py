@@ -536,8 +536,8 @@ def app_panel(app, parent, rerender, bg=theme.BG):
         bar = widgets.Progress(parent, ui, bg=bg)
         bar.pack(anchor="w", pady=(0, ui.px(10)))
         done, total = app.download["done"], app.download["total"]
-        bar.set(done / float(total) if total else None, w("status.app_check") if not total else
-                w("status.downloading", done="%.1f" % (done / 1048576.0), total="%.1f" % (total / 1048576.0)))
+        # The status line's words (app.download_words): how far it is, the server asked first, or stopping.
+        bar.set(done / float(total) if total else None, app.download_words())
         app.download_bar = bar
         stopping = app.download.get("stopping")
         stop = widgets.Button(parent, ui, w("online.stopping") if stopping else w("common.cancel"), lambda: halt())
