@@ -117,6 +117,12 @@ constexpr int kMediaOk = 0;
 // AMEDIA_ERROR_BASE: a dequeue's answer at or below this is the codec's error (NdkMediaError.h), where -1 is "nothing
 // yet" and -2 and -3 news of the format and buffers.
 constexpr ssize_t kMediaErrorBase = -10000;
+// AMEDIACODEC_ERROR_INSUFFICIENT_RESOURCE and AMEDIACODEC_ERROR_RECLAIMED (NdkMediaError.h): the codec's errors too, from
+// Android 9 on, for a codec the system ran short for or took back, and positive, so that they would pass for a buffer.
+constexpr ssize_t kCodecNoResource = 1100, kCodecReclaimed = 1101;
+
+// A dequeue's answer that is the codec's error, not a buffer, nothing yet or news.
+bool codec_error(ssize_t answer) { return answer <= kMediaErrorBase || answer == kCodecNoResource || answer == kCodecReclaimed; }
 // A session that ran this long before its encoder broke was a good one: the failures in a row start over with it.
 constexpr Nanos kGoodRun = 60 * kSecond;
 // MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface.
@@ -535,7 +541,7 @@ private:
             CodecBufferInfo info{};
             const ssize_t index = m.dequeue_output(video_, &info, 0);
             // Broken (a codec reclaimed by the system, a hardware fault): this session ends, and another is tried later.
-            if (index <= kMediaErrorBase) {
+            if (codec_error(index)) {
                 fail("the H.264 encoder broke");
                 return any;
             }
@@ -546,7 +552,12 @@ private:
             std::size_t capacity = 0;
             std::uint8_t* data = m.output_buffer(video_, static_cast<std::size_t>(index), &capacity);
             if (data && info.size > 0) on_video(data + info.offset, static_cast<std::size_t>(info.size), info.pts_us, info.flags);
-            m.release_output(video_, static_cast<std::size_t>(index), false);
+            // A buffer the codec will not take back: broken too, whatever the number it came with (or this loop would ask
+            // for the same answer for ever).
+            if (m.release_output(video_, static_cast<std::size_t>(index), false) != kMediaOk) {
+                fail("the H.264 encoder broke");
+                return any;
+            }
         }
     }
 
@@ -678,7 +689,7 @@ private:
         while (now >= audio_next_) {
             const ssize_t index = m.dequeue_input(audio_, 0);
             // Broken: as the picture's encoder (drain_video).
-            if (index <= kMediaErrorBase) {
+            if (codec_error(index)) {
                 fail("the AAC encoder broke");
                 return any;
             }
@@ -717,7 +728,7 @@ private:
             CodecBufferInfo info{};
             const ssize_t index = m.dequeue_output(audio_, &info, 0);
             // Broken: as the picture's encoder (drain_video).
-            if (index <= kMediaErrorBase) {
+            if (codec_error(index)) {
                 fail("the AAC encoder broke");
                 return any;
             }
@@ -735,7 +746,11 @@ private:
                     g_audio_frames.fetch_add(1, std::memory_order_relaxed);
                 }
             }
-            m.release_output(audio_, static_cast<std::size_t>(index), false);
+            // As the picture's (drain_video).
+            if (m.release_output(audio_, static_cast<std::size_t>(index), false) != kMediaOk) {
+                fail("the AAC encoder broke");
+                return any;
+            }
         }
     }
 
