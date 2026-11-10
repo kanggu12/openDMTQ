@@ -6,7 +6,7 @@
 //
 // What runs where:
 //
-// - The render thread, at each swap (live_frame): with live view off, one atomic load. With it on, a picture is due at
+// - The render thread, at each swap (live_frame): with live view off, a few atomic loads. With it on, a picture is due at
 //   the stream's frame rate: the finished frame is scaled to the stream's size with one blit, turned into NV12 (the
 //   encoder's format: a plane of luma, then one of chroma at half the size) by two small draws, and read into a pixel
 //   buffer without waiting. A later swap, once the GPU says it is done, copies it out for the encoder. Nothing on this
@@ -94,6 +94,9 @@ constexpr Nanos kPollEvery = 15 * kSecond;
 constexpr Nanos kAwayAfter = 5 * kSecond;
 // No picture for this long (a pause, a load): the stream starts over from a new first segment.
 constexpr Nanos kRestartAfter = 3 * kSecond;
+// The server's first answer within this of the control thread's start comes at the game's first screens, where making
+// the conversion's program ahead costs nobody a frame (warm_up); one later may come in a song.
+constexpr Nanos kWarmWithin = 20 * kSecond;
 // The stream's sound: 48 kHz stereo AAC at this bitrate (bytes a second, as Media Foundation's AAC encoder takes it),
 // in chunks of an AAC frame's 1024 samples.
 constexpr int kAudioRate = 48000;
@@ -1444,6 +1447,8 @@ void collect(Capture& c) {
 
 void control_main() {
     background_thread("live-control");
+    // When it started: the game's first frame, about (warm_up).
+    const Nanos started = now_ns();
     Nanos next_poll = 0;
     bool was_on = false;
     const std::string lang = player::host_locale().first == "ko" ? "ko" : "en";
@@ -1479,10 +1484,12 @@ void control_main() {
         // The answer, checked (live_net.cpp parse_state). None: as things were.
         const live::State state = g_link.ask_state(ids, lang.c_str());
         if (!state.answered) continue;
-        // The server answers: the render thread makes the conversion's program now, once (warm_up), ahead of any
-        // broadcast and its first capture.
+        // The server's first answer, at the game's first screens: the render thread makes the conversion's program now,
+        // once (warm_up), ahead of any broadcast. A first answer later than kWarmWithin (a server or network down at the
+        // start) may come in a song, where a compile would hold a frame even of a player who never broadcasts: the first
+        // capture makes it then, as before.
         static bool warmed = false;
-        if (!warmed) g_warm_due.store(true, std::memory_order_relaxed);
+        if (!warmed && now_ns() - started < kWarmWithin) g_warm_due.store(true, std::memory_order_relaxed);
         warmed = true;
         g_link.set_identity(ids, state);
         if (state.on) {
@@ -1555,6 +1562,14 @@ void desktop_live_frame(EGLDisplay d, EGLSurface s) {
     const Nanos start = now_ns();
     g_last_swap.store(start, std::memory_order_relaxed);
     Capture& c = g_capture;
+    // A context the game destroyed took the program along: made again in the next one. Looked at every swap, before
+    // anything else: the program may be made ahead (warm_up) with no broadcast, and a second context destroyed before the
+    // next look would hide the first, whose address a new context could get.
+    if (void* dead = g_destroyed_context.load(std::memory_order_relaxed)) {
+        if (dead == g_conversion.context) g_conversion = Conversion{};
+        // With no capture to end, nothing else waits for it: a new context at the same address is a new one.
+        if (!c.live) g_destroyed_context.store(nullptr, std::memory_order_relaxed);
+    }
     const bool want = g_want.load(std::memory_order_relaxed);
     // The conversion's program to make ahead of any broadcast (warm_up), once.
     const bool warm = g_warm_due.load(std::memory_order_relaxed);
@@ -1570,12 +1585,6 @@ void desktop_live_frame(EGLDisplay d, EGLSurface s) {
     static auto query_surface = reinterpret_cast<EGLBoolean (*)(EGLDisplay, EGLSurface, EGLint, EGLint*)>(egl_proc("eglQuerySurface"));
     if (!current_context || !current_surface || !query_surface) return;
     const EGLContext context = current_context();
-    // A context the game destroyed took the program along: made again in the next one.
-    if (void* dead = g_destroyed_context.load(std::memory_order_relaxed)) {
-        if (dead == g_conversion.context) g_conversion = Conversion{};
-        // With no capture to end, nothing else waits for it: a new context at the same address is a new one.
-        if (!c.live) g_destroyed_context.store(nullptr, std::memory_order_relaxed);
-    }
     // Made ahead while no capture runs, on the frame going to the window; a capture that runs has made it already.
     if (warm && (c.live || warm_up(d, s, context, current_surface(EGL_DRAW)))) g_warm_due.store(false, std::memory_order_relaxed);
     if (!want && !c.live) return;
