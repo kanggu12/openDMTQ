@@ -5,18 +5,12 @@ picks one on the guide's first page, under Launcher or with --language. The inst
 launcher's choice when there is one, else Windows'. Each entry is (English, Korean). Placeholders use str.format names.
 """
 
+from opendmtq_client import safety
 from opendmtq_client.errors import Worded
 
 TEXT = {
     # ---------------------------------------------------------------------------------------------- frame
     "app.tagline": ("Open-source TECHNIKA Q project", "오픈소스 TECHNIKA Q 프로젝트"),
-    "nav.play": ("Play", "플레이"),
-    "nav.screen": ("Screen", "화면"),
-    "nav.sound": ("Sound", "소리"),
-    "nav.controls": ("Controls", "조작"),
-    "nav.online": ("Online", "온라인"),
-    "nav.help": ("Help", "도움말"),
-    "nav.about": ("Launcher", "런처"),
     "bottom.play": ("PLAY", "PLAY"),
     "bottom.playing": ("PLAYING", "PLAYING"),
     "status.ready": ("Ready to play.", "플레이할 준비가 됐습니다."),
@@ -56,8 +50,6 @@ TEXT = {
     "common.seconds": ("{s} s", "{s}초"),
 
     # --------------------------------------------------------------------------------------------- play
-    "play.kicker": ("OPENDMTQ · WINDOWS", "OPENDMTQ · WINDOWS"),
-    "play.title": ("TECHNIKA Q", "TECHNIKA Q"),
     "play.on": ("On {name}", "{name}에서 플레이"),
     "play.no_server": ("No server yet. Connect to the OpenDMTQ server you play on.",
                        "아직 서버가 없습니다. 플레이할 OpenDMTQ 서버에 연결하세요."),
@@ -92,7 +84,6 @@ TEXT = {
     "check.running": ("A game is open: close it first", "게임이 열려 있습니다. 먼저 닫으세요"),
 
     # ------------------------------------------------------------------------------------------- screen
-    "screen.title": ("Screen", "화면"),
     "screen.sub": ("Full screen or a window, and the frame settings.", "전체 화면이나 창, 프레임 설정을 고릅니다."),
     "screen.display": ("Display", "디스플레이"),
     "screen.mode": ("Mode", "화면 모드"),
@@ -132,7 +123,6 @@ TEXT = {
                           "실제로 그리는 해상도의 비율입니다. 낮추면 그래픽 카드 부담이 줄고 화면이 흐려집니다."),
 
     # -------------------------------------------------------------------------------------------- sound
-    "sound.title": ("Sound", "소리"),
     "sound.sub": ("The game's volume, and the device it plays on.", "게임 음량과 소리를 낼 장치를 고릅니다."),
     "sound.volume": ("Volume", "음량"),
     "sound.volume.game": ("Game", "게임"),
@@ -165,7 +155,6 @@ TEXT = {
                                "소리를 더 앞서 준비해 바쁜 PC에서도 끊기지 않습니다. 지연이 조금 늘어납니다."),
 
     # ----------------------------------------------------------------------------------------- controls
-    "controls.title": ("Controls", "조작"),
     "controls.sub": ("On a PC, the game plays like this.", "PC에서는 아래처럼 조작합니다."),
     "controls.mouse": ("Mouse", "마우스"),
     "controls.click": ("Click: a tap, on a note or a button.", "클릭: 노트나 버튼을 터치합니다."),
@@ -185,7 +174,6 @@ TEXT = {
                         "게임이 글자를 받을 때 키보드로 입력합니다. 한글도 됩니다. 키보드가 없으면 Windows 터치 키보드가 뜹니다."),
 
     # ------------------------------------------------------------------------------------------- online
-    "online.title": ("Online", "온라인"),
     "online.sub": ("The OpenDMTQ server you play on, your sign-in there, and its app on this PC.",
                    "플레이하는 OpenDMTQ 서버, 그 서버의 로그인, 이 PC에 받은 그 서버의 앱입니다."),
     "online.server": ("Server", "서버"),
@@ -224,7 +212,6 @@ TEXT = {
                              "{name}의 로그인과 앱을 이 PC에서 지웁니다. 기록은 서버에 그대로 있습니다."),
 
     # --------------------------------------------------------------------------------------------- help
-    "help.title": ("Help", "도움말"),
     "help.sub": ("The ready check, and what to do when something goes wrong.", "준비 점검과 문제가 생겼을 때 할 일입니다."),
     "help.checks": ("Checks", "점검"),
     "help.recheck": ("Check again", "다시 점검"),
@@ -255,8 +242,6 @@ TEXT = {
     "help.repair.hint": ("Compares the program's files with the installed package and puts back what is missing or changed. Settings and the game's data are not touched.",
                          "프로그램 파일을 설치된 패키지와 대조해 없거나 바뀐 파일을 되돌립니다. 설정과 게임 데이터는 건드리지 않습니다."),
     "help.repair.working": ("Checking the program's files...", "프로그램 파일을 확인하는 중..."),
-    "help.repair.working.detail": ("What is missing or changed comes back from the installed package.",
-                                   "없거나 바뀐 파일은 설치된 패키지에서 되돌립니다."),
     "help.repair.fine": ("Nothing to repair", "고칠 것이 없습니다"),
     "help.repair.fine.detail": ("All {n} files of the program are as installed.", "프로그램 파일 {n}개가 모두 설치된 그대로입니다."),
     "help.repair.done": ("Repaired", "복구했습니다"),
@@ -305,7 +290,6 @@ TEXT = {
                                      "제거 프로그램이 시작되지 않았습니다: {error}\nWindows 설정의 앱에서도 OpenDMTQ를 제거할 수 있습니다."),
 
     # -------------------------------------------------------------------------------------------- about
-    "about.title": ("Launcher", "런처"),
     "about.sub": ("The launcher's own settings and updates.", "런처 자체의 설정과 업데이트입니다."),
     "about.general": ("General", "일반"),
     "about.language": ("Language", "언어"),
@@ -337,13 +321,11 @@ TEXT = {
                      "NEOWIZ와 관계없고 승인받지 않은 비공식 비상업 프로젝트입니다. DJMAX와 TECHNIKA Q의 권리는 NEOWIZ에 있습니다."),
 
     # -------------------------------------------------------------------------------------------- guide
-    "guide.heading": ("FIRST START", "처음 시작"),
     "guide.skip": ("Skip: I set it up myself", "건너뛰기(직접 설정)"),
     "guide.back": ("Back", "뒤로"),
     "guide.next": ("Next", "다음"),
     "guide.step": ("Step {n} of {total}", "{total}단계 중 {n}단계"),
     "guide.power.name": ("POWER ON", "POWER ON"),
-    "guide.power.sub": ("Welcome", "환영"),
     "guide.power.title": ("Welcome to OpenDMTQ", "OpenDMTQ에 오신 것을 환영합니다"),
     "guide.power.text": ("A few steps to your first song. Everything here can be changed later in the launcher.",
                          "첫 곡까지 몇 단계면 됩니다. 여기서 고른 것은 나중에 런처에서 모두 바꿀 수 있습니다."),
@@ -355,25 +337,20 @@ TEXT = {
                            "OpenDMTQ 서버 주소와, 서버 관리자가 만들어 준 아이디와 비밀번호."),
     "guide.power.need.2": ("64-bit Windows 10 or 11, and a touch screen, a mouse or both.", "64비트 Windows 10이나 11, 그리고 터치스크린이나 마우스."),
     "guide.server.name": ("SERVER", "SERVER"),
-    "guide.server.sub": ("Where you play", "플레이할 서버"),
     "guide.server.title": ("Which server?", "어느 서버인가요?"),
     "guide.server.text": ("The address of the OpenDMTQ server's site, as the server's admin gave it (the one a phone opens to get the app).",
                           "OpenDMTQ 서버 사이트의 주소입니다. 서버 관리자가 알려 준 주소(휴대폰으로 앱을 받을 때 여는 주소)를 쓰세요."),
     "guide.login.name": ("LOG IN", "LOG IN"),
-    "guide.login.sub": ("Your account", "계정"),
     "guide.login.title": ("Who plays?", "누가 플레이하나요?"),
     "guide.login.text": ("Sign in to the server's site with your account. The game keeps its own records on the server.",
                          "서버 사이트에 계정으로 로그인합니다. 플레이 기록은 게임이 서버에 남깁니다."),
     "guide.download.name": ("DOWNLOAD", "DOWNLOAD"),
-    "guide.download.sub": ("The game app", "게임 앱"),
     "guide.download.title": ("Get the app", "앱 받기"),
     "guide.download.text": ("The app the server made for itself, the same one its phones install. It comes once, and again only when the server has a newer one.",
                             "서버가 자기 주소로 만든 앱으로, 휴대폰이 설치하는 것과 같습니다. 한 번 받으면 서버에 새 앱이 생겼을 때만 다시 받습니다."),
     "guide.sound.name": ("SOUND CHECK", "SOUND CHECK"),
-    "guide.sound.sub": ("Screen and sound", "화면과 소리"),
     "guide.sound.title": ("Screen and sound", "화면과 소리"),
     "guide.stage.name": ("STAGE START", "STAGE START"),
-    "guide.stage.sub": ("Ready", "준비 끝"),
     "guide.stage.title": ("Ready for stage 1", "1스테이지 준비 끝"),
     "guide.stage.text": ("PLAY starts the game with these settings. The launcher waits while you play.",
                          "PLAY를 누르면 이 설정으로 게임을 시작합니다. 게임을 하는 동안 런처는 기다립니다."),
@@ -494,12 +471,16 @@ TEXT = {
 
 
 class Words:
-    """Looks words up in the chosen language; a missing Korean entry falls back to English."""
+    """Looks words up in the chosen language; a missing Korean entry falls back to English. A key with no words shows as
+    itself, except in a test run or the UI tests' container, where it is an error: the tests reach every page, dialog
+    and step, and a word left out would otherwise go unseen until a player sees the raw key."""
 
     def __init__(self, language="en"):
         self.language = language
 
     def __call__(self, key, **kw):
+        if key not in TEXT and (safety.testing() or safety.on_virtual_display()):
+            raise KeyError("no words for %r" % key)
         en, ko = TEXT.get(key, (key, key))
         text = ko if self.language == "ko" and ko else en
         return text.format(**kw) if kw else text

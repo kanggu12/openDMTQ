@@ -1,14 +1,18 @@
 """The words and the look: every key the code uses exists in both languages with the same gaps, every glyph is in the
 bundled font, and every colour of text reads at 4.5:1 or more on what it sits on."""
 
+import ast
 import os
 import re
 import string
 import unittest
+from unittest import mock
 
 from opendmtq_client import i18n, theme
 
 PACKAGE = os.path.join(os.path.dirname(__file__), "..", "opendmtq_client")
+# Strings in the code shaped as words' keys that are none: a file's name (apps.py).
+NOT_WORDS = {"app.json"}
 
 
 def _luminance(colour):
@@ -31,33 +35,48 @@ class Words(unittest.TestCase):
             self.assertEqual(gaps(en), gaps(ko), key)
 
     def test_every_key_the_code_uses_exists(self):
+        # Every string in the code shaped as a key whose first part is one the words use: in w("..."), in a tuple of
+        # rows a loop says, as an error's key. A key named anywhere but in w("...") itself would show as the raw key.
+        firsts = {key.split(".")[0] for key in i18n.TEXT}
         used = set()
         for name in os.listdir(PACKAGE):
-            if not name.endswith(".py"):
+            if not name.endswith(".py") or name == "i18n.py":
                 continue
             with open(os.path.join(PACKAGE, name), encoding="utf-8") as f:
-                source = f.read()
-            # w("key"), self.words("key"), app.words("key") and the like: plain keys only (built ones are checked below).
-            used.update(re.findall(r'(?:\bw|words)\("([a-z_]+(?:\.[a-z0-9_]+)+)"', source))
-        missing = sorted(k for k in used if k not in i18n.TEXT)
+                tree = ast.parse(f.read())
+            used.update(node.value for node in ast.walk(tree) if isinstance(node, ast.Constant)
+                        and isinstance(node.value, str) and re.fullmatch(r"[a-z_]+(?:\.[a-z0-9_]+)+", node.value)
+                        and node.value.split(".")[0] in firsts)
+        # The scan reads something: the words of every page are in it.
+        self.assertGreater(len(used), 250)
+        missing = sorted(k for k in used - NOT_WORDS if k not in i18n.TEXT)
         self.assertEqual(missing, [])
-        # Keys the code builds: the nav names, the page headers, the checks, the guide's steps, the hints by value.
-        from opendmtq_client import app, guide
+        # Keys the code builds: the page headers, the checks, the guide's steps, the installer's work, the hints by value.
+        from opendmtq_client import app, guide, installer
         for page in app.NAV:
-            self.assertIn("nav." + page, i18n.TEXT)
             if page != "play":
-                self.assertIn(page + ".title", i18n.TEXT)
                 self.assertIn(page + ".sub", i18n.TEXT)
         for key in ("player", "server", "account", "app", "app_update", "running"):
             self.assertIn("check." + key, i18n.TEXT)
         for step in guide.STEPS:
-            for part in ("name", "sub", "title"):
+            for part in ("name", "title"):
                 self.assertIn("guide.%s.%s" % (step, part), i18n.TEXT)
+        for action in installer.WORK:
+            self.assertIn("setup.work." + action, i18n.TEXT)
+            self.assertIn("setup.work.%s.line" % action, i18n.TEXT)
         for key in ("screen.mode.hint.fullscreen", "screen.mode.hint.window", "screen.vsync.hint.on",
-                    "screen.vsync.hint.off", "screen.fps.hint.vsync", "screen.fps.hint.free", "sound.mode.hint.shared",
-                    "sound.mode.hint.exclusive", "sound.buffer.hint.low", "sound.buffer.hint.normal",
-                    "sound.buffer.hint.safe"):
+                    "screen.vsync.hint.off", "screen.fps.hint.vsync", "screen.fps.hint.vsync_rate",
+                    "screen.fps.hint.free", "sound.mode.hint.shared", "sound.mode.hint.exclusive",
+                    "sound.buffer.hint.low", "sound.buffer.hint.normal", "sound.buffer.hint.safe"):
             self.assertIn(key, i18n.TEXT)
+
+    def test_a_key_with_no_words_is_an_error_in_a_test(self):
+        # The tests reach every page and dialog: a word left out stops them, where a player would see the raw key.
+        with self.assertRaises(KeyError):
+            i18n.Words("en")("play.no_such_words")
+        # A player sees the key itself, the launcher going on.
+        with mock.patch.dict(os.environ, {"OPENDMTQ_TESTING": "0", "OPENDMTQ_VIRTUAL_DISPLAY": "0"}):
+            self.assertEqual(i18n.Words("ko")("play.no_such_words"), "play.no_such_words")
 
     def test_errors_have_their_words(self):
         from opendmtq_client import server as srv
