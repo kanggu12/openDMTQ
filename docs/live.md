@@ -23,7 +23,7 @@ stays at "Waiting"; they can still play and watch.
 
 While someone is on air the site's home page shows a card for each: a picture of the broadcast, how long it has run, who
 and what they play. The browser takes the pictures from the stream itself, for those signed in to watch (one segment per
-player, every half minute at most); others see the card without one. The live page's player has the LIVE mark and the
+player, of the cards on the screen, every two and a half minutes at most); others see the card without one. The live page's player has the LIVE mark and the
 running time on the picture, and the player's name and profile under it.
 
 - **Turn them on for the server:** admin pages, Broadcasts, Turn broadcasts on. The page says how many players are

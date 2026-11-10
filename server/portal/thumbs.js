@@ -1,16 +1,30 @@
 /*
  * Cards for the players on air: a picture of each broadcast, how long it has run, who and what. The pictures are taken
- * here in the browser, from the stream itself: one segment of it, one player at a time, every half minute at most,
- * and only for those allowed to watch. The server never opens what phones send, and needs no video tools for this.
+ * here in the browser, from the stream itself: one segment of it, one player at a time, every few minutes at most, only
+ * of the cards on the screen, and only for those allowed to watch. The server never opens what phones send, and needs no
+ * video tools for this.
  */
 (function () {
   'use strict';
   const HLS_JS = '/opendmtq/hls/hls-1.5.17.min.js';
-  // How old a picture may get before the next one is taken.
-  const PICTURE_AGE = 30000;
+  // How old a picture may get before the next one is taken. Each costs a whole segment of the stream (300 KB and more at
+  // the standard quality): at the half minute it was, a home page left open with two players on air took 46 MB an hour.
+  const PICTURE_AGE = 150000;
   // The newest picture of each player: { url, at }.
   const pictures = new Map();
   let taking = false;
+  // The cards on the screen now (a card scrolled out of sight gets no new picture), and what the last round of pictures
+  // was for, so that a card coming into sight gets its picture then instead of at the next look.
+  const onScreen = new Set();
+  let wanted = null;
+  const sight = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
+    for (const e of entries) {
+      if (e.isIntersecting) onScreen.add(e.target); else onScreen.delete(e.target);
+    }
+    if (wanted && entries.some(e => e.isIntersecting)) takePictures(...wanted);
+  }) : null;
+  // Whether a card is on the screen: every card is, where the browser cannot tell.
+  const seen = a => !sight || onScreen.has(a);
   // The stream answered that this visitor may not watch (signed out in another tab): no more asking.
   let denied = false;
   let hlsLoaded = null;
@@ -152,7 +166,7 @@
   // progress stay on it. A player no longer on the list loses their picture: the next broadcast is another one.
   function render(root, list, onclickFor) {
     const have = new Map([...root.querySelectorAll('.thumb')].map(a => [Number(a.dataset.id), a]));
-    const wanted = list.map(c => {
+    const shown = list.map(c => {
       const a = have.get(c.id);
       if (!a) return card(c, onclickFor && onclickFor(c));
       have.delete(c.id);
@@ -161,14 +175,30 @@
       setTime(a, c);
       return a;
     });
-    for (const a of have.values()) a.remove();
-    wanted.forEach((a, i) => { if (root.children[i] !== a) root.insertBefore(a, root.children[i] || null); });
+    // Gone from the list: from the page, and from what is watched for the screen.
+    for (const a of have.values()) {
+      a.remove();
+      onScreen.delete(a);
+      if (sight) sight.unobserve(a);
+    }
+    shown.forEach((a, i) => { if (root.children[i] !== a) root.insertBefore(a, root.children[i] || null); });
+    // Every card, the page's own first ones too, watched for whether it is on the screen (once each: again is nothing).
+    if (sight) for (const a of shown) sight.observe(a);
     for (const id of pictures.keys()) if (!list.some(c => c.id === id)) pictures.delete(id);
   }
 
-  // New pictures for those whose picture is old, one at a time, while the page is looked at. Data savers get none.
+  // New pictures for those whose picture is old, one at a time, while the page is looked at and the card is on the screen.
+  // Data savers get none.
   async function takePictures(cards, root) {
+    // What to take pictures of when a card comes into sight: these cards, in this box.
+    wanted = [cards, root];
     if (taking || denied || document.hidden || (navigator.connection && navigator.connection.saveData)) return;
+    // Nothing on the screen wants a picture: hls.js is not even loaded for it.
+    const due = c => {
+      const a = root.querySelector(`.thumb[data-id="${c.id}"]`), known = pictures.get(c.id);
+      return !!a && seen(a) && !(known && Date.now() - known.at < PICTURE_AGE);
+    };
+    if (!cards.some(due)) return;
     taking = true;
     try {
       await loadHls();
@@ -177,7 +207,8 @@
         // Gone from the page while the ones before them were taken.
         const pic = () => root.querySelector(`.thumb[data-id="${c.id}"] .thumb-pic`);
         const known = pictures.get(c.id);
-        if (denied || !pic() || (known && Date.now() - known.at < PICTURE_AGE)) continue;
+        // Gone, out of sight, or with a picture young enough.
+        if (denied || !pic() || !due(c)) continue;
         const url = await grab(c.id);
         // One that failed waits its turn like one that worked, not until the next look a few seconds on.
         pictures.set(c.id, { url: url || (known && known.url), at: Date.now() });

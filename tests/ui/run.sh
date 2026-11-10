@@ -176,7 +176,7 @@ stage full
 
 # Two players on air while the pages that change are looked at; told to stop, the feed ends both broadcasts.
 if wanted air; then
-  python3 "$UI/feed.py" air 300 &
+  python3 "$UI/feed.py" air 420 &
   FEED_PID=$!
   sleep 6
   stage air

@@ -917,6 +917,30 @@ async function adminFlows(contexts) {
     check('marked as live', await textOf(page, '#pill-word') === 'LIVE');
     check('both players are listed', (await page.$$('#live-list > *, #live-others li')).length >= 1);
     await page.close();
+    // The home page's cards of who is on air: a picture of each broadcast, taken from a whole piece of its stream
+    // (thumbs.js), only of the cards on the screen and then not again for minutes (it was every half minute). On a short
+    // phone screen the cards start below it (the stage above them is 420 px at least, style.css .stage-in): nothing of the
+    // streams is asked for until they are scrolled to.
+    const home = await contexts.signed.newPage();
+    await home.setViewport({ width: 360, height: 400, isMobile: true, hasTouch: true });
+    const pieces = [];
+    home.on('request', r => { if (/\/live-media\.php\/\d+\//.test(r.url())) pieces.push(r.url().split('?')[0]); });
+    await home.goto(`${P}/`, { waitUntil: 'domcontentloaded' });
+    await home.bringToFront();
+    await pause(8000);
+    const below = await home.$eval('#live', e => !e.hidden && e.getBoundingClientRect().top > innerHeight).catch(() => false);
+    const unseen = pieces.length;
+    await home.$eval('#live', e => e.scrollIntoView({ block: 'center' }));
+    const pictured = await home.waitForFunction(() => {
+      const cards = [...document.querySelectorAll('#live .thumb')];
+      return cards.length >= 2 && cards.every(a => a.querySelector('.thumb-pic img'));
+    }, { timeout: 40000 }).then(() => true, () => false);
+    const taken = pieces.length;
+    // Longer than the half minute pictures were taken again after.
+    await pause(35000);
+    check('the home page takes pictures of the broadcasts on the screen only, and not again for minutes',
+      below && unseen === 0 && pictured && taken > 0 && pieces.length === taken, `${below} ${unseen} ${pictured} ${taken} ${pieces.length}`);
+    await home.close();
     await sweep(contexts, AIR, FEW_WIDTHS);
   } else if (stage === 'maint') {
     // On, by the owner's own form; a long message, so that it has to wrap.
