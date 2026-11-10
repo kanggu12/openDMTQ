@@ -1,24 +1,17 @@
 // HTTP for the game: the Java side of Unity's WWW and UnityWebRequest, as Unity 5.6's own Java has them (the callbacks
-// in its order, with its arguments), on a small HTTP/1.1 client of the player's own. The game talks to its server over
-// plain HTTP; HTTPS is refused with the error a failed handshake gives.
+// in its order, with its arguments), on the player's own HTTP/1.1 client (http.cpp), which asks for and inflates
+// compressed answers as a phone's HttpURLConnection does. The game talks to its server over plain HTTP; HTTPS is refused
+// with the error a failed handshake gives.
 #include "player.h"
 
+#include "http.h"
+
 #include <algorithm>
-#include <arpa/inet.h>
 #include <cctype>
-#include <cerrno>
-#include <chrono>
-#include <fstream>
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <poll.h>
+#include <fstream>
 #include <strings.h>
-#include <sys/socket.h>
-#include <unistd.h>
 
 namespace player {
 
@@ -29,243 +22,11 @@ using jvm::Class;
 using jvm::Object;
 using jvm::Ref;
 using jvm::Value;
-
-// ---------------------------------------------------------------------------------------------------------------------
-// The HTTP client.
-
-// Why a request failed, in UnityWebRequest's error codes, and what to say.
-struct Failure {
-    int code = 0;  // 2 any, 4 bad protocol, 5 malformed URL, 7 unknown host, 14 timeout, 16 SSL
-    std::string text;
-    explicit operator bool() const { return code != 0; }
-};
-
-struct Url {
-    std::string scheme, host, path;
-    int port = 80;
-};
-
-// http://host[:port]/path?query; false for anything else.
-bool parse_url(const std::string& text, Url& u, Failure& f) {
-    std::size_t colon = text.find("://");
-    if (colon == std::string::npos) {
-        f = Failure{5, "no protocol: " + text};
-        return false;
-    }
-    u.scheme = text.substr(0, colon);
-    for (char& ch : u.scheme) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-    std::size_t start = colon + 3;
-    std::size_t slash = text.find_first_of("/?", start);
-    std::string authority = text.substr(start, slash == std::string::npos ? std::string::npos : slash - start);
-    u.path = slash == std::string::npos ? "/" : text.substr(slash);
-    if (u.path[0] == '?') u.path = "/" + u.path;
-    // user:password@ is not used by the game.
-    std::size_t at = authority.rfind('@');
-    if (at != std::string::npos) authority = authority.substr(at + 1);
-    std::size_t port = authority.rfind(':');
-    if (port != std::string::npos && authority.find(']') == std::string::npos) {
-        u.host = authority.substr(0, port);
-        u.port = std::atoi(authority.c_str() + port + 1);
-    } else {
-        u.host = authority;
-        u.port = u.scheme == "https" ? 443 : 80;
-    }
-    if (u.host.empty()) {
-        f = Failure{5, "no host: " + text};
-        return false;
-    }
-    return true;
-}
-
-class Http {
-public:
-    ~Http() {
-        if (fd_ >= 0) close(fd_);
-    }
-
-    // Connects and sends the request; `timeout_ms` (0: none) bounds the connection and each read and write after it.
-    bool send(const std::string& method, const Url& u, const std::vector<std::pair<std::string, std::string>>& headers, const std::string& body,
-              int timeout_ms, Failure& f) {
-        if (u.scheme == "https") {
-            f = Failure{16, "javax.net.ssl.SSLHandshakeException: HTTPS is not available in this player"};
-            return false;
-        }
-        if (u.scheme != "http") {
-            f = Failure{4, "unsupported protocol: " + u.scheme};
-            return false;
-        }
-        timeout_ms_ = timeout_ms;
-        addrinfo hints{}, *found = nullptr;
-        hints.ai_family = AF_UNSPEC;
-        hints.ai_socktype = SOCK_STREAM;
-        if (getaddrinfo(u.host.c_str(), std::to_string(u.port).c_str(), &hints, &found) != 0 || !found) {
-            f = Failure{7, "java.net.UnknownHostException: Unable to resolve host \"" + u.host + "\""};
-            return false;
-        }
-        // Each address in turn until one connects.
-        for (addrinfo* a = found; a && fd_ < 0; a = a->ai_next) {
-            int fd = socket(a->ai_family, a->ai_socktype | SOCK_CLOEXEC | SOCK_NONBLOCK, a->ai_protocol);
-            if (fd < 0) continue;
-            int r = connect(fd, a->ai_addr, a->ai_addrlen);
-            if (r != 0 && errno == EINPROGRESS) {
-                pollfd p{fd, POLLOUT, 0};
-                int err = 0;
-                socklen_t len = sizeof err;
-                r = poll(&p, 1, timeout_ms > 0 ? timeout_ms : -1) == 1 && getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &len) == 0 && err == 0 ? 0 : -1;
-            }
-            if (r == 0) fd_ = fd;
-            else close(fd);
-        }
-        freeaddrinfo(found);
-        if (fd_ < 0) {
-            f = Failure{14, "java.net.ConnectException: failed to connect to " + u.host + " (port " + std::to_string(u.port) + ")"};
-            return false;
-        }
-        int one = 1;
-        setsockopt(fd_, IPPROTO_TCP, TCP_NODELAY, &one, sizeof one);
-        // The request: the game's headers, Host and a close at the end (one request per connection), and the body.
-        std::string host = u.host + (u.port != 80 ? ":" + std::to_string(u.port) : "");
-        std::string req = method + " " + u.path + " HTTP/1.1\r\nHost: " + host + "\r\nConnection: close\r\n";
-        bool has_type = false, has_agent = false;
-        for (auto& [k, v] : headers) {
-            req += k + ": " + v + "\r\n";
-            if (strcasecmp(k.c_str(), "Content-Type") == 0) has_type = true;
-            if (strcasecmp(k.c_str(), "User-Agent") == 0) has_agent = true;
-        }
-        // What Android's HttpURLConnection adds when the caller does not.
-        if (!has_agent) req += "User-Agent: Dalvik/2.1.0 (Linux; U; Android 9; OpenDMTQ Build/PQ3A)\r\n";
-        if (!body.empty() || method == "POST" || method == "PUT") {
-            if (!has_type) req += "Content-Type: application/x-www-form-urlencoded\r\n";
-            req += "Content-Length: " + std::to_string(body.size()) + "\r\n";
-        }
-        req += "\r\n";
-        req += body;
-        return write_all(req.data(), req.size(), f);
-    }
-
-    // The status line and the headers.
-    bool head(int& status, std::string& reason, std::vector<std::pair<std::string, std::string>>& headers, Failure& f) {
-        std::size_t end;
-        while ((end = buffer_.find("\r\n\r\n")) == std::string::npos) {
-            if (!fill(f)) {
-                if (!f) f = Failure{2, "java.io.IOException: the server closed the connection before answering"};
-                return false;
-            }
-        }
-        std::string head = buffer_.substr(0, end);
-        buffer_.erase(0, end + 4);
-        std::size_t line_end = head.find("\r\n");
-        std::string line = head.substr(0, line_end);
-        // "HTTP/1.1 200 OK"
-        std::size_t sp = line.find(' ');
-        if (line.compare(0, 5, "HTTP/") != 0 || sp == std::string::npos) {
-            f = Failure{2, "java.io.IOException: not an HTTP answer"};
-            return false;
-        }
-        status = std::atoi(line.c_str() + sp + 1);
-        std::size_t sp2 = line.find(' ', sp + 1);
-        reason = sp2 == std::string::npos ? "" : line.substr(sp2 + 1);
-        status_line_ = line;
-        for (std::size_t at = line_end == std::string::npos ? head.size() : line_end + 2; at < head.size();) {
-            std::size_t next = head.find("\r\n", at);
-            std::string h = head.substr(at, next == std::string::npos ? std::string::npos : next - at);
-            at = next == std::string::npos ? head.size() : next + 2;
-            std::size_t c = h.find(':');
-            if (c == std::string::npos) continue;
-            std::string name = h.substr(0, c), value = h.substr(c + 1);
-            while (!value.empty() && (value.front() == ' ' || value.front() == '\t')) value.erase(0, 1);
-            headers.emplace_back(name, value);
-            if (strcasecmp(name.c_str(), "Content-Length") == 0) left_ = std::atoll(value.c_str());
-            if (strcasecmp(name.c_str(), "Transfer-Encoding") == 0 && strcasecmp(value.c_str(), "chunked") == 0) chunked_ = true;
-        }
-        // No body for these, whatever the headers say.
-        if (status == 204 || status == 304 || (status >= 100 && status < 200)) {
-            left_ = 0;
-            chunked_ = false;
-        }
-        return true;
-    }
-
-    const std::string& status_line() const { return status_line_; }
-    long long content_length() const { return chunked_ ? -1 : left_; }
-
-    // The body a piece at a time: up to n bytes, 0 at its end, -1 on an error.
-    long read(char* out, std::size_t n, Failure& f) {
-        if (chunked_) {
-            if (chunk_left_ == 0) {
-                if (chunks_done_) return 0;
-                // The chunk's size line (after the CRLF that ended the chunk before).
-                std::size_t eol;
-                while ((eol = buffer_.find("\r\n", chunk_seen_ ? 2 : 0)) == std::string::npos) {
-                    if (!fill(f)) return f ? -1 : 0;
-                }
-                std::size_t from = chunk_seen_ ? 2 : 0;
-                chunk_left_ = std::strtoll(buffer_.c_str() + from, nullptr, 16);
-                buffer_.erase(0, eol + 2);
-                chunk_seen_ = true;
-                if (chunk_left_ == 0) {
-                    chunks_done_ = true;
-                    return 0;
-                }
-            }
-            n = static_cast<std::size_t>(std::min<long long>(static_cast<long long>(n), chunk_left_));
-        } else if (left_ >= 0) {
-            if (left_ == 0) return 0;
-            n = static_cast<std::size_t>(std::min<long long>(static_cast<long long>(n), left_));
-        }
-        if (buffer_.empty() && !fill(f)) return f ? -1 : 0;
-        std::size_t take = std::min(n, buffer_.size());
-        std::memcpy(out, buffer_.data(), take);
-        buffer_.erase(0, take);
-        if (chunked_) chunk_left_ -= static_cast<long long>(take);
-        else if (left_ >= 0) left_ -= static_cast<long long>(take);
-        return static_cast<long>(take);
-    }
-
-private:
-    // Waits for the socket to be ready within the timeout.
-    bool ready(short events, Failure& f) {
-        pollfd p{fd_, events, 0};
-        int r = poll(&p, 1, timeout_ms_ > 0 ? timeout_ms_ : -1);
-        if (r == 0) f = Failure{14, "java.net.SocketTimeoutException: timeout"};
-        return r == 1;
-    }
-    bool write_all(const char* p, std::size_t n, Failure& f) {
-        while (n) {
-            if (!ready(POLLOUT, f)) return false;
-            ssize_t w = ::send(fd_, p, n, MSG_NOSIGNAL);
-            if (w < 0 && (errno == EINTR || errno == EAGAIN)) continue;
-            if (w <= 0) {
-                f = Failure{2, std::string("java.io.IOException: ") + std::strerror(errno)};
-                return false;
-            }
-            p += w;
-            n -= static_cast<std::size_t>(w);
-        }
-        return true;
-    }
-    // More of the answer into the buffer; false at its end (f set on an error).
-    bool fill(Failure& f) {
-        char chunk[16384];
-        for (;;) {
-            if (!ready(POLLIN, f)) return false;
-            ssize_t r = recv(fd_, chunk, sizeof chunk, 0);
-            if (r < 0 && (errno == EINTR || errno == EAGAIN)) continue;
-            if (r < 0) {
-                f = Failure{2, std::string("java.io.IOException: ") + std::strerror(errno)};
-                return false;
-            }
-            if (r == 0) return false;
-            buffer_.append(chunk, static_cast<std::size_t>(r));
-            return true;
-        }
-    }
-    int fd_ = -1;
-    int timeout_ms_ = 0;
-    std::string buffer_, status_line_;
-    long long left_ = -1, chunk_left_ = 0;
-    bool chunked_ = false, chunk_seen_ = false, chunks_done_ = false;
-};
+// The HTTP client's names (http.h).
+using net::Failure;
+using net::Http;
+using net::Url;
+using net::parse_url;
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Local URLs, which Java's own URL classes read: file:///path, and jar:file:///path.apk!/entry (Unity's StreamingAssets on

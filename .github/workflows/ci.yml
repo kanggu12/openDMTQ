@@ -56,6 +56,16 @@ jobs:
       - name: The player's video reader
         run: c++ -std=c++20 -Wall -Wextra -Iarm32/desktop arm32/tests/host/mp4_test.cpp arm32/desktop/mp4.cpp -o /tmp/mp4_test && /tmp/mp4_test
 
+      # The HTTP client of the player for Windows (arm32/desktop/http.cpp), against stand-in servers on this machine: each
+      # request asks for gzip unless the game chose its encodings, an answer compressed for it is inflated whole however
+      # it comes, one cut short, broken, followed by more or inflating past its limit fails as a lost connection does, and
+      # every other answer comes as it always did.
+      - name: The player's HTTP answers
+        run: |
+          # zlib's headers, where the runner has none (the player links zlib on every system it is built for).
+          [ -f /usr/include/zlib.h ] || { sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends zlib1g-dev; }
+          c++ -std=c++20 -Wall -Wextra -pthread -Iarm32/desktop arm32/tests/host/http_test.cpp arm32/desktop/http.cpp -lz -o /tmp/http_test && /tmp/http_test
+
       - name: Live view's transport stream writer
         run: c++ -std=c++20 -Wall -Wextra -Iarm32/src arm32/tests/host/live_ts_test.cpp arm32/src/live_ts.cpp -o /tmp/live_ts_test && /tmp/live_ts_test
       # The colours of a computer's broadcast in its stream's sequence header (arm32/src/live_sps.cpp).

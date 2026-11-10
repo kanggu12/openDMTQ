@@ -185,7 +185,9 @@ The player runs the game's own 32-bit Android code, as the app does on phones th
 [arm32 runtime](../arm32/README.md) translates the game's ARM code (Dynarmic), and a small layer gives it Linux's system
 calls on Windows. In place of Android's Java side, the player has its own stand-in for the classes the game calls. The
 game draws with OpenGL ES, which ANGLE runs on Direct3D 11; its sound goes out through WASAPI, and its videos are
-decoded by Media Foundation. The menu, the notice and the pointer are drawn by the player over the game's window.
+decoded by Media Foundation. Its requests to the server go out as a phone's do, asking for the server's answers
+compressed, which makes its lists of songs and scores many times smaller on the way. The menu, the notice and the
+pointer are drawn by the player over the game's window.
 
 The launcher is Python with Tk, made into a Windows program with PyInstaller; Velopack installs it and updates it. The
 launcher writes the player's settings into a file and starts the player with it (`--app` names the folder of the
