@@ -4,7 +4,6 @@
 import datetime
 import hashlib
 import os
-import shutil
 import sqlite3
 import tarfile
 import tempfile
@@ -493,21 +492,12 @@ def restore_backup(name, path):
             return [("bad", t("bak.restore_failed", detail=why(e), saved=saved or kept))], False
         restored_custom = os.path.join(tmp, "custom")
         if os.path.isdir(restored_custom):
-            for item in ("songs", "hidden.json", "ids.json"):
-                src_p, dst_p = os.path.join(restored_custom, item), os.path.join(songs.CUSTOM, item)
-                if os.path.isdir(dst_p):
-                    shutil.rmtree(dst_p)
-                elif os.path.exists(dst_p):
-                    os.remove(dst_p)
-                if os.path.isdir(src_p):
-                    shutil.copytree(src_p, dst_p)
-                elif os.path.exists(src_p):
-                    shutil.copyfile(src_p, dst_p)
-            try:
-                songs.rebuild()
-            except (songs.SongError, OSError, ValueError) as e:
+            # The added songs, hidden flags and ids, and the song list made for them, under the songs' lock in one go: an
+            # add or a hide on the Songs page, or a start's rebuild, waits until both are done (songs.put_back).
+            not_rebuilt = songs.put_back(restored_custom)
+            if not_rebuilt:
                 # Without client data there is nothing to merge them with yet; the database is back all the same.
-                app.logger.warning("restore: songs not rebuilt: %s", e)
+                app.logger.warning("restore: songs not rebuilt: %s", not_rebuilt)
     said = [("ok", t("bak.restored_damaged", name=name, kept=kept) if kept else t("bak.restored", name=name, saved=saved))]
     # The signing key stays this server's. A backup from another server (a move to a new PC)
     # needs its key, or its players' phones cannot update; only the CLI puts a key back.

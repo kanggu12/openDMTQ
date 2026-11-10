@@ -120,9 +120,10 @@ _depth = threading.local()
 
 
 def _serialized(fn):
-    """One change at a time, across threads (the lock) and processes (a lock file in CUSTOM: the CLI
-    may rebuild while the admin service runs). Nested calls (add_package -> rebuild) take the file
-    lock only once: a second flock on a new descriptor would wait for the first forever."""
+    """One change at a time, across threads (the lock) and processes (a lock file in CUSTOM: a start's or an import's
+    `python -m opendmtq_tools.songs` may rebuild while the admin service adds or hides a song). Nested calls
+    (add_package -> rebuild) take the file lock only once: a second flock on a new descriptor would wait for the first
+    forever."""
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
         with _lock:
@@ -500,6 +501,40 @@ def remove_song(song_id):
     rebuild()
 
 
+# What a backup holds of the custom folder: the added songs, the hidden flags and the ids handed out so far. The rest of
+# the folder is made from these by rebuild().
+BACKED_UP = ("songs", "hidden.json", "ids.json")
+
+
+@_serialized
+def put_back(folder):
+    """A backup's added songs, hidden flags and ids (folder: its custom/, unpacked) in place of these, and the song list
+    and overlay made anew for them, under one lock: no add, hide or removal on the admin pages, and no other rebuild,
+    comes between the copy and the rebuild, to read songs half copied or to have its change undone by the copy.
+
+    A copy that fails raises. Returns None, or why the song list could not be made anew: the songs are back all the
+    same, and a server without client data has nothing to merge them with yet (its next start makes the list)."""
+    for item in BACKED_UP:
+        src, dst = os.path.join(folder, item), os.path.join(CUSTOM, item)
+        # Today's goes first, whether the backup has one or not: a backup without hidden flags shows every song.
+        if os.path.isdir(dst):
+            shutil.rmtree(dst)
+        elif os.path.exists(dst):
+            os.remove(dst)
+        # Then the backup's, a folder or a file, when it has one.
+        if os.path.isdir(src):
+            shutil.copytree(src, dst)
+        elif os.path.exists(src):
+            shutil.copyfile(src, dst)
+    try:
+        # Nested in this call's lock: it takes no second one.
+        rebuild()
+    except (SongError, OSError, ValueError) as e:
+        # Said to the caller, which notes it: the restore itself went through.
+        return str(e)
+    return None
+
+
 # ------------------------------------------------------------------------------ rebuild
 
 def _md5(b):
@@ -531,19 +566,21 @@ def _eol(text):
     return "\r\n" if "\r\n" in text else "\n"
 
 
-@_serialized
 def _place(src, dest):
     """An added song's file into the overlay being built: a hard link where the disk allows one (no second copy of
-    hundreds of MB at every rebuild; the overlay never writes into its files), else a copy."""
+    hundreds of MB at every rebuild; the overlay never writes into its files), else a copy. Only rebuild() calls it,
+    under its lock."""
     try:
         os.link(src, dest)
     except OSError:
         shutil.copyfile(src, dest)
 
 
+@_serialized
 def rebuild():
     """Regenerate songList.json, catalog.json and the overlay from the imported content plus the added songs and
-    the hidden flags."""
+    the hidden flags. One at a time, across threads and processes (_serialized): two at once would build the overlay in
+    the same web.new folder and swap each other's half out."""
     os.makedirs(CUSTOM, exist_ok=True)
     adds = added_songs()
     hide = hidden()
