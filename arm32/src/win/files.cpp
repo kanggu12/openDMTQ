@@ -848,6 +848,22 @@ bool own_name(const std::string& p) {
 // is below the descriptor's folder.
 bool absolute_path(const std::string& p) { return !p.empty() && (p[0] == '/' || p[0] == '\\' || (p.size() > 1 && p[1] == ':')); }
 
+// The program's check of the paths no call may change (arm32_set_read_only): none until it sets one.
+std::atomic<bool (*)(const char*)> g_read_only{nullptr};
+
+// Whether the program's check refuses a change to `path`: asked with the path as Windows reads it, a relative one after
+// the current folder with Linux's separators, as getcwd gives it (the player's names are spelt so too).
+bool read_only(const std::string& path) {
+    bool (*check)(const char*) = g_read_only.load(std::memory_order_acquire);
+    if (!check) return false;
+    if (absolute_path(path)) return check(path.c_str());
+    wchar_t w[32768];
+    const DWORD n = GetCurrentDirectoryW(32768, w);
+    std::string full = narrow(w, static_cast<int>(n));
+    std::replace(full.begin(), full.end(), '\\', '/');
+    return check((full + "/" + path).c_str());
+}
+
 // A thread's name: its description, which prctl(PR_SET_NAME) gives it (sys.cpp); "thread" for one without.
 std::string thread_description(HANDLE thread) {
     std::string name = thread_name(thread);
@@ -963,6 +979,11 @@ int open(const char* path, int flags, ...) {
     if ((flags & O_DIRECTORY) && !is_dir) return fail(attrs == INVALID_FILE_ATTRIBUTES ? ENOENT : ENOTDIR);
     const int acc = flags & O_ACCMODE;
     if (is_dir && acc != O_RDONLY) return fail(EISDIR);
+    // A write, or a file made, where the program allows no change: refused as a read-only file system refuses it. An
+    // existing file opened with O_CREAT to be read makes nothing, and opens, as on Linux.
+    const bool writes = acc != O_RDONLY || (flags & O_TRUNC);
+    const bool makes = (flags & O_CREAT) && attrs == INVALID_FILE_ATTRIBUTES;
+    if ((writes || makes) && read_only(p)) return fail(EROFS);
     DWORD access = acc == O_WRONLY ? GENERIC_WRITE : acc == O_RDWR ? (GENERIC_READ | GENERIC_WRITE) : GENERIC_READ;
     DWORD disposition = OPEN_EXISTING;
     if (flags & O_CREAT) disposition = (flags & O_EXCL) ? CREATE_NEW : (flags & O_TRUNC) ? CREATE_ALWAYS : OPEN_ALWAYS;
@@ -1276,6 +1297,8 @@ int faccessat(int dirfd, const char* path, int mode, int) {
 int unlink(const char* path) {
     // Not a file of Windows' by one of the layer's names (own_name).
     if (own_name(path)) return fail(ENOENT);
+    // Nothing goes where the program allows no change (arm32_set_read_only).
+    if (read_only(path)) return fail(EROFS);
     std::wstring w = host_path(path);
     // Read-only files go too, as Linux deletes them by the folder's permission.
     DWORD attrs = GetFileAttributesW(w.c_str());
@@ -1297,6 +1320,9 @@ int unlinkat(int dirfd, const char* path, int flags) {
 int mkdir(const char* path, unsigned int) {
     // No folder of Windows' by one of the layer's names (own_name).
     if (own_name(path)) return fail(ENOENT);
+    // No new folder where the program allows no change; one that is there already is EEXIST, as on Linux, so that a walk
+    // that makes each folder on its way goes on through them.
+    if (read_only(path) && GetFileAttributesW(host_path(path).c_str()) == INVALID_FILE_ATTRIBUTES) return fail(EROFS);
     if (CreateDirectoryW(host_path(path).c_str(), nullptr)) return 0;
     return fail_win32();
 }
@@ -1314,6 +1340,8 @@ int mkdirat(int dirfd, const char* path, unsigned int mode) {
 int rmdir(const char* path) {
     // Not a folder of Windows' by one of the layer's names (own_name).
     if (own_name(path)) return fail(ENOENT);
+    // Nothing goes where the program allows no change (arm32_set_read_only).
+    if (read_only(path)) return fail(EROFS);
     return RemoveDirectoryW(host_path(path).c_str()) ? 0 : fail_win32();
 }
 
@@ -1405,6 +1433,8 @@ int utimensat(int dirfd, const char* path, const struct timespec times[2], int) 
 int chmod(const char* path, unsigned int mode) {
     // Not a file of Windows' by one of the layer's names (own_name).
     if (own_name(path)) return fail(ENOENT);
+    // No change of mode where the program allows no change (arm32_set_read_only).
+    if (read_only(path)) return fail(EROFS);
     std::wstring w = host_path(path);
     DWORD attrs = GetFileAttributesW(w.c_str());
     if (attrs == INVALID_FILE_ATTRIBUTES) return fail_win32();
@@ -1558,8 +1588,12 @@ int statfs(const char*, struct statfs* st) { return arm32::posix::fstatfs(-1, st
 int arm32_rename(const char* from, const char* to) {
     // Neither side a file of Windows' by one of the layer's names (own_name).
     if (own_name(from) || own_name(to)) return fail(ENOENT);
+    // Nothing moved out of or into where the program allows no change (arm32_set_read_only).
+    if (read_only(from) || read_only(to)) return fail(EROFS);
     std::wstring f = wide(from), t = wide(to);
     // Replaces what is there, as Linux's rename does.
     if (MoveFileExW(f.c_str(), t.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED)) return 0;
     return fail_win32();
 }
+
+void arm32_set_read_only(bool (*check)(const char* path)) { g_read_only.store(check, std::memory_order_release); }

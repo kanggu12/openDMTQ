@@ -521,6 +521,12 @@ int arm32_clock_gettime(int clock, struct timespec* ts);
 int arm32_clock_nanosleep(int clock, int flags, const struct timespec* request, struct timespec* remain);
 int arm32_nanosleep(const struct timespec* request, struct timespec* remain);
 int arm32_rename(const char* from, const char* to);
+// The layer's own guard on what may change, which a program sets once before anything else uses the layer's files (none
+// at first): `check` is asked about each call that would change a file or a folder (an open to write or to make a file,
+// a new folder, a delete, a rename, a change of mode, times or length), with its path as it goes to Windows, a relative
+// one after the current folder; true refuses the call with EROFS, as a read-only file system does. The player sets it
+// for the folders it gives the guest to read only (desktop/main.cpp, guest_paths.h).
+void arm32_set_read_only(bool (*check)(const char* path));
 #define clock_gettime arm32_clock_gettime
 #define clock_nanosleep arm32_clock_nanosleep
 #define nanosleep arm32_nanosleep

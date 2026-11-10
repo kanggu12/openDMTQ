@@ -3,8 +3,8 @@
 //
 // The app's folders where they were (both ways, on Linux and on Windows); on Windows the names that would lead out of
 // them (.., a drive, a backslash, //?/, a relative ..), refused or kept in the data folder; the runtime's own names under
-// /dev and /proc as they are; everything else under the guest's root; and the package names a data folder may be named
-// after.
+// /dev and /proc as they are; everything else under the guest's root; the package names a data folder may be named
+// after; and the player's folders the guest may only read (its system, the app's libraries and the APK).
 #include "guest_paths.h"
 
 #include <cstdio>
@@ -17,6 +17,7 @@ namespace {
 using player::paths::guest_of;
 using player::paths::host_of;
 using player::paths::Layout;
+using player::paths::read_only;
 using player::paths::valid_package;
 
 int g_checks = 0, g_failures = 0;
@@ -176,6 +177,52 @@ int main() {
     for (const char* name : {"", "game", ".a.b", "a..b", "a.b.", "1a.b", "_a.b", "a/b.c", "a.b/../c", "..", "a.b c", "a.b-c", "C:.x",
                              "a.b\\c", "\xC3\xA9.x", "a.b\n"})
         package(name, false);
+
+    // Read only on Windows: the guest's system, the agent, the app's libraries and the APK, whichever way a call names
+    // them; the app's data and the guest's root stay its own to change.
+    auto fixed = [](const std::string& host, bool want) {
+        ++g_checks;
+        if (read_only(layout(), host) == want) return;
+        ++g_failures;
+        std::printf("FAIL read only \"%s\": %s, expected %s\n", host.c_str(), want ? "changeable" : "read only", want ? "read only" : "changeable");
+    };
+    // Each name the guest has for them, through the fence.
+    for (const char* name : {"/system/lib/libc.so", "/system/lib", "/system/lib/", "/system/bin/linker", "/system/bin/arm32-agent", "/vendor/lib/a.so",
+                             "/arm32/lib/libmain.so", "/arm32/lib", "/data/app/org.example.game-1/lib/arm/libil2cpp.so",
+                             "/data/app/org.example.game-1/base.apk", "/system/usr/share/zoneinfo/tzdata", "/system/lib/../lib/libm.so"})
+        fixed(host_of(a, name, true), true);
+    // The app's own folders and the guest's root, through the fence: as before.
+    for (const char* name : {"/data/data/org.example.game/files/a", "/data/user/0/org.example.game/shared_prefs/b.xml",
+                             "/storage/emulated/0/Android/data/org.example.game/cache/c", "/sdcard/Download/d", "/system", "/system/etc/hosts",
+                             "/system/lib2/x", "/data/app/org.example.game-1/oat", "/data/local/tmp/e", "/"})
+        fixed(host_of(a, name, true), false);
+    // The same folders as Windows may spell them: its separator, another case, "." and "..", a slash at the end, the
+    // relative names the layer puts after a folder.
+    fixed("C:\\Program Files\\OpenDMTQ\\player\\runtime\\sysroot\\lib\\libc.so", true);
+    fixed("c:/program files/opendmtq/PLAYER/Runtime/SysRoot/lib/libc.so", true);
+    fixed(a.host_libs + "/./sub/../libmain.so", true);
+    fixed(a.host_libs + "/", true);
+    fixed(a.host_data + "/root/../../lib/libmain.so", true);
+    fixed(a.host_apk + "/", true);
+    // Beside them, by a longer name, or above them: not theirs.
+    fixed(a.host_sysroot + "2/lib/libc.so", false);
+    fixed(a.host_libs + ".old/libmain.so", false);
+    fixed(a.host_apk + ".part", false);
+    fixed(a.host_agent + "-new", false);
+    fixed("C:/Program Files/OpenDMTQ/player/runtime", false);
+    fixed(a.host_sysroot + "/lib/../../../player.log", false);
+    fixed(a.host_data + "/internal/files/a", false);
+    fixed("", false);
+    // A layout with an empty folder (none given) makes nothing read only.
+    {
+        Layout none = layout();
+        none.host_sysroot = none.host_libs = none.host_apk = none.host_agent = "";
+        ++g_checks;
+        if (read_only(none, a.host_sysroot + "/lib/libc.so") || read_only(none, "/")) {
+            ++g_failures;
+            std::printf("FAIL read only with no folders given: something read only\n");
+        }
+    }
 
     if (g_failures) {
         std::printf("%d of %d checks FAILED\n", g_failures, g_checks);

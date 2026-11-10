@@ -78,6 +78,19 @@ void note_fenced(const std::string& guest, const std::string& host) {
     arm32::log("player: the guest's name %s %s", guest.c_str(), refused ? "is refused" : "is in the guest's root folder");
 }
 
+// The Windows layer's question before each call that would change a file or a folder (arm32_set_read_only): true for
+// the player's folders that the guest only reads (guest_paths.h read_only). Each such path in the log once, the first
+// kFencedNamesLogged of them, so that a run shows what was refused.
+[[maybe_unused]] bool refuses_change(const char* path) {
+    if (!paths::read_only(app(), path)) return false;
+    // Guest threads ask at once: the paths seen so far under a lock.
+    static std::mutex lock;
+    static std::set<std::string> seen;
+    std::lock_guard<std::mutex> guard(lock);
+    if (seen.size() < kFencedNamesLogged && seen.insert(path).second) arm32::log("player: a change to %s is refused: the guest only reads it", path);
+    return true;
+}
+
 }  // namespace
 
 App& app() {
@@ -346,6 +359,13 @@ int main(int argc, char** argv) {
     Guest& g = Guest::get();
     g.proc.path_hook = player::host_of;
     g.proc.name_hook = player::guest_of;
+#ifdef _WIN32
+    // From here on the guest's system, the agent, the app's libraries and its APK only ever read (guest_paths.h
+    // read_only): a write, a new file or folder, a delete or a rename there fails with EROFS in the Windows layer, as on
+    // a phone's read-only /system, whether the game or the Java the player gives it asks. The libraries were unpacked
+    // before (own_folder.cpp), and nothing of the player's writes there later.
+    arm32_set_read_only(player::refuses_change);
+#endif
     // The app's settings (app.cpp): fastmem, NEON without FPCR switches, atomics without the shared lock.
     g.proc.fastmem = requested("ARM32_FASTMEM", "", true);
     g.proc.mem.host_guards = g.proc.fastmem;

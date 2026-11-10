@@ -4,8 +4,8 @@
 //
 // The app comes from a server, any server, and a name it gives may be made to lead out of its folders: by "..", by a
 // drive ("C:/"), by Windows' own separator, or by a device's name ("COM1"). On Windows every name the guest gives lands
-// in the player's folders (the guest's system and libraries), in the app's data folder, or nowhere: the call then fails
-// as on a missing file. The desktop player for Linux is a developer's tool that reads the host's own /proc and /dev, and
+// in the player's folders (the guest's system and libraries, which it may only read, as a phone's /system: read_only),
+// in the app's data folder, or nowhere: the call then fails as on a missing file. The desktop player for Linux is a developer's tool that reads the host's own /proc and /dev, and
 // there the names keep their old way (fenced false).
 #pragma once
 
@@ -194,6 +194,45 @@ inline std::string host_of(const Layout& a, const std::string& given, bool fence
     // until the guest makes it there, as a phone keeps the rest of its file system from an app.
     if (windows_reads_otherwise(path)) return refused(a);
     return path == "/" ? root_folder(a) : root_folder(a) + path;
+}
+
+// A name on this computer as two names of one file compare equal: Windows' separator as "/", "." and ".." gone and
+// repeated slashes as one (normal()), a drive ("C:") in front of that, the ASCII letters in capitals (Windows does not
+// tell their case apart), and no slash at its end.
+inline std::string host_key(std::string_view host) {
+    std::string s(host);
+    for (char& c : s)
+        if (c == '\\') c = '/';
+    // The drive, kept in front of the folders that normal() reads.
+    std::string drive;
+    if (s.size() >= 2 && s[1] == ':') {
+        drive = s.substr(0, 2);
+        s.erase(0, 2);
+    }
+    s = drive + normal(s.empty() || s[0] != '/' ? "/" + s : s);
+    for (char& c : s)
+        if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A');
+    // A folder asked for with its slash is the same folder.
+    while (s.size() > 1 && s.back() == '/') s.pop_back();
+    return s;
+}
+
+// True when `host`, a name on this computer as one of the guest's calls reaches it (absolute: the Windows layer puts a
+// relative one after its folder first), is one the player gives the guest to read and never to change: its system (the
+// sysroot's libraries, linker and time zones), the agent, the app's libraries and the APK. A phone mounts /system
+// read-only, and an app's code belongs to the system there: a write or a new file in them fails, which the Windows layer
+// does with this (arm32_set_read_only, main.cpp).
+inline bool read_only(const Layout& a, std::string_view host) {
+    const std::string key = host_key(host);
+    // The folder itself, or a name below it.
+    auto in = [&key](const std::string& folder) {
+        if (folder.empty()) return false;
+        const std::string base = host_key(folder);
+        return key == base || (key.size() > base.size() && key.compare(0, base.size(), base) == 0 && key[base.size()] == '/');
+    };
+    // A file itself: nothing is below a file.
+    auto is = [&key](const std::string& file) { return !file.empty() && key == host_key(file); };
+    return in(a.host_sysroot) || in(a.host_libs) || is(a.host_apk) || is(a.host_agent);
 }
 
 // The guest's name of the file `host` on this computer (a descriptor's, a mapping's): the folders above, back; on
