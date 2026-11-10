@@ -750,7 +750,9 @@ def _in_background(app, message, glyph, job, then):
         if app.dialog is not None:
             app.dialog.close(None)
             app.dialog = None
-        then(result, error)
+        # A step of its own, out of the task pump: a question then() asks (after a count) waits for its answer, and the
+        # pump would hand the window nothing from the other worker threads meanwhile.
+        app.root.after(0, lambda: then(result, error))
 
     threading.Thread(target=work, daemon=True, name=job.__name__).start()
 
@@ -798,30 +800,37 @@ def clear_game_data(app):
     w = app.words
     if _not_now(app):
         return
-    # Counted at the press: the game adds to its data each time it runs.
-    size = removal.game_data_size()
-    if not size:
-        app.set_status(w("help.clear.none"), "normal", transient=True)
-        return
-    said = removal.megabytes(size)
-    if not dialogs.ask(app, "danger", w("help.clear"), w("help.clear.ask"), w("help.clear.detail", size=said),
-                       w("help.clear.confirm"), glyph="delete"):
-        return
 
-    def done(failed, error):
+    def counted(size, error):
         if error is not None:
-            dialogs.tell(app, "error", w("help.clear"), w("help.clear.partly"), w.error(error))
-        elif failed:
-            dialogs.tell(app, "warn", w("help.clear"), w("help.clear.partly"),
-                         w("help.clear.partly.detail", n=len(failed), path=failed[0]))
-        # The player's log went with the rest: its row comes back once the game has run.
-        if app.page == "help":
-            app.go("help")
-        if error is None and not failed:
-            # Said after the page is drawn again, whose ready check would otherwise take the line at once.
-            app.set_status(w("help.clear.done", size=said), "ok", sticky=True)
+            dialogs.tell(app, "error", w("help.clear"), w("failed.message"), w.error(error))
+            return
+        if not size:
+            app.set_status(w("help.clear.none"), "normal", transient=True)
+            return
+        said = removal.megabytes(size)
+        if not dialogs.ask(app, "danger", w("help.clear"), w("help.clear.ask"), w("help.clear.detail", size=said),
+                           w("help.clear.confirm"), glyph="delete"):
+            return
 
-    _in_background(app, w("help.clear.working"), "delete", removal.clear_game_data, done)
+        def done(failed, error):
+            if error is not None:
+                dialogs.tell(app, "error", w("help.clear"), w("help.clear.partly"), w.error(error))
+            elif failed:
+                dialogs.tell(app, "warn", w("help.clear"), w("help.clear.partly"),
+                             w("help.clear.partly.detail", n=len(failed), path=failed[0]))
+            # The player's log went with the rest: its row comes back once the game has run.
+            if app.page == "help":
+                app.go("help")
+            if error is None and not failed:
+                # Said after the page is drawn again, whose ready check would otherwise take the line at once.
+                app.set_status(w("help.clear.done", size=said), "ok", sticky=True)
+
+        _in_background(app, w("help.clear.working"), "delete", removal.clear_game_data, done)
+
+    # Counted at the press, as the game adds to its data each time it runs; on a worker thread, as a game's thousands
+    # of files take a while on a disk that has not read them lately, and the window would stop answering meanwhile.
+    _in_background(app, w("help.counting"), "delete", removal.game_data_size, counted)
 
 
 def uninstall_program(app):
@@ -831,12 +840,6 @@ def uninstall_program(app):
     w = app.words
     if _not_now(app):
         return
-    size = removal.megabytes(removal.everything_size())
-    # Cancel first and the ring on it: Enter alone removes nothing.
-    choice = dialogs.choose(app, "danger", w("help.uninstall"), w("help.uninstall.ask"),
-                            w("help.uninstall.detail", size=size),
-                            [(w("help.uninstall.keep"), "keep", "warn"), (w("help.uninstall.all"), "all", "danger")],
-                            glyph="delete")
 
     def start():
         try:
@@ -861,12 +864,24 @@ def uninstall_program(app):
                          w("help.uninstall.left.detail", n=len(failed), folder=removal.data_root()))
         start()
 
-    if choice == "keep":
-        # Written before the uninstaller starts: it closes what runs from the program's folder, this window too.
-        app.state.save()
-        start()
-    elif choice == "all":
-        _in_background(app, w("help.uninstall.working"), "delete", removal.delete_everything, deleted)
+    def counted(total, error):
+        if error is not None:
+            dialogs.tell(app, "error", w("help.uninstall"), w("failed.message"), w.error(error))
+            return
+        # Cancel first and the ring on it: Enter alone removes nothing.
+        choice = dialogs.choose(app, "danger", w("help.uninstall"), w("help.uninstall.ask"),
+                                w("help.uninstall.detail", size=removal.megabytes(total)),
+                                [(w("help.uninstall.keep"), "keep", "warn"),
+                                 (w("help.uninstall.all"), "all", "danger")], glyph="delete")
+        if choice == "keep":
+            # Written before the uninstaller starts: it closes what runs from the program's folder, this window too.
+            app.state.save()
+            start()
+        elif choice == "all":
+            _in_background(app, w("help.uninstall.working"), "delete", removal.delete_everything, deleted)
+
+    # What Delete all would free, counted on a worker thread first (the games' folders may hold thousands of files).
+    _in_background(app, w("help.counting"), "delete", removal.everything_size, counted)
 
 
 # --------------------------------------------------------------------------------------------- About

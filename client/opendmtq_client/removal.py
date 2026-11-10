@@ -57,13 +57,28 @@ def data_root():
     return os.path.join(st.local_dir(), VENDOR)
 
 
+def _link_stat(found):
+    """True when what os.lstat (or a listing's entry) found is a symbolic link or a Windows junction."""
+    # A junction is a folder to Windows: only its reparse tag (on Windows alone) tells it apart.
+    return stat.S_ISLNK(found.st_mode) or getattr(found, "st_reparse_tag", 0) == JUNCTION
+
+
 def _is_link(path):
     """True for a symbolic link or a Windows junction."""
     try:
         found = os.lstat(path)
     except OSError:
         return False
-    return stat.S_ISLNK(found.st_mode) or getattr(found, "st_reparse_tag", 0) == JUNCTION
+    return _link_stat(found)
+
+
+def _entry_is_link(entry):
+    """True for a symbolic link or a Windows junction in a folder's listing (os.scandir), asking the disk nothing on
+    Windows: its listing has each entry's kind and reparse tag."""
+    if entry.is_symlink():
+        return True
+    # Elsewhere there are no junctions, and the call below would cost a stat for each folder.
+    return os.name == "nt" and _link_stat(entry.stat(follow_symlinks=False))
 
 
 def _names(folder):
@@ -95,16 +110,45 @@ def game_folders():
     return found
 
 
+def _tree_bytes(folder):
+    """The bytes of the files under a folder; the links in it are not followed and count nothing. One listing a folder
+    and nothing more on Windows, whose listing has each file's size; one stat a file elsewhere."""
+    total, folders = 0, [folder]
+    # Folders still to list, one at a time: no recursion, however deep a game nests its files.
+    while folders:
+        try:
+            with os.scandir(folders.pop()) as listing:
+                entries = list(listing)
+        except OSError:
+            # Gone since, or not ours to read: it adds nothing, as the deletion would take nothing from it.
+            continue
+        for entry in entries:
+            try:
+                if _entry_is_link(entry):
+                    # Removed as itself and never followed (delete_everything, clear_game_data).
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    folders.append(entry.path)
+                else:
+                    total += entry.stat(follow_symlinks=False).st_size
+            except OSError:
+                # A file gone between the listing and its size adds nothing.
+                continue
+    return total
+
+
 def _counted(path, link_too=False):
     """The bytes under a path; links are not followed, except the path itself when link_too."""
     try:
-        if _is_link(path) and not link_too:
-            return 0
-        if not os.path.isdir(path):
-            return os.lstat(path).st_size
+        found = os.lstat(path)
     except OSError:
         return 0
-    return sum(_counted(os.path.join(path, name)) for name in _names(path))
+    if _link_stat(found):
+        if not link_too:
+            return 0
+        # Followed: a folder moved to another disk counts what it holds; a link to anything else is only itself.
+        return _tree_bytes(path) if os.path.isdir(path) else found.st_size
+    return _tree_bytes(path) if stat.S_ISDIR(found.st_mode) else found.st_size
 
 
 def game_data_size():
@@ -126,6 +170,10 @@ def everything_size():
     """How many bytes delete_everything() would free."""
     root, own = data_root(), st.config_dir()
     total = sum(_counted(os.path.join(root, name), link_too=True) for name in _names(root))
+    for folder in game_folders():
+        # A game's data folder moved to another disk: what it holds goes too, the id with it (delete_everything).
+        total += sum(_counted(os.path.join(folder, name), link_too=True) for name in _names(folder)
+                     if name.lower() == ID_FOLDER and _is_link(os.path.join(folder, name)))
     if not _inside(own, root):
         total += sum(_counted(path) for path in _own_paths(own))
     return total

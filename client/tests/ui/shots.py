@@ -116,15 +116,21 @@ def entries(app):
     return [w for w in widgets_of(app.root) if isinstance(w, tk.Entry) and w.winfo_ismapped()]
 
 
-def through_dialog(app, out, name, press, answer, problems, extra=None):
-    """Press a page button that asks first, as a person would; screenshot and measure the dialog it opens, then answer
-    it with `answer(dialog)`. Returns what the dialog answered (None when none opened)."""
-    seen = {}
+def through_dialog(app, out, name, press, answer, problems, extra=None, seconds=10.0):
+    """Press a page button that asks first, as a person would; screenshot and measure the question it opens (after the
+    work some buttons do first under a dialog that says so, such as counting what would go), then answer it with
+    `answer(dialog)`. Returns what the dialog answered (None when none opened)."""
+    seen, end = {}, time.time() + seconds
 
     def look():
         dialog = app.dialog
-        if dialog is None:
-            problems.append("%s: the button opened no dialog" % name)
+        if dialog is None or dialog.progress:
+            # No question yet: the work before it may still be under way.
+            if time.time() < end:
+                app.root.after(100, look)
+            else:
+                problems.append("%s: the button opened no dialog" % name)
+                seen["done"] = True
             return
         seen["dialog"] = dialog
         wait_out(app.root, 0.4)
@@ -133,9 +139,15 @@ def through_dialog(app, out, name, press, answer, problems, extra=None):
         if extra:
             extra(dialog)
         answer(dialog)
+        seen["done"] = True
 
     app.root.after(300, look)
     press()
+    # A question asked after work on a worker thread comes once press() has returned: the window goes on until it was
+    # seen and answered.
+    while "done" not in seen and time.time() < end + 1:
+        app.root.update()
+        time.sleep(0.02)
     dialog = seen.get("dialog")
     # The same dialog: work the answer started may show a dialog of its own.
     if dialog is not None and app.dialog is dialog:
@@ -519,7 +531,8 @@ def maintenance_check(app, out, tag, problems):
     if "dialog" not in failed or not app.root.winfo_exists():
         problems.append("%s: an uninstaller that did not start was not said" % tag)
     # The work under way, as the dialogs show it.
-    for key, glyph in (("help.repair.working", "restore"), ("help.uninstall.working", "delete")):
+    for key, glyph in (("help.repair.working", "restore"), ("help.uninstall.working", "delete"),
+                       ("help.counting", "delete")):
         dialog = dialogs.Dialog(app.root, app.ui, "info", w(key), w(key), progress=True, glyph=glyph)
         wait_out(app.root, 0.6)
         shot(app.root, out, "%s_dialog-%s" % (tag, key.replace(".", "-")))

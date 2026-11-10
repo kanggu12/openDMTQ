@@ -1,8 +1,10 @@
 """Clear game data, Delete all and Uninstall, on folders of the test's own (removal.py)."""
 
 import os
+import stat
 import subprocess
 import tempfile
+import types
 from unittest import mock
 
 from opendmtq_client import apps, main, removal, safety
@@ -76,6 +78,8 @@ class Removal(Folder):
         outside = os.path.join(self.home, "elsewhere")
         write(outside, {"keep.txt": b"mine"})
         os.symlink(outside, os.path.join(self.game, "data", "external", "linked"))
+        # Counted as nothing, as what it leads to stays.
+        self.assertEqual(removal.game_data_size(), sum(len(v) for k, v in GAME.items() if k != "data/android_id"))
         self.assertEqual(removal.clear_game_data(), [])
         self.assertFalse(os.path.lexists(os.path.join(self.game, "data", "external", "linked")))
         self.assertEqual(listing(outside), {"keep.txt"})
@@ -139,11 +143,14 @@ class Removal(Folder):
 
     def test_a_linked_data_folder_keeps_the_id(self):
         # The game's data moved to another disk, a link left in its place: cleared behind the link, the id kept there.
+        in_place = removal.everything_size()
         elsewhere = os.path.join(self.home, "other-disk", "data")
         os.makedirs(os.path.dirname(elsewhere))
         os.rename(os.path.join(self.game, "data"), elsewhere)
         os.symlink(elsewhere, os.path.join(self.game, "data"))
         self.assertEqual(removal.game_data_size(), sum(len(v) for k, v in GAME.items() if k != "data/android_id"))
+        # Delete all takes what is behind the link (below), so the size it says counts it as if it were in place.
+        self.assertEqual(removal.everything_size(), in_place)
         self.assertEqual(removal.clear_game_data(), [])
         self.assertTrue(os.path.islink(os.path.join(self.game, "data")))
         self.assertEqual(listing(elsewhere), {"android_id"})
@@ -152,6 +159,23 @@ class Removal(Folder):
         # Delete all takes what is behind the link too.
         self.assertEqual(removal.delete_everything(), [])
         self.assertEqual(listing(elsewhere), set())
+
+    def test_a_junction_in_a_listing_is_a_link(self):
+        # Windows lists a junction as a folder: its reparse tag alone says it leads elsewhere, so it is counted as a
+        # link (nothing), never walked into. The listing's entries stood in for, as this runs on Linux too.
+        class Entry:
+            def __init__(self, tag):
+                self.tag = tag
+
+            def is_symlink(self):
+                return False
+
+            def stat(self, follow_symlinks=True):
+                return types.SimpleNamespace(st_mode=stat.S_IFDIR, st_reparse_tag=self.tag)
+
+        with mock.patch.object(removal.os, "name", "nt"):
+            self.assertTrue(removal._entry_is_link(Entry(removal.JUNCTION)))
+            self.assertFalse(removal._entry_is_link(Entry(0)))
 
     def test_nothing_is_written_after_delete_all(self):
         state = st.LauncherState.load()
@@ -263,3 +287,30 @@ class WindowFlow(Folder):
             pages.uninstall_program(app)
         self.assertEqual(said, [app.words("help.uninstall.failed")])
         self.assertFalse(os.path.exists(removal.data_root()))
+
+    def test_clear_counts_in_the_background_then_asks_with_the_size(self):
+        # The count is work in the background like the clearing (through a game's thousands of files the window would
+        # stop answering), and the question after it says what it found.
+        from opendmtq_client import dialogs, i18n, pages
+        os.environ.pop("OPENDMTQ_CLIENT_DIR", None)
+        game = os.path.join(removal.data_root(), "com.example.game")
+        write(game, GAME)
+        app = types.SimpleNamespace(words=i18n.Words("en"), state=st.LauncherState(), busy=False, download=None,
+                                    session=None, page="online", set_status=lambda *a, **k: None)
+        jobs, asked = [], []
+
+        def background(app, words, glyph, job, then):
+            # Run at once, in order, each job named as the dialog over it would be shown.
+            jobs.append(job.__name__)
+            then(job(), None)
+
+        def ask(app, kind, title, message, detail, confirm, cancel=None, glyph=None):
+            asked.append(detail)
+            return True
+
+        with mock.patch.object(pages, "_in_background", background), mock.patch.object(dialogs, "ask", ask):
+            pages.clear_game_data(app)
+        self.assertEqual(jobs, ["game_data_size", "clear_game_data"])
+        size = removal.megabytes(sum(len(v) for k, v in GAME.items() if k != "data/android_id"))
+        self.assertEqual(asked, [app.words("help.clear.detail", size=size)])
+        self.assertEqual(listing(game), {"data/android_id"})

@@ -268,6 +268,7 @@ TEXT = {
                                   "되돌린 파일: {n}개. 되돌리지 못한 파일: {failed}개. OpenDMTQ-Setup.exe를 다시 실행해 복구를 고르세요."),
     "help.repair.failed": ("Repair failed", "복구 실패"),
     "help.remove": ("Reset and remove", "초기화와 제거"),
+    "help.counting": ("Measuring the data on this PC...", "이 PC의 데이터 크기를 확인하는 중..."),
     "help.clear": ("Clear game data", "게임 데이터 지우기"),
     "help.clear.hint": ("Deletes what the game keeps on this PC: its downloads and its own settings. The game downloads its data again at the next start, and this PC stays the same player.",
                         "게임이 이 PC에 둔 것(받은 데이터와 게임 안 설정)을 지웁니다. 다음에 시작할 때 다시 받고, 이 PC의 플레이어는 그대로입니다."),
