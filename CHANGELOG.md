@@ -6,6 +6,11 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+### Changed
+
+- The lines `.env` may hold are a table in docs/install.md (Settings); `.env.example` is gone from the repository's
+  root, as the setup writes `.env` itself.
+
 ## [0.8.1] - 2026-11-10
 
 ### Security

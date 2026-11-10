@@ -134,6 +134,27 @@ The same accounts play on a PC ([the PC client](windows-player.md)).
 
 Everything else is on the admin pages: the app, songs, players, accounts, recordings and backups.
 
+## Settings
+
+The setup writes `.env` beside `opendmtq`. These are the lines it may hold; edit by hand only for what no command sets,
+then restart.
+
+| Line | What it is | Set by |
+|---|---|---|
+| `PUBLIC_HOST` | The address the app uses: a LAN IPv4 address (`host:port` for another port than 80), or `host:port` when exposed | the setup, `./opendmtq host`, `./opendmtq expose` |
+| `SERVER_NAME` | The name after the game's title on phones, `TECHNIKA Q (<name>)`; empty: the whole address | `./opendmtq name` |
+| `LISTEN_PORT` | The port the server listens on (80 when unset): the port in a LAN `PUBLIC_HOST`, or the forwarded one | the setup, `./opendmtq host`, `./opendmtq expose` |
+| `BASE_APK` | The client to patch when `data/apk/base` holds several (a file name there) | `./opendmtq apk --base` |
+| `ADMIN_PASSWORD` | The owner's password on the admin pages | the setup |
+| `ADMIN_USER` | The owner's ID (`admin` when unset) | by hand |
+| `ADMIN_ON_PUBLIC_PORT` | `yes`: admin pages on the main port at `/opendmtq/admin/`; `no`: only at their own address | `./opendmtq expose` (unless `--admin-public`) |
+| `ADMIN_BIND`, `ADMIN_PORT` | The admin pages' own address (`127.0.0.1` and `8791` when unset: this PC only) | by hand; `ADMIN_PORT` also by `./opendmtq up` when 8791 is taken |
+| `LIVE_DEFAULT` | `on`: a new player's broadcast starts on until the Broadcasts page says otherwise ([broadcasts](live.md)); `off` when unset | by hand |
+| `RESTART` | `unless-stopped`: the server starts again with Docker | by hand |
+| `BIND_ADDRESS` | The interface the server's port is published on (all when unset) | by hand |
+| `COMPOSE_PROJECT_NAME` | What this server's containers are called; a second copy of the repository gets its own by itself | `./opendmtq`, for a second copy |
+| `OPENDMTQ_SERVER_IMAGE`, `OPENDMTQ_TOOLS_IMAGE` | A release's images to run instead of building them here ([without internet](closed-network.md)) | by hand |
+
 ## What it runs on
 
 | | Minimum | Recommended |
