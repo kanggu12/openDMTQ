@@ -38,7 +38,7 @@ collide:
 | `static.pmangplus.com` | `/inspection` | The maintenance notice |
 
 OpenDMTQ adds `/` (sends a visitor to the site), `/opendmtq/` (the site and `health.php`), `/thumbs` (small jackets for
-the site), `/apk` (the newest app), `/windows` (the PC client's installer, set up for this server), `/ca.crt` (the server's own certificate authority), `/live/` (the live view's
+the site), `/apk` (the newest app), `/windows` (the PC client's installer, set up for this server; both go on from where a broken download stopped), `/ca.crt` (the server's own certificate authority), `/live/` (the live view's
 uploads from phones and PCs), `/opendmtq/admin/` (passed to the admin pages; the old `/admin/` leads there) and `/opendmtq/api/` (their
 API, passed on with them).
 

@@ -1,5 +1,5 @@
 <?php
-/* Hands the newest patched APK to a phone browser (http://<server>/apk). */
+/* Hands the newest patched APK to a phone browser (http://<server>/apk), whole or from where a broken download stopped. */
 require __DIR__ . '/lib.php';
 
 // Locked downloads go through the sign-in page and come back here.
@@ -30,13 +30,13 @@ if ($m['host'] !== public_host()) {
     no_app(409, build_failed() ? t('build.failed') : t('apk.stale'));
 }
 $path = APK_DIR . '/' . basename($m['file']);
-// The type Android's installer expects, and a file name that says which server it is for.
-header('Content-Type: application/vnd.android.package-archive');
-header('Content-Disposition: attachment; filename="' . basename($m['file']) . '"');
-header('Content-Length: ' . filesize($path));
-header('Cache-Control: no-store');
-// A HEAD request (checks, download managers probing) needs the headers only.
-if ($_SERVER['REQUEST_METHOD'] === 'HEAD') {
-    exit;
+// Opened now, as windows.php opens the installer: the length said and the bytes sent are the same file's, even if the
+// builder swaps in a new build meanwhile (its size, then its bytes by name, could have been two files').
+$f = @fopen($path, 'rb');
+// Gone since the manifest was read: a new build is taking its place.
+if (!$f) {
+    no_app(404, build_failed() ? t('build.failed') : t('apk.notyet'));
 }
-readfile($path);
+// The type Android's installer expects, and a file name that says which server it is for: whole, or the part a broken
+// download asks for to go on, while it is still this build (its SHA-256 says so).
+send_download($f, 'application/vnd.android.package-archive', basename($m['file']), download_tag($m, fstat($f)));

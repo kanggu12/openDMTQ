@@ -192,6 +192,102 @@ function windows_download_name(): string
     return 'OpenDMTQ-Setup-' . preg_replace('/[^A-Za-z0-9.-]/', '-', public_host()) . '.exe';
 }
 
+/* A download's ETag, a strong one, as a broken download needs to go on (send_download()): the SHA-256 its manifest gives
+   ($manifest: latest.json for the app, windows.json for the installer) when that is a whole hash of a file the size of the
+   one opened ($stat, its fstat()); else the file's size and time, as Apache tags a file. With the end the installer gets
+   ($tail), that end's hash too: the same installer from another address, or after a new name, is other bytes. */
+function download_tag(array $manifest, array $stat, string $tail = ''): string
+{
+    $sha = strtolower((string)($manifest['sha256'] ?? ''));
+    // The builder's hash stays the same through a copy or a restore, which the file's time does not; a manifest of
+    // another size describes another file (swapped meanwhile), whose hash this one cannot borrow.
+    $tag = preg_match('/^[0-9a-f]{64}$/', $sha) && (int)($manifest['size'] ?? -1) === (int)$stat['size']
+        ? $sha : dechex((int)$stat['size']) . '-' . dechex((int)$stat['mtime']);
+    // The end's own hash, short: it only has to tell this server's ends apart.
+    return '"' . $tag . ($tail !== '' ? '-' . substr(hash('sha256', $tail), 0, 16) : '') . '"';
+}
+
+/* Hands out the open file $f with $tail after it as one download ($type, the file name $name), whole or the one part a
+   broken download asks for to go on where it stopped: Accept-Ranges, the ETag $tag (download_tag()) and the file's time
+   say what it is; Range asks for a part (206), If-Range for it only while the file is still that one (else the whole),
+   If-Match, which Android's own downloads send instead, for nothing but that one (else 412); a part past the end is 416.
+   One part per request: several (multipart answers, which no download manager needs) get the whole, as HTTP allows.
+   A HEAD gets the headers alone. Ends the request. */
+function send_download($f, string $type, string $name, string $tag, string $tail = ''): void
+{
+    $stat = fstat($f);
+    // The file's bytes and the end after them: one length, one range of positions.
+    $file_size = (int)$stat['size'];
+    $size = $file_size + strlen($tail);
+    $modified = gmdate('D, d M Y H:i:s', (int)$stat['mtime']) . ' GMT';
+    // The type Android's installer (or Windows) expects, and a file name that says which server it is for.
+    header('Content-Type: ' . $type);
+    header('Content-Disposition: attachment; filename="' . $name . '"');
+    // Behind the sign-in, and never kept: a download manager keeps its own part, checked by the tag below.
+    header('Cache-Control: no-store');
+    header('Accept-Ranges: bytes');
+    header('ETag: ' . $tag);
+    header('Last-Modified: ' . $modified);
+    // If-Match: going on is only right for the file it began with; another one under this address now is 412, and the
+    // download starts again from nothing. "*" is any file, which there is.
+    $match = trim((string)($_SERVER['HTTP_IF_MATCH'] ?? ''));
+    if ($match !== '' && $match !== '*' && !in_array($tag, array_map('trim', explode(',', $match)), true)) {
+        http_response_code(412);
+        exit;
+    }
+    // The positions to send, first and last: the whole by default.
+    [$from, $to] = [0, $size - 1];
+    $range = trim((string)($_SERVER['HTTP_RANGE'] ?? ''));
+    // If-Range: the part only while the file is the one the part belongs to, by its tag (exactly: strong), or by its time
+    // where no end follows the file (an end can change at the same time: a new name for the server).
+    $if_range = trim((string)($_SERVER['HTTP_IF_RANGE'] ?? ''));
+    $same = $if_range === '' || $if_range === $tag || ($tail === '' && $if_range === $modified);
+    // Ranges are for GET alone (a HEAD answers for the whole), of one part: bytes=first-last, first- or -how many last.
+    if ($range !== '' && $same && $_SERVER['REQUEST_METHOD'] === 'GET' && preg_match('/^bytes=(\d*)-(\d*)$/', $range, $m)
+        && ($m[1] !== '' || $m[2] !== '')) {
+        if ($m[1] === '') {
+            // The last bytes: as many as asked, or the whole when that is more. None at all is no part.
+            $last = (int)$m[2];
+            $from = $last > 0 ? max(0, $size - $last) : $size;
+        } else {
+            // From a position on, to one or the end; a last before the first is no range at all (the whole goes).
+            $from = (int)$m[1];
+            $to = $m[2] === '' ? $size - 1 : min((int)$m[2], $size - 1);
+            if ($m[2] !== '' && (int)$m[2] < $from) {
+                [$from, $to] = [0, $size - 1];
+                $range = '';
+            }
+        }
+        // Nothing of the file in the part asked for: 416, with the length the next try can go by.
+        if ($range !== '' && $from >= $size) {
+            http_response_code(416);
+            header('Content-Range: bytes */' . $size);
+            exit;
+        }
+        // The part itself: 206, and where it lies in the whole.
+        if ($range !== '') {
+            http_response_code(206);
+            header("Content-Range: bytes $from-$to/$size");
+        }
+    }
+    header('Content-Length: ' . ($to - $from + 1));
+    // A HEAD request (checks, download managers probing) needs the headers only.
+    if ($_SERVER['REQUEST_METHOD'] === 'HEAD') {
+        exit;
+    }
+    // The file's share of the part, straight from the open file (the same one whose length went out above).
+    if ($from < $file_size) {
+        stream_copy_to_stream($f, fopen('php://output', 'wb'), min($to, $file_size - 1) - $from + 1, $from);
+    }
+    // And the end's share, where the part reaches past the file.
+    if ($to >= $file_size) {
+        $start = max($from, $file_size) - $file_size;
+        echo substr($tail, $start, $to - $file_size - $start + 1);
+    }
+    fclose($f);
+    exit;
+}
+
 /* True when the builder gave up on the app for this address (data/apk/out/build.json says failed,
    or still says building long after any build ends): waiting for it is pointless. With no such
    file (an older builder) the portal keeps waiting as before. */

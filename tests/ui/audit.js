@@ -352,6 +352,36 @@ async function portalFlows(contexts) {
   check('and /windows hands a signed-in visitor the installer set up for this server',
     setup[0] === 200 && /portable-executable/.test(setup[1] || '') && /OpenDMTQ-Setup-/.test(setup[2] || '') &&
     setup[3].endsWith('OPENDMTQ-PRESET1') && setup[3].includes(`"url":"${SITE}"`), JSON.stringify(setup.slice(0, 3)));
+  // A broken download goes on where it stopped, the app's (a hundred megabytes and more on a phone's network) and the
+  // installer's alike (apk.php, windows.php): the headers that say so, a part as asked (the last 200 bytes, which for the
+  // installer reach from its own bytes into the server's details after them), the whole again once the file is another
+  // (If-Range, and If-Match as Android's downloads ask), and nothing past the end.
+  const resumed = await dl.evaluate(async () => {
+    const out = {};
+    for (const path of ['/apk', '/windows']) {
+      const whole = new Uint8Array(await (await fetch(path)).arrayBuffer());
+      const head = await fetch(path, { method: 'HEAD' });
+      const tag = head.headers.get('etag'), size = whole.length;
+      const part = await fetch(path, { headers: { Range: `bytes=${size - 200}-`, 'If-Range': tag } });
+      const got = new Uint8Array(await part.arrayBuffer());
+      const other = await fetch(path, { headers: { Range: 'bytes=0-9', 'If-Range': '"another"' } });
+      const otherSize = (await other.arrayBuffer()).byteLength;
+      const moved = await fetch(path, { headers: { Range: 'bytes=0-9', 'If-Match': '"another"' } });
+      const past = await fetch(path, { headers: { Range: `bytes=${size}-` } });
+      out[path] = {
+        // What a download manager reads before it trusts a part: one of bytes, a strong tag, the file's time.
+        offered: head.headers.get('accept-ranges') === 'bytes' && /^"[^"]+"$/.test(tag || '') && !!head.headers.get('last-modified'),
+        part: part.status === 206 && part.headers.get('content-range') === `bytes ${size - 200}-${size - 1}/${size}`
+          && got.length === 200 && got.every((b, i) => b === whole[size - 200 + i]),
+        another: other.status === 200 && otherSize === size,
+        moved: moved.status === 412,
+        past: past.status === 416 && past.headers.get('content-range') === `bytes */${size}`,
+      };
+    }
+    return out;
+  });
+  check('a broken download of the app or the installer goes on where it stopped',
+    Object.values(resumed).every(r => Object.values(r).every(Boolean)), JSON.stringify(resumed));
   // What the PC client asks the site (client.php): whether it is an OpenDMTQ server, then the app on offer, which only a
   // signed-in visitor gets.
   const asked = await dl.evaluate(async () => {

@@ -145,10 +145,13 @@ stage empty
 docker exec -i "$SITE" php < "$UI/seed.php"
 APP=OpenDMTQ-127.0.0.1-$SITE_PORT-v2026.11.02.apk
 head -c 1048576 /dev/zero > "$DATA/apk/out/$APP"
-printf '{"file": "%s", "host": "%s", "built_at": "2026-11-02T09:28:08", "sha256": "0", "size": 1048576, "patcher": "1.8.0", "runtime": "test", "label": "TECHNIKA Q (%s)", "package": "com.test.opendmtq"}' \
-  "$APP" "$HOST" "$HOST" | tee "$DATA/apk/out/latest.json" > "$DATA/apk/out/$APP.json"
+# With its SHA-256, as the builder writes it: the site tags the download with it, for a broken download to go on.
+APP_SHA=$(sha256sum "$DATA/apk/out/$APP" | cut -d' ' -f1)
+printf '{"file": "%s", "host": "%s", "built_at": "2026-11-02T09:28:08", "sha256": "%s", "size": 1048576, "patcher": "1.8.0", "runtime": "test", "label": "TECHNIKA Q (%s)", "package": "com.test.opendmtq"}' \
+  "$APP" "$HOST" "$APP_SHA" "$HOST" | tee "$DATA/apk/out/latest.json" > "$DATA/apk/out/$APP.json"
 # The installer for Windows beside it, as the builder leaves it (tools/opendmtq_tools/windows_client.py): the download
-# page's part for computers.
+# page's part for computers. Its manifest's hash is left a stand-in, no SHA-256: the site then tags this download by the
+# file's size and time, its other way of tagging one, which is checked so.
 { printf 'MZ'; head -c 2097150 /dev/zero; } > "$DATA/apk/out/OpenDMTQ-Setup.exe"
 printf '{"file": "OpenDMTQ-Setup.exe", "size": 2097152, "sha256": "0", "version": "0.8.0", "copied_at": "2026-11-02T09:29:00"}' \
   > "$DATA/apk/out/windows.json"

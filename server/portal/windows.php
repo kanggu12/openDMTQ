@@ -1,6 +1,7 @@
 <?php
 /* Hands the installer for Windows (the PC client) to a computer's browser (http://<server>/windows), set up for this
-   server: its address on the installer's end, which the installer reads to point the launcher here. */
+   server: its address on the installer's end, which the installer reads to point the launcher here. Whole, or from where
+   a broken download stopped. */
 require __DIR__ . '/lib.php';
 
 // Locked like the app: through the sign-in page, and back to the download page.
@@ -22,15 +23,6 @@ if (!$f) {
     exit;
 }
 $tail = windows_preset();
-// A Windows program, under a file name that says which server it is for, as long as the installer and its end together.
-header('Content-Type: application/vnd.microsoft.portable-executable');
-header('Content-Disposition: attachment; filename="' . windows_download_name() . '"');
-header('Content-Length: ' . (fstat($f)['size'] + strlen($tail)));
-header('Cache-Control: no-store');
-// A HEAD request (checks, download managers probing) needs the headers only.
-if ($_SERVER['REQUEST_METHOD'] === 'HEAD') {
-    exit;
-}
-fpassthru($f);
-fclose($f);
-echo $tail;
+// A Windows program, under a file name that says which server it is for: the installer and its end as one file, whole or
+// the part a broken download asks for to go on, while it is still this installer with this end (its tag covers both).
+send_download($f, 'application/vnd.microsoft.portable-executable', windows_download_name(), download_tag($w, fstat($f), $tail), $tail);
