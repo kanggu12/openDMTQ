@@ -127,8 +127,9 @@ The same accounts play on a PC ([the PC client](windows-player.md)).
 | Start | `OpenDMTQ.exe` | `./opendmtq start` | `./opendmtq up` |
 | Stop | close the window | `./opendmtq stop` | `./opendmtq down` |
 | See the address | the window shows it | `./opendmtq status` | `./opendmtq status` |
-| Start with the computer | a shortcut in `shell:startup` | `./opendmtq service` | `RESTART=unless-stopped` in `.env` |
+| Start with the computer | a shortcut in `shell:startup` | `./opendmtq service` | `RESTART=unless-stopped` in `.env`, or `cli/install.sh --service` |
 | Import songs | admin pages, **Songs** | admin pages, **Songs** | `./opendmtq import --songs <folder>` |
+| Remove it | close the window, then delete the folder | `./opendmtq stop`, `./opendmtq service --remove`, `host/install.sh --uninstall`, then delete the folder | `./opendmtq down`, `./opendmtq firewall --remove` under WSL, then delete the folder |
 
 Everything else is on the admin pages: the app, songs, players, accounts, recordings and backups.
 

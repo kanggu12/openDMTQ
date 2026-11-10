@@ -30,8 +30,8 @@ When the game does not start or shows no songs, this chart leads to the right se
   instead pass the PC's LAN address, its address on your home network (`ipconfig` shows it):
   `./opendmtq setup --host 192.168.x.y`.
 - `./opendmtq setup` warns when the firewall step fails (Windows PowerShell not reachable, the administrator prompt
-  declined) and goes on; run `./opendmtq firewall` afterwards, or `cli/firewall.ps1` in an administrator
-  PowerShell.
+  declined) and goes on; run `./opendmtq firewall` afterwards, or `cli/firewall.ps1 -Port <port>` (with `-Internet` when
+  exposed) in an administrator PowerShell.
 - Linux: Docker-published ports bypass ufw, so a ufw rule neither opens nor closes port 80. If the machine is
   reachable from outside your home network, set `BIND_ADDRESS` in `.env` to its LAN address. A host install's Apache
   is not Docker's: there the system's firewall applies as usual.

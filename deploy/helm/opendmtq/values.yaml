@@ -47,7 +47,7 @@ songs:
 # Live view (docs/live.md). Recordings live in the api pod's emptyDir, and die with the pod, unless
 # they get a claim of their own. It must follow the api to any node: use ReadWriteMany (or storage
 # that reattaches quickly); a claim tied to one node also ties the api to it, and failover ends there.
-# With a claim the size limit is the smaller of the Recordings page's cap (20 GB by default) and
+# With a claim the size limit is the smaller of the Broadcasts page's cap (20 GB by default) and
 # what fits on the claim, so keep it above the cap.
 live:
   # "on": a new player's broadcast starts on until the owner chooses on the admin pages' Broadcasts page, where broadcasts

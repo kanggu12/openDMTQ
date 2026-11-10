@@ -160,7 +160,7 @@ spec:
           volumeMounts:
             - {name: state, mountPath: /data}
             {{- if .Values.live.recordings.persistence.enabled }}
-            # The Recordings page reads, hides and deletes them, and sets their limits here.
+            # The Broadcasts page reads, hides and deletes them, and sets their limits here.
             - {name: recordings, mountPath: /data/live-rec}
             {{- end }}
             - {name: data, mountPath: /apk, subPath: apk}

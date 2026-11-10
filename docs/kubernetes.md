@@ -98,8 +98,8 @@ The phone's uploads, the site's pages and the media all go to the one api pod: t
 supports live broadcasts with one api pod, and only one.** `replicas: 1` is fixed for the database's sake
 and live broadcasts depend on it too: the live window (`/data/live`) and any open recording are that
 pod's own files, the switch-off and the cleanup act on them directly, and several pods would need
-shared storage and locks across pods that neither the code nor the chart provides. Do not raise the
-replica count or route by guid; there is no such option.
+shared storage and locks across pods that neither the code nor the chart provides. The chart has no setting for
+more api pods or for routing by player.
 
 What happens when the api pod is replaced (measured on kind):
 
@@ -111,8 +111,8 @@ What happens when the api pod is replaced (measured on kind):
 | Recordings | **Lost** | Kept |
 
 Without a claim, recordings count against the node's disk, and no limit of the pod applies, so the 20 GB default cap is
-checked against the node's free space. The `state` volume has no `sizeLimit` for that reason; if you add one, keep it
-above the cap (Broadcasts page), or the kubelet may evict the pod.
+checked against the node's free space. The `state` volume has no `sizeLimit` for that reason; if you add one, a limit
+below the cap (Broadcasts page) lets the kubelet evict the pod.
 
 With a claim, recordings stay when the pod goes, and the server copies segments into it rather than
 linking them. Make it ReadWriteMany (the default), or storage that reattaches quickly: a claim tied
@@ -206,7 +206,7 @@ The main ones; see `values.yaml` for all.
 | `api.failoverSeconds` | 20 | How long the api waits on an unreachable node. |
 | `litestream.enabled` | true | Off means the database is lost when the api pod is replaced. |
 | `litestream.s3.*` | | Endpoint, bucket, path, credentials secret. |
-| `objectStore.enabled` | false | Bundled single-pod SeaweedFS, for evaluation only. |
+| `objectStore.enabled` | false | Bundled SeaweedFS: one pod, one copy on one node. |
 | `builder.enabled` | true | Build the app after install and upgrade. |
 | `admin.onPublicPort` | (automatic) | The admin pages through the router: yes with `router.tls` or for a private IPv4 `publicHost`, no otherwise. |
 | `songs.rebuildOnStart` | true | Rebuild the song list before the api starts; off only where something else keeps `custom/` current. |

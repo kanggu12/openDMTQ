@@ -77,10 +77,10 @@ client data and the song data together, or the `DMQ` folder alone, with **Import
 
 **What leaves my computer?**
 Accounts, scores, recordings and backups stay on the server's computer, in `data/`, and phones talk to the server alone.
-The server asks the internet for two things, from this repository's latest release, and only when it lacks them: the
-runtime for newer phones, when it builds the app without one, and the PC client's installer, when none came with it (a
-release's images and the Windows bundle carry both). The PC client asks the same releases when **Check for updates** is
-pressed, and nothing else on its own. `./opendmtq check` on a server reachable from the
+The server asks the internet for two things, from this repository's latest release: the runtime for newer phones, when
+it builds the app without one, and the PC client's installer, when none came with it, then once a week for a newer one
+(a release's images and the Windows bundle carry both, and ask for neither). The PC client asks the same releases when
+**Check for updates** is pressed, and nothing else on its own. `./opendmtq doctor` on a server reachable from the
 internet asks check-host.net to open its page from outside, which tells that site the server's address. The game's own
 app, and Android, also look up a few Google and ad addresses; the game plays the same without them
 ([without internet](closed-network.md)).

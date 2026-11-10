@@ -9,7 +9,7 @@ build, the server and the game all stay on your network.
 | Windows bundle | Works as it is | The zip and your game files |
 | Docker Compose | Works | A release's images and source, and your game files. Docker has to be on the computer already |
 | Kubernetes | Works | A release's images in your registry, the chart, and your game files |
-| Linux host install (Debian, Ubuntu) | Works | The system's packages, three programs (apktool, uber-apk-signer, 7-Zip), the source, the runtime for newer phones, and your game files |
+| Linux host install (Debian, Ubuntu) | Works | The system's packages, three programs (apktool, uber-apk-signer, 7-Zip), the source, the runtime for newer phones, the PC client's installer, and your game files |
 | macOS host install | **Not possible**: Homebrew has no way to install from files carried in | Use Docker Compose instead |
 
 Below, `1.2.3` stands for the release you want. Everything is fetched on a computer with internet, carried over on a disk,

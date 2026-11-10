@@ -59,8 +59,8 @@ then the copy imported last. `BASE_APK=<file name>` in `.env` chooses another.
 
 ## The client data and the song data
 
-The game's files as its server kept them. What counts is the folder of the game's host, under its own name or any
-other, and in it the client data and the song data, together or apart:
+What counts is the folder of the game's host, under its own name or any other, and in it the client data and the song
+data, together or apart:
 
 ```text
 game host folder/                  any name: what counts is what is inside

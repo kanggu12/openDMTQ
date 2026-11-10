@@ -34,7 +34,8 @@ running time on the picture, and the player's name and profile under it.
   broadcasting now.
 - **For every new player:** on the Broadcasts page, New players, Start on: a new player's switch turns on at their first
   play, with the same notice in the game. Players turned off on the Players page stay off. Until the owner chooses there,
-  `LIVE_DEFAULT=on` in `.env` (`live.default` in the Helm chart) says the same.
+  `LIVE_DEFAULT=on` in `.env` (`live.default` in the Helm chart) turns on every player whose switch the owner has not
+  set, the players already there included.
 - **The quality:** on the Broadcasts page, one of four ([Limits](#limits)). Phones and the PC player follow a new one
   within 15 seconds.
 - **Find it:** LIVE is in the site's main menu on every page while broadcasts are on, with a small count while someone
@@ -255,5 +256,5 @@ The pages, the player and its controls are tested in a real browser by `tests/ui
 throwaway server and admin service on loopback, with an empty database. It needs the client data and the song data in
 `data/content` and Docker, so it does not run in CI (`tests/qa.sh` runs it). `BROWSER=1` also plays a real recording in headless Chromium
 (`tests/live/browser.js`), and in a Chromium with a sound card that records, whose output has to match the
-recording almost to the bit (`tests/live/sound`). Never point `smoke.py` at a server people play on: it makes
-accounts and flips switches.
+recording almost to the bit (`tests/live/sound`). `smoke.py` makes accounts and flips switches on the
+server it is given.

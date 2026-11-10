@@ -5,8 +5,7 @@ name that points at your public IP and forward one TCP port to it.
 
 This guide is for Docker Compose, which brings the HTTPS the site's sign-in needs on the internet. A host install
 and the Windows bundle have no HTTPS. Their `host` command takes a host name too (`./opendmtq host
-myhome.example.com:8790` on a host install), but passwords would then cross the internet in clear, so use them on a
-local network.
+myhome.example.com:8790` on a host install), but passwords would then cross the internet in clear.
 
 How a phone on mobile data reaches the server PC:
 
@@ -48,7 +47,7 @@ A test from inside your network does not prove the forward works.
 
 | Path | Access |
 |---|---|
-| Game endpoints (`/DMQ`, `/api`, `/accounts`, ...) | Open to anyone, because the app has no way to sign in to the site. The game's own protocol does not authenticate players either: the player id travels in clear in its token and is trusted as it is, so anyone who reaches the port can create accounts and act as any player. The site's sign-in does not change that; expose the server to people you trust. |
+| Game endpoints (`/DMQ`, `/api`, `/accounts`, ...) | Open to anyone, because the app has no way to sign in to the site. The game's own protocol does not authenticate players either: the player id travels in clear in its token and is trusted as it is, so anyone who reaches the port can create accounts and act as any player. The site's sign-in does not change that. |
 | The site (`/opendmtq/`: home, broadcasts, download, rankings, songs, players) and the app download (`/apk`) | Sign-in page first, whatever page is asked for, then that page: an account's ID and password, made on the admin pages' Accounts page (nobody makes their own). Repeated wrong passwords are slowed down. Open without it: the sign-in page, its language switch, the licenses and the health check. The game's own score viewer (`/djmaxQ`, `/score`), which the game opens in its window, is behind the same sign-in. |
 | Admin pages (`/opendmtq/admin/`) | With `expose --admin-public` (or `ADMIN_ON_PUBLIC_PORT=yes`): `https://<address>/opendmtq/admin/` from anywhere, over HTTPS only (a plain-HTTP visit is sent there), and the site's footer links to it. Without it they are not on the public port. On the server PC itself, `http://localhost:8791/opendmtq/admin/` always works. |
 | The API (`/opendmtq/api/v1/`) | Where the admin pages are, over HTTPS only, with a token from the Accounts page on every request. A request over plain HTTP is refused (`403 use_https`, with the HTTPS address), and nothing of it is passed on ([api.md](api.md)). |
@@ -97,8 +96,7 @@ the server certificate before it runs out (it lasts 825 days) and restarts the e
 `doctor` warns 30 days ahead.
 
 The containers run unprivileged with a read-only root filesystem, and only the edge holds the certificate's key. The
-game's protocol stays open as described above, so treat the machine accordingly: keep it updated and do not expose
-anything else from it.
+game's protocol stays open as described above.
 
 ## Going back
 
@@ -106,7 +104,7 @@ anything else from it.
 ./opendmtq expose --off
 ```
 
-Returns to the local address on port 80, puts the admin pages back
+Returns to the local address on port 80 (or the first free port from 8080 when 80 is taken), puts the admin pages back
 on the main port, limits the Windows firewall rule to the local network (under WSL) and rebuilds
 the app. Remove the port forward from the router(s). The address is detected as `setup` detects
 it; give it with `--host` when that fails, as it does with Docker Desktop while WSL runs in NAT

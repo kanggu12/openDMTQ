@@ -779,7 +779,7 @@ def cmd_setup(args):
         # Nothing imported yet and no folder given: look where downloads usually land.
         found = discover.find()
         if not found:
-            die("game files not found in Downloads or on the Desktop (README, \"What you need\" says which); "
+            die("game files not found in Downloads or on the Desktop (docs/install.md, \"What you need\", says which); "
                 "put them there, or run: ./opendmtq setup --from <folder>")
         source, names = found[0]
         if len(found) > 1 and sys.stdin.isatty():

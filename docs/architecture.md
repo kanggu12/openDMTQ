@@ -20,7 +20,7 @@ With Docker Compose:
 | Import | Takes the game's data files from the owner's folder or archive | `tools/opendmtq_tools/importer.py` | `importer`, one-shot | plain Python |
 | Song list | The song list and the client's tables, from what was imported and added | `tools/opendmtq_tools/songs.py` | `tools`, before every start | before every start |
 | arm32 runtime | Runs the 32-bit game on phones without 32-bit support | `arm32/`; handed out by `tools/opendmtq_tools/runtime.py` | ready-made from a release into `data/apk/arm32`, added to the app by the app builder | the same |
-| Player for Windows | Runs the same app on a PC: the arm32 runtime on a layer for Windows, a Java VM of its own, ANGLE, WASAPI, Media Foundation | `arm32/desktop`, `arm32/jvm`, `arm32/src/win`; the zip with the app made by `tools/opendmtq_tools/player_windows.py` | in a release's tools image, which the Helm chart runs too. Compose builds its images from the source by default, and those have none: the app builder then fetches the latest release's into `data/apk`. It adds the app to the player | the Windows bundle has it; a host install fetches the latest release's into `data/apk` |
+| PC client | The installer and the launcher for Windows PCs, and the player that runs the server's app there: the arm32 runtime on a layer for Windows, a Java VM of its own, ANGLE, WASAPI, Media Foundation | `client/`, `arm32/desktop`, `arm32/jvm`, `arm32/src/win`; the installer handed out by `tools/opendmtq_tools/windows_client.py` | in a release's tools image, which the Helm chart runs too; images built from the source have none, and the app builder fetches the latest release's into `data/apk` | the Windows bundle has it; a host install takes it from its kit or fetches the latest release's into `data/apk` |
 | Command line | Setup, start and stop, checks, backups | `opendmtq`, `cli/opendmtq_cli`, `host/opendmtq_host` | `./opendmtq` | `./opendmtq`, passed on to `host/opendmtq_host`; `OpenDMTQ.exe` on Windows |
 
 The Helm chart runs the same images with a router in front ([kubernetes.md](kubernetes.md)).
@@ -241,7 +241,7 @@ and `./opendmtq doctor` read.
 `server/entrypoint.sh` (the image) and `host/opendmtq_host` (a host install) do the same before Apache starts:
 
 - `server/game/bin/setup-db.php` prepares the database: a new one gets the game's two tables (`Member`, `Play`); every
-  start adds what later versions need (`PlayLog`, `AchievementDate`, `LiveSwitch`, `SiteUser`, the indexes), merges a
+  start adds what later versions need (`PlayLog`, `AchievementDate`, `LiveSwitch`, `LiveSetting`, `SiteUser`, `ApiToken`, the indexes), merges a
   player's duplicate score rows on one chart (the best of each), caps scores a forged result left out of range, and
   deletes plays older than a year. It picks the journal mode the disk allows.
 - The live broadcasts' window (`data/state/live`) starts empty; the recordings stay.
@@ -372,8 +372,8 @@ hand.
   The database keeps a SHA-256 of each token, compared in constant time; a token that works is never throttled, and
   wrong ones count with the sign-in throttle; a token works while its admin can open the pages ([api.md](api.md)).
 - The game's own protocol has no real authentication: the platform login trusts the phone's device id, and the game
-  login the player id in its token. Anyone who reaches the port can make accounts and act as any player. Open the
-  server to the internet only through `./opendmtq expose` ([internet.md](internet.md)), for people you trust.
+  login the player id in its token. Anyone who reaches the port can make accounts and act as any player. `./opendmtq expose` puts the server on the
+  internet ([internet.md](internet.md)).
 - The signing key's password is random per install and kept next to the key in `data/` (never tracked).
 
 ## Without containers

@@ -77,8 +77,8 @@ cd openDMTQ
 **Kubernetes:** the Helm chart, with a volume for the game files and S3 storage:
 [install on a cluster](docs/kubernetes.md#install-on-a-cluster).
 
-The setup takes you through your files, the address, an account for each player and the app: in the browser on
-Windows, Linux and macOS, in the terminal with Docker. On each Android phone, open the address it shows, sign in and
+The setup takes you through your files, the address and the app: in the browser on Windows, Linux and macOS, in the
+terminal with Docker. The players' accounts are made on the admin pages, under **Accounts**. On each Android phone, open the address it shows, sign in and
 install the app; on a Windows PC, download the installer from the same page.
 
 [Installing, step by step](docs/install.md).

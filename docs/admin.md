@@ -13,7 +13,7 @@ owner sets up and runs the server.
   anyone signs in; and the PC client's installer for Windows, set up for this server, when the server has it
   ([the PC client](windows-player.md)).
 - **Rankings:** the first three on a podium, then the others who have played, by total best score (best score per
-  chart, summed), or by S grades, perfect plays, charts played. Players with nothing in a category are not listed in
+  chart, summed), this month's as the game ranks them, or by S grades, perfect plays, charts played. Players with nothing in a category are not listed in
   it. Average accuracy is the game's own figure.
 - **Songs:** every song with its jacket; search by title, artist or genre.
 - **Song:** one leaderboard per chart (2, 3 or 4 lines; Easy on a few songs, Normal, Hard, Expert).
@@ -97,18 +97,18 @@ SameSite=Lax, and Secure when it comes over HTTPS. Signing out ends that sign-in
 stops working; restarting the admin pages signs everyone out. Until a visitor has signed in, the pages read at most 16
 KB of any request. On the PC's own address the password travels without TLS, but only within this PC (unless
 `ADMIN_BIND` opens that address to the network). On a host install the address on the local network has no TLS either.
-Keep the password unique and change it if in doubt: edit `.env`, then restart the server.
+To change the password, edit `.env`, then restart the server.
 
 | Page | What it does |
 | :--- | :--- |
 | Setup | The four steps above: the game's files, the address, the players and the app. Reached from the status page while a step is left, and from the Songs page to import songs. |
-| Status | Things to look at first when there are any (no app, no backup, little disk, a failed build). Game server health, players, plays in the last 24 hours, players broadcasting now (or that broadcasts are off), disk space, current app, last backup, maintenance. A message to send a friend with where to get the app and how to sign in, and its QR code. Plays over the last 30 days, when people play by weekday and hour, who plays most, the most played songs, what takes the disk, best records by grade, recent plays. |
+| Status | Things to look at first when there are any (no app, no backup, little disk, a failed build). Game server health, players, plays in the last 24 hours, players broadcasting now (or that broadcasts are off), disk space, current app, last backup, maintenance. A message to send a friend with where to get the app and how to sign in, and its QR code. Plays over the last 30 days, when people play by weekday and hour, who plays most, the most played songs, what takes the disk, best records by grade, recent plays. Resources: this machine's processors, uptime, memory, swap, disk and load, with CPU, memory in use and the game server's answers over the last 24 hours. |
 | App | The app's name on phones, `TECHNIKA Q (<name>)`: SERVER_NAME, or the address in PUBLIC_HOST when it is unset. Build the app (about 20 seconds, output shown live), download any build, delete one, or all the old ones at once. A build for another address is kept for download and does not replace the one the site offers. The PC client's installer for Windows, its size and its own download, set up for this server (the builder keeps it beside the app; the same installer serves every server). |
 | Songs | Add a song package, remove added songs, hide or show any song. Each song's plays over the last 30 days, against the most played, and when it was last played. Says so when the server has no client data or no songs yet. See [songs.md](songs.md). |
 | Players | Search by name, sort by any column, when each last played, and a row of 14 small cells, one per day of the last two weeks, darker on days with more plays. A spreadsheet of them all. A name leads to the player's page on the site. On each row whether their broadcast is on, with its switch (while broadcasts are off for the server, the page says so and a switch that is on is held for then); under More: rename, reset scores, delete (those two ask first and make a backup first, and take the player's achievements with their scores) ([live.md](live.md)). |
 | Accounts | The site's accounts, the only way into it: make one (an ID, a password typed or made, whom it is for, the game player it is, admin rights to these pages too), and its password shows once with the message to send; a new password, disable or enable, delete. Each with when it was made and last signed in. Under them the API's tokens: make one (a name and a scope, read or write), shown once; each with whose it is, when it was last used and whether it works; revoke ([api.md](api.md)). |
 | Broadcasts | At the top, broadcasts for the whole server: on or off (off until turned on; turning them off while someone is on air asks first), how many players are switched on and on air, what new players start with (off, or on from their first play), and the stream's quality, one of four with what an hour of it takes and what each viewer's connection needs. Under it every broadcast, kept (players see them as past broadcasts): watch, download as one file, hide from players, delete one, selected or all of a player's. Disk used against the two limits (20 GB and 30 days by default), which are set here, and about how many hours of broadcast still fit at the quality chosen. See [live.md](live.md). |
-| Backups | Back up now, download, upload, restore (the server keeps running; the current state is saved first), delete, each with its date and kind. A daily backup when turned on: one a day while something has changed, the latest seven kept. The page shows those seven as seven slots, the newest on the right, and when the next one comes. |
+| Backups | Back up now, download, upload, restore (the server keeps running; the current state is saved first), delete, each with its date and kind. A daily backup, on unless turned off: one a day while something has changed, the latest seven kept. The page shows those seven as seven slots, the newest on the right, and when the next one comes. |
 | Maintenance | Turn the in-game maintenance notice on or off, with a message, typed or one of a few ready ones. The site shows it too. On the server PC's own install (the Windows bundle, Linux, macOS), **Stop the server** stops every part of it. With Docker Compose the page names the command instead, `./opendmtq down`, which also makes a backup. |
 | Logs | Three tabs. **Requests:** the last 24 hours as a chart, what was asked for most, by which devices and addresses, then the newest requests with filters by text, result and kind, a click on an address to filter by it, keep updating, and the log as a file. **Plays:** every play, a page at a time, narrowed by a word, a player and days, with what the filter leaves added up over it (plays, new records, average accuracy, plays per day or week, grades); it also comes as a CSV file. **Changes:** what was done on these pages, sign-ins and failed sign-ins too, when and on whom, in words (at most a few hundred kilobytes are kept). |
 
@@ -116,7 +116,7 @@ The pages are in English until the visitor picks another language, whatever the 
 at the top of every page, for the site and the admin pages alike, and a cookie remembers it. The texts are in
 `tools/opendmtq_tools/strings.py`, the site's in `server/portal/strings.php`.
 
-Backups hold neither live video nor recordings, so they stay small. Download any recording you want to keep.
+Backups hold neither live video nor recordings, so they stay small.
 
 On a host install and in the Windows bundle, the setup imports the game's files and changes the address. With Docker
 Compose those stay on the command line (`./opendmtq import`, `./opendmtq host`, `./opendmtq expose`), because they
