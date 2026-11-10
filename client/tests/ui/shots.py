@@ -345,6 +345,14 @@ def dialogs_check(app, out, tag, problems):
     if answer is not False or app.state.server() is None:
         problems.append("%s: Esc on the start-over dialog answered %r" % (tag, answer))
     maintenance_check(app, out, tag, problems)
+    # A step of the window that fails: said once in the launcher's dialog, and the window goes on.
+    seen = next_dialog(app, out, "%s_dialog-step-failed" % tag, problems, lambda d: d.message == w("failed.message"),
+                       lambda d: d.canvas.event_generate("<Return>"))
+    app.step_failed(RuntimeError, RuntimeError("could not read C:\\Users\\player\\AppData\\Local\\OpenDMTQ\\client"
+                                                "\\servers\\example.com-8080\\app.json"), None)
+    wait_out(app.root, 1.0)
+    if "dialog" not in seen or not app.failure_said:
+        problems.append("%s: a failed step of the window was not said" % tag)
     # The update under way.
     app.go("about")
     settle(app)
@@ -473,6 +481,24 @@ def maintenance_check(app, out, tag, problems):
     if app.status_text != w("help.clear.done", size="3 MB"):
         problems.append("%s: the status line said %r after clearing" % (tag, app.status_text))
     shot(app.root, out, "%s_help-cleared" % tag)
+
+
+def stopped_check(out, tag, lang, problems):
+    """The window an error nobody expected ends in (stopped.py), with a long path in it."""
+    from opendmtq_client import dialogs, i18n
+    w = i18n.Words(lang)
+    error = OSError(28, "No space left on device", "C:\\Users\\player\\AppData\\Local\\OpenDMTQ\\client\\settings.json")
+    root, dialog = dialogs.window("error", w("stopped.title"), w("stopped.message"),
+                                  w("stopped.detail", error=w.error(error),
+                                    path="C:\\Users\\player\\AppData\\Local\\OpenDMTQ\\client\\logs\\launcher.log"),
+                                  [(w("start.close"), "close", "home")], 0, "close", language=lang)
+    wait_out(root, 1.0)
+    shot(root, out, "%s_stopped" % tag)
+    problems.extend("%s_stopped: %s" % (tag, p) for p in dialog.layout_problems())
+    dialog.canvas.event_generate("<Return>")
+    root.update()
+    if not dialog.closed or dialog.result != "close":
+        problems.append("%s: Enter did not close the stopped dialog (answer %r)" % (tag, dialog.result))
 
 
 def standalone_check(out, tag, lang, problems):
@@ -664,6 +690,7 @@ def main():
         app.root.after_cancel(job)
     app.root.destroy()
     standalone_check(args.out, tag, args.lang, problems)
+    stopped_check(args.out, tag, args.lang, problems)
     # The installer in this language (Windows' display language, with no launcher installed yet).
     installer_check(args.out, tag, args.lang, problems)
     site.stop()

@@ -201,7 +201,9 @@ cp /build/launcher.c /build/launcher.rc /build/opendmtq.ico "$work/"
 x86_64-w64-mingw32-windres -DOPENDMTQ_VERSION_NUMBERS="$numbers" -DOPENDMTQ_VERSION_TEXT="\\\"$VERSION\\\"" \
   -I "$work" "$work/launcher.rc" -O coff -o "$work/launcher.res"
 # Linked statically: it needs no MinGW DLL on the PC, only Windows' own.
-x86_64-w64-mingw32-gcc -O2 -Wall -Wextra -municode -static -s -o "$STAGE/OpenDMTQ.exe" "$work/launcher.c" "$work/launcher.res"
+# GDI draws its box for what went wrong (launcher.c).
+x86_64-w64-mingw32-gcc -O2 -Wall -Wextra -municode -static -s -o "$STAGE/OpenDMTQ.exe" "$work/launcher.c" "$work/launcher.res" \
+  -lgdi32
 rm -rf "$work"
 
 step "Notices"

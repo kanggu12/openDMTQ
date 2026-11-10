@@ -29,6 +29,8 @@
 
 #ifdef _WIN32
 #include <windows.h>
+
+#include "overlay_win32.h"
 // The C runtime's descriptors for a Windows handle (its io.h is Linux's here).
 extern "C" int _open_osfhandle(intptr_t handle, int flags);
 extern "C" int _dup2(int from, int to);
@@ -302,18 +304,20 @@ void show_error(const std::string& what) {
     // Only a start by a double click has no console to say it in: a start with arguments (a test, a developer) has its
     // output, and no box that waits for a click.
     if (!g_own_folder) return;
-    // Windows' own message box: what happened in the user's language, the reason as the log has it, and where the log is
-    // when it has one yet.
+    // The launcher's own dialog as a window of its own (overlay_win32.cpp): what happened in the user's language, the
+    // reason as the log has it, and where the log is when it has one yet.
     const bool korean = host_locale().first == "ko";
-    std::string text = korean ? "게임을 시작하지 못했습니다." : "The game could not start.";
-    text += "\n\n" + what;
+    // The reason as a sentence: its first letter up, a full stop at its end.
+    std::string detail = what;
+    if (!detail.empty() && detail[0] >= 'a' && detail[0] <= 'z') detail[0] = static_cast<char>(detail[0] - 'a' + 'A');
+    if (!detail.empty() && detail.back() != '.') detail += '.';
     if (!g_log_path.empty()) {
         std::string where = g_log_path;
         for (char& c : where)
             if (c == '/') c = '\\';
-        text += (korean ? "\n\n기록: " : "\n\nThe log: ") + where;
+        detail += (korean ? "\n\n기록: " : "\n\nThe log: ") + where;
     }
-    MessageBoxW(nullptr, utf16(text).c_str(), L"OpenDMTQ", MB_OK | MB_ICONERROR);
+    overlay::error_box(korean ? "게임을 시작하지 못했습니다." : "The game could not start.", detail, korean);
 #endif
 }
 

@@ -6,6 +6,7 @@ that created it.
 """
 
 import logging
+import os
 import queue
 import threading
 import tkinter as tk
@@ -14,6 +15,7 @@ from PIL import ImageTk
 
 from opendmtq_client import __version__, actions, art, i18n, player, safety, theme, widgets
 from opendmtq_client import server as srv
+from opendmtq_client import state as st
 
 log = logging.getLogger("opendmtq_client")
 
@@ -68,6 +70,9 @@ class LauncherApp:
         self._setup_fonts()
         self._size_window()
         self.root.protocol("WM_DELETE_WINDOW", self.close)
+        # A step of the window that fails is said in the launcher's own dialog, never silently.
+        self.root.report_callback_exception = self.step_failed
+        self.failure_said = False       # the first such failure of this run was said (the next ones go to the log)
         # Shown again while a game runs (the window was closed, then OpenDMTQ started again): it stays after the game.
         self.root.bind("<Map>", self._mapped, add="+")
         self.root.after(50, self._pump)
@@ -638,6 +643,22 @@ class LauncherApp:
         self.state.save()
         self._setup_fonts()
         self.show()
+
+    def step_failed(self, kind, error, trace):
+        """A step of the window raised an error nobody expected: logged, and the first of the run said in a dialog with
+        where the log is. The window goes on."""
+        log.error("a step of the window failed", exc_info=(kind, error, trace))
+        if self.failure_said or self.dialog is not None:
+            return
+        self.failure_said = True
+        from opendmtq_client import dialogs
+        logs = os.path.join(st.config_dir(), "logs", "launcher.log")
+        try:
+            dialogs.tell(self, "error", self.words("stopped.title"), self.words("failed.message"),
+                         self.words("failed.detail", error=self.words.error(error), path=logs))
+        except tk.TclError:
+            # The window went while the dialog was opening.
+            pass
 
     def close(self):
         """Close the launcher. A game playing keeps going: the launcher hides until it ends, then goes."""

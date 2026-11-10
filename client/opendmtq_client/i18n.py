@@ -441,6 +441,12 @@ TEXT = {
     "start.broken.detail": ("Start over keeps the file under another name and opens the first-start guide.\n{path}",
                             "'처음부터'를 누르면 이 파일을 다른 이름으로 남겨 두고 처음 안내를 엽니다.\n{path}"),
     "start.close": ("Close", "닫기"),
+    "stopped.title": ("OpenDMTQ stopped", "OpenDMTQ가 멈춤"),
+    "stopped.message": ("OpenDMTQ stopped because of an error.", "오류로 OpenDMTQ가 멈췄습니다."),
+    "stopped.detail": ("{error}\n\nWhat happened is in the log: {path}", "{error}\n\n자세한 내용은 기록에 있습니다: {path}"),
+    "failed.message": ("Something went wrong.", "문제가 생겼습니다."),
+    "failed.detail": ("{error}\n\nThe launcher goes on. What happened is in its log: {path}",
+                      "{error}\n\n런처는 계속 쓸 수 있습니다. 자세한 내용은 기록에 있습니다: {path}"),
     "start.over": ("Start over", "처음부터"),
 
     # ------------------------------------------------------------------------------------------- errors

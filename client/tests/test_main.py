@@ -4,6 +4,7 @@ import contextlib
 import io
 import os
 import sys
+import unittest
 
 import subprocess
 import zipfile
@@ -317,3 +318,33 @@ class Maintenance(Folder):
         for args in (["--repair", "--status"], ["--uninstall", "--clear-game-data"], ["--delete-data"]):
             with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
                 main.parse(args)
+
+
+class Stopped(unittest.TestCase):
+    """An error nobody expected ends in the launcher's own dialog (stopped.py), never in PyInstaller's box."""
+
+    def failing(self):
+        raise RuntimeError("the disk went away")
+
+    def test_the_window_copy_says_it_in_the_launchers_dialog(self):
+        from opendmtq_client import stopped
+        with mock.patch.object(stopped, "windowed", return_value=True), mock.patch.object(stopped, "show") as show:
+            self.assertEqual(stopped.run(self.failing, lambda: "C:\\logs\\launcher.log"), 1)
+        error, path = show.call_args[0]
+        self.assertEqual((str(error), path), ("the disk went away", "C:\\logs\\launcher.log"))
+
+    def test_the_console_copy_says_it_on_the_console(self):
+        from opendmtq_client import stopped
+        out = io.StringIO()
+        with mock.patch.object(stopped, "windowed", return_value=False), mock.patch.object(stopped, "show") as show, \
+                contextlib.redirect_stderr(out):
+            self.assertEqual(stopped.run(self.failing, lambda: "launcher.log"), 1)
+        show.assert_not_called()
+        self.assertIn("OpenDMTQ stopped: the disk went away (the log: launcher.log)", out.getvalue())
+
+    def test_a_chosen_ending_is_no_error(self):
+        from opendmtq_client import stopped
+        with mock.patch.object(stopped, "show") as show, self.assertRaises(SystemExit):
+            stopped.run(lambda: sys.exit(2), lambda: "launcher.log")
+        show.assert_not_called()
+        self.assertEqual(stopped.run(lambda: 0, lambda: "launcher.log"), 0)

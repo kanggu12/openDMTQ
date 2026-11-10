@@ -37,9 +37,15 @@ bool menu_key(UINT vk);
 void place();
 // The cursor over the game, pressed or not, at the display's scale.
 HCURSOR cursor(bool pressed);
+// An error before the game came up, in the launcher's own dialog as a window of its own: `message` the question's line,
+// `detail` what it means. Returns when the player answers it (its button, Enter, Space or Esc).
+void error_box(const std::string& message, const std::string& detail, bool korean);
 #ifdef OVERLAY_TEST_HOOKS
 // The probe's look at the notice and the menu: their pictures as PNGs named after `prefix`.
 void test_save(const std::wstring& prefix);
+// The error box's pictures (as it is, under the pointer, pressed) at a scale, as PNGs named after `prefix`.
+void test_save_error_box(const std::wstring& prefix, const std::string& message, const std::string& detail,
+                         bool korean, float scale);
 #endif
 
 }  // namespace player::overlay
