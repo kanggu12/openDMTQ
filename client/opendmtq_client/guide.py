@@ -8,9 +8,7 @@ not.
 
 import tkinter as tk
 
-from PIL import ImageTk
-
-from opendmtq_client import apps, art, pages, theme, widgets
+from opendmtq_client import apps, pages, theme, widgets
 
 # Step keys name the words in i18n (guide.<key>.name, .sub, .title); the number shown is the place in this list.
 STEPS = ("power", "server", "login", "download", "sound", "stage")
@@ -56,8 +54,8 @@ class Guide:
         self.counter.pack(side="left")
         self.next_button = widgets.Button(bar, ui, w("guide.next"), self.next, kind="primary")
         self.next_button.pack(side="right")
-        # The last step's PLAY: the launcher's own lime slab in place of Next.
-        self.play_slab = self._make_play(bar)
+        # The last step's PLAY: the launcher's own lime slab in place of Next (not packed until then).
+        self.play_slab = widgets.PlaySlab(bar, ui, w("bottom.play"), self.next)
         self.back_button = widgets.Button(bar, ui, w("guide.back"), self.back)
         self.back_button.pack(side="right", padx=(0, px(10)))
         # Leaving the guide for the launcher: a quiet link before Back, which the keyboard reaches too.
@@ -67,42 +65,6 @@ class Guide:
         # The step's page: its name as the page's title over the site's field, its question under it.
         self.body = app.make_page(root, self.header)
         self.show(self.index)
-
-    def _make_play(self, parent):
-        """PLAY as the launcher's bottom bar shows it, for the guide's last step (not packed until then)."""
-        app, px = self.app, self.app.ui.px
-        size = (px(212), px(50))
-        self._play_pictures = {s: art.play_button(*size, state=s) for s in ("normal", "hover", "pressed", "disabled")}
-        self._play_images = {s: ImageTk.PhotoImage(p, master=app.root) for s, p in self._play_pictures.items()}
-        slab = tk.Label(parent, image=self._play_images["normal"], text=app.words("bottom.play"), compound="center",
-                        font=app.fonts.display_big, fg=theme.SECTION_COLOURS["home"]["ink"], bg=theme.STRIP, bd=0,
-                        takefocus=1, highlightthickness=max(1, px(2)), highlightbackground=theme.STRIP,
-                        highlightcolor=theme.CYAN)
-        slab.odq_enabled = False
-        slab.bind("<Enter>", lambda e: self._paint_play("hover"))
-        slab.bind("<Leave>", lambda e: self._paint_play())
-        slab.bind("<Button-1>", lambda e: self._paint_play("pressed"))
-        # Only a release over the slab counts, like a real button (drag off to cancel).
-        slab.bind("<ButtonRelease-1>", lambda e: self._released(e))
-        # The keyboard presses it as the mouse does.
-        slab.bind("<Return>", lambda e: self.next())
-        slab.bind("<space>", lambda e: self.next())
-        return slab
-
-    def _released(self, event):
-        """The mouse's button came up: PLAY when it is still over the slab, else only its look back."""
-        if 0 <= event.x < self.play_slab.winfo_width() and 0 <= event.y < self.play_slab.winfo_height():
-            self.next()
-        else:
-            self._paint_play()
-
-    def _paint_play(self, mouse=None):
-        """The slab lit when the ready check lets PLAY go, dark and still otherwise."""
-        slab = self.play_slab
-        look = (mouse or "normal") if slab.odq_enabled else "disabled"
-        slab.odq_picture = self._play_pictures[look]
-        slab.configure(image=self._play_images[look], cursor="hand2" if slab.odq_enabled else "arrow",
-                       fg=theme.SECTION_COLOURS["home"]["ink"] if slab.odq_enabled else theme.FAINT)
 
     # ------------------------------------------------------------------------------------- steps
 
@@ -160,8 +122,8 @@ class Guide:
     def _update_next(self):
         can = self._can_go_on()
         self.next_button.enable(can)
-        self.play_slab.odq_enabled = can
-        self._paint_play()
+        # The last step's PLAY lit when the ready check lets it go, dark and still otherwise.
+        self.play_slab.set("ready" if can else "waiting")
 
     def next(self):
         if self.index == len(STEPS) - 1:

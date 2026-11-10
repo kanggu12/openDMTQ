@@ -201,11 +201,33 @@ def guide_check(app, site, out, tag, problems):
             settle(app, 20, until=lambda: app.download is None)
             # The step drawn again with its answer.
             settle(app)
-        shot(app.root, out, name)
+        seen = shot(app.root, out, name)
         measure(app, name, problems)
+        if key == "stage":
+            slab_check(app.root, guide.play_slab, seen, name, problems)
         if not guide.next_button.enabled:
             problems.append("%s: Next stays off on the %s step" % (tag, key))
     return guide
+
+
+def slab_check(root, slab, picture, name, problems):
+    """PLAY's slab on its bar, in the screenshot as a person sees it: its keyboard ring's place along each side and the
+    corner its cut leaves show the bar's own colour, never a frame of another round the slab."""
+    from PIL import Image
+    from opendmtq_client import theme
+    if slab.focus_get() is slab:
+        # The keyboard is on it: its cyan ring is meant to show.
+        return
+    x, y = slab.winfo_rootx() - root.winfo_rootx(), slab.winfo_rooty() - root.winfo_rooty()
+    width, height = slab.winfo_width(), slab.winfo_height()
+    bar = tuple(int(theme.STRIP[i:i + 2], 16) for i in (1, 3, 5))
+    with Image.open(picture) as image:
+        image = image.convert("RGB")
+        spots = ((x, y + height // 2), (x + width - 1, y + height // 2), (x + width // 2, y),
+                 (x + width // 2, y + height - 1), (x + 3, y + 3))
+        others = sorted({image.getpixel(spot) for spot in spots} - {bar})
+    if others:
+        problems.append("%s: PLAY's slab sits in a frame of another colour than its bar's: %r" % (name, others))
 
 
 def wheel_check(app, problems):
@@ -307,8 +329,10 @@ def pages_check(app, out, tag, problems):
             settle(app, 6, until=lambda: app.devices is not None)
             settle(app)
         name = "%s_%s" % (tag, page)
-        shot(app.root, out, name)
+        seen = shot(app.root, out, name)
         measure(app, name, problems)
+        if page == "play":
+            slab_check(app.root, app.play_button, seen, name, problems)
         if page == "screen":
             # After its shot: the wheel scrolls the page (the header turns into the dark bar).
             wheel_check(app, problems)

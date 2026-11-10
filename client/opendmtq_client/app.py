@@ -11,8 +11,6 @@ import queue
 import threading
 import tkinter as tk
 
-from PIL import ImageTk
-
 from opendmtq_client import __version__, actions, art, i18n, player, safety, theme, widgets
 from opendmtq_client import server as srv
 from opendmtq_client import state as st
@@ -124,7 +122,8 @@ class LauncherApp:
         bar = tk.Frame(bottom, bg=theme.STRIP, height=px(BAR_HEIGHT))
         bar.pack(fill="x", padx=px(EDGE), pady=px(12))
         bar.pack_propagate(False)
-        self.play_button = self._make_play(bar)
+        # PLAY: the lime slab on the bar's own colour, the same as the guide's last step shows.
+        self.play_button = widgets.PlaySlab(bar, ui, self.words("bottom.play"), self.play)
         self.play_button.pack(side="right")
         # The status's lamp in its tone's colour, then its words.
         from PIL import ImageTk
@@ -173,53 +172,18 @@ class LauncherApp:
 
     # -------------------------------------------------------------------------------------- PLAY
 
-    def _make_play(self, parent):
-        """PLAY: the lime slab, its word in the site's wide letters, in the dark ink that reads on lime."""
-        px = self.ui.px
-        size = (px(212), px(50))
-        self._play_pictures = {s: art.play_button(*size, state=s)
-                               for s in ("normal", "hover", "pressed", "disabled", "playing")}
-        self._play_images = {s: ImageTk.PhotoImage(p, master=self.root) for s, p in self._play_pictures.items()}
-        button = tk.Label(parent, image=self._play_images["normal"], text=self.words("bottom.play"),
-                          compound="center", font=self.fonts.display_big, fg=theme.SECTION_COLOURS["home"]["ink"],
-                          bg=theme.PANEL, cursor="hand2", bd=0)
-        button.bind("<Enter>", lambda e: self._paint_play("hover"))
-        button.bind("<Leave>", lambda e: self._paint_play())
-        button.bind("<Button-1>", lambda e: self._paint_play("pressed"))
-        # Only a release over the slab counts, like a real button (drag off to cancel).
-        button.bind("<ButtonRelease-1>", lambda e: self._released(e))
-        # The keyboard's way to it: Tab reaches it (a cyan ring), Enter or Space presses it.
-        button.configure(takefocus=1, highlightthickness=max(1, px(2)), highlightbackground=theme.PANEL,
-                         highlightcolor=theme.CYAN)
-        button.bind("<Return>", lambda e: self.play())
-        button.bind("<space>", lambda e: self.play())
-        return button
-
-    def _released(self, event):
-        """The mouse's button came up: PLAY when it is still over the slab, else only its look back."""
-        widget = event.widget
-        if 0 <= event.x < widget.winfo_width() and 0 <= event.y < widget.winfo_height():
-            self.play()
-        else:
-            self._paint_play()
-
-    def _paint_play(self, mouse=None):
-        """The button's look follows the state first (busy, playing), then the mouse."""
+    def _paint_play(self):
+        """PLAY follows the state: PLAYING while the game is open, waiting while it gets ready, downloads or has
+        something to fix first, else lit (widgets.PlaySlab lights it further under the mouse)."""
         if not hasattr(self, "play_button") or not self.play_button.winfo_exists():
             # The guide is on show: it has no PLAY bar.
             return
         if self.session is not None and self.session.running():
-            look, text = "playing", self.words("bottom.playing")
+            self.play_button.set("playing", self.words("bottom.playing"))
         elif self.busy or self.download is not None or not self.ready():
-            # Getting ready, downloading or something to fix first: PLAY waits, and looks it.
-            look, text = "disabled", self.words("bottom.play")
+            self.play_button.set("waiting", self.words("bottom.play"))
         else:
-            look, text = mouse or "normal", self.words("bottom.play")
-        lit = look not in ("disabled", "playing")
-        # PLAYING is read (4.5:1 and more); a PLAY that waits is the dimmest text.
-        ink = theme.SECTION_COLOURS["home"]["ink"] if lit else theme.MUTED if look == "playing" else theme.FAINT
-        self.play_button.odq_picture = self._play_pictures[look]
-        self.play_button.configure(image=self._play_images[look], text=text, fg=ink, cursor="hand2" if lit else "arrow")
+            self.play_button.set("ready", self.words("bottom.play"))
 
     def ready(self):
         """True when nothing stops PLAY (the player, a server, its app or a sign-in to get it, no game running)."""

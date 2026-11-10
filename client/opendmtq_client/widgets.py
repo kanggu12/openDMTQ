@@ -662,6 +662,71 @@ class Button(tk.Canvas):
         self._paint("normal" if on else "disabled")
 
 
+class PlaySlab(tk.Label):
+    """PLAY, as the launcher's bottom bar and the guide's last step show it: the lime slab with its corners cut
+    (art.play_button), its word in the site's wide letters in the dark ink that reads on lime. It sits on the bar's own
+    colour, its cut corners and its keyboard ring's place too, so the slab alone shows.
+
+    set() says what PLAY can do: "ready" (lit, and lit further under the mouse), "waiting" (dark and still: something
+    to fix first, or work under way) or "playing" (the game is open). command() runs on a click released over it (drag
+    off to cancel), and on Enter or Space once Tab has reached it (a cyan ring)."""
+
+    LOOKS = ("normal", "hover", "pressed", "disabled", "playing")
+    # The slab's size (logical pixels).
+    WIDTH, HEIGHT = 212, 50
+
+    def __init__(self, parent, ui, words, command, bg=theme.STRIP):
+        px = ui.px
+        # Every look drawn once: the mouse and the state only swap them.
+        self.pictures = {look: art.play_button(px(self.WIDTH), px(self.HEIGHT), state=look) for look in self.LOOKS}
+        self.images = {look: ImageTk.PhotoImage(p, master=parent) for look, p in self.pictures.items()}
+        super().__init__(parent, image=self.images["normal"], text=words, compound="center", font=ui.fonts.display_big,
+                         fg=theme.SECTION_COLOURS["home"]["ink"], bg=bg, cursor="hand2", bd=0, takefocus=1,
+                         highlightthickness=max(1, px(2)), highlightbackground=bg, highlightcolor=theme.CYAN)
+        self.command, self.words, self.state, self.mouse = command, words, "ready", None
+        # A dialog draws the window behind it from the widgets (snapshot.py): the slab's own picture.
+        self.odq_picture = self.pictures["normal"]
+        self.bind("<Enter>", lambda e: self._mouse("hover"))
+        self.bind("<Leave>", lambda e: self._mouse(None))
+        self.bind("<Button-1>", lambda e: self._mouse("pressed"))
+        self.bind("<ButtonRelease-1>", self._released)
+        for key in ("<Return>", "<space>"):
+            self.bind(key, lambda e: self.command())
+
+    def set(self, state, words=None):
+        """What PLAY can do now ("ready", "waiting" or "playing"), and its word when that changes too (PLAYING)."""
+        self.state = state
+        if words is not None:
+            self.words = words
+        self._paint()
+
+    def _mouse(self, look):
+        self.mouse = look
+        self._paint()
+
+    def _released(self, event):
+        """The mouse's button came up: the command when it is still over the slab, else only its look back."""
+        inside = 0 <= event.x < self.winfo_width() and 0 <= event.y < self.winfo_height()
+        self.mouse = "hover" if inside else None
+        self._paint()
+        if inside:
+            self.command()
+
+    def _paint(self):
+        """The look follows the state first, then the mouse."""
+        if self.state == "ready":
+            look, ink = self.mouse or "normal", theme.SECTION_COLOURS["home"]["ink"]
+        elif self.state == "playing":
+            # PLAYING is read (4.5:1 and more on its slab).
+            look, ink = "playing", theme.MUTED
+        else:
+            # A PLAY that waits is the dimmest text.
+            look, ink = "disabled", theme.FAINT
+        self.odq_picture = self.pictures[look]
+        self.configure(image=self.images[look], text=self.words, fg=ink,
+                       cursor="hand2" if self.state == "ready" else "arrow")
+
+
 class Toggle(tk.Label):
     """An on/off switch as the site's (art.toggle); command(new_value) runs after each click."""
 
