@@ -30,8 +30,9 @@ chmod -R a+rwX "$DATA"
 docker run --rm -u 33:33 -v "$DATA/content:/content" -v "$ROOT/tests/ui:/ui:ro" --entrypoint php "opendmtq-server:$TAG" /ui/make_content.php /content >/dev/null
 # The song list as the tools write it once the owner hides a song (songs.py rebuild()): the stand-in songs, the last one
 # kept in the list and marked hidden. A play of its charts is still a play of this server's (protocol.py).
-python3 -c 'import json, sys; songs = json.load(open(sys.argv[1], encoding="utf-8")); songs[-1]["hidden_yn"] = "Y"; json.dump(songs, open(sys.argv[2], "w", encoding="utf-8"), ensure_ascii=False)' \
-  "$DATA/content/songs.json" "$DATA/custom/songList.json"
+# Its number goes to protocol.py, which then holds the hidden song's checks to it.
+HIDDEN_SONG=$(python3 -c 'import json, sys; songs = json.load(open(sys.argv[1], encoding="utf-8")); songs[-1]["hidden_yn"] = "Y"; json.dump(songs, open(sys.argv[2], "w", encoding="utf-8"), ensure_ascii=False); print(songs[-1]["song_id"])' \
+  "$DATA/content/songs.json" "$DATA/custom/songList.json")
 docker rm -f "$NAME" >/dev/null 2>&1 || true
 # As compose starts it: read-only, unprivileged, capped.
 docker run -d --name "$NAME" --cpus 2 --memory 1g -u 33:33 --read-only --tmpfs /var/opendmtq:mode=1777 --tmpfs /tmp:mode=1777 \
@@ -49,7 +50,7 @@ if ! curl -sf -m 3 -o /dev/null "http://127.0.0.1:$PORT/opendmtq/health.php"; th
   exit 1
 fi
 failed=0
-python3 "$ROOT/tests/game/protocol.py" "http://127.0.0.1:$PORT" || failed=1
+PROTOCOL_HIDDEN_SONG="$HIDDEN_SONG" python3 "$ROOT/tests/game/protocol.py" "http://127.0.0.1:$PORT" || failed=1
 # Storing achievements while another writer holds the database, on the same database, beside the running server.
 docker run --rm -u 33:33 -v "$DATA/state:/data" -v "$ROOT/tests/game:/t:ro" --entrypoint php "opendmtq-server:$TAG" \
   /t/lock.php /data/dmtq.db3 || failed=1

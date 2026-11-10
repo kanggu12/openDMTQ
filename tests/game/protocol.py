@@ -10,6 +10,7 @@ Usage: python3 tests/game/protocol.py http://127.0.0.1:18701
 
 import hashlib
 import json
+import os
 import sys
 import urllib.error
 import urllib.parse
@@ -176,9 +177,17 @@ check("the player picks a name", result is True and one("user.getUsersByPuid", [
 
 songs = one("game.getSongList", [])[0]["songs"]
 check("game.getSongList gives every song with its charts", len(songs) == 26 and all(s["song_patterns"] for s in songs))
-# The song the owner hid (protocol.sh marks the last one as the tools do): still in the list, marked, with its charts.
+# The song the owner hid, where the run hid one: protocol.sh marks the last one as the tools do, and names it in
+# PROTOCOL_HIDDEN_SONG. The runs on a host install, the Windows bundle and closed networks hide none.
+HIDDEN_SONG = int(os.environ.get("PROTOCOL_HIDDEN_SONG") or 0)
 hidden = [s for s in songs if s["hidden_yn"] == "Y"]
-check("a hidden song stays in the list, marked hidden", [s["song_id"] for s in hidden] == [26], json.dumps([s["song_id"] for s in hidden]))
+if HIDDEN_SONG:
+    # Still in the list, marked, with its charts.
+    check("a hidden song stays in the list, marked hidden", [s["song_id"] for s in hidden] == [HIDDEN_SONG],
+          json.dumps([s["song_id"] for s in hidden]))
+else:
+    # Nothing hidden that the owner did not hide.
+    check("no song is marked hidden where none was hidden", hidden == [], json.dumps([s["song_id"] for s in hidden]))
 # Every chart of the server's songs, hidden ones included: a save of any other is no play of this server's.
 listed = {c["pattern_id"] for s in songs for c in s["song_patterns"]}
 url = one("game.getSongUrl", [int(guid), 1, "ANDROID", "1.3.4"])[0]
@@ -286,12 +295,16 @@ check("none of them is kept: the player's best scores are as they were, and the 
       one("game.getOwnPatternScore", [int(guid)])[0] == before and one("game.getOwnPatternScore", [nobody])[0] == [])
 after = rows(one("game.getLineTopRankWithLevel", [0, 1, 20, []])[0]["ranks"])
 check("nor counted: the month's TOTAL is as it was", after == total, str(after))
-# A play of a chart of the hidden song: the owner may hide a song while someone plays it, and the play is the server's.
-kept, error = save(ben, hidden[0]["song_patterns"][0]["pattern_id"], notes(at100=100))
-# Ben's TOTAL: song 2's chart before, and this one.
-bens = [score for _, who, score in rows(one("game.getLineTopRankWithLevel", [0, 1, 20, [ben]])[0]["ranks"]) if who == "Ben"]
-check("a play of a hidden song's chart is kept: the owner may hide a song while it is played",
-      error is None and kept["is_success"] and bens == [130000], json.dumps([kept, error, bens])[:200])
+if HIDDEN_SONG:
+    # A play of a chart of the hidden song: the owner may hide a song while someone plays it, and the play is the server's.
+    kept, error = save(ben, hidden[0]["song_patterns"][0]["pattern_id"], notes(at100=100))
+    # Ben's TOTAL: song 2's chart before, and this one.
+    bens = [score for _, who, score in rows(one("game.getLineTopRankWithLevel", [0, 1, 20, [ben]])[0]["ranks"]) if who == "Ben"]
+    check("a play of a hidden song's chart is kept: the owner may hide a song while it is played",
+          error is None and kept["is_success"] and bens == [130000], json.dumps([kept, error, bens])[:200])
+else:
+    # Said, so that a run that meant to hide one and did not is seen in its output.
+    print("SKIP a play of a hidden song's chart: this run hid no song", flush=True)
 # The most a save may count is still a play: 10,000 notes at 100 %, by the check account, which no ranking shows.
 result, error = save(checker, 11, notes(at100=10000))
 check("10,000 notes of one judgement are still a play", error is None and result["score"] == 10000 * 200 + 45000,
