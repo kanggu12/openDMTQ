@@ -13,9 +13,7 @@ import sys
 # Run from client/ (the build mounts the repository and works there).
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from PIL import ImageDraw, ImageFont  # noqa: E402
-
-from opendmtq_client import art, theme  # noqa: E402
+from opendmtq_client import art  # noqa: E402
 
 
 def icon(path):
@@ -26,15 +24,13 @@ def icon(path):
     images[-1].save(path, format="ICO", sizes=[(s, s) for s in sizes], append_images=images[:-1])
 
 
-def splash(path, version, width=720, height=400, scale=1.4, label="TECHNIKA Q"):
-    """The picture shown while OpenDMTQ installs or updates: the site's shards, the wordmark in chrome."""
-    img = art.shards(width, height, seed=19).convert("RGBA")
-    mark = art.logo(int(width * 0.42), scale)
-    x, y = int(width * 0.075), int(height * 0.29)
-    img.alpha_composite(mark, (x, y))
-    small = ImageFont.truetype(theme.WIDE_ITALIC_FILE, max(10, int(round(9.5 * scale))))
-    ImageDraw.Draw(img).text((x + int(6 * scale), y + mark.height + int(10 * scale)), "%s  ·  %s" % (label, version),
-                             font=small, fill=theme.MUTED)
+def splash(path, version, width=720, height=400, scale=1.75, label="PC CLIENT"):
+    """The picture shown while OpenDMTQ installs or updates, as the launcher's own header: the site's page behind, and
+    the wordmark with the version block beside it, in the middle."""
+    img = art.backdrop(width, height, scale=scale / 1.75).convert("RGBA")
+    # The header's brand at a larger size: the wordmark with PC after it, the label over the version.
+    brand = art.brand(scale, "v" + version, label=label)
+    img.alpha_composite(brand, ((width - brand.width) // 2, (height - brand.height) // 2))
     img.convert("RGB").save(path)
 
 
@@ -64,7 +60,7 @@ def main():
     os.makedirs(out, exist_ok=True)
     icon(os.path.join(out, "OpenDMTQ.ico"))
     splash(os.path.join(out, "splash.png"), version)
-    splash(os.path.join(out, "setup-splash.png"), version, 560, 312, 1.1, "SETUP")
+    splash(os.path.join(out, "setup-splash.png"), version, 560, 312, 1.375, "SETUP")
     version_file(os.path.join(out, "version-info.txt"), version)
     version_file(os.path.join(out, "setup-version-info.txt"), version, "OpenDMTQ setup")
 

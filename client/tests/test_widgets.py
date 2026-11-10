@@ -51,3 +51,34 @@ class Wheel(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BuildPictures(unittest.TestCase):
+    """The pictures the Windows build makes from the launcher's drawing code (packaging/windows/assets.py)."""
+
+    def test_the_build_draws_its_pictures(self):
+        import importlib.util
+        import os
+        import shutil
+        import sys
+        import tempfile
+        from PIL import Image
+        here = os.path.dirname(os.path.abspath(__file__))
+        spec = importlib.util.spec_from_file_location(
+            "odq_assets", os.path.join(here, "..", "packaging", "windows", "assets.py"))
+        assets = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(assets)
+        out = tempfile.mkdtemp(prefix="odq-assets-test-")
+        saved = sys.argv
+        try:
+            sys.argv = ["assets.py", out, "0.8.0"]
+            assets.main()
+            sizes = {name: Image.open(os.path.join(out, name)).size for name in ("splash.png", "setup-splash.png")}
+            self.assertEqual(sizes, {"splash.png": (720, 400), "setup-splash.png": (560, 312)})
+            with Image.open(os.path.join(out, "OpenDMTQ.ico")) as icon:
+                self.assertIn((256, 256), icon.info["sizes"])
+            with open(os.path.join(out, "version-info.txt"), encoding="utf-8") as f:
+                self.assertIn("filevers=(0, 8, 0, 0)", f.read())
+        finally:
+            sys.argv = saved
+            shutil.rmtree(out, ignore_errors=True)
