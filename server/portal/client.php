@@ -20,7 +20,8 @@ function answer(int $status, array $body): void
 }
 
 // A browser's request from another site (it says so) is no launcher's: nobody's browser gets signed in from elsewhere.
-if (($_SERVER['HTTP_SEC_FETCH_SITE'] ?? 'none') === 'cross-site') {
+// The same rule as the sign-in page's (auth.php).
+if (from_another_site()) {
     answer(403, ['error' => 'cross-site']);
 }
 

@@ -7,8 +7,7 @@ $next = safe_next((string)($_GET['next'] ?? $_POST['next'] ?? '/opendmtq/'));
 
 // Signing out: forget the cookie and go home. A form on this site only: a link or a form elsewhere does nothing.
 if (isset($_GET['logout'])) {
-    $from = (string)($_SERVER['HTTP_SEC_FETCH_SITE'] ?? 'same-origin');
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($from === 'same-origin' || $from === 'none')) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && !from_another_site()) {
         dl_sign_out();
     }
     header('Location: /opendmtq/', true, 303);
@@ -18,6 +17,13 @@ if (isset($_GET['logout'])) {
 // download; the install box has the button.
 if (dl_signed_in()) {
     header('Location: ' . ($next === '/apk' ? '/opendmtq/download.php' : ($next === '/windows' ? '/opendmtq/download.php#computer' : $next)));
+    exit;
+}
+
+// A sign-in form on another site: nobody is signed in to an account that site chose, nothing it sent is read or counted,
+// and the browser gets this sign-in page, empty.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && from_another_site()) {
+    header('Location: /opendmtq/login.php?next=' . rawurlencode($next), true, 303);
     exit;
 }
 

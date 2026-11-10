@@ -190,6 +190,29 @@ function dl_sign_out(): void
     setcookie(DL_COOKIE, '', ['expires' => 1, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax', 'secure' => visit_is_https()]);
 }
 
+/* True when the browser says this request comes from a page of another site, which may not sign anyone in or out: a form
+   there would sign a visitor in to an account of its own choosing, or out. Asked of every sign-in and sign-out. */
+function from_another_site(): bool
+{
+    // What a browser says about where the request comes from: only this site's own pages, or the visitor's own typing
+    // and bookmarks, are this site.
+    $site = $_SERVER['HTTP_SEC_FETCH_SITE'] ?? null;
+    if ($site !== null) {
+        return $site !== 'same-origin' && $site !== 'none';
+    }
+    // A browser too old to say that still names the page a form came from (Origin). A request that names neither (the PC
+    // client, a script) comes from no other site's page.
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? null;
+    if ($origin === null) {
+        return false;
+    }
+    // That page's host against the one this request was sent to, ports aside (a proxy in front may leave the port out).
+    // A page with no origin of its own ("null") names no host at all.
+    $from = strtolower((string)parse_url((string)$origin, PHP_URL_HOST));
+    $here = strtolower((string)preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? '')));
+    return $from === '' || $from !== $here;
+}
+
 /* Whether signing in can work at all: the accounts can be read and the server's secret is there. Otherwise the sign-in
    page says so, instead of calling a right password wrong. */
 function site_sign_in_works(): bool

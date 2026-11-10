@@ -491,11 +491,32 @@ request(leaving, SITE + "/opendmtq/login.php?logout=1", b"", {"Sec-Fetch-Site": 
 check("the site's own form does", signed_in and 'action="/opendmtq/login.php?logout=1"' not in page("ranking.php", "en", leaving))
 
 # Accounts: an ID and a password from the Accounts page, and nothing else, signs in to the site.
-def site_sign_in(name, password):
-    """A browser of its own, signed in (or not) with this ID and password; and whether it got in."""
+def site_sign_in(name, password, headers=None):
+    """A browser of its own, signed in (or not) with this ID and password, its form sent with these headers (what a
+    browser says about the page it came from); and whether it got in."""
     jar = urllib.request.build_opener(NoRedirect, urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
-    request(jar, SITE + "/opendmtq/login.php", urllib.parse.urlencode({"user": name, "password": password, "next": "/opendmtq/"}).encode())
+    request(jar, SITE + "/opendmtq/login.php", urllib.parse.urlencode({"user": name, "password": password, "next": "/opendmtq/"}).encode(), headers)
     return jar, request(jar, SITE + "/opendmtq/ranking.php")[0] == 200
+
+
+# Signing in takes this site's own form too: a form on another site cannot sign a visitor in to an account that site
+# chose (its owner's, to see what the visitor does there). What the browser says decides: where the request comes from,
+# or in an older browser the page the form came from (Origin, its host against the one asked; "null" names none).
+form = urllib.parse.urlencode({"user": "dmtq", "password": SITE_PASSWORD, "next": "/opendmtq/live.php"}).encode()
+status, headers, _ = request(plain, SITE + "/opendmtq/login.php", form, {"Sec-Fetch-Site": "cross-site"})
+check("a sign-in form on another site leads to the empty sign-in page", status == 303 and headers.get("Location") == "/opendmtq/login.php?next=%2Fopendmtq%2Flive.php",
+      f"{status} {headers.get('Location')}")
+elsewhere = [{"Sec-Fetch-Site": "cross-site"}, {"Sec-Fetch-Site": "same-site"}, {"Origin": "http://elsewhere.example"}, {"Origin": "null"}]
+check("and signs nobody in, nor does one on a neighbour of this site, nor one an older browser names",
+      not any(site_sign_in("dmtq", SITE_PASSWORD, h)[1] for h in elsewhere))
+here = [{"Sec-Fetch-Site": "same-origin"}, {"Sec-Fetch-Site": "none"}, {"Origin": SITE}, {}]
+check("the site's own form signs in, from any browser, and so does a request that names no page",
+      all(site_sign_in("dmtq", SITE_PASSWORD, h)[1] for h in here))
+# The PC client's sign-in answers what a page of another site asks with 403, the launcher itself (it names no page) as before.
+client_signin = urllib.parse.urlencode({"user": "dmtq", "password": SITE_PASSWORD}).encode()
+check("the PC client's sign-in refuses another site's page too",
+      all(request(plain, SITE + "/opendmtq/client.php?signin", client_signin, h)[0] == 403 for h in elsewhere)
+      and request(plain, SITE + "/opendmtq/client.php?signin", client_signin)[0] == 200)
 
 
 made = account_post(action="create", name="Smoke2", password="", note="")
