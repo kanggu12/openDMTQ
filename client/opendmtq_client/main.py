@@ -216,7 +216,7 @@ def _repair():
     from opendmtq_client import repair
     try:
         result = repair.run()
-    except repair.RepairError as e:
+    except (repair.RepairError, OSError) as e:
         _say(str(e), error=True)
         return 2
     # Each file named, as the log names it.

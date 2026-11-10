@@ -849,6 +849,9 @@ def uninstall_program(app):
         app.leave()
 
     def deleted(failed, error):
+        # From here on the window writes nothing, whatever the player does next (closing it during a dialog below too):
+        # its copy of the settings, sign-ins and all, would bring the deleted folder back.
+        app.state.discarded = True
         if error is not None:
             # Nothing is uninstalled after a deletion that stopped half way: the player can choose again.
             dialogs.tell(app, "error", w("help.uninstall"), w("help.uninstall.failed"), w.error(error))

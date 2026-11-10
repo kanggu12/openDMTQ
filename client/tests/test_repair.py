@@ -98,6 +98,47 @@ class Repair(Folder):
         repair.run()
         self.assertFalse(os.path.exists(target + repair.ASIDE))
 
+    def test_a_changed_file_never_becomes_a_missing_one(self):
+        # The new copy cannot take the old one's place even after the old one moved aside (a scanner holding it):
+        # the old one comes back, and the file is counted as not put back.
+        target = self.path("current/OpenDMTQ.exe")
+        with open(target, "wb") as f:
+            f.write(b"damaged")
+        real = os.replace
+
+        def replace(source, destination):
+            if source.endswith(repair.PART):
+                raise PermissionError(32, "in use", source)
+            real(source, destination)
+
+        with mock.patch.object(os, "replace", replace), mock.patch.object(repair, "PAUSE", 0):
+            result = repair.run()
+        self.assertEqual(result.failed, [os.path.join("current", "OpenDMTQ.exe")])
+        self.assertEqual(self.read("current/OpenDMTQ.exe"), b"damaged")
+        self.assertFalse(os.path.exists(target + repair.ASIDE))
+
+    def test_a_file_that_cannot_be_read_is_put_back_and_the_rest_compared(self):
+        os.remove(self.path("current/player/opendmtq-player.exe"))
+        real = repair._crc
+
+        def crc(path):
+            if path.endswith("python312.dll"):
+                raise PermissionError(13, "denied", path)
+            return real(path)
+
+        with mock.patch.object(repair, "_crc", crc):
+            result = repair.run()
+        self.assertEqual(sorted(result.changed + result.missing),
+                         sorted([os.path.join("current", "_internal", "python312.dll"),
+                                 os.path.join("current", "player", "opendmtq-player.exe")]))
+        self.assertEqual(result.failed, [])
+
+    def test_a_package_that_cannot_be_opened(self):
+        with mock.patch.object(repair.zipfile, "ZipFile", side_effect=PermissionError(13, "denied")):
+            with self.assertRaises(repair.RepairError) as caught:
+                repair.run()
+        self.assertEqual(caught.exception.key, "error.repair.package")
+
     def test_what_cannot_be_put_back_is_counted(self):
         os.remove(self.path("current/player/lib/x86/libc++.dll"))
         with mock.patch.object(repair, "_put_back", return_value=False):

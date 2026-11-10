@@ -107,6 +107,7 @@ class LauncherState:
         self.servers = []                       # the servers this launcher knows (see _server)
         self.current = None                     # the address of the one PLAY plays on, or None
         self.last_session = None                # {"seconds", "exit_code", "crashed"} of the last game
+        self.discarded = False                  # Delete all removed the folder (removal.py): nothing is written again
 
     @property
     def language(self):
@@ -168,6 +169,9 @@ class LauncherState:
 
     def save(self, path=None):
         """Write the state through a temporary file in the same folder, then swap it in."""
+        if self.discarded:
+            # The player deleted everything OpenDMTQ keeps: writing would bring the folder back, sign-ins and all.
+            return
         path = path or self.path()
         folder = os.path.dirname(path)
         os.makedirs(folder, exist_ok=True)

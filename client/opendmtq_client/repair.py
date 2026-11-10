@@ -13,6 +13,7 @@ Repair (OpenDMTQ-Setup.exe run again) takes over from there.
 
 import logging
 import os
+import time
 import zipfile
 import zlib
 
@@ -29,6 +30,8 @@ UPDATER_ENTRY, STUB_ENDING = "Squirrel.exe", "_ExecutionStub.exe"
 ASIDE, PART = ".odq-old", ".odq-new"
 # Read and written a megabyte at a time.
 CHUNK = 1 << 20
+# Tries at swapping a file in, a moment apart: a virus scanner holds a file it has just seen being written.
+TRIES, PAUSE = 3, 0.2
 
 
 class RepairError(errors.Worded):
@@ -105,11 +108,31 @@ def _sweep(root):
                     pass
 
 
+def _swap_in(part, target):
+    """Put the written file in its place; OSError when Windows keeps refusing. A file in use by a running program (this
+    one, most likely) cannot be written over but can be renamed: it goes aside first, and comes back when the new one
+    still cannot take its place, so that a changed file never becomes a missing one."""
+    for attempt in range(TRIES):
+        try:
+            os.replace(part, target)
+            return
+        except OSError:
+            if attempt < TRIES - 1:
+                time.sleep(PAUSE)
+    aside = target + ASIDE
+    os.replace(target, aside)
+    try:
+        os.replace(part, target)
+    except OSError:
+        os.replace(aside, target)
+        raise
+
+
 def _put_back(package, info, target):
     """One file out of the package into its place; False when Windows does not let it be replaced."""
-    os.makedirs(os.path.dirname(target), exist_ok=True)
     part = target + PART
     try:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
         # Written beside its place first: a repair that stops half way leaves the file there as it was.
         with package.open(info) as source, open(part, "wb") as out:
             while True:
@@ -117,12 +140,7 @@ def _put_back(package, info, target):
                 if not piece:
                     break
                 out.write(piece)
-        try:
-            os.replace(part, target)
-        except OSError:
-            # In use by a running program (this one, most likely): renamed aside, which Windows allows.
-            os.replace(target, target + ASIDE)
-            os.replace(part, target)
+        _swap_in(part, target)
         return True
     except OSError as e:
         log.warning("could not put %s back: %s", target, e)
@@ -151,12 +169,17 @@ def run(root=None, progress=None):
             entries = [(info, target) for info, target in entries if target]
             for done, (info, target) in enumerate(entries, 1):
                 name = os.path.relpath(target, root)
-                if not os.path.isfile(target):
-                    kind = missing
-                elif os.path.getsize(target) != info.file_size or _crc(target) != info.CRC:
+                try:
+                    if not os.path.isfile(target):
+                        kind = missing
+                    elif os.path.getsize(target) != info.file_size or _crc(target) != info.CRC:
+                        kind = changed
+                    else:
+                        kind = None
+                except OSError as e:
+                    # A file that cannot be read is put back as a changed one; the files after it are still compared.
+                    log.warning("could not read %s: %s", target, e)
                     kind = changed
-                else:
-                    kind = None
                 if kind is not None:
                     kind.append(name)
                     if not _put_back(package, info, target):
@@ -164,8 +187,8 @@ def run(root=None, progress=None):
                 checked += 1
                 if progress:
                     progress(done, len(entries))
-    except (zipfile.BadZipFile, zlib.error, EOFError) as e:
-        # The package itself is damaged: only the installer has another copy.
+    except (zipfile.BadZipFile, zlib.error, EOFError, OSError) as e:
+        # The package itself is damaged or cannot be opened: only the installer has another copy.
         log.warning("the installed package cannot be read: %s", e)
         raise RepairError("the installed package cannot be read (run OpenDMTQ-Setup.exe again)",
                           "error.repair.package") from e

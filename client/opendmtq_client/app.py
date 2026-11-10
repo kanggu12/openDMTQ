@@ -662,7 +662,11 @@ class LauncherApp:
         if self.dialog is not None:
             self.dialog.close(self.dialog.cancel_value)
         self.cancel_download()
-        self.root.destroy()
+        try:
+            self.root.destroy()
+        except tk.TclError:
+            # The player closed the window already, while a dialog before this was up.
+            pass
 
     def run(self):
         self.root.mainloop()

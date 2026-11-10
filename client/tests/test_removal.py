@@ -115,14 +115,51 @@ class Removal(Folder):
         self.assertEqual(listing(own), {"notes.txt"})
         self.assertFalse(os.path.exists(self.root))
 
-    def test_the_launchers_names_are_its_own(self):
+    def test_the_launchers_files_are_its_own(self):
         # Everything the launcher wrote in its folder while it ran: the settings, the log, a server's app.
         main._logging()
-        write(apps.folder("http://127.0.0.1:1"), {"app.apk": b"a"})
-        for name in os.listdir(st.config_dir()):
-            self.assertTrue(removal._own(name), name)
+        write(apps.folder("http://127.0.0.1:1"), {"app.apk": b"a", apps.CONF: b"apk=app.apk", apps.DETAILS: b"{}"})
+        own = st.config_dir()
+        found = {os.path.relpath(p, own) for p in removal._own_paths(own)}
+        self.assertEqual(found, {st.FILE_NAME, os.path.join("logs", "launcher.log"),
+                                 os.path.join("servers", "127.0.0.1-1")})
         # A file the player put there is not.
         self.assertFalse(removal._own("notes.txt"))
+
+    def test_a_shared_folder_keeps_other_programs_files(self):
+        # OPENDMTQ_CLIENT_DIR naming a folder other programs use too: their logs and folders stay.
+        own = os.path.join(self.home, "shared")
+        os.environ["OPENDMTQ_CLIENT_DIR"] = own
+        st.LauncherState().save()
+        main._logging()
+        write(apps.folder("http://127.0.0.1:1"), {"app.apk": b"a", apps.CONF: b"apk=app.apk"})
+        write(own, {"logs/other.log": b"theirs", "servers/other/data.bin": b"theirs"})
+        self.assertEqual(removal.delete_everything(), [])
+        self.assertEqual(listing(own), {"logs/other.log", "servers/other/data.bin"})
+
+    def test_a_linked_data_folder_keeps_the_id(self):
+        # The game's data moved to another disk, a link left in its place: cleared behind the link, the id kept there.
+        elsewhere = os.path.join(self.home, "other-disk", "data")
+        os.makedirs(os.path.dirname(elsewhere))
+        os.rename(os.path.join(self.game, "data"), elsewhere)
+        os.symlink(elsewhere, os.path.join(self.game, "data"))
+        self.assertEqual(removal.game_data_size(), sum(len(v) for k, v in GAME.items() if k != "data/android_id"))
+        self.assertEqual(removal.clear_game_data(), [])
+        self.assertTrue(os.path.islink(os.path.join(self.game, "data")))
+        self.assertEqual(listing(elsewhere), {"android_id"})
+        with open(os.path.join(self.game, "data", "android_id"), "rb") as f:
+            self.assertEqual(f.read(), GAME["data/android_id"])
+        # Delete all takes what is behind the link too.
+        self.assertEqual(removal.delete_everything(), [])
+        self.assertEqual(listing(elsewhere), set())
+
+    def test_nothing_is_written_after_delete_all(self):
+        state = st.LauncherState.load()
+        removal.delete_everything()
+        # The window's copy, sign-ins and all, marked as the window marks it after Delete all.
+        state.discarded = True
+        state.save()
+        self.assertFalse(os.path.exists(self.root))
 
     def test_no_log_comes_back_after_delete_all(self):
         main._logging()

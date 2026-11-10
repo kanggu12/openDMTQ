@@ -15,7 +15,8 @@ Three removals, from the least to the most:
   uninstall()          the program, by Velopack's own uninstaller, which also takes the shortcuts and Windows' entry
 
 Nothing here asks: the window and the command line ask first (pages.py, main.py). A link or a Windows junction is
-removed as itself and never followed, except a game's folder that is one (moved to another disk): its contents go.
+removed as itself and never followed, except a game's folder or its data folder that is one (moved to another disk):
+what it holds is the game's, and goes as if it were in place.
 """
 
 import logging
@@ -25,7 +26,7 @@ import subprocess
 import sys
 import tempfile
 
-from opendmtq_client import errors, installed, player, preset, safety, updates
+from opendmtq_client import apps, errors, installed, player, preset, safety, updates
 from opendmtq_client import server as srv
 from opendmtq_client import state as st
 
@@ -35,9 +36,12 @@ log = logging.getLogger("opendmtq_client")
 VENDOR, LAUNCHER = "OpenDMTQ", "client"
 # Where the player keeps the id this PC is a player by, inside a game's folder.
 ID_FOLDER, ID_FILE = "data", "android_id"
-# What the launcher writes in its folder: asked only for a folder OPENDMTQ_CLIENT_DIR names, where other files may be.
-OWN_NAMES = (st.FILE_NAME, srv.TRUST_FILE, preset.FILE_NAME, updates.PENDING, player.SETTINGS, "logs", "servers")
+# What the launcher writes in its folder: asked only for a folder OPENDMTQ_CLIENT_DIR names, where other programs'
+# files may be. Its files by their names; in "logs" and "servers", which other programs may have too, only its own.
+OWN_NAMES = (st.FILE_NAME, srv.TRUST_FILE, preset.FILE_NAME, updates.PENDING, player.SETTINGS)
 OWN_STARTS = (st.FILE_NAME + ".broken-", player.SETTINGS + ".", ".settings-", ".trust-", ".preset-")
+LOGS, LOG_NAMES = "logs", ("launcher.log", "launcher.log.1", "launcher.log.2")
+SERVERS = "servers"
 # Windows' tag of a junction (the stat module has it on Windows only).
 JUNCTION = getattr(stat, "IO_REPARSE_TAG_MOUNT_POINT", 0xA0000003)
 # CREATE_NO_WINDOW and CREATE_NEW_PROCESS_GROUP: the uninstaller shows nothing and outlives this program.
@@ -70,9 +74,14 @@ def _names(folder):
         return []
 
 
+def _real(path):
+    """A path as the system finds it: links followed, Windows' short names long, in one case."""
+    return os.path.normcase(os.path.realpath(path))
+
+
 def _same(a, b):
     """Whether two paths name one place."""
-    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+    return _real(a) == _real(b)
 
 
 def game_folders():
@@ -104,8 +113,8 @@ def game_data_size():
     for folder in game_folders():
         for name in _names(folder):
             path = os.path.join(folder, name)
-            if name.lower() == ID_FOLDER and os.path.isdir(path) and not _is_link(path):
-                # The data folder: all of it but the id.
+            if name.lower() == ID_FOLDER and os.path.isdir(path):
+                # The data folder (or the folder it links to): all of it but the id.
                 total += sum(_counted(os.path.join(path, inner)) for inner in _names(path)
                              if inner.lower() != ID_FILE)
             else:
@@ -118,7 +127,7 @@ def everything_size():
     root, own = data_root(), st.config_dir()
     total = sum(_counted(os.path.join(root, name), link_too=True) for name in _names(root))
     if not _inside(own, root):
-        total += sum(_counted(os.path.join(own, name)) for name in _names(own) if _own(name))
+        total += sum(_counted(path) for path in _own_paths(own))
     return total
 
 
@@ -168,13 +177,33 @@ def _rmdir(path):
 
 def _inside(path, folder):
     """Whether a path is a folder or under it."""
-    path, folder = (os.path.normcase(os.path.abspath(p)) for p in (path, folder))
+    path, folder = _real(path), _real(folder)
     return path == folder or path.startswith(folder + os.sep)
 
 
 def _own(name):
-    """Whether a name in the launcher's folder is one the launcher writes."""
+    """Whether a file in the launcher's folder is one the launcher writes."""
     return name in OWN_NAMES or name.startswith(OWN_STARTS)
+
+
+def _own_paths(own):
+    """What the launcher wrote in a folder of other programs' files too: its files, its logs, its servers' apps."""
+    found = [os.path.join(own, name) for name in _names(own) if _own(name)]
+    logs = os.path.join(own, LOGS)
+    found += [os.path.join(logs, name) for name in _names(logs) if name in LOG_NAMES]
+    servers = os.path.join(own, SERVERS)
+    for name in _names(servers):
+        # A server's folder is the launcher's when it holds what the launcher puts there (apps.py).
+        path = os.path.join(servers, name)
+        if any(os.path.isfile(os.path.join(path, mark)) for mark in (apps.CONF, apps.DETAILS)):
+            found.append(path)
+    return found
+
+
+def _followed(path):
+    """Stop a test before it deletes what a linked folder leads to, unless that is a temporary folder."""
+    if _is_link(path):
+        safety.refuse_deleting_in_tests(os.path.realpath(path))
 
 
 def clear_game_data():
@@ -186,10 +215,12 @@ def clear_game_data():
     failed = []
     safety.refuse_deleting_in_tests(data_root())
     for folder in game_folders():
+        _followed(folder)
         for name in _names(folder):
             path = os.path.join(folder, name)
-            if name.lower() == ID_FOLDER and os.path.isdir(path) and not _is_link(path):
-                # The data folder stays, with the id alone in it.
+            if name.lower() == ID_FOLDER and os.path.isdir(path):
+                # The data folder stays, with the id alone in it; a link to one elsewhere too, the id still behind it.
+                _followed(path)
                 for inner in _names(path):
                     if inner.lower() != ID_FILE:
                         _delete(os.path.join(path, inner), failed)
@@ -223,14 +254,22 @@ def delete_everything():
     log.info("deleting everything OpenDMTQ keeps on this PC")
     close_log()
     if not _inside(own, root):
-        # A folder OPENDMTQ_CLIENT_DIR names: only what the launcher wrote goes, and the folder when that empties it.
-        for name in _names(own):
-            if _own(name):
-                _delete(os.path.join(own, name), failed)
-        _rmdir(own)
+        # A folder OPENDMTQ_CLIENT_DIR names: only what the launcher wrote goes, and each folder when that empties it.
+        for path in _own_paths(own):
+            _delete(path, failed)
+        for name in (LOGS, SERVERS, ""):
+            _rmdir(os.path.join(own, name))
     for folder in game_folders():
+        # A game's data folder moved to another disk: what is in it goes, the id with it, then the link below.
+        for name in _names(folder):
+            path = os.path.join(folder, name)
+            if name.lower() == ID_FOLDER and _is_link(path):
+                _followed(path)
+                for inner in _names(path):
+                    _delete(os.path.join(path, inner), failed)
         if _is_link(folder):
             # A game's folder moved to another disk: what is in it goes, then the link below.
+            _followed(folder)
             for name in _names(folder):
                 _delete(os.path.join(folder, name), failed)
     # OpenDMTQ's own folder: everything in it is OpenDMTQ's.
