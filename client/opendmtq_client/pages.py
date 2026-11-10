@@ -377,7 +377,7 @@ def check_server(app, address, then=None):
     threading.Thread(target=work, daemon=True, name="connect").start()
 
 
-def connect_panel(app, parent, rerender, bg=theme.BG, forget=False):
+def connect_panel(app, parent, rerender, forget=False):
     """The server's card: its address and Connect, and one line under them (server_line). With `forget`, the server in
     use can be forgotten there too (the Online page; the guide only connects)."""
     ui, w = app.ui, app.words
@@ -414,7 +414,7 @@ def connect_panel(app, parent, rerender, bg=theme.BG, forget=False):
     return address
 
 
-def signin_panel(app, parent, rerender, bg=theme.BG):
+def signin_panel(app, parent, rerender):
     """The sign-in on the current server: who is signed in and Sign out, or the ID and password and Sign in."""
     ui, w = app.ui, app.words
     server = app.state.server()
@@ -503,7 +503,7 @@ def signin_panel(app, parent, rerender, bg=theme.BG):
     message.pack(fill="x", pady=(ui.px(8), 0))
 
 
-def app_panel(app, parent, rerender, bg=theme.BG):
+def app_panel(app, parent, rerender):
     """The server's app on this PC: what it has, what the server offers, and the download with its progress."""
     ui, w = app.ui, app.words
     server = app.state.server()

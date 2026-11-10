@@ -51,12 +51,10 @@ FONT_FILES = ("DMTQWide-ExtraBold.ttf", "Pretendard-Regular.ttf", "Pretendard-Se
 DISPLAY = "DMTQ Wide"
 TEXT_FONT = "Pretendard"
 TEXT_BOLD = "Pretendard SemiBold"
-ICONS = "Material Icons"
 # Files for the titles drawn as pictures (art.py): Latin in the leaning wide face, Korean in Pretendard Bold (leant).
 WIDE_FILE = os.path.join(FONT_DIR, "DMTQWide-ExtraBold.ttf")
 WIDE_ITALIC_FILE = os.path.join(FONT_DIR, "DMTQWide-ExtraBoldItalic.ttf")
 HANGUL_TITLE_FILE = os.path.join(FONT_DIR, "Pretendard-Bold.ttf")
-TEXT_BOLD_FILE = os.path.join(FONT_DIR, "Pretendard-SemiBold.ttf")
 ICON_FILE = os.path.join(FONT_DIR, "MaterialIcons-Regular.ttf")
 
 

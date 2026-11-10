@@ -82,27 +82,6 @@ def path_breaks(font, text, width):
     return "\n".join(lines)
 
 
-def balanced_width(font, text, width):
-    """The narrowest wrap width that keeps `text` on as few lines as `width` does, so the lines come out even and
-    no word is left alone on the last one (as the web's text-wrap: pretty)."""
-    def lines(w):
-        return len(snapshot.wrap(font, text, w))
-    count = lines(width)
-    if count <= 1:
-        return width
-    # Never narrower than the longest word (a path has no spaces: Tk would cut it between letters).
-    longest = max([font.measure(word) for word in text.split()] or [0])
-    low, high = min(width, max(width // 2, longest + 4)), width
-    while low < high:
-        mid = (low + high) // 2
-        if lines(mid) <= count:
-            high = mid
-        else:
-            low = mid + 1
-    # A few pixels of room: Tk measures a line the same way, but never wraps one that fits exactly.
-    return min(width, low + 4)
-
-
 class Dialog:
     """One dialog over `root`. buttons: [(words, value, look)]; `default` has the ring at first; `cancel` is the
     value Esc, closing the window or a rebuild of the window give. `window` draws the scene behind for a size

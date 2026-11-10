@@ -116,7 +116,7 @@ def _paint(widget, img, draw, origin, clip):
             font = _font(child, _option(child, "font"))
             if font:
                 _bars(draw, font, [child.get()], _colour(child, theme.TEXT), (box[0] + 8, box[1], box[2], box[3]),
-                      "w", "left", seen, False)
+                      "w", "left", seen)
             continue
         picture = getattr(child, "odq_picture", None)
         if callable(picture):
@@ -209,7 +209,7 @@ def wrap(font, text, width):
     return lines
 
 
-def _bars(draw, font, lines, colour, area, anchor, justify, seen, icon):
+def _bars(draw, font, lines, colour, area, anchor, justify, seen):
     """Each line as a bar about as tall as small letters, placed the way Tk places the text in `area`."""
     if colour is None:
         return
@@ -221,8 +221,8 @@ def _bars(draw, font, lines, colour, area, anchor, justify, seen, icon):
     down = "n" if anchor in ("n", "nw", "ne") else ("s" if anchor in ("s", "sw", "se") else "centre")
     x = left if across == "w" else (right - block_w if across == "e" else (left + right - block_w) // 2)
     y = top if down == "n" else (bottom - block_h if down == "s" else (top + bottom - block_h) // 2)
-    # An icon is one solid glyph; a line of letters is a band through the middle of its height.
-    band = (0.2, 0.8) if icon else (0.32, 0.72)
+    # A line of letters is a band through the middle of its height.
+    band = (0.32, 0.72)
     for i, (line, width) in enumerate(zip(lines, widths)):
         if not line.strip():
             continue
@@ -240,7 +240,7 @@ def _label_text(label, draw, box, seen):
     padx, pady = _pixels(label, label.cget("padx")), _pixels(label, label.cget("pady"))
     area = (box[0] + padx, box[1] + pady, box[2] - padx, box[3] - pady)
     _bars(draw, font, wrap(font, text, wrap_px), _colour(label, label.cget("fg")), area, str(label.cget("anchor")),
-          str(label.cget("justify")), seen, font.actual("family") == theme.ICONS)
+          str(label.cget("justify")), seen)
 
 
 def _entry_text(entry, draw, box, seen):
@@ -250,7 +250,7 @@ def _entry_text(entry, draw, box, seen):
     font = _font(entry, _option(entry, "font"))
     if text and font:
         _bars(draw, font, [text], _colour(entry, _option(entry, "fg")), (box[0] + 4, box[1], box[2] - 4, box[3]),
-              "w", "left", seen, False)
+              "w", "left", seen)
 
 
 def _canvas(canvas, draw, box, seen):
@@ -279,4 +279,4 @@ def _canvas(canvas, draw, box, seen):
             justify = canvas.itemcget(item, "justify") or "left"
             _bars(draw, font, wrap(font, canvas.itemcget(item, "text"), width),
                   _colour(canvas, canvas.itemcget(item, "fill")), area, "nw" if justify == "left" else "n", justify,
-                  seen, font.actual("family") == theme.ICONS)
+                  seen)

@@ -89,7 +89,7 @@ class Header(tk.Canvas):
         self.brand_picture = brand
         self.nav, self.on_nav, self.link, self.steps = list(nav), on_nav, link, list(steps)
         self.current, self.hover, self.ring, self.under, self.step = None, None, None, False, 0
-        self._job, self._size = None, None
+        self._job = None
         # Each entry's box on the bar, known once it is drawn.
         self.boxes = {}
         self.bind("<Configure>", lambda e: self._queue())
