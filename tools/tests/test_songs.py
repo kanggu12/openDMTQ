@@ -1,5 +1,5 @@
 """Tests for the client table round trip: decode, rewrite, re-encode without changing shipped rows; and for rebuild() on a
-made-up library: what it writes, and one rebuild at a time."""
+made-up library: what it writes, one rebuild at a time, and the added songs' tiles made once."""
 
 import csv
 import io
@@ -11,7 +11,10 @@ import tempfile
 import unittest
 from unittest import mock
 
-from opendmtq_tools import songs
+from PIL import Image
+
+from opendmtq_tools import jacket_atlas, songs
+from tests import test_jacket_atlas as tja
 from tests.test_jacket_atlas import _jacket, _template
 
 
@@ -468,6 +471,136 @@ class RebuildOutputTest(LibraryCase):
                     self.assertEqual(a.read(), b.read())
         # And its picture for the web pages.
         self.assertTrue(os.path.isfile(os.path.join(self.custom, "thumbs", "made_added.jpg")))
+
+
+# ------------------------------------------------------------------------------ tiles made once
+
+def _plain_jacket(colour):
+    """A jacket of one colour, at the game's size: a tile unlike _jacket()'s."""
+    out = io.BytesIO()
+    Image.new("RGB", (1024, 768), colour).save(out, "PNG")
+    return out.getvalue()
+
+
+class KeptTileTest(LibraryCase):
+    """An added song's tile bundle is made once and kept in its folder under the key of what it is made from: later
+    rebuilds (every start, and every add, hide or removal) take it from there, byte for byte, and make it again only for
+    a new jacket, template or way of making it. The template is read once a rebuild."""
+
+    def setUp(self):
+        super().setUp()
+        # A second added song beside the library's, with a jacket of its own.
+        folder = os.path.join(self.custom, "songs", "1002")
+        os.makedirs(os.path.join(folder, "patterns"))
+        for rel, raw in (("song.fpk", b"made music two"), ("jacket.png", _plain_jacket((0, 160, 0))), ("patterns/20003", b"made chart three")):
+            with open(os.path.join(folder, rel), "wb") as f:
+                f.write(raw)
+        meta = dict(ADDED, song_id=1002, name="made_second", full_name="Made Up Second", has_preview=False,
+                    charts=[{"pattern_id": 20003, "line": 3, "signature": 1, "difficulty": 4}])
+        with open(os.path.join(folder, "song.json"), "w", encoding="utf-8") as f:
+            json.dump(meta, f)
+
+    def building(self):
+        """jacket_atlas.build as it is, counted: one call per bundle made."""
+        return mock.patch.object(songs.jacket_atlas, "build", side_effect=songs.jacket_atlas.build)
+
+    @staticmethod
+    def made(build):
+        """The song ids of the bundles build made, in order."""
+        return [c.args[2] for c in build.call_args_list]
+
+    def served(self):
+        """Each added song's bundle in the overlay, as phones download it."""
+        out = {}
+        for sid in (1001, 1002):
+            with open(self.overlay(f"dlc/d3_e{sid}.unity3d.lz4"), "rb") as f:
+                out[sid] = f.read()
+        return out
+
+    def kept(self, sid):
+        """The tiles kept in a song's folder, by name."""
+        return sorted(n for n in os.listdir(os.path.join(self.custom, "songs", str(sid))) if n.startswith("tile-"))
+
+    def test_a_second_rebuild_makes_no_bundle_and_serves_the_same_bytes(self):
+        with self.building() as build:
+            songs.rebuild()
+        self.assertEqual(self.made(build), [1001, 1002])
+        first = self.served()
+        with open(self.overlay("patch_new.csv.lz4"), "rb") as f:
+            manifest = f.read()
+        # Each kept once, the bytes phones get.
+        for sid in (1001, 1002):
+            self.assertEqual(len(self.kept(sid)), 1)
+            with open(os.path.join(self.custom, "songs", str(sid), self.kept(sid)[0]), "rb") as f:
+                self.assertEqual(f.read(), songs.lz4_decode(first[sid]))
+        with self.building() as build, mock.patch.object(songs, "_tile_template", side_effect=songs._tile_template) as read:
+            songs.rebuild()
+        # Nothing made again; the template read once, not once per song.
+        self.assertEqual(self.made(build), [])
+        self.assertEqual(read.call_count, 1)
+        # And phones are told of nothing new.
+        self.assertEqual(self.served(), first)
+        with open(self.overlay("patch_new.csv.lz4"), "rb") as f:
+            self.assertEqual(f.read(), manifest)
+
+    def test_a_new_jacket_makes_that_songs_bundle_again_and_only_it(self):
+        songs.rebuild()
+        before, kept_before = self.served(), self.kept(1002)
+        with open(os.path.join(self.custom, "songs", "1002", "jacket.png"), "wb") as f:
+            f.write(_plain_jacket((200, 0, 200)))
+        with self.building() as build:
+            songs.rebuild()
+        self.assertEqual(self.made(build), [1002])
+        after = self.served()
+        self.assertEqual(after[1001], before[1001])
+        self.assertNotEqual(after[1002], before[1002])
+        # Kept in place of the one before, which goes.
+        self.assertEqual(len(self.kept(1002)), 1)
+        self.assertNotEqual(self.kept(1002), kept_before)
+
+    def test_a_song_named_anew_gets_a_bundle_with_its_new_sprite(self):
+        songs.rebuild()
+        # Its song.json changed by hand: the sprite inside the bundle must be the name the item table now gives.
+        path = os.path.join(self.custom, "songs", "1002", "song.json")
+        with open(path, encoding="utf-8") as f:
+            meta = json.load(f)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(dict(meta, name="made_renamed"), f)
+        with self.building() as build:
+            songs.rebuild()
+        self.assertEqual([c.args[2:] for c in build.call_args_list], [(1002, "made_renamed")])
+
+    def test_a_new_template_makes_every_bundle_again(self):
+        songs.rebuild()
+        # The same layout, with another object beside the texture and the atlas.
+        other = jacket_atlas._write_bundle((6, b"5.x.x", b"5.6.5p2"), 0x43, b"CAB-" + b"1" * 32, tja._serialized(
+            [(21, b"another material"), (28, tja._texture()), (114, tja._atlas(["e33_a"]))]))
+        with open(os.path.join(self.patch, songs.TILE_TEMPLATE + ".lz4"), "wb") as f:
+            f.write(songs.stored_encode(other))
+        with self.building() as build:
+            songs.rebuild()
+        self.assertEqual(self.made(build), [1001, 1002])
+
+    def test_another_way_of_making_them_makes_every_bundle_again(self):
+        songs.rebuild()
+        # An OpenDMTQ whose jacket_atlas.py differs, if only by a line: its bundles may differ too.
+        maker = os.path.join(self.custom, "..", "jacket_atlas.py")
+        with open(songs.jacket_atlas.__file__, "rb") as src, open(maker, "wb") as dst:
+            dst.write(src.read() + b"\n# another version\n")
+        with self.building() as build, mock.patch.object(songs.jacket_atlas, "__file__", maker):
+            songs.rebuild()
+        self.assertEqual(self.made(build), [1001, 1002])
+
+    def test_a_tile_that_cannot_be_kept_is_served_all_the_same(self):
+        with mock.patch.object(songs, "_keep_tile", side_effect=OSError("read-only folder")):
+            result = songs.rebuild()
+            self.assertEqual(result["tile_failures"], [])
+            self.assertEqual(sorted(self.served()), [1001, 1002])
+            # Nothing kept: the next rebuild makes them again, as before there was keeping.
+            with self.building() as build:
+                songs.rebuild()
+        self.assertEqual(self.made(build), [1001, 1002])
+        self.assertEqual(self.kept(1001), [])
 
 
 if __name__ == "__main__":

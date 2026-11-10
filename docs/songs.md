@@ -122,13 +122,16 @@ before the first `_` picks the bundle, `e33_uad` is `dlc/d3_e33.unity3d` in the 
 `dlc/d3_e<song id>.unity3d`, with one sprite, `e<song id>_<name>` (`tools/opendmtq_tools/jacket_atlas.py`). Song ids
 start above the game's atlas numbers (0 to 33) and are never reused.
 
-The bundle is made from one of the imported songs' bundles, `d3_e33`, at rebuild time. Its shader, material and type
-information stay; the sprite list and the texture are replaced. The tile is the centre of the jacket at 256x149, the
-size of every tile of the game (those were framed by hand, so a jacket that needs other framing has to be cropped
-before upload). The texture is uncompressed RGBA32, because the tools have no encoder for the game's ETC2, and is
-256x256: 256 KB of memory while shown, the same as one of the game's atlases of six tiles. The imported bundles are
-not changed. Without the imported songs there is no bundle to start from: the song then keeps the name `e0_<name>` and
-plays as before with an empty tile, and `rebuild()` reports it in `tile_failures` (the admin Songs page shows it).
+The bundle is made from one of the imported songs' bundles, `d3_e33`, by the first rebuild after the song is added, and
+kept beside the song's files (`data/custom/songs/<song id>/tile-<key>.unity3d`, in backups with them): later rebuilds
+take it from there, and make it again only when the jacket, the template, the song's name or OpenDMTQ's way of making it
+changed. Its shader, material and type information stay; the sprite list and the texture are replaced. The tile is the
+centre of the jacket at 256x149, the size of every tile of the game (those were framed by hand, so a jacket that needs
+other framing has to be cropped before upload). The texture is uncompressed RGBA32, because the tools have no encoder
+for the game's ETC2, and is 256x256: 256 KB of memory while shown, the same as one of the game's atlases of six tiles.
+The imported bundles are not changed. Without the imported songs there is no bundle to start from: the song then keeps
+the name `e0_<name>` and plays as before with an empty tile, and `rebuild()` reports it in `tile_failures` (the admin
+Songs page shows it).
 
 The imported rows stay byte-identical; only rows are appended. Removing an added song takes it out of the same files.
 

@@ -9,7 +9,8 @@ The imported content (data/content, read only here; importer.py fills it from th
 
 Everything else lives under the custom folder (data/custom):
 
-    songs/<song_id>/      one added song: song.json plus its files, as uploaded
+    songs/<song_id>/      one added song: song.json plus its files, as uploaded, and its tile bundle as the last
+                          rebuild made it (tile-<key>.unity3d)
     hidden.json           song ids hidden from the song list
     songList.json         the list the server reads (imported songs + added songs + hidden flags)
     catalog.json          facts of the client's tables some replies need (game server, src/content.php)
@@ -644,6 +645,18 @@ def rebuild():
         shipped = {int(r[col["song_id"]]) for r in rows if r[col["song_id"]].isdigit()}
     filtering = bool(shipped - imported)
     if locales and (adds or hide or filtering or missing):
+        # What the added songs' tiles are made from besides each song's own jacket, read once for them all: the template,
+        # or why there is none (no song gets a tile then), and the digest that stands for it in each tile's key.
+        template = made_from = no_template = None
+        if adds:
+            try:
+                loaded = _tile_template()
+                made_from = _tile_source_digest(loaded)
+            except (OSError, SongError) as e:
+                no_template = e
+            else:
+                # Only with its digest: tiles are never made without a key to keep them under.
+                template = loaded
         for m in adds:
             src = os.path.join(CUSTOM, "songs", str(m["song_id"]))
             sid = str(m["song_id"])
@@ -662,12 +675,14 @@ def rebuild():
                 with open(os.path.join(src, "preview.opus"), "rb") as f:
                     raw = f.read()
                 changed[f"preview/{m['name']}.p.opus"] = (raw, False)
-            # The jacket on its tile in the song list: the game reads those from image bundles.
+            # The jacket on its tile in the song list: the game reads those from image bundles. A song without a tile
+            # image still plays, so a tile that cannot be made must not stop the rebuild.
+            if template is None:
+                tile_failures.append(f"{m['name']}: {no_template}")
+                continue
             try:
-                with open(os.path.join(src, "jacket.png"), "rb") as f:
-                    bundle = jacket_atlas.build(_tile_template(), f.read(), m["song_id"], m["name"])
-            except (OSError, SongError, jacket_atlas.AtlasError) as e:
-                # A song without a tile image still plays, so this must not stop the rebuild.
+                bundle = _tile_bundle(template, made_from, src, m)
+            except (OSError, jacket_atlas.AtlasError) as e:
                 tile_failures.append(f"{m['name']}: {e}")
             else:
                 changed[jacket_atlas.bundle_path(m["song_id"])] = (bundle, False)
@@ -865,6 +880,61 @@ def _tile_template():
     path = os.path.join(patch_dir(content_web()), TILE_TEMPLATE + ".lz4")
     with open(path, "rb") as f:
         return lz4_decode(f.read())
+
+
+# An added song's tile bundle as the last rebuild made it, kept in the song's folder under the key of what it was made
+# from: a rebuild makes it again only when that changed, not for every added song at every start and every change of the
+# songs (about 50 ms each). It travels with the song in backups, and goes with it when the song is removed. No file of an
+# upload starts with the prefix (add_package keeps the package's files under names of its own).
+KEPT_TILE_PREFIX = "tile-"
+KEPT_TILE = KEPT_TILE_PREFIX + "{key}.unity3d"
+
+
+def _tile_source_digest(template):
+    """What every tile of a rebuild is made from besides its own song, as one digest for the tiles' keys: the template,
+    and the code that turns it into a bundle (jacket_atlas.py as it is on disk: an OpenDMTQ that makes the bundles
+    another way makes each one once again instead of keeping the old ones)."""
+    with open(jacket_atlas.__file__, "rb") as f:
+        maker = f.read()
+    return hashlib.md5(hashlib.md5(template).digest() + hashlib.md5(maker).digest()).digest()
+
+
+def _tile_bundle(template, made_from, folder, meta):
+    """The tile bundle of the added song in folder (meta: its song.json), from the template (made_from: its digest,
+    _tile_source_digest): the one kept in the folder when its key is that of the template, the jacket, the song's id and
+    name; else made (jacket_atlas.build, which makes the same bytes from the same input) and kept there in place of
+    the one before."""
+    with open(os.path.join(folder, "jacket.png"), "rb") as f:
+        jacket = f.read()
+    # The key: every input of jacket_atlas.build, each by its digest (the id and the name are the sprite's).
+    key = _md5(made_from + hashlib.md5(jacket).digest() + f"{meta['song_id']}/{meta['name']}".encode("utf-8"))
+    kept = os.path.join(folder, KEPT_TILE.format(key=key))
+    try:
+        with open(kept, "rb") as f:
+            return f.read()
+    except OSError:
+        # Not made yet, or made from something else: made now.
+        pass
+    bundle = jacket_atlas.build(template, jacket, meta["song_id"], meta["name"])
+    try:
+        _keep_tile(kept, bundle)
+    except OSError:
+        # A folder this cannot write to costs the next rebuild the same work again, nothing more.
+        pass
+    return bundle
+
+
+def _keep_tile(path, bundle):
+    """Keep a song's tile bundle at path, and only that one: written aside and renamed (a rebuild stopped halfway never
+    leaves half a bundle under a key), then the song's earlier ones (and a half-written one) removed."""
+    with open(path + ".tmp", "wb") as f:
+        f.write(bundle)
+    os.replace(path + ".tmp", path)
+    folder, name = os.path.split(path)
+    for other in os.listdir(folder):
+        # Every kept tile of the song but this one: made from a jacket or template it no longer has.
+        if other.startswith(KEPT_TILE_PREFIX) and other != name:
+            os.remove(os.path.join(folder, other))
 
 
 def _ints(row, col, names):
