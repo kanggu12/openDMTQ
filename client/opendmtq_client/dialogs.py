@@ -1,11 +1,11 @@
-"""Dialogs drawn inside the launcher's window, in the shape of the game's own popups.
+"""Dialogs drawn inside the launcher's window, as the site's cards.
 
-The game asks and tells in a panel over its dimmed screen, its title on a tab hanging from the panel's top edge. The
-launcher does the same instead of Windows' message boxes: the window behind is blurred and dimmed (drawn from its
-widgets by snapshot.py, so nothing is read from the screen), the panel has the site's cut corner, and the tab, the ring
-and the main button take the colour of what the dialog is about: red to remove something for good, yellow for a big
-change, lime to tell. Buttons say what they do. Esc cancels, Enter presses the button with the ring, Tab and the arrow
-keys move the ring.
+The launcher asks and tells in a card over its window instead of Windows' message boxes: the window behind is blurred
+and dimmed (drawn from its widgets by snapshot.py, so nothing is read from the screen), the card is the site's frosted
+gunmetal with its top-right corner cut, the question in Pretendard Bold beside a small lamp, and the site's buttons at
+its foot. The lamp and the main button take the colour of what the dialog is about: red to remove something for good,
+yellow for a big change, lime to tell. Buttons say what they do. Esc cancels, Enter presses the button with the ring,
+Tab and the arrow keys move the ring.
 
 ask() and tell() wait for the answer like a message box. A window of its own (when the launcher cannot open, so
 there is no window to draw over) comes from standalone().
@@ -21,26 +21,23 @@ from opendmtq_client import art, safety, snapshot, theme
 
 log = logging.getLogger("opendmtq_client")
 
-# Each kind: the colour of its glow and ring, its tab (top and bottom of the gradient; dark words on it), the glyph
-# in the ring, and the look of its main button (art.BUTTON_LOOKS).
+# Each kind: the colour of its lamp and of the light along a progress track, the glyph (kept for callers that name
+# one), and the look of its main button (art.BUTTON_LOOKS).
 KINDS = {
-    "danger": {"accent": theme.BAD, "tab": ("#ff8a96", "#f04a5e"), "glyph": "delete", "button": "danger"},
-    "warn": {"accent": theme.WARN, "tab": ("#ffdc72", "#f5bd2a"), "glyph": "warn", "button": "warn"},
-    "info": {"accent": theme.OK, "tab": ("#b9f78a", "#86e83c"), "glyph": "info", "button": "home"},
-    "error": {"accent": theme.BAD, "tab": ("#ff8a96", "#f04a5e"), "glyph": "error", "button": "home"},
+    "danger": {"accent": theme.BAD, "glyph": "delete", "button": "danger"},
+    "warn": {"accent": theme.WARN, "glyph": "warn", "button": "warn"},
+    "info": {"accent": theme.OK, "glyph": "info", "button": "home"},
+    "error": {"accent": theme.BAD, "glyph": "error", "button": "home"},
 }
 
 # Sizes in pixels at 100 % scaling.
-WIDTH = 464         # the panel, when the window has room
-MARGIN = 24         # the least room between the panel and the window's edge
-PAD = 38            # inside the panel, left and right of the text
-CUT = 16            # the cut corners
-TAB = 30            # the title tab's height
-SLANT = 14          # how far the tab's sides lean in
-RING = 58           # the ring round the glyph
+WIDTH = 480         # the card, when the window has room
+MARGIN = 24         # the least room between the card and the window's edge
+PAD = 28            # inside the card (the site's 24 px, and a little more for a card on its own)
+CUT = 16            # the cut corner
 BUTTON = 40         # a button's height
-BUTTON_MIN = 132    # a button's least width
-GAP = 12            # between two buttons
+BUTTON_MIN = 110    # a button's least width
+GAP = 10            # between two buttons
 RISE = 14           # how far the panel rises as it appears
 FRAMES = 8          # the rise, one frame every 16 ms
 
@@ -118,43 +115,40 @@ class Dialog:
     # --------------------------------------------------------------------------------------------- drawing
 
     def _layout(self, width, height):
-        """Where everything goes, in the panel's own pixels; the text items are made here to measure them."""
+        """Where everything goes, in the card's own pixels; the text items are made here to measure them."""
         px, fonts, c = self.ui.px, self.ui.fonts, self.canvas
         panel_w = max(px(280), min(px(WIDTH), width - 2 * px(MARGIN)))
-        text_w = panel_w - 2 * px(PAD)
-        tab_words = self.title.upper() if self.ui.words.language == "en" else self.title
-        tab_w = min(panel_w - 2 * px(CUT) - px(8), fonts.dialog_tab.measure(tab_words) + 2 * px(26) + 2 * px(SLANT))
-        y = px(TAB) + px(24)
-        ring_y = y + px(RING) // 2
-        y += px(RING) + px(18)
-        message = c.create_text(panel_w // 2, y, text=self.message, font=fonts.dialog_title, fill=theme.TEXT,
-                                width=balanced_width(fonts.dialog_title, self.message, text_w), justify="center",
-                                anchor="n", tags=("card", "words"))
+        lamp_room = px(18)
+        text_w = panel_w - 2 * px(PAD) - lamp_room
+        y = px(PAD)
+        # The question in Pretendard Bold, after the lamp; what it means under it in ash.
+        message = c.create_text(px(PAD) + lamp_room, y, text=self.message, font=fonts.dialog_title, fill=theme.TEXT,
+                                width=text_w, justify="left", anchor="nw", tags=("card", "words"))
+        lamp_y = y + fonts.dialog_title.metrics("linespace") // 2
         y = c.bbox(message)[3]
         detail = None
         if self.detail:
-            y += px(9)
-            detail = c.create_text(panel_w // 2, y, text=self.detail, font=fonts.body, fill=theme.MUTED,
-                                   width=balanced_width(fonts.body, self.detail, text_w), justify="center",
-                                   anchor="n", tags=("card", "words"))
+            y += px(8)
+            detail = c.create_text(px(PAD) + lamp_room, y, text=self.detail, font=fonts.body, fill=theme.MUTED,
+                                   width=text_w, justify="left", anchor="nw", tags=("card", "words"))
             y = c.bbox(detail)[3]
-        y += px(28)
+        y += px(24)
         if self.progress:
-            track = (px(PAD), y + px(BUTTON) // 2 - px(3), panel_w - px(PAD), y + px(BUTTON) // 2 + px(3))
-            y += px(BUTTON) + px(22)
-            self._tab_room = tab_w - 2 * px(SLANT)
-            return {"panel": (panel_w, y), "tab": (tab_w, tab_words), "ring_y": ring_y, "message": message,
+            track = (px(PAD), y + px(3), panel_w - px(PAD), y + px(9))
+            y += px(12) + px(PAD) - px(6)
+            return {"panel": (panel_w, y), "lamp": (px(PAD) + px(4), lamp_y), "message": message,
                     "detail": detail, "buttons": [], "button_w": 0, "track": track}
         count = len(self.buttons)
         widest = max([fonts.dialog_button.measure(b[0]) for b in self.buttons] or [0])
-        button_w = max(px(BUTTON_MIN), widest + px(48))
-        room = panel_w - 2 * px(22)
+        button_w = max(px(BUTTON_MIN), widest + px(40))
+        room = panel_w - 2 * px(PAD)
         button_w = min(button_w, (room - (count - 1) * px(GAP)) // max(1, count))
         row_w = count * button_w + (count - 1) * px(GAP)
-        buttons = [((panel_w - row_w) // 2 + i * (button_w + px(GAP)), y) for i in range(count)]
-        y += px(BUTTON) + px(28)
-        self._tab_room = tab_w - 2 * px(SLANT)
-        return {"panel": (panel_w, y), "tab": (tab_w, tab_words), "ring_y": ring_y, "message": message,
+        # At the card's foot on the right, the main one last, as the site's forms end.
+        start = panel_w - px(PAD) - row_w
+        buttons = [(start + i * (button_w + px(GAP)), y) for i in range(count)]
+        y += px(BUTTON) + px(PAD) - px(4)
+        return {"panel": (panel_w, y), "lamp": (px(PAD) + px(4), lamp_y), "message": message,
                 "detail": detail, "buttons": buttons, "button_w": button_w}
 
     def _draw(self, rise=False):
@@ -174,17 +168,15 @@ class Dialog:
             behind = behind.resize((width, height))
         box = (x0, y0, panel_w, panel_h)
         scene, soft = art.dialog_scene(behind, box, px(CUT), self.style["accent"], scale)
-        tab_w, tab_words = lay["tab"]
-        panel = art.dialog_panel(scene, soft, box, px(CUT), (tab_w, px(TAB), px(SLANT)) + self.style["tab"],
-                                 (panel_w // 2, lay["ring_y"], px(RING)), self.style["accent"], scale)
+        panel = art.dialog_panel(scene, soft, box, px(CUT), scale)
+        # The lamp in the dialog's colour, drawn into the card.
+        light = art.lamp(self.style["accent"], scale)
+        lx, ly = lay["lamp"]
+        panel.paste(light, (lx - light.width // 2, ly - light.height // 2), light)
         self._scene, self._panel = ImageTk.PhotoImage(scene, master=c), ImageTk.PhotoImage(panel, master=c)
         c.create_image(0, 0, image=self._scene, anchor="nw", tags=("scene",))
         c.create_image(0, 0, image=self._panel, anchor="nw", tags=("card", "panel"))
-        c.create_text(panel_w // 2, px(TAB) // 2, text=tab_words, font=self.ui.fonts.dialog_tab,
-                      fill=theme.INK, tags=("card", "words"))
-        c.create_text(panel_w // 2, lay["ring_y"], text=self.glyph, font=self.ui.fonts.dialog_glyph,
-                      fill=self.style["accent"], tags=("card", "words"))
-        # The buttons: one picture for each look, drawn over the panel's own pixels.
+        # The buttons: one picture for each look, drawn over the card's own pixels.
         margin = max(5, int(round(6 * scale)))
         self._images, self._items, self._boxes = [], [], []
         for i, ((words, _value, look), (bx, by)) in enumerate(zip(self.buttons, lay["buttons"])):
@@ -419,9 +411,6 @@ class Dialog:
                 problems.append("dialog: text outside the panel: %r" % text)
             if "button" not in " ".join(c.gettags(item)) and tops and box[3] > min(tops):
                 problems.append("dialog: text runs into the buttons: %r" % text)
-        tab_words = self.title.upper() if self.ui.words.language == "en" else self.title
-        if self.ui.fonts.dialog_tab.measure(tab_words) > self._tab_room:
-            problems.append("dialog: the title does not fit its tab: %r" % tab_words)
         for i, (left, top, right, bottom) in enumerate(self._boxes):
             words = self.buttons[i][0]
             if self.ui.fonts.dialog_button.measure(words) > right - left - 2 * self.ui.px(10):
@@ -441,6 +430,18 @@ def ask(app, kind, title, message, detail, confirm, cancel=None, glyph=None):
     app.dialog = dialog
     try:
         return bool(dialog.wait())
+    finally:
+        app.dialog = None
+
+
+def choose(app, kind, title, message, detail, answers, glyph=None):
+    """Ask a question with more than one way to go on: `answers` are [(words, value, look)] after Cancel. Returns the
+    value chosen, or None for Cancel. It starts on Cancel, so Enter alone does nothing."""
+    buttons = [(app.words("common.cancel"), None, "neutral")] + list(answers)
+    dialog = Dialog(app.root, app.ui, kind, title, message, detail, buttons, default=0, cancel=None, glyph=glyph)
+    app.dialog = dialog
+    try:
+        return dialog.wait()
     finally:
         app.dialog = None
 
@@ -501,7 +502,7 @@ def window(kind, title, message, detail=None, buttons=(), default=0, cancel=None
     (root, dialog); the window closes itself once the dialog is answered."""
     root, ui = window_root(language=language)
     dialog = Dialog(root, ui, kind, title, message, detail, buttons, default=default, cancel=cancel,
-                    window=lambda w, h: art.shards(w, h, seed=29), on_close=lambda value: root.destroy())
+                    window=lambda w, h: art.backdrop(w, h, ui.scale), on_close=lambda value: root.destroy())
     fit(root, ui, dialog)
     root.protocol("WM_DELETE_WINDOW", lambda: dialog.close(cancel))
     return root, dialog

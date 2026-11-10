@@ -7,7 +7,7 @@ downloaded from a server's site has that server on its end and starts with it; o
 
 | Path | What it is |
 |---|---|
-| `opendmtq_client/` | The launcher (Python and Tk): `app.py` (the window), `pages.py`, `guide.py` (the first-start guide), `actions.py` (what the buttons do, shared with the command line in `main.py`), `server.py` (the server's `client.php` and `/apk`), `apps.py` (each server's app on this PC), `player.py`, `values.py` (the PC settings), `installer.py` (the installer's dialogs) |
+| `opendmtq_client/` | The launcher (Python and Tk): `app.py` (the window), `pages.py`, `guide.py` (the first-start guide), `actions.py` (what the buttons do, shared with the command line in `main.py`), `server.py` (the server's `client.php` and `/apk`), `apps.py` (each server's app on this PC), `player.py`, `values.py` (the PC settings), `installer.py` (the installer's dialogs), `repair.py` and `removal.py` (Help's Repair, Clear game data and Uninstall) |
 | `packaging/windows/` | The Windows build: PyInstaller under Wine, the player beside the launcher, Velopack's packages, the installer |
 | `tests/` | Unit tests, the UI screenshots on a virtual screen (`tests/ui`), and the installer to the game under Wine (`tests/windows`) |
 

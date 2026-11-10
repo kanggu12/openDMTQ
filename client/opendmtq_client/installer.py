@@ -208,7 +208,7 @@ class Installer:
             self.dialog.close(None)
         self.dialog = self.dialogs.Dialog(self.root, self.ui, kind, title, message, detail, buttons, default=default,
                                           cancel=cancel, glyph=glyph, progress=progress,
-                                          window=lambda w, h: art.shards(w, h, seed=29), on_close=self._answered)
+                                          window=lambda w, h: art.backdrop(w, h, self.ui.scale), on_close=self._answered)
         self.dialogs.fit(self.root, self.ui, self.dialog)
 
     def ask(self):

@@ -187,15 +187,23 @@ def finish(state, session):
 
 
 def open_folder(path):
-    """Show a folder (or a file, selected) in Explorer, made first when it is a folder still to come."""
+    """Show a folder in Explorer, made first when it is still to come."""
     safety.refuse_windows_in_tests("Explorer")
+    os.makedirs(path, exist_ok=True)
     if sys.platform == "win32":
-        if os.path.isfile(path):
-            # Explorer with the file selected: the player's log among its folder's other files.
-            subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])
-            return
-        os.makedirs(path, exist_ok=True)
         os.startfile(path)
         return
-    os.makedirs(path if not os.path.isfile(path) else os.path.dirname(path), exist_ok=True)
-    subprocess.Popen(["xdg-open", path if not os.path.isfile(path) else os.path.dirname(path)])
+    subprocess.Popen(["xdg-open", path])
+
+
+def show_file(path):
+    """Show a file in Explorer, selected among its folder's other files. False when the file is not there: nothing is
+    made in its place (a folder of that name would stand where the file is to be written)."""
+    if not os.path.isfile(path):
+        return False
+    safety.refuse_windows_in_tests("Explorer")
+    if sys.platform == "win32":
+        subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])
+    else:
+        subprocess.Popen(["xdg-open", os.path.dirname(path)])
+    return True

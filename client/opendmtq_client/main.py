@@ -15,11 +15,15 @@
   OpenDMTQ.exe --forget URL [--yes]     forget a server, its sign-in and its app on this PC
   OpenDMTQ.exe --reset [--yes]          start over: forget the servers, the sign-ins, the apps and the settings
   OpenDMTQ.exe --update [--yes]         look for a newer launcher and install it (it restarts)
+  OpenDMTQ.exe --repair                 put back the program's files that are missing or changed
+  OpenDMTQ.exe --clear-game-data [--yes]    delete the game's data on this PC; this PC stays the same player
+  OpenDMTQ.exe --uninstall [--delete-data] [--yes]  uninstall OpenDMTQ; --delete-data deletes its data on this PC too
 
 The console copy OpenDMTQ-cmd.exe takes the same arguments and prints to the terminal. Several jobs in one command run
-in the order above (--server, then --sign-in, then --app, then --play). While the launcher's window is open, the jobs
-that change what it keeps (--set, --reset, --forget, --language, --guide, --server, --sign-in, --sign-out) are refused:
-the window would write its own copy over them.
+in the order above (--server, then --sign-in, then --app, then --play); --repair, --clear-game-data and --uninstall run
+on their own. While the launcher's window is open, the jobs that change what it keeps (--set, --reset, --forget,
+--language, --guide, --server, --sign-in, --sign-out, --uninstall) are refused: the window would write its own copy over
+them. --repair, --clear-game-data and --uninstall are refused while a game runs: it uses the files they change.
 """
 
 import argparse
@@ -59,15 +63,20 @@ def _velopack_hooks(argv):
             sys.exit(0)
 
 
-def _logging():
-    """One log file with a size cap: 1 MB, the two previous ones kept, nothing older."""
+def _logging(make=True):
+    """One log file with a size cap: 1 MB, the two previous ones kept, nothing older. With `make` False the log is
+    written only where its folder already is (Velopack's uninstall hook, which runs after Delete all has removed it)."""
     folder = os.path.join(st.config_dir(), "logs")
+    root = logging.getLogger("opendmtq_client")
+    if not make and not os.path.isdir(folder):
+        # Something still listens, so that Python does not print what is logged to the console itself.
+        root.addHandler(logging.NullHandler())
+        return
     os.makedirs(folder, exist_ok=True)
     handler = logging.handlers.RotatingFileHandler(os.path.join(folder, "launcher.log"), maxBytes=1_000_000,
                                                    backupCount=2, encoding="utf-8")
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(threadName)s %(message)s"))
     handler.odq_log = True
-    root = logging.getLogger("opendmtq_client")
     root.setLevel(logging.INFO)
     # One file handler at a time, even when main() runs more than once in a process (the tests do).
     for old in [h for h in root.handlers if getattr(h, "odq_log", False)]:
@@ -188,6 +197,96 @@ def _update(yes):
     return 0
 
 
+def _maintain(args):
+    """--repair, --clear-game-data, --uninstall: Help's buttons of the same names, with the same questions as y/N."""
+    from opendmtq_client import playing
+    if playing.running():
+        # The player's files and the game's data are open while it plays.
+        _say("Close the game first: it uses the files this changes.", error=True)
+        return 2
+    if args.repair:
+        return _repair()
+    if args.clear_game_data:
+        return _clear_game_data(args.yes)
+    return _uninstall(args.delete_data, args.yes)
+
+
+def _repair():
+    """--repair: the program's files compared with the installed package, what is missing or changed put back."""
+    from opendmtq_client import repair
+    try:
+        result = repair.run()
+    except repair.RepairError as e:
+        _say(str(e), error=True)
+        return 2
+    # Each file named, as the log names it.
+    for kind, names in (("missing", result.missing), ("changed", result.changed)):
+        for name in names:
+            _say("  %s: %s%s" % (kind, name, " (not put back)" if name in result.failed else ""))
+    if result.failed:
+        _say("Put back %d files; %d could not be. Run OpenDMTQ-Setup.exe again and choose Repair."
+             % (result.restored, len(result.failed)), error=True)
+        return 1
+    if result.restored:
+        _say("Put back %d files.%s" % (result.restored, " Start the launcher again: some are its own."
+                                       if result.needs_restart else ""))
+    else:
+        _say("All %d files of the program are as installed." % result.checked)
+    return 0
+
+
+def _clear_game_data(yes):
+    """--clear-game-data: the games' folders emptied but for the id this PC plays by."""
+    from opendmtq_client import removal
+    size = removal.game_data_size()
+    if not size:
+        _say("There is no game data on this PC.")
+        return 0
+    if not _ask("Delete the game's data on this PC (%s)? It downloads again, and this PC stays the same player."
+                % removal.megabytes(size), yes):
+        _say("Nothing changed.")
+        return 1
+    failed = removal.clear_game_data()
+    for path in failed:
+        _say("  in use, left in place: %s" % path, error=True)
+    if failed:
+        return 1
+    _say("Cleared the game's data (%s)." % removal.megabytes(size))
+    return 0
+
+
+def _uninstall(delete_data, yes):
+    """--uninstall: Velopack's uninstaller, after the data on this PC went too with --delete-data."""
+    from opendmtq_client import removal
+    try:
+        removal.can_uninstall()
+    except removal.RemovalError as e:
+        _say(str(e), error=True)
+        return 2
+    if delete_data:
+        question = ("Uninstall OpenDMTQ and delete its settings, sign-ins and game data on this PC (%s)? A later "
+                    "install is a new player." % removal.megabytes(removal.everything_size()))
+    else:
+        question = "Uninstall OpenDMTQ? Its settings, sign-ins and game data stay for a later install."
+    if not _ask(question, yes):
+        _say("Nothing changed.")
+        return 1
+    code = 0
+    if delete_data:
+        failed = removal.delete_everything()
+        for path in failed:
+            _say("  in use, left in place: %s" % path, error=True)
+        code = 1 if failed else 0
+    # Said before the uninstaller starts: it closes what runs from the program's folder, this console copy too.
+    _say("Uninstalling: OpenDMTQ is gone from this PC in a few seconds. Your records stay on the servers.")
+    try:
+        removal.uninstall()
+    except OSError as e:
+        _say("The uninstaller did not start: %s" % e, error=True)
+        return 2
+    return code
+
+
 def _status(state):
     """--status: where PLAY plays, what it has, and the ready check; 0 when PLAY can go."""
     server = state.server()
@@ -294,7 +393,14 @@ def parse(argv):
     p.add_argument("--forget", metavar="URL", help="forget a server, its sign-in and its app")
     p.add_argument("--reset", action="store_true", help="forget the servers, the sign-ins, the apps and the settings")
     p.add_argument("--update", action="store_true", help="look for a newer launcher and install it")
-    p.add_argument("--yes", action="store_true", help="do not ask before --forget, --reset or --update")
+    p.add_argument("--repair", action="store_true", help="put back the program's files that are missing or changed")
+    p.add_argument("--clear-game-data", action="store_true",
+                   help="delete the game's data on this PC (this PC stays the same player)")
+    p.add_argument("--uninstall", action="store_true", help="uninstall OpenDMTQ from this PC")
+    p.add_argument("--delete-data", action="store_true",
+                   help="with --uninstall: delete the settings, sign-ins and game data on this PC too")
+    p.add_argument("--yes", action="store_true",
+                   help="do not ask before --forget, --reset, --update, --clear-game-data or --uninstall")
     # Velopack passes its own --veloapp-* arguments (each with its value); they are handled before this parser runs and
     # are let through here. Anything else unknown is a mistake, said as argparse says it (exit code 2).
     args, unknown = p.parse_known_args(argv)
@@ -310,13 +416,19 @@ def parse(argv):
             after_velopack = False
     if rest:
         p.error("unrecognized arguments: %s" % " ".join(rest))
+    if args.delete_data and not args.uninstall:
+        p.error("--delete-data goes with --uninstall")
+    alone = [args.repair, args.clear_game_data, args.uninstall]
+    others = _jobs(args, maintenance=False)
+    if sum(map(bool, alone)) > 1 or (any(alone) and others):
+        p.error("--repair, --clear-game-data and --uninstall each run on their own")
     return args
 
 
 def _writes(args):
     """Whether the command line changes what the launcher keeps (refused while its window is open)."""
     return any((args.set, args.reset, args.forget, args.language, args.guide, args.server, args.sign_in,
-                args.sign_out))
+                args.sign_out, args.uninstall))
 
 
 def window_open():
@@ -325,16 +437,19 @@ def window_open():
     return installer.launcher_open()
 
 
-def _jobs(args):
-    """Whether the command line asks for any job (none: the window)."""
+def _jobs(args, maintenance=True):
+    """Whether the command line asks for any job (none: the window); with `maintenance` False, any but --repair,
+    --clear-game-data and --uninstall."""
     return any((args.status, args.server, args.sign_in, args.sign_out, args.app, args.set, args.audio_devices,
-                args.language, args.guide, args.open_log, args.play, args.forget, args.reset, args.update))
+                args.language, args.guide, args.open_log, args.play, args.forget, args.reset, args.update)) or (
+        maintenance and any((args.repair, args.clear_game_data, args.uninstall)))
 
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
-    # The log first, so a failure in Velopack's own start-up handling is written down too.
-    _logging()
+    # The log first, so a failure in Velopack's own start-up handling is written down too. Not in the uninstall hook
+    # after Delete all: the folder it was in is gone, and a log would make it again.
+    _logging(make=not any(a.startswith("--veloapp-uninstall") for a in argv))
     # The arguments as given: the password never is one (it comes from standard input).
     log.info("OpenDMTQ %s started%s", __version__, (": " + " ".join(argv)) if argv else "")
     _velopack_hooks(argv)
@@ -344,6 +459,9 @@ def main(argv=None):
         # The window keeps its own copy of the settings and writes it back: a change made here would be lost.
         _say("The launcher's window is open: make this change there, or close the window first.", error=True)
         return 2
+    if args.repair or args.clear_game_data or args.uninstall:
+        # Before the settings are read: none of this needs them, and after --delete-data a save would bring them back.
+        return _maintain(args)
     if not jobs:
         # The window copy: sharp at any scaling and only once, settled before any window (a dialog too) opens.
         dpi.aware()
@@ -451,8 +569,12 @@ def _run(state, args, jobs):
         if path is None:
             _say("There is no player's log yet: the current server's app is not on this PC.", error=True)
             return 2
+        if not os.path.isfile(path):
+            # Nothing is made in its place: the player writes its log itself when the game first starts.
+            _say("There is no %s's log yet: %s" % (args.open_log, path), error=True)
+            return 2
         _say(path)
-        actions.open_folder(path)
+        actions.show_file(path)
     if args.status:
         return _status(state)
     if args.play:

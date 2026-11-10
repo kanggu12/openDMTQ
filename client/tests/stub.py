@@ -26,6 +26,7 @@ class Site:
         self.apk_kind = "application/vnd.android.package-archive"
         self.damage = False            # /apk hands out other bytes than the description says
         self.requests = []             # (method, path, cookie) of each request
+        self.old = False               # an OpenDMTQ from before the PC client: no client.php, its health page only
 
     def describe(self):
         return {"file": "OpenDMTQ-127.0.0.1-8080-v2026.11.09.apk", "sha256": hashlib.sha256(self.app).hexdigest(),
@@ -63,6 +64,12 @@ class Site:
 
             def do_GET(self):
                 site.requests.append(("GET", self.path, self._cookie()))
+                if site.old and self.path.startswith("/opendmtq/client.php"):
+                    # The page is not there before 0.8: the site's own not-found.
+                    return self._json(404, {"error": "not found"})
+                if self.path == "/opendmtq/health.php":
+                    # What every OpenDMTQ answers: its game server's state and the game's patch.
+                    return self._json(200, {"ok": True, "patch": "1.003.005", "maintenance": False})
                 if self.path == "/opendmtq/client.php?about":
                     return self._json(200, {"opendmtq": "0.8.0", "name": "Stand-in", "address": "127.0.0.1:8080",
                                             "app": site.app_state == "ok"})

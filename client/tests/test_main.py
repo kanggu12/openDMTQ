@@ -5,10 +5,15 @@ import io
 import os
 import sys
 
-from opendmtq_client import apps, main, preset
+import subprocess
+import zipfile
+from unittest import mock
+
+from opendmtq_client import apps, main, playing, preset, removal
 from opendmtq_client import state as st
 from tests import stub
 from tests.base import Folder
+from tests.test_removal import GAME, listing, write
 
 
 class CommandLine(Folder):
@@ -110,6 +115,14 @@ class CommandLine(Folder):
         code, said = self.run_main(["--open-log", "player"])
         self.assertEqual(code, 2)
         self.assertIn("no player's log yet", said)
+        # A launcher log that is not there yet: said, and nothing made in its place.
+        logs = os.path.join(st.config_dir(), "logs")
+        os.remove(os.path.join(logs, "launcher.log"))
+        with mock.patch.object(main, "_logging"):
+            code, said = self.run_main(["--open-log", "launcher"])
+        self.assertEqual(code, 2)
+        self.assertIn("There is no launcher's log yet", said)
+        self.assertEqual(os.listdir(logs), [])
 
     def test_a_known_server_without_its_site(self):
         # Switching to a server this launcher knows works while that server does not answer, as "Play here" does.
@@ -182,3 +195,109 @@ class CommandLine(Folder):
         with contextlib.redirect_stdout(out), self.assertRaises(SystemExit):
             main.main(["--version"])
         self.assertTrue(out.getvalue().startswith("OpenDMTQ "))
+
+
+class Maintenance(Folder):
+    """--repair, --clear-game-data and --uninstall: Help's buttons, from the command line."""
+
+    # The same way of running main() as above, without running the tests above a second time.
+    run_main = CommandLine.run_main
+
+    def setUp(self):
+        super().setUp()
+        self.site = stub.Site().start()
+        # An install as Velopack lays it out: one file of the program, its package, and a stand-in Update.exe.
+        self.install = os.path.join(self.home, "OpenDMTQ.Client")
+        version = b"<version>0.8.0</version>"
+        write(self.install, {"Update.exe": b"MZ", "current/sq.version": version, "current/OpenDMTQ.exe": b"launcher"})
+        os.makedirs(os.path.join(self.install, "packages"))
+        with zipfile.ZipFile(os.path.join(self.install, "packages", "OpenDMTQ.Client-0.8.0-full.nupkg"), "w") as z:
+            z.writestr("lib/app/OpenDMTQ.exe", b"launcher")
+        os.environ["OPENDMTQ_INSTALL_ROOT"] = self.install
+        self.game = os.path.join(removal.data_root(), "com.example.game")
+        write(self.game, GAME)
+
+    def tearDown(self):
+        os.environ.pop("OPENDMTQ_INSTALL_ROOT", None)
+        self.site.stop()
+        super().tearDown()
+
+    def test_repair(self):
+        code, said = self.run_main(["--repair"])
+        self.assertEqual(code, 0)
+        self.assertIn("All 1 files of the program are as installed.", said)
+        os.remove(os.path.join(self.install, "current", "OpenDMTQ.exe"))
+        code, said = self.run_main(["--repair"])
+        self.assertEqual(code, 0)
+        self.assertIn("missing: %s" % os.path.join("current", "OpenDMTQ.exe"), said)
+        self.assertIn("Start the launcher again", said)
+        self.assertTrue(os.path.isfile(os.path.join(self.install, "current", "OpenDMTQ.exe")))
+        os.environ.pop("OPENDMTQ_INSTALL_ROOT")
+        code, said = self.run_main(["--repair"])
+        self.assertEqual(code, 2)
+        self.assertIn("installed by OpenDMTQ-Setup.exe", said)
+
+    def test_clear_game_data_asks_first(self):
+        code, said = self.run_main(["--clear-game-data"], stdin="n\n")
+        self.assertEqual(code, 1)
+        self.assertEqual(listing(self.game), set(GAME))
+        code, said = self.run_main(["--clear-game-data", "--yes"])
+        self.assertEqual(code, 0)
+        self.assertEqual(listing(self.game), {"data/android_id"})
+        code, said = self.run_main(["--clear-game-data"])
+        self.assertEqual((code, said.strip()), (0, "There is no game data on this PC."))
+
+    def test_uninstall_keeps_the_data(self):
+        self.run_main(["--server", self.site.url])
+        with mock.patch.object(subprocess, "Popen") as popen:
+            code, said = self.run_main(["--uninstall"], stdin="y\n")
+        self.assertEqual(code, 0)
+        self.assertEqual(popen.call_args[0][0][1:], ["--uninstall", "--silent"])
+        self.assertEqual(listing(self.game), set(GAME))
+        self.assertEqual(st.LauncherState.load().server()["url"], self.site.url)
+
+    def test_uninstall_with_its_data(self):
+        self.run_main(["--server", self.site.url])
+        write(st.config_dir(), {"notes.txt": b"the player's own"})
+        with mock.patch.object(subprocess, "Popen") as popen:
+            code, said = self.run_main(["--uninstall", "--delete-data"], stdin="n\n")
+        self.assertEqual(code, 1)
+        popen.assert_not_called()
+        with mock.patch.object(subprocess, "Popen") as popen:
+            code, said = self.run_main(["--uninstall", "--delete-data", "--yes"])
+        self.assertEqual(code, 0)
+        popen.assert_called_once()
+        self.assertFalse(os.path.exists(removal.data_root()))
+        # The launcher's folder here is one of the test's choosing: the launcher's files went, the other stays.
+        self.assertEqual(listing(st.config_dir()), {"notes.txt"})
+        # Velopack's uninstall hook writes no log where none is left.
+        os.environ["OPENDMTQ_CLIENT_DIR"] = os.path.join(removal.data_root(), "client")
+        with self.assertRaises(SystemExit), mock.patch.object(main, "_velopack_hooks", side_effect=SystemExit(0)):
+            self.run_main(["--veloapp-uninstall", "0.8.0"])
+        self.assertFalse(os.path.exists(removal.data_root()))
+
+    def test_uninstall_waits_for_the_window_and_the_game(self):
+        with mock.patch.object(main, "window_open", return_value=True), \
+                mock.patch.object(subprocess, "Popen") as popen:
+            code, said = self.run_main(["--uninstall", "--yes"])
+        self.assertEqual(code, 2)
+        self.assertIn("window is open", said)
+        with mock.patch.object(playing, "running", return_value=True), \
+                mock.patch.object(subprocess, "Popen") as popen:
+            for job in (["--uninstall", "--yes"], ["--clear-game-data", "--yes"], ["--repair"]):
+                code, said = self.run_main(job)
+                self.assertEqual(code, 2, job)
+                self.assertIn("Close the game first", said)
+        popen.assert_not_called()
+        self.assertEqual(listing(self.game), set(GAME))
+
+    def test_a_copied_folder_cannot_uninstall(self):
+        os.environ.pop("OPENDMTQ_INSTALL_ROOT")
+        code, said = self.run_main(["--uninstall", "--yes"])
+        self.assertEqual(code, 2)
+        self.assertIn("installed by OpenDMTQ-Setup.exe", said)
+
+    def test_they_run_on_their_own(self):
+        for args in (["--repair", "--status"], ["--uninstall", "--clear-game-data"], ["--delete-data"]):
+            with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+                main.parse(args)

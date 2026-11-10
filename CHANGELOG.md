@@ -47,6 +47,12 @@ one that only fixes raises the patch number. Each release's section here is its 
   server has one, which the launcher trusts for that server alone. The installer and the launcher speak English or
   Korean, as Windows does, and the launcher can be set to either. `OpenDMTQ-cmd.exe` does the same from the command
   line.
+- The PC client's Help page repairs, clears and removes, each with the same flag of `OpenDMTQ-cmd.exe`: Repair puts the
+  program's files that are missing or changed back from the package it was installed from (`--repair`); Clear game
+  data deletes what the game keeps, all but the device id, so the PC stays the same player (`--clear-game-data`);
+  Start over forgets the servers, sign-ins, apps and settings (`--reset`); Uninstall removes the program, its shortcuts
+  and its entry in Windows' Apps, keeping the data for a later install or deleting it too (`--uninstall`,
+  `--uninstall --delete-data`). The Online page forgets the server in use as well as the others.
 - A switch for broadcasts on the whole server, off on a new server: while off, nothing of broadcasts reaches a phone,
   the PC player or the site (no LIVE menu, no home box, no LIVE marks, no recordings to watch), and uploads are refused.
   The players' own switches are kept for when it is on again. The settings are kept in the database, so they go with

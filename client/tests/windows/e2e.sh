@@ -5,6 +5,9 @@
 #   2. installed through its own dialog (Enter on Install), Velopack's setup underneath, the launcher started after
 #   3. the launcher's first-start guide: the server the installer brought, the sign-in, the app's download, PLAY
 #   4. the player reaching the game's menu (a frame of it saved), closed as a person closes a window, the launcher back
+#   5. Repair from the command line: a file of the player and one of the launcher put back as they were installed
+#   6. Clear game data: the id alone stays, and the game starts again with it and gets to its menu
+#   7. Uninstall with the data: refused while the window is open, then the program, its shortcut and its data gone
 # Every step leaves a screenshot of the virtual screen in OUT_DIR, and the logs.
 #
 #   TEST_SITE=URL TEST_NET=NETWORK TEST_APK=DIR TEST_TOOLS=IMAGE ACCOUNT_FILE=FILE client/tests/windows/e2e.sh BUILD_DIR OUT_DIR
@@ -152,11 +155,12 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
     || { snap launcher-hidden; echo 'FAIL: the launcher did not come back'; exit 1; }
   echo 'launcher back'
   sleep 3; snap launcher-back
-  # The Screen page with what Windows says of the display, and the Sound page with the devices the player lists: the
-  # middles of their rows in the menu column at 96 dpi (rows 49 px apart, PLAY's at 166). A layout that moves them
-  # shows the same page twice, and the run fails on it below rather than passing with the wrong screens.
-  click_from_top 90 215; sleep 3; snap screen-page
-  click_from_top 90 264; sleep 10; snap sound-page
+  # The Screen page with what Windows says of the display, and the Sound page with the devices the player lists, by the
+  # keyboard as a person without a mouse goes: Tab takes the menu first (its ring on PLAY), Right moves the ring along,
+  # Enter opens the page. A menu that does not answer shows the same page twice, and the run fails on it below.
+  launcher=\$(window '^OpenDMTQ\$'); xdotool windowfocus --sync \"\$launcher\" 2>/dev/null
+  xdotool key Tab; sleep 0.5; xdotool key Right Return; sleep 3; snap screen-page
+  xdotool key Right Return; sleep 10; snap sound-page
   if [ \"\$(md5sum < /out/\$(printf %02d \$((step - 1)))-screen-page.png | cut -d' ' -f1)\" = \
        \"\$(md5sum < /out/\$(printf %02d \$step)-sound-page.png | cut -d' ' -f1)\" ]; then
     echo 'FAIL: the Screen and Sound clicks showed the same page'; exit 1
@@ -166,7 +170,57 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   # The sound devices as the Sound page asks the player for them (Wine's own, here).
   wine \"\$LOCAL/OpenDMTQ.Client/current/OpenDMTQ-cmd.exe\" --audio-devices 2>&1 | tr -d '\r' >> /out/status.txt
   cat /out/status.txt
+  CUR=\"\$LOCAL/OpenDMTQ.Client/current\"
+  CMD() { wine \"\$CUR/OpenDMTQ-cmd.exe\" \"\$@\" 2>&1 | tr -d '\r'; }
+  # 5. Repair: a file of the player and one of the launcher's own gone, put back from the installed package as they were.
+  damaged='player/libEGL.dll _internal/opendmtq_client/assets/fonts/DMTQWide-ExtraBoldItalic.ttf'
+  sums=\$(cd \"\$CUR\" && md5sum \$damaged)
+  (cd \"\$CUR\" && rm \$damaged)
+  CMD --repair | tee /out/repair.txt
+  (cd \"\$CUR\" && echo \"\$sums\" | md5sum -c --quiet) || { echo 'FAIL: the repair did not put the files back'; exit 1; }
+  grep -q 'Put back 2 files' /out/repair.txt || { echo 'FAIL: the repair did not say what it put back'; exit 1; }
+  echo 'repair: both files back as installed'
+  # 6. Clear game data: all of the game's but the id this PC plays by. The first game's log and frame are kept aside.
+  ID=\$(ls \"\$LOCAL\"/OpenDMTQ/*/data/android_id | head -n 1)
+  GAME=\${ID%/data/android_id}
+  id_before=\$(md5sum < \"\$ID\")
+  cp \"\$GAME/player.log\" /out/player-first.log; cp -r \"\$GAME/data/shots\" /out/shots-first 2>/dev/null
+  CMD --clear-game-data --yes | tee /out/clear.txt
+  [ \"\$(cd \"\$GAME\" && find . -type f)\" = './data/android_id' ] || { echo 'FAIL: clearing left more than the id'; exit 1; }
+  echo 'cleared: the id alone stayed'
+  # PLAY again: the game makes its data anew and gets to its menu with the same id.
+  click_from_corner 66 31
+  wait_for 60 player_running || { snap no-player-again; echo 'FAIL: the player did not start after clearing'; exit 1; }
+  wait_for 180 '[ -n \"\$(ls \"\$GAME\"/data/shots 2>/dev/null)\" ]' \\
+    || { snap no-menu-again; echo 'FAIL: the game did not get to its menu after clearing'; exit 1; }
+  sleep 5; snap game-again
+  [ \"\$(md5sum < \"\$ID\")\" = \"\$id_before\" ] || { echo 'FAIL: the game took another id after clearing'; exit 1; }
+  echo 'the game started again with the same id'
+  game=\$(xdotool search --name 'TECHNIKA' 2>/dev/null | tail -n 1)
+  eval \$(xdotool getwindowgeometry --shell \"\$game\")
+  xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5
+  xdotool mousemove \$((X + WIDTH - 33)) \$((Y + 33)); sleep 1; xdotool click 1; sleep 2
+  xdotool mousemove \$((X + WIDTH / 2)) \$((Y + (HEIGHT - 264) / 2 + 193)); sleep 1; xdotool click 1
+  wait_for 60 '! player_running' || { snap player-stays-again; echo 'FAIL: the menu did not end the game'; exit 1; }
+  wait_for 20 '[ -n \"\$(xdotool search --onlyvisible --name \"^OpenDMTQ\$\" 2>/dev/null)\" ]' \\
+    || { snap launcher-hidden-again; echo 'FAIL: the launcher did not come back'; exit 1; }
+  sleep 3; snap launcher-back-again
+  # 7. Uninstall with the data: refused while the window is open, which would write its settings back.
+  CMD --uninstall --delete-data --yes | tee /out/uninstall-refused.txt
+  grep -q 'window is open' /out/uninstall-refused.txt || { echo 'FAIL: the uninstall did not wait for the window'; exit 1; }
+  xdotool windowfocus --sync \$(window '^OpenDMTQ\$') 2>/dev/null; xdotool key alt+F4
+  wait_for 20 '[ -z \"\$(window \"^OpenDMTQ\$\")\" ]' || { snap launcher-stays; echo 'FAIL: the launcher did not close'; exit 1; }
+  # The logs, before they go.
   collect
+  CMD --uninstall --delete-data --yes | tee /out/uninstall.txt
+  wait_for 60 '[ ! -e \"\$LOCAL/OpenDMTQ.Client\" ]' || { echo 'FAIL: the program stayed'; ls \"\$LOCAL/OpenDMTQ.Client\"; exit 1; }
+  # Velopack's uninstall hook starts the launcher once more: it must not make the data folder again.
+  sleep 3
+  [ ! -e \"\$LOCAL/OpenDMTQ\" ] || { echo 'FAIL: the data stayed'; find \"\$LOCAL/OpenDMTQ\" | head; exit 1; }
+  shortcut=\$(find / -iname 'OpenDMTQ*.lnk' -path '*drive_c*' 2>/dev/null | head -n 1)
+  [ -z \"\$shortcut\" ] || { echo \"FAIL: a shortcut stayed: \$shortcut\"; exit 1; }
+  echo 'uninstalled: the program, its shortcut and its data are gone'
+  snap uninstalled
   wineserver -k
   echo 'e2e done'
 "

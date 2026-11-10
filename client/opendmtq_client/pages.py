@@ -1,4 +1,5 @@
-"""The launcher's pages. Each builder fills the page area; HEADERS gives each page's header words.
+"""The launcher's pages, as the site's: a title in the wide face and a line under it (heading), then cards. Each builder
+fills the page's column.
 
 A setting row changes the remembered state right away (app.changed); the player reads the settings at the next PLAY,
 so nothing changes under a game that is running.
@@ -16,30 +17,54 @@ from opendmtq_client import values as choices
 
 log = logging.getLogger("opendmtq_client")
 
-# ------------------------------------------------------------------------------------------- headers
+# ------------------------------------------------------------------------------------------- headings
+
+# Each page's title, in English in both languages as the site's page titles and the game's menus are.
+TITLES = {"play": "PLAY", "screen": "SCREEN", "sound": "SOUND", "controls": "CONTROLS", "online": "ONLINE",
+          "help": "HELP", "about": "LAUNCHER"}
 
 
-def _plain_header(key):
-    """A page header: the launcher's own kicker above the page's title (the title already names the page), then a line."""
-    def words(app):
-        return app.words("play.kicker"), app.words(key + ".title"), app.words(key + ".sub")
-    return words
+def heading(app, page):
+    """A page's title and the line under it: PLAY's says where it plays, the others what the page is for."""
+    if page == "play":
+        server = app.state.server()
+        return TITLES[page], (app.words("play.on", name=server["name"]) if server else app.words("app.tagline"))
+    return TITLES[page], app.words(page + ".sub")
 
 
-def _play_header(app):
-    """PLAY's header: the game's name in chrome, and the server it plays on under it."""
-    server = app.state.server()
-    sub = app.words("play.on", name=server["name"]) if server else app.words("app.tagline")
-    return app.words("play.kicker"), app.words("play.title"), sub
+def _card(parent, ui, title, last=False):
+    """A card with its title, stacked under the ones before it with the site's gap between cards."""
+    card = widgets.Card(parent, ui, title)
+    card.pack(fill="x", pady=(0, 0 if last else ui.px(CARD_GAP)))
+    return card
 
 
-HEADERS = {"play": _play_header}
-HEADERS.update({key: _plain_header(key) for key in ("screen", "sound", "controls", "online", "help", "about")})
+# The gap between two cards (the site's --gap is 20 px; the window is smaller than a page).
+CARD_GAP = 16
 
 
-def _gap(parent, ui, height=18):
-    """Vertical space between blocks, in logical pixels."""
-    tk.Frame(parent, bg=parent["bg"], height=ui.px(height)).pack(fill="x")
+def _columns(parent, ui, weights=(3, 2)):
+    """Cards side by side: a frame for each column, as wide as its share of the row less the gaps. The shares come from
+    the row's own width alone: a grid that sized them from what they hold would loop for ever, as the text in each
+    wraps to the width it is given and so asks for what it got (one pixel going back and forth between the columns)."""
+    row = tk.Frame(parent, bg=theme.BG)
+    row.pack(fill="x")
+    columns = []
+    for i in range(len(weights)):
+        column = tk.Frame(row, bg=theme.BG)
+        column.grid(row=0, column=i, sticky="nsew", padx=(ui.px(CARD_GAP) if i else 0, 0))
+        columns.append(column)
+
+    def fit(event):
+        room = max(1, event.width - ui.px(CARD_GAP) * (len(weights) - 1))
+        given = 0
+        for i, weight in enumerate(weights):
+            width = room * weight // sum(weights) if i < len(weights) - 1 else room - given
+            given += width
+            row.columnconfigure(i, minsize=width + (ui.px(CARD_GAP) if i else 0), weight=0)
+
+    row.bind("<Configure>", fit)
+    return columns
 
 
 def _busy(app):
@@ -51,62 +76,53 @@ def _busy(app):
 
 
 def _server_card(app, parent):
-    """Where PLAY plays: the server, the account signed in, and the app this PC has of it."""
+    """Where PLAY plays: the server, its address, and the account signed in there."""
     ui, w = app.ui, app.words
-    card = widgets.Card(parent, ui)
-    card.pack(fill="x", pady=(0, ui.px(16)))
+    card = _card(parent, ui, w("play.server"))
     server = app.state.server()
     line = tk.Frame(card.body, bg=theme.PANEL)
     line.pack(fill="x")
-    tk.Label(line, text=theme.ICON["server"], font=ui.fonts.icon, fg=ui.section["accent"], bg=theme.PANEL).pack(
-        side="left", anchor="n")
-    words = tk.Frame(line, bg=theme.PANEL)
-    words.pack(side="left", fill="x", expand=True, padx=(ui.px(10), ui.px(12)))
     if server is None:
-        widgets.label(words, ui, w("play.no_server"), fg=theme.WARN, bg=theme.PANEL, wrap_margin=0).pack(fill="x")
-        widgets.Button(line, ui, w("play.connect"), lambda: app.go("online"), kind="primary", icon="online").pack(
-            side="right")
+        widgets.label(line, ui, w("play.no_server"), fg=theme.MUTED, wrap_margin=0).pack(side="left", fill="x",
+                                                                                         expand=True)
+        widgets.Button(line, ui, w("play.connect"), lambda: app.nav_go("online"), kind="primary").pack(side="right")
         return
-    widgets.label(words, ui, server["name"], font=ui.fonts.body_bold, bg=theme.PANEL, wrap_margin=0).pack(fill="x")
-    widgets.label(words, ui, server["url"], font=ui.fonts.small, fg=theme.MUTED, bg=theme.PANEL, wrap_margin=0).pack(
-        fill="x")
     signed = app.state.signed_in(server)
+    if not signed:
+        widgets.Button(line, ui, w("online.signin"), lambda: app.nav_go("online"), kind="primary").pack(
+            side="right", anchor="n")
+    words = tk.Frame(line, bg=theme.PANEL)
+    words.pack(side="left", fill="x", expand=True)
+    widgets.label(words, ui, server["name"], font=ui.fonts.body_bold, wrap_margin=0).pack(fill="x")
+    widgets.label(words, ui, server["url"], font=ui.fonts.small, fg=theme.MUTED, wrap_margin=0).pack(fill="x")
+    widgets.divider(card.body, ui)
     account = (w("play.signed", account=server["account"]) if signed else
                w("play.not_signed", account=server["account"]) if server.get("account") else w("play.no_account"))
-    widgets.label(words, ui, account, font=ui.fonts.small, fg=theme.MUTED if signed else theme.WARN, bg=theme.PANEL,
-                  wrap_margin=0).pack(fill="x", pady=(ui.px(6), 0))
-    if not signed:
-        widgets.Button(line, ui, w("online.signin"), lambda: app.go("online"), icon="login").pack(side="right")
+    state = widgets.check_line(card.body, ui, "ok" if signed else "change", account)
+    state.pack(fill="x")
 
 
 def build_play(app, parent):
     ui, w = app.ui, app.words
     _server_card(app, parent)
-    row = tk.Frame(parent, bg=theme.BG)
-    row.pack(fill="x")
-    row.columnconfigure(0, weight=3, uniform="cards")
-    row.columnconfigure(1, weight=2, uniform="cards")
-    # Left: the ready check, filled in when the worker thread finishes it.
-    ready = widgets.Card(row, ui)
-    ready.grid(row=0, column=0, sticky="nsew", padx=(0, ui.px(16)))
-    widgets.section(ready.body, ui, w("play.ready"), bg=theme.PANEL).pack(fill="x", pady=(0, ui.px(12)))
+    left, right = _columns(parent, ui)
+    # Left: the ready check, filled in when the worker thread finishes it, as tall as the column.
+    ready = widgets.Card(left, ui, w("play.ready"))
+    ready.pack(fill="both", expand=True)
     app.check_box = tk.Frame(ready.body, bg=theme.PANEL)
     app.check_box.pack(fill="x")
     # Right: how to play, and how the last game went.
-    how = widgets.Card(row, ui)
-    how.grid(row=0, column=1, sticky="nsew")
-    widgets.section(how.body, ui, w("play.how"), bg=theme.PANEL).pack(fill="x", pady=(0, ui.px(10)))
-    for key in ("play.how.1", "play.how.2", "play.how.3"):
-        widgets.label(how.body, ui, w(key), bg=theme.PANEL, fg=theme.TEXT, wrap_margin=0).pack(
-            fill="x", pady=(0, ui.px(6)))
-    _gap(how.body, ui, 10)
-    widgets.section(how.body, ui, w("play.last"), bg=theme.PANEL).pack(fill="x", pady=(0, ui.px(10)))
-    widgets.label(how.body, ui, _last_session(app), bg=theme.PANEL, fg=theme.MUTED, wrap_margin=0).pack(fill="x")
+    how = _card(right, ui, w("play.how"))
+    for i, key in enumerate(("play.how.1", "play.how.2", "play.how.3")):
+        if i:
+            widgets.divider(how.body, ui, pady=8)
+        widgets.label(how.body, ui, w(key), wrap_margin=0).pack(fill="x")
+    last = _card(right, ui, w("play.last"), last=True)
+    widgets.label(last.body, ui, _last_session(app), fg=theme.MUTED, wrap_margin=0).pack(fill="x")
     record = app.state.last_session or {}
     if record.get("crashed") or record.get("failed_start"):
         # The reason is in the player's log: one press away from where it says the game stopped.
-        widgets.Button(how.body, ui, w("status.open_log"), app.open_player_log, icon="file").pack(
-            anchor="w", pady=(ui.px(10), 0))
+        widgets.Button(last.body, ui, w("status.open_log"), app.open_player_log).pack(anchor="w", pady=(ui.px(12), 0))
     # Made again each time the page shows: a sign-in can have ended, or an app come, since the last one. Until it
     # comes back, the box says it is being made.
     app.refresh_checks()
@@ -125,7 +141,8 @@ def _last_session(app):
 
 
 def refresh_checks(app):
-    """Fill the ready check (PLAY page, Help page, the guide's last step) from app.checks."""
+    """Fill the ready check (PLAY page, Help page, the guide's last step) from app.checks: a row a line, each with its
+    lamp, its name, and at the right end what it is about or the way to fix it."""
     box = getattr(app, "check_box", None)
     if box is None or not box.winfo_exists():
         return
@@ -133,40 +150,43 @@ def refresh_checks(app):
         child.destroy()
     ui, w = app.ui, app.words
     if app.checks is None:
-        widgets.label(box, ui, "...", bg=theme.PANEL, fg=theme.MUTED).pack(anchor="w")
+        widgets.label(box, ui, "...", fg=theme.MUTED).pack(anchor="w")
         return
-    for check in app.checks:
-        name = w("check." + check.key)
-        if not check.ok and check.key == "player":
-            # The player comes with the launcher: installing again brings it back, and no page here can.
-            state, action = "bad", None
-            name = "%s  ·  %s" % (name, w("check.player.missing"))
+    from opendmtq_client import installed
+    for i, check in enumerate(app.checks):
+        if i:
+            widgets.divider(box, ui, pady=9)
+        name, value, action, fix = w("check." + check.key), None, None, w("play.fix")
+        if not check.ok and check.key == "player" and installed.root():
+            # The player comes with the launcher: the installed one puts it back from its package.
+            state, fix, action = "bad", w("check.player.repair"), lambda: repair_program(app)
+        elif not check.ok and check.key == "player":
+            # A copied folder: installing brings the player back, and no page here can.
+            state, value = "bad", w("check.player.missing")
         elif check.ok:
-            state, action = "ok", None
+            state = "ok"
             # What it is about, which a player wants to confirm: the server, the account, the app's date. The PLAY
             # page's server card above already names the server and the account.
             about = ("app",) if app.page == "play" and app.guide is None else ("server", "account", "app")
             if check.key in about:
-                name = "%s  ·  %s" % (name, check.detail)
+                value = check.detail
         elif check.play_fixes:
-            # PLAY does these by itself; the line only says it will.
-            state, action = "change", None
-            name = "%s  ·  %s" % (name, w("play.will_get"))
+            # PLAY does these by itself; the row only says it will.
+            state, value = "change", w("play.will_get")
         else:
             state = "bad" if check.key in actions.BLOCKING else "change"
-            action = (lambda p=check.page: app.go(p)) if check.page and app.guide is None else None
-        widgets.check_line(box, ui, state, name, w("play.fix") if action else None, action).pack(
-            fill="x", pady=(0, ui.px(7)))
+            action = (lambda p=check.page: app.nav_go(p)) if check.page and app.guide is None else None
+        widgets.check_line(box, ui, state, name, fix if action else None, action, value=value).pack(fill="x")
 
 
 # -------------------------------------------------------------------------------------------- Screen
 
 
 def screen_rows(app, parent, redraw, full=True):
-    """The Screen page's settings, which the guide's SOUND CHECK shows too (full=False: the ones a first start needs)."""
+    """The Screen page's settings in their cards, which the guide's SOUND CHECK shows too (full=False: the ones a first
+    start needs)."""
     ui, w, v = app.ui, app.words, app.state.values
     display = displays.main_display(app.root)
-    widgets.section(parent, ui, w("screen.display")).pack(fill="x", pady=(0, ui.px(14)))
     mode = v["display"]
 
     def set_and_redraw(name):
@@ -176,11 +196,12 @@ def screen_rows(app, parent, redraw, full=True):
             redraw()
         return setter
 
-    widgets.setting_row(parent, ui, w("screen.mode"),
+    card = _card(parent, ui, w("screen.display"))
+    widgets.setting_row(card.body, ui, w("screen.mode"),
                         lambda p: widgets.Segmented(p, ui, [("fullscreen", w("screen.mode.fullscreen")),
                                                             ("window", w("screen.mode.window"))], mode,
                                                     set_and_redraw("display")),
-                        w("screen.mode.hint." + mode)).pack(fill="x", pady=(0, ui.px(16)))
+                        w("screen.mode.hint." + mode)).pack(fill="x")
     if mode == "window" and full:
         # Sizes that fit the display with room for the title bar and the taskbar; fitted always stays.
         sizes = [s for s in choices.WINDOW_SIZES if s == "auto" or (choices.size_of(s)[0] <= display["width"] and
@@ -189,40 +210,41 @@ def screen_rows(app, parent, redraw, full=True):
             # A size set on the command line keeps its row.
             sizes.append(v["window"])
         options = [(s, w("screen.size.auto") if s == "auto" else s.replace("x", " × ")) for s in sizes]
-        widgets.setting_row(parent, ui, w("screen.size"),
+        widgets.divider(card.body, ui)
+        widgets.setting_row(card.body, ui, w("screen.size"),
                             lambda p: widgets.Select(p, ui, options, v["window"], lambda s: app.changed("window", s),
                                                      width=22),
-                            w("screen.size.hint")).pack(fill="x", pady=(0, ui.px(16)))
+                            w("screen.size.hint")).pack(fill="x")
     hz = display.get("hz")
     if full:
-        widgets.label(parent, ui, w("screen.main", w=display["width"], h=display["height"]) + (
+        widgets.divider(card.body, ui)
+        widgets.label(card.body, ui, w("screen.main", w=display["width"], h=display["height"]) + (
             w("screen.main.hz", hz=hz) if hz else ""), font=ui.fonts.small, fg=theme.MUTED, wrap_margin=0).pack(
-            fill="x", pady=(0, ui.px(16)))
-        _gap(parent, ui, 6)
-    widgets.section(parent, ui, w("screen.frames")).pack(fill="x", pady=(0, ui.px(14)))
+            fill="x")
+    card = _card(parent, ui, w("screen.frames"), last=not full)
     vsync = v["vsync"] == "on"
-    widgets.setting_row(parent, ui, w("screen.vsync"),
+    widgets.setting_row(card.body, ui, w("screen.vsync"),
                         lambda p: widgets.Toggle(p, ui, vsync,
                                                  lambda on: set_and_redraw("vsync")("on" if on else "off")),
-                        w("screen.vsync.hint." + ("on" if vsync else "off"))).pack(fill="x", pady=(0, ui.px(16)))
+                        w("screen.vsync.hint." + ("on" if vsync else "off"))).pack(fill="x")
     rate = w("screen.fps.auto.hz", hz=hz) if hz else w("screen.fps.auto")
     # The VSync hint about fractions of the rate only means something for a number of frames.
     numbered = v["fps"] not in ("auto", "unlimited")
     fps_hint = ("vsync" if numbered else "vsync_rate") if vsync else "free"
     options = [(f, rate if f == "auto" else w("screen.fps.unlimited") if f == "unlimited" else w("screen.fps.n", n=f))
                for f in choices.FPS]
-    widgets.setting_row(parent, ui, w("screen.fps"),
+    widgets.divider(card.body, ui)
+    widgets.setting_row(card.body, ui, w("screen.fps"),
                         lambda p: widgets.Select(p, ui, options, v["fps"], set_and_redraw("fps"), width=22),
-                        w("screen.fps.hint." + fps_hint)).pack(fill="x", pady=(0, ui.px(16)))
+                        w("screen.fps.hint." + fps_hint)).pack(fill="x")
     if not full:
         return
-    _gap(parent, ui, 6)
-    widgets.section(parent, ui, w("screen.picture")).pack(fill="x", pady=(0, ui.px(14)))
+    card = _card(parent, ui, w("screen.picture"), last=True)
     options = [(s, w("screen.scale.full") if s == "100" else "%s%%" % s) for s in choices.RENDER_SCALE]
-    widgets.setting_row(parent, ui, w("screen.scale"),
+    widgets.setting_row(card.body, ui, w("screen.scale"),
                         lambda p: widgets.Select(p, ui, options, v["render_scale"],
                                                  lambda s: app.changed("render_scale", s), width=22),
-                        w("screen.scale.hint")).pack(fill="x", pady=(0, ui.px(16)))
+                        w("screen.scale.hint")).pack(fill="x")
 
 
 def build_screen(app, parent):
@@ -233,20 +255,20 @@ def build_screen(app, parent):
 
 
 def sound_rows(app, parent, redraw, full=True):
-    """The Sound page's settings, which the guide's SOUND CHECK shows too (full=False: the volume alone)."""
+    """The Sound page's settings in their cards, which the guide's SOUND CHECK shows too (full=False: the volume
+    alone)."""
     ui, w, v = app.ui, app.words, app.state.values
-    widgets.section(parent, ui, w("sound.volume")).pack(fill="x", pady=(0, ui.px(14)))
-    widgets.setting_row(parent, ui, w("sound.volume.game"),
+    card = _card(parent, ui, w("sound.volume"), last=not full)
+    widgets.setting_row(card.body, ui, w("sound.volume.game"),
                         lambda p: widgets.Slider(p, ui, v["volume"], lambda val: app.changed("volume", val)),
-                        w("sound.volume.hint")).pack(fill="x", pady=(0, ui.px(18)))
+                        w("sound.volume.hint")).pack(fill="x")
     if not full:
         return
-    widgets.section(parent, ui, w("sound.output")).pack(fill="x", pady=(0, ui.px(14)))
+    card = _card(parent, ui, w("sound.output"), last=True)
     if app.devices is None:
         # Asked once from the player, on a worker thread; the page is drawn again with the answer.
-        widgets.setting_row(parent, ui, w("sound.device"),
-                            lambda p: widgets.label(p, ui, w("sound.device.looking"), fg=theme.MUTED)).pack(
-            fill="x", pady=(0, ui.px(16)))
+        widgets.setting_row(card.body, ui, w("sound.device"),
+                            lambda p: widgets.label(p, ui, w("sound.device.looking"), fg=theme.MUTED)).pack(fill="x")
         app.load_devices(then=redraw)
     else:
         options = [("default", w("sound.device.default"))]
@@ -254,11 +276,10 @@ def sound_rows(app, parent, redraw, full=True):
         if v["audio_device"] != "default" and all(d["id"] != v["audio_device"] for d in app.devices):
             # A device chosen before that is not there now (unplugged): it stays chosen, and says so.
             options.append((v["audio_device"], w("sound.device.gone")))
-        widgets.setting_row(parent, ui, w("sound.device"),
+        widgets.setting_row(card.body, ui, w("sound.device"),
                             lambda p: widgets.Select(p, ui, options, v["audio_device"],
                                                      lambda d: app.changed("audio_device", d), width=34),
-                            w("sound.device.hint" if app.devices else "sound.device.none")).pack(
-            fill="x", pady=(0, ui.px(16)))
+                            w("sound.device.hint" if app.devices else "sound.device.none")).pack(fill="x")
 
     def set_and_redraw(name):
         def setter(value):
@@ -267,18 +288,20 @@ def sound_rows(app, parent, redraw, full=True):
         return setter
 
     mode = v["audio_mode"]
-    widgets.setting_row(parent, ui, w("sound.mode"),
+    widgets.divider(card.body, ui)
+    widgets.setting_row(card.body, ui, w("sound.mode"),
                         lambda p: widgets.Segmented(p, ui, [("shared", w("sound.mode.shared")),
                                                             ("exclusive", w("sound.mode.exclusive"))], mode,
                                                     set_and_redraw("audio_mode")),
-                        w("sound.mode.hint." + mode)).pack(fill="x", pady=(0, ui.px(16)))
+                        w("sound.mode.hint." + mode)).pack(fill="x")
     buffer = v["audio_buffer"]
-    widgets.setting_row(parent, ui, w("sound.buffer"),
+    widgets.divider(card.body, ui)
+    widgets.setting_row(card.body, ui, w("sound.buffer"),
                         lambda p: widgets.Segmented(p, ui, [("low", w("sound.buffer.low")),
                                                             ("normal", w("sound.buffer.normal")),
                                                             ("safe", w("sound.buffer.safe"))], buffer,
                                                     set_and_redraw("audio_buffer")),
-                        w("sound.buffer.hint." + buffer)).pack(fill="x", pady=(0, ui.px(16)))
+                        w("sound.buffer.hint." + buffer)).pack(fill="x")
 
 
 def build_sound(app, parent):
@@ -290,18 +313,16 @@ def build_sound(app, parent):
 
 def build_controls(app, parent):
     ui, w = app.ui, app.words
-    for section, glyph, keys in (("controls.mouse", "controls", ("controls.click", "controls.drag", "controls.wheel")),
-                                 ("controls.touch", "touch", ("controls.fingers", "controls.edges")),
-                                 ("controls.keyboard", "keyboard", ("controls.esc", "controls.menu", "controls.f11", "controls.typing"))):
-        widgets.section(parent, ui, w(section)).pack(fill="x", pady=(0, ui.px(12)))
-        for key in keys:
-            row = tk.Frame(parent, bg=theme.BG)
-            row.pack(fill="x", pady=(0, ui.px(7)))
-            mark = tk.Label(row, text=theme.ICON[glyph], font=ui.fonts.icon_small, fg=ui.section["accent"], bg=theme.BG)
-            mark.pack(side="left", anchor="n")
-            widgets.label(row, ui, w(key), wrap_margin=0, beside=(mark,)).pack(side="left", fill="x",
-                                                                              padx=(ui.px(10), 0))
-        _gap(parent, ui, 10)
+    groups = (("controls.mouse", ("controls.click", "controls.drag", "controls.wheel")),
+              ("controls.touch", ("controls.fingers", "controls.edges")),
+              ("controls.keyboard", ("controls.esc", "controls.menu", "controls.f11", "controls.typing")))
+    for n, (title, keys) in enumerate(groups):
+        card = _card(parent, ui, w(title), last=n == len(groups) - 1)
+        for i, key in enumerate(keys):
+            # One line each, split by the card's faint lines.
+            if i:
+                widgets.divider(card.body, ui, pady=9)
+            widgets.label(card.body, ui, w(key), wrap_margin=0).pack(fill="x")
 
 
 # -------------------------------------------------------------------------------------------- Online
@@ -360,10 +381,12 @@ def check_server(app, address, then=None):
     threading.Thread(target=work, daemon=True, name="connect").start()
 
 
-def connect_panel(app, parent, rerender, bg=theme.BG):
-    """The server: its address and Connect, and one line under them (server_line)."""
+def connect_panel(app, parent, rerender, bg=theme.BG, forget=False):
+    """The server's card: its address and Connect, and one line under them (server_line). With `forget`, the server in
+    use can be forgotten there too (the Online page; the guide only connects)."""
     ui, w = app.ui, app.words
-    widgets.section(parent, ui, w("online.server"), bg=bg).pack(fill="x", pady=(0, ui.px(12)))
+    card = _card(parent, ui, w("online.server"))
+    parent, bg = card.body, theme.PANEL
     row = tk.Frame(parent, bg=bg)
     row.pack(fill="x")
     tk.Label(row, text=w("online.address"), font=ui.fonts.small, fg=theme.MUTED, bg=bg).grid(row=0, column=0, sticky="w")
@@ -373,7 +396,7 @@ def connect_panel(app, parent, rerender, bg=theme.BG):
     address.insert(0, server["url"] if server else "")
     text, colour = server_line(app)
     answer = widgets.label(parent, ui, text, font=ui.fonts.small, fg=colour, bg=bg, wrap_margin=0)
-    answer.pack(fill="x", pady=(ui.px(6), ui.px(12)))
+    answer.pack(fill="x", pady=(ui.px(8), 0))
 
     def connect():
         if _busy(app):
@@ -384,7 +407,11 @@ def connect_panel(app, parent, rerender, bg=theme.BG):
         answer.configure(text=w("online.connecting"), fg=theme.MUTED)
 
     address.bind("<Return>", lambda e: connect())
-    widgets.Button(row, ui, w("online.connect"), connect, kind="primary", icon="online").grid(row=1, column=1, sticky="w")
+    widgets.Button(row, ui, w("online.connect"), connect, kind="primary").grid(row=1, column=1, sticky="w")
+    if server and forget:
+        # After Connect, apart from it: the next server this launcher knows becomes the one PLAY plays on.
+        widgets.Button(row, ui, w("online.forget"), lambda: forget_server(app, server, rerender),
+                       kind="danger").grid(row=1, column=2, sticky="w", padx=(ui.px(8), 0))
     if not server:
         # Not connected yet: typing goes to the address, Enter connects.
         address.after_idle(address.focus_set)
@@ -397,12 +424,12 @@ def signin_panel(app, parent, rerender, bg=theme.BG):
     server = app.state.server()
     if server is None:
         return
-    widgets.section(parent, ui, w("online.account"), bg=bg).pack(fill="x", pady=(ui.px(6), ui.px(12)))
+    card = _card(parent, ui, w("online.account"))
+    parent, bg = card.body, theme.PANEL
     if app.state.signed_in(server):
         signed = tk.Frame(parent, bg=bg)
         signed.pack(fill="x")
-        mark = tk.Label(signed, text=theme.ICON["ok"], font=ui.fonts.icon_small, fg=theme.OK, bg=bg)
-        mark.pack(side="left")
+        widgets.lamp(signed, ui, theme.OK, bg=bg).pack(side="left")
 
         def sign_out():
             if _busy(app):
@@ -416,8 +443,8 @@ def signin_panel(app, parent, rerender, bg=theme.BG):
 
         # Sign out right after the account it signs out of.
         widgets.label(signed, ui, w("online.signed", account=server["account"]), bg=bg).pack(
-            side="left", padx=(ui.px(8), 0))
-        widgets.Button(signed, ui, w("online.signout"), sign_out, icon="logout").pack(side="left", padx=(ui.px(16), 0))
+            side="left", padx=(ui.px(6), 0))
+        widgets.Button(signed, ui, w("online.signout"), sign_out).pack(side="left", padx=(ui.px(16), 0))
         return
     form = tk.Frame(parent, bg=bg)
     form.pack(anchor="w")
@@ -473,7 +500,7 @@ def signin_panel(app, parent, rerender, bg=theme.BG):
     # Typing goes to the first empty field; Tab to the next; Enter signs in.
     first = fields["online.password"] if server.get("account") else fields["online.id"]
     first.after_idle(first.focus_set)
-    widgets.Button(form, ui, w("online.signin"), sign_in, kind="primary", icon="login").grid(row=1, column=2, sticky="w")
+    widgets.Button(form, ui, w("online.signin"), sign_in, kind="primary").grid(row=1, column=2, sticky="w")
     message.pack(fill="x", pady=(ui.px(8), 0))
 
 
@@ -483,7 +510,8 @@ def app_panel(app, parent, rerender, bg=theme.BG):
     server = app.state.server()
     if server is None:
         return
-    widgets.section(parent, ui, w("online.app"), bg=bg).pack(fill="x", pady=(ui.px(10), ui.px(12)))
+    card = _card(parent, ui, w("online.app"))
+    parent, bg = card.body, theme.PANEL
     have = apps.local(server["url"])
     offered = server.get("app")
     newer = bool(have and offered and offered.get("sha256", "").lower() != have["sha256"])
@@ -532,7 +560,7 @@ def app_panel(app, parent, rerender, bg=theme.BG):
     buttons.pack(anchor="w")
     words = w("online.app.update") if newer else w("online.app.check") if have else w("online.app.get")
     widgets.Button(buttons, ui, words, lambda: _get(app, rerender), kind="primary" if not have or newer else
-                   "secondary", icon="download").pack(side="left")
+                   "secondary").pack(side="left")
 
 
 def _date(details):
@@ -556,10 +584,13 @@ def known_servers(app, parent, rerender):
     others = [s for s in app.state.servers if s["url"] != app.state.current]
     if not others:
         return
-    widgets.section(parent, ui, w("online.others")).pack(fill="x", pady=(ui.px(14), ui.px(12)))
-    for s in others:
-        line = tk.Frame(parent, bg=theme.PANEL, padx=ui.px(14), pady=ui.px(8))
-        line.pack(fill="x", pady=(0, ui.px(6)))
+    card = _card(parent, ui, w("online.others"), last=True)
+    for i, s in enumerate(others):
+        # One row a server, split by the card's faint lines.
+        if i:
+            widgets.divider(card.body, ui, pady=9)
+        line = tk.Frame(card.body, bg=theme.PANEL)
+        line.pack(fill="x")
 
         def pick(url=s["url"]):
             if _busy(app):
@@ -572,28 +603,40 @@ def known_servers(app, parent, rerender):
             app.refresh_checks()
             rerender()
 
-        def forget(url=s["url"], name=s["name"]):
-            # The question short, the server it is about named in the line under it.
-            if not dialogs.ask(app, "danger", w("online.forget.title"), w("online.forget.ask"),
-                               w("online.forget.detail", name=name), w("online.forget")):
-                return
-            app.state.remove_server(url)
-            apps.remove(url)
-            app.state.save()
-            app.refresh_checks()
-            rerender()
-
-        forget_button = widgets.Button(line, ui, w("online.forget"), forget, kind="danger", icon="delete")
+        forget_button = widgets.Button(line, ui, w("online.forget"), lambda s=s: forget_server(app, s, rerender),
+                                       kind="danger")
         forget_button.pack(side="right")
         pick_button = widgets.Button(line, ui, w("online.pick"), pick)
         pick_button.pack(side="right", padx=(0, ui.px(8)))
-        widgets.label(line, ui, "%s  ·  %s" % (s["name"], s["url"]), bg=theme.PANEL, wrap_margin=12,
+        widgets.label(line, ui, "%s  ·  %s" % (s["name"], s["url"]), wrap_margin=12,
                       beside=(forget_button, pick_button)).pack(side="left", fill="x")
+
+
+def forget_server(app, server, rerender):
+    """Forget a server, its sign-in and its app on this PC, after a question that names it."""
+    w = app.words
+    in_use = server["url"] == app.state.current
+    if in_use and _busy(app):
+        # Its app is downloading or playing.
+        app.set_status(w("online.busy"), "warn")
+        return
+    # The question short, the server it is about named in the line under it.
+    if not dialogs.ask(app, "danger", w("online.forget.title"), w("online.forget.ask"),
+                       w("online.forget.detail", name=server["name"]), w("online.forget")):
+        return
+    app.state.remove_server(server["url"])
+    apps.remove(server["url"])
+    if in_use:
+        # What the last download and the last look said was about the server that is gone.
+        app.download_error, app.app_note = None, None
+    app.state.save()
+    app.refresh_checks()
+    rerender()
 
 
 def build_online(app, parent):
     rerender = lambda: app.page == "online" and app.go("online")  # noqa: E731  (the page drawn again)
-    connect_panel(app, parent, rerender)
+    connect_panel(app, parent, rerender, forget=True)
     signin_panel(app, parent, rerender)
     app_panel(app, parent, rerender)
     known_servers(app, parent, rerender)
@@ -604,48 +647,59 @@ def build_online(app, parent):
 
 def build_help(app, parent):
     ui, w = app.ui, app.words
-    card = widgets.Card(parent, ui)
-    card.pack(fill="x")
-    head = tk.Frame(card.body, bg=theme.PANEL)
-    head.pack(fill="x", pady=(0, ui.px(12)))
-    widgets.section(head, ui, w("help.checks"), bg=theme.PANEL).pack(side="left", fill="x", expand=True)
-    widgets.Button(head, ui, w("help.recheck"), app.refresh_checks, icon="refresh").pack(side="right",
-                                                                                         padx=(ui.px(12), 0))
+    card = _card(parent, ui, w("help.checks"))
+    # Check again at the title's right end.
+    widgets.Button(card.head, ui, w("help.recheck"), app.refresh_checks).pack(side="right")
     app.check_box = tk.Frame(card.body, bg=theme.PANEL)
     app.check_box.pack(fill="x")
     app.refresh_checks()
     refresh_checks(app)
-    _gap(parent, ui, 22)
-    widgets.section(parent, ui, w("help.trouble")).pack(fill="x", pady=(0, ui.px(12)))
+    card = _card(parent, ui, w("help.trouble"))
     # Each line with the page it names one press away.
     server = app.state.server()
     have = apps.local(server["url"]) if server else None
-    # The first line points at the player's log below, which is there once the game has an app to run.
-    first = "help.trouble.1" if have else "help.trouble.1.none"
-    for key, page in ((first, None), ("help.trouble.2", "screen"), ("help.trouble.3", "sound"),
-                      ("help.trouble.4", None)):
-        line = tk.Frame(parent, bg=theme.BG)
-        line.pack(fill="x", pady=(0, ui.px(6)))
+    # The first line points at the player's log below, which is there once the game has run with the app.
+    log_file = player.log_path(have["package"]) if have else None
+    has_log = bool(log_file and os.path.isfile(log_file))
+    first = "help.trouble.1" if has_log else "help.trouble.1.none"
+    for i, (key, page) in enumerate(((first, None), ("help.trouble.2", "screen"), ("help.trouble.3", "sound"),
+                                     ("help.trouble.4", None))):
+        if i:
+            widgets.divider(card.body, ui, pady=9)
+        line = tk.Frame(card.body, bg=theme.PANEL)
+        line.pack(fill="x")
         beside = ()
         if page:
-            # The page the line names, reached by the mouse or the keyboard.
-            to = widgets.link(line, ui, w("nav." + page), lambda p=page: app.nav_go(p))
+            # The page the line names, by the menu's own name, reached by the mouse or the keyboard.
+            to = widgets.link(line, ui, TITLES[page], lambda p=page: app.nav_go(p))
             to.pack(side="right", anchor="n")
             beside = (to,)
         widgets.label(line, ui, w(key), wrap_margin=12, beside=beside).pack(side="left", fill="x")
-    _gap(parent, ui, 14)
-    widgets.section(parent, ui, w("help.tools")).pack(fill="x", pady=(0, ui.px(14)))
-    if have:
-        log_file = player.log_path(have["package"])
-        widgets.setting_row(parent, ui, w("help.player_log"),
-                            lambda p: widgets.Button(p, ui, w("common.open"), lambda: actions.open_folder(log_file),
-                                                     icon="file"),
-                            w("help.player_log.hint")).pack(fill="x", pady=(0, ui.px(16)))
+    card = _card(parent, ui, w("help.tools"))
+    if has_log:
+        widgets.setting_row(card.body, ui, w("help.player_log"),
+                            lambda p: widgets.Button(p, ui, w("common.open"), lambda: actions.show_file(log_file)),
+                            w("help.player_log.hint")).pack(fill="x")
+        widgets.divider(card.body, ui)
     logs = os.path.join(st.config_dir(), "logs")
-    widgets.setting_row(parent, ui, w("help.logs"),
-                        lambda p: widgets.Button(p, ui, w("common.open"), lambda: actions.open_folder(logs),
-                                                 icon="folder"),
-                        w("help.logs.hint")).pack(fill="x", pady=(0, ui.px(16)))
+    widgets.setting_row(card.body, ui, w("help.logs"),
+                        lambda p: widgets.Button(p, ui, w("common.open"), lambda: actions.open_folder(logs)),
+                        w("help.logs.hint")).pack(fill="x")
+    from opendmtq_client import installed
+    root = installed.root()
+    if root:
+        # Only the installed launcher has a package to put its files back from.
+        widgets.divider(card.body, ui)
+        widgets.setting_row(card.body, ui, w("help.repair"),
+                            lambda p: widgets.Button(p, ui, w("help.repair"), lambda: repair_program(app)),
+                            w("help.repair.hint")).pack(fill="x")
+    # From the least to the most: the game's data, the launcher's, the program.
+    card = _card(parent, ui, w("help.remove"), last=True)
+    widgets.setting_row(card.body, ui, w("help.clear"),
+                        lambda p: widgets.Button(p, ui, w("help.clear.confirm"), lambda: clear_game_data(app),
+                                                 kind="danger"),
+                        w("help.clear.hint")).pack(fill="x")
+    widgets.divider(card.body, ui)
 
     def start_over():
         if _busy(app):
@@ -665,9 +719,151 @@ def build_help(app, parent):
         app.page = "play"
         app.show()
 
-    widgets.setting_row(parent, ui, w("help.reset"),
-                        lambda p: widgets.Button(p, ui, w("help.reset"), start_over, kind="danger", icon="restore"),
-                        w("help.reset.hint")).pack(fill="x", pady=(0, ui.px(16)))
+    widgets.setting_row(card.body, ui, w("help.reset"),
+                        lambda p: widgets.Button(p, ui, w("help.reset"), start_over, kind="danger"),
+                        w("help.reset.hint")).pack(fill="x")
+    if root and installed.updater(root):
+        # Velopack's uninstaller is what takes the program; a copied folder is deleted as any folder.
+        widgets.divider(card.body, ui)
+        widgets.setting_row(card.body, ui, w("help.uninstall"),
+                            lambda p: widgets.Button(p, ui, w("help.uninstall"), lambda: uninstall_program(app),
+                                                     kind="danger"),
+                            w("help.uninstall.hint")).pack(fill="x")
+
+
+def _in_background(app, message, glyph, job, then):
+    """Run job() on a worker thread under a dialog that says what is under way, then then(result, error) on the
+    window's thread with the dialog gone. The window is not closed meanwhile: the work would stop half done."""
+    app.dialog = dialogs.Dialog(app.root, app.ui, "info", message, message, progress=True, glyph=glyph)
+    app.updating = True
+
+    def work():
+        try:
+            result, error = job(), None
+        except Exception as e:  # noqa: BLE001  (shown in a dialog, never swallowed)
+            log.exception("%s failed", job.__name__)
+            result, error = None, e
+        app.post(lambda: finished(result, error))
+
+    def finished(result, error):
+        app.updating = False
+        if app.dialog is not None:
+            app.dialog.close(None)
+            app.dialog = None
+        then(result, error)
+
+    threading.Thread(target=work, daemon=True, name=job.__name__).start()
+
+
+def _not_now(app):
+    """True, said on the status line, while the game runs or PLAY or a download is under way: the files these tools
+    change are in use then. A game started from the command line counts too."""
+    from opendmtq_client import playing
+    if _busy(app) or playing.running():
+        app.set_status(app.words("help.reset.busy"), "warn")
+        return True
+    return False
+
+
+def repair_program(app):
+    """Repair: the program's files compared with the installed package, what is missing or changed put back."""
+    from opendmtq_client import repair
+    w = app.words
+    if _not_now(app):
+        return
+
+    def done(result, error):
+        if error is not None:
+            dialogs.tell(app, "error", w("help.repair"), w("help.repair.failed"), w.error(error))
+        elif result.failed:
+            dialogs.tell(app, "warn", w("help.repair"), w("help.repair.partly"),
+                         w("help.repair.partly.detail", n=result.restored, failed=len(result.failed)))
+        elif result.restored:
+            # The running launcher goes on with the files it loaded; its next start reads the ones put back.
+            detail = "help.repair.done.restart" if result.needs_restart else "help.repair.done.detail"
+            dialogs.tell(app, "info", w("help.repair"), w("help.repair.done"), w(detail, n=result.restored))
+        else:
+            dialogs.tell(app, "info", w("help.repair"), w("help.repair.fine"),
+                         w("help.repair.fine.detail", n=result.checked))
+        # The player may be back.
+        app.refresh_checks()
+
+    _in_background(app, w("help.repair.working"), "restore", repair.run, done)
+
+
+def clear_game_data(app):
+    """Clear game data: the games' folders emptied but for the id this PC plays by, after a question that says how
+    much goes."""
+    from opendmtq_client import removal
+    w = app.words
+    if _not_now(app):
+        return
+    # Counted at the press: the game adds to its data each time it runs.
+    size = removal.game_data_size()
+    if not size:
+        app.set_status(w("help.clear.none"), "normal", transient=True)
+        return
+    said = removal.megabytes(size)
+    if not dialogs.ask(app, "danger", w("help.clear"), w("help.clear.ask"), w("help.clear.detail", size=said),
+                       w("help.clear.confirm"), glyph="delete"):
+        return
+
+    def done(failed, error):
+        if error is not None:
+            dialogs.tell(app, "error", w("help.clear"), w("help.clear.partly"), w.error(error))
+        elif failed:
+            dialogs.tell(app, "warn", w("help.clear"), w("help.clear.partly"),
+                         w("help.clear.partly.detail", n=len(failed), path=failed[0]))
+        # The player's log went with the rest: its row comes back once the game has run.
+        if app.page == "help":
+            app.go("help")
+        if error is None and not failed:
+            # Said after the page is drawn again, whose ready check would otherwise take the line at once.
+            app.set_status(w("help.clear.done", size=said), "ok", sticky=True)
+
+    _in_background(app, w("help.clear.working"), "delete", removal.clear_game_data, done)
+
+
+def uninstall_program(app):
+    """Uninstall: a question with two ways, the data kept or deleted with the program; then Velopack's uninstaller
+    starts and the window closes for it."""
+    from opendmtq_client import removal
+    w = app.words
+    if _not_now(app):
+        return
+    size = removal.megabytes(removal.everything_size())
+    # Cancel first and the ring on it: Enter alone removes nothing.
+    choice = dialogs.choose(app, "danger", w("help.uninstall"), w("help.uninstall.ask"),
+                            w("help.uninstall.detail", size=size),
+                            [(w("help.uninstall.keep"), "keep", "warn"), (w("help.uninstall.all"), "all", "danger")],
+                            glyph="delete")
+
+    def start():
+        try:
+            removal.uninstall()
+        except Exception as e:  # noqa: BLE001  (Update.exe that did not start: said, and the window stays)
+            log.exception("the uninstaller did not start")
+            dialogs.tell(app, "error", w("help.uninstall"), w("help.uninstall.failed"),
+                         w("help.uninstall.failed.detail", error=w.error(e)))
+            return
+        app.leave()
+
+    def deleted(failed, error):
+        if error is not None:
+            # Nothing is uninstalled after a deletion that stopped half way: the player can choose again.
+            dialogs.tell(app, "error", w("help.uninstall"), w("help.uninstall.failed"), w.error(error))
+            return
+        if failed:
+            dialogs.tell(app, "warn", w("help.uninstall"), w("help.uninstall.left"),
+                         w("help.uninstall.left.detail", n=len(failed), folder=removal.data_root()))
+        start()
+
+    if choice == "keep":
+        # Written before the uninstaller starts: it closes what runs from the program's folder, this window too.
+        app.state.save()
+        start()
+    elif choice == "all":
+        _in_background(app, w("help.uninstall.working"), "delete", removal.delete_everything, deleted)
 
 
 # --------------------------------------------------------------------------------------------- About
@@ -680,20 +876,20 @@ def language_options(app):
 
 def build_about(app, parent):
     ui, w = app.ui, app.words
-    widgets.section(parent, ui, w("about.general")).pack(fill="x", pady=(0, ui.px(14)))
-    widgets.setting_row(parent, ui, w("about.language"),
+    card = _card(parent, ui, w("about.general"))
+    widgets.setting_row(card.body, ui, w("about.language"),
                         lambda p: widgets.Segmented(p, ui, language_options(app), app.state.picked_language or "system",
-                                                    app.set_language)).pack(fill="x", pady=(0, ui.px(18)))
-    widgets.section(parent, ui, w("about.updates")).pack(fill="x", pady=(0, ui.px(14)))
+                                                    app.set_language)).pack(fill="x")
+    card = _card(parent, ui, w("about.updates"))
     from opendmtq_client import __version__
     version = updates.current_version() or __version__
-    box = tk.Frame(parent, bg=theme.BG)
-    box.pack(fill="x", pady=(0, ui.px(8)))
+    box = tk.Frame(card.body, bg=theme.PANEL)
+    box.pack(fill="x")
     widgets.label(box, ui, w("about.version", v=version), font=ui.fonts.body_bold).pack(side="left")
     # The answer and "Update to vX" under the version, taking room only once there is an answer.
-    result = tk.Frame(parent, bg=theme.BG)
+    result = tk.Frame(card.body, bg=theme.PANEL)
     answer = widgets.label(result, ui, "", fg=theme.MUTED, wrap_margin=0)
-    slot = tk.Frame(result, bg=theme.BG)
+    slot = tk.Frame(result, bg=theme.PANEL)
 
     # One look at a time: a second press while it asks does nothing.
     checking = {"now": False}
@@ -706,7 +902,7 @@ def build_about(app, parent):
             child.destroy()
         answer.configure(text=w("about.checking"), fg=theme.MUTED)
         if not answer.winfo_manager():
-            answer.pack(fill="x", pady=(ui.px(4), ui.px(10)))
+            answer.pack(fill="x", pady=(ui.px(10), 0))
             slot.pack(fill="x")
 
         def work():
@@ -729,7 +925,7 @@ def build_about(app, parent):
         answer.configure(text=text, fg=theme.BAD if result.kind == "failed" else theme.MUTED)
         if result.kind == "available":
             widgets.Button(slot, ui, w("about.update_now", v=result.version), lambda: update(result),
-                           kind="primary", icon="update").pack(anchor="w", pady=(0, ui.px(12)))
+                           kind="primary").pack(anchor="w", pady=(ui.px(10), 0))
 
     def update(result):
         from opendmtq_client import playing
@@ -770,19 +966,21 @@ def build_about(app, parent):
 
         threading.Thread(target=work, daemon=True, name="update").start()
 
-    widgets.Button(box, ui, w("about.check"), check, icon="update").pack(side="left", padx=(ui.px(16), 0))
-    result.pack(fill="x", pady=(0, ui.px(4)))
-    widgets.section(parent, ui, w("about.guide")).pack(fill="x", pady=(ui.px(4), ui.px(14)))
+    widgets.Button(box, ui, w("about.check"), check).pack(side="left", padx=(ui.px(16), 0))
+    result.pack(fill="x")
+    card = _card(parent, ui, w("about.guide"))
 
     def rerun():
         app.state.guide_done = False
         app.state.save()
         app.show()
 
-    widgets.Button(parent, ui, w("about.guide.run"), rerun, icon="history").pack(anchor="w", pady=(0, ui.px(18)))
-    widgets.section(parent, ui, w("about.legal")).pack(fill="x", pady=(0, ui.px(12)))
-    for key in ("about.license", "about.notice"):
-        widgets.label(parent, ui, w(key), fg=theme.MUTED, wrap_margin=0).pack(fill="x", pady=(0, ui.px(8)))
+    widgets.Button(card.body, ui, w("about.guide.run"), rerun).pack(anchor="w")
+    card = _card(parent, ui, w("about.legal"), last=True)
+    for i, key in enumerate(("about.license", "about.notice")):
+        if i:
+            widgets.divider(card.body, ui, pady=9)
+        widgets.label(card.body, ui, w(key), fg=theme.MUTED, wrap_margin=0).pack(fill="x")
 
 
 BUILDERS = {

@@ -1,6 +1,7 @@
 # The PC client on Windows itself (CI's client-windows job, a windows-2022 runner): the installer as a release builds it,
 # silently, for this Windows user, then what it installed, without a window: the command line twin, the player it
-# carries (found by the ready check, and its sound devices), and a second run of the same installer (a repair).
+# carries (found by the ready check, and its sound devices), a second run of the same installer (a repair), the
+# launcher's own repair of a file gone, and its uninstall with the data.
 #
 #   client/tests/windows/install.ps1 -Folder <client/packaging/windows/build.sh's releases folder>
 #
@@ -59,6 +60,32 @@ $r = Run $setup @('--silent', '--no-start') 600
 Check "a second run of the installer ends with 0 (exit $($r.code))" ($r.code -eq 0)
 $r = Run $cmd @('--version') 60
 Check "after it, still $version" ($r.text -match [regex]::Escape($version))
+
+# 5. The launcher's own repair: a file of the player gone, put back from the installed package as it was.
+$gone = Join-Path $player.DirectoryName 'libEGL.dll'
+$before = (Get-FileHash $gone).Hash
+Remove-Item $gone
+$r = Run $cmd @('--repair') 300
+Write-Output $r.text
+Check "--repair ends with 0 (exit $($r.code))" ($r.code -eq 0)
+Check "--repair put the player's file back as installed" ((Test-Path $gone) -and ((Get-FileHash $gone).Hash -eq $before))
+
+# 6. Uninstall with the data: the program, its shortcuts and OpenDMTQ's data folder gone (a game's folder stands in).
+$data = Join-Path $env:LOCALAPPDATA 'OpenDMTQ'
+New-Item -ItemType Directory -Force (Join-Path $data 'com.example.game\data') | Out-Null
+Set-Content (Join-Path $data 'com.example.game\data\android_id') '0123456789abcdef'
+# The uninstaller closes what runs from the program's folder, this command line too: its exit code says nothing.
+$r = Run $cmd @('--uninstall', '--delete-data', '--yes') 120
+Write-Output $r.text
+$removed = $false
+foreach ($i in 1..60) { if (-not (Test-Path $installed)) { $removed = $true; break }; Start-Sleep 1 }
+Check "--uninstall removed the program" $removed
+# Velopack's uninstall hook starts the launcher once more: it must not make the data folder again.
+Start-Sleep 3
+Check "--uninstall --delete-data removed the data" (-not (Test-Path $data))
+$shortcuts = @([Environment]::GetFolderPath('Programs'), [Environment]::GetFolderPath('Desktop'))
+$left = Get-ChildItem -Path $shortcuts -Recurse -Filter 'OpenDMTQ*.lnk' -ErrorAction SilentlyContinue
+Check "no shortcut stayed" ($null -eq $left)
 
 # Velopack's and the installer's own logs, for a look when something failed.
 Get-ChildItem $env:TEMP -Filter 'OpenDMTQ-setup*.log' -ErrorAction SilentlyContinue | Select-Object -Last 2 | ForEach-Object {

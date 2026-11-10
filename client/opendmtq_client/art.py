@@ -5,7 +5,6 @@ down, because Tk's own canvas does not smooth diagonal edges.
 """
 
 import math
-import random
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
@@ -14,11 +13,6 @@ from opendmtq_client import theme
 # Draw at this many times the final size, then scale down: smooth edges without a drawing library.
 SS = 3
 
-# Chrome, top to bottom: bright, a dark band where the horizon reflects, bright again (the site's wordmark).
-CHROME = ((0.0, "#ffffff"), (0.46, "#e4e9ee"), (0.54, "#76808b"), (0.72, "#b3bbc4"), (1.0, "#f4f6f8"))
-# How far titles lean, as the site's wordmark and the TECHNIKA Q logo do: 12 degrees.
-LEAN = math.tan(math.radians(12))
-
 
 def _rgb(hex_colour):
     """'#1f5bff' -> (31, 91, 255)."""
@@ -26,203 +20,344 @@ def _rgb(hex_colour):
     return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
 
 
-def lit_chrome(colour):
-    """Chrome that turns into a colour towards its foot, for the last letter of a mark (the wordmark's lime Q)."""
-    return ((0.0, "#ffffff"), (0.6, colour), (1.0, colour))
+# ------------------------------------------------------------------------------------------------ the site's wordmark
+
+# The wordmark's metal (server/portal/style.css .logo .m): over the line box of DMTQ, top to bottom.
+WORDMARK_CHROME = ((0.0, "#ffffff"), (0.46, "#e4e9ee"), (0.54, "#76808b"), (0.72, "#b3bbc4"), (1.0, "#f4f6f8"))
 
 
-def _ramp(size, stops):
-    """A vertical gradient through several colours: stops are (place 0..1, colour)."""
+def _vertical(size, stops, top=0.0, span=None):
+    """A vertical gradient picture of `size`, its stops placed over `span` pixels starting `top` pixels from the
+    picture's top (as a CSS gradient over a box that is not the picture), the end colours held beyond them."""
     w, h = size
-    column = Image.new("RGB", (1, max(2, h)))
+    span = span or h
+    column = Image.new("RGB", (1, max(1, h)))
     for y in range(column.height):
-        t = y / float(column.height - 1)
+        t = (y + 0.5 - top) / float(span)
+        t = min(1.0, max(0.0, t))
         for (t0, c0), (t1, c1) in zip(stops, stops[1:]):
             if t0 <= t <= t1:
                 k = 0.0 if t1 == t0 else (t - t0) / (t1 - t0)
                 a, b = _rgb(c0), _rgb(c1)
                 column.putpixel((0, y), tuple(int(round(a[i] + (b[i] - a[i]) * k)) for i in range(3)))
                 break
-    return column.resize((max(1, w), max(1, h)), Image.BILINEAR)
+    return column.resize((max(1, w), max(1, h)), Image.NEAREST)
 
 
-def _dots(img, step, alpha):
-    """The site's perforated metal: a faint grid of points over a surface."""
-    layer = Image.new("L", img.size, 0)
-    draw = ImageDraw.Draw(layer)
-    for y in range(step // 2, img.height, step):
-        for x in range(step // 2, img.width, step):
-            draw.point((x, y), fill=alpha)
-    img.paste(Image.new("RGB", img.size, (255, 255, 255)), (0, 0), layer)
+def wordmark(mark, scale=1.0, suffix=None, accent=theme.OK):
+    """The site's wordmark (style.css .logo) at `mark` CSS pixels, as the site's header draws it: OPEN small and spaced
+    out above, its skewed bar running grey into the accent to DMTQ's end, DMTQ in chrome with the Q lit in the accent,
+    and an optional suffix (the site's .s: ADMIN, here PC) at DMTQ's lower right. Returns an RGBA picture.
 
-
-def shards(width, height, seed=7, density=1.0, colours=None):
-    """The page behind its title: gunmetal with shards cutting in from the right, the Technika shards at the site's
-    edges. The shards take the section's colour (PLAY's lime unless told otherwise)."""
-    colours = colours or theme.SECTION_COLOURS["home"]
-    w, h = width * SS, height * SS
-    rng = random.Random(seed)
-    img = Image.new("RGB", (w, h), _rgb(theme.BG))
-    layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(layer)
-    bright, deep = _rgb(colours["light"]), _rgb(colours["deep"])
-    # Large dark planes first, then bright splinters over them, all leaning the same way.
-    for i in range(int(16 * density)):
-        splinter = i >= 6
-        # Shards start on the right two thirds so the title on the left stays on dark metal.
-        x = rng.uniform(0.38, 1.08) * w
-        y = rng.uniform(-0.3, 1.1) * h
-        length = rng.uniform(0.45, 1.3) * h * (1.3 if not splinter else 1.0)
-        spread = rng.uniform(0.05, 0.20) * w
-        # A long thin triangle: one sharp tip, one short base edge, like broken glass.
-        points = [(x, y), (x + spread, y - length * 0.30), (x - spread * rng.uniform(0.3, 1.0), y + length)]
-        # Splinters half seen through, so the section's colour lights the page without shouting over the title.
-        alpha = rng.randint(100, 150) if splinter else rng.randint(120, 190)
-        draw.polygon(points, fill=(bright if splinter else deep) + (alpha,))
-    img.paste(layer, (0, 0), layer)
-    img = img.resize((width, height), Image.LANCZOS)
-    # A soft fade from the left, so the title reads on plain metal.
-    fade = Image.linear_gradient("L").rotate(90, expand=True).resize((width, height))
-    plain = Image.new("RGB", (width, height), _rgb(theme.BG))
-    _dots(plain, 6, 12)
-    return Image.composite(img, plain, fade.point(lambda v: min(255, int(v * 1.6))))
-
-
-def _hangul(text):
-    """True when the text has Hangul, which the wide face lacks."""
-    return any("가" <= ch <= "힣" or "ㄱ" <= ch <= "ㆎ" for ch in text)
-
-
-def _lean(img, slope):
-    """The picture sheared to lean right by `slope` (x moves right as y goes up), wider by what the lean takes."""
-    extra = int(math.ceil(img.height * slope))
-    wide = Image.new(img.mode, (img.width + extra, img.height), (0, 0, 0, 0))
-    wide.paste(img, (0, 0))
-    # Image.transform maps each output pixel back to the input: x_in = x_out + slope * y_out - extra.
-    return wide.transform(wide.size, Image.AFFINE, (1, slope, -extra, 0, 1, 0), resample=Image.BICUBIC)
-
-
-def chrome_text(parts, size, scale=1.0):
-    """Words with a chrome face, a dark rim and a soft shadow, leaning like the site's wordmark.
-
-    parts: [(text, stops)] drawn one after another, so a mark can end in another colour (the wordmark's lime Q). Latin
-    is set in the leaning wide face; Korean, which it lacks, in Pretendard Bold, leant by shearing the picture. Returns
-    an RGBA picture just big enough, and the baseline's height in it.
+    The places come from the stylesheet and the face's own metrics (ascent 1.135 em, descent 0.439 em), as a browser
+    sets them: OPEN at 0.34 em with 0.2 em spacing and margins 0.72 em left, 0.5 em right, 0.28 em under it; its bar
+    0.34 of OPEN's size thick after a 0.42 em gap; DMTQ at 1 em in a 0.94 em line; the suffix at 0.52 em, 8 px after.
     """
-    whole = "".join(t for t, _ in parts)
-    korean = _hangul(whole)
-    # Pretendard's letters sit smaller in their size than the wide face's capitals: a little larger, the same height.
-    font = ImageFont.truetype(theme.HANGUL_TITLE_FILE, int(round(size * 1.15))) if korean else \
-        ImageFont.truetype(theme.WIDE_ITALIC_FILE, size)
-    rim = max(1, int(round(1.4 * scale)))
-    pad = rim + int(6 * scale)
-    ascent, descent = font.getmetrics()
-    # Room for the italic's last letter, which leans past its advance.
-    width = int(sum(font.getlength(t) for t, _ in parts)) + 2 * pad + int(size * 0.18)
-    height = ascent + descent + 2 * pad
-    baseline = pad + ascent
+    k = SS
+    m = mark * scale * k                       # the mark's size in the drawing's pixels
+    big = ImageFont.truetype(theme.WIDE_ITALIC_FILE, max(1, int(round(m))))
+    o_size = 0.34 * m
+    small = ImageFont.truetype(theme.WIDE_ITALIC_FILE, max(1, int(round(o_size))))
+    asc, desc = 1.135, 0.439                   # the face's ascent and descent, in its em
+    # Column 1: DMTQ's width (its advances, -0.01 em spacing a letter, 0.14 em room for the lean) sets it.
+    m_width = big.getlength("DMTQ") - 0.04 * m + 0.14 * m
+    gap = 8 * scale * k                        # the grid's column gap, in pixels whatever the size
+    s_size = 0.52 * m
+    s_font = ImageFont.truetype(theme.WIDE_ITALIC_FILE, max(1, int(round(s_size)))) if suffix else None
+    s_width = (s_font.getlength(suffix) + 0.02 * s_size * len(suffix)) if suffix else 0
+    row1 = o_size + 0.28 * o_size              # OPEN's line (line-height 1) and its margin under it
+    row2 = 0.94 * m                            # DMTQ's line
+    width = int(math.ceil(m_width + (gap + s_width + 0.1 * m if suffix else 0)))
+    height = int(math.ceil(row1 + row2 + 0.12 * m))   # room under the line for the Q's tail
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    fill_mask = Image.new("L", img.size, 0)
-    rim_mask = Image.new("L", img.size, 0)
-    colour = Image.new("RGB", img.size, (0, 0, 0))
-    x = pad
-    # The gradient spans the capitals, so the dark band sits across every letter at the same height.
-    top = baseline - int(font.getbbox("H")[3] - font.getbbox("H")[1])
-    for text, stops in parts:
-        piece = Image.new("L", img.size, 0)
-        ImageDraw.Draw(piece).text((x, baseline), text, font=font, fill=255, anchor="ls")
-        ImageDraw.Draw(rim_mask).text((x, baseline), text, font=font, fill=255, anchor="ls", stroke_width=rim,
-                                      stroke_fill=255)
-        ramp = _ramp((width, baseline - top + 2), stops)
-        layer = Image.new("RGB", img.size, _rgb(stops[-1][1]))
-        layer.paste(_rgb(stops[0][1]), (0, 0, width, top))
-        layer.paste(ramp, (0, top))
-        colour.paste(layer, (0, 0), piece)
-        fill_mask.paste(255, (0, 0), piece)
-        x += font.getlength(text)
-    shadow = rim_mask.filter(ImageFilter.GaussianBlur(3 * scale)).point(lambda v: int(v * 0.7))
-    img.paste((0, 0, 0, 255), (0, int(2 * scale)), shadow)
-    img.paste(_rgb(theme.INK) + (255,), (0, 0), rim_mask)
-    rgba = colour.convert("RGBA")
-    img.paste(rgba, (0, 0), fill_mask)
-    if korean:
-        # Pretendard stands upright: the picture leans instead, as the Latin face does by itself.
-        img = _lean(img, LEAN)
-    return img, baseline
-
-
-def header(width, height, seed=7, colours=None, title=None, title_tail=None, scale=1.0, title_at=(32, 98)):
-    """The page header: shards in the section's colour and the page's title in leaning chrome (its tail, such as the
-    Q of OpenDMTQ, in the section's colour).
-
-    title_at is the title's left edge and baseline in logical pixels.
-    """
-    colours = colours or theme.SECTION_COLOURS["home"]
-    img = shards(width, height, seed=seed, colours=colours).convert("RGBA")
-    if title:
-        parts = [(title, CHROME)]
-        if title_tail and title.endswith(title_tail):
-            parts = [(title[:-len(title_tail)], CHROME), (title_tail, lit_chrome(colours["accent"]))]
-        words, baseline = chrome_text(parts, int(round(34 * scale)), scale)
-        pad = int(6 * scale) + max(1, int(round(1.4 * scale)))
-        img.alpha_composite(words, (int(title_at[0] * scale) - pad, int(title_at[1] * scale) - baseline))
-    return img.convert("RGB")
-
-
-def logo(width, scale=1.0, label="PC", accent=theme.OK, version=None):
-    """OpenDMTQ's wordmark as the site draws it, `width` pixels wide: OPEN spaced out in small leaning letters beside a
-    splinter that runs from grey into the accent, then DMTQ in leaning chrome with a lime Q, and a small label after it.
-    With `version`, a small plate with it at the end of the OPEN line, where the splinter stops short of it."""
-    small = ImageFont.truetype(theme.WIDE_ITALIC_FILE, max(8, int(round(10 * scale))))
-    tiny = ImageFont.truetype(theme.WIDE_ITALIC_FILE, max(8, int(round(11 * scale))))
-    label_w = int(tiny.getlength(label)) + int(8 * scale)
-    # DMTQ as large as the width allows beside its label.
-    size = int(round(42 * scale))
-    while size > 12:
-        big, baseline = chrome_text([("DMT", CHROME), ("Q", lit_chrome(accent))], size, scale)
-        if big.width + label_w <= width:
-            break
-        size -= 1
-    pad = int(6 * scale) + max(1, int(round(1.4 * scale)))
-    top = int(round(15 * scale))
-    img = Image.new("RGBA", (width, top + big.height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    # OPEN, letter by letter with air between them (the site's 0.2 em), starting a little in: its lean starts further right.
-    x = pad + int(4 * scale)
+    # OPEN: its baseline where a 1-high line puts it, letter by letter with its spacing after each.
+    o_base = (o_size - (asc + desc) * o_size) / 2 + asc * o_size
+    x = 0.72 * o_size
     for ch in "OPEN":
-        draw.text((x, top), ch, font=small, fill=(0xf4, 0xf6, 0xf8, 255), anchor="ls")
-        x += small.getlength(ch) + 2.6 * scale
-    # The splinter: a leaning bar after OPEN up to DMTQ's right end, grey turning into the accent (the site's ::after,
-    # which stops half its letters' height short of the big word's end).
-    left, right = x + 5 * scale, max(x + 12 * scale, big.width - pad - int(size * 0.17))
-    plate = None
-    if version:
-        # The version's plate: its words in the text face, measured first so the splinter can stop before it.
-        face = ImageFont.truetype(theme.TEXT_BOLD_FILE, max(9, int(round(11 * scale))))
-        text_w = face.getlength(version)
-        plate_w, plate_h = int(text_w + 12 * scale), int(round(17 * scale))
-        # Right-aligned to the picture, its middle on the OPEN line's middle (OPEN's letters stand about 7 px tall).
-        plate = (width - plate_w, int(top - 3.5 * scale - plate_h / 2.0), plate_w, plate_h, face)
-        right = min(right, width - plate_w - 7 * scale)
-    foot, head = top - 1.5 * scale, top - 5.5 * scale
-    slant = (foot - head) * LEAN
-    mask = _mask(img.size, lambda d, s: d.polygon([((left + slant) * s, head * s), (right * s, head * s),
-                                                   ((right - slant) * s, foot * s), (left * s, foot * s)], fill=255))
-    ramp = Image.linear_gradient("L").rotate(90, expand=True).resize(img.size)
-    tint = Image.composite(Image.new("RGBA", img.size, _rgb(accent) + (255,)),
-                           Image.new("RGBA", img.size, (0x8f, 0x99, 0xa4, 255)), ramp)
-    img.paste(tint, (0, 0), mask)
-    img.alpha_composite(big, (0, top))
-    # The label sits on the big letters' baseline, after them, in the accent (the site's .s).
-    draw.text((big.width + int(2 * scale), top + baseline), label, font=tiny, fill=_rgb(accent) + (255,), anchor="ls")
-    if plate is not None:
-        px_, py_, pw, ph, face = plate
-        # Quiet metal with the version in light grey: read at a glance, never louder than the name (7:1 contrast).
-        draw.rounded_rectangle((px_, max(0, py_), px_ + pw - 1, max(0, py_) + ph - 1), radius=int(round(4 * scale)),
-                               fill=_rgb(theme.RAIL) + (255,), outline=_rgb(theme.LINE) + (255,))
-        draw.text((px_ + pw / 2.0, max(0, py_) + ph / 2.0), version, font=face, fill=_rgb(theme.MUTED) + (255,),
-                  anchor="mm")
+        draw.text((x, o_base), ch, font=small, fill=(0xf4, 0xf6, 0xf8, 255), anchor="ls")
+        x += small.getlength(ch) + 0.2 * o_size
+    # The bar: from OPEN's end and the gap to column 1's end less OPEN's right margin, centred on OPEN's line, skewed
+    # -14 degrees about its middle (its top further right).
+    left, right = x + 0.42 * o_size, m_width - 0.5 * o_size
+    thick = 0.34 * o_size
+    mid = o_size / 2
+    lean = thick / 2 * math.tan(math.radians(14))
+    bar = Image.new("L", (width, height), 0)
+    ImageDraw.Draw(bar).polygon([(left + lean, mid - thick / 2), (right + lean, mid - thick / 2),
+                                 (right - lean, mid + thick / 2), (left - lean, mid + thick / 2)], fill=255)
+    ramp = Image.linear_gradient("L").rotate(90, expand=True).resize((max(1, int(right - left)), height))
+    tint = Image.new("RGBA", (width, height), _rgb("#8f99a4") + (255,))
+    tint.paste(Image.composite(Image.new("RGBA", ramp.size, _rgb(accent) + (255,)),
+                               Image.new("RGBA", ramp.size, _rgb("#8f99a4") + (255,)), ramp), (int(left), 0))
+    tint.paste(_rgb(accent) + (255,), (int(right), 0, width, height))
+    img.paste(tint, (0, 0), bar)
+    # DMTQ: in a 0.94 em line under row 1, its baseline where that line puts it; DMT in chrome, the Q lit.
+    m_top = row1
+    m_base = m_top + (row2 - (asc + desc) * m) / 2 + asc * m
+    letters = Image.new("L", (width, height), 0)
+    q_mask = Image.new("L", (width, height), 0)
+    x = 0
+    for ch in "DMTQ":
+        ImageDraw.Draw(q_mask if ch == "Q" else letters).text((x, m_base), ch, font=big, fill=255, anchor="ls")
+        x += big.getlength(ch) - 0.01 * m
+    chrome = _vertical((width, height), WORDMARK_CHROME, top=m_top, span=row2).convert("RGBA")
+    img.paste(chrome, (0, 0), letters)
+    # The Q's own box is its inline box: the face's ascent and descent around its baseline, white into the accent at 60 %.
+    q_top = m_base - asc * m
+    lit = _vertical((width, height), ((0.0, "#ffffff"), (0.6, accent), (1.0, accent)), top=q_top,
+                    span=(asc + desc) * m).convert("RGBA")
+    img.paste(lit, (0, 0), q_mask)
+    if suffix:
+        # The suffix at row 2's foot (0.06 em above it), after column 1 and the gap, in the accent.
+        s_top = m_top + row2 - 0.06 * s_size - s_size
+        s_base = s_top + (s_size - (asc + desc) * s_size) / 2 + asc * s_size
+        x = m_width + gap
+        for ch in suffix:
+            draw.text((x, s_base), ch, font=s_font, fill=_rgb(accent) + (255,), anchor="ls")
+            x += s_font.getlength(ch) + 0.02 * s_size
+    return img.resize((max(1, width // k), max(1, height // k)), Image.LANCZOS)
+
+
+def version_block(label, version, scale=1.0, accent=theme.OK):
+    """The version as the site's front page sets it beside the wordmark (style.css .server-ver): a slanted line in the
+    accent, a small label in the leaning wide face over the number in the wide face. Returns an RGBA picture."""
+    k = SS
+    s = scale * k
+    label_font = ImageFont.truetype(theme.WIDE_ITALIC_FILE, max(1, int(round(12 * s))))
+    number_font = ImageFont.truetype(theme.WIDE_FILE, max(1, int(round(16 * s))))
+    pad_left, gap_y, pad_bottom = 12 * s, 4 * s, 2 * s
+    spacing = 0.08 * 12 * s
+    label_w = sum(label_font.getlength(ch) + spacing for ch in label)
+    number_w = number_font.getlength(version)
+    label_h = 12 * s
+    number_h = 16 * s
+    # Room after the label for its last letter's lean, which goes past its advance.
+    width = int(math.ceil(pad_left + max(label_w + 0.3 * 12 * s, number_w) + 4 * s))
+    height = int(math.ceil(label_h + gap_y + number_h + pad_bottom + 2 * s))
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    # The line: 2 px, from 2 px down to the foot, leaning as the wordmark does.
+    line_w, top, bottom = 2 * s, 2 * s, height - pad_bottom
+    lean = (bottom - top) / 2 * math.tan(math.radians(14))
+    mid_x = line_w / 2 + lean
+    shape = Image.new("L", (width, height), 0)
+    ImageDraw.Draw(shape).polygon([(mid_x + lean, top), (mid_x + lean + line_w, top), (mid_x - lean + line_w, bottom),
+                                   (mid_x - lean, bottom)], fill=255)
+    img.paste(Image.new("RGBA", (width, height), _rgb(accent) + (255,)), (0, 0), shape)
+    # The label in light grey, spaced out; the number white under it.
+    x = pad_left + 2 * lean
+    for ch in label:
+        draw.text((x, label_h), ch, font=label_font, fill=_rgb("#d7dde4") + (255,), anchor="ls")
+        x += label_font.getlength(ch) + spacing
+    draw.text((pad_left + lean, label_h + gap_y + number_h), version, font=number_font, fill=(255, 255, 255, 255),
+              anchor="ls")
+    return img.resize((max(1, width // k), max(1, height // k)), Image.LANCZOS)
+
+
+def brand(scale=1.0, version="", mark=26, label="PC CLIENT"):
+    """The header's left end: the wordmark with PC after it, and the version block beside it standing on the same
+    line, as the site's front page sets its version. Returns an RGBA picture."""
+    logo = wordmark(mark, scale, suffix="PC")
+    block = version_block(label, version, scale) if version else None
+    if block is None:
+        return logo
+    gap = int(round(16 * scale))
+    width = logo.width + gap + block.width
+    height = max(logo.height, block.height)
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    # Both stand on the picture's foot (the Q's tail room under the wordmark's line lifts the block a little with it).
+    tail = int(round(0.12 * mark * scale))
+    img.paste(logo, (0, height - logo.height), logo)
+    img.paste(block, (logo.width + gap, height - block.height - tail), block)
     return img
+
+
+# ------------------------------------------------------------------------------------------------- the page behind
+
+# The site's shards at the page's edges (style.css .facets): each (opacity, points) in a 1440 x 900 box, stretched to the
+# page's width and kept 900 CSS pixels tall, every one fading out downwards.
+FACETS = ((0.75, ((1440, 60), (1330, 0), (1440, 0))),
+          (0.62, ((1290, 70), (1440, 250), (1440, 420), (1345, 300))),
+          (0.34, ((1345, 300), (1440, 420), (1440, 670), (1400, 480))),
+          (0.72, ((0, 250), (112, 470), (0, 425))),
+          (0.30, ((0, 425), (112, 470), (176, 900), (0, 900))),
+          (0.16, ((1400, 480), (1440, 670), (1440, 900), (1344, 900))))
+
+
+def _mix(a, b, k):
+    """Colour a with k of colour b over it (0: a, 1: b), as hex."""
+    ra, rb = _rgb(a), _rgb(b)
+    return "#%02x%02x%02x" % tuple(int(round(x + (y - x) * k)) for x, y in zip(ra, rb))
+
+
+def _half_plane(box, normal, limit):
+    """The part of the rectangle `box` (w, h) where the point's projection on `normal` is below `limit`: a polygon."""
+    w, h = box
+    corners = [(0, 0), (w, 0), (w, h), (0, h)]
+    inside = lambda p: p[0] * normal[0] + p[1] * normal[1] < limit  # noqa: E731
+    out = []
+    for a, b in zip(corners, corners[1:] + corners[:1]):
+        pa, pb = a[0] * normal[0] + a[1] * normal[1], b[0] * normal[0] + b[1] * normal[1]
+        if inside(a):
+            out.append(a)
+        if inside(a) != inside(b):
+            t = (limit - pa) / (pb - pa)
+            out.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
+    return out
+
+
+def backdrop(width, height, scale=1.0, accent=theme.OK, offset=0, top=None):
+    """The page behind the cards, as the site's: its field with the faint perforated metal all over, two pale panes and
+    the section's light at the top (body::before), and the green shards at the left and right edges (.facets).
+
+    The picture is the part of the page from `offset` down, `height` tall: the header draws the page's top and the
+    page area the rest, and they meet without a seam. `top` is how far down the page the panes and the light reach
+    before they have faded (the site's 620 px; less when the cards would cover them anyway).
+    """
+    width, height = max(1, int(width)), max(1, int(height))
+    offset = max(0, int(offset))
+    img = Image.new("RGB", (width, height), _rgb(theme.BG))
+    # The dots: one in each 6 px square, white at 4.5 %, on the page's own grid whatever part this is.
+    step = max(4, int(round(6 * scale)))
+    tile = Image.new("L", (step, step), 0)
+    ImageDraw.Draw(tile).ellipse([step / 2 - scale, step / 2 - scale, step / 2 + scale, step / 2 + scale], fill=11)
+    strip = Image.new("L", (width, step), 0)
+    for x in range(0, width, step):
+        strip.paste(tile, (x, 0))
+    dots = Image.new("L", (width, height), 0)
+    for y in range(-(offset % step), height, step):
+        dots.paste(strip, (0, y))
+    img.paste((255, 255, 255), (0, 0), dots)
+    # The top: full to 45 % of its reach, then fading; drawn whole, the part in this picture kept.
+    top_h = int(top if top is not None else 620 * scale)
+    if offset < top_h:
+        fade = Image.new("L", (1, top_h), 0)
+        for y in range(top_h):
+            t = y / float(max(1, top_h))
+            fade.putpixel((0, y), 255 if t < 0.45 else int(255 * max(0.0, (1 - t) / 0.55)))
+        fade = fade.resize((width, top_h))
+        panes = Image.new("L", (width, top_h), 0)
+        draw = ImageDraw.Draw(panes)
+        # 115 degrees from the top-left corner, light up to 22 % of the way; 245 degrees from the top-right, up to 16 %.
+        # The panes' geometry is the site's 620 px top, whatever the reach of their light.
+        full = int(620 * scale)
+        for angle, alpha, share, from_right in ((115, 14, 0.22, False), (245, 10, 0.16, True)):
+            rad = math.radians(angle)
+            normal = (math.sin(rad), -math.cos(rad))
+            length = abs(width * normal[0]) + abs(full * normal[1])
+            origin = (width, 0) if from_right else (0, 0)
+            limit = share * length + origin[0] * normal[0]
+            polygon = _half_plane((width, top_h), normal, limit)
+            if len(polygon) >= 3:
+                draw.polygon(polygon, fill=alpha)
+        light = Image.composite(panes, Image.new("L", panes.size, 0), fade)
+        band = Image.new("RGB", (width, top_h), (255, 255, 255))
+        # The section's light from above the middle: an ellipse 70 % wide, at 12 % in its middle.
+        glow = Image.radial_gradient("L").resize((max(1, int(width * 1.4)), max(1, int(full * 2))))
+        glow = glow.point(lambda v: int(30 * max(0.0, 1 - (v / 255.0) / 0.7)))
+        sheet = Image.new("L", (width, top_h), 0)
+        sheet.paste(glow, (int(width / 2 - glow.width / 2), int(-0.2 * full - glow.height / 2)))
+        sheet = Image.composite(sheet, Image.new("L", sheet.size, 0), fade)
+        rows = (offset, min(top_h, offset + height))
+        region = img.crop((0, 0, width, rows[1] - rows[0]))
+        region.paste(band.crop((0, rows[0], width, rows[1])), (0, 0), light.crop((0, rows[0], width, rows[1])))
+        region.paste(_rgb(accent), (0, 0), sheet.crop((0, rows[0], width, rows[1])))
+        img.paste(region, (0, 0))
+    # The shards, 900 px tall from the page's top: drawn twice as large and scaled down, smooth along their edges.
+    span = int(900 * scale)
+    if offset < span:
+        k = 2
+        mask = Image.new("L", (width * k, span * k), 0)
+        for opacity, points in FACETS:
+            layer = Image.new("L", mask.size, 0)
+            ImageDraw.Draw(layer).polygon([(x / 1440.0 * width * k, y / 900.0 * span * k) for x, y in points],
+                                          fill=int(255 * opacity))
+            mask = Image.composite(layer, mask, layer)
+        mask = mask.resize((width, span), Image.LANCZOS)
+        down = Image.linear_gradient("L").resize((1, span)).point(lambda v: 255 - v)
+        mask = Image.composite(mask, Image.new("L", mask.size, 0), down.resize((width, span)))
+        colour = _vertical((width, span), ((0.0, _mix(accent, "#ffffff", 0.12)), (1.0, _mix(accent, "#000000", 0.30))))
+        rows = (offset, min(span, offset + height))
+        part = img.crop((0, 0, width, rows[1] - rows[0]))
+        part.paste(colour.crop((0, rows[0], width, rows[1])), (0, 0), mask.crop((0, rows[0], width, rows[1])))
+        img.paste(part, (0, 0))
+    return img
+
+
+def page_title(text, scale=1.0, size=42, accent=theme.OK):
+    """A page's name as the site's masthead sets it: the leaning wide face, white at its top into the accent at its
+    foot (#fff 8 %, the accent 72 %, over a 1.08 line). Returns an RGBA picture and its baseline."""
+    k = SS
+    t = size * scale * k
+    font = ImageFont.truetype(theme.WIDE_ITALIC_FILE, max(1, int(round(t))))
+    asc, desc = 1.135, 0.439
+    line = 1.08 * t
+    base = (line - (asc + desc) * t) / 2 + asc * t
+    # Room after the last letter for its lean and the 0.12 em the site keeps, and under the line for nothing.
+    width = int(math.ceil(font.getlength(text) - 0.012 * t * len(text) + 0.3 * t))
+    height = int(math.ceil(line))
+    letters = Image.new("L", (width, height), 0)
+    x = 0
+    for ch in text:
+        ImageDraw.Draw(letters).text((x, base), ch, font=font, fill=255, anchor="ls")
+        x += font.getlength(ch) - 0.012 * t
+    colour = _vertical((width, height), ((0.0, "#ffffff"), (0.08, "#ffffff"), (0.72, accent), (1.0, accent)),
+                       span=height).convert("RGBA")
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    img.paste(colour, (0, 0), letters)
+    return img.resize((max(1, width // k), max(1, height // k)), Image.LANCZOS), int(round(base / k))
+
+
+def numeral(text, colour, scale=1.0, size=34, bg=theme.BG):
+    """A step's number as the site's steps set it (.steps li::before): big, leaning, in one colour. On `bg`."""
+    k = SS
+    t = size * scale * k
+    font = ImageFont.truetype(theme.WIDE_ITALIC_FILE, max(1, int(round(t))))
+    asc = 1.135
+    # The figure's own height (its capitals' 0.69 em) and a little room above and under it.
+    top, base = int(asc * t - 0.74 * t), int(asc * t)
+    width = int(math.ceil(font.getlength(text) + 0.25 * t))
+    height = int(math.ceil(0.84 * t))
+    # On a plain colour, or on nothing (bg None) to lie over a picture.
+    img = Image.new("RGB", (width, height), _rgb(bg)) if bg else Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    fill = _rgb(colour) + (() if bg else (255,))
+    ImageDraw.Draw(img).text((0, base - top + 0.04 * t), text, font=font, fill=fill, anchor="ls")
+    return img.resize((max(1, width // k), max(1, height // k)), Image.LANCZOS)
+
+
+def lamp(colour, scale=1.0, bg=None):
+    """A state's small light, as the site's (.state i): a 7 px dot with a soft glow of its colour around it. On `bg`
+    when given (an opaque picture), else on nothing."""
+    d = 7 * scale
+    reach = 7 * scale
+    size = int(math.ceil(d + 2 * reach))
+    k = SS
+    glow = Image.new("L", (size * k, size * k), 0)
+    c = size * k / 2.0
+    ImageDraw.Draw(glow).ellipse([c - d * k / 2, c - d * k / 2, c + d * k / 2, c + d * k / 2], fill=140)
+    glow = glow.filter(ImageFilter.GaussianBlur(reach * k / 2.5)).resize((size, size), Image.LANCZOS)
+    dot = Image.new("L", (size * k, size * k), 0)
+    ImageDraw.Draw(dot).ellipse([c - d * k / 2, c - d * k / 2, c + d * k / 2, c + d * k / 2], fill=255)
+    dot = dot.resize((size, size), Image.LANCZOS)
+    img = Image.new("RGBA", (size, size), _rgb(bg) + (255,) if bg else (0, 0, 0, 0))
+    img.paste(_rgb(colour) + (255,), (0, 0), glow)
+    img.paste(_rgb(colour) + (255,), (0, 0), dot)
+    return img
+
+
+def tab_face(width, height, state, scale=1.0, bg=theme.PANEL):
+    """One choice of a row of tabs, as the site's (.tabs a): a trapezoid, its top 11 px shorter at each end, in rail
+    metal, lighter under the pointer, filled with the accent when chosen. On `bg` around its slanted sides."""
+    k = SS
+    w, h = width * k, height * k
+    slant = 11 * scale * k
+    fill = {"on": theme.OK, "hover": theme.RAIL_UP, "normal": theme.RAIL}[state]
+    img = Image.new("RGB", (w, h), _rgb(bg))
+    shape = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(shape).polygon([(slant, 0), (w - slant, 0), (w, h), (0, h)], fill=255)
+    img.paste(_rgb(fill), (0, 0), shape)
+    return img.resize((width, height), Image.LANCZOS)
 
 
 def play_button(width, height, state="normal"):
@@ -252,21 +387,32 @@ def play_button(width, height, state="normal"):
     return img.resize((width, height), Image.LANCZOS)
 
 
-def toggle(on, width, height, enabled=True, colour=None, knob=None):
-    """An on/off switch: a pill with a round knob, in the section's colour when on (the knob in its dark ink)."""
-    w, h = width * SS, height * SS
-    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    track = (colour or theme.OK) if on else theme.RAIL
-    if not enabled:
-        track = "#20262e"
-    draw.rounded_rectangle([0, 0, w - 1, h - 1], radius=h // 2, fill=_rgb(track) + (255,))
-    pad = int(h * 0.16)
-    d = h - 2 * pad
-    x = w - pad - d if on else pad
-    face = (knob if on and knob else theme.TEXT) if enabled else theme.FAINT
-    draw.ellipse([x, pad, x + d, pad + d], fill=_rgb(face) + (255,))
-    return img.resize((width, height), Image.LANCZOS)
+def toggle(on, width, height, enabled=True, colour=None, knob=None, bg=theme.BG):
+    """An on/off switch as the site's (.screen-switch): a pill in the accent with a faint ring of it around, a dark knob
+    at its right end; off, rail metal with a light knob at its left end. The picture is the ring's 3 px wider on every
+    side, on `bg`."""
+    k = SS
+    ring = 3
+    w, h = (width + 2 * ring) * k, (height + 2 * ring) * k
+    colour = colour or theme.OK
+    img = Image.new("RGB", (w, h), _rgb(bg))
+    r = height * k / 2.0
+    x0, y0, x1, y1 = ring * k, ring * k, ring * k + width * k, ring * k + height * k
+    if on and enabled:
+        halo = Image.new("L", (w, h), 0)
+        ImageDraw.Draw(halo).rounded_rectangle([0, 0, w - 1, h - 1], radius=r + ring * k, fill=int(255 * 0.35))
+        img.paste(_rgb(colour), (0, 0), halo)
+    track = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(track).rounded_rectangle([x0, y0, x1 - 1, y1 - 1], radius=r, fill=255)
+    img.paste(_rgb(colour if on and enabled else theme.RAIL_UP), (0, 0), track)
+    # The knob: 16 of 22, 3 from the end.
+    kd = (height - 6) * k
+    kx = x1 - 3 * k - kd if on else x0 + 3 * k
+    ky = y0 + 3 * k
+    dot = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(dot).ellipse([kx, ky, kx + kd, ky + kd], fill=255)
+    img.paste(_rgb(knob or ("#0c0f13" if on and enabled else theme.MUTED)), (0, 0), dot)
+    return img.resize((width + 2 * ring, height + 2 * ring), Image.LANCZOS)
 
 
 def knob(size, colour=theme.TEXT, ring=theme.OK):
@@ -332,41 +478,34 @@ def _soft(window, radius):
 
 
 def dialog_scene(window, box, cut, accent, scale):
-    """What shows behind a dialog: the window blurred and dimmed, with the panel's shadow under it and a faint glow of
-    its colour around it.
+    """What shows behind a dialog: the window blurred and dimmed, with the card's shadow under it.
 
-    `window` is the window as a picture (snapshot.py) and `box` the panel's (x, y, width, height) in it. Returns the
-    scene and the blurred window before dimming, which the panel's glass is made from.
+    `window` is the window as a picture (snapshot.py) and `box` the card's (x, y, width, height) in it. Returns the
+    scene and the blurred window before dimming, which the card's glass is made from.
     """
     w, h = window.size
     soft = _soft(window, 9 * scale)
     scene = Image.blend(soft, Image.new("RGB", (w, h), _rgb(theme.BG)), 0.58)
     x, y, bw, bh = box
-    # The shadow and the glow are only blurred near the panel: a blur over the whole window would cost much more.
+    # The shadow is only blurred near the card: a blur over the whole window would cost much more.
     reach = int(40 * scale)
     area = (max(0, x - reach), max(0, y - reach), min(w, x + bw + reach), min(h, y + bh + reach + int(12 * scale)))
     size = (area[2] - area[0], area[3] - area[1])
-    for colour, strength, drop, blur in (("#000000", 0.72, 12, 20), (accent, 0.16, 0, 28)):
-        mask = Image.new("L", size, 0)
-        outline = card_outline(x - area[0], y - area[1] + int(drop * scale), bw, bh, cut)
-        ImageDraw.Draw(mask).polygon(outline, fill=int(255 * strength))
-        mask = mask.filter(ImageFilter.GaussianBlur(blur * scale))
-        region = scene.crop(area)
-        region.paste(Image.new("RGB", size, _rgb(colour)), (0, 0), mask)
-        scene.paste(region, area[:2])
+    mask = Image.new("L", size, 0)
+    outline = card_outline(x - area[0], y - area[1] + int(12 * scale), bw, bh, cut)
+    ImageDraw.Draw(mask).polygon(outline, fill=int(255 * 0.72))
+    mask = mask.filter(ImageFilter.GaussianBlur(20 * scale))
+    region = scene.crop(area)
+    region.paste(Image.new("RGB", size, (0, 0, 0)), (0, 0), mask)
+    scene.paste(region, area[:2])
     return scene, soft
 
 
-def dialog_panel(scene, soft, box, cut, tab, ring, accent, scale):
-    """The panel: gunmetal glass over the blurred window with a sheen at its head and a light rim along its top (the
-    site's frosted panels), the title tab hanging from the top edge, and the ring the glyph sits in.
-
-    tab: (width, height, slant, top colour, bottom colour); ring: (centre x, centre y, diameter), both in the panel's own
-    pixels. Returns an opaque picture of the box.
-    """
+def dialog_panel(scene, soft, box, cut, scale):
+    """The card a dialog is: the site's frosted gunmetal over the blurred window (86 %), a sheen at its head and a faint
+    light along its top edge, the top-right corner cut. Returns an opaque picture of the box."""
     x, y, bw, bh = box
     panel = scene.crop((x, y, x + bw, y + bh))
-    # Glass: the blurred window through gunmetal, as the site's panels (86 %), brighter at its head.
     glass = Image.blend(soft.crop((x, y, x + bw, y + bh)), Image.new("RGB", (bw, bh), _rgb(theme.PANEL)), 0.86)
     reach = max(1, int(240 * scale))
     sheen = Image.linear_gradient("L").resize((1, reach)).point(lambda v: int(14 * (1 - v / 255.0) ** 1.6))
@@ -374,65 +513,44 @@ def dialog_panel(scene, soft, box, cut, tab, ring, accent, scale):
         (0, 0, bw, min(reach, bh))))
     shape = _mask((bw, bh), lambda d, s: d.polygon(card_outline(0, 0, bw * s, bh * s, cut * s), fill=255))
     panel.paste(glass, (0, 0), shape)
-    # The edge: one pixel of seam, lit along the top and the cut like polished metal.
-    edge = _mask((bw, bh), lambda d, s: d.line(card_outline(0, 0, bw * s - s, bh * s - s, cut * s) + [(0, 0)],
-                                                fill=255, width=s))
-    panel.paste(_gradient((bw, bh), "#626d7c", theme.LINE), (0, 0), edge)
-    # The tab: wider at the panel's edge, narrowing downwards, in the dialog's colour.
-    tw, th, slant, top, bottom = tab
-    tx = (bw - tw) // 2
-    tab_shape = _mask((bw, bh), lambda d, s: d.polygon(
-        [(tx * s, 0), ((tx + tw) * s, 0), ((tx + tw - slant) * s, th * s), ((tx + slant) * s, th * s)], fill=255))
-    filled = Image.new("RGB", (bw, bh))
-    filled.paste(_gradient((tw, th), top, bottom), (tx, 0))
-    panel.paste(filled, (0, 0), tab_shape)
-    shine = _mask((bw, bh), lambda d, s: d.line([((tx + 2) * s, s), ((tx + tw - 2) * s, s)], fill=130, width=s))
-    panel.paste(Image.new("RGB", (bw, bh), (255, 255, 255)), (0, 0), shine)
-    # The ring: a faint disc of the colour, a bright line around it and a soft glow outside.
-    cx, cy, d = ring
-    r = d / 2.0
-    glow = Image.new("L", (bw, bh), 0)
-    ImageDraw.Draw(glow).ellipse([cx - r, cy - r, cx + r, cy + r], outline=150, width=max(2, int(3 * scale)))
-    glow = glow.filter(ImageFilter.GaussianBlur(6 * scale))
-    disc = _mask((bw, bh), lambda dr, s: dr.ellipse([(cx - r) * s, (cy - r) * s, (cx + r) * s, (cy + r) * s],
-                                                    fill=30))
-    line = _mask((bw, bh), lambda dr, s: dr.ellipse([(cx - r) * s, (cy - r) * s, (cx + r) * s, (cy + r) * s],
-                                                    outline=245, width=max(2, int(round(2 * scale))) * s))
-    colour = Image.new("RGB", (bw, bh), _rgb(accent))
-    for layer in (glow, disc, line):
-        panel.paste(colour, (0, 0), layer)
+    # The rim: white at 10 % along the top edge, as the site's glass (inset 0 1px rgba(255,255,255,.1)).
+    rim = _mask((bw, bh), lambda d, s: d.line([(0, 0), ((bw - cut) * s, 0)], fill=26, width=s))
+    panel.paste(Image.new("RGB", (bw, bh), (255, 255, 255)), (0, 0), rim)
     return panel
 
 
-# A button's colours for each look: (top, bottom) of its fill, its edge (None for none), and its words.
-_OFF = ("#20262e", "#1c2128")
+# A button's colours for each look, as the site's: each state's fill (one colour, or the colours down it), and its
+# words. Lit buttons (.button, .btn-primary) in the accent's gradient with dark words; the rest quiet metal (.btn) or
+# the red of removing (.btn-danger). None has an edge.
+_OFF = (theme.RAIL,)
 BUTTON_LOOKS = {
-    "neutral": {"normal": (theme.RAIL_UP, theme.RAIL), "hover": ("#414b57", theme.RAIL_UP),
-                "pressed": (theme.RAIL, "#20262e"), "disabled": _OFF,
-                "edge": ("#5a6573", theme.LINE), "text": theme.TEXT},
-    "danger": {"normal": ("#ff8592", theme.BAD), "hover": ("#ff9ba6", "#ff7484"), "pressed": (theme.BAD, "#e04558"),
-               "disabled": _OFF, "edge": None, "text": "#2b0409"},
-    "warn": {"normal": ("#ffdc6e", theme.WARN), "hover": ("#ffe48d", "#ffd556"), "pressed": (theme.WARN, "#e0b22a"),
-             "disabled": _OFF, "edge": None, "text": theme.INK},
-    "home": {"normal": ("#b2f777", theme.OK), "hover": ("#c6fa98", "#9df55a"), "pressed": (theme.OK, "#6fcf22"),
-             "disabled": _OFF, "edge": None, "text": "#0d1c04"},
-    "songs": {"normal": ("#9ae3ff", theme.CYAN), "hover": ("#b2eaff", "#84dcff"), "pressed": (theme.CYAN, "#45bfee"),
-              "disabled": _OFF, "edge": None, "text": "#04202e"},
-    "ranking": {"normal": ("#d6b2ff", theme.VIOLET), "hover": ("#e0c4ff", "#cfa3ff"),
-                "pressed": (theme.VIOLET, "#a874ee"), "disabled": _OFF, "edge": None, "text": "#1b0a34"},
-    "admin": {"normal": ("#ffc86e", theme.AMBER), "hover": ("#ffd38d", "#ffbf57"), "pressed": (theme.AMBER, "#e0952a"),
-              "disabled": _OFF, "edge": None, "text": "#2a1700"},
-    # Removing or starting over: metal with a red tint and red words, filled red under the pointer.
-    "danger_quiet": {"normal": ("#5a333b", "#4a2a31"), "hover": ("#ff8592", theme.BAD),
-                     "pressed": (theme.BAD, "#e04558"), "disabled": _OFF,
-                     "edge": ("#7a4650", "#4a2a31"), "text": "#ffc0c7", "hover_text": "#2b0409"},
+    "neutral": {"normal": (theme.RAIL_UP,), "hover": ("#414b57",), "pressed": (theme.RAIL,), "disabled": _OFF,
+                "text": theme.TEXT},
+    "danger": {"normal": ("#ff8592", theme.BAD, "#e04558"), "hover": ("#ff9ba6", "#ff7484", theme.BAD),
+               "pressed": (theme.BAD, "#ea4d60", "#e04558"), "disabled": _OFF, "text": "#2b0409"},
+    "warn": {"normal": ("#ffdc6e", theme.WARN, "#e0b22a"), "hover": ("#ffe48d", "#ffd556", theme.WARN),
+             "pressed": (theme.WARN, "#e0b22a", "#c99c1e"), "disabled": _OFF, "text": theme.INK},
+    "home": {"normal": ("#acf673", theme.OK, "#76cb33"), "hover": ("#bcf98c", "#9df55a", "#82d83c"),
+             "pressed": ("#9ee665", "#7fe234", "#6bb92e"), "disabled": _OFF, "text": "#0d1c04"},
+    # Removing or starting over: metal with a red tint and pale red words, filled red under the pointer.
+    "danger_quiet": {"normal": ("#4e3741",), "hover": (theme.BAD,), "pressed": ("#e04558",), "disabled": _OFF,
+                     "text": "#ffb3bc", "hover_text": "#2b0409"},
 }
-# The section a page belongs to gives its main buttons their look.
-SECTION_LOOKS = {"home": "home", "songs": "songs", "ranking": "ranking", "admin": "admin"}
+# Every page's main buttons are lit in the site's lime.
+SECTION_LOOKS = {"home": "home", "songs": "home", "ranking": "home", "admin": "home"}
+
+
+def _fill(size, colours):
+    """A button's fill: one colour, or a gradient through two or three (top, middle at 55 %, foot) as the site's."""
+    if len(colours) == 1:
+        return Image.new("RGB", size, _rgb(colours[0]))
+    if len(colours) == 2:
+        return _gradient(size, *colours)
+    return _vertical(size, ((0.0, colours[0]), (0.55, colours[1]), (1.0, colours[2])))
 
 
 def button_face(size, margin, look, state, focused, scale, under=None, bg=None):
-    """A button's picture, cut at two corners like PLAY: quiet metal, or a fill in a section's colour.
+    """A button's picture, cut at two corners as the site's buttons: quiet metal, or lit in a colour.
 
     `under` is what lies beneath (a dialog's panel pixels) or `bg` a plain colour; `margin` pixels on every side hold
     the focus ring when the button has the keyboard. With no margin (a page's button, which keeps its size) the ring
@@ -443,23 +561,13 @@ def button_face(size, margin, look, state, focused, scale, under=None, bg=None):
     w, h = size
     img = under.copy() if under is not None else Image.new("RGB", size, _rgb(bg or theme.BG))
     bw, bh = w - 2 * margin, h - 2 * margin
+    # The site's cut: 8 px on its buttons.
     cut = max(4, int(round(8 * scale)))
     shape = _mask((w, h), lambda d, s: d.polygon(cut_outline(margin * s, margin * s, bw * s, bh * s, cut * s),
                                                  fill=255))
     filled = Image.new("RGB", (w, h))
-    filled.paste(_gradient((bw, bh), *colours[state]), (margin, margin))
+    filled.paste(_fill((bw, bh), colours[state]), (margin, margin))
     img.paste(filled, (0, 0), shape)
-    if colours["edge"] and state != "disabled":
-        edge = _mask((w, h), lambda d, s: d.line(cut_outline(margin * s, margin * s, bw * s - s, bh * s - s, cut * s)
-                                                  + [((margin + cut) * s, margin * s)], fill=200, width=s))
-        edged = Image.new("RGB", (w, h))
-        edged.paste(_gradient((bw, bh), *colours["edge"]), (margin, margin))
-        img.paste(edged, (0, 0), edge)
-    elif state != "disabled":
-        # A bright line along the top, the chrome highlight (as on PLAY).
-        shine = _mask((w, h), lambda d, s: d.line([((margin + cut) * s, (margin + 1) * s),
-                                                   ((margin + bw - 2) * s, (margin + 1) * s)], fill=110, width=s))
-        img.paste(Image.new("RGB", (w, h), (255, 255, 255)), (0, 0), shine)
     if focused and not margin:
         # Inside the outline, parallel to it: the cut corners move in by about 0.4 of the inset (45 degrees).
         inset = max(2, int(round(3 * scale)))
@@ -467,7 +575,7 @@ def button_face(size, margin, look, state, focused, scale, under=None, bg=None):
         ring = _mask((w, h), lambda d, s: d.line(
             cut_outline(inset * s, inset * s, (bw - 2 * inset) * s - s, (bh - 2 * inset) * s - s, inner_cut * s)
             + [((inset + inner_cut) * s, inset * s)], fill=255, width=max(2, int(round(2 * scale))) * s))
-        if look == "neutral" or (colours["edge"] is not None and state not in ("hover", "pressed")):
+        if look == "neutral" or (look == "danger_quiet" and state not in ("hover", "pressed")):
             # On metal: the keyboard's own cyan.
             tint = theme.CYAN
         elif state in ("hover", "pressed"):
@@ -488,13 +596,19 @@ def button_face(size, margin, look, state, focused, scale, under=None, bg=None):
     return img
 
 
-def corner(size, inside, outside, seam):
-    """The top-right corner of a panel, cut: what a card's cut corner shows over its square frame."""
-    s = size * SS
-    img = Image.new("RGB", (s, s), _rgb(outside))
-    draw = ImageDraw.Draw(img)
-    draw.polygon([(0, 0), (s, s), (0, s)], fill=_rgb(inside))
-    draw.line([(0, 0), (s, s)], fill=_rgb(seam), width=SS)
+def corner(size, inside, outside, seam=None):
+    """A panel's top-right corner, cut: what covers a card's square corner, the page's colour beyond the cut (a seam
+    along the cut when one is given)."""
+    k = SS
+    s = size * k
+    img = Image.new("RGB", (s, s), _rgb(inside))
+    cut = Image.new("L", (s, s), 0)
+    ImageDraw.Draw(cut).polygon([(0, 0), (s, 0), (s, s)], fill=255)
+    img.paste(_rgb(outside), (0, 0), cut)
+    if seam:
+        line = Image.new("L", (s, s), 0)
+        ImageDraw.Draw(line).line([(0, 0), (s, s)], fill=255, width=k)
+        img.paste(_rgb(seam), (0, 0), line)
     return img.resize((size, size), Image.LANCZOS)
 
 

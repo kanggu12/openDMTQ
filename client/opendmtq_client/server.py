@@ -197,10 +197,25 @@ def about(base):
     """The server's word on itself: {"opendmtq", "name", "address", "app"}; ServerError unless it is an OpenDMTQ server."""
     status, answer, _ = _call(base, "/opendmtq/client.php?about")
     if status != 200 or not isinstance(answer, dict) or "opendmtq" not in answer:
-        # A page that is not the client's answer: another site, or an OpenDMTQ too old to have one.
+        # A page that is not the client's answer: an OpenDMTQ from before the PC client (every one since 0.1 answers its
+        # health page with its game's patch), or another site.
+        if _older_opendmtq(base):
+            raise ServerError("%s runs an OpenDMTQ older than 0.8, without the PC client's part" % base,
+                              "error.server.too_old", base=base)
         raise ServerError("%s is not an OpenDMTQ server for PCs" % base, "error.server.not_opendmtq", base=base)
     return {"opendmtq": str(answer.get("opendmtq") or ""), "name": str(answer.get("name") or base),
             "address": str(answer.get("address") or ""), "app": bool(answer.get("app"))}
+
+
+def _older_opendmtq(base):
+    """True when the site answers OpenDMTQ's health page as every OpenDMTQ does (a JSON object with its game's patch):
+    an OpenDMTQ from before the PC client, which has no client.php."""
+    try:
+        status, answer, _ = _call(base, "/opendmtq/health.php")
+    except ServerError:
+        # It answered the first question and not this one: whatever it is, it is no OpenDMTQ for PCs.
+        return False
+    return status == 200 and isinstance(answer, dict) and "patch" in answer
 
 
 def sign_in(base, user, password):

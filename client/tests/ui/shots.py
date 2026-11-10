@@ -81,8 +81,10 @@ def settle(app, seconds=8.0, until=None):
     end = time.time() + seconds
     while time.time() < end:
         app.root.update()
-        # The header is drawn a moment after the page (app._queue_header): a dialog draws the window with it.
-        busy = app.checks is None or app.download is not None or getattr(app, "_header_job", None) is not None
+        # The page's picture behind is drawn a moment after the page (widgets.ScrollArea): a shot waits for it.
+        body = getattr(app.guide, "body", None) if getattr(app, "guide", None) is not None else getattr(app, "body", None)
+        busy = (app.checks is None or app.download is not None or
+                (body is not None and body.winfo_exists() and body._backdrop_job is not None))
         guide = getattr(app, "guide", None)
         if guide is not None and guide.checking:
             busy = True
@@ -135,7 +137,8 @@ def through_dialog(app, out, name, press, answer, problems, extra=None):
     app.root.after(300, look)
     press()
     dialog = seen.get("dialog")
-    if dialog is not None and app.dialog is not None:
+    # The same dialog: work the answer started may show a dialog of its own.
+    if dialog is not None and app.dialog is dialog:
         problems.append("%s: the dialog stayed after its answer" % name)
     return dialog.result if dialog is not None else None
 
@@ -221,8 +224,6 @@ def pages_check(app, out, tag, problems):
     for page in NAV:
         app.go(page)
         settle(app)
-        if page == "screen":
-            wheel_check(app, problems)
         if page == "sound":
             # The devices come from the player on a worker thread: the page is drawn again with them.
             settle(app, 6, until=lambda: app.devices is not None)
@@ -230,6 +231,9 @@ def pages_check(app, out, tag, problems):
         name = "%s_%s" % (tag, page)
         shot(app.root, out, name)
         measure(app, name, problems)
+        if page == "screen":
+            # After its shot: the wheel scrolls the page (the header turns into the dark bar).
+            wheel_check(app, problems)
 
 
 def variants_check(app, site, out, tag, problems):
@@ -299,10 +303,12 @@ def dialogs_check(app, out, tag, problems):
     w = app.words
     app.go("online")
     settle(app)
+    # One for the server in use (its card), one for the other server (the last card): this checks the other's.
     forget = [x for x in widgets_of(app.root) if isinstance(x, widgets.Button) and x.words == w("online.forget")]
-    if len(forget) != 1:
-        problems.append("%s: expected one Forget button on Online, found %d" % (tag, len(forget)))
+    if len(forget) != 2:
+        problems.append("%s: expected two Forget buttons on Online, found %d" % (tag, len(forget)))
         return
+    forget = forget[1:]
 
     def ring_moves(dialog):
         dialog.canvas.event_generate("<Tab>")
@@ -338,6 +344,7 @@ def dialogs_check(app, out, tag, problems):
                             lambda d: d.canvas.event_generate("<Escape>"), problems)
     if answer is not False or app.state.server() is None:
         problems.append("%s: Esc on the start-over dialog answered %r" % (tag, answer))
+    maintenance_check(app, out, tag, problems)
     # The update under way.
     app.go("about")
     settle(app)
@@ -351,6 +358,121 @@ def dialogs_check(app, out, tag, problems):
     if dialog.closed:
         problems.append("%s: Esc closed the update under way" % tag)
     dialog.close(None)
+
+
+def fake_install(home):
+    """A folder laid out as Velopack's install, with its package: Help shows Repair and Uninstall as in an installed
+    launcher, and Repair has something to compare."""
+    import zipfile
+    root = os.path.join(home, "OpenDMTQ.Client")
+    files = {"OpenDMTQ.exe": b"launcher", "player/opendmtq-player.exe": b"player"}
+    os.makedirs(os.path.join(root, "packages"))
+    with zipfile.ZipFile(os.path.join(root, "packages", "OpenDMTQ.Client-0.8.0-full.nupkg"), "w") as z:
+        for name, data in files.items():
+            z.writestr("lib/app/" + name, data)
+    for name, data in list(files.items()) + [("sq.version", b"<version>0.8.0</version>")]:
+        path = os.path.join(root, "current", *name.split("/"))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(data)
+    # Not a program: starting it fails, which is the uninstall's failure to show.
+    with open(os.path.join(root, "Update.exe"), "wb") as f:
+        f.write(b"MZ")
+    return root
+
+
+def next_dialog(app, out, name, problems, want, answer, seconds=5.0):
+    """Wait for the dialog `want(dialog)` picks (one opened by work on a worker thread), screenshot and measure it, then
+    answer it. Returns a dict that holds it under "dialog" once it came."""
+    seen, end = {}, time.time() + seconds
+
+    def look():
+        dialog = app.dialog
+        if dialog is None or not want(dialog):
+            if time.time() < end:
+                app.root.after(100, look)
+            else:
+                problems.append("%s: the dialog never came" % name)
+            return
+        seen["dialog"] = dialog
+        wait_out(app.root, 0.4)
+        shot(app.root, out, name)
+        problems.extend("%s: %s" % (name, p) for p in dialog.layout_problems())
+        answer(dialog)
+
+    app.root.after(100, look)
+    return seen
+
+
+def maintenance_check(app, out, tag, problems):
+    """Help's Repair, Clear game data and Uninstall: each question, the work under way, and what comes after."""
+    from opendmtq_client import dialogs, removal
+    from opendmtq_client import state as st
+    w = app.words
+    install = os.environ["OPENDMTQ_INSTALL_ROOT"]
+    # The game's folder with an id and some data.
+    game = os.path.join(st.local_dir(), "OpenDMTQ", "com.example.game")
+    song = os.path.join(game, "data", "external", "song.bin")
+    os.makedirs(os.path.dirname(song), exist_ok=True)
+    with open(os.path.join(game, "data", "android_id"), "w") as f:
+        f.write("0123456789abcdef")
+    with open(song, "wb") as f:
+        f.write(b"s" * (3 << 20))
+    app.go("help")
+    settle(app)
+    # The page's foot, where the tools and Reset and remove are.
+    app.body.canvas.yview_moveto(1.0)
+    wait_out(app.root, 0.6)
+    shot(app.root, out, "%s_help-foot" % tag)
+    answer = through_dialog(app, out, "%s_dialog-clear" % tag, button(app, w("help.clear.confirm")).press,
+                            lambda d: d.canvas.event_generate("<Escape>"), problems)
+    if answer is not False or not os.path.isfile(song):
+        problems.append("%s: Esc on the clear dialog answered %r" % (tag, answer))
+
+    def three_ways(dialog):
+        if len(dialog.buttons) != 3 or dialog.focus != 0:
+            problems.append("%s: the uninstall dialog has %d buttons, the ring on %r"
+                            % (tag, len(dialog.buttons), dialog.focus))
+    answer = through_dialog(app, out, "%s_dialog-uninstall" % tag, button(app, w("help.uninstall")).press,
+                            lambda d: d.canvas.event_generate("<Escape>"), problems, extra=three_ways)
+    if answer is not None or not os.path.isfile(song):
+        problems.append("%s: Esc on the uninstall dialog answered %r" % (tag, answer))
+    # Keep data, with an uninstaller that does not start: said, and the window stays.
+    failed = next_dialog(app, out, "%s_dialog-uninstall-failed" % tag, problems,
+                         lambda d: d.message == w("help.uninstall.failed"), lambda d: d.canvas.event_generate("<Return>"))
+    through_dialog(app, out, "%s_dialog-uninstall-keep" % tag, button(app, w("help.uninstall")).press,
+                   lambda d: click_button(d, 1), problems)
+    if "dialog" not in failed or not app.root.winfo_exists():
+        problems.append("%s: an uninstaller that did not start was not said" % tag)
+    # The work under way, as the dialogs show it.
+    for key, glyph in (("help.repair.working", "restore"), ("help.uninstall.working", "delete")):
+        dialog = dialogs.Dialog(app.root, app.ui, "info", w(key), w(key), progress=True, glyph=glyph)
+        wait_out(app.root, 0.6)
+        shot(app.root, out, "%s_dialog-%s" % (tag, key.replace(".", "-")))
+        problems.extend("%s_dialog-%s: %s" % (tag, key, p) for p in dialog.layout_problems())
+        dialog.close(None)
+    # Repair with a file of the launcher missing: put back, and said to need a restart.
+    os.remove(os.path.join(install, "current", "OpenDMTQ.exe"))
+    done = next_dialog(app, out, "%s_dialog-repaired" % tag, problems, lambda d: not d.progress,
+                       lambda d: d.canvas.event_generate("<Return>"))
+    button(app, w("help.repair")).press()
+    wait_out(app.root, 2.0)
+    dialog = done.get("dialog")
+    if dialog is None or dialog.detail != w("help.repair.done.restart", n=1):
+        problems.append("%s: the repair said %r" % (tag, dialog and dialog.detail))
+    if not os.path.isfile(os.path.join(install, "current", "OpenDMTQ.exe")):
+        problems.append("%s: the repair did not put the launcher's file back" % tag)
+    # Clear game data, for real: the id alone stays.
+    cleared = removal.game_data_size()
+    through_dialog(app, out, "%s_dialog-clear-yes" % tag, button(app, w("help.clear.confirm")).press,
+                   lambda d: click_button(d, 1), problems)
+    wait_out(app.root, 2.0)
+    left = sorted(os.path.relpath(os.path.join(f, n), game) for f, _d, names in os.walk(game) for n in names)
+    if left != [os.path.join("data", "android_id")] or cleared != 3 << 20:
+        problems.append("%s: clearing left %r (counted %d bytes)" % (tag, left, cleared))
+    if app.status_text != w("help.clear.done", size="3 MB"):
+        problems.append("%s: the status line said %r after clearing" % (tag, app.status_text))
+    shot(app.root, out, "%s_help-cleared" % tag)
 
 
 def standalone_check(out, tag, lang, problems):
@@ -507,6 +629,8 @@ def main():
     with open(player, "w", encoding="utf-8") as f:
         f.write(FAKE_PLAYER)
     os.environ["OPENDMTQ_PLAYER"] = player
+    # Help as an installed launcher shows it: with Repair and Uninstall.
+    os.environ["OPENDMTQ_INSTALL_ROOT"] = fake_install(home)
     site = stub.Site().start()
     from opendmtq_client import state as st
     from opendmtq_client.app import LauncherApp

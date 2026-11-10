@@ -39,11 +39,16 @@ def style_ttk(ui):
     s = ttk.Style(ui.root)
     # 'clam' is the built-in theme that honours colours on every platform.
     s.theme_use("clam")
-    s.configure("Dark.TCombobox", fieldbackground=theme.FIELD, background=theme.PANEL_HI, foreground=theme.TEXT,
-                arrowcolor=theme.TEXT, bordercolor=theme.LINE, lightcolor=theme.LINE, darkcolor=theme.LINE,
-                selectbackground=theme.FIELD, selectforeground=theme.TEXT, padding=ui.px(6))
+    # A drop-down as the site's select: a dark field with a one-pixel seam and a light chevron; lime round it while it
+    # has the keyboard, as the site's fields.
+    s.configure("Dark.TCombobox", fieldbackground=theme.FIELD, background=theme.FIELD, foreground=theme.TEXT,
+                arrowcolor=theme.MUTED, bordercolor=theme.LINE, lightcolor=theme.FIELD, darkcolor=theme.FIELD,
+                selectbackground=theme.FIELD, selectforeground=theme.TEXT, padding=(ui.px(10), ui.px(7)),
+                arrowsize=ui.px(13))
     s.map("Dark.TCombobox", fieldbackground=[("readonly", theme.FIELD)], foreground=[("readonly", theme.TEXT)],
-          bordercolor=[("focus", theme.CYAN)], arrowcolor=[("disabled", theme.FAINT)])
+          background=[("active", theme.FIELD), ("readonly", theme.FIELD)],
+          bordercolor=[("focus", theme.OK), ("hover", "#55606c")], arrowcolor=[("disabled", theme.FAINT),
+                                                                              ("hover", theme.TEXT)])
     # The list that drops down is a plain Tk listbox; its colours come from the option database.
     ui.root.option_add("*TCombobox*Listbox.background", theme.FIELD)
     ui.root.option_add("*TCombobox*Listbox.foreground", theme.TEXT)
@@ -69,16 +74,223 @@ def quiet_combobox_wheel(root):
         root.unbind_class("TCombobox", sequence)
 
 
-class ScrollArea(tk.Frame):
-    """A frame whose content scrolls with the mouse wheel; `inner` is where the page goes."""
+class Header(tk.Canvas):
+    """The bar across the window's top, as the site's: on the page's own backdrop at the top (it continues into the page
+    under it), a dark bar with a line under it once the page has moved. At its left the wordmark and the version
+    (`brand`, a picture), then the menu: names in the wide face, ash, white under the pointer, the one in use lime with a
+    3 px rule at the bar's foot. At its right end an optional link. Under them, for the guide, its steps.
 
-    def __init__(self, parent, ui, bg=theme.BG):
+    The menu takes the keyboard first: Tab and Shift+Tab move along it, then on to the page; Enter or Space opens the
+    entry with the cyan ring, the arrow keys move the ring.
+    """
+
+    # The bar's height, its room at either end and round each name (logical pixels), the reach of the page's lit top.
+    HEIGHT, EDGE, NAME_PAD, STEPS_H, LIGHT = 64, 28, 13, 64, 260
+
+    def __init__(self, parent, ui, brand, nav=(), on_nav=None, link=None, steps=()):
+        self.ui = ui
+        px = ui.px
+        height = px(self.HEIGHT) + (px(self.STEPS_H) if steps else 0)
+        super().__init__(parent, height=height, bg=theme.BG, highlightthickness=0, bd=0,
+                         takefocus=1 if nav or link else 0)
+        self.brand_picture = brand
+        self.nav, self.on_nav, self.link, self.steps = list(nav), on_nav, link, list(steps)
+        self.current, self.hover, self.ring, self.under, self.step = None, None, None, False, 0
+        self._job, self._size = None, None
+        # Each entry's box on the bar, known once it is drawn.
+        self.boxes = {}
+        self.bind("<Configure>", lambda e: self._queue())
+        for key, move in (("<Tab>", 1), ("<Shift-Tab>", -1), ("<ISO_Left_Tab>", -1), ("<Right>", 1), ("<Left>", -1)):
+            self.bind(key, lambda e, m=move, k=key: self._move(m, k))
+        for key in ("<Return>", "<space>"):
+            self.bind(key, lambda e: self._press(self.ring))
+        self.bind("<FocusIn>", lambda e: self._focused(True))
+        self.bind("<FocusOut>", lambda e: self._focused(False))
+
+    # The entries the keyboard and the pointer reach: the menu's, then the link at the right end.
+    def _entries(self):
+        return [key for key, _ in self.nav] + (["link"] if self.link else [])
+
+    def _queue(self):
+        """Draw again once the size settles (a drag fires many resize events)."""
+        if self._job is not None:
+            self.after_cancel(self._job)
+        self._job = self.after(30, self.draw)
+
+    def draw(self):
+        from PIL import Image, ImageTk
+        self._job = None
+        if not self.winfo_exists():
+            return
+        px, scale = self.ui.px, self.ui.scale
+        width, height = max(1, self.winfo_width()), max(1, self.winfo_height())
+        self.delete("all")
+        if self.under:
+            # Once the page has moved: the site's bar under, dark, with a line along its foot.
+            picture = Image.new("RGB", (width, height), art._rgb(theme.STRIP))
+            picture.paste(art._rgb("#2a3038"), (0, height - 1, width, height))
+        else:
+            # At the top: the page's own backdrop, its top part (the page area draws the rest from here down).
+            picture = art.backdrop(width, height, scale, top=px(self.HEIGHT) + px(self.LIGHT))
+        picture = picture.copy()
+        brand = self.brand_picture
+        bx, by = px(self.EDGE), (px(self.HEIGHT) - brand.height) // 2
+        picture.paste(brand, (bx, by), brand)
+        self._picture = picture
+        self._image = ImageTk.PhotoImage(picture, master=self)
+        # A dialog draws the window from the widgets (snapshot.py): the bar as it looks now.
+        self.odq_picture = picture
+        self.create_image(0, 0, image=self._image, anchor="nw")
+        # The menu after the wordmark, a step smaller where the window is too narrow for it in one line.
+        x = bx + brand.width + px(22)
+        font, pad = self.ui.fonts.nav, px(self.NAME_PAD)
+        right_room = (self.ui.fonts.small.measure(self.link[0]) + px(self.EDGE) + px(24)) if self.link else px(self.EDGE)
+        need = sum(font.measure(words) + 2 * pad for _, words in self.nav)
+        if x + need + right_room > width:
+            font, pad = self.ui.fonts.nav_small, px(8)
+        self.boxes = {}
+        for key, words in self.nav:
+            w = font.measure(words) + 2 * pad
+            self.boxes[key] = (x, 0, x + w, px(self.HEIGHT))
+            self.create_text(x + w // 2, px(self.HEIGHT) // 2, text=words, font=font, tags=("name", "n-" + key))
+            for event, handler in (("<Enter>", lambda e, k=key: self._hover(k)), ("<Leave>", lambda e: self._hover(None)),
+                                   ("<Button-1>", lambda e, k=key: self._press(k))):
+                self.tag_bind("n-" + key, event, handler)
+            x += w
+        if self.link:
+            words, _command = self.link
+            lx = width - px(self.EDGE)
+            item = self.create_text(lx, px(self.HEIGHT) // 2, text=words, font=self.ui.fonts.small, anchor="e",
+                                    tags=("name", "n-link"))
+            x0, y0, x1, y1 = self.bbox(item)
+            self.boxes["link"] = (x0 - px(6), y0 - px(6), x1 + px(6), y1 + px(6))
+            for event, handler in (("<Enter>", lambda e: self._hover("link")), ("<Leave>", lambda e: self._hover(None)),
+                                   ("<Button-1>", lambda e: self._press("link"))):
+                self.tag_bind("n-link", event, handler)
+        if self.steps:
+            self._draw_steps(width)
+        self._paint()
+
+    def _draw_steps(self, width):
+        """The guide's six steps across, as the site's numbered steps: each number big and leaning, its name, a line
+        under; the one on show lit, the ones done in lime, the ones to come in the seam's grey."""
+        from PIL import ImageTk
+        px, scale = self.ui.px, self.ui.scale
+        left, right = px(self.EDGE), width - px(self.EDGE)
+        top = px(self.HEIGHT) + px(4)
+        cell = (right - left - (len(self.steps) - 1) * px(8)) / float(len(self.steps))
+        self._numerals = []
+        for i, name in enumerate(self.steps):
+            done, now = i < self.step, i == self.step
+            x = left + i * (cell + px(8))
+            colour = theme.OK if (done or now) else theme.LINE
+            picture = art.numeral(str(i + 1), colour, scale, bg=None)
+            image = ImageTk.PhotoImage(picture, master=self)
+            self._numerals.append(image)
+            self.create_image(x, top, image=image, anchor="nw")
+            self._picture.paste(picture, (int(x), int(top)), picture if picture.mode == "RGBA" else None)
+            self.create_text(x + picture.width + px(6), top + picture.height - px(6), text=name, anchor="sw",
+                             font=self.ui.fonts.step,
+                             fill=theme.TEXT if now else (theme.MUTED if done else theme.FAINT))
+            thick = px(3) if now else px(2)
+            y = top + picture.height + px(8)
+            self.create_rectangle(x, y, x + cell, y + thick, width=0,
+                                  fill=theme.OK if (done or now) else theme.LINE)
+
+    def _paint(self):
+        """Each name's colour, the rule under the page in use, and the keyboard's ring."""
+        px = self.ui.px
+        self.delete("rule", "ring")
+        for key, _words in self.nav:
+            on = key == self.current
+            colour = theme.OK if on else ("#ffffff" if key == self.hover else theme.MUTED)
+            self.itemconfigure("n-" + key, fill=colour)
+            if on and key in self.boxes:
+                x0, _y0, x1, y1 = self.boxes[key]
+                self.create_rectangle(x0 + px(8), y1 - px(3), x1 - px(8), y1, fill=theme.OK, width=0, tags=("rule",))
+        if self.link:
+            self.itemconfigure("n-link", fill="#ffffff" if self.hover == "link" else theme.MUTED)
+        if self.ring in self.boxes:
+            x0, y0, x1, y1 = self.boxes[self.ring]
+            inset = px(10) if self.ring != "link" else 0
+            self.create_rectangle(x0 + px(2), y0 + inset, x1 - px(2), y1 - inset, outline=theme.CYAN,
+                                  width=max(1, px(2)), tags=("ring",))
+
+    def _hover(self, key):
+        self.hover = key
+        self._paint()
+
+    def _press(self, key):
+        if key is None:
+            return
+        if key == "link":
+            self.link[1]()
+        elif self.on_nav:
+            self.on_nav(key)
+
+    def _focused(self, on):
+        """The keyboard came: the ring on the page in use (or the first entry); it went: the ring goes."""
+        entries = self._entries()
+        if on and entries:
+            if self.ring not in entries:
+                self.ring = self.current if self.current in entries else entries[0]
+        else:
+            self.ring = None
+        self._paint()
+
+    def _move(self, by, key):
+        """The ring along the entries; Tab past the last (Shift+Tab before the first) leaves the bar as Tab does."""
+        entries = self._entries()
+        if not entries or self.ring not in entries:
+            return None
+        i = entries.index(self.ring) + by
+        if 0 <= i < len(entries):
+            self.ring = entries[i]
+            self._paint()
+            return "break"
+        if key in ("<Left>", "<Right>"):
+            return "break"
+        return None
+
+    def set_current(self, key):
+        """The page on show: its name lit, with the rule under it."""
+        self.current = key
+        self._paint()
+
+    def set_under(self, under):
+        """The page has moved (the bar is drawn dark, with its line) or is back at its top."""
+        if under != self.under:
+            self.under = under
+            self.draw()
+
+    def set_step(self, index):
+        """The guide's step on show."""
+        self.step = index
+        self.draw()
+
+
+class ScrollArea(tk.Frame):
+    """The page area, as the site's page: its field with the shards at the edges and the dots in the margins (drawn
+    behind on the canvas, art.backdrop), the page's title and a line under it (set_heading), and the page's content in
+    a column between margins (`inner`), all scrolling together with the mouse wheel."""
+
+    # The margins either side of the column, the room above the title and under the content (logical pixels).
+    MARGIN, TOP, BOTTOM, GAP = 32, 20, 28, 18
+
+    def __init__(self, parent, ui, bg=theme.BG, offset=0, light=None, on_moved=None):
         super().__init__(parent, bg=bg)
         self.ui = ui
+        # Where this area starts on the page (under the header, which draws the page's top) and how far the page's
+        # lit top reaches; told when the page has moved from its top, or come back to it.
+        self.offset, self.light, self.on_moved, self._moved = offset, light, on_moved, None
         self.canvas = tk.Canvas(self, bg=bg, highlightthickness=0, bd=0)
         self.bar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview, style="Dark.Vertical.TScrollbar")
         self.inner = tk.Frame(self.canvas, bg=bg)
-        self._window = self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
+        px = ui.px
+        self._window = self.canvas.create_window((px(self.MARGIN), px(self.TOP)), window=self.inner, anchor="nw")
+        # The heading's items (the title's picture, the line under it) and where the content starts under them.
+        self._heading, self._content_top = [], px(self.TOP)
+        self._backdrop_job, self._backdrop_size, self._backdrop_item = None, None, None
         # The part of the wheel's turning that has not made a whole step yet (a touchpad sends it a little at a time).
         self._wheel_rest = 0.0
         self.canvas.configure(yscrollcommand=self._bar_set)
@@ -88,16 +300,21 @@ class ScrollArea(tk.Frame):
         self.spacer = tk.Frame(self, bg=bg, width=self.bar.winfo_reqwidth())
         self.spacer.pack(side="right", fill="y")
         self.canvas.pack(side="left", fill="both", expand=True)
-        # The content's height decides how far it scrolls.
-        self.inner.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        # The content is always as wide as the visible area, so text wraps instead of running off.
+        # The content's height decides how far it scrolls, and how tall the picture behind it is.
+        self.inner.bind("<Configure>", lambda e: self._relayout())
+        # The column is as wide as the area less its margins, so text wraps instead of running off.
         self.canvas.bind("<Configure>", self._on_resize)
         # The wheel scrolls whatever is under the pointer, so bind only while the pointer is over this area.
         self.bind("<Enter>", lambda e: self._wheel(True))
         self.bind("<Leave>", lambda e: self._wheel(False))
 
     def _bar_set(self, first, last):
-        """Show the scroll bar only when the content is taller than the area, in the room the strip keeps for it."""
+        """Show the scroll bar only when the content is taller than the area, in the room the strip keeps for it; tell
+        the header when the page has moved from its top."""
+        moved = float(first) > 0.0
+        if self.on_moved is not None and moved != self._moved:
+            self._moved = moved
+            self.on_moved(moved)
         # The strip as wide as the bar, so swapping one for the other never moves the page.
         self.spacer.configure(width=self.bar.winfo_reqwidth())
         if float(first) <= 0.0 and float(last) >= 1.0:
@@ -109,9 +326,93 @@ class ScrollArea(tk.Frame):
             self.spacer.pack_forget()
         self.bar.set(first, last)
 
+    def set_heading(self, title, description=""):
+        """The page's title as the site's masthead (art.page_title) and one plain line under it, in the margin's place
+        above the content; "" for none."""
+        from PIL import ImageTk
+        px, c = self.ui.px, self.canvas
+        for item in self._heading:
+            c.delete(item)
+        self._heading = []
+        y = px(self.TOP)
+        if title:
+            picture, _baseline = art.page_title(title, self.ui.scale)
+            self._title_image = ImageTk.PhotoImage(picture, master=c)
+            # A dialog draws the window from the widgets (snapshot.py): the title's picture goes with the canvas's.
+            self._title_picture = picture
+            self._heading.append(c.create_image(px(self.MARGIN) - px(2), y, image=self._title_image, anchor="nw"))
+            y += picture.height
+        if description:
+            self._heading.append(c.create_text(px(self.MARGIN), y + px(2), text=description, anchor="nw",
+                                               font=self.ui.fonts.body, fill=theme.MUTED,
+                                               width=max(px(200), c.winfo_width() - 2 * px(self.MARGIN))))
+        self._place_content()
+        self._compose()
+
+    def _place_content(self):
+        """The content's top under the heading as it now wraps (the line under the title takes more lines in a
+        narrower window), and the scrolled height after it."""
+        px, c = self.ui.px, self.canvas
+        y = px(self.TOP)
+        if self._heading:
+            y = c.bbox(self._heading[-1])[3]
+        self._content_top = y + (px(self.GAP) if self._heading else 0)
+        c.coords(self._window, px(self.MARGIN), self._content_top)
+        self._relayout()
+
     def _on_resize(self, event):
-        # The content is exactly as wide as the visible area; labels wrap to their own box (follow_width).
-        self.canvas.itemconfigure(self._window, width=event.width)
+        px = self.ui.px
+        # The column between the margins; labels wrap to their own box (follow_width).
+        self.canvas.itemconfigure(self._window, width=max(1, event.width - 2 * px(self.MARGIN)))
+        for item in self._heading:
+            if self.canvas.type(item) == "text":
+                self.canvas.itemconfigure(item, width=max(px(200), event.width - 2 * px(self.MARGIN)))
+        self._place_content()
+
+    def _relayout(self):
+        """The scrolled height: the content and the room under it, at least the area's own height; the picture behind
+        drawn again for it (a moment later, once the sizes stop changing)."""
+        c = self.canvas
+        width, seen = max(1, c.winfo_width()), max(1, c.winfo_height())
+        bottom = self._content_top + self.inner.winfo_reqheight() + self.ui.px(self.BOTTOM)
+        height = max(seen, bottom)
+        c.configure(scrollregion=(0, 0, width, height))
+        if self._backdrop_size != (width, height):
+            if self._backdrop_job is not None:
+                self.after_cancel(self._backdrop_job)
+            self._backdrop_job = self.after(60, self._draw_backdrop)
+
+    def _draw_backdrop(self):
+        from PIL import ImageTk
+        self._backdrop_job = None
+        c = self.canvas
+        if not c.winfo_exists():
+            return
+        width, seen = max(1, c.winfo_width()), max(1, c.winfo_height())
+        height = max(seen, self._content_top + self.inner.winfo_reqheight() + self.ui.px(self.BOTTOM))
+        self._backdrop_size = (width, height)
+        picture = art.backdrop(width, height, self.ui.scale, offset=self.offset, top=self.light)
+        self._backdrop_image = ImageTk.PhotoImage(picture, master=c)
+        # A dialog draws the window from the widgets (snapshot.py): the page's picture with its title on it.
+        self._backdrop_picture = picture
+        self._compose()
+        if self._backdrop_item is None:
+            self._backdrop_item = c.create_image(0, 0, image=self._backdrop_image, anchor="nw")
+        else:
+            c.itemconfigure(self._backdrop_item, image=self._backdrop_image)
+        c.tag_lower(self._backdrop_item)
+
+    def _compose(self):
+        """The picture a dialog takes for this area: what lies behind with the title's picture on it."""
+        behind = getattr(self, "_backdrop_picture", None)
+        if behind is None:
+            return
+        picture = behind.copy()
+        title = getattr(self, "_title_picture", None)
+        if title is not None and self._heading and self.canvas.type(self._heading[0]) == "image":
+            x, y = (int(v) for v in self.canvas.coords(self._heading[0]))
+            picture.paste(title, (x, y), title)
+        self.canvas.odq_picture = picture
 
     def _wheel(self, on):
         if on:
@@ -196,9 +497,10 @@ def focus_ring(widget, ui, bg):
                      highlightcolor=theme.CYAN)
 
 
-def link(parent, ui, text, command, fg=None, bg=theme.BG, font=None, chevron=True):
+def link(parent, ui, text, command, fg=None, bg=None, font=None, chevron=True):
     """Words that do something: a click, or Enter or Space once Tab has reached them (a cyan ring shows it). In the
-    page's colour with a chevron after them by default."""
+    page's colour with a chevron after them by default; on the parent's colour unless told."""
+    bg = bg or parent.cget("bg")
     words = tk.Label(parent, text=text + ("  " + theme.ICON["chevron"] if chevron else ""),
                      font=font or ui.fonts.body_bold, fg=fg or ui.section["accent"], bg=bg, cursor="hand2")
     focus_ring(words, ui, bg)
@@ -207,22 +509,40 @@ def link(parent, ui, text, command, fg=None, bg=theme.BG, font=None, chevron=Tru
     return words
 
 
-def label(parent, ui, text, font=None, fg=theme.TEXT, bg=theme.BG, wrap_margin=None, beside=(), **kw):
-    """A text label in the theme; with wrap_margin it wraps at its box's width minus that margin."""
+def label(parent, ui, text, font=None, fg=theme.TEXT, bg=None, wrap_margin=None, beside=(), **kw):
+    """A text label in the theme, on its parent's colour unless told; with wrap_margin it wraps at its box's width minus
+    that margin."""
+    bg = bg or parent.cget("bg")
     w = tk.Label(parent, text=text, font=font or ui.fonts.body, fg=fg, bg=bg, justify="left", anchor="w", **kw)
     if wrap_margin is not None:
         follow_width(ui, w, wrap_margin, beside)
     return w
 
 
-def section(parent, ui, text, bg=theme.BG):
-    """A section heading: small wide capitals and a thin rule to the right edge."""
+def section(parent, ui, text, bg=None):
+    """A heading inside a card, as the site's card titles: Pretendard Bold in chalk, nothing after it."""
+    bg = bg or parent.cget("bg")
     row = tk.Frame(parent, bg=bg)
-    words = text.upper() if ui.words.language == "en" else text
-    tk.Label(row, text=words, font=ui.fonts.section, fg=theme.MUTED, bg=bg).pack(side="left")
-    rule = tk.Frame(row, bg=theme.LINE, height=max(1, ui.px(1)))
-    rule.pack(side="left", fill="x", expand=True, padx=(ui.px(12), 0), pady=(ui.px(2), 0))
+    tk.Label(row, text=text, font=ui.fonts.card_title, fg=theme.TEXT, bg=bg).pack(side="left")
     return row
+
+
+def divider(parent, ui, bg=theme.DIVIDER, pady=12):
+    """The faint line between two rows of a card (white at 7.5 % on the deck)."""
+    line = tk.Frame(parent, bg=bg, height=1)
+    line.pack(fill="x", pady=ui.px(pady))
+    return line
+
+
+def lamp(parent, ui, colour, bg=theme.PANEL):
+    """A state's small light with its glow (art.lamp), as a label."""
+    from PIL import ImageTk
+    picture = art.lamp(colour, ui.scale, bg=bg)
+    image = ImageTk.PhotoImage(picture, master=parent)
+    light = tk.Label(parent, image=image, bg=bg, bd=0)
+    # Kept on the label: Tk drops a picture the moment Python forgets it. A dialog draws the window from it.
+    light.odq_image, light.odq_picture = image, picture
+    return light
 
 
 class Button(tk.Canvas):
@@ -235,9 +555,12 @@ class Button(tk.Canvas):
     """
 
     LOOKS = {"secondary": "neutral", "danger": "danger_quiet"}
+    # The site's control height for buttons in a page (between its 34 px and 42 px ones).
+    HEIGHT = 36
 
     def __init__(self, parent, ui, text, command, kind="secondary", icon=None):
-        self.ui, self.icon, self.bg = ui, icon, parent.cget("bg")
+        # The site's buttons carry words only: `icon` is taken and not drawn.
+        self.ui, self.icon, self.bg = ui, None, parent.cget("bg")
         self.look = art.SECTION_LOOKS[ui.section_name] if kind == "primary" else self.LOOKS[kind]
         super().__init__(parent, bg=self.bg, highlightthickness=0, bd=0, cursor="hand2")
         self.command, self.enabled, self.words, self.state = command, True, None, "normal"
@@ -265,9 +588,9 @@ class Button(tk.Canvas):
         self.words = text
         fonts, px = self.ui.fonts, self.ui.px
         glyph_w = fonts.icon_small.measure(theme.ICON[self.icon]) if self.icon else 0
-        left = px(13) if self.icon else px(16)
-        width = left + (glyph_w + px(7) if self.icon else 0) + fonts.body_bold.measure(text) + px(16)
-        height = px(34)
+        left = px(13) if self.icon else px(18)
+        width = left + (glyph_w + px(7) if self.icon else 0) + fonts.body_bold.measure(text) + px(18)
+        height = px(self.HEIGHT)
         self.configure(width=width, height=height)
         self.delete("all")
         # Each state's face, without and with the keyboard's ring (a disabled button never has the keyboard).
@@ -322,16 +645,15 @@ class Button(tk.Canvas):
 
 
 class Toggle(tk.Label):
-    """An on/off switch; command(new_value) runs after each click."""
+    """An on/off switch as the site's (art.toggle); command(new_value) runs after each click."""
 
-    def __init__(self, parent, ui, value, command, bg=theme.BG):
+    def __init__(self, parent, ui, value, command, bg=None):
+        bg = bg or parent.cget("bg")
         super().__init__(parent, bg=bg, cursor="hand2", bd=0)
         self.ui, self.value, self.command = ui, bool(value), command
-        size = (ui.px(42), ui.px(23))
+        size = (ui.px(40), ui.px(22))
         # Both pictures are made once; a click only swaps them.
-        colour = ui.section["fill"]
-        self.pictures = {True: art.toggle(True, *size, colour=colour, knob=ui.section["ink"]),
-                         False: art.toggle(False, *size)}
+        self.pictures = {on: art.toggle(on, *size, bg=bg) for on in (True, False)}
         self.images = {on: ImageTk.PhotoImage(p, master=parent) for on, p in self.pictures.items()}
         self.configure(image=self.images[self.value])
         # A dialog draws the window behind it from the widgets (snapshot.py): this is the switch's part.
@@ -351,29 +673,73 @@ class Toggle(tk.Label):
 
 
 class Segmented(tk.Frame):
-    """A row of choices of which one is on, like the site's tabs."""
+    """A row of choices of which one is on, as the site's tabs: trapezoids in rail metal standing on a lime rule, the
+    chosen one filled lime with dark words (art.tab_face). The words are Tk's, crisp at any scale."""
 
-    def __init__(self, parent, ui, options, value, command, bg=theme.BG):
-        super().__init__(parent, bg=theme.LINE, padx=1, pady=1)
-        self.ui, self.command, self.labels, self.value = ui, command, {}, value
-        self.keys = [key for key, _ in options]
+    # Each tab's room either side of its words, its height, the gap between tabs and the rule under them.
+    PAD, HEIGHT, GAP, RULE = 20, 32, 3, 2
+
+    def __init__(self, parent, ui, options, value, command, bg=None):
+        bg = bg or parent.cget("bg")
+        super().__init__(parent, bg=bg)
+        self.ui, self.command, self.value, self.bg = ui, command, value, bg
+        self.options = list(options)
+        self.keys = [key for key, _ in self.options]
+        px = ui.px
+        widths = [ui.fonts.tab.measure(text) + 2 * px(self.PAD) for _, text in self.options]
+        self.boxes, x = [], 0
+        for w in widths:
+            self.boxes.append((x, w))
+            x += w + px(self.GAP)
+        total = x - px(self.GAP)
+        height = px(self.HEIGHT) + px(self.RULE)
+        self.canvas = tk.Canvas(self, width=total, height=height, bg=bg, highlightthickness=0, bd=0, cursor="hand2")
+        self.canvas.pack()
+        # The faces for each tab and state, made once: a click only swaps them.
+        self.faces = {(i, state): art.tab_face(w, px(self.HEIGHT), state, ui.scale, bg=bg)
+                      for i, (_x, w) in enumerate(self.boxes) for state in ("normal", "hover", "on")}
+        self.images = {key: ImageTk.PhotoImage(face, master=self) for key, face in self.faces.items()}
+        self.items, self.words, self.hover = [], [], None
+        for i, ((x0, w), (_key, text)) in enumerate(zip(self.boxes, self.options)):
+            self.items.append(self.canvas.create_image(x0, 0, image=self.images[(i, "normal")], anchor="nw"))
+            self.words.append(self.canvas.create_text(x0 + w // 2, px(self.HEIGHT) // 2, text=text, font=ui.fonts.tab))
+            for item in (self.items[-1], self.words[-1]):
+                self.canvas.tag_bind(item, "<Button-1>", lambda e, k=self.keys[i]: self.set(k, notify=True))
+                self.canvas.tag_bind(item, "<Enter>", lambda e, i=i: self._hover(i))
+                self.canvas.tag_bind(item, "<Leave>", lambda e: self._hover(None))
+        # The rule the tabs stand on, in lime.
+        self.canvas.create_rectangle(0, px(self.HEIGHT), total, height, fill=theme.OK, width=0)
         # Tab reaches the row; the arrow keys move the choice.
-        focus_ring(self, ui, parent.cget("bg"))
+        focus_ring(self, ui, bg)
         self.bind("<Left>", lambda e: self._step(-1))
         self.bind("<Right>", lambda e: self._step(1))
-        for key, text in options:
-            lab = tk.Label(self, text=text, font=ui.fonts.body_bold, padx=ui.px(16), pady=ui.px(6), cursor="hand2")
-            lab.pack(side="left", padx=(0, 1))
-            lab.bind("<Button-1>", lambda e, k=key: self.set(k, notify=True))
-            self.labels[key] = lab
         self.set(value)
+
+    def _hover(self, i):
+        self.hover = i
+        self._paint()
+
+    def _paint(self):
+        """Each tab's face and words: the chosen one lime with dark words, the one under the pointer lighter."""
+        for i, key in enumerate(self.keys):
+            state = "on" if key == self.value else ("hover" if i == self.hover else "normal")
+            self.canvas.itemconfigure(self.items[i], image=self.images[(i, state)])
+            self.canvas.itemconfigure(self.words[i], fill=theme.SECTION_COLOURS["home"]["ink"] if state == "on" else
+                                      (theme.TEXT if state == "hover" else theme.MUTED))
+        # A dialog draws the window behind it from the widgets (snapshot.py): the row as it looks now.
+        from PIL import Image
+        px = self.ui.px
+        picture = Image.new("RGB", (int(self.canvas.cget("width")), int(self.canvas.cget("height"))),
+                            art._rgb(self.bg))
+        for i, key in enumerate(self.keys):
+            state = "on" if key == self.value else ("hover" if i == self.hover else "normal")
+            picture.paste(self.faces[(i, state)], (self.boxes[i][0], 0))
+        picture.paste(art._rgb(theme.OK), (0, px(self.HEIGHT), picture.width, picture.height))
+        self.canvas.odq_picture = picture
 
     def set(self, value, notify=False):
         self.value = value
-        for key, lab in self.labels.items():
-            on = key == value
-            lab.configure(bg=self.ui.section["fill"] if on else theme.RAIL,
-                          fg=self.ui.section["ink"] if on else theme.MUTED)
+        self._paint()
         if notify:
             self.command(value)
 
@@ -387,7 +753,8 @@ class Segmented(tk.Frame):
 class Slider(tk.Frame):
     """A 0-100 slider with its number beside it; command(value) runs when the drag ends."""
 
-    def __init__(self, parent, ui, value, command, bg=theme.BG, width=320):
+    def __init__(self, parent, ui, value, command, bg=None, width=320):
+        bg = bg or parent.cget("bg")
         super().__init__(parent, bg=bg)
         self.ui, self.command, self.value = ui, command, int(value)
         self.w, self.h = ui.px(width), ui.px(26)
@@ -467,8 +834,9 @@ class Select(ttk.Combobox):
 LABEL_COLUMN = 150
 
 
-def setting_row(parent, ui, title, control_factory, hint=None, bg=theme.BG):
+def setting_row(parent, ui, title, control_factory, hint=None, bg=None):
     """A setting: its name on the left, the control on the right of it, the hint underneath."""
+    bg = bg or parent.cget("bg")
     row = tk.Frame(parent, bg=bg)
     row.columnconfigure(1, weight=1)
     # One width for every row's name, so the controls of a page start on one line (a longer name still fits).
@@ -486,46 +854,57 @@ def setting_row(parent, ui, title, control_factory, hint=None, bg=theme.BG):
 
 
 class Card(tk.Frame):
-    """A panel with a 1-pixel seam and its top-right corner cut, like the site's panels; put content into `body`."""
+    """A panel as the site's cards: the deck's colour with no border, the top-right corner cut, the site's 24 px inside,
+    and its title in Pretendard Bold with nothing after it. Content goes into `body`; `head` holds the title and
+    anything at its right end."""
 
-    CUT = 14
+    CUT = 16
 
-    def __init__(self, parent, ui, pad=18):
+    def __init__(self, parent, ui, title=None, pad=24):
         outside = parent.cget("bg")
-        super().__init__(parent, bg=theme.LINE, padx=1, pady=1)
-        self.body = tk.Frame(self, bg=theme.PANEL, padx=ui.px(pad), pady=ui.px(pad - 2))
+        super().__init__(parent, bg=theme.PANEL)
+        self.body = tk.Frame(self, bg=theme.PANEL, padx=ui.px(pad), pady=ui.px(pad - 4))
         self.body.pack(fill="both", expand=True)
-        # The cut: a small picture over the frame's square corner, the page's colour beyond the seam.
+        self.head = None
+        if title:
+            self.head = tk.Frame(self.body, bg=theme.PANEL)
+            self.head.pack(fill="x", pady=(0, ui.px(12)))
+            tk.Label(self.head, text=title, font=ui.fonts.card_title, fg=theme.TEXT, bg=theme.PANEL).pack(side="left")
+        # The cut: a small picture over the square corner, the page's colour beyond it.
         cut = ui.px(self.CUT)
-        picture = art.corner(cut, theme.PANEL, outside, theme.LINE)
+        picture = art.corner(cut, theme.PANEL, outside)
         self._corner = ImageTk.PhotoImage(picture, master=self)
         corner = tk.Label(self, image=self._corner, bd=0, highlightthickness=0, bg=outside)
         corner.odq_picture = picture
         corner.place(relx=1.0, x=-cut, y=0, width=cut, height=cut)
 
 
-def check_line(parent, ui, state, text, action_text=None, action=None, bg=theme.PANEL):
-    """A ready-check line: a coloured glyph (ok, will change, problem), the words, and an optional link."""
+def check_line(parent, ui, state, text, action_text=None, action=None, bg=theme.PANEL, value=None):
+    """A ready-check row as the site's state rows: a small lamp (lime fine, yellow will change, red a problem), the
+    words, and at the right end the value or the way to fix it."""
     row = tk.Frame(parent, bg=bg)
-    glyph, colour = {"ok": ("ok", theme.OK), "change": ("info", theme.WARN), "bad": ("error", theme.BAD)}[state]
-    icon = tk.Label(row, text=theme.ICON[glyph], font=ui.fonts.icon_small, fg=colour, bg=bg)
-    icon.pack(side="left", anchor="n")
-    beside = [icon]
+    colour = {"ok": theme.OK, "change": theme.WARN, "bad": theme.BAD}[state]
+    light = lamp(row, ui, colour, bg=bg)
+    light.pack(side="left", anchor="n", pady=(ui.px(1), 0))
+    beside = [light]
     if action_text and action:
         # The way to fix it, reached by the mouse or the keyboard.
         fix = link(row, ui, action_text, action, bg=bg)
         fix.pack(side="right", anchor="n")
         beside.append(fix)
-    words = label(row, ui, text, fg=theme.TEXT if state != "ok" else theme.MUTED, bg=bg, wrap_margin=24,
-                  beside=beside)
-    words.pack(side="left", fill="x", padx=(ui.px(8), 0))
+    elif value:
+        what = tk.Label(row, text=value, font=ui.fonts.body, fg=theme.MUTED, bg=bg)
+        what.pack(side="right", anchor="n")
+        beside.append(what)
+    words = label(row, ui, text, fg=theme.TEXT, bg=bg, wrap_margin=24, beside=beside)
+    words.pack(side="left", fill="x", padx=(ui.px(6), 0))
     return row
 
 
 def entry(parent, ui, width=18, secret=False):
-    """A text field in the theme: dark inside, a cyan edge while typing."""
+    """A text field as the site's: a dark field with a one-pixel seam, lime round it while typing."""
     field = tk.Entry(parent, width=width, font=ui.fonts.body, bg=theme.FIELD, fg=theme.TEXT, insertbackground=theme.TEXT,
-                     relief="flat", highlightthickness=1, highlightbackground=theme.LINE, highlightcolor=theme.CYAN,
+                     relief="flat", highlightthickness=1, highlightbackground=theme.LINE, highlightcolor=theme.OK,
                      show="\u2022" if secret else "")
     return field
 
@@ -534,7 +913,8 @@ class Progress(tk.Frame):
     """A progress bar with its words under it (a download): set(fraction, text) moves it; fraction None shows the
     track alone, for work whose size is not known yet."""
 
-    def __init__(self, parent, ui, width=420, bg=theme.BG):
+    def __init__(self, parent, ui, width=420, bg=None):
+        bg = bg or parent.cget("bg")
         super().__init__(parent, bg=bg)
         self.ui, self.bg = ui, bg
         self.w, self.h = ui.px(width), ui.px(8)

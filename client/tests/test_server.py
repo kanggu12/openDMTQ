@@ -44,6 +44,14 @@ class Talking(Folder):
             srv.about(self.site.url + "/elsewhere")
         self.assertEqual(caught.exception.key, "error.server.not_opendmtq")
 
+    def test_an_older_opendmtq_is_said_as_such(self):
+        # An OpenDMTQ from before the PC client has no client.php, but answers its health page as every one does.
+        self.site.old = True
+        with self.assertRaises(srv.ServerError) as caught:
+            srv.about(self.site.url)
+        self.assertEqual(caught.exception.key, "error.server.too_old")
+        self.assertEqual(caught.exception.params["base"], self.site.url)
+
     def test_nobody_there(self):
         with self.assertRaises(srv.ServerError) as caught:
             srv.about("http://127.0.0.1:9")

@@ -17,14 +17,12 @@ from opendmtq_client import server as srv
 
 log = logging.getLogger("opendmtq_client")
 
-# The menu, top to bottom.
+# The menu, left to right, in English in both languages as the site's and the game's menus are.
 NAV = ("play", "screen", "sound", "controls", "online", "help", "about")
-NAV_ICON = {"play": "play", "screen": "screen", "sound": "sound", "controls": "controls", "online": "online",
-            "help": "help", "about": "about"}
-# Each page gets its own arrangement of shards, so moving between pages feels like moving.
-SEEDS = {"play": 7, "screen": 11, "sound": 23, "controls": 31, "online": 13, "help": 17, "about": 41}
-# The menu column's width and the logo's place in it, the same in the guide (logical pixels).
-SIDE_WIDTH, LOGO_PAD = 232, 20
+NAV_WORDS = {"play": "PLAY", "screen": "SCREEN", "sound": "SOUND", "controls": "CONTROLS", "online": "ONLINE",
+             "help": "HELP", "about": "LAUNCHER"}
+# The room at the window's left and right ends (logical pixels), the same in the guide.
+EDGE = 28
 # The bottom bar's height inside its padding: PLAY's slab and its keyboard ring, on every page and every guide step.
 BAR_HEIGHT = 54
 # How often the window looks for a server an installer left while it is open, in turns of the 50 ms task pump (2 s).
@@ -54,7 +52,6 @@ class LauncherApp:
         self.status_text, self.status_tone = "", "normal"
         self.status_sticky = False      # a message that stays until the player does something (an update's outcome, a
         #                                 sign-in that ended, a stopped download): the ready check does not replace it
-        self._header_job = None
         self.quit_after_game = False    # the window was closed while the game ran
         self.dialog = None              # the dialog on show (dialogs.py), while one is
         self.devices = None             # the sound devices the player lists (None: not asked yet)
@@ -64,7 +61,7 @@ class LauncherApp:
         self.app_note = None            # what the last look for a newer app found when it found none (the page shows it)
         self.status_transient = False   # the status line says something passing, which the ready check may replace
         self.status_action = None       # (words, function): a link after the status line, or None
-        self.updating = False           # the launcher's own update is downloading (the window stays until it is done)
+        self.updating = False           # the launcher's own update or a repair is under way (the window stays until then)
         self.play_offline = False       # PLAY went on with this PC's app because the server did not answer
         self.server_check = None        # the last time a server was asked in this run: {"url", "state", "text"}
         self.pumps = 0                  # turns of the task pump, for the slower look for an installer's server
@@ -113,54 +110,52 @@ class LauncherApp:
 
     def _build_main(self):
         ui, px = self.ui, self.ui.px
-        # ---- the menu column
-        side = tk.Frame(self.root, bg=theme.SIDEBAR, width=px(SIDE_WIDTH))
-        side.pack(side="left", fill="y")
-        side.pack_propagate(False)
-        # The name as the site draws it (art.logo): OPEN, a splinter, DMTQ in leaning chrome with the lime Q.
-        self.make_logo(side).pack(anchor="w", padx=px(LOGO_PAD), pady=(px(LOGO_PAD), px(20)))
-        self.nav = {}
-        for key in NAV:
-            self.nav[key] = self._nav_item(side, key)
-        # ---- the right side: header, page, bottom bar
-        right = tk.Frame(self.root, bg=theme.BG)
-        right.pack(side="left", fill="both", expand=True)
-        self.header = tk.Canvas(right, height=px(176), bg=theme.BG, highlightthickness=0, bd=0)
-        self.header.pack(fill="x")
-        self.header.bind("<Configure>", lambda e: self._queue_header())
-        bottom = tk.Frame(right, bg=theme.PANEL)
+        # ---- the header bar: the wordmark and the version, then the menu (as the site's top bar)
+        self.header = self.make_header(self.root, nav=[(key, NAV_WORDS[key]) for key in NAV], on_nav=self.nav_go)
+        # ---- the strip along the foot: what is going on at the left, PLAY at the right
+        bottom = tk.Frame(self.root, bg=theme.STRIP)
         bottom.pack(side="bottom", fill="x")
-        tk.Frame(bottom, bg=theme.LINE, height=1).pack(fill="x", side="top")
         # One height whatever it holds, as the guide's bar.
-        bar = tk.Frame(bottom, bg=theme.PANEL, height=px(BAR_HEIGHT))
-        bar.pack(fill="x", padx=px(24), pady=px(12))
+        bar = tk.Frame(bottom, bg=theme.STRIP, height=px(BAR_HEIGHT))
+        bar.pack(fill="x", padx=px(EDGE), pady=px(12))
         bar.pack_propagate(False)
         self.play_button = self._make_play(bar)
         self.play_button.pack(side="right")
-        self.status_glyph = tk.Label(bar, text="", font=self.fonts.icon_small, fg=theme.MUTED, bg=theme.PANEL)
+        # The status's lamp in its tone's colour, then its words.
+        from PIL import ImageTk
+        self._status_lamps = {tone: art.lamp(colour, self.scale, bg=theme.STRIP) for tone, colour in
+                              (("normal", theme.FAINT), ("ok", theme.OK), ("warn", theme.WARN), ("bad", theme.BAD))}
+        self._status_images = {tone: ImageTk.PhotoImage(p, master=self.root) for tone, p in self._status_lamps.items()}
+        self.status_glyph = tk.Label(bar, image=self._status_images["normal"], bg=theme.STRIP, bd=0)
         self.status_glyph.pack(side="left")
-        self.status_label = tk.Label(bar, text="", font=self.fonts.body, fg=theme.MUTED, bg=theme.PANEL,
+        self.status_label = tk.Label(bar, text="", font=self.fonts.body, fg=theme.MUTED, bg=theme.STRIP,
                                      justify="left", anchor="w", wraplength=px(560))
-        self.status_label.pack(side="left", padx=(px(6), px(12)))
+        self.status_label.pack(side="left", padx=(px(4), px(12)))
         # A link after the words when there is something to open (the player's log after a crash): the words and the
         # chevron come with the message (_paint_status).
         self.status_link = widgets.link(bar, ui, "", lambda: self.status_link.odq_action and self.status_link.odq_action(),
-                                        fg=theme.TEXT, bg=theme.PANEL, chevron=False)
+                                        fg=theme.TEXT, bg=theme.STRIP, chevron=False)
         self.status_link.odq_action = None
-        self.body = widgets.ScrollArea(right, ui)
-        self.body.pack(fill="both", expand=True)
+        # ---- the page: its title and its cards over the site's field (widgets.ScrollArea)
+        self.body = self.make_page(self.root, self.header)
         self._paint_status()
 
-    def make_logo(self, parent):
-        """The name as the site draws it (art.logo), with the version in a small plate at the end of its top line: the
-        same picture in the launcher's menu column and in the guide's."""
-        px = self.ui.px
-        picture = art.logo(px(SIDE_WIDTH) - 2 * px(LOGO_PAD), self.scale, version="v" + __version__)
-        image = ImageTk.PhotoImage(picture, master=self.root)
-        brand = tk.Label(parent, image=image, bg=theme.SIDEBAR, bd=0)
-        # Kept on the label: Tk drops a picture the moment Python forgets it. A dialog draws the window from it.
-        brand.odq_image, brand.odq_picture = image, picture
-        return brand
+    def make_header(self, parent, nav=(), on_nav=None, link=None, steps=()):
+        """The bar across the window's top, as the site's (widgets.Header): the wordmark with PC after it and the
+        version beside it (art.brand), then the menu; the guide's has its steps under them instead."""
+        header = widgets.Header(parent, self.ui, art.brand(self.scale, "v" + __version__), nav=nav, on_nav=on_nav,
+                                link=link, steps=steps)
+        header.pack(side="top", fill="x")
+        return header
+
+    def make_page(self, parent, header):
+        """The page area under a header: the page's backdrop goes on from where the header's ends, and the header turns
+        into the dark bar once the page has moved."""
+        page = widgets.ScrollArea(parent, self.ui, offset=int(header.cget("height")),
+                                  light=self.ui.px(widgets.Header.HEIGHT) + self.ui.px(widgets.Header.LIGHT),
+                                  on_moved=header.set_under)
+        page.pack(fill="both", expand=True)
+        return page
 
     def user_acted(self):
         """The player did something: a message kept until then (status_sticky) may give way now."""
@@ -170,42 +165,6 @@ class LauncherApp:
         """A page chosen from the menu (a click, or Enter or Space)."""
         self.user_acted()
         self.go(page)
-
-    def _nav_item(self, parent, key):
-        """One menu entry: a bar in the section's colour when chosen, the glyph and the name."""
-        px = self.ui.px
-        # Reached with Tab too: a cyan ring while it has the keyboard, Enter or Space opens the page.
-        row = tk.Frame(parent, bg=theme.SIDEBAR, cursor="hand2", takefocus=1, highlightthickness=max(1, px(2)),
-                       highlightbackground=theme.SIDEBAR, highlightcolor=theme.CYAN)
-        row.pack(fill="x", padx=px(12), pady=px(1))
-        for key_name in ("<Return>", "<space>"):
-            row.bind(key_name, lambda e, k=key: self.nav_go(k))
-        bar = tk.Frame(row, bg=theme.SIDEBAR, width=px(3))
-        bar.pack(side="left", fill="y")
-        glyph = tk.Label(row, text=theme.ICON[NAV_ICON[key]], font=self.fonts.icon, bg=theme.SIDEBAR, fg=theme.MUTED)
-        glyph.pack(side="left", padx=(px(12), px(10)), pady=px(9))
-        words = self.words("nav." + key)
-        name = tk.Label(row, text=words.upper() if self.state.language == "en" else words, font=self.fonts.nav,
-                        bg=theme.SIDEBAR, fg=theme.MUTED)
-        name.pack(side="left")
-        parts = (row, bar, glyph, name)
-        for part in parts:
-            part.bind("<Button-1>", lambda e, k=key: self.nav_go(k))
-            part.bind("<Enter>", lambda e, k=key: self._paint_nav(k, hover=True))
-            part.bind("<Leave>", lambda e, k=key: self._paint_nav(k))
-        return parts
-
-    def _paint_nav(self, key, hover=False):
-        """The page on show is lit in its section's colour: the bar at its edge and its glyph."""
-        row, bar, glyph, name = self.nav[key]
-        on = key == self.page
-        accent = theme.section_colours(key)["accent"]
-        bg = theme.PANEL_HI if (on or hover) else theme.SIDEBAR
-        for part in (row, glyph, name):
-            part.configure(bg=bg)
-        bar.configure(bg=accent if on else bg)
-        glyph.configure(fg=accent if on else (theme.TEXT if hover else theme.MUTED))
-        name.configure(fg=theme.TEXT if (on or hover) else theme.MUTED)
 
     # -------------------------------------------------------------------------------------- PLAY
 
@@ -385,14 +344,12 @@ class LauncherApp:
 
     def open_player_log(self):
         """Show the player's log for the current server's app (Explorer, the file selected); the Help page when there
-        is no app yet to have one."""
+        is no log yet (no app, or the game has not run with it)."""
         from opendmtq_client import apps
         server = self.state.server()
         have = apps.local(server["url"]) if server else None
-        if have is None:
+        if have is None or not actions.show_file(player.log_path(have["package"])):
             self.go("help")
-            return
-        actions.open_folder(player.log_path(have["package"]))
 
     def _mapped(self, event):
         """The window came back on screen: a close while the game ran is taken back."""
@@ -435,54 +392,21 @@ class LauncherApp:
     # ----------------------------------------------------------------------------------- pages
 
     def go(self, page):
-        """Show a page: its header picture and titles, and its content."""
+        """Show a page: its title and the line under it, and its cards."""
         from opendmtq_client import pages
         self.page = page
-        # The page's widgets take its section's colour.
+        # Every page in the site's lime; the menu lights its name.
         self.ui.use_section(page)
-        for key in self.nav:
-            self._paint_nav(key)
+        self.header.set_current(page)
         for child in self.body.inner.winfo_children():
             child.destroy()
         self.download_bar = None
         content = tk.Frame(self.body.inner, bg=theme.BG)
-        content.pack(fill="both", expand=True, padx=self.ui.px(32), pady=(self.ui.px(22), self.ui.px(28)))
+        content.pack(fill="both", expand=True)
+        title, description = pages.heading(self, page)
+        self.body.set_heading(title, description)
         pages.BUILDERS[page](self, content)
         self.body.to_top()
-        self._queue_header()
-
-    def _queue_header(self):
-        """Redraw the header once the size settles (a drag fires many resize events)."""
-        if self._header_job is not None:
-            self.root.after_cancel(self._header_job)
-        self._header_job = self.root.after(90, self._draw_header)
-
-    def _draw_header(self):
-        from opendmtq_client import pages
-        self._header_job = None
-        if not hasattr(self, "header") or not self.header.winfo_exists():
-            # The guide is on show; it draws its own header.
-            return
-        c = self.header
-        width, height = c.winfo_width(), c.winfo_height()
-        if width < 50:
-            return
-        px = self.ui.px
-        kicker, title, sub = pages.HEADERS[self.page](self)
-        colours = theme.section_colours(self.page)
-        words = title.upper() if self.state.language == "en" else title
-        # The title is part of the picture: leaning chrome letters, the lime Q of TECHNIKA Q on PLAY.
-        picture = art.header(width, height, seed=SEEDS.get(self.page, 7), colours=colours, title=words,
-                             title_tail="Q" if words.endswith(" Q") else None, scale=self.scale)
-        self._header_img = ImageTk.PhotoImage(picture, master=self.root)
-        # A dialog draws the window behind it from the widgets (snapshot.py); this is the header's part.
-        c.odq_picture = picture
-        c.delete("all")
-        c.create_image(0, 0, image=self._header_img, anchor="nw")
-        x = px(32)
-        c.create_text(x, px(46), text=kicker, font=self.fonts.kicker, fill=colours["accent"], anchor="w")
-        c.create_text(x, px(118), text=sub, font=self.fonts.body, fill=theme.MUTED, anchor="nw",
-                      width=max(px(300), int(width * 0.56)))
 
     # ------------------------------------------------------------------------------ background
 
@@ -684,9 +608,9 @@ class LauncherApp:
     def _paint_status(self):
         if not hasattr(self, "status_label") or not self.status_label.winfo_exists():
             return
-        glyph, colour = {"normal": ("info", theme.MUTED), "ok": ("ok", theme.OK), "warn": ("warn", theme.WARN),
-                         "bad": ("error", theme.BAD)}[self.status_tone]
-        self.status_glyph.configure(text=theme.ICON[glyph], fg=colour)
+        # The lamp in the tone's colour, as the site shows a state.
+        self.status_glyph.configure(image=self._status_images[self.status_tone])
+        self.status_glyph.odq_picture = self._status_lamps[self.status_tone]
         self.status_label.configure(text=self.status_text, fg=theme.TEXT if self.status_tone != "normal" else theme.MUTED)
         # The link after the words: shown with an action, gone without one.
         if self.status_action:
@@ -718,7 +642,8 @@ class LauncherApp:
     def close(self):
         """Close the launcher. A game playing keeps going: the launcher hides until it ends, then goes."""
         if self.updating:
-            # The update is downloading: the launcher closes by itself once it is in Velopack's hands.
+            # The update is downloading (the launcher closes by itself once it is in Velopack's hands), or a repair is
+            # writing the program's files.
             return
         if self.dialog is not None:
             # Closing the window answers an open question with Cancel.
@@ -729,6 +654,14 @@ class LauncherApp:
             self.quit_after_game = True
             self.root.withdraw()
             return
+        self.root.destroy()
+
+    def leave(self):
+        """Close at once for an uninstall, writing nothing: the caller saved what stays before the uninstaller started,
+        and after Delete all a write would make the deleted folder again."""
+        if self.dialog is not None:
+            self.dialog.close(self.dialog.cancel_value)
+        self.cancel_download()
         self.root.destroy()
 
     def run(self):

@@ -1,0 +1,200 @@
+"""Clear game data, Delete all and Uninstall, on folders of the test's own (removal.py)."""
+
+import os
+import subprocess
+import tempfile
+from unittest import mock
+
+from opendmtq_client import apps, main, removal, safety
+from opendmtq_client import state as st
+from tests.base import Folder
+
+# A game's folder as the player leaves it: its libraries, its data with the id, and its log.
+GAME = {
+    "lib/libgame.so": b"l" * 3000,
+    "data/android_id": b"0123456789abcdef",
+    "data/internal/shared_prefs/game.xml": b"<map/>",
+    "data/external/files/song.bin": b"s" * 5000,
+    "data/cwd/.keep": b"",
+    "player.log": b"started\n",
+}
+
+
+def write(root, files):
+    """Files under a folder, with what is in them."""
+    for name, data in files.items():
+        path = os.path.join(root, *name.split("/"))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(data)
+
+
+def listing(root):
+    """Every file under a folder, by its name inside it."""
+    found = set()
+    for folder, _dirs, files in os.walk(root):
+        for name in files:
+            found.add(os.path.relpath(os.path.join(folder, name), root).replace(os.sep, "/"))
+    return found
+
+
+class Removal(Folder):
+    def setUp(self):
+        super().setUp()
+        # The launcher's folder where an installed launcher has it: inside OpenDMTQ's folder, beside the games'.
+        os.environ.pop("OPENDMTQ_CLIENT_DIR", None)
+        os.environ.pop("OPENDMTQ_INSTALL_ROOT", None)
+        self.root = removal.data_root()
+        self.game = os.path.join(self.root, "com.example.game")
+        write(self.game, GAME)
+        state = st.LauncherState()
+        state.add_server("http://127.0.0.1:1", "Somewhere")
+        state.save()
+
+    def tearDown(self):
+        os.environ.pop("OPENDMTQ_INSTALL_ROOT", None)
+        super().tearDown()
+
+    def test_the_folders_are_the_tests_own(self):
+        self.assertTrue(self.root.startswith(self.home + os.sep))
+        self.assertEqual(st.config_dir(), os.path.join(self.root, "client"))
+        self.assertEqual(removal.game_folders(), [self.game])
+
+    def test_clearing_keeps_the_id_alone(self):
+        everything_but_the_id = sum(len(v) for k, v in GAME.items() if k != "data/android_id")
+        self.assertEqual(removal.game_data_size(), everything_but_the_id)
+        self.assertEqual(removal.clear_game_data(), [])
+        # The id this PC plays by, as it was, and nothing else of the game's.
+        self.assertEqual(listing(self.game), {"data/android_id"})
+        with open(os.path.join(self.game, "data", "android_id"), "rb") as f:
+            self.assertEqual(f.read(), GAME["data/android_id"])
+        self.assertEqual(removal.game_data_size(), 0)
+        # The launcher's own folder is no game's.
+        self.assertEqual(st.LauncherState.load().server()["name"], "Somewhere")
+
+    def test_a_link_goes_and_what_it_points_at_stays(self):
+        outside = os.path.join(self.home, "elsewhere")
+        write(outside, {"keep.txt": b"mine"})
+        os.symlink(outside, os.path.join(self.game, "data", "external", "linked"))
+        self.assertEqual(removal.clear_game_data(), [])
+        self.assertFalse(os.path.lexists(os.path.join(self.game, "data", "external", "linked")))
+        self.assertEqual(listing(outside), {"keep.txt"})
+
+    def test_what_cannot_go_is_said_and_the_rest_goes(self):
+        held = os.path.join(self.game, "data", "external", "files", "song.bin")
+        real = removal._unlink
+
+        def unlink(path):
+            # Windows' answer for a file another program has open.
+            if path == held:
+                raise PermissionError(13, "in use", path)
+            real(path)
+
+        with mock.patch.object(removal, "_unlink", unlink):
+            failed = removal.clear_game_data()
+        # The file, once: not again for each folder it keeps in place.
+        self.assertEqual(failed, [held])
+        self.assertEqual(listing(self.game), {"data/android_id", "data/external/files/song.bin"})
+
+    def test_delete_all_takes_every_folder_of_opendmtq(self):
+        apps_folder = apps.folder("http://127.0.0.1:1")
+        write(apps_folder, {"app.apk": b"a" * 100})
+        self.assertGreater(removal.everything_size(), removal.game_data_size())
+        self.assertEqual(removal.delete_everything(), [])
+        self.assertFalse(os.path.exists(self.root))
+        self.assertEqual(os.listdir(os.path.dirname(self.root)), [])
+
+    def test_delete_all_in_a_folder_of_ones_own_choice(self):
+        # OPENDMTQ_CLIENT_DIR names a folder that may hold other files: only the launcher's go.
+        own = os.path.join(self.home, "chosen")
+        os.environ["OPENDMTQ_CLIENT_DIR"] = own
+        st.LauncherState().save()
+        main._logging()
+        write(own, {"notes.txt": b"the player's own"})
+        self.assertEqual(removal.delete_everything(), [])
+        self.assertEqual(listing(own), {"notes.txt"})
+        self.assertFalse(os.path.exists(self.root))
+
+    def test_the_launchers_names_are_its_own(self):
+        # Everything the launcher wrote in its folder while it ran: the settings, the log, a server's app.
+        main._logging()
+        write(apps.folder("http://127.0.0.1:1"), {"app.apk": b"a"})
+        for name in os.listdir(st.config_dir()):
+            self.assertTrue(removal._own(name), name)
+        # A file the player put there is not.
+        self.assertFalse(removal._own("notes.txt"))
+
+    def test_no_log_comes_back_after_delete_all(self):
+        main._logging()
+        removal.delete_everything()
+        # Velopack's uninstall hook starts the launcher once more: it writes no log where none is left.
+        main._logging(make=False)
+        removal.log.info("the uninstall hook")
+        self.assertFalse(os.path.exists(self.root))
+
+    def test_sizes_are_said_plainly(self):
+        self.assertEqual(removal.megabytes(1), "1 KB")
+        self.assertEqual(removal.megabytes(640 * 1024), "640 KB")
+        self.assertEqual(removal.megabytes(85 << 20), "85 MB")
+        self.assertEqual(removal.megabytes(1288490189), "1.2 GB")
+
+    def test_a_test_never_deletes_outside_the_temporary_folder(self):
+        # The accident this guards against: a test that left the real folders in place. Here the temporary folder is
+        # said to be another one, which puts this test's own folders outside it.
+        elsewhere = tempfile.mkdtemp(prefix="odq-other-temp-")
+        try:
+            with mock.patch.object(tempfile, "gettempdir", lambda: elsewhere):
+                for remove in (removal.clear_game_data, removal.delete_everything):
+                    with self.assertRaises(safety.DeleteRefused):
+                        remove()
+            # Nothing went.
+            self.assertEqual(listing(self.game), set(GAME))
+            self.assertEqual(st.LauncherState.load().server()["name"], "Somewhere")
+        finally:
+            os.rmdir(elsewhere)
+
+    def test_the_temporary_folder_itself_is_refused(self):
+        with self.assertRaises(safety.DeleteRefused):
+            safety.refuse_deleting_in_tests(tempfile.gettempdir())
+        safety.refuse_deleting_in_tests(self.home)
+
+
+class Uninstall(Folder):
+    def setUp(self):
+        super().setUp()
+        # An install folder as Velopack lays it out, with a stand-in Update.exe.
+        self.install = os.path.join(self.home, "OpenDMTQ.Client")
+        write(self.install, {"Update.exe": b"MZ", "current/sq.version": b"<version>0.8.0</version>"})
+        os.environ["OPENDMTQ_INSTALL_ROOT"] = self.install
+
+    def tearDown(self):
+        os.environ.pop("OPENDMTQ_INSTALL_ROOT", None)
+        super().tearDown()
+
+    def test_velopacks_uninstaller_starts_on_its_own(self):
+        with mock.patch.object(subprocess, "Popen") as popen:
+            removal.uninstall()
+        command, = popen.call_args[0]
+        self.assertEqual(command, [os.path.join(self.install, "Update.exe"), "--uninstall", "--silent"])
+        # Not from inside the folder that is going.
+        cwd = popen.call_args[1]["cwd"]
+        self.assertFalse(os.path.abspath(cwd).startswith(self.install))
+
+    def test_a_copied_folder_has_no_uninstaller(self):
+        os.environ.pop("OPENDMTQ_INSTALL_ROOT")
+        with mock.patch.object(subprocess, "Popen") as popen:
+            with self.assertRaises(removal.RemovalError) as caught:
+                removal.uninstall()
+        self.assertEqual(caught.exception.key, "error.uninstall.not_installed")
+        popen.assert_not_called()
+
+    def test_an_install_folder_outside_the_temporary_one_is_refused(self):
+        elsewhere = tempfile.mkdtemp(prefix="odq-other-temp-")
+        try:
+            with mock.patch.object(tempfile, "gettempdir", lambda: elsewhere), \
+                    mock.patch.object(subprocess, "Popen") as popen:
+                with self.assertRaises(safety.DeleteRefused):
+                    removal.uninstall()
+            popen.assert_not_called()
+        finally:
+            os.rmdir(elsewhere)

@@ -31,7 +31,7 @@ servers, each with its own sign-in and app, and plays on the one chosen on the *
 | **Sound** | The volume, the device, shared or the device alone, the buffer |
 | **Controls** | What the touch screen, the mouse and the keyboard do |
 | **Online** | The servers, the sign-in, the app on this PC and a check for a newer one |
-| **Help** | What to try when something does not work, and the logs |
+| **Help** | The checks, what to try when something does not work, the logs, and repairing, clearing, starting over and uninstalling |
 | **Launcher** | The language, updates of the launcher, the first-start guide again |
 
 **PLAY** asks the server for a newer app first and downloads it when there is one; when the server cannot be asked, the
@@ -39,7 +39,8 @@ game starts with the app this PC has. The launcher updates itself from the proje
 updates**. While the game runs the launcher steps aside, and comes back when the game ends.
 
 `OpenDMTQ-cmd.exe`, next to the launcher in its folder, does the same from the command line, each step a flag
-(`OpenDMTQ-cmd.exe --help`): connect, sign in and out, download, the settings, the sound devices, **PLAY**, updates.
+(`OpenDMTQ-cmd.exe --help`): connect, sign in and out, download, the settings, the sound devices, **PLAY**, updates,
+repairing, clearing the game's data, starting over and uninstalling.
 
 ### In the game
 
@@ -123,8 +124,18 @@ says when a broadcast starts and ends, and where it can be watched.
     (`lib`), the game's settings and the songs it downloaded (`data`), and the player's log, `player.log`, which starts
     over past 8 MB and keeps the part before as `player.log.1`.
 
-  Scores are kept on the server. The launcher keeps the server's sign-in cookie, never the password. Uninstalling
-  (Windows' Settings, Apps) removes the program; the other two folders stay for a later install.
+  Scores are kept on the server. The launcher keeps the server's sign-in cookie, never the password.
+- **Repairing, clearing and removing,** on the launcher's **Help** page, each with the same flag of `OpenDMTQ-cmd.exe`:
+  - **Repair** compares the program's files with the package it was installed from and puts back what is missing or
+    changed (`--repair`). Running `OpenDMTQ-Setup.exe` again repairs too.
+  - **Clear game data** deletes what the game keeps, all but the device id: the game downloads its data again at the
+    next start, and the PC stays the same player (`--clear-game-data`).
+  - **Start over** forgets the servers, the sign-ins, the apps and the settings, and opens the first-start guide
+    (`--reset`). **Forget** on the **Online** page does that for one server (`--forget URL`).
+  - **Uninstall** removes the program, its shortcuts and its entry in Windows' Apps (`--uninstall`). It asks whether
+    the settings, sign-ins and game data stay for a later install or go too (`--uninstall --delete-data`). With them
+    goes the device id, and a later install is a new player, unless the account transfer below brings this one back.
+    Windows' Settings, Apps uninstalls too, and keeps the data.
 - **The account:** a PC is a player of its own, apart from the same person's phone. The server gives each new device a
   new account, and the device id the PC goes by is kept in the game's folder: deleting that folder makes this PC a new
   player. The game's own account transfer carries a player to another device: on the device that has the player,
@@ -172,9 +183,11 @@ server's app, `--settings` the file).
 
 ## When something goes wrong
 
-- **The game does not start:** the launcher says why on its **Play** page, with a button to the player's log. The log
-  is `player.log` in the game's folder in `%LOCALAPPDATA%\OpenDMTQ`; the launcher's own is in
+- **The game does not start:** the launcher says why on its bottom line, with a link to the player's log; **Help**
+  opens it too. The log is `player.log` in the game's folder in `%LOCALAPPDATA%\OpenDMTQ`; the launcher's own is in
   `%LOCALAPPDATA%\OpenDMTQ\client\logs`.
+- **The player is missing or a file of the program is damaged:** **Help**, **Repair** puts the program's files back
+  from the package it was installed from.
 - **The installer says a game is going on:** finish it and close the game; installing replaces the player it plays in.
 - **The sign-in is refused:** the ID and password are the site's. Too many wrong passwords make the server wait a while
   before the next try.

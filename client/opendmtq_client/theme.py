@@ -1,13 +1,12 @@
 """Colours, fonts and sizes of the launcher: the OpenDMTQ site's look (server/portal/style.css) in a window.
 
-The surfaces are the site's neutral gunmetal, never tinted by one brand colour. Colour marks a section or a meaning, as
-the site colours its sections: the site's lime for PLAY, the timeline's cyan for the picture and the sound, the
-rankings' violet for being online, and the admin pages' amber for the tools. The checks say "fine", "will change" and
-"problem" in the site's own lime, yellow and red.
+The surfaces are the site's neutral gunmetal, never tinted by one brand colour. Colour says what something is: the
+site's lime for what is in use, the main action and what is fine; its yellow and red for a warning and a problem; cyan
+for the keyboard's place.
 
-Titles lean in the wide face, as the TECHNIKA Q logo and the site's wordmark do. Fonts are bundled under open licences:
-DMTQ Wide (the site's cut of Saira) for Latin headings and labels, Pretendard for text in both languages, Material Icons
-for glyphs (assets/fonts/README.md).
+Page titles, the menu and the guide's numerals are in the wide face, as the site's are. Fonts are bundled under open
+licences: DMTQ Wide (the site's cut of Saira) for those, Pretendard for text in both languages, Material Icons for the
+few glyphs left (assets/fonts/README.md).
 """
 
 import os
@@ -18,13 +17,15 @@ FONT_DIR = os.path.join(ASSETS, "fonts")
 
 # Surfaces, darkest first: the site's field, deck and rails, and the seam between them.
 BG = "#11151a"          # the window behind everything (the site's --field)
-SIDEBAR = "#0d1014"     # the menu column, a step darker than the page
-PANEL = "#1a1f25"       # cards and the bottom bar (--deck)
-PANEL_HI = "#21272e"    # a hovered or chosen row, the top of a card (--deck-top)
-RAIL = "#272e36"        # quiet metal: buttons and tracks (--rail)
-RAIL_UP = "#323a44"     # the same under the pointer (--rail-up)
-LINE = "#3a434d"        # 1-pixel seams and rules (--seam)
-FIELD = "#0b0e12"       # inside inputs and lists
+SIDEBAR = BG            # the header bar: it melts into the page, as the site's does at the page's top
+PANEL = "#1a1f25"       # cards (--deck)
+PANEL_HI = "#21272e"    # a hovered row (--deck-top)
+RAIL = "#272e36"        # quiet metal: tabs and tracks (--rail)
+RAIL_UP = "#323a44"     # buttons, and tabs under the pointer (--rail-up)
+LINE = "#3a434d"        # 1-pixel seams: an input's edge (--seam)
+FIELD = "#0e1216"       # inside inputs and lists (the site's .input)
+STRIP = "#151a20"       # the strip along the window's foot with PLAY (the site's bar once a page has moved)
+DIVIDER = "#2b3035"     # the faint line between rows in a card (white at 7.5 % on the deck)
 
 # Text.
 TEXT = "#eef2f6"        # body text (--chalk)
@@ -48,9 +49,9 @@ SECTION_COLOURS = {
     "ranking": {"accent": VIOLET, "light": "#9a62f0", "deep": "#2d1257", "fill": VIOLET, "ink": "#1b0a34"},
     "admin": {"accent": AMBER, "light": "#e3961f", "deep": "#4f3306", "fill": AMBER, "ink": "#2a1700"},
 }
-# Which section each page of the launcher belongs to.
-PAGE_SECTIONS = {"play": "home", "screen": "songs", "sound": "songs", "controls": "songs", "online": "ranking",
-                 "help": "admin", "about": "admin"}
+# Which section each page of the launcher belongs to: all of them the site's lime, the one colour for what is in use.
+PAGE_SECTIONS = {"play": "home", "screen": "home", "sound": "home", "controls": "home", "online": "home",
+                 "help": "home", "about": "home"}
 
 
 def section_colours(page):
@@ -102,33 +103,25 @@ def register_fonts():
 
 
 class Fonts:
-    """The named fonts, sized for the window's DPI and chosen for the language.
-
-    DMTQ Wide has no Hangul, so in Korean the headings use Pretendard SemiBold at a size that matches the wide face's
-    height; Latin-only labels (PLAY, the guide's step names) stay wide in both languages.
-    """
+    """The named fonts, sized for the window's DPI. The wide face only ever sets English (the menu, PLAY, the guide's
+    step names), so the same fonts serve both languages; Pretendard sets all text, Korean and Latin."""
 
     def __init__(self, root, language):
         import tkinter.font as tkfont
-        korean = language == "ko"
-        section = (TEXT_BOLD, 10) if korean else (DISPLAY, 8)
-        self.title = tkfont.Font(root, family=TEXT_BOLD if korean else DISPLAY, size=21 if korean else 18)
-        kicker = (TEXT_BOLD, 9) if korean else (DISPLAY, 8)
-        self.kicker = tkfont.Font(root, family=kicker[0], size=kicker[1])            # the small line above a title
-        self.section = tkfont.Font(root, family=section[0], size=section[1])         # section headings
-        self.display = tkfont.Font(root, family=DISPLAY, size=10)                    # Latin labels in the site's style
+        # The menu in the wide face, English in both languages as the site's and the game's menus are (13.5 px).
+        self.nav = tkfont.Font(root, family=DISPLAY, size=10)
+        # The same, a step smaller, where the window is too narrow for the menu in one line at the full size.
+        self.nav_small = tkfont.Font(root, family=DISPLAY, size=9)
+        self.step = tkfont.Font(root, family=DISPLAY, size=9)                        # the guide's step names
         self.display_big = tkfont.Font(root, family=DISPLAY, size=17)                # PLAY
+        self.card_title = tkfont.Font(root, family=TEXT_FONT, size=13, weight="bold")  # a card's title (17 px)
         self.body = tkfont.Font(root, family=TEXT_FONT, size=10)                     # text
         self.body_bold = tkfont.Font(root, family=TEXT_BOLD, size=10)                # labels and buttons
         self.small = tkfont.Font(root, family=TEXT_FONT, size=9)                     # hints
-        self.nav = tkfont.Font(root, family=TEXT_BOLD if korean else DISPLAY, size=11 if korean else 9)  # menu
-        self.icon = tkfont.Font(root, family=ICONS, size=15)                         # menu and check glyphs
-        self.icon_small = tkfont.Font(root, family=ICONS, size=12)                   # glyphs inside rows
-        tab = (TEXT_BOLD, 10) if korean else (DISPLAY, 8)
-        self.dialog_tab = tkfont.Font(root, family=tab[0], size=tab[1])              # a dialog's title tab
-        self.dialog_title = tkfont.Font(root, family=TEXT_BOLD, size=13)             # a dialog's question
+        self.tab = tkfont.Font(root, family=TEXT_BOLD, size=10)                      # a choice in a row of tabs
+        self.icon_small = tkfont.Font(root, family=ICONS, size=12)                   # the chevron after a link
+        self.dialog_title = tkfont.Font(root, family=TEXT_FONT, size=13, weight="bold")  # a dialog's question
         self.dialog_button = tkfont.Font(root, family=TEXT_BOLD, size=10)            # a dialog's buttons
-        self.dialog_glyph = tkfont.Font(root, family=ICONS, size=24)                 # the glyph in its ring
         self.language = language
 
 
