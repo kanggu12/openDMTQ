@@ -8,8 +8,10 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import signal
+import stat
 import struct
 import subprocess
 import tempfile
@@ -44,6 +46,8 @@ class Workshop:
         self.signed = b"signed"
         # keytool's command lines and environments, as it was run.
         self.keytool_runs = []
+        # The signer's command lines, with the arguments its file held and that file's mode, as it was run.
+        self.signer_runs = []
 
     def path(self, rel):
         return os.path.join(self.apk, rel)
@@ -60,6 +64,13 @@ class Workshop:
             return json.load(f)
 
     def run(self, cmd, *args, **kwargs):
+        if cmd[0] == "java" and cmd[1].startswith("@"):
+            # Java's argument file (java @file): its arguments in double quotes, a backslash escaping what follows.
+            with open(cmd[1][1:], encoding="utf-8") as f:
+                held = [re.sub(r"\\(.)", r"\1", a) for a in re.findall(r'"((?:[^"\\]|\\.)*)"', f.read())]
+            self.signer_runs.append((list(cmd), held, stat.S_IMODE(os.stat(cmd[1][1:]).st_mode)))
+            cmd = ["java"] + held
+
         def arg(flag):
             return cmd[cmd.index(flag) + 1]
         if cmd[0] == "keytool":
@@ -141,6 +152,20 @@ class KeyTest(unittest.TestCase):
             # With the key in place the same app is current.
             w.write("keystore/opendmtq.jks", b"lost key")
             self.assertIsNone(builder.reason_to_build(HOST, w.base))
+
+    def test_the_signer_does_not_get_the_password_on_its_command_line(self):
+        # Every user of the machine can read a process's command line: the signer's arguments go in a file of this
+        # user's alone, gone once it has run.
+        with Workshop() as w:
+            w.build()
+            [(cmd, held, mode)] = w.signer_runs
+            with open(w.path("keystore/password.txt"), encoding="utf-8") as f:
+                password = f.read().strip()
+            self.assertFalse([part for part in cmd if password in part], cmd)
+            self.assertEqual(held[held.index("--ksPass") + 1], password)
+            self.assertEqual(held[:2], ["-jar", patch_apk.SIGNER])
+            self.assertEqual(mode, 0o600)
+            self.assertFalse(os.path.exists(cmd[1][1:]))
 
     def test_keytool_does_not_get_the_password_on_its_command_line(self):
         # A failed run's error (recorded in build.json, shown on the admin pages) and the process

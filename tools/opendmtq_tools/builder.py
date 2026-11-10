@@ -48,8 +48,9 @@ def write_status(state, host, **details):
 
 def short_reason(err):
     """One line for the owner: the patcher's own message, or which program failed. Never a failed
-    program's command line: keytool's and the signer's carry the signing key's password, and the
-    reason is shown on the admin pages and kept in a file everyone on the server PC can read."""
+    program's command line: the reason is shown on the admin pages and kept in a file everyone on the
+    server PC can read, and a command line may carry what neither should (the signing key's password
+    went on the signer's once; it goes in a file of its own now, pack_arm64.run_signer)."""
     if isinstance(err, (subprocess.CalledProcessError, subprocess.TimeoutExpired)):
         cmd = [str(c) for c in err.cmd] if isinstance(err.cmd, (list, tuple)) else str(err.cmd).split()
         program = os.path.basename(cmd[0]) if cmd else "a program"

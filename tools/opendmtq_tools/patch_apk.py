@@ -1015,12 +1015,9 @@ def build(args, host, out_dir):
                             tweaks=ARM32_TWEAKS + f"server {host}\n")
             unsigned = universal
         signed_dir = os.path.join(WORK, "signed")
-        # v1+v2+v3 so every Android version from 4.0 up accepts it; quiet unless it fails.
-        r = subprocess.run([JAVA, "-jar", SIGNER, "-a", unsigned, "-o", signed_dir, "--ks", ks,
-                            "--ksAlias", "opendmtq", "--ksPass", password, "--ksKeyPass", password],
-                           # Java writes in the system's code page, this program reads UTF-8: a message in another
-                           # language must not stop the build.
-                           capture_output=True, text=True, encoding="utf-8", errors="replace")
+        # v1+v2+v3 so every Android version from 4.0 up accepts it; quiet unless it fails. The key's password reaches
+        # the signer through a file only this user can read, not its command line (pack_arm64.run_signer).
+        r = pack_arm64.run_signer(unsigned, signed_dir, ks, password)
         if r.returncode != 0:
             sys.stderr.write(r.stdout + r.stderr)
             raise SystemExit("signing failed")

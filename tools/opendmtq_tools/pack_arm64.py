@@ -129,15 +129,42 @@ def pack(src_apk, unsigned_apk, bundle, abi, only_64bit, debuggable=False, tweak
     return len(guest_libs)
 
 
+def java_quoted(arg):
+    """One argument as a Java argument file holds it: in double quotes (spaces stay in it, # starts no comment), where the
+    launcher reads a backslash as an escape, so Windows' backslashes and any quote are escaped."""
+    return '"' + arg.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def run_signer(unsigned_apk, out_dir, keystore, password, alias="opendmtq"):
+    """The signer on unsigned_apk, into the folder out_dir: zip alignment and v1+v2+v3 signatures. Returns the finished
+    run, its output as text. The signer takes the key's password on its command line only (it hands it on to apksigner
+    as pass:, so apksigner's env: cannot reach it), and any user of the machine can read a process's command line: its
+    arguments go to Java in a file instead (java @file), readable by this user only and gone when the run is."""
+    args = ["-jar", SIGNER, "-a", unsigned_apk, "-o", out_dir, "--ks", keystore, "--ksAlias", alias,
+            "--ksPass", password, "--ksKeyPass", password]
+    # A folder of its own (mkdtemp's: this user's alone), so that no other program can put a file of its own there.
+    folder = tempfile.mkdtemp(prefix="opendmtq-sign-")
+    try:
+        path = os.path.join(folder, "signer.args")
+        text = "\n".join(java_quoted(a) for a in args) + "\n"
+        # The launcher reads the file's bytes as it reads its own command line: in Windows' ANSI code page there (a
+        # character it lacks turns out as on a command line), in the file system's encoding elsewhere.
+        data = text.encode("mbcs", "replace") if os.name == "nt" else os.fsencode(text)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        # Java writes in the system's code page, this program reads UTF-8: a message in another language must not stop
+        # the build.
+        return subprocess.run([JAVA, "@" + path], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    finally:
+        shutil.rmtree(folder, ignore_errors=True)
+
+
 def sign(unsigned_apk, out_apk, keystore, password, alias="opendmtq"):
     """Zip alignment and v1+v2+v3 signatures, as for the 32-bit builds."""
     work = tempfile.mkdtemp()
     try:
-        r = subprocess.run([JAVA, "-jar", SIGNER, "-a", unsigned_apk, "-o", work, "--ks", keystore,
-                            "--ksAlias", alias, "--ksPass", password, "--ksKeyPass", password],
-                           # Java writes in the system's code page, this program reads UTF-8: a message in another
-                           # language must not stop the build.
-                           capture_output=True, text=True, encoding="utf-8", errors="replace")
+        r = run_signer(unsigned_apk, work, keystore, password, alias)
         if r.returncode != 0:
             sys.stderr.write(r.stdout + r.stderr)
             raise SystemExit("pack_arm64: signing failed")

@@ -1,6 +1,8 @@
 """Tests for the runtime packer: what goes where in the app, on small files instead of a real game."""
 
 import os
+import shutil
+import subprocess
 import tempfile
 import unittest
 import zipfile
@@ -75,3 +77,31 @@ class ShimTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(os.path.isfile(pack_arm64.SIGNER) and shutil.which("keytool"), "needs the signer and Java (the tools image has them)")
+class RealSignerTest(unittest.TestCase):
+    """The pinned signer, run as a build runs it: its arguments in Java's argument file, the password in nothing a process
+    list shows."""
+
+    def test_an_app_comes_out_signed_with_the_key_through_the_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            # A folder with a space, a quote and a # in its name: the file keeps each argument whole.
+            here = os.path.join(d, 'my "server" #1')
+            os.makedirs(here)
+            app = os.path.join(here, "unsigned.apk")
+            with zipfile.ZipFile(app, "w") as z:
+                z.writestr("AndroidManifest.xml", manifest())
+                z.writestr("classes.dex", b"dex\n035\0" + bytes(100))
+            key = os.path.join(here, "opendmtq.jks")
+            password = "a-password_of-24-letters"
+            subprocess.run(["keytool", "-genkeypair", "-keystore", key, "-alias", "opendmtq", "-keyalg", "RSA", "-keysize", "2048",
+                            "-validity", "2", "-storepass:env", "PW", "-keypass:env", "PW", "-dname", "CN=signer test"],
+                           check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env={**os.environ, "PW": password})
+            out = os.path.join(here, "signed.apk")
+            pack_arm64.sign(app, out, key, password)
+            # Signed with that key (apksigner, in the signer's own jar, says whose certificate it carries).
+            r = subprocess.run([pack_arm64.JAVA, "-cp", pack_arm64.SIGNER, "com.android.apksigner.ApkSignerTool", "verify",
+                                "--print-certs", out], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn("certificate DN: CN=signer test", r.stdout)

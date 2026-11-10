@@ -374,7 +374,9 @@ hand.
 - The game's own protocol has no real authentication: the platform login trusts the phone's device id, and the game
   login the player id in its token. Anyone who reaches the port can make accounts and act as any player. `./opendmtq expose` puts the server on the
   internet ([internet.md](internet.md)).
-- The signing key's password is random per install and kept next to the key in `data/` (never tracked).
+- The signing key's password is random per install and kept next to the key in `data/` (never tracked). keytool reads
+  it from its environment, and the signer from a Java argument file only the server's user can read: neither has it on
+  its command line, which every user of the machine can see.
 
 ## Without containers
 

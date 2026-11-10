@@ -483,7 +483,8 @@ class ChildOutputTest(unittest.TestCase):
     a real Windows in another language shows it, so it is checked here."""
 
     def test_every_text_read_of_a_child_program_can_take_any_byte(self):
-        for rel in ("host/opendmtq_host/server.py", "host/opendmtq_host/folders.py", "tools/opendmtq_tools/importer.py", "tools/opendmtq_tools/patch_apk.py",
+        # The app's build reads the signer's output through pack_arm64.run_signer, the import 7-Zip's in importer.py.
+        for rel in ("host/opendmtq_host/server.py", "host/opendmtq_host/folders.py", "tools/opendmtq_tools/importer.py",
                     "tools/opendmtq_tools/pack_arm64.py", "tools/opendmtq_tools/admin/jobs.py"):
             with open(os.path.join(ROOT, rel), encoding="utf-8") as f:
                 text = f.read()
