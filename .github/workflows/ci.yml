@@ -71,6 +71,10 @@ jobs:
       # the same number of refreshes, and which go by the clock, and when each frame goes out by the clock.
       - name: Frame limits on computer displays
         run: c++ -std=c++20 -Wall -Wextra -Iarm32/src arm32/tests/host/pacing_math_test.cpp -o /tmp/pacing_math_test && /tmp/pacing_math_test
+      # Following the display (arm32/src/follow.cpp), with a display and a game the test plays: the steps down and back up
+      # on a computer's display, a phone's panel's steps as it follows the window, and the heat's.
+      - name: Following the display
+        run: c++ -std=c++20 -Wall -Wextra -Iarm32/src arm32/tests/host/follow_test.cpp arm32/src/follow.cpp -o /tmp/follow_test && /tmp/follow_test
 
       - name: Shell scripts
         run: |

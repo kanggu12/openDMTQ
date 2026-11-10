@@ -148,7 +148,7 @@ its own when a newer one is due too, and after the S26's adaptive panel went to 
 pacing; otherwise the game's own stands (Technika Q asks for 1). With stats on, a line reports the
 intervals at which frames reached the screen and how many came later than asked.
 
-**Frame rate** (`src/pacing.cpp`, `debug.arm32.framerate` unset). The frame rate follows the
+**Frame rate** (`src/follow.cpp`, fed by `src/pacing.cpp`; `debug.arm32.framerate` unset). The frame rate follows the
 display, once the cap tweak has found its field and the game's target can be read (until then it
 is 60, and the window asks for 60 Hz). The game's window, the one its EGL surface draws on, asks
 for 144 Hz, the most there is any use for, and the panel answers with the nearest it has: once that has
@@ -165,7 +165,9 @@ frames came at (under 97 % falls short). Three short windows without a good one 
 down the list for the rest of the run: the window asks for that rate, and the frame rate is the panel's
 refresh rate or the highest whole fraction of it not above that (72 fps on a panel that stays at 144 Hz, and
 those are paced). The phone's own word that it is hot (thermal status SEVERE or worse) takes a step
-too, every half minute while it lasts.
+too, every half minute while it lasts. `tests/host/follow_test.cpp` plays these on the build machine, with a
+display and a game of its own: a phone's 120 Hz panel down to 90, 72 and 60, one that stays at 120 Hz, the heat's
+steps, and a computer's display (below).
 
 On a computer the display keeps its own rate whatever a window asks, and its compositor gives no frame
 times. The player reads the rate of the display its window is on and that display's refreshes from the
@@ -258,7 +260,7 @@ cost is in the log.
 **The shim** (`shim/shim.cpp`, `debug.arm32.shim`, on). Phones that can run 32-bit apps never start this
 runtime: the manifest's `use32bitAbi` sends them to `lib/armeabi-v7a`, and the game's own libraries run
 natively, which is faster. They get `libopendmtq.so` there, with live view and the frame rate from the same
-source files (`live.cpp`, `live_ts.cpp`, `pacing.cpp`, `window_rate.cpp`), built for 32-bit ARM. A line the
+source files (`live.cpp`, `live_net.cpp`, `live_ts.cpp`, `pacing.cpp`, `follow.cpp`, `window_rate.cpp`), built for 32-bit ARM. A line the
 patcher adds to `UnityPlayer` loads it right after `libunity.so`, and it rewrites a few imports in the
 global offset tables of `libunity.so`, `libil2cpp.so` and `libopenal.so`: EGL for pictures and pacing, `dlopen`
 and `dlsym` to reach the later libraries and FMOD's OpenSL ES, and `slCreateEngine`. OpenSL ES objects keep a
