@@ -65,6 +65,10 @@ one that only fixes raises the patch number. Each release's section here is its 
 - `GET /broadcasts` and `PUT /broadcasts` in the admin API read and change those settings.
 - The admin pages' Players page marks a switch kept on while broadcasts are off for the server, and the Logs page
   records broadcasts turned on or off and changes to their settings.
+- Every message box of the PC client, the player for Windows and the Windows bundle is drawn as the launcher's dialogs:
+  the player failing to start from its own folder and the bundle's `OpenDMTQ.exe` missing its parts show the
+  launcher's dialog over the site's page in place of Windows' plain box, and an error nobody expected in the launcher
+  or the installer ends in it too, with where the log is.
 - An upgrade is tested in CI and in the local gate: the last release's images are used as people use them, then the new ones start on
   the same data and must have lost nothing (`tests/upgrade/run.sh`).
 
