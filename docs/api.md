@@ -43,8 +43,8 @@ make another. A write token can make tokens too (`POST /tokens`), for the same a
 
 | Scope | May |
 |:---:|:---|
-| `read` | Every `GET` route but a backup's download: everything the pages show |
-| `write` | Everything the pages do too, and a backup's download, which holds the accounts' password hashes and the app's signing key |
+| `read` | Every `GET` route but three: a backup's download, and the setup's looks at the server PC's folders (`GET /setup/folder`, `GET /setup/what`) |
+| `write` | Everything the pages do too, and those three: a backup holds the accounts' password hashes and the app's signing key, and the setup's looks show any folder the server can read |
 
 A token belongs to the admin who made it. It works while that admin can open the admin pages: the owner's (`ADMIN_USER`
 in `.env`) while the pages have a password, an account's while it is enabled and has admin rights. When the account is
@@ -905,7 +905,7 @@ Makes a token for the same admin as the token that asks. The token comes back th
 Body (JSON):
 
 - `name` (string): What it is for, 1 to 40 characters.
-- `scope` (string): What it may do: read only answers GET. One of `read`, `write`.
+- `scope` (string): What it may do: read only answers GET, and not a backup's download or a look at the server PC's folders. One of `read`, `write`.
 
 Answer: `201` with [TokenMade](#tokenmade).
 
@@ -1304,8 +1304,8 @@ The setup's four steps.
 |:---|:---:|:---|
 | [`GET /setup`](#get-setup) | read | The setup's four steps: what each has and whether it is done. |
 | [`GET /setup/found`](#get-setupfound) | read | The game's files found on the server PC: in the home folder, Downloads, the Desktop, Documents and OneDrive's folders. |
-| [`GET /setup/folder`](#get-setupfolder) | read | A folder of the server PC, as the setup's folder picker shows it. |
-| [`GET /setup/what`](#get-setupwhat) | read | What one file or folder of the server PC is to the import. |
+| [`GET /setup/folder`](#get-setupfolder) | write | A folder of the server PC, as the setup's folder picker shows it. |
+| [`GET /setup/what`](#get-setupwhat) | write | What one file or folder of the server PC is to the import. |
 | [`POST /setup/import`](#post-setupimport) | write | Imports the game's files from a folder or file on the server PC: the app, the client data, the song data. |
 | [`PUT /setup/address`](#put-setupaddress) | write | Changes the address phones use to another private address of the server PC, and starts the server again for it. |
 | [`POST /setup/player`](#post-setupplayer) | write | Makes an account for a player, as the setup's players step does: its password is made. |
@@ -1329,23 +1329,23 @@ Refusals:
 
 #### `GET /setup/folder`
 
-A folder of the server PC, as the setup's folder picker shows it. A host install only. A file's path gives its folder, with the file picked. With it the places the picker goes to in one step, as the setup page shows them.
+A folder of the server PC, as the setup's folder picker shows it. A host install only, and a write token's: any folder the server can read. A file's path gives its folder, with the file picked. With it the places the picker goes to in one step, as the setup page shows them.
 
 Parameters:
 
-- `path` (query, string, optional): The folder, as typed or pasted: quotes around it go, and ~ is the home folder. $NAME and %NAME% stay as they are written. A path on another computer is refused. Left out: Downloads.
+- `path` (query, string, optional): The folder, as typed or pasted: quotes around it go, and ~ is the home folder. $NAME and %NAME% stay as they are written. A path on another computer is refused, and on Windows any path but a drive letter's. Left out: Downloads.
 
 Answer: `200` with [Folder](#folder).
 
 Refusals:
 
 - `404 host_only`: Not a host install.
-- `400 network_path`: A path on another computer (a network share).
+- `400 network_path`: A path on another computer (a network share), or on Windows not a drive letter's.
 - `404 cannot_open`: The folder is not there, or cannot be read: nearest names the folder the page opens instead.
 
 #### `GET /setup/what`
 
-What one file or folder of the server PC is to the import. A host install only. An archive's look can take 7-Zip a second.
+What one file or folder of the server PC is to the import. A host install only, and a write token's, as for /setup/folder. An archive's look can take 7-Zip a second.
 
 Parameters:
 
@@ -1356,7 +1356,7 @@ Answer: `200` with [What](#what).
 Refusals:
 
 - `404 host_only`: Not a host install.
-- `400 network_path`: A path on another computer (a network share).
+- `400 network_path`: A path on another computer (a network share), or on Windows not a drive letter's.
 
 #### `POST /setup/import`
 
@@ -1373,7 +1373,7 @@ Refusals:
 
 - `404 host_only`: Not a host install: use ./opendmtq import.
 - `400 no_path`: No path.
-- `400 network_path`: A path on another computer (a network share).
+- `400 network_path`: A path on another computer (a network share), or on Windows not a drive letter's.
 - `404 path_not_found`: Nothing at the path.
 - `400 cannot_read`: It cannot be read.
 - `400 too_wide`: A whole drive or the home folder.

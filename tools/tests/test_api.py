@@ -597,6 +597,9 @@ def CASES():
         C("setup_what", "GET", "/setup/what?path=~/Downloads/game", 200, setup=host_install),
         C("setup_what", "GET", "/setup/what", 400, "bad_query", setup=host_install),
         C("setup_what", "GET", "/setup/what?path=//nas/share/game.apk", 400, "network_path", setup=host_install),
+        # Any folder the server can read: more than a token that only watches may look through.
+        C("setup_folder", "GET", "/setup/folder?path=~/Downloads", 403, "read_only", token="reader", setup=host_install),
+        C("setup_what", "GET", "/setup/what?path=~/Downloads/game", 403, "read_only", token="reader", setup=host_install),
         C("setup_import", "POST", "/setup/import", 202, json={"path": "~/Downloads/game"}, setup=lambda inst: host_install(inst) + [quick_jobs()]),
         C("setup_import", "POST", "/setup/import", 404, "path_not_found", json={"path": "~/nowhere"}, setup=host_install),
         C("setup_import", "POST", "/setup/import", 400, "network_path", json={"path": "file://nas/share/DMTQ"}, setup=host_install),
@@ -739,6 +742,8 @@ class RoutesTest(unittest.TestCase):
                 else:
                     self.assertNotIn(r.status_code, (401, 403), route.name)
             self.assertEqual(api_routes.by_name()["backup_download"].scope, "write")
+            # The setup's looks at the server PC's folders too: any folder the server can read.
+            self.assertEqual({api_routes.by_name()[n].scope for n in ("setup_folder", "setup_what")}, {"write"})
 
     def test_a_number_past_the_databases_largest_is_no_such_thing(self):
         # Every route with a number in its path: past the largest the database keeps, it matches no route (404), where it

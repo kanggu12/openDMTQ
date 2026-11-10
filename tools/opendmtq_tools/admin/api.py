@@ -47,7 +47,7 @@ _refused_lock = threading.Lock()
 INT_MAX = api_routes.INT_MAX
 
 # The scope each route takes, by its endpoint: a read token is refused on a write route, whatever its method (a
-# backup's download is a GET that takes a write token).
+# backup's download, and the setup's looks at the server PC's folders, are GETs that take a write token).
 SCOPES = {"api_" + route.name: route.scope for route in api_routes.ROUTES}
 
 # The routes that take a file, with the page's limit for the same file (core.AdminRequest reads these); a backup waits on
@@ -104,8 +104,8 @@ def check_token():
     # The route's own scope; an address no route has (answered 404 or 405 next) by its method.
     needs = SCOPES.get(request.endpoint) or ("read" if request.method in READS else "write")
     if needs == "write" and row["scope"] != "write":
-        return json_error(403, "read_only", "This is a read token, and this route takes a write token: every change, and a "
-                          "backup's download.")
+        return json_error(403, "read_only", "This is a read token, and this route takes a write token: every change, a "
+                          "backup's download, and a look at the server PC's folders.")
     # Who acts, for the log of changes (core.changed): the admin, and which of their tokens.
     g.api_token, g.api_who = row, f"{row['admin']} ({row['name']})"
     tokens.touch(row)

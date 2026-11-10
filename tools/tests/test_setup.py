@@ -459,6 +459,18 @@ class FilesOnThisPcTest(unittest.TestCase):
                     setup.clean_path(typed)
         # This PC's own file:// addresses stay.
         self.assertEqual(setup.clean_path("file://localhost/home/x"), "/home/x")
+        # Windows' own forms that reach a share by rules of their own, and a path from the top of no named drive: on
+        # Windows only a drive letter's path is taken (a link to the setup could otherwise send the PC to sign in there).
+        with mock.patch("os.path", ntpath), mock.patch.object(setup.os, "name", "nt"), \
+                mock.patch.dict(os.environ, {"USERPROFILE": "C:\\Users\\me"}):
+            for typed in ("\\??\\UNC\\nas\\share", "/??/UNC/nas/share", "\\??\\UNC\\nas\\share\\..\\..\\..",
+                          "file:///%3F%3F/UNC/nas/share", "\\Device\\Mup\\nas\\share", "\\Users\\me"):
+                with self.assertRaises(setup.Refused, msg=typed) as caught:
+                    setup.clean_path(typed)
+                self.assertEqual((caught.exception.status, caught.exception.code), (400, "network_path"), typed)
+            # A drive letter's, in any of the ways it is written, still opens.
+            self.assertEqual(setup.clean_path("c:/Users/me/../me/Downloads"), "c:\\Users\\me\\Downloads")
+            self.assertEqual(setup.clean_path("D:"), "D:\\")
 
     def test_the_picker_says_why_it_will_not_open_a_network_path(self):
         with HostInstall() as inst:

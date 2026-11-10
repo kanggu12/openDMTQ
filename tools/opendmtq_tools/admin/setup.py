@@ -232,7 +232,8 @@ def clean_path(text):
     it in quotes), a file:// address made a path, ~ made the home folder, a drive letter alone made its top folder, and a
     path from no drive's top or root taken from the home folder (Downloads/DMTQ). Empty when nothing is left. $NAME and
     %NAME% stay as they are written: a path never brings out a value of this program's environment (its passwords are
-    there). Refused (network_refusal): a path on another computer, on any system."""
+    there). Refused (network_refusal): a path on another computer, on any system, and on Windows any path but a drive
+    letter's (C:\\...)."""
     # No system's paths hold a NUL, and the calls that read folders raise ValueError on one rather than OSError.
     text = (text or "").replace("\0", "").strip()
     while len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
@@ -264,6 +265,11 @@ def clean_path(text):
     text = os.path.normpath(text)
     # Once more on what came out: no way of writing it may end on another computer.
     if re.match(r"[\\/]{2}", text):
+        raise network_refusal()
+    # On Windows a drive letter's path and nothing else. Windows passes other forms by rules of its own: \??\UNC\host\share
+    # (or /??/..., the same once normalised) reaches a share as two backslashes do. A path from the top of no named drive
+    # (\Users) goes with them: the picker's own paths all start with a drive letter.
+    if os.name == "nt" and not re.match(r"[A-Za-z]:\\", text):
         raise network_refusal()
     return text
 

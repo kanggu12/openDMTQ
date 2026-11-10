@@ -798,7 +798,8 @@ ROUTES = [
     Route("POST", "/tokens", "write", "tokens_create", "Tokens", "Makes a token for the same admin as the token that asks.",
           "The token comes back this once; only its hash is kept.",
           body=[Field("name", "string", "What it is for, 1 to 40 characters."),
-                Field("scope", "string", "What it may do: read only answers GET.", enum=["read", "write"])],
+                Field("scope", "string", "What it may do: read only answers GET, and not a backup's download or a look at the "
+                      "server PC's folders.", enum=["read", "write"])],
           answer="TokenMade", status=201,
           errors=[(400, "bad_name", "No name, or one over 40 characters.")]),
     Route("DELETE", "/tokens/{token}", "write", "token_revoke", "Tokens", "Revokes a token for good. It may be the token that asks.",
@@ -900,25 +901,28 @@ ROUTES = [
     Route("GET", "/setup/found", "read", "setup_found", "Setup", "The game's files found on the server PC: in the home folder, Downloads, the Desktop, Documents and OneDrive's folders.",
           "A host install only. Each of those places is looked in, and each folder in it.", answer="FoundList",
           errors=[(404, "host_only", "Not a host install.")]),
-    Route("GET", "/setup/folder", "read", "setup_folder", "Setup", "A folder of the server PC, as the setup's folder picker shows it.",
-          "A host install only. A file's path gives its folder, with the file picked. With it the places the picker goes to in one "
-          "step, as the setup page shows them.",
+    # The two looks at the server PC's folders take a write token: they show any folder the server can read, more than a
+    # token that only watches the pages may see.
+    Route("GET", "/setup/folder", "write", "setup_folder", "Setup", "A folder of the server PC, as the setup's folder picker shows it.",
+          "A host install only, and a write token's: any folder the server can read. A file's path gives its folder, with the "
+          "file picked. With it the places the picker goes to in one step, as the setup page shows them.",
           query=[Field("path", "string", "The folder, as typed or pasted: quotes around it go, and ~ is the home folder. $NAME and "
-                       "%NAME% stay as they are written. A path on another computer is refused. Left out: Downloads.", optional=True)],
+                       "%NAME% stay as they are written. A path on another computer is refused, and on Windows any path but a "
+                       "drive letter's. Left out: Downloads.", optional=True)],
           answer="Folder",
-          errors=[(404, "host_only", "Not a host install."), (400, "network_path", "A path on another computer (a network share)."),
+          errors=[(404, "host_only", "Not a host install."), (400, "network_path", "A path on another computer (a network share), or on Windows not a drive letter's."),
                   (404, "cannot_open", "The folder is not there, or cannot be read: nearest names the folder the page opens instead.")]),
-    Route("GET", "/setup/what", "read", "setup_what", "Setup", "What one file or folder of the server PC is to the import.",
-          "A host install only. An archive's look can take 7-Zip a second.",
+    Route("GET", "/setup/what", "write", "setup_what", "Setup", "What one file or folder of the server PC is to the import.",
+          "A host install only, and a write token's, as for /setup/folder. An archive's look can take 7-Zip a second.",
           query=[Field("path", "string", "The file or folder, as for /setup/folder.")], answer="What",
-          errors=[(404, "host_only", "Not a host install."), (400, "network_path", "A path on another computer (a network share).")]),
+          errors=[(404, "host_only", "Not a host install."), (400, "network_path", "A path on another computer (a network share), or on Windows not a drive letter's.")]),
     Route("POST", "/setup/import", "write", "setup_import", "Setup", "Imports the game's files from a folder or file on the server PC: the app, the client data, the song data.",
           "A host install only. Then the song list is made. Song data alone is imported as the songs whatever songs says.",
           body=[Field("path", "string", "The folder or file."),
                 Field("songs", "boolean", "True (the default) to import the song data too.", optional=True)],
           answer="JobAnswer", status=202,
           errors=[(404, "host_only", "Not a host install: use ./opendmtq import."), (400, "no_path", "No path."),
-                  (400, "network_path", "A path on another computer (a network share)."),
+                  (400, "network_path", "A path on another computer (a network share), or on Windows not a drive letter's."),
                   (404, "path_not_found", "Nothing at the path."), (400, "cannot_read", "It cannot be read."),
                   (400, "too_wide", "A whole drive or the home folder."), (409, "busy", "An import or a build runs.")]),
     Route("PUT", "/setup/address", "write", "setup_address", "Setup", "Changes the address phones use to another private address of the server PC, and starts the server again for it.",
