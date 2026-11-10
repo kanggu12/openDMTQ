@@ -922,6 +922,13 @@ check("ALL COMBO is dated by the play that made it",
 _, headers, _ = request(plain, f"{SITE}/opendmtq/style.css", headers={"Accept-Encoding": "gzip"})
 status, _, body = request(plain, f"{SITE}/opendmtq/style.css", headers={"Accept-Encoding": "gzip", "If-None-Match": headers["ETag"]})
 check("the stylesheet revalidates", status == 304 and not body, f"{status}, {len(body)} bytes")
+# So does the live page's script, a file of its own and not part of every page: compressed, and named by its version, so
+# that a browser that kept it gets the new one with the next page after an update.
+named = re.search(r'<script src="(/opendmtq/live\.js\?v=\d+)"></script>', request(portal, SITE + "/opendmtq/live.php")[2].decode())
+_, headers, body = request(plain, SITE + named.group(1), headers={"Accept-Encoding": "gzip"}) if named else (0, {}, b"")
+status, _, again = request(plain, SITE + named.group(1), headers={"Accept-Encoding": "gzip", "If-None-Match": headers.get("ETag", "")}) if named else (0, {}, b"")
+check("the live page's script comes compressed, and revalidates", headers.get("Content-Encoding") == "gzip" and status == 304 and not again,
+      f"{named and named.group(1)}, {headers.get('Content-Encoding')}, {status}")
 
 # The video player comes from this server, on both of the admin's ways in: a local network has no internet.
 HLS = "/opendmtq/hls/hls-1.5.17.min.js"

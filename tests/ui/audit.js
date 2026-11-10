@@ -332,7 +332,7 @@ async function portalFlows(contexts) {
   // The site's answers, its pages, files and JSON alike, are never shown inside another site's page, never taken for
   // another type than they say, and never tell another site the address of the page they were on (site.conf).
   const guarded = ['x-frame-options', 'x-content-type-options', 'referrer-policy'];
-  const fetched = await front.evaluate(async names => Promise.all(['/opendmtq/style.css', '/opendmtq/thumbs.js', '/opendmtq/client.php?about']
+  const fetched = await front.evaluate(async names => Promise.all(['/opendmtq/style.css', '/opendmtq/live.js', '/opendmtq/client.php?about']
     .map(async u => { const r = await fetch(u); return names.map(n => r.headers.get(n)).join(' '); })), guarded);
   const said = [guarded.map(n => arrived.headers()[n]).join(' '), ...fetched];
   check('the site is never framed, sniffed or named to another site', said.every(s => s === 'DENY nosniff same-origin'), JSON.stringify(said));
