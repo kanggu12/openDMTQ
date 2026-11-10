@@ -18,7 +18,12 @@ import urllib.request
 BASE = sys.argv[1].rstrip("/")
 # The key the login reply gives the client, which then signs every request with it.
 KEY = "DMQGLBlive1"
+# The device id of the server's own check account (./opendmtq check logs in with it): never a player in a ranking.
+CHECK_UDID = "opendmtq-check"
 failures = 0
+# Every reply the RPC gave in this run, as (the method it answers, its error code or None): the checks at the end look at
+# all of them, whichever request a check above was about.
+answered = []
 
 
 def check(name, ok, detail=""):
@@ -27,6 +32,27 @@ def check(name, ok, detail=""):
     if not ok:
         failures += 1
     print(("PASS " if ok else "FAIL ") + name + (f" | {detail}" if detail and not ok else ""), flush=True)
+
+
+def keep_answers(sent, data):
+    """Notes each reply of one RPC request in `answered`, by the place of its call in what was sent."""
+    try:
+        replies = json.loads(data)
+    except ValueError:
+        # Not JSON (an empty body, for one): no reply to note; the check of that request says what is wrong with it.
+        return
+    try:
+        calls = json.loads(sent) if sent else None
+    except ValueError:
+        calls = None
+    # A body that was no list of calls has no method at any place.
+    calls = calls if isinstance(calls, list) else []
+    for i, reply in enumerate(replies if isinstance(replies, list) else []):
+        call = calls[i] if i < len(calls) else None
+        method = call.get("method") if isinstance(call, dict) else None
+        error = reply.get("error") if isinstance(reply, dict) else None
+        # The code the client reads; an error of another shape is kept whole, so that it shows at the end too.
+        answered.append((method, error.get("code") if isinstance(error, dict) else error))
 
 
 def post(path, body, headers=None):
@@ -38,9 +64,13 @@ def post(path, body, headers=None):
     req = urllib.request.Request(BASE + path, data=body, headers=headers or {}, method="POST" if body is not None else "GET")
     try:
         with opener.open(req, timeout=15) as r:
-            return r.status, dict(r.headers), r.read()
+            status, got, data = r.status, dict(r.headers), r.read()
     except urllib.error.HTTPError as e:
-        return e.code, dict(e.headers), e.read()
+        status, got, data = e.code, dict(e.headers), e.read()
+    # Every answer of the RPC, also those of the requests below that post to it without rpc().
+    if path == "/DMQ/rpc":
+        keep_answers(body, data)
+    return status, got, data
 
 
 def rpc(calls, signed=True):
@@ -57,6 +87,31 @@ def one(method, params, signed=True):
     """One call's result and error."""
     status, reply = rpc([(method, params)], signed)
     return reply[0]["result"], reply[0]["error"]
+
+
+def phone(udid, name):
+    """A phone's account as the game makes it: the platform login by its device id, the game's login, the name the
+    player picks. Its guid, as a number."""
+    _, _, body = post("/api/accounts/v3/global/login_dmq", f"app_id=576&udid={udid}".encode(),
+                      {"Content-Type": "application/x-www-form-urlencoded"})
+    token = json.loads(body)["value"]["access_token"]
+    result, _ = one("user.loginV2", [token, " ", "", "1.3.4", "ANDROID", "KR"])
+    guid = int(result["guid"])
+    one("user.setNickname", [guid, name])
+    return guid
+
+
+def notes(breaks=0, at1=0, at90=0, at100=0):
+    """A play's judgementStat, as the client counts the notes: place 1 the breaks, 2 those judged 1 %, 3 to 12 those judged
+    10 % to 100 %; place 0 the client fills with something the server does not read."""
+    stat = [0] * 13
+    stat[1], stat[2], stat[11], stat[12] = breaks, at1, at90, at100
+    return stat
+
+
+def save(guid, chart, stat):
+    """A signed save of a play, as the result screen sends it; its result and error."""
+    return one("game.savePlayResult", [guid, chart, stat, sum(stat[2:]), 0, [0, 0, 0], [0, 0, 0], "t"])
 
 
 # ------------------------------------------------------------------ the start of a phone
@@ -144,6 +199,9 @@ worse = [0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 90]
 saved, _ = one("game.savePlayResult", [int(guid), 1, worse, 50, 0, [0, 0, 0], [0, 0, 0], "t"])
 check("a worse play is no new record and changes no best", saved["is_new_record"] is False and saved["is_first_pattern"] is False
       and saved["allcom_yn"] == "N" and saved["new_achievements"] == [])
+# Its accuracy is 90.0 % exactly (90 notes at 100 %, 10 breaks), the least an A takes.
+check("the worse play, 90 notes at 100 % and 10 breaks, is an A at exactly 90.0 %: 18,000 points, no bonus",
+      saved["judgement_name"] == "A" and saved["score"] == 18000 and saved["bonus_score"] == 0, json.dumps(saved)[:200])
 best = one("game.getOwnPatternScore", [int(guid)])[0]
 check("the best stays the perfect one, with its accuracy in percent", best == [{"guid": int(guid), "pattern_id": 1, "score": 65000,
       "judgement_name": "S", "allcom_yn": "Y", "perfect_yn": "Y", "judgement": 100}], json.dumps(best))
@@ -159,11 +217,48 @@ mine = one("game.getLineScoreMyRankWithLevel", [int(guid), 1, 3])[0]
 check("the player's own row on the song's ranking", len(mine["scores"]) == 1 and mine["scores"][0]["rank"] == 1)
 check("no row on a line they did not play (OUT OF RANK)", one("game.getLineScoreMyRankWithLevel", [int(guid), 1, 5])[0] == {"scores": []})
 
+# ------------------------------------------------------------------ several players
+
+# Three more phones and the server's own check account play song 2's 2LINE NORMAL (chart 10): Ann and Ben tie, Cid is
+# behind with a play of mixed judgements, and the check account would lead if it counted. The accounts are made in
+# this order, so Ann's is older than Ben's and Cid's.
+ann, ben, cid = phone("protocol-phone-a", "Ann"), phone("protocol-phone-b", "Ben"), phone("protocol-phone-c", "Cid")
+checker = phone(CHECK_UDID, "Check")
+# Each row of a ranking as (rank, who, score), who by the names above.
+names = {int(guid): "Proto", ann: "Ann", ben: "Ben", cid: "Cid", checker: "check account"}
+rows = lambda reply: [(r["rank"], names.get(r["guid"], r["guid"]), r["score"]) for r in reply]
+# 100 notes at 100 % each: 65,000 apiece, a tie.
+for player in (ann, ben):
+    save(player, 10, notes(at100=100))
+# 70 notes at 100 %, 20 at 90 % and 10 at 1 %: 70 x 200 + 20 x 180 + 10 x 1 points and ALL COMBO's 15,000 (no break).
+mixed, error = save(cid, 10, notes(at1=10, at90=20, at100=70))
+check("a play of mixed judgements, 70 notes at 100 %, 20 at 90 % and 10 at 1 %: 32,610 with the ALL COMBO bonus, a B",
+      error is None and mixed["score"] == 32610 and mixed["bonus_score"] == 15000 and mixed["judgement_name"] == "B"
+      and mixed["allcom_yn"] == "Y" and mixed["perfect_yn"] == "N", json.dumps(mixed)[:200])
+# The accuracy is the notes' mean judgement: (70 x 100 + 20 x 90 + 10 x 1) / 100 notes.
+best = one("game.getOwnPatternScore", [cid])[0]
+check("its accuracy is the notes' mean judgement, 88.1 %", best == [{"guid": cid, "pattern_id": 10, "score": 32610,
+      "judgement_name": "B", "allcom_yn": "Y", "perfect_yn": "N", "judgement": 88.1}], json.dumps(best))
+# 200 notes at 100 %: 85,000, more than anybody's.
+save(checker, 10, notes(at100=200))
+
+board = rows(one("game.getLineScoreRangeWithLevel", [2, 3, 1, 5])[0]["scores"])
+check("a tie goes to the older account, and the server's check account is never ranked",
+      board == [(1, "Ann", 65000), (2, "Ben", 65000), (3, "Cid", 32610)], str(board))
+# The client asks for ranks from..to as from and to - from + 1.
+board = rows(one("game.getLineScoreRangeWithLevel", [2, 3, 2, 2])[0]["scores"])
+check("a song's ranking from rank 2 with a count of 2 has two rows", board == [(2, "Ben", 65000), (3, "Cid", 32610)], str(board))
+# TOTAL: Proto, Ann and Ben at 65,000 each in the order of their accounts, Cid fourth.
+board = rows(one("game.getLineTopRankWithLevel", [0, 1, 1, [cid]])[0]["ranks"])
+check("TOTAL's first rank, then the asking player's own row (MY RANK)", board == [(1, "Proto", 65000), (4, "Cid", 32610)], str(board))
+board = rows(one("game.getLineTopRankWithLevel", [0, 1, 20, [checker]])[0]["ranks"])
+check("the check account is not in TOTAL, not even as the row it asks for", board == [(1, "Proto", 65000), (2, "Ann", 65000),
+      (3, "Ben", 65000), (4, "Cid", 32610)], str(board))
+
 # ------------------------------------------------------------------ what the client also relies on
 
 result, error = one("game.noSuchMethod", [])
 check("a method this server does not have is handled without a popup (SVC.05008)", result is None and error["code"] == "SVC.05008")
-check("SVC.001 is never sent: the client would quit for an update", all(r["error"] is None or r["error"]["code"] != "SVC.001" for r in reply))
 status, _, body = post("/DMQ/rpc", json.dumps({"id": 1, "method": "x", "params": []}).encode(), {"Content-Type": "application/json"})
 check("a JSON object instead of a list answers each of its places without an id", status == 200
       and [r["id"] for r in json.loads(body)] == [None, None, None])
@@ -184,6 +279,17 @@ check("the game's window asks a stranger to sign in to the site first", status =
 check("the help page the SDK opens answers", post("/www/mobile/help", None)[0] == 200)
 check("an address the game never asks for is a 404", post("/DMQ/nothing", None)[0] == 404)
 check("the game server's code is never served", all(post(p, None)[0] in (403, 404) for p in ("/game/src/rpc.php", "/src/config.php", "/game/index.php")))
+
+# ------------------------------------------------------------------ every reply of the run
+
+# The errors among all the replies above. The unknown method's SVC.05008 must be among them: without it, the replies
+# were not looked at and the checks below would pass on nothing.
+errors = [(method, code) for method, code in answered if code is not None]
+check("SVC.001 is never sent: the client would quit for an update", ("game.noSuchMethod", "SVC.05008") in errors
+      and all(code != "SVC.001" for _, code in errors), f"{len(answered)} replies, errors: {errors}")
+# Any other code opens the client's "retry?" popup, whose other button quits the game: nothing above may cause one.
+check("no reply of the run opens the client's retry popup: every error is SVC.05008",
+      all(code == "SVC.05008" for _, code in errors), f"errors: {errors}")
 
 print(f"{'FAIL' if failures else 'PASS'} the game server's contract: {failures} failure(s)", flush=True)
 sys.exit(1 if failures else 0)
