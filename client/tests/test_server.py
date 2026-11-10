@@ -4,6 +4,7 @@ import os
 import socket
 import threading
 import urllib.error
+from unittest import mock
 
 from opendmtq_client import server as srv
 from tests import stub
@@ -53,7 +54,8 @@ class Talking(Folder):
         self.assertEqual(caught.exception.params["base"], self.site.url)
 
     def test_nobody_there(self):
-        with self.assertRaises(srv.ServerError) as caught:
+        # Port 9 refuses on most machines, but under WSL nothing answers at all: a second is wait enough for that.
+        with mock.patch.object(srv, "TIMEOUT", 1), self.assertRaises(srv.ServerError) as caught:
             srv.about("http://127.0.0.1:9")
         # Refused, or no answer at all, as this computer's network has it: either way the server was not reached.
         self.assertIn(caught.exception.key, ("error.server.refused", "error.server.timeout", "error.server.unreachable"))

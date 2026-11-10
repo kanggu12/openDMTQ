@@ -124,12 +124,13 @@ class Look(unittest.TestCase):
                 self.assertGreaterEqual(contrast(theme.FAINT, fill), 4.5, (look, "disabled", fill))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class KoreanParticles(unittest.TestCase):
     def test_no_mechanical_particles(self):
         # "(으)로", "을(를)" and the like read as a form being filled in: the words are put so that none is needed.
         for key, (_en, ko) in i18n.TEXT.items():
             self.assertIsNone(re.search(r"\((으|을|를|이|가|은|는|와|과)\)|(을|이|은|와)\((를|가|는|과)\)", ko), key)
+
+
+if __name__ == "__main__":
+    unittest.main()

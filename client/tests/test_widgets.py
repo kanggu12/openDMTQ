@@ -80,9 +80,6 @@ class Backdrop(unittest.TestCase):
         self.assertIs(art._tops[key], before)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class BuildPictures(unittest.TestCase):
     """The pictures the Windows build makes from the launcher's drawing code (packaging/windows/assets.py)."""
@@ -113,3 +110,7 @@ class BuildPictures(unittest.TestCase):
         finally:
             sys.argv = saved
             shutil.rmtree(out, ignore_errors=True)
+
+
+if __name__ == "__main__":
+    unittest.main()
