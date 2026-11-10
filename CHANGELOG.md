@@ -6,10 +6,22 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-11-11
+
 ### Changed
 
+- The player for Windows draws what it shows over the game in the game's own look and at the game's size. A bar comes
+  down when the pointer touches the game's top edge (or a finger draws down from it), with full screen and an X; the X
+  asks in the game's own dialog, Keep playing or Quit the game, so that a click by mistake does not end a song, and the
+  window's own X asks the same. The broadcast notice takes the same look. The menu is gone, Alt+F4 does nothing, and
+  holding Esc no longer does anything: Esc is the game's Back key.
 - The lines `.env` may hold are a table in docs/install.md (Settings); `.env.example` is gone from the repository's
   root, as the setup writes `.env` itself.
+- For contributors: the player for Windows's planned keys (`PLAYER_KEYS`) also click (`click=x,y`), type (`text=...`)
+  and compose through the input method (`ime=...`), which filled in the game's Set nickname on Windows in English, in
+  Hangul and through the Korean input method; `debug.arm32.livebreak <seconds>` takes a phone's broadcast encoder as
+  broken that long into each session, which showed the retry ten seconds later, the giving up after three, and the
+  count starting over after a minute's session on a phone.
 
 ## [0.8.1] - 2026-11-10
 
@@ -445,7 +457,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 - Four ways to run it: the Windows bundle, one command on Linux or macOS, Docker Compose, and a Helm chart for
   Kubernetes.
 
-[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/kanggu12/openDMTQ/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/kanggu12/openDMTQ/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/kanggu12/openDMTQ/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/kanggu12/openDMTQ/compare/v0.6.0...v0.7.0
