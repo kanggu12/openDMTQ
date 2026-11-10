@@ -1788,6 +1788,65 @@ def page_args():
     return found
 
 
+# One piece of a PHP constant's value: a quoted string, the name of another constant, the dot that joins them, or the
+# semicolon that ends it. A double-quoted string with a $ in it would put a variable in: it matches nothing here.
+PHP_PIECE = re.compile(r"""\s*(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\$]|\\.)*)"|([A-Z_][A-Z0-9_]*)|(\.)|(;))""", re.S)
+
+
+def php_constant(text, name):
+    """A string constant of a PHP file as PHP makes it (const NAME = 'a' . OTHER . "b";): its quoted pieces joined, the
+    constants it names put in. Anything else in it fails the test instead of being guessed at."""
+    found = re.search(rf"^const {name} = ", text, re.M)
+    if not found:
+        raise AssertionError(f"no const {name} in the PHP")
+    pos, pieces = found.end(), []
+    while True:
+        piece = PHP_PIECE.match(text, pos)
+        if not piece:
+            raise AssertionError(f"const {name}: cannot read {text[pos:pos + 40]!r}")
+        pos = piece.end()
+        single, double, other, dot, end = piece.groups()
+        if end:
+            return "".join(pieces)
+        if dot:
+            continue
+        if other:
+            # Another constant of the same file, as PHP puts it in.
+            pieces.append(php_constant(text, other))
+        elif single is not None:
+            # In single quotes only \' and \\ mean something.
+            pieces.append(re.sub(r"\\([\\'])", r"\1", single))
+        else:
+            # In double quotes, the escapes PHP knows; any other backslash stays as it is, as in PHP.
+            pieces.append(re.sub(r'\\([\\"$nt])', lambda m: {"n": "\n", "t": "\t"}.get(m.group(1), m.group(1)), double))
+
+
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class SameQueriesAsTheSiteTest(unittest.TestCase):
+    """The players' site (server/portal/lib.php) and these pages and the API (core.py, site.py) keep their own copies of
+    the queries that decide who counts as a player and what a score counts for: the copies must say the same."""
+
+    @staticmethod
+    def same(sql):
+        """A query as SQLite reads it, for comparing: one space wherever there is any, none at the ends."""
+        return re.sub(r"\s+", " ", sql).strip()
+
+    def test_the_shared_queries_are_the_sites(self):
+        lib = os.path.join(PORTAL, "lib.php")
+        if not os.path.isfile(lib):
+            self.skipTest("the portal is not at hand")
+        with open(lib, encoding="utf-8") as f:
+            php = f.read()
+        ours = {"PLAYER_ROWS": admin.core.PLAYER_ROWS, "SCORE_SQL": admin.site.SCORE_SQL,
+                "PLAYER_FIGURES": admin.site.PLAYER_FIGURES, "PLAYER_TOTALS": admin.site.PLAYER_TOTALS}
+        for name, query in ours.items():
+            # Each on its own: a change to one the others take in shows in all of them.
+            with self.subTest(name):
+                # PHP binds the check account by name (:check), Python by place (?).
+                theirs = re.sub(r":check\b", "?", php_constant(php, name))
+                self.assertEqual(self.same(query), self.same(theirs))
+
+
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class ParityTest(unittest.TestCase):
     """Nothing a person can do or see on the admin pages, or see on the players' site, without a route of the API."""
