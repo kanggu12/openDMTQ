@@ -128,7 +128,7 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   # The frame PLAYER_SHOTS asks for comes 50 s in: then the game is at its menu.
   sleep 45; snap game-menu
   # 4. Alt+F4 does nothing: the game runs on, not held still. The menu button opens the menu (the game held still) and
-  # Esc closes it (the game goes on). The X asks first, and its "Quit the game" ends the game, and the launcher comes
+  # Esc closes it (the game goes on). The X asks first, and its Quit the game ends the game, and the launcher comes
   # back. The game fills the screen (full screen at 96 dpi): the X sits 33 px in from the top right corner and the menu
   # button 81 px; the question's card is 210 px high, its second row centred 139 px below its top.
   game=\$(xdotool search --name 'TECHNIKA' 2>/dev/null | tail -n 1)
@@ -206,9 +206,10 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   game=\$(xdotool search --name 'TECHNIKA' 2>/dev/null | tail -n 1)
   eval \$(xdotool getwindowgeometry --shell \"\$game\")
   xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5
+  # The X, then its question's Quit the game (as in step 4).
   xdotool mousemove \$((X + WIDTH - 33)) \$((Y + 33)); sleep 1; xdotool click 1; sleep 2
-  xdotool mousemove \$((X + WIDTH / 2)) \$((Y + (HEIGHT - 264) / 2 + 193)); sleep 1; xdotool click 1
-  wait_for 60 '! player_running' || { snap player-stays-again; echo 'FAIL: the menu did not end the game'; exit 1; }
+  xdotool mousemove \$((X + WIDTH / 2)) \$((Y + (HEIGHT - 210) / 2 + 139)); sleep 1; xdotool click 1
+  wait_for 60 '! player_running' || { snap player-stays-again; echo 'FAIL: the X did not end the game'; exit 1; }
   wait_for 20 '[ -n \"\$(xdotool search --onlyvisible --name \"^OpenDMTQ\$\" 2>/dev/null)\" ]' \\
     || { snap launcher-hidden-again; echo 'FAIL: the launcher did not come back'; exit 1; }
   sleep 3; snap launcher-back-again
@@ -230,8 +231,15 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   snap uninstalled
   wineserver -k
   echo 'e2e done'
+  # The last step's mark: a run that ends early with 0 (its script cut short) is no pass outside.
+  touch /out/e2e-done
 "
 status=$?
+# Ended with 0 but short of its last step: a failure.
+if [ "$status" = 0 ] && [ ! -f "$OUT/e2e-done" ]; then
+  echo "FAIL: the run inside ended before its last step"
+  status=1
+fi
 echo "screens and logs in $OUT"
 # The run inside says FAIL and ends with 1 at the step that failed: this script ends the same way.
 exit $status
