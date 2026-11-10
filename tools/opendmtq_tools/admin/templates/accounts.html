@@ -50,6 +50,10 @@
   {% if broken %}<p class="empty">{{ t('dash.db_short') }}</p>
   {% elif not accounts %}<p class="empty">{{ t('acc.none') }}</p>
   {% else %}
+  {# Every player to link an account to, once on the page: admin.js puts this list into each row's choice (data-choice),
+     which the page sends with only the player it is now. Repeated in every row, it grew as accounts times players. #}
+  <template id="player-choice"><option value="">{{ t('acc.player_none') }}</option>{% for id, name in players %}<option value="{{ id }}">{{ name }}</option>{% endfor %}</template>
+  {% set names = dict(players) %}
   <div class="table-scroll"><table class="data accounts">
     <thead><tr><th>{{ t('acc.id') }}</th><th>{{ t('acc.player') }}</th><th>{{ t('acc.th_rights') }}</th><th>{{ t('acc.th_last') }}</th><th>{{ t('acc.th_state') }}</th><th></th></tr></thead>
     <tbody>
@@ -57,8 +61,9 @@
       <tr>
         {# The ID never split; whom it is for under it, and when it was made under the pointer. #}
         <td class="primary" title="{{ t('acc.made_on', when=a.created_at|rec_date) }}"><span class="account-id">{{ a.name }}</span>{% if a.note %}<span class="runtime">{{ a.note }}</span>{% endif %}</td>
-        {# The player it is, changed here at any time. #}
-        <td data-label="{{ t('acc.player') }}" class="account-player"><form method="post" class="account-link"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="link"><input type="hidden" name="name" value="{{ a.name }}"><select class="input" name="player" aria-label="{{ t('acc.player') }}: {{ a.name }}"><option value="">{{ t('acc.player_none') }}</option>{% for id, name in players %}<option value="{{ id }}"{% if a.guid == id %} selected{% endif %}>{{ name }}</option>{% endfor %}</select><button class="btn btn-sm">{{ t('acc.link') }}</button></form></td>
+        {# The player it is, changed here at any time: the list comes from the template above. One that is no player now
+           (deleted since) reads as none, as before. #}
+        <td data-label="{{ t('acc.player') }}" class="account-player"><form method="post" class="account-link"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="link"><input type="hidden" name="name" value="{{ a.name }}"><select class="input" name="player" data-choice="player-choice" aria-label="{{ t('acc.player') }}: {{ a.name }}">{% if a.guid in names %}<option value="{{ a.guid }}" selected>{{ names[a.guid] }}</option>{% else %}<option value="" selected>{{ t('acc.player_none') }}</option>{% endif %}</select><button class="btn btn-sm">{{ t('acc.link') }}</button></form></td>
         <td data-label="{{ t('acc.th_rights') }}" class="account-rights">{{ t('acc.rights_admin') if a.admin else t('acc.rights_site') }}</td>
         <td data-label="{{ t('acc.th_last') }}" class="date">{% if a.signed_in_at %}<span title="{{ a.signed_in_at|rec_date }}">{{ a.last }}</span>{% else %}{{ t('acc.never') }}{% endif %}</td>
         <td data-label="{{ t('acc.th_state') }}"><span class="account-state"><span class="lamp {{ 'off' if a.off else 'on' }}"></span>{{ t('acc.state_off') if a.off else t('acc.state_on') }}</span></td>

@@ -2001,6 +2001,25 @@ class AccountLinkTest(unittest.TestCase):
             self.assertIsNone(AccountsTest.row("sena")["guid"])
             self.assertIn("sena is no longer linked to a player.", page)
 
+    def test_the_players_are_sent_once_whatever_the_number_of_accounts(self):
+        # Each row's list comes from one template on the page (admin.js): the page grows as accounts plus players, not as
+        # accounts times players. A row is sent with the player it is now, or none.
+        with Install() as inst:
+            self.server(inst)
+            for n in range(6):
+                self.post(inst, action="create", name=f"friend{n}", password="hunter22", password2="hunter22", player="7" if n == 0 else "")
+            page = inst.client.get("/opendmtq/admin/accounts").get_data(as_text=True)
+            self.assertEqual(page.count('<template id="player-choice">'), 1)
+            rows = re.findall(r'<select class="input" name="player" data-choice="player-choice"[^>]*>(.*?)</select>', page)
+            self.assertEqual(rows, ['<option value="7" selected>Sena</option>'] + ['<option value="" selected>Not linked</option>'] * 5)
+            # The new account's own list and the template: the three players twice, whatever the number of rows.
+            self.assertEqual(page.count(">Twin (9)</option>"), 2)
+            # A link to a player since deleted reads as none, as it did.
+            with sqlite3.connect(admin.core.DB) as con:
+                con.execute("DELETE FROM Member WHERE id = 7")
+            page = inst.client.get("/opendmtq/admin/accounts").get_data(as_text=True)
+            self.assertNotIn('<option value="7" selected>', page)
+
     def test_a_player_there_is_not_is_refused(self):
         with Install() as inst:
             self.server(inst)

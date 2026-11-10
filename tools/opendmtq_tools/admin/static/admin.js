@@ -33,6 +33,17 @@
   addEventListener('scroll', () => { box.hidden = true; }, { passive: true });
 })();
 
+// A list of choices sent once (a <template> of its options) and put into every <select> that names it (data-choice): the
+// Accounts page's players, which in every row made the page grow as accounts times players. Each keeps the choice it came
+// with; one the list does not have reads as its first, none.
+for (const select of document.querySelectorAll('select[data-choice]')) {
+  const kept = select.value, list = document.getElementById(select.dataset.choice);
+  if (!list) continue;
+  select.replaceChildren(list.content.cloneNode(true));
+  select.value = kept;
+  if (select.selectedIndex < 0) select.selectedIndex = 0;
+}
+
 // A button with data-copy copies what the element it names holds. Over plain HTTP the browser only has the older way.
 document.addEventListener('click', async e => {
   const b = e.target.closest && e.target.closest('[data-copy]');
