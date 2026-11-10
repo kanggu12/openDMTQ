@@ -4,7 +4,8 @@
 # loopback with an empty database, runs the checks, and removes everything again. Needs nothing but Docker and Python 3.
 #
 # Usage: tests/game/protocol.sh        (PORT, default 18701; KEEP=1 leaves the server up)
-# Also runs tests/game/lock.php on the same database, and fails on any PHP warning in the server's log.
+# Also runs tests/game/lock.php and tests/game/names.php on the same database, and fails on any PHP warning in the server's
+# log.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -48,6 +49,9 @@ python3 "$ROOT/tests/game/protocol.py" "http://127.0.0.1:$PORT" || failed=1
 # Storing achievements while another writer holds the database, on the same database, beside the running server.
 docker run --rm -u 33:33 -v "$DATA/state:/data" -v "$ROOT/tests/game:/t:ro" --entrypoint php "opendmtq-server:$TAG" \
   /t/lock.php /data/dmtq.db3 || failed=1
+# Players' names that are no UTF-8, as an older server's database can hold them: the start batch that lists one, and the
+# next start's repair of them (tests/game/names.php), inside the running server, on its database and at its own address.
+docker exec -i "$NAME" php -- /data/dmtq.db3 http://127.0.0.1:8080 < "$ROOT/tests/game/names.php" || failed=1
 # The folder of the built apps that a deployment names (the Helm chart: OPENDMTQ_APK_OUT, APK_DIR in charts from before
 # 2026-11) wins over the image's own default, or the site would find no app there.
 for var in OPENDMTQ_APK_OUT APK_DIR; do

@@ -171,5 +171,22 @@ function odq_rpc(string $body): array
         $reply = odq_call($method, $params);
         $out[] = ['result' => $reply['result'], 'error' => $reply['error'], 'id' => $id];
     }
-    return [200, json_encode($out)];
+    return [200, odq_json_list($out)];
+}
+
+/*
+ * The replies as the JSON the client reads. A stored text that is no UTF-8 (a player's name in the database of an older
+ * server, which bin/setup-db.php writes as UTF-8 at the next start) goes out with U+FFFD in place of each bad byte:
+ * json_encode() would otherwise give false, an empty body for every phone whose ranking lists that name. Anything else
+ * JSON cannot hold (a number that is not finite) goes out as null or 0 instead of the whole batch, and is logged.
+ */
+function odq_json_list(array $out): string
+{
+    $json = json_encode($out, JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+    // Said once per batch: what JSON could not hold, for the owner to find in the server's log.
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        error_log('opendmtq: rpc: part of a reply could not be written as JSON: ' . json_last_error_msg());
+    }
+    // False only past json_encode()'s nesting limit, which no reply comes near; even then the client gets a list.
+    return $json === false ? '[]' : $json;
 }

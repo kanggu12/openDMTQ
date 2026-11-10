@@ -104,6 +104,9 @@ What the replies rely on, as the client behaves:
   does not have gets `SVC.05008`.
 - **Lists.** The client reads a missing list as null and stops, and turns some lists into arrays of entries: an empty
   news list closes the game, so `board.getNoticeList` always has one plain entry.
+- **Text.** Every reply is UTF-8. A player's name that is not (another program can have written one into an older
+  server's database) goes out with U+FFFD in place of each bad byte rather than emptying the reply, and the next start
+  stores it as UTF-8.
 - **The signature.** The game signs every request: an `Fp` header with MD5 of the key its login reply gave and the body.
   A batch with a save or a shop call needs it (`403` otherwise). That stops anything that merely posts to the address.
   Someone who has read the app can still sign requests.
@@ -242,8 +245,9 @@ and `./opendmtq doctor` read.
 
 - `server/game/bin/setup-db.php` prepares the database: a new one gets the game's two tables (`Member`, `Play`); every
   start adds what later versions need (`PlayLog`, `AchievementDate`, `LiveSwitch`, `LiveSetting`, `SiteUser`, `ApiToken`, the indexes), merges a
-  player's duplicate score rows on one chart (the best of each), caps scores a forged result left out of range, and
-  deletes plays older than a year. It picks the journal mode the disk allows.
+  player's duplicate score rows on one chart (the best of each), caps scores a forged result left out of range, stores
+  players' names that are no UTF-8 as UTF-8 (read as CP949 where they are that, else with U+FFFD in place of each bad
+  byte), and deletes plays older than a year. It picks the journal mode the disk allows.
 - The live broadcasts' window (`data/state/live`) starts empty; the recordings stay.
 - The key that signs the site's sign-in cookie (`data/state/download.key`) is made once.
 - A small process keeps one database handle open while the server runs, so that closing a request's handle does not fold

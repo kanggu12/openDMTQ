@@ -179,4 +179,37 @@ foreach (['Play', 'PlayLog'] as $t) {
 if ($capped) {
     echo "opendmtq: capped $capped score(s) outside 0 to 2147483647 (forged results)\n";
 }
+// Players' names that are no UTF-8, which another program can have written into the database of an older server (the
+// game's own requests only ever bring UTF-8): the game gets U+FFFD in place of their bad bytes (src/rpc.php), the site an
+// empty name. Each is stored as UTF-8 once: read as CP949, the Korean encoding older Korean programs wrote, when it is
+// that, else with U+FFFD in place of each bad byte, as the game shows it.
+$broken = [];
+$names = @$db->query('SELECT rowid, nickname FROM Member WHERE nickname IS NOT NULL');
+while ($names && ($row = $names->fetchArray(SQLITE3_ASSOC))) {
+    // A blob or a number reads as its bytes or digits: only text that is no UTF-8 needs anything.
+    if (!mb_check_encoding((string)$row['nickname'], 'UTF-8')) {
+        $broken[$row['rowid']] = (string)$row['nickname'];
+    }
+}
+if ($broken) {
+    // What mb_scrub() puts in place of a bad byte: the mark JSON_INVALID_UTF8_SUBSTITUTE puts there too.
+    mb_substitute_character(0xFFFD);
+    $fixed = $korean = 0;
+    $write = $db->prepare('UPDATE Member SET nickname = :name WHERE rowid = :row');
+    // All of them together, waiting out the game's writers (the busy timeout above).
+    $db->exec('BEGIN IMMEDIATE');
+    foreach ($broken as $rowid => $name) {
+        $cp949 = mb_check_encoding($name, 'CP949');
+        $write->bindValue(':name', $cp949 ? mb_convert_encoding($name, 'UTF-8', 'CP949') : mb_scrub($name, 'UTF-8'), SQLITE3_TEXT);
+        $write->bindValue(':row', $rowid, SQLITE3_INTEGER);
+        // Counted only when written, so that the line below says what happened.
+        if ($write->execute()) {
+            $fixed++;
+            $korean += $cp949 ? 1 : 0;
+        }
+        $write->reset();
+    }
+    $db->exec('COMMIT');
+    echo "opendmtq: stored $fixed player name(s) that were not UTF-8 as UTF-8, $korean of them from CP949\n";
+}
 $db->close();
