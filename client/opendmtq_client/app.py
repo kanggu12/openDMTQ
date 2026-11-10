@@ -456,6 +456,8 @@ class LauncherApp:
         """Make the ready check again on a worker thread; the PLAY page and button follow it."""
         self.checks = None
         self.checks_asked += 1
+        # Which check this is: only the last one asked is taken when it answers.
+        asked = self.checks_asked
 
         def work():
             try:
@@ -463,11 +465,15 @@ class LauncherApp:
             except Exception as e:  # noqa: BLE001
                 log.exception("ready check failed")
                 checks = [actions.Check("server", False, str(e), page="online")]
-            self.post(lambda: self._checked(checks))
+            self.post(lambda: self._checked(checks, asked))
 
         threading.Thread(target=work, daemon=True, name="check").start()
 
-    def _checked(self, checks):
+    def _checked(self, checks, asked):
+        if asked != self.checks_asked:
+            # A check asked before the last one, answering after it: about the state before, so the last one's answer,
+            # on its way, is the one to show.
+            return
         self.checks = checks
         # A message kept until the player does something (a sign-in that ended, a stopped download) stays.
         quiet = self.status_sticky

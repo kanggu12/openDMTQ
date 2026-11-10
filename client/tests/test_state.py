@@ -175,3 +175,49 @@ class WindowThread(Folder):
         # Every Connect went through, the last one played on.
         self.assertEqual(len(state.servers), rounds)
         self.assertEqual(state.current, "http://club%d.test" % (rounds - 1))
+
+    def test_an_older_ready_check_never_replaces_a_newer_one(self):
+        # Help's Check again pressed just before a download ends: the check asked first may answer last (a disk that
+        # has not read the app's folder lately). Its answer is about the state before, and stays on screen until the
+        # next check if it is taken: only the last check asked is.
+        from opendmtq_client import actions
+        from opendmtq_client import app as launcher
+        state = st.LauncherState()
+        tasks = []
+        slow = threading.Event()
+        asked = []
+
+        def readiness(state):
+            # What the check reads when it runs: the server played on then.
+            seen = state.current
+            asked.append(seen)
+            if len(asked) == 1:
+                # The first check waits until the second has answered.
+                slow.wait(5)
+            return [actions.Check("server", True, seen)]
+
+        app = types.SimpleNamespace(state=state, checks=None, checks_asked=0, post=tasks.append, status_sticky=True,
+                                    guide=None, check_box=None, _paint_play=lambda: None)
+        for name in ("refresh_checks", "_checked"):
+            setattr(app, name, getattr(launcher.LauncherApp, name).__get__(app))
+
+        def answers(count):
+            # The worker threads' answers handed over (app.post), in the order they came.
+            end = time.time() + 5
+            while len(tasks) < count and time.time() < end:
+                time.sleep(0.005)
+            self.assertEqual(len(tasks), count)
+
+        with mock.patch.object(actions, "readiness", readiness):
+            state.add_server("http://first.test")
+            app.refresh_checks()
+            state.add_server("http://second.test")
+            app.refresh_checks()
+            answers(1)
+            slow.set()
+            answers(2)
+        # The window's task pump runs them as they came: the second check's answer, then the first's.
+        for task in tasks:
+            task()
+        self.assertEqual(asked, ["http://first.test", "http://second.test"])
+        self.assertEqual([c.detail for c in app.checks], ["http://second.test"])
