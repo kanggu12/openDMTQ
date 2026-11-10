@@ -47,6 +47,9 @@ namespace {
 constexpr double kSharedMs[] = {10, 20, 50};
 // How long after a loss the device is asked for again.
 constexpr auto kRetry = std::chrono::seconds(1);
+// How long a full buffer may stay as it is before the device counts as gone: shared, its padding the same for that long
+// (write_shared); alone, that long without its event (write_alone's ten waits of 200 ms).
+constexpr auto kStalled = std::chrono::seconds(2);
 // A device's friendly name ("Speakers (Realtek(R) Audio)"): PKEY_Device_FriendlyName, spelled out here so that no
 // translation unit has to define every property key of its header.
 const PROPERTYKEY kFriendlyName = {{0xa45c254e, 0xdf1c, 0x4efd, {0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0}}, 14};
@@ -268,17 +271,34 @@ private:
         jvm::log("player: WASAPI: %s", why);
         return false;
     }
-    // Shared: as much as the device has room for, waiting for its event while it has none.
+    // Shared: as much as the device has room for, waiting for its event while it has none. A device whose padding stays
+    // as it is for kStalled while the buffer is full has stopped taking frames, as alone (write_alone): lost. A change of
+    // the devices ends the wait too, for the next write to move to the output to play on now.
     bool write_shared(const float* data, std::size_t frames) {
         std::size_t done = 0;
+        // The padding last read, and since when it has been that: the device's progress.
+        UINT32 last_padding = 0;
+        bool read_once = false;
+        Clock::time_point since = Clock::now();
         while (done < frames) {
+            // The default output changed, or the named device came or went: the rest of these frames go by in time, and
+            // write (which looks at the change first) opens the output again.
+            if (news_->changed.load()) return keep_time(frames - done);
             UINT32 padding = 0;
             HRESULT hr = client_->GetCurrentPadding(&padding);
             if (FAILED(hr)) return lost(hr, frames - done);
+            // Frames taken by the device or put in by this write move the padding: the time without progress starts again.
+            if (!read_once || padding != last_padding) {
+                last_padding = padding;
+                read_once = true;
+                since = Clock::now();
+            }
             UINT32 room = frames_ > padding ? frames_ - padding : 0;
             if (room == 0) {
                 // Full: the device's event says when it has taken a period.
                 if (!started_) begin();
+                // Full and still for kStalled: no event is coming, and the wait would never end.
+                if (Clock::now() - since >= kStalled) return lost(E_FAIL, frames - done);
                 WaitForSingleObject(event_, 100);
                 continue;
             }
