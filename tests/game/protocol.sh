@@ -61,6 +61,33 @@ for var in OPENDMTQ_APK_OUT APK_DIR; do
     failed=1
   fi
 done
+# The hall of fame's months (portal/lib.php month_name()) are the months the rankings count, which begin at midnight UTC
+# (month_start()): last month by its own name in zones west of UTC too, where that midnight is still the evening before,
+# as in UTC and east of it. In both of the site's languages; the test stack itself runs in Asia/Seoul, east of UTC.
+for lang in en ko; do
+  # Last month in UTC by the shell's own calendar, in the site's words for it (C: English month names on any machine).
+  format='+%B %Y'
+  [ "$lang" = ko ] && format='+%Y년 %-m월'
+  want=$(LC_ALL=C date -u -d "$(date -u +%Y-%m-01) -1 month" "$format")
+  # Each zone in one PHP run: PHP's own zone set before the name is asked for, as entrypoint.sh sets it from TZ.
+  # shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
+  got=$(docker run --rm --network none -e "ODQ_LANG=$lang" --entrypoint php "opendmtq-server:$TAG" -r '
+    $_COOKIE["opendmtq_lang"] = getenv("ODQ_LANG");
+    require "/opt/opendmtq/portal/lib.php";
+    foreach (["America/Los_Angeles", "America/New_York", "UTC", "Asia/Seoul", "Pacific/Kiritimati"] as $zone) {
+        date_default_timezone_set($zone);
+        echo $zone, "=", month_name(month_start(1)), "\n";
+    }')
+  # Every zone's line must end in the month UTC names; none may name another.
+  wrong=$(grep -v "=$want\$" <<<"$got" || true)
+  if [ "$(grep -c "=$want\$" <<<"$got")" = 5 ] && [ -z "$wrong" ]; then
+    echo "PASS the hall of fame names last month as the rankings count it, in zones west of UTC too ($lang: $want)"
+  else
+    echo "FAIL the hall of fame names last month otherwise than the rankings count it ($lang, $want wanted):"
+    echo "$got" | sed 's/^/  /'
+    failed=1
+  fi
+done
 # The installer's end as the site makes it (portal/lib.php) and as the admin pages make it (tools/opendmtq_tools/
 # windows_client.py): the same bytes, for an address over plain HTTP, one over HTTPS on port 80 (its port named) with the
 # server's own authority and a name in Korean, and one over HTTPS on a port of its own without an authority.

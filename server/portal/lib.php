@@ -353,10 +353,13 @@ function month_moment(int $at): string
     return lang() === 'ko' ? date('n', $at) . "월\u{00A0}" . date('j', $at) . '일 ' . date('G:i', $at) : date('j', $at) . "\u{00A0}" . date('M', $at) . ' at ' . date('H:i', $at);
 }
 
-/* A month by its first moment, in the page's words: "October 2026", "2026년 10월". */
+/* A month by its first moment (month_start()), in the page's words: "October 2026", "2026년 10월". Named in UTC, as its
+   bounds are: west of UTC that first moment is still the evening before on the server's clock (October's is 30 September
+   at 20:00 in New York), which would name every month of the hall of fame one month early. */
 function month_name(int $at): string
 {
-    return lang() === 'ko' ? date('Y', $at) . '년 ' . date('n', $at) . '월' : date('F Y', $at);
+    // gmdate(): the month the rankings count, whatever zone the server keeps (TZ, entrypoint.sh).
+    return lang() === 'ko' ? gmdate('Y', $at) . '년 ' . gmdate('n', $at) . '월' : gmdate('F Y', $at);
 }
 
 /* The players of one month (from $since to before $until), best first, as the game ranks them: the sum of each one's
