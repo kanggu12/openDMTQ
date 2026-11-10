@@ -950,27 +950,38 @@ function dl_take_start(): bool
 
 // Sign-in failures of the last ten minutes, for the throttle below, in the server's scratch folder.
 define('DL_ATTEMPTS', odq_run_dir() . '/download-signin.json');
+// Failures in ten minutes: from one address, and at accounts with admin rights from all addresses together (as many as
+// the admin pages' own sign-in allows through the server: OVERALL in tools/opendmtq_tools/admin/auth.py).
+const DL_PER_ADDRESS = 10;
+const DL_ADMIN_OVERALL = 30;
 
-/* Sign-in attempts: at most 10 failures in ten minutes from one address (the edge proxy passes
-   each visitor's own), and every failure waits a second (login.php). No limit for the whole server:
-   the whole site is behind this sign-in, and such a limit would let anyone lock everyone out.
+/* Sign-in attempts, for the account named $name: at most DL_PER_ADDRESS failures in ten minutes from one address (the
+   edge proxy passes each visitor's own), and every failure waits a second (login.php). For the whole server, a limit on
+   the accounts with admin rights alone: they open the admin pages too, whose own sign-in holds guesses from everywhere
+   together to DL_ADMIN_OVERALL, and this sign-in must not be the way around that. No such limit on the other accounts:
+   the whole site is behind this sign-in, and it would let anyone lock every player out.
 
    An attempt takes its place in the count before the password is compared, under a lock, so
    attempts sent at the same moment cannot all pass the check before any is counted; a right
    password gives the place back (dl_attempt_succeeded()). Returns the attempt's id, or null when
-   this address is throttled. */
-function dl_attempt_begin(): ?string
+   this address, or the account's admin rights, is throttled. */
+function dl_attempt_begin(string $name = ''): ?string
 {
     $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '?');
     $id = bin2hex(random_bytes(8));
+    // Whether the name typed is an account with admin rights, switched off or not: a guess at its password is one all the same.
+    $row = site_account($name);
+    $admin = $row !== null && !empty($row['admin']);
     $granted = false;
-    $counted = dl_attempts(function (array $fails) use ($ip, $id, &$granted): array {
+    $counted = dl_attempts(function (array $fails) use ($ip, $id, $admin, &$granted): array {
         $mine = count(array_filter($fails, fn($f) => ($f[1] ?? '') === $ip));
-        if ($mine >= 10) {
+        // The failures at accounts with admin rights, from anywhere (entries from before this count carry no such mark).
+        $at_admins = count(array_filter($fails, fn($f) => !empty($f[3])));
+        if ($mine >= DL_PER_ADDRESS || ($admin && $at_admins >= DL_ADMIN_OVERALL)) {
             return $fails;
         }
         $granted = true;
-        $fails[] = [time(), $ip, $id];
+        $fails[] = [time(), $ip, $id, $admin ? 1 : 0];
         return $fails;
     });
     // Nowhere to count (the run folder is not writable): let it through, as before the throttle.
@@ -983,9 +994,9 @@ function dl_attempt_succeeded(string $id): void
     dl_attempts(fn(array $fails): array => array_filter($fails, fn($f) => ($f[2] ?? '') !== $id));
 }
 
-/* Runs $change on the failures of the last ten minutes ([[time, address, attempt id], ...]) and
-   saves what it returns, all under an exclusive lock on the file. False when the file cannot be
-   used. */
+/* Runs $change on the failures of the last ten minutes ([[time, address, attempt id, 1 when at an
+   account with admin rights], ...]) and saves what it returns, all under an exclusive lock on the
+   file. False when the file cannot be used. */
 function dl_attempts(callable $change): bool
 {
     $h = @fopen(DL_ATTEMPTS, 'c+');

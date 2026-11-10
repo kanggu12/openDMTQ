@@ -544,6 +544,34 @@ check("admin rights open the admin pages", 'class="account-form"' in request(hel
 outsider = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 request(outsider, ADMIN + "/opendmtq/admin/login", urllib.parse.urlencode({"name": "dmtq", "password": SITE_PASSWORD}).encode())
 check("a site account does not", "Wrong ID or password" in request(outsider, ADMIN + "/opendmtq/admin/login")[2].decode() or 'name="password"' in request(outsider, ADMIN + "/opendmtq/admin/players")[2].decode())
+# The site's sign-in takes such an account too, so guesses at it there count for the whole server, as on the admin pages'
+# own sign-in: thirty failures in ten minutes from anywhere, and its sign-in waits. Here from an address each (the server
+# takes a forwarded address from the test's own network, as from a proxy of its own), all at once, as many guessers
+# would come: two past the limit, held back however close together they come.
+answers = []
+
+
+def guess(n):
+    """A wrong password for the account with admin rights, from an address of its own; what the sign-in page said."""
+    form = urllib.parse.urlencode({"user": "helper", "password": f"guess-{n}", "next": "/opendmtq/"}).encode()
+    page_text = request(plain, SITE + "/opendmtq/login.php", form, {"X-Forwarded-For": f"198.51.100.{n}"})[2].decode()
+    answers.append("wrong" if "Wrong ID or password" in page_text else "held" if "Too many failed sign-ins" in page_text else page_text[:80])
+
+
+guessers = [threading.Thread(target=guess, args=(n,)) for n in range(1, 33)]
+for g in guessers:
+    g.start()
+for g in guessers:
+    g.join()
+check("thirty wrong guesses at an account with admin rights from anywhere, and no more", sorted(answers) == ["held"] * 2 + ["wrong"] * 30,
+      str(sorted(answers)))
+right = urllib.parse.urlencode({"user": "helper", "password": "hunter22", "next": "/opendmtq/"}).encode()
+fresh = {"X-Forwarded-For": "198.51.100.200"}
+held = request(plain, SITE + "/opendmtq/login.php", right, fresh)
+client_held = request(plain, SITE + "/opendmtq/client.php?signin", urllib.parse.urlencode({"user": "helper", "password": "hunter22"}).encode(), fresh)[0]
+check("then that account waits, from a new address and with its right password, on the PC client's sign-in too",
+      held[0] == 200 and "Too many failed sign-ins" in held[2].decode() and client_held == 429, f"{held[0]}, {client_held}")
+check("while an account without admin rights signs in as before", site_sign_in("dmtq", SITE_PASSWORD, {"X-Forwarded-For": "198.51.100.201"})[1])
 account_post(action="delete", name="helper")
 
 # The game's own window (its event page, /score/) shows the site, behind the same sign-in: a stranger goes to the sign-in,

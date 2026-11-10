@@ -42,7 +42,8 @@ if (isset($_GET['signin'])) {
     if (!site_sign_in_works()) {
         answer(503, ['error' => 'down']);
     }
-    $attempt = dl_attempt_begin();
+    // For the account named: one with admin rights counts toward the limit for the whole server as well.
+    $attempt = dl_attempt_begin($user);
     if ($attempt === null) {
         answer(429, ['error' => 'throttled']);
     }

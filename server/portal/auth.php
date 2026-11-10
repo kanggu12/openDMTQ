@@ -60,17 +60,18 @@ function dl_key(): string
     return $key;
 }
 
-/* An account by its ID, whatever the letter case: ['name', 'pass', 'off'] as the admin pages keep it (their Accounts page
-   makes them; nobody makes their own), or null. */
+/* An account by its ID, whatever the letter case: ['name', 'pass', 'off', 'admin', 'guid'] as the admin pages keep it
+   (their Accounts page makes them; nobody makes their own), or null. */
 function site_account(string $name): ?array
 {
     $db = site_db();
     if (!$db || !preg_match('/^[A-Za-z0-9._-]{3,20}$/', $name)) {
         return null;
     }
-    // With the game player it is linked to; a table from before the link has no such column yet (the admin pages add
-    // it), and then no player.
-    $q = @$db->prepare('SELECT name, pass, off, guid FROM SiteUser WHERE name = :name') ?: @$db->prepare('SELECT name, pass, off, NULL AS guid FROM SiteUser WHERE name = :name');
+    // With its admin rights (guesses at such an account's password count for the whole server, lib.php's
+    // dl_attempt_begin()) and the game player it is linked to; a table from before the link has no such column yet (the
+    // admin pages add it), and then no player.
+    $q = @$db->prepare('SELECT name, pass, off, admin, guid FROM SiteUser WHERE name = :name') ?: @$db->prepare('SELECT name, pass, off, admin, NULL AS guid FROM SiteUser WHERE name = :name');
     if (!$q) {
         // No table yet: no accounts.
         return null;

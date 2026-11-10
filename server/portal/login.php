@@ -36,8 +36,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!site_sign_in_works()) {
         // Nothing to check the password against: the server's trouble, said as such, and not counted as a guess.
         $error = 'signin.down';
-    } elseif (($attempt = dl_attempt_begin()) === null) {
-        // Counted before the password is compared, so a burst of guesses cannot pass the limit together.
+    } elseif (($attempt = dl_attempt_begin($user)) === null) {
+        // Counted before the password is compared, so a burst of guesses cannot pass the limit together; for the account
+        // typed, whose admin rights put it under a limit for the whole server too.
         $error = 'signin.throttled';
     } elseif (($who = site_check($user, $password)) !== null) {
         // A right password is not a failure.
