@@ -218,8 +218,10 @@ def live_set(con, guid, on):
     if not on:
         # The live window goes; the recording stays, and the server's next sweep closes it.
         shutil.rmtree(live_folder(guid), ignore_errors=True)
-        for rec in rec_all():
-            if rec["guid"] == guid and rec["open"]:
+        # This player's recordings only: the caller's write to the database is open meanwhile, and the game's saves wait
+        # for it.
+        for rec in rec_player(guid):
+            if rec["open"]:
                 with open(os.path.join(rec["dir"], ".close-now"), "a", encoding="utf-8"):
                     pass
 
@@ -274,39 +276,71 @@ def rec_over_limits(cap_gb, days):
     return gone
 
 
+def folder_number(name):
+    """The number a folder of the recordings is named by, or None for any other name. The server names them by plain
+    numbers (a player's, then a recording's), as rec_folder() does: a name it would not make (a leading zero, a file of
+    the owner's) is no recording, and rec_folder() would never find it again."""
+    return int(name) if re.fullmatch(r"0|[1-9][0-9]*", name) else None
+
+
+def rec_item(guid, rid):
+    """One recording, or None when there is no such recording: meta.json over what every recording has, with whose it
+    is (guid), its number (id), its folder (dir), whether it is still being made (open) and whether it is hidden from the
+    site. An open one has only its start in meta.json: its length and size come from its list of segments so far."""
+    rec = rec_folder(guid, rid)
+    # Only a folder: the server makes one per recording.
+    if not os.path.isdir(rec):
+        return None
+    try:
+        with open(os.path.join(rec, "meta.json"), encoding="utf-8") as f:
+            meta = json.load(f)
+    except (OSError, ValueError):
+        # Not written yet (it is written as the recording begins) or cut off: what every recording has.
+        meta = {}
+    # Anything but an object is no meta.json of the server's either.
+    if not isinstance(meta, dict):
+        meta = {}
+    item = {"started": int(rid), "duration_ms": 0, "size": 0, "songs": [], **meta,
+            "guid": int(guid), "id": int(rid), "dir": rec,
+            "open": os.path.exists(os.path.join(rec, ".open")),
+            "hidden": os.path.exists(os.path.join(rec, ".hidden"))}
+    if item["open"]:
+        try:
+            with open(os.path.join(rec, "segs.log"), encoding="utf-8") as f:
+                lines = [line.split() for line in f]
+            # A line per segment: its number, milliseconds, 1 after a break, bytes (live_lib.php writes them).
+            item["duration_ms"] = sum(int(x[1]) for x in lines if len(x) == 4)
+            item["size"] = sum(int(x[3]) for x in lines if len(x) == 4)
+        except (OSError, ValueError):
+            # No segment yet, or a line being written: what meta.json said.
+            pass
+    return item
+
+
+def rec_player(guid):
+    """A player's recordings, newest first: [] for a player who has none. Only that player's folder is read."""
+    try:
+        names = os.listdir(os.path.join(rec_root(), str(int(guid))))
+    except OSError:
+        # No folder (the server makes it with the player's first recording), or a file in its place: none.
+        return []
+    # One recording per folder named by a number; rec_item() leaves out what is no folder.
+    found = (rec_item(guid, rid) for rid in map(folder_number, names) if rid is not None)
+    return sorted((rec for rec in found if rec), key=lambda rec: rec["id"], reverse=True)
+
+
 def rec_all():
-    """Every recording, newest first. An open one has only its start in meta.json: its length and size
-    come from its list of segments so far."""
-    out = []
-    root = rec_root()
-    for guid in os.listdir(root) if os.path.isdir(root) else []:
-        folder = os.path.join(root, guid)
-        # Only the folders the server makes.
-        if not guid.isdigit() or not os.path.isdir(folder):
-            continue
-        for rid in os.listdir(folder):
-            rec = os.path.join(folder, rid)
-            if not rid.isdigit() or not os.path.isdir(rec):
-                continue
-            try:
-                with open(os.path.join(rec, "meta.json"), encoding="utf-8") as f:
-                    meta = json.load(f)
-            except (OSError, ValueError):
-                meta = {}
-            item = {"started": int(rid), "duration_ms": 0, "size": 0, "songs": [], **meta,
-                    "guid": int(guid), "id": int(rid), "dir": rec,
-                    "open": os.path.exists(os.path.join(rec, ".open")),
-                    "hidden": os.path.exists(os.path.join(rec, ".hidden"))}
-            if item["open"]:
-                try:
-                    with open(os.path.join(rec, "segs.log"), encoding="utf-8") as f:
-                        lines = [line.split() for line in f]
-                    item["duration_ms"] = sum(int(x[1]) for x in lines if len(x) == 4)
-                    item["size"] = sum(int(x[3]) for x in lines if len(x) == 4)
-                except (OSError, ValueError):
-                    pass
-            out.append(item)
-    out.sort(key=lambda r: r["id"], reverse=True)
+    """Every recording, newest first: each player's (rec_player()), together. Each of them is read: a page that needs
+    one recording or one player's asks rec_item() or rec_player()."""
+    try:
+        names = os.listdir(rec_root())
+    except OSError:
+        # No folder yet (before the first recording): none.
+        return []
+    # One folder per player named by a number; limits.json and anything else of the owner's are no player.
+    out = [rec for guid in map(folder_number, names) if guid is not None for rec in rec_player(guid)]
+    # Newest first across players, as the site lists them; a recording's number is its start.
+    out.sort(key=lambda rec: rec["id"], reverse=True)
     return out
 
 
@@ -427,10 +461,12 @@ def recordings_action():
     # "hide 7/1798000000": one row's button. The rest name their recordings in the check boxes.
     verb, _, one = action.partition(" ")
     names = [one] if one else request.form.getlist("sel")
-    # "delete-player 7": all of theirs.
     if verb == "delete-player":
-        names = [f"{r['guid']}/{r['id']}" for r in rec_all() if str(r["guid"]) == one]
-    done, kept = act_on(verb, names)
+        # "delete-player 7": all of theirs; a player's number the server would not make names nobody.
+        guid = folder_number(one)
+        done, kept = rec_delete_player(guid) if guid is not None else (0, 0)
+    else:
+        done, kept = act_on(verb, names)
     word = {"hide": "rec.done_hide", "show": "rec.done_show"}.get(verb, "rec.done_delete")
     if done or kept:
         flash(t(word, n=done) + (t("rec.kept", n=kept) if kept else ""), "ok" if done else "bad")
@@ -494,6 +530,12 @@ def act_on(verb, names):
             whose = ", ".join(str(guid) for guid in sorted(who))
         changed(f"recordings_page:{verb}", f"{whose} ({done})")
     return done, kept
+
+
+def rec_delete_player(guid):
+    """Deletes all of a player's recordings, the Recordings page's "Delete all" (and the API's): act_on() over their
+    list, so one still being made is kept. Returns (done, kept)."""
+    return act_on("delete-player", [f"{rec['guid']}/{rec['id']}" for rec in rec_player(guid)])
 
 
 @app.route(BASE + "/recordings/<int:guid>/<int:rid>/download")

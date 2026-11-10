@@ -1130,6 +1130,31 @@ class FilesTest(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class OneRecordingTest(unittest.TestCase):
+    """A recording's routes read that recording's folder, and a player's delete their recordings, not every one there is
+    (rec_all() reads each recording's files)."""
+
+    def test_a_recordings_routes_read_it_alone(self):
+        closed = Server.names["closed"]
+        with Server() as inst, mock.patch.object(admin.recordings, "rec_all", side_effect=AssertionError("every recording was read")):
+            self.assertEqual(inst.ask("GET", f"/recordings/7/{closed}").get_json()["recording"]["key"], f"7/{closed}")
+            # Hide and show answer the recording as it is after.
+            self.assertTrue(inst.ask("POST", f"/recordings/7/{closed}/hide").get_json()["recording"]["hidden"])
+            self.assertFalse(inst.ask("POST", f"/recordings/7/{closed}/show").get_json()["recording"]["hidden"])
+            # One that is not there, and one being made that stays.
+            self.assertEqual(inst.ask("POST", "/recordings/7/1/hide").status_code, 404)
+            self.assertEqual(inst.ask("DELETE", f"/recordings/8/{Server.names['open']}").status_code, 409)
+            self.assertEqual(inst.ask("DELETE", f"/recordings/7/{closed}").get_json(), {"deleted": f"7/{closed}"})
+
+    def test_all_of_a_players_is_the_pages_own_action(self):
+        # The page's side, and what the action does: test_admin.py.
+        with Server() as inst, mock.patch.object(admin.recordings, "rec_delete_player", wraps=admin.recordings.rec_delete_player) as action, \
+                mock.patch.object(admin.recordings, "rec_all", side_effect=AssertionError("every recording was read")):
+            self.assertEqual(inst.ask("POST", "/recordings/delete", json={"player": 7}).get_json(), {"done": 1, "kept": 0})
+            action.assert_called_once_with(7)
+
+
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class BuildTest(unittest.TestCase):
     """A build waits for an import, and two asked for at once start one builder."""
 

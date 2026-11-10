@@ -623,6 +623,64 @@ class RecordingsTest(unittest.TestCase):
             self.assertFalse(admin.recordings.rec_remove(7, 1800000000))
             self.assertTrue(os.path.isdir(rec))
 
+    def test_one_recording_and_one_players_are_read_on_their_own(self):
+        with Install():
+            self._rec(7, 1800000000)
+            self._rec(7, 1800000200, opened=True)
+            self._rec(8, 1800000100)
+            # What the server never makes: a player's number with a leading zero, a file in place of a recording, and
+            # the limits beside the players.
+            os.makedirs(os.path.join(admin.recordings.rec_root(), "07", "1800000300"))
+            with open(os.path.join(admin.recordings.rec_root(), "7", "1800000400"), "w", encoding="utf-8") as f:
+                f.write("not a recording")
+            admin.recordings.rec_save_limits(20, 30)
+            every = admin.recordings.rec_all()
+            # Newest first across the players, and the three recordings only.
+            self.assertEqual([(r["guid"], r["id"]) for r in every], [(7, 1800000200), (8, 1800000100), (7, 1800000000)])
+            # Each one read alone is what the whole list has for it, the open one's figures from its segments too.
+            for r in every:
+                self.assertEqual(admin.recordings.rec_item(r["guid"], r["id"]), r)
+            # A player's own, in the same order.
+            self.assertEqual(admin.recordings.rec_player(7), [r for r in every if r["guid"] == 7])
+            # Nothing where there is no recording: none of that number, a file, a player without any.
+            self.assertIsNone(admin.recordings.rec_item(7, 1))
+            self.assertIsNone(admin.recordings.rec_item(7, 1800000400))
+            self.assertEqual(admin.recordings.rec_player(9), [])
+
+    def test_switching_a_player_off_reads_their_recordings_only(self):
+        # The switch is flipped inside a write to the database, which the game's saves wait for: nobody else's
+        # recordings are read meanwhile.
+        with Install() as inst:
+            mine = self._rec(7, 1800000000, opened=True)
+            theirs = self._rec(8, 1800000100, opened=True)
+            con = sqlite3.connect(inst.path("state/dmtq.db3"))
+            con.row_factory = sqlite3.Row
+            admin.recordings.live_set(con, 7, True)
+            with mock.patch.object(admin.recordings, "rec_all", side_effect=AssertionError("every recording was read")):
+                admin.recordings.live_set(con, 7, False)
+            con.close()
+            # Theirs is asked to close; the other player's, still on air, is not.
+            self.assertTrue(os.path.exists(os.path.join(mine, ".close-now")))
+            self.assertFalse(os.path.exists(os.path.join(theirs, ".close-now")))
+
+    def test_delete_all_is_the_shared_action(self):
+        # The page's "Delete all" and the API's {"player": n} are one function (the API's side: test_api.py).
+        with Install() as inst:
+            self._rec(7, 1800000000)
+            self._rec(7, 1800000200, opened=True)
+            self._rec(8, 1800000100)
+            csrf = self._token(inst)
+            with mock.patch.object(admin.recordings, "rec_delete_player", wraps=admin.recordings.rec_delete_player) as action:
+                page = inst.client.post("/opendmtq/admin/recordings", data={"csrf": csrf, "action": "delete-player 7"},
+                                        follow_redirects=True).get_data(as_text=True)
+                # A number the server would not make names nobody, and does not reach it.
+                inst.client.post("/opendmtq/admin/recordings", data={"csrf": csrf, "action": "delete-player 07"})
+            action.assert_called_once_with(7)
+            # The closed one went, the one being made stayed, and the page says both.
+            self.assertEqual([(r["guid"], r["id"]) for r in admin.recordings.rec_all()], [(7, 1800000200), (8, 1800000100)])
+            self.assertIn("Recordings deleted: 1.", page)
+            self.assertIn("1 still recording, kept.", page)
+
     def test_switching_off_keeps_the_recording_and_asks_to_close_it(self):
         with Install() as inst:
             con = sqlite3.connect(inst.path("state/dmtq.db3"))

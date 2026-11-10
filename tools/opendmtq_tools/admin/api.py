@@ -802,8 +802,8 @@ def recording_view(r, names):
 
 
 def find_recording(guid, rid):
-    """A recording, or 404."""
-    r = next((r for r in recordings.rec_all() if r["guid"] == guid and r["id"] == rid), None)
+    """A recording, or 404. Only its own folder is read, not every recording's."""
+    r = recordings.rec_item(guid, rid)
     if not r:
         raise Refused(404, "recording_not_found", plain(core.t("rec.nothing")))
     return r
@@ -890,8 +890,8 @@ def recordings_delete(args):
     if ("items" in args) == ("player" in args):
         raise bad("bad_body", "Send items (the recordings) or player (all of theirs), one of the two.")
     if "player" in args:
-        names = [f"{r['guid']}/{r['id']}" for r in recordings.rec_all() if r["guid"] == args["player"]]
-        return recordings_done(*recordings.act_on("delete-player", names))
+        # The page's "Delete all" itself: the same function, so the two cannot pick differently.
+        return recordings_done(*recordings.rec_delete_player(args["player"]))
     return recordings_done(*recordings.act_on("delete", args["items"]))
 
 
