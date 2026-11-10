@@ -218,6 +218,30 @@ class AppPageTest(unittest.TestCase):
             self.assertNotIn("OpenDMTQ-new.apk", others.split("</table>")[0])
             self.assertIn("/opendmtq/admin/app/prune", others)
 
+    def test_a_build_under_way_is_followed_from_its_log_box(self):
+        # admin.js (followJob) follows a job from what its log box says: no script of the page's own, which stopped for good
+        # at the first look that failed on the network.
+        with Install() as inst:
+            self.build(inst, "OpenDMTQ-new.apk", HOST, "2026-11-01T08:00:00", offered=True)
+            with admin.jobs._jobs_lock:
+                admin.jobs._jobs["b1"] = {"id": "b1", "kind": "build", "state": "running", "log": [], "started": time.time()}
+            try:
+                inst.sign_in()
+                page = inst.client.get("/opendmtq/admin/app?job=b1").get_data(as_text=True)
+                self.assertIn('<pre class="log" id="log" data-job="/opendmtq/admin/jobs/b1" data-done="/opendmtq/admin/app?built=b1" '
+                              'data-gone="/opendmtq/admin/app">', page)
+                self.assertNotIn("fetch(", page)
+                # Both build buttons wait for it, and say what they say again if it fails.
+                self.assertEqual(re.findall(r'data-again data-label="([^"]*)" disabled', page), ["Build again", "Build"])
+                # Signed out meanwhile, the page's own look gets a plain 401 (the page then reloads to the sign-in), not
+                # the sign-in page to read as the job.
+                inst.client.post("/opendmtq/admin/logout", data={"csrf": self.csrf(inst)})
+                r = inst.client.get("/opendmtq/admin/jobs/b1", headers={"X-Requested-With": "fetch"})
+                self.assertEqual(r.status_code, 401)
+            finally:
+                with admin.jobs._jobs_lock:
+                    admin.jobs._jobs.pop("b1", None)
+
     def test_an_offered_app_for_another_address_is_a_problem_at_the_top(self):
         with Install() as inst:
             self.build(inst, "OpenDMTQ-moved.apk", "10.0.0.1", "2026-11-01T08:00:00", offered=True)

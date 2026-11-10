@@ -60,6 +60,50 @@ for (const box of document.querySelectorAll('textarea')) {
   addEventListener('resize', fit);
 }
 
+// A job a page started (the app's build, the setup's import), followed in its log box until it ends. The box says where to
+// ask (data-job), where to go once the job is done (data-done), and where once this service no longer knows it
+// (data-gone: it started again). A look that fails, on the network or in a reply that does not read, is tried again 3
+// seconds later: one blip, or this service starting again, must not leave the log frozen and the buttons waiting.
+function followJob(log) {
+  const look = async () => {
+    try {
+      // Asked as the page's own look: signed out meanwhile, the answer is a plain 401, not the sign-in page.
+      const r = await fetch(log.dataset.job, { headers: { 'X-Requested-With': 'fetch' }, cache: 'no-store' });
+      // Gone with a restart of this service: the page as it is now.
+      if (r.status === 404) { location.replace(log.dataset.gone); return; }
+      // Signed out meanwhile: the whole page finds out, with the sign-in's own words on why.
+      if (r.status === 401) { location.reload(); return; }
+      // A proxy's error while this service starts, say: the next look.
+      if (!r.ok) { setTimeout(look, 3000); return; }
+      const j = await r.json();
+      // The job's last lines, the newest in sight.
+      log.textContent = j.log.join('\n') || '…';
+      log.scrollTop = log.scrollHeight;
+      if (j.state === 'running') { setTimeout(look, 1000); return; }
+      // Its end in the box's colour: done or failed.
+      log.classList.add(j.state);
+      // Done: the page again, which now says what came of it.
+      if (j.state === 'done') { setTimeout(() => location.replace(log.dataset.done), 800); return; }
+      // Failed: the log stays, and the buttons work again with their own words back (a build's said "Building…").
+      for (const b of document.querySelectorAll('button[disabled][data-again]')) {
+        b.disabled = false;
+        if (b.dataset.label) b.textContent = b.dataset.label;
+      }
+      // Why, in the page's words, where the page has a place for it and the job's own lines say it.
+      const failed = document.getElementById('job-failed');
+      if (failed) {
+        if (j.why) failed.textContent = j.why;
+        failed.hidden = false;
+      }
+    } catch (_) {
+      // No answer at all, or one that is not the job's: the next look.
+      setTimeout(look, 3000);
+    }
+  };
+  look();
+}
+for (const log of document.querySelectorAll('.log[data-job]')) followJob(log);
+
 // Tables with headings that say data-sort: a click puts the rows in that column's order, a second reverses it.
 for (const table of document.querySelectorAll('table.sortable')) {
   const heads = [...table.tHead.rows[0].cells], sortKey = `opendmtq.sort.${location.pathname}`;

@@ -11,34 +11,11 @@
   </ol>
 </section>
 
-{# A job the step started (the import, the app's build): its output until it ends, then the page again. #}
+{# A job the step started (the import, the app's build): its output until it ends, then the page again (followJob in
+   admin.js). Done: the step again, which now says what came in; gone with a restart of these pages, the step as it is now.
+   Failed: the log stays, the buttons marked data-again work again, and why it failed shows under it. #}
 {% macro follow(job, step) %}
-<pre class="log" id="log">{{ t('app.starting') }}</pre>
-<script>
-  (async function poll() {
-    const r = await fetch("{{ url_for('job_status', job_id=job) }}");
-    // Gone with a restart of these pages: the step as it is now.
-    if (r.status === 404) return location.replace("{{ url_for('setup_page', step=step) }}");
-    if (!r.ok) return setTimeout(poll, 3000);
-    const j = await r.json();
-    const el = document.getElementById('log');
-    el.textContent = j.log.join('\n') || '…';
-    el.scrollTop = el.scrollHeight;
-    if (j.state === 'running') return setTimeout(poll, 1000);
-    el.classList.add(j.state);
-    // Done: the step again, which now says what came in. Failed: the log stays, the forms are there for another try.
-    if (j.state === 'done') return setTimeout(() => location.replace("{{ url_for('setup_page', step=step) }}"), 800);
-    // The buttons work again, with their own words back (a build's said "Building…").
-    for (const b of document.querySelectorAll('button[disabled][data-again]')) {
-      b.disabled = false;
-      if (b.dataset.label) b.textContent = b.dataset.label;
-    }
-    const failed = document.getElementById('job-failed');
-    // Why, in the page's words, when the job's own lines say it.
-    if (j.why) failed.textContent = j.why;
-    failed.hidden = false;
-  })();
-</script>
+<pre class="log" id="log" data-job="{{ url_for('job_status', job_id=job) }}" data-done="{{ url_for('setup_page', step=step) }}" data-gone="{{ url_for('setup_page', step=step) }}">{{ t('app.starting') }}</pre>
 <p class="flash bad" id="job-failed" role="status" hidden>{{ t('setup.import_failed') if step == 'files' else t('alert.build_failed') }}</p>
 {% endmacro %}
 

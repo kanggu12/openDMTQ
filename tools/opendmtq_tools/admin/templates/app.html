@@ -22,34 +22,14 @@
   {% endif %}
   <p class="meta">{{ t('app.offer_rule', host=public_host) }}</p>
   <div class="btn-line">
-    <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="host" value="{{ public_host }}"><button class="btn btn-primary" {% if running %}disabled{% endif %}>{{ t('app.building') if running else (t('app.rebuild') if offer else t('app.build')) }}</button></form>
+    {# data-again: a build that fails gives the button back, with its own word (data-label), for another try. #}
+    <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="host" value="{{ public_host }}"><button class="btn btn-primary" data-again data-label="{{ tp('app.rebuild') if offer else tp('app.build') }}" {% if running %}disabled{% endif %}>{{ t('app.building') if running else (t('app.rebuild') if offer else t('app.build')) }}</button></form>
     {% if offer %}<a class="btn" href="{{ url_for('app_download', name=offer.file) }}">{{ t('btn.download') }}</a>{% endif %}
     {% if windows %}<a class="btn" href="{{ url_for('app_windows') }}">{{ t('app.windows_download') }}</a>{% endif %}
   </div>
-  {% if job %}
-    <pre class="log" id="log">{{ t('app.starting') }}</pre>
-    <script>
-      // Follow the build's output until it finishes, then show the new list. A failed build keeps
-      // its log on screen and the forms ready for another try.
-      (async function poll() {
-        const r = await fetch("{{ url_for('job_status', job_id=job) }}");
-        // Gone with a restart of this service: the page starts over.
-        if (r.status === 404) return location.replace("{{ url_for('app_page') }}");
-        if (!r.ok) return setTimeout(poll, 3000);
-        const j = await r.json();
-        const el = document.getElementById('log');
-        el.textContent = j.log.join('\n') || '…';
-        el.scrollTop = el.scrollHeight;
-        if (j.state === 'running') return setTimeout(poll, 1000);
-        el.classList.add(j.state);
-        if (j.state === 'done') return setTimeout(() => location.replace("{{ url_for('app_page', built=job) }}"), 800);
-        for (const button of document.querySelectorAll('form button[disabled]')) {
-          button.disabled = false;
-          button.textContent = button.closest('form').querySelector('input[name=host][type=hidden]') ? {{ tp('app.rebuild')|tojson }} : {{ tp('app.build')|tojson }};
-        }
-      })();
-    </script>
-  {% endif %}
+  {# The build's output until it finishes, then the new list (followJob in admin.js). A failed build keeps its log on
+     screen and the forms ready for another try; gone with a restart of this service, the page starts over. #}
+  {% if job %}<pre class="log" id="log" data-job="{{ url_for('job_status', job_id=job) }}" data-done="{{ url_for('app_page', built=job) }}" data-gone="{{ url_for('app_page') }}">{{ t('app.starting') }}</pre>{% endif %}
 </section>
 {# A build for another address, for a test on another network: kept here for download, never offered to players. #}
 <section class="card">
@@ -58,7 +38,7 @@
   <form method="post" class="form-row">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label class="field grow">{{ t('app.address') }} <input class="input" name="host" value="{{ host }}" placeholder="host:port" autocapitalize="none" spellcheck="false" required></label>
-    <button class="btn" {% if running %}disabled{% endif %}>{{ t('app.building') if running else t('app.build') }}</button>
+    <button class="btn" data-again data-label="{{ tp('app.build') }}" {% if running %}disabled{% endif %}>{{ t('app.building') if running else t('app.build') }}</button>
   </form>
 </section>
 {# Every other build, each saying why it is not the one on offer (the reason in one span: where the table stacks on a

@@ -794,7 +794,8 @@ class ImportTest(unittest.TestCase):
             try:
                 page = inst.page(BASE + "/setup?step=files&job=imp")
                 self.assertIn("Importing. The songs take some minutes.", page)
-                self.assertIn(f'fetch("{BASE}/jobs/imp")', page)
+                # admin.js follows it from the log box: where to ask, and the step again when it is done or gone.
+                self.assertIn(f'data-job="{BASE}/jobs/imp" data-done="{BASE}/setup?step=files" data-gone="{BASE}/setup?step=files"', page)
                 # Its import buttons wait for it.
                 self.assertRegex(page, r'data-again\s+disabled')
             finally:
