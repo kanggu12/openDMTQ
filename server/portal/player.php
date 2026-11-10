@@ -58,16 +58,19 @@ if ($me && has_playlog($db)) {
     }
 }
 // Their records by the chart's level, as the game's own song select shows how far one has come through a level: for each
-// level the server's songs have, how many of its charts they hold a record on, split by grade, out of all of them.
+// level the server's songs have, how many of its charts they hold a record on, split by grade, out of all of them. Only
+// the songs players can see, as the songs page and the game list them: a song the owner hid is in neither number, or a
+// level could say more records than charts.
 $levels = [];
+$listed = array_filter($songs, fn($s) => ($s['hidden_yn'] ?? 'N') !== 'Y');
 foreach ($charts as [$sid, , $diff]) {
-    if (isset($songs[$sid]) && $diff > 0) {
+    if (isset($listed[$sid]) && $diff > 0) {
         $levels[$diff]['all'] = ($levels[$diff]['all'] ?? 0) + 1;
     }
 }
 foreach ($best as $r) {
-    $diff = $charts[(int)$r['pattern_id']][2] ?? 0;
-    if (isset($levels[$diff])) {
+    [$sid, , $diff] = $charts[(int)$r['pattern_id']] ?? [0, 0, 0];
+    if (isset($listed[$sid], $levels[$diff])) {
         $levels[$diff]['grades'][$r['grade']] = ($levels[$diff]['grades'][$r['grade']] ?? 0) + 1;
     }
 }

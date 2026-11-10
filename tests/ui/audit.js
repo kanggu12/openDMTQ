@@ -348,6 +348,18 @@ async function portalFlows(contexts) {
   check('the site names its own files by their versions, and a browser keeps them a year',
     /^\/opendmtq\/style\.css\?v=\d+$/.test(kept.css) && kept.scripts.length > 0 && kept.scripts.every(x => /^\/opendmtq\/[a-z]+\.js\?v=\d+$/.test(x))
     && kept.versioned === 'max-age=31536000, immutable' && kept.bare === 'no-cache' && kept.font === 'max-age=31536000, immutable', JSON.stringify(kept));
+  // Only an answer that depends on Accept says so (Vary: Accept, site.conf): the site's files are one answer for every
+  // cache, and an address with nothing there still answers a browser with the site's page and anything else short.
+  const varied = await front.evaluate(async () => {
+    const ask = async (u, accept) => {
+      const r = await fetch(u, { cache: 'no-store', headers: accept ? { Accept: accept } : {} });
+      return [r.status, (r.headers.get('vary') || '').split(',').map(v => v.trim().toLowerCase()).includes('accept'), (await r.text()).length];
+    };
+    return [await ask('/opendmtq/style.css'), await ask('/opendmtq/fonts/dmtq-wide-800.woff2'), await ask('/opendmtq/favicon.svg'),
+      await ask('/opendmtq/no-such-page', 'text/html'), await ask('/opendmtq/no-such-page.png', 'image/png')];
+  });
+  check('only the answers that depend on Accept say so', varied.slice(0, 3).every(([status, vary]) => status === 200 && !vary)
+    && varied[3][0] === 404 && varied[3][2] > 1000 && varied[4][0] === 404 && varied[4][2] < 400, JSON.stringify(varied));
   await front.close();
   // The download page's part for computers: the installer for Windows (the PC client), its button the site's /windows,
   // which hands a signed-in visitor the installer with this server's address on its end and sends a stranger to the
@@ -896,6 +908,30 @@ async function adminFlows(contexts) {
   // What did not happen is not in the log of changes.
   await page.goto(`${A}/logs?tab=changes`, { waitUntil: 'domcontentloaded' });
   check('a refused package is no change', !/Added a song/.test(await textOf(page, '.changes')));
+
+  // A player's records by level count the songs players can see (player.php): with the first song hidden on the Songs
+  // page, its charts go from every level's count (four of level 1 with its Easy, three of 4 and of 7, make_content.php),
+  // and no level says more records than charts; shown again, the counts are as they were.
+  const levelsOf = async () => {
+    const p = await contexts.signed.newPage();
+    await p.goto(`${P}/player.php?id=1`, { waitUntil: 'domcontentloaded' });
+    const rows = await p.$$eval('.levels .level', ls => ls.map(l => [Number(l.querySelector('.level-name').textContent.replace(/\D/g, '')),
+      ...l.querySelector('b').textContent.split('/').map(n => Number(n.trim()))]));
+    await p.close();
+    return Object.fromEntries(rows.map(([lv, held, all]) => [lv, [held, all]]));
+  };
+  const shownLevels = await levelsOf();
+  await page.goto(`${A}/songs`, { waitUntil: 'domcontentloaded' });
+  await press(page, 'form:has(input[name=song_id][value="1"]):has(input[name=action][value=hide]) button');
+  const hiddenLevels = await levelsOf();
+  await page.goto(`${A}/songs`, { waitUntil: 'domcontentloaded' });
+  await press(page, 'form:has(input[name=song_id][value="1"]):has(input[name=action][value=show]) button');
+  const backLevels = await levelsOf();
+  const dropped = Object.fromEntries(Object.entries(shownLevels).map(([lv, [, all]]) => [lv, all - ((hiddenLevels[lv] || [0, 0])[1])]).filter(([, d]) => d));
+  check("a player's levels count only the songs players can see",
+    Object.keys(shownLevels).length > 0 && JSON.stringify(dropped) === '{"1":4,"4":3,"7":3}'
+    && Object.values(hiddenLevels).every(([held, all]) => held <= all) && JSON.stringify(backLevels) === JSON.stringify(shownLevels),
+    JSON.stringify({ shownLevels, hiddenLevels, dropped }));
 
   // A recording hidden from the public list comes back when shown again. A live page open all the while asks for that list
   // only when it changed (live.php, live_past_rev()): not at its looks while nothing changes, once right after each change.
