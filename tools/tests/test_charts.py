@@ -4,8 +4,10 @@ import importlib.util
 import re
 import unittest
 
-HAVE_MARKUPSAFE = importlib.util.find_spec("markupsafe") is not None
-if HAVE_MARKUPSAFE:
+# The admin package makes its Flask application as it is imported (admin/__init__.py), so this module needs Flask, not
+# only markupsafe: both are in the tools image only.
+HAVE_FLASK = importlib.util.find_spec("flask") is not None
+if HAVE_FLASK:
     from opendmtq_tools.admin import charts
 
 # The colours the status page paints blocks in (GRADE_COLOURS in admin/status.py).
@@ -24,7 +26,7 @@ def contrast(one, other):
     return (a + 0.05) / (b + 0.05)
 
 
-@unittest.skipUnless(HAVE_MARKUPSAFE, "needs the admin's libraries (in the tools image)")
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class NumbersTest(unittest.TestCase):
     def test_a_count_is_short_only_when_large(self):
         for value, shown in ((0, "0"), (999, "999"), (1000, "1,000"), (9999, "9,999"), (12000, "12K"), (1500000, "1.5M")):
@@ -35,7 +37,7 @@ class NumbersTest(unittest.TestCase):
             self.assertEqual(charts.nice_top(value), top)
 
 
-@unittest.skipUnless(HAVE_MARKUPSAFE, "needs the admin's libraries (in the tools image)")
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class OverTimeTest(unittest.TestCase):
     POINTS = [("10-01", "1 play", 1), ("", "none", 0), ("", "3 plays", 3), ("10-04", "9 plays", 9)]
 
@@ -80,7 +82,7 @@ class OverTimeTest(unittest.TestCase):
         self.assertNotIn("<script>", html)
 
 
-@unittest.skipUnless(HAVE_MARKUPSAFE, "needs the admin's libraries (in the tools image)")
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class HeatmapTest(unittest.TestCase):
     def test_a_cell_for_every_hour_of_every_day_stronger_with_more(self):
         rows = [[0] * 24 for _ in range(7)]
@@ -97,7 +99,7 @@ class HeatmapTest(unittest.TestCase):
         self.assertEqual(html.count('class="c0"'), 7 * 24)
 
 
-@unittest.skipUnless(HAVE_MARKUPSAFE, "needs the admin's libraries (in the tools image)")
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class SegmentsTest(unittest.TestCase):
     def test_a_share_is_printed_only_where_it_fits(self):
         html = str(charts.segments([("Big", 95, "95 GB"), ("Small", 5, "5 GB")], "Disk"))
@@ -120,7 +122,7 @@ class SegmentsTest(unittest.TestCase):
         self.assertNotIn("<i>1</i>", html)
 
 
-@unittest.skipUnless(HAVE_MARKUPSAFE, "needs the admin's libraries (in the tools image)")
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class RankedAndSparkTest(unittest.TestCase):
     def test_the_bars_are_long_by_their_value_against_the_first(self):
         html = str(charts.ranked([("A", 10, "10", None), ("B", 5, "5", None), ("C", 0, "0", None)], "Who"))
@@ -140,7 +142,7 @@ if __name__ == "__main__":
     unittest.main()
 
 
-@unittest.skipUnless(HAVE_MARKUPSAFE, "needs the admin's libraries (in the tools image)")
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class ResourcesTest(unittest.TestCase):
     """The status page's resources: a level over the day with its gaps, how full something is, a strip of states."""
 

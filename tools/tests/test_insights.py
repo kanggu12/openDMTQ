@@ -10,8 +10,10 @@ import time
 import unittest
 from unittest import mock
 
-HAVE_MARKUPSAFE = importlib.util.find_spec("markupsafe") is not None
-if HAVE_MARKUPSAFE:
+# The admin package makes its Flask application as it is imported (admin/__init__.py), so this module needs Flask, not
+# only markupsafe: both are in the tools image only.
+HAVE_FLASK = importlib.util.find_spec("flask") is not None
+if HAVE_FLASK:
     from opendmtq_tools.admin import insights
 
 PHONE = "Dalvik/2.1.0 (Linux; U; Android 14)"
@@ -30,7 +32,7 @@ def row(path="/opendmtq/", status=200, at=0.0, **fields):
     return parsed
 
 
-@unittest.skipUnless(HAVE_MARKUPSAFE, "needs the admin's libraries (in the tools image)")
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class RequestLogTest(unittest.TestCase):
     def test_a_line_is_read_whole(self):
         r = insights.parse_line(line("/apk?x=1", 206, "1048576", PHONE))
@@ -147,7 +149,7 @@ class RequestLogTest(unittest.TestCase):
         self.assertEqual(insights.top_pages(rows), [("/opendmtq/song.php", 2), ("/opendmtq/", 1)])
 
 
-@unittest.skipUnless(HAVE_MARKUPSAFE, "needs the admin's libraries (in the tools image)")
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class ChangesTest(unittest.TestCase):
     def test_newest_first_and_a_broken_line_is_skipped(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -177,7 +179,7 @@ class ChangesTest(unittest.TestCase):
             self.assertEqual(insights.audit_read(os.path.join(a_file.name, "sub")), [])
 
 
-@unittest.skipUnless(HAVE_MARKUPSAFE, "needs the admin's libraries (in the tools image)")
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class PlaysTest(unittest.TestCase):
     NOW = datetime.datetime(2026, 11, 2, 20, 0).timestamp()
     # One row per player: the same shape as the admin's PLAYER_ROWS, with its one parameter.
@@ -237,7 +239,7 @@ class PlaysTest(unittest.TestCase):
         self.assertEqual(insights.player_activity(self.con, now=self.NOW)[1]["last"], None)
 
 
-@unittest.skipUnless(HAVE_MARKUPSAFE, "needs the admin's libraries (in the tools image)")
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class FolderSizeTest(unittest.TestCase):
     def test_all_the_bytes_under_a_folder(self):
         with tempfile.TemporaryDirectory() as folder:
