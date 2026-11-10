@@ -21,6 +21,11 @@ _shown_lock = threading.Lock()
 # The buttons of an account's row, by the form's action.
 ACTIONS = ("password", "off", "on", "delete", "admin", "player")
 
+# The shortest password typed for an account with admin rights. It opens these pages too, and the site's sign-in, which
+# takes the same password, lets more guesses through than theirs. The passwords made here are as long
+# (auth.account_password), so only a typed one can be shorter.
+ADMIN_PASSWORD_MIN = 10
+
 
 def keep_once(name, password, note, word):
     """Keeps an account's password for the next page to show, once: the session holds only the way to it."""
@@ -146,6 +151,9 @@ def create(name, password, password2, note, admin_rights, player):
         raise Refused(400, "bad_id", t("acc.bad_id"))
     if password and not 6 <= len(password) <= 64:
         raise Refused(400, "bad_password", t("acc.bad_password"))
+    # With admin rights, longer: what one guess on the site's sign-in may open is these pages.
+    if password and admin_rights and len(password) < ADMIN_PASSWORD_MIN:
+        raise Refused(400, "bad_password", t("acc.bad_admin_password", n=ADMIN_PASSWORD_MIN))
     if password and password2 != password:
         raise Refused(400, "password_mismatch", t("acc.mismatch"))
     guid = account_player(player)

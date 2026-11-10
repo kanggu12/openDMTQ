@@ -464,6 +464,7 @@ STRINGS = {
         "acc.done_delete": "The account {name} is deleted.",
         "acc.bad_id": "An ID is 3 to 20 Latin letters, digits, dots, dashes or underscores.",
         "acc.bad_password": "A password is 6 to 64 characters. Leave it empty to have one made.",
+        "acc.bad_admin_password": "With admin rights a password is {n} to 64 characters. Leave it empty to have one made.",
         "acc.taken": "The ID {name} is taken.",
         "acc.gone": "There is no account {name} any more.",
         # The API's tokens, on the Accounts page.
@@ -1274,6 +1275,7 @@ STRINGS = {
         "acc.done_delete": "{name} 계정을 지웠습니다.",
         "acc.bad_id": "아이디는 영문, 숫자, 점(.), 하이픈(-), 밑줄(_)로 3~20자입니다.",
         "acc.bad_password": "비밀번호는 6~64자입니다. 비우면 자동으로 만듭니다.",
+        "acc.bad_admin_password": "관리자 권한 계정의 비밀번호는 {n}~64자입니다. 비우면 자동으로 만듭니다.",
         "acc.taken": "이미 있는 아이디입니다: {name}",
         "acc.gone": "없는 계정입니다: {name}",
         # The API's tokens, on the Accounts page.

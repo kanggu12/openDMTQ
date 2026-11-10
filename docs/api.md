@@ -740,7 +740,7 @@ Makes an account. Its password is made when none is sent, and comes back this on
 Body (JSON):
 
 - `name` (string): Its ID: 3 to 20 Latin letters, digits, dots, dashes or underscores.
-- `password` (string, optional): Its password, 6 to 64 characters. Left out or empty: one is made.
+- `password` (string, optional): Its password, 6 to 64 characters, 10 at least with admin rights. Left out or empty: one is made.
 - `note` (string, optional, 40 characters at most): Whom it is for. The Accounts page cuts a longer one; here it is refused.
 - `admin` (boolean, optional): True to open the admin pages to it too.
 - `player` (integer, or null, optional): The game player it is.
@@ -750,7 +750,7 @@ Answer: `201` with [AccountPassword](#accountpassword).
 Refusals:
 
 - `400 bad_id`: Not an ID.
-- `400 bad_password`: Not 6 to 64 characters.
+- `400 bad_password`: Not 6 to 64 characters, or under 10 with admin rights.
 - `400 bad_player`: No such player.
 - `400 bad_field`: A note over 40 characters.
 - `409 id_taken`: The ID is taken (by an account in any letter case, or the owner's).

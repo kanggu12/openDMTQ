@@ -486,6 +486,10 @@ def CASES():
         C("accounts_create", "POST", "/accounts", 400, "bad_id", json={"name": "a b"}),
         C("accounts_create", "POST", "/accounts", 409, "id_taken", json={"name": "FRIEND", "password": "hunter22"}),
         C("accounts_create", "POST", "/accounts", 400, "bad_player", json={"name": "newbie", "player": 999}),
+        # With admin rights a typed password is 10 at least; one made is as long.
+        C("accounts_create", "POST", "/accounts", 400, "bad_password", json={"name": "newbie", "password": "hunter222", "admin": True}),
+        C("accounts_create", "POST", "/accounts", 201, json={"name": "newbie", "password": "hunter2222", "admin": True},
+          check=lambda t, inst, r: t.assertTrue(r.get_json()["account"]["admin"])),
         # A note over 40 characters: refused, where the page cuts it.
         C("accounts_create", "POST", "/accounts", 400, "bad_field", json={"name": "newbie", "note": "n" * 41}),
         C("accounts_create", "POST", "/accounts", 201, json={"name": "newbie", "note": "n" * 40},

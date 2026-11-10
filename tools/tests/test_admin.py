@@ -1962,6 +1962,9 @@ class AccountsTest(unittest.TestCase):
             self.assertIn("An ID is 3 to 20", self.make(inst, name="a b"))
             self.assertIn("An ID is 3 to 20", self.make(inst, name="민호"))
             self.assertIn("A password is 6 to 64", self.make(inst, name="short", password="12345"))
+            # With admin rights a typed password is 10 at least: it opens these pages, and the site's sign-in takes it too.
+            self.assertIn("With admin rights a password is 10 to 64", self.make(inst, name="helper", password="hunter222", admin="1"))
+            self.assertIsNone(self.row("helper"))
             self.make(inst, name="Sena", password="hunter22")
             # The same ID in other letters, and the owner's own ID, are taken.
             self.assertIn("is taken", self.make(inst, name="SENA", password="hunter22"))
@@ -1973,28 +1976,28 @@ class AccountsTest(unittest.TestCase):
     def test_admin_rights_open_these_pages_and_a_site_account_does_not(self):
         with Install() as inst:
             self.server(inst)
-            self.make(inst, name="helper", password="hunter22", admin="1")
+            self.make(inst, name="helper", password="hunter2222", admin="1")
             self.make(inst, name="friend", password="hunter22")
             other = admin.app.test_client()
             self.assertEqual(other.post("/opendmtq/admin/login", data={"name": "friend", "password": "hunter22"}).status_code, 200)
-            self.assertEqual(other.post("/opendmtq/admin/login", data={"name": "HELPER", "password": "hunter22"}).status_code, 302)
+            self.assertEqual(other.post("/opendmtq/admin/login", data={"name": "HELPER", "password": "hunter2222"}).status_code, 302)
             self.assertEqual(other.get("/opendmtq/admin/players").status_code, 200)
             self.assertIsNotNone(self.row("helper")["signed_in_at"])
 
     def test_a_new_password_or_switching_off_ends_an_admins_session(self):
         with Install() as inst:
             self.server(inst)
-            self.make(inst, name="helper", password="hunter22", admin="1")
+            self.make(inst, name="helper", password="hunter2222", admin="1")
             other = admin.app.test_client()
-            other.post("/opendmtq/admin/login", data={"name": "helper", "password": "hunter22"})
+            other.post("/opendmtq/admin/login", data={"name": "helper", "password": "hunter2222"})
             self.act(inst, "password", "helper")
             self.assertEqual(other.get("/opendmtq/admin/players").status_code, 302)
             # A new password: the old one no longer signs in.
-            self.assertEqual(other.post("/opendmtq/admin/login", data={"name": "helper", "password": "hunter22"}).status_code, 200)
+            self.assertEqual(other.post("/opendmtq/admin/login", data={"name": "helper", "password": "hunter2222"}).status_code, 200)
             # Switched off: an admin signed in with it is out at the next page.
-            self.make(inst, name="second", password="hunter22", admin="1")
+            self.make(inst, name="second", password="hunter2222", admin="1")
             third = admin.app.test_client()
-            third.post("/opendmtq/admin/login", data={"name": "second", "password": "hunter22"})
+            third.post("/opendmtq/admin/login", data={"name": "second", "password": "hunter2222"})
             self.assertEqual(third.get("/opendmtq/admin/players").status_code, 200)
             self.act(inst, "off", "second")
             self.assertEqual(self.row("second")["off"], 1)
@@ -2006,9 +2009,9 @@ class AccountsTest(unittest.TestCase):
     def test_an_admin_keeps_their_sign_in_with_a_new_password_and_cannot_lock_themselves_out(self):
         with Install() as inst:
             self.server(inst)
-            self.make(inst, name="helper", password="hunter22", admin="1")
+            self.make(inst, name="helper", password="hunter2222", admin="1")
             other = admin.app.test_client()
-            other.post("/opendmtq/admin/login", data={"name": "helper", "password": "hunter22"})
+            other.post("/opendmtq/admin/login", data={"name": "helper", "password": "hunter2222"})
             token = lambda: other.get("/opendmtq/admin/accounts").get_data(as_text=True).split('name="csrf" value="')[1].split('"')[0]
             # Their own new password: shown, and they stay signed in with it.
             page = other.post("/opendmtq/admin/accounts", data={"csrf": token(), "action": "password", "name": "HELPER"}, follow_redirects=True).get_data(as_text=True)
