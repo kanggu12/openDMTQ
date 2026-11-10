@@ -1,7 +1,7 @@
 """A named mutex the launcher holds while a game it started is running.
 
 The installer looks for it and waits then: Velopack's setup replaces the player's files, and a game playing from them
-would lose them mid-song. The launcher's own update waits in the same moment for the same reason (pages.build_about).
+would lose them mid-song. The launcher's own update waits in the same moment for the same reason (maintenance.py).
 """
 
 import sys

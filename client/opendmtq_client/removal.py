@@ -14,7 +14,7 @@ Three removals, from the least to the most:
   delete_everything()  the second and third places whole, the id with them
   uninstall()          the program, by Velopack's own uninstaller, which also takes the shortcuts and Windows' entry
 
-Nothing here asks: the window and the command line ask first (pages.py, main.py). A link or a Windows junction is
+Nothing here asks: the window and the command line ask first (maintenance.py, main.py). A link or a Windows junction is
 removed as itself and never followed, except a game's folder or its data folder that is one (moved to another disk):
 what it holds is the game's, and goes as if it were in place.
 """

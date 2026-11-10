@@ -266,7 +266,7 @@ class WindowFlow(Folder):
 
     def test_closing_the_window_after_delete_all_writes_nothing(self):
         import types
-        from opendmtq_client import dialogs, i18n, pages
+        from opendmtq_client import dialogs, i18n, maintenance
         os.environ.pop("OPENDMTQ_CLIENT_DIR", None)
         state = st.LauncherState()
         state.add_server("http://127.0.0.1:1", "Somewhere")
@@ -282,16 +282,17 @@ class WindowFlow(Folder):
             app.state.save()
 
         with mock.patch.object(dialogs, "choose", return_value="all"), mock.patch.object(dialogs, "tell", tell), \
-                mock.patch.object(pages, "_in_background", lambda app, words, glyph, job, then: then(job(), None)), \
+                mock.patch.object(maintenance, "_in_background",
+                                  lambda app, words, glyph, job, then: then(job(), None)), \
                 mock.patch.object(removal, "uninstall", side_effect=OSError("Update.exe did not start")):
-            pages.uninstall_program(app)
+            maintenance.uninstall_program(app)
         self.assertEqual(said, [app.words("help.uninstall.failed")])
         self.assertFalse(os.path.exists(removal.data_root()))
 
     def test_start_over_and_forget_wait_for_a_game_from_the_command_line(self):
         # Every tool that deletes waits while a game runs, also one the command line started (app.files_in_use), which
         # the page's own busy state (PLAY, a download, this window's game) does not know of.
-        from opendmtq_client import app as launcher, dialogs, i18n, pages, playing
+        from opendmtq_client import app as launcher, dialogs, i18n, maintenance, pages, playing
         state = st.LauncherState()
         state.add_server("http://127.0.0.1:1", "Somewhere")
         os.makedirs(apps.folder("http://127.0.0.1:1"))
@@ -303,7 +304,7 @@ class WindowFlow(Folder):
         with mock.patch.object(playing, "running", return_value=True), \
                 mock.patch.object(dialogs, "ask", side_effect=AssertionError("asked")):
             self.assertEqual((app.busy_now(), app.files_in_use()), (False, True))
-            pages.start_over(app)
+            maintenance.start_over(app)
             pages.forget_server(app, state.server(), lambda: None)
         self.assertEqual(said, [app.words("help.reset.busy"), app.words("online.busy")])
         self.assertIsNotNone(state.server("http://127.0.0.1:1"))
@@ -312,7 +313,7 @@ class WindowFlow(Folder):
     def test_clear_counts_in_the_background_then_asks_with_the_size(self):
         # The count is work in the background like the clearing (through a game's thousands of files the window would
         # stop answering), and the question after it says what it found.
-        from opendmtq_client import dialogs, i18n, pages
+        from opendmtq_client import dialogs, i18n, maintenance
         os.environ.pop("OPENDMTQ_CLIENT_DIR", None)
         game = os.path.join(removal.data_root(), "com.example.game")
         write(game, GAME)
@@ -329,8 +330,8 @@ class WindowFlow(Folder):
             asked.append(detail)
             return True
 
-        with mock.patch.object(pages, "_in_background", background), mock.patch.object(dialogs, "ask", ask):
-            pages.clear_game_data(app)
+        with mock.patch.object(maintenance, "_in_background", background), mock.patch.object(dialogs, "ask", ask):
+            maintenance.clear_game_data(app)
         self.assertEqual(jobs, ["game_data_size", "clear_game_data"])
         size = removal.megabytes(sum(len(v) for k, v in GAME.items() if k != "data/android_id"))
         self.assertEqual(asked, [app.words("help.clear.detail", size=size)])

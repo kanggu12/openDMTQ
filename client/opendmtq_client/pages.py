@@ -10,7 +10,7 @@ import os
 import threading
 import tkinter as tk
 
-from opendmtq_client import actions, apps, dialogs, displays, player, theme, updates, widgets
+from opendmtq_client import actions, apps, dialogs, displays, maintenance, player, theme, updates, widgets
 from opendmtq_client import server as srv
 from opendmtq_client import state as st
 from opendmtq_client import values as choices
@@ -154,7 +154,7 @@ def refresh_checks(app):
         name, value, action, fix = w("check." + check.key), None, None, w("play.fix")
         if not check.ok and check.key == "player" and installed.root():
             # The player comes with the launcher: the installed one puts it back from its package.
-            state, fix, action = "bad", w("check.player.repair"), lambda: repair_program(app)
+            state, fix, action = "bad", w("check.player.repair"), lambda: maintenance.repair_program(app)
         elif not check.ok and check.key == "player":
             # A copied folder: installing brings the player back, and no page here can.
             state, value = "bad", w("check.player.missing")
@@ -687,194 +687,26 @@ def build_help(app, parent):
         # Only the installed launcher has a package to put its files back from.
         widgets.divider(card.body, ui)
         widgets.setting_row(card.body, ui, w("help.repair"),
-                            lambda p: widgets.Button(p, ui, w("help.repair"), lambda: repair_program(app)),
+                            lambda p: widgets.Button(p, ui, w("help.repair"), lambda: maintenance.repair_program(app)),
                             w("help.repair.hint")).pack(fill="x")
     # From the least to the most: the game's data, the launcher's, the program.
     card = _card(parent, ui, w("help.remove"), last=True)
     widgets.setting_row(card.body, ui, w("help.clear"),
-                        lambda p: widgets.Button(p, ui, w("help.clear.confirm"), lambda: clear_game_data(app),
+                        lambda p: widgets.Button(p, ui, w("help.clear.confirm"), lambda: maintenance.clear_game_data(app),
                                                  kind="danger"),
                         w("help.clear.hint")).pack(fill="x")
     widgets.divider(card.body, ui)
 
     widgets.setting_row(card.body, ui, w("help.reset"),
-                        lambda p: widgets.Button(p, ui, w("help.reset"), lambda: start_over(app), kind="danger"),
+                        lambda p: widgets.Button(p, ui, w("help.reset"), lambda: maintenance.start_over(app), kind="danger"),
                         w("help.reset.hint")).pack(fill="x")
     if root and installed.updater(root):
         # Velopack's uninstaller is what takes the program; a copied folder is deleted as any folder.
         widgets.divider(card.body, ui)
         widgets.setting_row(card.body, ui, w("help.uninstall"),
-                            lambda p: widgets.Button(p, ui, w("help.uninstall"), lambda: uninstall_program(app),
+                            lambda p: widgets.Button(p, ui, w("help.uninstall"), lambda: maintenance.uninstall_program(app),
                                                      kind="danger"),
                             w("help.uninstall.hint")).pack(fill="x")
-
-
-def _in_background(app, message, glyph, job, then):
-    """Run job() on a worker thread under a dialog that says what is under way, then then(result, error) on the
-    window's thread with the dialog gone. The window is not closed meanwhile: the work would stop half done."""
-    app.dialog = dialogs.Dialog(app.root, app.ui, "info", message, message, progress=True, glyph=glyph)
-    app.updating = True
-
-    def work():
-        try:
-            result, error = job(), None
-        except Exception as e:  # noqa: BLE001  (shown in a dialog, never swallowed)
-            log.exception("%s failed", job.__name__)
-            result, error = None, e
-        app.post(lambda: finished(result, error))
-
-    def finished(result, error):
-        app.updating = False
-        if app.dialog is not None:
-            app.dialog.close(None)
-            app.dialog = None
-        # A step of its own, out of the task pump: a question then() asks (after a count) waits for its answer, and the
-        # pump would hand the window nothing from the other worker threads meanwhile.
-        app.root.after(0, lambda: then(result, error))
-
-    threading.Thread(target=work, daemon=True, name=job.__name__).start()
-
-
-def _not_now(app):
-    """True, said on the status line, while the files these tools change are in use (app.files_in_use): the game runs,
-    from this window or the command line, or PLAY or a download is under way."""
-    if app.files_in_use():
-        app.set_status(app.words("help.reset.busy"), "warn")
-        return True
-    return False
-
-
-def start_over(app):
-    """Start over: after a question, every server's app goes and the launcher is as at a first start, the guide next
-    in the language it speaks now (actions.reset)."""
-    w = app.words
-    if _not_now(app):
-        return
-    if not dialogs.ask(app, "danger", w("help.reset.title"), w("help.reset.ask"), w("help.reset.detail"),
-                       w("help.reset.confirm"), glyph="restore"):
-        return
-    actions.reset(app.state)
-    app.state.save()
-    app.devices = None
-    app.page = "play"
-    app.show()
-
-
-def repair_program(app):
-    """Repair: the program's files compared with the installed package, what is missing or changed put back."""
-    from opendmtq_client import repair
-    w = app.words
-    if _not_now(app):
-        return
-
-    def done(result, error):
-        if error is not None:
-            dialogs.tell(app, "error", w("help.repair"), w("help.repair.failed"), w.error(error))
-        elif result.failed:
-            dialogs.tell(app, "warn", w("help.repair"), w("help.repair.partly"),
-                         w("help.repair.partly.detail", n=result.restored, failed=len(result.failed)))
-        elif result.restored:
-            # The running launcher goes on with the files it loaded; its next start reads the ones put back.
-            detail = "help.repair.done.restart" if result.needs_restart else "help.repair.done.detail"
-            dialogs.tell(app, "info", w("help.repair"), w("help.repair.done"), w(detail, n=result.restored))
-        else:
-            dialogs.tell(app, "info", w("help.repair"), w("help.repair.fine"),
-                         w("help.repair.fine.detail", n=result.checked))
-        # The player may be back.
-        app.refresh_checks()
-
-    _in_background(app, w("help.repair.working"), "restore", repair.run, done)
-
-
-def clear_game_data(app):
-    """Clear game data: the games' folders emptied but for the id this PC plays by, after a question that says how
-    much goes."""
-    from opendmtq_client import removal
-    w = app.words
-    if _not_now(app):
-        return
-
-    def counted(size, error):
-        if error is not None:
-            dialogs.tell(app, "error", w("help.clear"), w("failed.message"), w.error(error))
-            return
-        if not size:
-            app.set_status(w("help.clear.none"), "normal", transient=True)
-            return
-        said = removal.megabytes(size)
-        if not dialogs.ask(app, "danger", w("help.clear"), w("help.clear.ask"), w("help.clear.detail", size=said),
-                           w("help.clear.confirm"), glyph="delete"):
-            return
-
-        def done(failed, error):
-            if error is not None:
-                dialogs.tell(app, "error", w("help.clear"), w("help.clear.partly"), w.error(error))
-            elif failed:
-                dialogs.tell(app, "warn", w("help.clear"), w("help.clear.partly"),
-                             w("help.clear.partly.detail", n=len(failed), path=failed[0]))
-            # The player's log went with the rest: its row comes back once the game has run.
-            if app.page == "help":
-                app.go("help")
-            if error is None and not failed:
-                # Said after the page is drawn again, whose ready check would otherwise take the line at once.
-                app.set_status(w("help.clear.done", size=said), "ok", sticky=True)
-
-        _in_background(app, w("help.clear.working"), "delete", removal.clear_game_data, done)
-
-    # Counted at the press, as the game adds to its data each time it runs; on a worker thread, as a game's thousands
-    # of files take a while on a disk that has not read them lately, and the window would stop answering meanwhile.
-    _in_background(app, w("help.counting"), "delete", removal.game_data_size, counted)
-
-
-def uninstall_program(app):
-    """Uninstall: a question with two ways, the data kept or deleted with the program; then Velopack's uninstaller
-    starts and the window closes for it."""
-    from opendmtq_client import removal
-    w = app.words
-    if _not_now(app):
-        return
-
-    def start():
-        try:
-            removal.uninstall()
-        except Exception as e:  # noqa: BLE001  (Update.exe that did not start: said, and the window stays)
-            log.exception("the uninstaller did not start")
-            dialogs.tell(app, "error", w("help.uninstall"), w("help.uninstall.failed"),
-                         w("help.uninstall.failed.detail", error=w.error(e)))
-            return
-        app.leave()
-
-    def deleted(failed, error):
-        # From here on the window writes nothing, whatever the player does next (closing it during a dialog below too):
-        # its copy of the settings, sign-ins and all, would bring the deleted folder back.
-        app.state.discarded = True
-        if error is not None:
-            # Nothing is uninstalled after a deletion that stopped half way: the player can choose again.
-            dialogs.tell(app, "error", w("help.uninstall"), w("help.uninstall.failed"), w.error(error))
-            return
-        if failed:
-            dialogs.tell(app, "warn", w("help.uninstall"), w("help.uninstall.left"),
-                         w("help.uninstall.left.detail", n=len(failed), folder=removal.data_root()))
-        start()
-
-    def counted(total, error):
-        if error is not None:
-            dialogs.tell(app, "error", w("help.uninstall"), w("failed.message"), w.error(error))
-            return
-        # Cancel first and the ring on it: Enter alone removes nothing.
-        choice = dialogs.choose(app, "danger", w("help.uninstall"), w("help.uninstall.ask"),
-                                w("help.uninstall.detail", size=removal.megabytes(total)),
-                                [(w("help.uninstall.keep"), "keep", "warn"),
-                                 (w("help.uninstall.all"), "all", "danger")], glyph="delete")
-        if choice == "keep":
-            # Written before the uninstaller starts: it closes what runs from the program's folder, this window too.
-            app.state.save()
-            start()
-        elif choice == "all":
-            _in_background(app, w("help.uninstall.working"), "delete", removal.delete_everything, deleted)
-
-    # What Delete all would free, counted on a worker thread first (the games' folders may hold thousands of files).
-    _in_background(app, w("help.counting"), "delete", removal.everything_size, counted)
 
 
 # --------------------------------------------------------------------------------------------- About
@@ -939,42 +771,9 @@ def build_about(app, parent):
                            kind="primary").pack(anchor="w", pady=(ui.px(10), 0))
 
     def update(result):
-        # A game from this window or from the command line: the update replaces the player's files under it.
-        if app.files_in_use():
-            # The update replaces the player's files: a game playing from them would lose them mid-song.
+        if not maintenance.update_launcher(app, result):
+            # A game from this window or from the command line: the update replaces the player's files under it.
             answer.configure(text=w("about.update_busy"), fg=theme.WARN)
-            return
-        # The launcher's own dialog says what happens while the update downloads; then the launcher closes and Velopack
-        # puts the update in without a window of its own and starts the new launcher.
-        app.dialog = dialogs.Dialog(app.root, app.ui, "info", w("about.updating.title"),
-                                    w("about.updating.message", v=result.version), w("about.updating.detail"),
-                                    progress=True, glyph="update")
-
-        # The window stays until the update is in Velopack's hands: closing it now would end the download.
-        app.updating = True
-
-        def work():
-            try:
-                updates.apply(result)
-            except Exception as e:  # noqa: BLE001  (shown, never swallowed)
-                log.exception("the update failed")
-                app.post(lambda text=str(e): failed(text))
-                return
-            log.info("closing for the update to %s", result.version)
-            app.post(done)
-
-        def done():
-            app.updating = False
-            app.close()
-
-        def failed(text):
-            app.updating = False
-            if app.dialog is not None:
-                app.dialog.close(None)
-                app.dialog = None
-            dialogs.tell(app, "error", w("about.update_failed.title"), w("about.apply_failed", error=text))
-
-        threading.Thread(target=work, daemon=True, name="update").start()
 
     widgets.Button(box, ui, w("about.check"), check).pack(side="left", padx=(ui.px(16), 0))
     result.pack(fill="x")
