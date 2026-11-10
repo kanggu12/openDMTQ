@@ -510,4 +510,8 @@ class Words:
             except (KeyError, IndexError):
                 # Words that name a gap the error does not fill: its own sentence instead.
                 pass
+        if isinstance(error, OSError) and error.strerror:
+            # The system's reason and the file it is about, as written: not Python's "[Errno 28] ..." with each
+            # backslash doubled.
+            return "%s: %s" % (error.strerror, error.filename) if error.filename else error.strerror
         return str(error)

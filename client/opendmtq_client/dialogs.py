@@ -12,6 +12,7 @@ there is no window to draw over) comes from standalone().
 """
 
 import logging
+import re
 import sys
 import tkinter as tk
 
@@ -54,6 +55,31 @@ def _motion_on():
         return bool(on.value)
     except (AttributeError, OSError):
         return True
+
+
+def path_breaks(font, text, width):
+    """`text` with a line break inside each word wider than `width` (a path has no spaces), after one of its folders'
+    separators: a path then breaks between its folders, never inside a name that fits on a line."""
+    lines = []
+    for line in text.split("\n"):
+        words = []
+        for word in line.split(" "):
+            if font.measure(word) <= width:
+                words.append(word)
+                continue
+            # The separator stays at the end of the part before it.
+            parts = re.split(r"(?<=[\\/])", word)
+            chunks, chunk = [], ""
+            for part in parts:
+                if chunk and font.measure(chunk + part) > width:
+                    chunks.append(chunk)
+                    chunk = part
+                else:
+                    chunk += part
+            chunks.append(chunk)
+            words.append("\n".join(chunks))
+        lines.append(" ".join(words))
+    return "\n".join(lines)
 
 
 def balanced_width(font, text, width):
@@ -122,14 +148,16 @@ class Dialog:
         text_w = panel_w - 2 * px(PAD) - lamp_room
         y = px(PAD)
         # The question in Pretendard Bold, after the lamp; what it means under it in ash.
-        message = c.create_text(px(PAD) + lamp_room, y, text=self.message, font=fonts.dialog_title, fill=theme.TEXT,
+        message = c.create_text(px(PAD) + lamp_room, y, text=path_breaks(fonts.dialog_title, self.message, text_w),
+                                font=fonts.dialog_title, fill=theme.TEXT,
                                 width=text_w, justify="left", anchor="nw", tags=("card", "words"))
         lamp_y = y + fonts.dialog_title.metrics("linespace") // 2
         y = c.bbox(message)[3]
         detail = None
         if self.detail:
             y += px(8)
-            detail = c.create_text(px(PAD) + lamp_room, y, text=self.detail, font=fonts.body, fill=theme.MUTED,
+            detail = c.create_text(px(PAD) + lamp_room, y, text=path_breaks(fonts.body, self.detail, text_w),
+                                   font=fonts.body, fill=theme.MUTED,
                                    width=text_w, justify="left", anchor="nw", tags=("card", "words"))
             y = c.bbox(detail)[3]
         y += px(24)
