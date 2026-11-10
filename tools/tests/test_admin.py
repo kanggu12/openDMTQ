@@ -11,6 +11,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import mimetypes
 import os
 import re
 import sqlite3
@@ -1172,6 +1173,47 @@ class SafetyTest(unittest.TestCase):
             page = install.client.post("/opendmtq/admin/logout", data={"csrf": csrf}, follow_redirects=True).get_data(as_text=True)
             self.assertIn('class="done"', page)
             self.assertNotIn('class="error"', page)
+
+    def test_every_answer_forbids_frames_and_sniffing_and_keeps_its_address_home(self):
+        # The values themselves, not the module's table: a change there must change this test too.
+        wanted = {"X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "same-origin"}
+        with Install() as install:
+            client = install.client
+            # Before signing in: the sign-in page, the way there from a page, a file of the pages, the API refusing.
+            answers = {"sign-in page": client.get("/opendmtq/admin/login"), "redirect": client.get("/opendmtq/admin/"),
+                       "static file": client.get("/opendmtq/admin/static/admin.js"),
+                       "API": client.get("/opendmtq/api/v1/status")}
+            install.sign_in()
+            # Signed in: a page, and an address with nothing at it.
+            answers["page"] = client.get("/opendmtq/admin/backups")
+            answers["not found"] = client.get("/opendmtq/admin/nothing-here")
+            for what, r in answers.items():
+                # Closed once looked at: a file's answer holds the file open until then.
+                with r:
+                    for name, value in wanted.items():
+                        # Once each: a second, different value would leave a browser to choose.
+                        self.assertEqual(r.headers.getlist(name), [value], f"{what}: {name}")
+
+    def test_the_pages_script_and_stylesheets_keep_their_types_whatever_the_system_says(self):
+        # On Windows Python takes the types from the registry, where some programs make .js text/plain; under nosniff a
+        # browser would not run admin.js. The same list here, as such a registry leaves it, then the service's own types.
+        before = {ending: mimetypes.types_map.get(ending) for ending in (".js", ".css")}
+        try:
+            for ending in before:
+                mimetypes.add_type("text/plain", ending)
+            with Install() as install:
+                # The mistake shows first: without the service's own types the script goes out as plain text.
+                with install.client.get("/opendmtq/admin/static/admin.js") as r:
+                    self.assertEqual(r.mimetype, "text/plain")
+                # What the service does as it starts.
+                admin.core.static_types()
+                for name, kind in (("admin.js", "text/javascript"), ("admin.css", "text/css"), ("fallback.css", "text/css")):
+                    with install.client.get(f"/opendmtq/admin/static/{name}") as r:
+                        self.assertEqual(r.mimetype, kind, name)
+        finally:
+            # The list as it was, for the tests after this one.
+            for ending, kind in before.items():
+                mimetypes.add_type(kind, ending)
 
 
 if __name__ == "__main__":

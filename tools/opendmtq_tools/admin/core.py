@@ -10,6 +10,7 @@ import errno
 import hmac
 import html
 import json
+import mimetypes
 import os
 import re
 import secrets
@@ -287,6 +288,38 @@ def vary_by_language(response):
     if response.mimetype == "text/html":
         response.headers["Cache-Control"] = "no-store"
     return response
+
+
+# What every answer of these pages and their API tells the browser. No page of theirs is ever framed, by them or by the
+# site: another site's frame could put an admin's clicks on buttons it hides (DENY). A file is what its type says,
+# never what the browser guesses from its bytes (nosniff). A link to another address takes no address of these pages
+# with it, a recording's or a player's (same-origin).
+SECURITY_HEADERS = {"X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "same-origin"}
+
+
+@app.after_request
+def security_headers(response):
+    """SECURITY_HEADERS on every answer, unless the answer set one of its own."""
+    for name, value in SECURITY_HEADERS.items():
+        # setdefault: a value an answer chose for itself stays.
+        response.headers.setdefault(name, value)
+    return response
+
+
+# The types of the pages' own files (static/), which Flask takes from the system's list. Under nosniff a browser runs a
+# script only when it is sent as one, and on Windows that list comes from the registry, where some programs make .js
+# text/plain: admin.js would then never run there.
+STATIC_TYPES = {".js": "text/javascript", ".css": "text/css"}
+
+
+def static_types():
+    """Puts STATIC_TYPES over what the system says. Called once here, before any request is answered."""
+    for ending, kind in STATIC_TYPES.items():
+        # add_type reads the system's list first when nothing has yet, so this comes after it and stays.
+        mimetypes.add_type(kind, ending)
+
+
+static_types()
 
 
 def public_url():
