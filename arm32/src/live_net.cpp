@@ -6,10 +6,15 @@
 #include <algorithm>
 #include <cctype>
 #include <cerrno>
+#include <chrono>
+#include <climits>
 #include <cstdlib>
 #include <cstring>
 #include <netdb.h>
+#include <poll.h>
 #include <sys/socket.h>
+#include <system_error>
+#include <thread>
 #include <time.h>
 #include <unistd.h>
 
@@ -32,71 +37,221 @@ Server parse_server(const std::string& text) {
     return s;
 }
 
-// ---- HTTP: plain, one request per connection, a blocking socket with time limits (as the game's own requests go)
+// ---- HTTP: plain, one request per connection, all of it within the request's deadline
 
 namespace {
 
-// A connection to the server, or -1.
-int connect_to(const Server& server) {
+// An address of the server's, as getaddrinfo found it.
+struct Address {
+    int family = 0, protocol = 0;
+    sockaddr_storage address{};
+    socklen_t length = 0;
+};
+
+// The addresses `resolve` finds for `host` and `port`, for a stream socket; none when it finds none or fails.
+std::vector<Address> resolve_all(Resolver resolve, const std::string& host, const std::string& port, int flags) {
+    std::vector<Address> out;
     addrinfo hints{};
     hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = flags;
     addrinfo* list = nullptr;
-    const std::string port = std::to_string(server.port);
-    if (getaddrinfo(server.host.c_str(), port.c_str(), &hints, &list) != 0) return -1;
-    int fd = -1;
-    // Each address the name has, until one connects.
-    for (addrinfo* a = list; a; a = a->ai_next) {
-        fd = socket(a->ai_family, a->ai_socktype | SOCK_CLOEXEC, a->ai_protocol);
-        if (fd < 0) continue;
-        // Both limits, and the send one also limits connect.
-        timeval limit{10, 0};
-        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &limit, sizeof limit);
-        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &limit, sizeof limit);
-        if (connect(fd, a->ai_addr, a->ai_addrlen) == 0) break;
-        close(fd);
-        fd = -1;
+    if (resolve(host.c_str(), port.c_str(), &hints, &list) != 0) return out;
+    for (const addrinfo* a = list; a; a = a->ai_next) {
+        // socklen_t is signed on some systems (32-bit Android): its size as a size, to compare and copy.
+        const auto size = static_cast<std::size_t>(a->ai_addrlen);
+        // One that would not fit is no address of any family this code connects to.
+        if (!a->ai_addr || size > sizeof(sockaddr_storage)) continue;
+        Address x;
+        x.family = a->ai_family;
+        x.protocol = a->ai_protocol;
+        std::memcpy(&x.address, a->ai_addr, size);
+        x.length = a->ai_addrlen;
+        out.push_back(x);
     }
     freeaddrinfo(list);
-    return fd;
+    return out;
 }
 
-// All of `data`, or false.
-bool send_all(int fd, const void* data, std::size_t size) {
+// Waits until `fd` is ready for `events` (or has failed, which the next call on it says), up to `deadline`: false once
+// that has passed.
+bool wait_ready(int fd, short events, Nanos deadline) {
+    for (;;) {
+        const Nanos left = deadline - now_ns();
+        if (left <= 0) return false;
+        pollfd p{};
+        p.fd = fd;
+        p.events = events;
+        // What is left in milliseconds, rounded up: the last part of one is waited for, not spun through.
+        const int ms = static_cast<int>(std::min<Nanos>((left + 999999) / 1000000, INT_MAX));
+        const int n = poll(&p, 1, ms);
+        if (n > 0) return true;
+        // Interrupted: again, for what is left. Any other failure ends the wait as the deadline would.
+        if (n < 0 && errno != EINTR) return false;
+    }
+}
+
+// A connection to one of `addresses` within the deadline, or -1. The socket does not block: connect, send and recv
+// come back at once, and poll waits for what is left. An address that does not answer leaves those after it their
+// share of the time, rather than all of it.
+int connect_any(const std::vector<Address>& addresses, Nanos deadline) {
+    for (std::size_t i = 0; i < addresses.size(); ++i) {
+        const Address& a = addresses[i];
+        const Nanos now = now_ns();
+        if (now >= deadline) break;
+        // An equal part of what is left with each address after this one.
+        const Nanos until = now + (deadline - now) / static_cast<Nanos>(addresses.size() - i);
+        const int fd = socket(a.family, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, a.protocol);
+        if (fd < 0) continue;
+        // At once on a local address; otherwise under way, and done once the socket can be written to.
+        if (connect(fd, reinterpret_cast<const sockaddr*>(&a.address), a.length) == 0) return fd;
+        if (errno == EINPROGRESS && wait_ready(fd, POLLOUT, until)) {
+            // Writable: connected, or failed, which SO_ERROR tells.
+            int error = 0;
+            socklen_t length = sizeof error;
+            if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &length) == 0 && error == 0) return fd;
+        }
+        close(fd);
+    }
+    return -1;
+}
+
+// All of `data` by the deadline, or false: the connection broke, or the server took too long to take it.
+bool send_all(int fd, const void* data, std::size_t size, Nanos deadline) {
     auto* p = static_cast<const char*>(data);
     while (size > 0) {
         // No SIGPIPE for a connection the server closed: the error is enough.
-        ssize_t n = send(fd, p, size, MSG_NOSIGNAL);
+        const ssize_t n = send(fd, p, size, MSG_NOSIGNAL);
+        if (n > 0) {
+            p += n;
+            size -= static_cast<std::size_t>(n);
+            continue;
+        }
         if (n < 0 && errno == EINTR) continue;
-        if (n <= 0) return false;
-        p += n;
-        size -= static_cast<std::size_t>(n);
+        // The socket's buffer is full: on once the server has taken some, if it does in time.
+        if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) && wait_ready(fd, POLLOUT, deadline)) continue;
+        return false;
     }
     return true;
 }
 
+// The answer, read until the server closes the connection, where an HTTP/1.0 answer ends: true with it in `in`. False
+// when the deadline cuts it, or it runs past kMaxAnswer: neither is an answer to go by.
+bool receive(int fd, std::string& in, Nanos deadline) {
+    char buffer[4096];
+    for (;;) {
+        const ssize_t n = recv(fd, buffer, sizeof buffer, 0);
+        // The connection's end: the answer's.
+        if (n == 0) return true;
+        if (n > 0) {
+            // A notice and a few numbers: an answer past this is not one of ours.
+            if (in.size() + static_cast<std::size_t>(n) > kMaxAnswer) return false;
+            in.append(buffer, static_cast<std::size_t>(n));
+            continue;
+        }
+        if (errno == EINTR) continue;
+        // Nothing yet: more once there is some, if it comes in time.
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            if (wait_ready(fd, POLLIN, deadline)) continue;
+            return false;
+        }
+        // Broken off (a reset): what came is the answer as far as it goes, which the status line and the headers' end
+        // then have to be in.
+        return true;
+    }
+}
+
 }  // namespace
 
+// A lookup of the server's name on a thread of its own (Link::look_up).
+struct Link::Lookup {
+    std::mutex lock;
+    std::condition_variable done_wake;
+    bool done = false;               // the thread has an answer
+    std::vector<Address> addresses;  // what it found: none for no such name, or a resolver that failed
+    Nanos done_at = 0;               // when it was done
+};
+
+std::shared_ptr<Link::Lookup> Link::look_up(Nanos deadline) {
+    std::shared_ptr<Lookup> l;
+    {
+        std::lock_guard<std::mutex> guard(lookup_lock_);
+        if (lookup_) {
+            std::lock_guard<std::mutex> last(lookup_->lock);
+            // Still out: this request waits for that one too, so that a resolver that does not answer holds one thread,
+            // not one for each request. Done with addresses, lately: as it found them.
+            if (!lookup_->done || (!lookup_->addresses.empty() && now_ns() - lookup_->done_at < kLookupKept)) l = lookup_;
+        }
+        if (!l) {
+            l = std::make_shared<Lookup>();
+            // Copies of what the thread needs: it may outlive this request, and in the tests this Link.
+            const std::string host = server_.host, port = std::to_string(server_.port);
+            const Resolver resolve = resolver ? resolver : &::getaddrinfo;
+            const char* name = names_.lookup_thread;
+            void (*start)(const char*) = names_.thread_start;
+            try {
+                std::thread([l, host, port, resolve, name, start] {
+                    // This side's name, priority and signals for the thread.
+                    if (start) start(name);
+                    std::vector<Address> found = resolve_all(resolve, host, port, 0);
+                    std::lock_guard<std::mutex> answer(l->lock);
+                    l->addresses = std::move(found);
+                    l->done = true;
+                    l->done_at = now_ns();
+                    l->done_wake.notify_all();
+                }).detach();
+            } catch (const std::system_error&) {
+                // No thread to be had: no lookup, and this request fails as one with no answer.
+                return nullptr;
+            }
+            lookup_ = l;
+        }
+    }
+    std::unique_lock<std::mutex> wait(l->lock);
+    while (!l->done) {
+        // What is left of the request's time, by the same clock as its deadline.
+        const Nanos left = deadline - now_ns();
+        if (left <= 0) return nullptr;
+        l->done_wake.wait_for(wait, std::chrono::nanoseconds(left));
+    }
+    return l;
+}
+
+void Link::forget(const std::shared_ptr<Lookup>& lookup) {
+    std::lock_guard<std::mutex> guard(lookup_lock_);
+    // Only that one: a newer lookup may have taken its place meanwhile.
+    if (lookup_ == lookup) lookup_.reset();
+}
+
 HttpResult Link::request(const char* method, const std::string& path, const std::string& extra_headers, const void* body,
-                         std::size_t body_size) const {
+                         std::size_t body_size) {
     HttpResult r;
-    int fd = connect_to(server_);
-    if (fd < 0) return r;
+    // The time this request has in all, from the lookup to the answer's end.
+    const Nanos deadline = now_ns() + limit;
+    // A server named by its address needs no lookup, and asks nothing of the network for it.
+    std::vector<Address> addresses = resolve_all(&::getaddrinfo, server_.host, std::to_string(server_.port), AI_NUMERICHOST);
+    std::shared_ptr<Lookup> looked;
+    if (addresses.empty()) {
+        // A name: its lookup, waited for until the deadline at most. Done, its addresses no longer change.
+        looked = look_up(deadline);
+        if (!looked) return r;
+        addresses = looked->addresses;
+    }
+    const int fd = connect_any(addresses, deadline);
+    if (fd < 0) {
+        // No address answered: the name is looked up again next time (the server may have moved).
+        if (looked) forget(looked);
+        return r;
+    }
     // The request line and headers: this side's User-Agent, and a body's length when it has one.
     std::string head = std::string(method) + " " + path + " HTTP/1.0\r\nHost: " + server_.host_header + "\r\nUser-Agent: " + names_.user_agent +
                        "\r\n" + extra_headers;
     if (body) head += "Content-Length: " + std::to_string(body_size) + "\r\n";
     head += "\r\n";
-    if (send_all(fd, head.data(), head.size()) && (!body || send_all(fd, body, body_size))) {
-        std::string in;
-        char buffer[4096];
-        ssize_t n;
-        // A notice and a few numbers: an answer past this is not one of ours.
-        while (in.size() < 65536 && ((n = recv(fd, buffer, sizeof buffer, 0)) > 0 || (n < 0 && errno == EINTR))) {
-            if (n > 0) in.append(buffer, static_cast<std::size_t>(n));
-        }
+    std::string in;
+    if (send_all(fd, head.data(), head.size(), deadline) && (!body || send_all(fd, body, body_size, deadline)) && receive(fd, in, deadline)) {
         // The status line's number, and the body after the headers.
-        std::size_t space = in.find(' ');
-        std::size_t end = in.find("\r\n\r\n");
+        const std::size_t space = in.find(' ');
+        const std::size_t end = in.find("\r\n\r\n");
         if (in.rfind("HTTP/", 0) == 0 && space != std::string::npos && end != std::string::npos) {
             r.status = std::atoi(in.c_str() + space + 1);
             r.body = in.substr(end + 4);

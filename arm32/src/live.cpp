@@ -289,8 +289,9 @@ std::atomic<bool> g_gave_up{false};    // this phone cannot do it: the server is
 std::atomic<int> g_failures{0};        // encoder start-ups that failed; three end the attempts
 
 // The requests to the server, the upload thread and the network's quality step (live_net.cpp), with the phone's names:
-// its log's prefix, its User-Agent, and its upload thread's name and start.
-live::Link g_link({"arm32: live", "arm32-live", "arm32-liveup", background_thread});
+// its log's prefix, its User-Agent, and the names and start of its upload thread and of the thread that looks the
+// server's name up.
+live::Link g_link({"arm32: live", "arm32-live", "arm32-liveup", "arm32-livedns", background_thread});
 
 // What the server asks for (the top step).
 std::atomic<int> g_fps{30}, g_height{720}, g_bitrate{2000000}, g_segment{2};

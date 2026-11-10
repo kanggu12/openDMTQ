@@ -1,7 +1,8 @@
 // The broadcast's requests to the server, the same on a phone (live.cpp) and on a computer (desktop/live_desktop.cpp):
-// plain HTTP, one request per connection; the server's small JSON answers and the checks on them; the upload thread with
-// its queue of segments; and the network's quality step, which the uploads move. What differs between the two comes in
-// as arguments (Link::Names): the log's prefix, the requests' User-Agent, and the upload thread's name and start.
+// plain HTTP, one request per connection, each within a deadline from the name's lookup to the answer's end; the
+// server's small JSON answers and the checks on them; the upload thread with its queue of segments; and the network's
+// quality step, which the uploads move. What differs between the two comes in as arguments (Link::Names): the log's
+// prefix, the requests' User-Agent, and the names and start of the threads here.
 #pragma once
 
 #include <atomic>
@@ -9,10 +10,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
+
+// getaddrinfo's list, for the lookup's form below (<netdb.h> has it).
+struct addrinfo;
 
 namespace arm32::live {
 
@@ -24,6 +29,17 @@ inline constexpr std::size_t kUploadQueue = 3;
 inline constexpr std::size_t kMaxSegment = 4 * 1024 * 1024 - 1024;
 // The lowest of the quality steps (each side has its own frame rate, bitrate and height for them).
 inline constexpr int kLastStep = 3;
+// A request's time in all, from the lookup of the server's name to the answer's last byte: a server that answers a byte
+// at a time, or never, and a resolver that does not answer, hold a thread no longer than this. A request cut there has
+// no answer, as one that failed. A segment is ten seconds at most, so an upload this slow counts as slow anyway.
+inline constexpr Nanos kRequestLimit = 10 * kSecond;
+// The most of an answer read: a notice and a few numbers. A longer one is none of the server's, and counts as none.
+inline constexpr std::size_t kMaxAnswer = 65536;
+// How long the addresses a lookup found are used without another: a phone uploads every two seconds or so.
+inline constexpr Nanos kLookupKept = 60 * kSecond;
+
+// The lookup of a name, getaddrinfo's form: getaddrinfo itself, or the tests' stand-in (its list freed by freeaddrinfo).
+using Resolver = int (*)(const char* host, const char* service, const struct addrinfo* hints, struct addrinfo** result);
 
 // The monotonic clock, in nanoseconds.
 Nanos now_ns();
@@ -38,7 +54,7 @@ struct Server {
 // "host[:port]", as the packer's line in the tweaks file and the test settings give it.
 Server parse_server(const std::string& text);
 
-// A request's answer: its status (0: no answer) and its body.
+// A request's answer: its status (0: no answer, one cut by the deadline or past kMaxAnswer included) and its body.
 struct HttpResult {
     int status = 0;
     std::string body;
@@ -89,7 +105,8 @@ public:
         const char* log_prefix;             // before each log line ("arm32: live", "player: live")
         const char* user_agent;             // every request's User-Agent
         const char* upload_thread;          // the upload thread's name
-        void (*thread_start)(const char*);  // run first on the upload thread with its name: its name, priority, signals
+        const char* lookup_thread;          // the name of the thread that looks the server's name up
+        void (*thread_start)(const char*);  // run first on those threads with their names: name, priority, signals
     };
 
     explicit Link(const Names& names) : names_(names) {}
@@ -98,11 +115,12 @@ public:
     void set_server(const Server& server) { server_ = server; }
     const Server& server() const { return server_; }
 
-    // One request: HTTP/1.0, so the answer needs no chunk decoding and ends where the connection does.
+    // One request, within `limit` in all: HTTP/1.0, so the answer needs no chunk decoding and ends where the connection
+    // does. The control thread and the upload thread may each make one at the same time.
     HttpResult request(const char* method, const std::string& path, const std::string& extra_headers, const void* body,
-                       std::size_t body_size) const;
+                       std::size_t body_size);
     // GET /live/state for these ids, in this language for the notice ("ko" or "en"), checked.
-    State ask_state(const std::string& ids, const char* lang) const { return parse_state(request("GET", "/live/state?ids=" + ids + "&lang=" + lang, "", nullptr, 0)); }
+    State ask_state(const std::string& ids, const char* lang) { return parse_state(request("GET", "/live/state?ids=" + ids + "&lang=" + lang, "", nullptr, 0)); }
 
     // The ids the requests name the player by, and from an answer that has it on, the stream's key.
     void set_identity(const std::string& ids, const State& state);
@@ -126,10 +144,25 @@ public:
     // Called on the upload thread when the server refuses a segment (403): its owner turned live view off, or a new
     // key is out, which the control thread's next request brings.
     void (*on_refused)() = nullptr;
+    // A request's time in all (kRequestLimit; the tests give less), and how a name is looked up (nullptr: getaddrinfo;
+    // the tests give a stand-in). Both set before the first request.
+    Nanos limit = kRequestLimit;
+    Resolver resolver = nullptr;
 
 private:
+    // A lookup of the server's name on a thread of its own, which requests wait for no longer than their deadlines.
+    struct Lookup;
+    // The lookup a request goes by once it is done: the last one, while it is out or under kLookupKept old with
+    // addresses, or a new one. nullptr when none is done by the deadline, or no thread could be started for one.
+    std::shared_ptr<Lookup> look_up(Nanos deadline);
+    // Drops `lookup` (no address of it answered): the next request looks the name up again.
+    void forget(const std::shared_ptr<Lookup>& lookup);
+
     const Names names_;
     Server server_;
+    // The last lookup, under its lock.
+    std::mutex lookup_lock_;
+    std::shared_ptr<Lookup> lookup_;
     // The identity and the key, set by the control thread, read by the upload thread.
     std::mutex identity_lock_;
     std::string ids_, token_;

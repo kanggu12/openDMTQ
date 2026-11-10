@@ -139,8 +139,9 @@ std::atomic<bool> g_paused{false};   // the game is held still behind the player
 std::atomic<int> g_failures{0};      // encoder start-ups that failed; three end the attempts
 
 // The requests to the server, the upload thread and the network's quality step (src/live_net.cpp, a phone's too), with
-// this player's names: its log's prefix, its User-Agent, and its upload thread's name and start.
-live::Link g_link({"player: live", "opendmtq-player-live", "live-upload", background_thread});
+// this player's names: its log's prefix, its User-Agent, and the names and start of its upload thread and of the thread
+// that looks the server's name up.
+live::Link g_link({"player: live", "opendmtq-player-live", "live-upload", "live-lookup", background_thread});
 
 // What the server asks for (the top step); the step the network has taken it down to is g_link's.
 std::atomic<int> g_fps{30}, g_height{720}, g_bitrate{2000000}, g_segment{2};
