@@ -582,230 +582,34 @@ def _place(src, dest):
 def rebuild():
     """Regenerate songList.json, catalog.json and the overlay from the imported content plus the added songs and
     the hidden flags. One at a time, across threads and processes (_serialized): two at once would build the overlay in
-    the same web.new folder and swap each other's half out."""
+    the same web.new folder and swap each other's half out. In steps: the song list (_song_list), the added songs' files
+    with their kept tiles (_added_files), the client's tables of each language folder (_language_tables), the patch
+    folder's files and manifest (_write_patch), the swap (_swap)."""
     os.makedirs(CUSTOM, exist_ok=True)
     adds = added_songs()
     hide = hidden()
 
     # 1. The server's song list.
-    songs = base_song_list()
-    for s in songs:
-        s["hidden_yn"] = "Y" if s["song_id"] in hide else s.get("hidden_yn", "N")
-    for m in adds:
-        songs.append({"song_id": m["song_id"], "name": m["name"], "full_name": m["full_name"],
-                      "genre": m["genre"], "artist_name": m["artist_name"], "composed_by": m["composed_by"],
-                      "singer": m["singer"], "feat_by": m["feat_by"], "arranged_by": m["arranged_by"],
-                      "visualized_by": m["visualized_by"], "original_bga_yn": "Y" if m["has_video"] else "N",
-                      "loop_bga_yn": "N", "cost_game_point": 0, "cost_game_cash": 0, "flag": 0, "status": "",
-                      "free_yn": "Y", "hidden_yn": "Y" if m["song_id"] in hide else "N",
-                      "song_patterns": [{"pattern_id": c["pattern_id"], "line": c["line"],
-                                         "difficulty": c["difficulty"], "signature": c["signature"]}
-                                        for c in m["charts"]]})
+    song_list = _song_list(adds, hide)
 
     # 2. The overlay, built aside and swapped in whole.
     web = os.path.join(CUSTOM, "web")
     new = web + ".new"
     shutil.rmtree(new, ignore_errors=True)
     os.makedirs(new)
-    changed = {}
-    # Sprite name by song id, for the added songs whose tile bundle could be made.
-    tiles = {}
-    tile_failures = []
-    # The client's tables, image bundles and fonts: the client data imported from the operator's files (the content's
-    # patch folder). Phones are told only of what the server has: the songs that came with the import and the added
-    # ones; the other songs' rows, previews and tiles leave the tables and the manifest. Without client data the game
-    # cannot start at all (it needs the images of its screens): there is nothing to rebuild then.
-    content_patch = patch_dir(content_web())
     imported = {s["song_id"] for s in base_song_list()}
-
-    def source(rel):
-        """A table's text as the content has it (rel: "table/us/song_song.csv")."""
-        return _read_table(os.path.join(content_patch, rel))
-
-    def has(rel):
-        return os.path.exists(os.path.join(content_patch, rel)) or os.path.exists(os.path.join(content_patch, rel + ".lz4"))
-
-    manifest_path = os.path.join(content_patch, "patch_new.csv.lz4")
-    locales, manifest_text, missing = [], "", set()
-    if os.path.isfile(manifest_path):
-        table_root = os.path.join(content_patch, "table")
-        locales = sorted(loc for loc in os.listdir(table_root)
-                         if os.path.exists(os.path.join(table_root, loc, "song_song.csv.lz4"))) if os.path.isdir(table_root) else []
-        with open(manifest_path, "rb") as f:
-            manifest_text = lz4_decode(f.read()).decode("utf-8-sig")
-        # Files the manifest names that the content does not have: those of songs not imported, which is as it should
-        # be, and the game's own when the files given lacked them, which is not.
-        missing = {ln.split(",", 1)[0] for ln in manifest_text.splitlines()[1:]
-                   if ln and not os.path.exists(os.path.join(content_patch, ln.split(",", 1)[0] + ".lz4"))}
-    game_missing = sorted(n for n in missing if not SONG_FILE.fullmatch(n) and not n.startswith(OPTIONAL_GAME_FILES))
-    # Whether the tables list songs the server has not got: then their rows go, with their items and products.
-    shipped = set()
-    if locales:
-        header, rows = _table_rows(source(f"table/{locales[0]}/song_song.csv"))
-        col = {h: i for i, h in enumerate(header)}
-        shipped = {int(r[col["song_id"]]) for r in rows if r[col["song_id"]].isdigit()}
-    filtering = bool(shipped - imported)
-    if locales and (adds or hide or filtering or missing):
-        # What the added songs' tiles are made from besides each song's own jacket, read once for them all: the template,
-        # or why there is none (no song gets a tile then), and the digest that stands for it in each tile's key.
-        template = made_from = no_template = None
-        if adds:
-            try:
-                loaded = _tile_template()
-                made_from = _tile_source_digest(loaded)
-            except (OSError, SongError) as e:
-                no_template = e
-            else:
-                # Only with its digest: tiles are never made without a key to keep them under.
-                template = loaded
-        for m in adds:
-            src = os.path.join(CUSTOM, "songs", str(m["song_id"]))
-            sid = str(m["song_id"])
-            os.makedirs(os.path.join(new, "DMQ", "Songs", sid), exist_ok=True)
-            _place(os.path.join(src, "song.fpk"), os.path.join(new, "DMQ", "Songs", sid, sid + ".fpk"))
-            if m["has_video"]:
-                _place(os.path.join(src, "song.webm"), os.path.join(new, "DMQ", "Songs", sid, sid + ".webm"))
-            os.makedirs(os.path.join(new, "DMQ", "Patterns"), exist_ok=True)
-            for c in m["charts"]:
-                pid = str(c["pattern_id"])
-                for suffix in ("", "_EARPHONE"):
-                    _place(os.path.join(src, "patterns", pid), os.path.join(new, "DMQ", "Patterns", pid + suffix))
-            os.makedirs(os.path.join(new, "viewImg", "eye"), exist_ok=True)
-            _place(os.path.join(src, "jacket.png"), os.path.join(new, "viewImg", "eye", m["name"] + ".png"))
-            if m["has_preview"]:
-                with open(os.path.join(src, "preview.opus"), "rb") as f:
-                    raw = f.read()
-                changed[f"preview/{m['name']}.p.opus"] = (raw, False)
-            # The jacket on its tile in the song list: the game reads those from image bundles. A song without a tile
-            # image still plays, so a tile that cannot be made must not stop the rebuild.
-            if template is None:
-                tile_failures.append(f"{m['name']}: {no_template}")
-                continue
-            try:
-                bundle = _tile_bundle(template, made_from, src, m)
-            except (OSError, jacket_atlas.AtlasError) as e:
-                tile_failures.append(f"{m['name']}: {e}")
-            else:
-                changed[jacket_atlas.bundle_path(m["song_id"])] = (bundle, False)
-                tiles[m["song_id"]] = jacket_atlas.sprite_name(m["song_id"], m["name"])
-
-        # Client tables for every language folder that has them.
-        for loc in locales:
-            # Songs taken out of the tables, and their items and products with them: the game looks a listed song's
-            # product up, and a product whose song is gone would point at nothing.
-            gone_items, gone_products = set(), set()
-            text = source(f"table/{loc}/song_song.csv")
-            header, rows = _table_rows(text)
-            col = {h: i for i, h in enumerate(header)}
-            stamp = rows[-1][col["mod_date"]] if rows and "mod_date" in col else "0"
-            # Shipped track ids are their own numbering (up to 490); continue after the highest.
-            track_base = max([int(r[col["track_id"]]) for r in rows if "track_id" in col and r[col["track_id"]].isdigit()] or [0])
-            rows = [r for r in rows if r[col["song_id"]].isdigit() and int(r[col["song_id"]]) in imported]
-            for row in rows:
-                if int(row[col["song_id"]]) in hide:
-                    row[col["hidden_yn"]] = "Y"
-            for m in adds:
-                values = {"song_id": m["song_id"], "item_id": m["song_id"], "name": m["name"],
-                          "full_name": m["full_name"], "genre": m["genre"], "artist_name": m["artist_name"],
-                          "original_bga_yn": "Y" if m["has_video"] else "N", "loop_bga_yn": "N",
-                          "composed_by": m["composed_by"], "singer": m["singer"], "feat_by": m["feat_by"],
-                          "arranged_by": m["arranged_by"], "visualized_by": m["visualized_by"],
-                          "cost_game_point": 0, "cost_game_cash": 0, "flag": 0, "status": "", "free_yn": "Y",
-                          "hidden_yn": "Y" if m["song_id"] in hide else "N", "open_yn": "Y",
-                          "track_id": track_base + m["song_id"] - FIRST_SONG_ID + 1, "mod_date": stamp, "update": 0}
-                rows.append([str(values.get(h, "")) for h in header])
-            changed[f"table/{loc}/song_song.csv"] = (_csv_text(header, rows, _eol(text), text.endswith("\n")), True)
-
-            # The charts keep every row: the client refuses an empty chart table (its whole first download fails), and
-            # a chart whose song is not listed is never offered.
-            if adds:
-                text = source(f"table/{loc}/song_songPattern.csv")
-                header, rows = _table_rows(text)
-                for m in adds:
-                    for c in m["charts"]:
-                        values = {"pattern_id": c["pattern_id"], "song_id": m["song_id"], "signature": c["signature"],
-                                  "line": c["line"], "difficulty": c["difficulty"], "point_type": 0, "point_value": 0,
-                                  "flg": "Y", "update": 0}
-                        rows.append([str(values.get(h, "")) for h in header])
-                changed[f"table/{loc}/song_songPattern.csv"] = (_csv_text(header, rows, _eol(text), text.endswith("\n")), True)
-
-            # Every shipped song also has a "song" item; give added songs one in the same form.
-            if (adds or filtering) and has(f"table/{loc}/product_item.csv"):
-                text = source(f"table/{loc}/product_item.csv")
-                header, rows = _table_rows(text)
-                icol = {h: i for i, h in enumerate(header)}
-                # A table without the item type has no song items to take out.
-                gone_items = {r[icol["item_id"]] for r in rows
-                              if r[icol["item_type"]] == "S" and not (r[icol["item_id"]].isdigit() and int(r[icol["item_id"]]) in imported)} \
-                    if {"item_id", "item_type"} <= icol.keys() else set()
-                rows = [r for r in rows if not gone_items or r[icol["item_id"]] not in gone_items]
-                for m in adds:
-                    values = {"item_id": m["song_id"], "item_name": m["name"], "img_url_1": tiles.get(m["song_id"], "e0_" + m["name"]),
-                              "img_url_2": "", "description": "", "repeat_count": 0, "item_type": "S",
-                              "limit_minute": 0, "status": "N", "buy_level": 0, "buy_limit_count": 1,
-                              "buy_limit_type": "F", "summary": m["full_name"], "update": 0}
-                    rows.append([str(values.get(h, "")) for h in header])
-                changed[f"table/{loc}/product_item.csv"] = (_csv_text(header, rows, _eol(text), text.endswith("\n")), True)
-
-            # And a product, as every shipped song has (see _product_row).
-            if (adds or gone_items) and has(f"table/{loc}/product_product.csv"):
-                text = source(f"table/{loc}/product_product.csv")
-                header, rows = _table_rows(text)
-                pcol = {h: i for i, h in enumerate(header)}
-                gone_products = {r[pcol["product_id"]] for r in rows if r[pcol["item_id"]] in gone_items}
-                rows = [r for r in rows if r[pcol["product_id"]] not in gone_products]
-                rows.extend(_product_row(header, m["song_id"]) for m in adds)
-                changed[f"table/{loc}/product_product.csv"] = (_csv_text(header, rows, _eol(text), text.endswith("\n")), True)
-
-            # Listed in the music shop categories, as the shipped songs' products are.
-            if (adds or gone_products) and has(f"table/{loc}/category_categoryproduct.csv"):
-                text = source(f"table/{loc}/category_categoryproduct.csv")
-                header, rows = _table_rows(text)
-                ccol = {h: i for i, h in enumerate(header)}
-                rows = [r for r in rows if r[ccol["product_id"]] not in gone_products]
-                for m in adds:
-                    rows.extend(_category_rows(header, m["song_id"]))
-                changed[f"table/{loc}/category_categoryproduct.csv"] = (_csv_text(header, rows, _eol(text), text.endswith("\n")), True)
-
-            if has(f"table/{loc}/song_desc_{loc}.csv"):
-                text = source(f"table/{loc}/song_desc_{loc}.csv")
-                header, rows = _table_rows(text)
-                dcol = {h: i for i, h in enumerate(header)}
-                if "song_id" in dcol:
-                    rows = [r for r in rows if r[dcol["song_id"]].isdigit() and int(r[dcol["song_id"]]) in imported]
-                for m in adds:
-                    values = {"song_id": m["song_id"], "fullname": m["full_name"], "genre": m["genre"],
-                              "artist": m["artist_name"], "composed_by": m["composed_by"], "singer": m["singer"],
-                              "feat_by": m["feat_by"], "arranged_by": m["arranged_by"],
-                              "visualized_by": m["visualized_by"]}
-                    rows.append([str(values.get(h, "")) for h in header])
-                changed[f"table/{loc}/song_desc_{loc}.csv"] = (_csv_text(header, rows, _eol(text), text.endswith("\n")), True)
-
-        # Write the changed client files (plain where the content has plain, always .lz4) and the manifest: the
-        # content's own, without the files the server has not got, with these rows replaced or added.
-        out_patch = patch_dir(new)
-        manifest_eol = _eol(manifest_text)
-        manifest_final = manifest_text.endswith("\n")
-        lines = [ln for ln in manifest_text.splitlines() if ln.split(",", 1)[0] not in missing]
-        index = {ln.split(",", 1)[0]: i for i, ln in enumerate(lines)}
-        for rel, (raw, has_plain) in sorted(changed.items()):
-            # Image bundles are packed already, and travel in the form the shipped ones do.
-            packed = stored_encode(raw) if rel.startswith("dlc/") else lz4_encode(raw)
-            os.makedirs(os.path.dirname(os.path.join(out_patch, rel)), exist_ok=True)
-            with open(os.path.join(out_patch, rel + ".lz4"), "wb") as f:
-                f.write(packed)
-            if has_plain and os.path.exists(os.path.join(content_patch, rel)):
-                with open(os.path.join(out_patch, rel), "wb") as f:
-                    f.write(raw)
-            row = f"{rel},{len(raw)},{_md5(raw)},{len(packed)},{_md5(packed)},0,1,,,"
-            if rel in index:
-                lines[index[rel]] = row
-            else:
-                lines.append(row)
-        with open(os.path.join(out_patch, "patch_new.csv.lz4"), "wb") as f:
-            # Same line endings (and final break, or none) as the content's manifest.
-            body = manifest_eol.join(lines) + (manifest_eol if manifest_final else "")
-            f.write(lz4_encode(body.encode("utf-8")))
+    client = _ClientData(imported)
+    # The client files phones get anew, by their path in the patch folder: (their bytes, whether the content has the
+    # file plain beside its .lz4).
+    changed = {}
+    tile_failures = []
+    # Only where there is something to change: songs added or hidden, rows or files of songs the server has not got.
+    if client.locales and (adds or hide or client.filtering or client.missing):
+        files, tiles, tile_failures = _added_files(new, adds)
+        changed.update(files)
+        for loc in client.locales:
+            changed.update(_language_tables(client, loc, adds, hide, imported, tiles))
+        _write_patch(new, client, changed)
 
     # Charts the imported files carry that the game cannot load (empty, or cut short): the overlay serves the chart's
     # pair in their place. A chart and its earphone variant have their notes at the same ticks (every pair of the
@@ -816,28 +620,277 @@ def rebuild():
     def effective(rel):
         if rel in changed:
             return _decode_table(changed[rel][0])
-        return source(rel) if has(rel) else None
-    _write_json(os.path.join(CUSTOM, "catalog.json"), _catalog(effective, locales, imported | {m["song_id"] for m in adds}))
+        return client.source(rel) if client.has(rel) else None
+    _write_json(os.path.join(CUSTOM, "catalog.json"), _catalog(effective, client.locales, imported | {m["song_id"] for m in adds}))
 
-    # Maintenance notice survives a rebuild (it lives in the overlay too).
+    _swap(web, new)
+    _write_json(os.path.join(CUSTOM, "songList.json"), song_list)
+    # For the admin pages: songs that went out without a picture on their list tile.
+    _write_json(os.path.join(CUSTOM, "tile-failures.json"), tile_failures)
+    # For the setup and the doctor: the game's own files that did not come with the import.
+    _write_json(os.path.join(CUSTOM, "missing-game-files.json"), client.game_missing)
+    made = thumbnails(song_list)
+    return {"added": len(adds), "hidden": len(hide), "client_files": sorted(changed), "thumbnails": made,
+            "tile_failures": tile_failures, "missing_game_files": client.game_missing,
+            "charts_from_pair": charts_from_pair, "charts_unreadable": charts_unreadable}
+
+
+def _song_list(adds, hide):
+    """The song list the server reads (songList.json): the imported songs, those hidden on the admin pages flagged, then
+    the added songs (adds: their song.json), each free, flagged too when hidden (hide: the hidden ids)."""
+    listed = base_song_list()
+    for s in listed:
+        s["hidden_yn"] = "Y" if s["song_id"] in hide else s.get("hidden_yn", "N")
+    for m in adds:
+        listed.append({"song_id": m["song_id"], "name": m["name"], "full_name": m["full_name"],
+                       "genre": m["genre"], "artist_name": m["artist_name"], "composed_by": m["composed_by"],
+                       "singer": m["singer"], "feat_by": m["feat_by"], "arranged_by": m["arranged_by"],
+                       "visualized_by": m["visualized_by"], "original_bga_yn": "Y" if m["has_video"] else "N",
+                       "loop_bga_yn": "N", "cost_game_point": 0, "cost_game_cash": 0, "flag": 0, "status": "",
+                       "free_yn": "Y", "hidden_yn": "Y" if m["song_id"] in hide else "N",
+                       "song_patterns": [{"pattern_id": c["pattern_id"], "line": c["line"],
+                                          "difficulty": c["difficulty"], "signature": c["signature"]}
+                                         for c in m["charts"]]})
+    return listed
+
+
+class _ClientData:
+    """The client's tables, image bundles and fonts: the client data imported from the operator's files (the content's
+    patch folder), as a rebuild reads it. Phones are told only of what the server has: the songs that came with the import
+    and the added ones; the other songs' rows, previews and tiles leave the tables and the manifest. Without client data
+    the game cannot start at all (it needs the images of its screens): there is nothing to rebuild then (no locales).
+
+      patch         the content's patch folder
+      locales       its language folders that have a song table, by name ("kr", "us"...)
+      manifest      its manifest's text (patch_new.csv), "" without one
+      missing       the files the manifest names that the content has not got
+      game_missing  of those, the game's own (not a song's file, nor a font it starts without), by name
+      filtering     whether the tables list songs the server has not got: then their rows go, with their items and
+                    products
+    """
+
+    def __init__(self, imported):
+        self.patch = patch_dir(content_web())
+        self.locales, self.manifest, self.missing = [], "", set()
+        manifest_path = os.path.join(self.patch, "patch_new.csv.lz4")
+        if os.path.isfile(manifest_path):
+            table_root = os.path.join(self.patch, "table")
+            self.locales = sorted(loc for loc in os.listdir(table_root)
+                                  if os.path.exists(os.path.join(table_root, loc, "song_song.csv.lz4"))) if os.path.isdir(table_root) else []
+            with open(manifest_path, "rb") as f:
+                self.manifest = lz4_decode(f.read()).decode("utf-8-sig")
+            # Files the manifest names that the content does not have: those of songs not imported, which is as it should
+            # be, and the game's own when the files given lacked them, which is not.
+            self.missing = {ln.split(",", 1)[0] for ln in self.manifest.splitlines()[1:]
+                            if ln and not os.path.exists(os.path.join(self.patch, ln.split(",", 1)[0] + ".lz4"))}
+        self.game_missing = sorted(n for n in self.missing if not SONG_FILE.fullmatch(n) and not n.startswith(OPTIONAL_GAME_FILES))
+        shipped = set()
+        if self.locales:
+            header, rows = _table_rows(self.source(f"table/{self.locales[0]}/song_song.csv"))
+            col = {h: i for i, h in enumerate(header)}
+            shipped = {int(r[col["song_id"]]) for r in rows if r[col["song_id"]].isdigit()}
+        self.filtering = bool(shipped - imported)
+
+    def source(self, rel):
+        """A table's text as the content has it (rel: "table/us/song_song.csv")."""
+        return _read_table(os.path.join(self.patch, rel))
+
+    def has(self, rel):
+        """Whether the content has the file at rel, plain or packed."""
+        return os.path.exists(os.path.join(self.patch, rel)) or os.path.exists(os.path.join(self.patch, rel + ".lz4"))
+
+
+def _added_files(new, adds):
+    """The added songs' files in the overlay being built (new), as the game asks for them: the music and video, each chart
+    twice (with the earphones' timing too), the jacket. And what phones download of them through the client's patch
+    folder: each preview, and each tile bundle (the jacket on its tile in the song list), the one kept in the song's
+    folder while it was made from the same (_tile_bundle). Returns ({patch folder path: (bytes, False)}, the tile's sprite
+    name by song id for the songs that have one, the songs that go without one: "name: why")."""
+    files, tiles, failures = {}, {}, []
+    # What the added songs' tiles are made from besides each song's own jacket, read once for them all: the template,
+    # or why there is none (no song gets a tile then), and the digest that stands for it in each tile's key.
+    template = made_from = no_template = None
+    if adds:
+        try:
+            loaded = _tile_template()
+            made_from = _tile_source_digest(loaded)
+        except (OSError, SongError) as e:
+            no_template = e
+        else:
+            # Only with its digest: tiles are never made without a key to keep them under.
+            template = loaded
+    for m in adds:
+        src = os.path.join(CUSTOM, "songs", str(m["song_id"]))
+        sid = str(m["song_id"])
+        os.makedirs(os.path.join(new, "DMQ", "Songs", sid), exist_ok=True)
+        _place(os.path.join(src, "song.fpk"), os.path.join(new, "DMQ", "Songs", sid, sid + ".fpk"))
+        if m["has_video"]:
+            _place(os.path.join(src, "song.webm"), os.path.join(new, "DMQ", "Songs", sid, sid + ".webm"))
+        os.makedirs(os.path.join(new, "DMQ", "Patterns"), exist_ok=True)
+        for c in m["charts"]:
+            pid = str(c["pattern_id"])
+            for suffix in ("", "_EARPHONE"):
+                _place(os.path.join(src, "patterns", pid), os.path.join(new, "DMQ", "Patterns", pid + suffix))
+        os.makedirs(os.path.join(new, "viewImg", "eye"), exist_ok=True)
+        _place(os.path.join(src, "jacket.png"), os.path.join(new, "viewImg", "eye", m["name"] + ".png"))
+        if m["has_preview"]:
+            with open(os.path.join(src, "preview.opus"), "rb") as f:
+                raw = f.read()
+            files[f"preview/{m['name']}.p.opus"] = (raw, False)
+        # The jacket on its tile in the song list: the game reads those from image bundles. A song without a tile
+        # image still plays, so a tile that cannot be made must not stop the rebuild.
+        if template is None:
+            failures.append(f"{m['name']}: {no_template}")
+            continue
+        try:
+            bundle = _tile_bundle(template, made_from, src, m)
+        except (OSError, jacket_atlas.AtlasError) as e:
+            failures.append(f"{m['name']}: {e}")
+        else:
+            files[jacket_atlas.bundle_path(m["song_id"])] = (bundle, False)
+            tiles[m["song_id"]] = jacket_atlas.sprite_name(m["song_id"], m["name"])
+    return files, tiles, failures
+
+
+def _language_tables(client, loc, adds, hide, imported, tiles):
+    """The client's tables of one language folder (loc) as phones get them, from the content's (client: _ClientData): the
+    songs the server has, hidden ones flagged, then the added songs (adds), with their charts, items, products, places in
+    the music shop and descriptions; the songs the server has not got taken out, with their items and products. imported:
+    the imported songs' ids; tiles: the added songs' tile sprites (_added_files). Returns {table's path: (bytes, True)},
+    the tables that change."""
+    changed = {}
+    # Songs taken out of the tables, and their items and products with them: the game looks a listed song's
+    # product up, and a product whose song is gone would point at nothing.
+    gone_items, gone_products = set(), set()
+    text = client.source(f"table/{loc}/song_song.csv")
+    header, rows = _table_rows(text)
+    col = {h: i for i, h in enumerate(header)}
+    stamp = rows[-1][col["mod_date"]] if rows and "mod_date" in col else "0"
+    # Shipped track ids are their own numbering (up to 490); continue after the highest.
+    track_base = max([int(r[col["track_id"]]) for r in rows if "track_id" in col and r[col["track_id"]].isdigit()] or [0])
+    rows = [r for r in rows if r[col["song_id"]].isdigit() and int(r[col["song_id"]]) in imported]
+    for row in rows:
+        if int(row[col["song_id"]]) in hide:
+            row[col["hidden_yn"]] = "Y"
+    for m in adds:
+        values = {"song_id": m["song_id"], "item_id": m["song_id"], "name": m["name"],
+                  "full_name": m["full_name"], "genre": m["genre"], "artist_name": m["artist_name"],
+                  "original_bga_yn": "Y" if m["has_video"] else "N", "loop_bga_yn": "N",
+                  "composed_by": m["composed_by"], "singer": m["singer"], "feat_by": m["feat_by"],
+                  "arranged_by": m["arranged_by"], "visualized_by": m["visualized_by"],
+                  "cost_game_point": 0, "cost_game_cash": 0, "flag": 0, "status": "", "free_yn": "Y",
+                  "hidden_yn": "Y" if m["song_id"] in hide else "N", "open_yn": "Y",
+                  "track_id": track_base + m["song_id"] - FIRST_SONG_ID + 1, "mod_date": stamp, "update": 0}
+        rows.append([str(values.get(h, "")) for h in header])
+    changed[f"table/{loc}/song_song.csv"] = (_csv_text(header, rows, _eol(text), text.endswith("\n")), True)
+
+    # The charts keep every row: the client refuses an empty chart table (its whole first download fails), and
+    # a chart whose song is not listed is never offered.
+    if adds:
+        text = client.source(f"table/{loc}/song_songPattern.csv")
+        header, rows = _table_rows(text)
+        for m in adds:
+            for c in m["charts"]:
+                values = {"pattern_id": c["pattern_id"], "song_id": m["song_id"], "signature": c["signature"],
+                          "line": c["line"], "difficulty": c["difficulty"], "point_type": 0, "point_value": 0,
+                          "flg": "Y", "update": 0}
+                rows.append([str(values.get(h, "")) for h in header])
+        changed[f"table/{loc}/song_songPattern.csv"] = (_csv_text(header, rows, _eol(text), text.endswith("\n")), True)
+
+    # Every shipped song also has a "song" item; give added songs one in the same form.
+    if (adds or client.filtering) and client.has(f"table/{loc}/product_item.csv"):
+        text = client.source(f"table/{loc}/product_item.csv")
+        header, rows = _table_rows(text)
+        icol = {h: i for i, h in enumerate(header)}
+        # A table without the item type has no song items to take out.
+        gone_items = {r[icol["item_id"]] for r in rows
+                      if r[icol["item_type"]] == "S" and not (r[icol["item_id"]].isdigit() and int(r[icol["item_id"]]) in imported)} \
+            if {"item_id", "item_type"} <= icol.keys() else set()
+        rows = [r for r in rows if not gone_items or r[icol["item_id"]] not in gone_items]
+        for m in adds:
+            values = {"item_id": m["song_id"], "item_name": m["name"], "img_url_1": tiles.get(m["song_id"], "e0_" + m["name"]),
+                      "img_url_2": "", "description": "", "repeat_count": 0, "item_type": "S",
+                      "limit_minute": 0, "status": "N", "buy_level": 0, "buy_limit_count": 1,
+                      "buy_limit_type": "F", "summary": m["full_name"], "update": 0}
+            rows.append([str(values.get(h, "")) for h in header])
+        changed[f"table/{loc}/product_item.csv"] = (_csv_text(header, rows, _eol(text), text.endswith("\n")), True)
+
+    # And a product, as every shipped song has (see _product_row).
+    if (adds or gone_items) and client.has(f"table/{loc}/product_product.csv"):
+        text = client.source(f"table/{loc}/product_product.csv")
+        header, rows = _table_rows(text)
+        pcol = {h: i for i, h in enumerate(header)}
+        gone_products = {r[pcol["product_id"]] for r in rows if r[pcol["item_id"]] in gone_items}
+        rows = [r for r in rows if r[pcol["product_id"]] not in gone_products]
+        rows.extend(_product_row(header, m["song_id"]) for m in adds)
+        changed[f"table/{loc}/product_product.csv"] = (_csv_text(header, rows, _eol(text), text.endswith("\n")), True)
+
+    # Listed in the music shop categories, as the shipped songs' products are.
+    if (adds or gone_products) and client.has(f"table/{loc}/category_categoryproduct.csv"):
+        text = client.source(f"table/{loc}/category_categoryproduct.csv")
+        header, rows = _table_rows(text)
+        ccol = {h: i for i, h in enumerate(header)}
+        rows = [r for r in rows if r[ccol["product_id"]] not in gone_products]
+        for m in adds:
+            rows.extend(_category_rows(header, m["song_id"]))
+        changed[f"table/{loc}/category_categoryproduct.csv"] = (_csv_text(header, rows, _eol(text), text.endswith("\n")), True)
+
+    if client.has(f"table/{loc}/song_desc_{loc}.csv"):
+        text = client.source(f"table/{loc}/song_desc_{loc}.csv")
+        header, rows = _table_rows(text)
+        dcol = {h: i for i, h in enumerate(header)}
+        if "song_id" in dcol:
+            rows = [r for r in rows if r[dcol["song_id"]].isdigit() and int(r[dcol["song_id"]]) in imported]
+        for m in adds:
+            values = {"song_id": m["song_id"], "fullname": m["full_name"], "genre": m["genre"],
+                      "artist": m["artist_name"], "composed_by": m["composed_by"], "singer": m["singer"],
+                      "feat_by": m["feat_by"], "arranged_by": m["arranged_by"],
+                      "visualized_by": m["visualized_by"]}
+            rows.append([str(values.get(h, "")) for h in header])
+        changed[f"table/{loc}/song_desc_{loc}.csv"] = (_csv_text(header, rows, _eol(text), text.endswith("\n")), True)
+    return changed
+
+
+def _write_patch(new, client, changed):
+    """The changed client files (changed: {path: (bytes, whether the content has the file plain too)}) into the patch
+    folder of the overlay being built (new): plain where the content has plain, always .lz4. And the manifest: the
+    content's own (client: _ClientData), without the files the server has not got, with these rows replaced or added."""
+    out_patch = patch_dir(new)
+    manifest_eol = _eol(client.manifest)
+    manifest_final = client.manifest.endswith("\n")
+    lines = [ln for ln in client.manifest.splitlines() if ln.split(",", 1)[0] not in client.missing]
+    index = {ln.split(",", 1)[0]: i for i, ln in enumerate(lines)}
+    for rel, (raw, has_plain) in sorted(changed.items()):
+        # Image bundles are packed already, and travel in the form the shipped ones do.
+        packed = stored_encode(raw) if rel.startswith("dlc/") else lz4_encode(raw)
+        os.makedirs(os.path.dirname(os.path.join(out_patch, rel)), exist_ok=True)
+        with open(os.path.join(out_patch, rel + ".lz4"), "wb") as f:
+            f.write(packed)
+        if has_plain and os.path.exists(os.path.join(client.patch, rel)):
+            with open(os.path.join(out_patch, rel), "wb") as f:
+                f.write(raw)
+        row = f"{rel},{len(raw)},{_md5(raw)},{len(packed)},{_md5(packed)},0,1,,,"
+        if rel in index:
+            lines[index[rel]] = row
+        else:
+            lines.append(row)
+    with open(os.path.join(out_patch, "patch_new.csv.lz4"), "wb") as f:
+        # Same line endings (and final break, or none) as the content's manifest.
+        body = manifest_eol.join(lines) + (manifest_eol if manifest_final else "")
+        f.write(lz4_encode(body.encode("utf-8")))
+
+
+def _swap(web, new):
+    """The overlay built aside (new) in place of the one in use (web), whole: a reader finds the one or the other. The
+    maintenance notice survives a rebuild (it lives in the overlay too)."""
     old_notice = os.path.join(web, "inspection")
     if os.path.isdir(old_notice):
         shutil.copytree(old_notice, os.path.join(new, "inspection"))
-
     shutil.rmtree(web + ".old", ignore_errors=True)
     if os.path.exists(web):
         os.rename(web, web + ".old")
     os.rename(new, web)
     shutil.rmtree(web + ".old", ignore_errors=True)
-    _write_json(os.path.join(CUSTOM, "songList.json"), songs)
-    # For the admin pages: songs that went out without a picture on their list tile.
-    _write_json(os.path.join(CUSTOM, "tile-failures.json"), tile_failures)
-    # For the setup and the doctor: the game's own files that did not come with the import.
-    _write_json(os.path.join(CUSTOM, "missing-game-files.json"), game_missing)
-    made = thumbnails(songs)
-    return {"added": len(adds), "hidden": len(hide), "client_files": sorted(changed), "thumbnails": made,
-            "tile_failures": tile_failures, "missing_game_files": game_missing,
-            "charts_from_pair": charts_from_pair, "charts_unreadable": charts_unreadable}
 
 
 def _chart_loads(path):
