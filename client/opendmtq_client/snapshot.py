@@ -26,9 +26,27 @@ def render(root):
     root.update_idletasks()
     width, height = max(1, root.winfo_width()), max(1, root.winfo_height())
     img = Image.new("RGB", (width, height), _colour(root, root.cget("bg")) or (0, 0, 0))
-    draw = ImageDraw.Draw(img, "RGBA")
-    _paint(root, img, draw, (root.winfo_rootx(), root.winfo_rooty()), (0, 0, width, height))
+    try:
+        _paint(root, img, _Draw(img), (root.winfo_rootx(), root.winfo_rooty()), (0, 0, width, height))
+    finally:
+        # The fonts made for this drawing go with it: each is a Tk font until Python forgets it.
+        _FONTS.clear()
     return img
+
+
+class _Draw:
+    """The window's picture drawn on in two ways: opaque colours plainly, and the text's soft bars blended (blending
+    every fill would cost a third of a drawing)."""
+
+    def __init__(self, img):
+        self.plain, self.blend = ImageDraw.Draw(img), ImageDraw.Draw(img, "RGBA")
+
+    def rectangle(self, xy, fill):
+        # A colour with its strength (r, g, b, a) blends; (r, g, b) covers.
+        (self.blend if len(fill) == 4 else self.plain).rectangle(xy, fill=fill)
+
+    def line(self, points, fill, width):
+        (self.blend if len(fill) == 4 else self.plain).line(points, fill=fill, width=width)
 
 
 def _colour(widget, name):
@@ -100,11 +118,14 @@ def _paint(widget, img, draw, origin, clip):
                 _bars(draw, font, [child.get()], _colour(child, theme.TEXT), (box[0] + 8, box[1], box[2], box[3]),
                       "w", "left", seen, False)
             continue
+        picture = getattr(child, "odq_picture", None)
+        if callable(picture):
+            # A picture made only when a dialog asks (the page area's: the page's height in pixels, kept otherwise).
+            picture = picture()
         background = _colour(child, _option(child, "bg"))
-        if background:
+        if background and not _covers(picture, box):
             _fill(draw, box, seen, background)
         _border(child, draw, box, seen)
-        picture = getattr(child, "odq_picture", None)
         if picture is not None:
             _picture(img, picture, box, seen)
         if kind == "Label":
@@ -129,20 +150,44 @@ def _border(widget, draw, box, seen):
             _fill(draw, strip, seen, colour)
 
 
+def _covers(picture, box):
+    """Whether a widget's own picture hides all of its box: an opaque one at least as big (its background unseen)."""
+    return (picture is not None and picture.mode == "RGB" and picture.width >= box[2] - box[0]
+            and picture.height >= box[3] - box[1])
+
+
 def _picture(img, picture, box, seen):
-    """Paste a widget's own picture where it shows."""
+    """Paste a widget's own picture where it shows: the part that shows cut out first, then made opaque if it is not
+    (a page's picture is many times what shows of it)."""
     left, top = seen[0] - box[0], seen[1] - box[1]
-    part = picture.convert("RGBA").crop((left, top, left + seen[2] - seen[0], top + seen[3] - seen[1]))
+    # Never past the picture's own edge: a widget can be bigger than its picture (a switch inside its keyboard ring),
+    # and what lies past it is the widget's background, not black.
+    right, bottom = min(picture.width, left + seen[2] - seen[0]), min(picture.height, top + seen[3] - seen[1])
+    if right <= left or bottom <= top:
+        return
+    part = picture.crop((left, top, right, bottom))
+    if part.mode == "RGB":
+        img.paste(part, (seen[0], seen[1]))
+        return
+    part = part.convert("RGBA")
     img.paste(part.convert("RGB"), (seen[0], seen[1]), part.getchannel("A"))
 
 
+# The fonts of one drawing by their names: render() empties it when the drawing is done.
+_FONTS = {}
+
+
 def _font(widget, name):
+    """A Tk font as a widget names it, made once for each name in a drawing (a few dozen labels share a few fonts)."""
     if not name:
         return None
-    try:
-        return tkfont.Font(widget, font=name)
-    except tk.TclError:
-        return None
+    key = str(name)
+    if key not in _FONTS:
+        try:
+            _FONTS[key] = tkfont.Font(widget, font=name)
+        except tk.TclError:
+            _FONTS[key] = None
+    return _FONTS[key]
 
 
 def wrap(font, text, width):

@@ -291,6 +291,8 @@ class ScrollArea(tk.Frame):
         # The heading's items (the title's picture, the line under it) and where the content starts under them.
         self._heading, self._content_top = [], px(self.TOP)
         self._backdrop_job, self._backdrop_size, self._backdrop_item = None, None, None
+        # A dialog draws the window from the widgets (snapshot.py): this area's part is made when one asks.
+        self.canvas.odq_picture = self._picture_on_show
         # The part of the wheel's turning that has not made a whole step yet (a touchpad sends it a little at a time).
         self._wheel_rest = 0.0
         self.canvas.configure(yscrollcommand=self._bar_set)
@@ -352,7 +354,6 @@ class ScrollArea(tk.Frame):
                                                font=self.ui.fonts.body, fill=theme.MUTED,
                                                width=max(px(200), c.winfo_width() - 2 * px(self.MARGIN))))
         self._place_content()
-        self._compose()
 
     def _place_content(self):
         """The content's top under the heading as it now wraps (the line under the title takes more lines in a
@@ -398,26 +399,31 @@ class ScrollArea(tk.Frame):
         self._backdrop_size = (width, height)
         picture = art.backdrop(width, height, self.ui.scale, offset=self.offset, top=self.light)
         self._backdrop_image = ImageTk.PhotoImage(picture, master=c)
-        # A dialog draws the window from the widgets (snapshot.py): the page's picture with its title on it.
+        # A dialog draws the window from the widgets (snapshot.py): the page's picture, its title put on it then.
         self._backdrop_picture = picture
-        self._compose()
         if self._backdrop_item is None:
             self._backdrop_item = c.create_image(0, 0, image=self._backdrop_image, anchor="nw")
         else:
             c.itemconfigure(self._backdrop_item, image=self._backdrop_image)
         c.tag_lower(self._backdrop_item)
 
-    def _compose(self):
-        """The picture a dialog takes for this area: what lies behind with the title's picture on it."""
+    def _picture_on_show(self):
+        """The picture a dialog draws for this area (snapshot.py), made when one asks: the part of the page's picture
+        on show, as far down as the page is scrolled, with the title's picture where it now is. A copy of the whole
+        page's picture kept for it would hold the page's height again (13.6 MB at 200 %)."""
         behind = getattr(self, "_backdrop_picture", None)
         if behind is None:
-            return
-        picture = behind.copy()
+            return None
+        c = self.canvas
+        top = min(int(c.canvasy(0)), behind.height - 1)
+        # Never past the picture's edge (a resize not drawn for yet): the canvas's own colour shows there.
+        picture = behind.crop((0, top, min(behind.width, max(1, c.winfo_width())),
+                               min(behind.height, top + max(1, c.winfo_height()))))
         title = getattr(self, "_title_picture", None)
-        if title is not None and self._heading and self.canvas.type(self._heading[0]) == "image":
-            x, y = (int(v) for v in self.canvas.coords(self._heading[0]))
-            picture.paste(title, (x, y), title)
-        self.canvas.odq_picture = picture
+        if title is not None and self._heading and c.type(self._heading[0]) == "image":
+            x, y = (int(v) for v in c.coords(self._heading[0]))
+            picture.paste(title, (x, y - top), title)
+        return picture
 
     def _wheel(self, on):
         """The wheel bound for the whole window to this area (on), or no longer (off); the last binding's commands go
