@@ -829,23 +829,56 @@ async function adminFlows(contexts) {
   await page.goto(`${A}/logs?tab=changes`, { waitUntil: 'domcontentloaded' });
   check('a refused package is no change', !/Added a song/.test(await textOf(page, '.changes')));
 
-  // A recording hidden from the public list comes back when shown again.
+  // A recording hidden from the public list comes back when shown again. A live page open all the while asks for that list
+  // only when it changed (live.php, live_past_rev()): not at its looks while nothing changes, once right after each change.
   await page.goto(`${A}/recordings`, { waitUntil: 'domcontentloaded' });
   const hide = await page.$('button[name=action][value^="hide"]');
   check('a recording can be hidden', !!hide);
   if (hide) {
     const name = await hide.evaluate(e => e.value.split(' ')[1]);
+    const key = name.replace('/', '-');
+    // The viewer's page, and every look it takes: 'past' for the list of recordings, 'look' for who is on alone.
+    const viewer = await contexts.signed.newPage();
+    await viewer.setViewport({ width: 1280, height: 900 });
+    const asked = [];
+    viewer.on('request', r => { if (/\/live\.php\?list=1/.test(r.url())) asked.push(r.url().includes('past=1') ? 'past' : 'look'); });
+    await viewer.goto(`${P}/live.php`, { waitUntil: 'domcontentloaded' });
+    // In front, as a page someone watches: a page out of sight with nothing playing takes no looks.
+    await viewer.bringToFront();
+    // The sign of the list, as a look carries it.
+    const rev = () => viewer.evaluate(async () => (await (await fetch('/opendmtq/live.php?list=1')).json()).past_rev);
+    const before = await rev();
+    // Two looks and more with nothing changed.
+    await pause(11000);
+    const quiet = [...asked];
+    const card = shown => viewer.waitForFunction((k, on) => !!document.querySelector(`#past-list .past[data-key="${k}"]`) === on,
+      { timeout: 15000 }, key, shown).then(() => true, () => false);
+    // The owner's page in front for its button, then the viewer's again, which looks at once on coming back.
+    await page.bringToFront();
     await press(page, 'button[name=action][value^="hide"]');
+    await viewer.bringToFront();
+    const hiddenRev = await rev();
+    const goneThere = await card(false);
+    const afterHide = asked.length;
     const list = () => contexts.signed.newPage().then(async p => {
       await p.goto(`${P}/live.php?list=1&past=1`, { waitUntil: 'domcontentloaded' });
       const text = await p.evaluate(() => document.body.textContent);
       await p.close();
       return text;
     });
-    const key = name.replace('/', '-');
     check('and is gone from the public list', !(await list()).includes(key));
+    await page.bringToFront();
     await press(page, `button[name=action][value="show ${name}"]`);
+    await viewer.bringToFront();
+    const shownRev = await rev();
+    const backThere = await card(true);
     check('and is back when shown', (await list()).includes(key));
+    const pastAsked = asked.filter(a => a === 'past').length;
+    check("an open live page asks for the recordings' list only when it changed",
+      quiet.length >= 2 && !quiet.includes('past') && hiddenRev !== before && shownRev === before && goneThere && backThere
+      && asked.slice(quiet.length, afterHide).filter(a => a === 'past').length === 1 && pastAsked === 2,
+      `${quiet.join(',')} | ${asked.slice(quiet.length).join(',')} | ${before} ${hiddenRev} ${shownRev} ${goneThere} ${backThere}`);
+    await viewer.close();
   }
   check('no failed requests or script errors in all that', errors.length === 0, errors.slice(0, 5).join(' ; '));
   await page.close();

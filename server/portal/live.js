@@ -6,6 +6,8 @@ const livePage = JSON.parse(document.getElementById('live-data').textContent);
 // What the server knows at page load, and the page's words.
 let cards = livePage.cards;
 let past = livePage.past;
+// The sign of that list of recordings (live_past_rev() in lib.php): a look that brings another one means the list changed.
+let pastRev = livePage.past_rev;
 // The live player on screen; whether a link or a click chose them (the page then stays with them
 // rather than moving on to whoever else is on); the recording on screen instead, if any.
 let current = livePage.current, pinned = livePage.pinned, replay = livePage.replay;
@@ -690,8 +692,7 @@ function show() {
       watching = 0;
       // Nobody in particular was chosen and somebody else is on: straight on to them, with the box staying in place.
       if (!pinned && cards.length) { endedName = ''; return show(); }
-      // Its recording is about to appear: no need to wait for the half-minute look.
-      looks = 5;
+      // Its recording is about to appear: a look now, whose sign of the list says when it has.
       look();
     }
   }
@@ -890,14 +891,15 @@ video.addEventListener('play', () => { ending.hidden = true; });
 // Back from the end by the keys or the timeline: the buttons for the end leave, and the play button is itself again.
 video.addEventListener('seeking', () => { if (!video.ended) { ending.hidden = true; drawControls(); } });
 
-// Who is on, every few seconds; the past broadcasts, which cost the server more, every half minute. A tab out of sight
-// with nothing playing asks nothing, and catches up when it is looked at again.
-let looks = 0, looking = false;
+// Who is on, every few seconds, with the sign of the list of recordings; the list itself, which costs the server a file
+// per recording and a viewer some 60 KB at 300 of them, only when that sign says it changed (it was every half minute, 7 MB
+// an hour per open page). A tab out of sight with nothing playing asks nothing, and catches up when it is looked at again.
+let looking = false, pastWanted = false;
 function look() {
   if (looking || (document.hidden && (video.paused || !attached))) return;
   // One at a time: a slow answer must not arrive after, and overwrite, a newer one.
   looking = true;
-  const withPast = looks++ % 6 === 5;
+  const withPast = pastWanted;
   // Signed out meanwhile (here or in another tab): the page itself asks for the sign-in. Any other failure
   // is the network's: what is on screen stays, and the next look decides.
   fetch(withPast ? '?list=1&past=1' : '?list=1').then(r => {
@@ -907,11 +909,23 @@ function look() {
     // Broadcasts turned off for the server meanwhile: the page as it is now says so.
     if (l.off) { location.reload(); return; }
     cards = l.live;
-    if (l.past) past = l.past;
+    if (l.past) {
+      // The list, with the sign of that very list: the next looks compare against it.
+      past = l.past;
+      pastRev = l.past_rev;
+      pastWanted = false;
+    } else if (l.past_rev !== pastRev) {
+      // A recording ended, or one was hidden, shown again or deleted: the list, right after this look.
+      pastWanted = true;
+    }
     show();
     liveThumbs.headerCount(cards.length, words);
-  }).catch(() => {}).finally(() => { looking = false; });
+  }).catch(() => {}).finally(() => {
+    looking = false;
+    // The list asked for at once, once: a look for it that failed waits for the next turn like any other.
+    if (pastWanted && !withPast) look();
+  });
 }
 setInterval(look, 5000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { looks = 5; look(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) look(); });
 show();

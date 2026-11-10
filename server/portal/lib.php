@@ -855,18 +855,13 @@ function live_cards(?SQLite3 $db): array
 // screenful at a time (PAST_SHOWN in tools/opendmtq_tools/admin/site.py).
 const LIVE_PAST_SHOWN = 300;
 
-/* The recordings players may watch, newest first: key, player, how long, when, and its songs with where each begins and
-   the first one's jacket. Closed and not hidden only, read fresh each time, so one the owner hides or deletes goes from
-   the next look on. $count of them at most; with $guid, the player's own among the list's LIVE_PAST_SHOWN (those the live
-   page has, narrowed to them). Found by their folders' names, which say when each began, so that only those shown are
-   read: four for the home page out of the thousands a server may keep. */
-function live_past(?SQLite3 $db, int $count = LIVE_PAST_SHOWN, int $guid = 0): array
+/* The recordings players may watch, as their folders, newest first: [[folder, player, id], ...], closed and not hidden,
+   found by their folders' names (which say when each began) and two small looks at each, with nothing read. The first
+   LIVE_PAST_SHOWN of them are the list every page shows from; $count of them at most, and with $guid the player's own
+   among those. */
+function live_past_folders(int $count = LIVE_PAST_SHOWN, int $guid = 0): array
 {
-    // Broadcasts off for the server: no recording is shown to players either (the admin pages still have them).
-    if (!live_enabled() || !$db) {
-        return [];
-    }
-    $recs = [];
+    $out = [];
     $listed = 0;
     foreach (live_rec_folders() as [$rec, $player, $id]) {
         // Running and hidden ones are never on the list: two small looks, nothing read.
@@ -877,13 +872,57 @@ function live_past(?SQLite3 $db, int $count = LIVE_PAST_SHOWN, int $guid = 0): a
         if (++$listed > LIVE_PAST_SHOWN) {
             break;
         }
+        // A player's page: theirs alone, among the same list.
         if ($guid > 0 && $player !== $guid) {
             continue;
         }
-        $recs[] = live_rec_read($rec, $player, $id);
-        if (count($recs) >= $count) {
+        $out[] = [$rec, $player, $id];
+        if (count($out) >= $count) {
             break;
         }
+    }
+    return $out;
+}
+
+/* What the live page's list of recordings (live_past(), all of it) is now, in sixteen letters: a hash of their keys, from
+   the folders alone (live_past_folders()). The live page's look every few seconds carries it, and the page asks for the
+   list itself, a file to read for each recording, only when it changed: one ended, was hidden, shown again or deleted.
+   With broadcasts off or no database, that of an empty list, as live_past() gives none then. */
+function live_past_rev(?SQLite3 $db): string
+{
+    $keys = [];
+    if (live_enabled() && $db) {
+        foreach (live_past_folders() as [, $player, $id]) {
+            // The key as live_past() gives it.
+            $keys[] = "$player-$id";
+        }
+    }
+    return live_past_rev_of($keys);
+}
+
+/* The hash of a list of recordings by their keys in order (live_past_rev()): live.php hashes the list it sends the same way,
+   so that the page can tell the list it has from the one there is now. */
+function live_past_rev_of(array $keys): string
+{
+    return substr(hash('sha256', implode(',', $keys)), 0, 16);
+}
+
+/* The recordings players may watch, newest first: key, player, how long, when, and its songs with where each begins and
+   the first one's jacket. Closed and not hidden only, read fresh each time, so one the owner hides or deletes goes from
+   the next look on. $count of them at most; with $guid, the player's own among the list's LIVE_PAST_SHOWN (those the live
+   page has, narrowed to them). Found by their folders' names (live_past_folders()), so that only those shown are read:
+   four for the home page out of the thousands a server may keep. */
+function live_past(?SQLite3 $db, int $count = LIVE_PAST_SHOWN, int $guid = 0): array
+{
+    // Broadcasts off for the server: no recording is shown to players either (the admin pages still have them).
+    if (!live_enabled() || !$db) {
+        return [];
+    }
+    $recs = [];
+    // Each with the player and id its folder is named by, which its address (live-media.php) finds it by, as the API's
+    // twin of this list takes them (recordings.rec_all()).
+    foreach (live_past_folders($count, $guid) as [$rec, $player, $id]) {
+        $recs[] = [$player, $id, live_rec_read($rec, $player, $id)];
     }
     if (!$recs) {
         return [];
@@ -899,7 +938,7 @@ function live_past(?SQLite3 $db, int $count = LIVE_PAST_SHOWN, int $guid = 0): a
     }
     $out = [];
     // Already no more than the list holds (above).
-    foreach ($recs as $r) {
+    foreach ($recs as [$player, $id, $r]) {
         $sec = (int)round((int)$r['duration_ms'] / 1000);
         $length = $sec >= 3600 ? sprintf('%d:%02d:%02d', $sec / 3600, $sec / 60 % 60, $sec % 60) : sprintf('%d:%02d', $sec / 60, $sec % 60);
         $songs = [];
@@ -917,7 +956,7 @@ function live_past(?SQLite3 $db, int $count = LIVE_PAST_SHOWN, int $guid = 0): a
         $line = $titles ? implode(', ', array_slice($titles, 0, 3)) . (count($titles) > 3 ? ' +' . (count($titles) - 3) : '') : t('live.choosing');
         // What a search goes through: every song, not the three that fit on the card.
         $find = implode(' ', $titles);
-        $out[] = ['key' => $r['guid'] . '-' . $r['id'], 'id' => (int)$r['guid'], 'name' => player_name(['nickname' => $names[(int)$r['guid']] ?? '', 'id' => $r['guid']]),
+        $out[] = ['key' => "$player-$id", 'id' => $player, 'name' => player_name(['nickname' => $names[$player] ?? '', 'id' => $player]),
                   'doing' => $line, 'find' => $find, 'length' => $length, 'seconds' => $sec, 'started' => (int)$r['started'], 'when' => date('Y-m-d H:i', (int)$r['started']), 'ago' => ago((int)$r['started']),
                   'songs' => $songs, 'pic' => $titles ? ($jackets[$titles[0]] ?? '') : ''];
     }
