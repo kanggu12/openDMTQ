@@ -8,6 +8,9 @@ from unittest import mock
 
 from opendmtq_cli import env
 
+# The repository: the host program is beside the command line in it.
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 class ParseTest(unittest.TestCase):
     def test_compose_compatible_forms(self):
@@ -43,6 +46,33 @@ class SaveTest(unittest.TestCase):
             env.save(path, {"ADMIN_USER": "y"})
             self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
 
+
+    def test_the_host_installs_keys_are_owner_only(self):
+        # The download sign-in's key and the setup's one-time sign-in, as a host install writes them: whoever reads one
+        # signs in as anyone, or opens the setup.
+        import importlib
+        import sys
+        with tempfile.TemporaryDirectory() as d:
+            key = os.path.join(d, "download.key")
+            env.write_private(key, "k")
+            self.assertEqual(stat.S_IMODE(os.stat(key).st_mode), 0o600)
+            # A sibling an earlier write left, readable by everyone: narrowed as it is written.
+            with open(key + ".tmp", "w") as f:
+                f.write("old")
+            os.chmod(key + ".tmp", 0o644)
+            env.write_private(key, "k2")
+            self.assertEqual(stat.S_IMODE(os.stat(key).st_mode), 0o600)
+            with open(key) as f:
+                self.assertEqual(f.read(), "k2")
+            # The host program's one-time link writes its key so (its paths module sets the root in the environment:
+            # put back after).
+            with mock.patch.dict(os.environ), mock.patch.object(sys, "path", [os.path.join(ROOT, "host")] + sys.path):
+                server = importlib.import_module("opendmtq_host.server")
+            with mock.patch.object(server, "RUN", d):
+                link = server.setup_link({})
+            self.assertEqual(stat.S_IMODE(os.stat(os.path.join(d, "signin.token")).st_mode), 0o600)
+            with open(os.path.join(d, "signin.token")) as f:
+                self.assertTrue(link.endswith("key=" + f.read()))
 
     def test_a_first_start_on_windows_writes_it_too(self):
         # Windows' Python (3.12 in the bundle) has neither os.fchmod nor os.getuid: the first start of OpenDMTQ.exe,

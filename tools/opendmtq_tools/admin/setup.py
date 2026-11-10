@@ -687,7 +687,9 @@ def save_env(updates):
             lines[i] = f"{key}={updates[key]}"
             done.add(key)
     lines += [f"{k}={v}" for k, v in updates.items() if k not in done]
-    with open(ENV_FILE + ".tmp", "w", encoding="utf-8") as f:
+    # The passwords live here: readable by its owner only, as the command line writes it, and through a sibling swapped
+    # in, so an interrupted write never leaves half a file.
+    with core.private_file(ENV_FILE + ".tmp", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
     os.replace(ENV_FILE + ".tmp", ENV_FILE)
 
@@ -698,7 +700,8 @@ def new_signin_key():
     """A one-time sign-in for these pages, kept in the run folder: the host program opens the browser with it, and a
     restart asked for here comes back signed in with it."""
     key = secrets.token_urlsafe(24)
-    with open(SIGNIN_FILE + ".tmp", "w", encoding="ascii") as f:
+    # Readable by this user only: for an hour it opens these pages signed in, to whoever can read it on this PC.
+    with core.private_file(SIGNIN_FILE + ".tmp", encoding="ascii") as f:
         f.write(key)
     os.replace(SIGNIN_FILE + ".tmp", SIGNIN_FILE)
     return key

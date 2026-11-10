@@ -937,6 +937,26 @@ class AddressTest(unittest.TestCase):
             with open(path, encoding="utf-8") as f:
                 self.assertEqual(f.read(), "A=1\n# note\nPUBLIC_HOST=10.0.0.5\nNEW=x\n")
 
+    @unittest.skipUnless(hasattr(os, "fchmod"), "a system with file modes")
+    def test_the_settings_and_the_one_time_sign_in_are_the_owners_alone(self):
+        # .env holds the passwords, the one-time sign-in opens these pages: other users of the PC must not read them.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, ".env")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("ADMIN_PASSWORD=x\n")
+            # Written by an earlier version, readable by everyone; a sibling left from a write cut off, too.
+            os.chmod(path, 0o644)
+            with open(path + ".tmp", "w", encoding="utf-8") as f:
+                f.write("half")
+            os.chmod(path + ".tmp", 0o644)
+            with mock.patch.object(setup, "ENV_FILE", path), mock.patch.object(setup, "SIGNIN_FILE", os.path.join(tmp, "signin.token")):
+                setup.save_env({"PUBLIC_HOST": "10.0.0.5"})
+                key = setup.new_signin_key()
+            for name in (".env", "signin.token"):
+                self.assertEqual(os.stat(os.path.join(tmp, name)).st_mode & 0o777, 0o600, name)
+            with open(os.path.join(tmp, "signin.token"), encoding="ascii") as f:
+                self.assertEqual(f.read(), key)
+
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class StopTest(unittest.TestCase):

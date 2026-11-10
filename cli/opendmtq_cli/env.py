@@ -62,21 +62,26 @@ def save(path, updates):
     for key, value in updates.items():
         if key not in done:
             lines.append(f"{key}={value}")
+    # The passwords live here: readable by its owner only.
+    write_private(path, "\n".join(lines) + "\n")
+
+
+def write_private(path, text):
+    """Writes text to path, readable by its owner only: .env, and the keys a host install keeps (the download sign-in's,
+    the setup's one-time sign-in). Other users of the machine must not read them."""
     # Write a sibling first and swap, so an interrupted write never leaves half a file.
     tmp = path + ".tmp"
-    # The passwords live here: readable by its owner only (also when replacing an older 0644 file).
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
-        # Windows has neither call (its Python before 3.13 has no fchmod, and no user ids): there the file is as
-        # private as the folder it is in.
+        # O_CREAT's mode only applies to a new file: a sibling left from before is narrowed too. Windows has neither
+        # call (its Python before 3.13 has no fchmod, and no user ids): there the file is as private as its folder.
         if hasattr(os, "fchmod"):
             os.fchmod(fd, 0o600)
-        # Run with sudo, keep the file the repository owner's, so the CLI and compose still read it
-        # without sudo.
+        # Run with sudo, keep the file the folder owner's, so the CLI and compose still read it without sudo.
         if hasattr(os, "getuid") and os.getuid() == 0:
             owner = os.stat(os.path.dirname(os.path.abspath(path)))
             os.fchown(fd, owner.st_uid, owner.st_gid)
-        f.write("\n".join(lines) + "\n")
+        f.write(text)
     os.replace(tmp, path)
 
 

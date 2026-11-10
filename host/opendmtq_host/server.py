@@ -292,12 +292,14 @@ class Server:
         shutil.rmtree(live, ignore_errors=True)
         os.makedirs(live, exist_ok=True)
         os.makedirs(os.path.join(DATA, "state", "live-rec"), exist_ok=True)
-        # The key that signs the download sign-in cookie, made once (portal/auth.php).
+        # The key that signs the download sign-in cookie, made once (portal/auth.php): readable by this user only, as
+        # whoever reads it could sign in to the site as anyone. Apache runs as this user, and still reads it.
         key = os.path.join(DATA, "state", "download.key")
         if not os.path.isfile(key) or os.path.getsize(key) == 0:
-            with open(key + ".new", "w", encoding="ascii") as f:
-                f.write(secrets.token_hex(32))
-            os.replace(key + ".new", key)
+            env.write_private(key, secrets.token_hex(32))
+        elif not WINDOWS:
+            # One made before it was kept so: narrowed now (Windows has no such modes; its folder keeps it).
+            os.chmod(key, 0o600)
         # Apache checks its configuration before it starts: a problem is reported here, readable.
         # Apache writes in the system's code page, this program reads UTF-8: its message must not stop this one.
         r = subprocess.run([self.found["httpd"], "-t", "-f", os.path.join(RUN, "httpd.conf")], env=senv,
@@ -506,10 +508,8 @@ def setup_link(values):
     """A one-time link that opens the setup pages signed in: its key goes into the run folder, where they take it once
     (it works from this PC only, for an hour)."""
     key = secrets.token_urlsafe(24)
-    path = os.path.join(RUN, "signin.token")
-    with open(path + ".tmp", "w", encoding="ascii") as f:
-        f.write(key)
-    os.replace(path + ".tmp", path)
+    # Readable by this user only: for an hour it opens the setup signed in, to whoever can read it on this PC.
+    env.write_private(os.path.join(RUN, "signin.token"), key)
     return f"http://localhost:{admin_port(values)}/opendmtq/admin/setup/start?key={key}"
 
 

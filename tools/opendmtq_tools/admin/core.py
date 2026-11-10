@@ -392,15 +392,16 @@ def human(n):
 app.jinja_env.filters["human"] = human
 
 
-def private_file(path):
-    """A new file at path, readable by this user only (backups hold the signing key)."""
-    # Binary on Windows too, where files open as text unless told.
+def private_file(path, encoding=None):
+    """A new file at path, readable by this user only (backups hold the signing key; .env the passwords): open for
+    bytes, or for text in encoding when given."""
+    # Binary on Windows too, where files open as text unless told: the text wrapper does its own line ends.
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_BINARY", 0), 0o600)
     # O_CREAT's mode only applies to a new file; one being replaced is narrowed too (Windows has no such modes:
     # there the file is as private as the folder it is in).
     if hasattr(os, "fchmod"):
         os.fchmod(fd, 0o600)
-    return os.fdopen(fd, "wb")
+    return os.fdopen(fd, "w", encoding=encoding) if encoding else os.fdopen(fd, "wb")
 
 
 def discard_body():
