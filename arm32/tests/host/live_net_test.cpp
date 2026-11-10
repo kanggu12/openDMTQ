@@ -389,7 +389,7 @@ void state_answers() {
     check(odd.fps == 30 && odd.height == 720 && odd.bitrate == 2000000 && odd.segment == 3, "state: what is no number is the default, a fraction its whole part",
           std::to_string(odd.fps) + " " + std::to_string(odd.height) + " " + std::to_string(odd.bitrate) + " " + std::to_string(odd.segment));
     // The notice's escapes, as PHP's json_encode writes them, and what is not a string.
-    check(parse_state(answer_of(200, R"({"toast":"다시\r\n\t\/\b\f"})")).toast == "\xeb\x8b\xa4\xec\x8b\x9c\r\n\t/\b\f", "state: the notice's escapes");
+    check(parse_state(answer_of(200, R"({"toast":"\ub2e4\uc2dc\r\n\t\/\b\f"})")).toast == "\xeb\x8b\xa4\xec\x8b\x9c\r\n\t/\b\f", "state: the notice's escapes");
     check(parse_state(answer_of(200, R"({"toast":"a\u0000b"})")).toast == "ab", "state: a NUL in the notice is left out");
     // An escape that is no number: its backslash and u left out, what follows read as it is, the string's end kept.
     check(parse_state(answer_of(200, R"({"toast":"a\u00zzb"})")).toast == "a00zzb", "state: an escape that is no number is left out");
