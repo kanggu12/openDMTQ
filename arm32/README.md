@@ -247,10 +247,11 @@ swap 170 us longer for each picture (worst seen 2.3 ms). `arm32/tests/host/live_
 segment writer without a phone (`debug.arm32.liveserver <host:port>` asks another server, with `adb
 reverse` a test server on the computer). Encoding from a surface takes Android 8 or newer.
 
-The player for Windows broadcasts too (`desktop/live_desktop.cpp`), with a phone's requests and the same stream. At a
-swap a picture is due at, the frame is scaled with one blit and turned into the encoder's NV12 by two small draws on
-the graphics card, and a later swap copies it out once the GPU is done, so the game never waits for it. Windows' own
-H.264 and AAC encoders (Media Foundation) make the stream from those pictures and the player's mix, before its volume.
+The player for Windows broadcasts too (`desktop/live_desktop.cpp`, with its capture in `live_capture.cpp` and its encoder
+in `live_mf.cpp`), with a phone's requests and the same stream. At a swap a picture is due at, the frame is scaled with
+one blit and turned into the encoder's NV12 by two small draws on the graphics card, and a later swap copies it out once
+the GPU is done, so the game never waits for it. Windows' own H.264 and AAC encoders (Media Foundation) make the stream
+from those pictures and the player's mix, before its volume.
 Windows' H.264 encoder leaves the colours out of its sequence header, so `src/live_sps.cpp` writes BT.709 into it
 (`tests/host/live_sps_test.cpp`). The quality steps down as on a phone for a slow upload, and for an encoder that does
 not keep up, and comes back up after a minute with time to spare. The conversion's shaders are compiled when the

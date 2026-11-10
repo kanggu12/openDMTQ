@@ -85,18 +85,21 @@ if(NOT ANDROID)
   target_compile_options(jvmtest PRIVATE -Wall -Wextra -Wno-unused-parameter)
   target_link_libraries(jvmtest PRIVATE jvm)
   # What the desktop player does differently on each host: its window, its sound output and its video decoders (X11,
-  # PulseAudio and FFmpeg on Linux; Win32, WASAPI and Media Foundation on Windows), and the libraries those need.
+  # PulseAudio and FFmpeg on Linux; Win32, WASAPI and Media Foundation on Windows), its broadcast (Windows only), and the
+  # libraries those need.
   if(WIN32)
     set(WIN_DEPS "" CACHE PATH "Folder with ANGLE's DLLs, the EGL and GLES headers and zlib (arm32/build_windows.sh)")
     set(PLAYER_WINDOW desktop/window_win32.cpp desktop/overlay_win32.cpp desktop/error_box_win32.cpp desktop/player.rc)
     set(PLAYER_OUTPUT desktop/output_wasapi.cpp)
     set(PLAYER_DECODER desktop/decoder_mf.cpp)
+    # The broadcast's encoder and its capture of the game's frames (desktop/live_desktop.cpp says what runs where).
+    set(PLAYER_LIVE desktop/live_mf.cpp desktop/live_capture.cpp)
     set(PLAYER_SYSTEM_INCLUDE ${WIN_DEPS}/include)
     set(PLAYER_OUTPUT_LIBS ole32 avrt ksuser)
     # Media Foundation itself is loaded when a video plays (decoder_mf.cpp); its GUIDs are mfuuid's.
     set(PLAYER_DECODER_LIBS mfuuid ole32)
     # DXGI waits for the display's refreshes, IMM is the text field's input method (window_win32.cpp).
-    # oleaut32: the broadcast's encoder settings come as VARIANTs (live_desktop.cpp); GDI+ draws the overlay and the error
+    # oleaut32: the broadcast's encoder settings come as VARIANTs (live_mf.cpp); GDI+ draws the overlay and the error
     # box (overlay_win32.cpp, error_box_win32.cpp).
     set(PLAYER_LIBS ${WIN_DEPS}/lib/libzlib1.dll.a user32 gdi32 shell32 dxgi imm32 oleaut32 gdiplus ${PLAYER_OUTPUT_LIBS} ${PLAYER_DECODER_LIBS})
     # The POSIX calls in the player's own files (open, pread, the clocks) are the runtime's Windows layer's, which
@@ -108,6 +111,8 @@ if(NOT ANDROID)
     set(PLAYER_WINDOW desktop/window_x11.cpp)
     set(PLAYER_OUTPUT desktop/output_pulse.cpp)
     set(PLAYER_DECODER desktop/decoder_ffmpeg.cpp)
+    # No broadcast here: live_desktop.cpp alone, which does nothing on Linux.
+    set(PLAYER_LIVE)
     set(PLAYER_SYSTEM_INCLUDE)
     set(PLAYER_OUTPUT_LIBS)
     set(PLAYER_DECODER_LIBS)
@@ -144,7 +149,7 @@ if(NOT ANDROID)
   add_executable(player desktop/main.cpp desktop/logd.cpp desktop/java_lang.cpp desktop/threads.cpp desktop/android_os.cpp desktop/unity.cpp
                  desktop/android_app.cpp desktop/audio.cpp desktop/mixer.cpp ${PLAYER_OUTPUT} desktop/media.cpp desktop/mp4.cpp desktop/decoder.cpp
                  ${PLAYER_DECODER} desktop/sdk.cpp desktop/web.cpp desktop/http.cpp desktop/pmangplus.cpp desktop/input.cpp desktop/ndk.cpp ${PLAYER_WINDOW} desktop/frames.cpp
-                 desktop/own_folder.cpp desktop/settings.cpp desktop/live_desktop.cpp src/live_net.cpp src/live_ts.cpp src/live_sps.cpp
+                 desktop/own_folder.cpp desktop/settings.cpp desktop/live_desktop.cpp ${PLAYER_LIVE} src/live_net.cpp src/live_ts.cpp src/live_sps.cpp
                  src/jni_bridge.cpp ${ARM32_JNI_ENTRY} src/android_bridge.cpp src/egl_bridge.cpp src/gl_special.cpp ${ARM32_GEN_DIR}/gl_thunks.cpp
                  src/opensl_bridge.cpp src/pacing.cpp src/follow.cpp src/window_rate.cpp src/tweaks.cpp)
   target_include_directories(player PRIVATE src desktop ${ARM32_GEN_DIR})

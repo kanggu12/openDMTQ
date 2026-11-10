@@ -194,7 +194,7 @@ private:
     std::thread thread_;
 };
 
-// Another taker of the mix, the computer's broadcast (live_desktop.cpp): each period on the mixer's thread, before the
+// Another taker of the mix, the computer's broadcast (live_mf.cpp): each period on the mixer's thread, before the
 // player's volume, as interleaved stereo floats at the output's rate. It must not block. Null: none.
 using MixTap = void (*)(const float* stereo, std::size_t frames, int rate);
 void set_mix_tap(MixTap tap);
