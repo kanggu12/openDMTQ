@@ -16,6 +16,8 @@
 //                                            AMD FidelityFX Super Resolution 1 (EASU then RCAS), or NVIDIA Image Scaling
 //   anti_aliasing off | cmaa2 | smaa |       the edges of the game's shapes smoothed: not at all, by Intel's CMAA 2 or by
 //                 msaa2 | msaa4 | msaa8      SMAA 1x over the finished picture, or by drawing with 2, 4 or 8 samples
+//   show_fps      off | top_left | top_right | the frames a second and the frame time in that corner of the game
+//                 bottom_left | bottom_right
 //   audio_device  default | <endpoint id>    the sound's device: Windows' default output, or one by its id
 //                                            (player --audio-devices lists them)
 //   audio_mode    shared | exclusive         with the computer's other sound, or the device alone (less latency)
@@ -115,6 +117,15 @@ bool load_settings(const std::string& path) {
                 s.anti_aliasing = static_cast<Settings::AntiAliasing>(i);
                 ok = true;
             }
+        } else if (key == "show_fps") {
+            // Each corner's name to its kind, in the order of the enum; a name it does not know shows none.
+            static const char* const kCorners[] = {"off", "top_left", "top_right", "bottom_left", "bottom_right"};
+            ok = false;
+            for (int i = 0; i < 5; ++i) {
+                if (value != kCorners[i]) continue;
+                s.show_fps = static_cast<Settings::ShowFps>(i);
+                ok = true;
+            }
         } else if (key == "audio_device") {
             s.audio_device = value == "default" ? "" : value;
         } else if (key == "audio_mode") {
@@ -134,11 +145,14 @@ bool load_settings(const std::string& path) {
     // The picture's passes by the names the file uses, for the line below.
     static const char* const kUpscalers[] = {"bilinear", "fsr1", "nis"};
     static const char* const kAntiAliasing[] = {"off", "cmaa2", "smaa", "msaa2", "msaa4", "msaa8"};
-    jvm::log("player: settings: %s, %s, vsync %s, fps %s, render %d%% (upscaler %s), anti-aliasing %s; sound %s, %s, %s buffer, volume %d%%",
+    static const char* const kCorners[] = {"off", "top left", "top right", "bottom left", "bottom right"};
+    jvm::log("player: settings: %s, %s, vsync %s, fps %s, render %d%% (upscaler %s), anti-aliasing %s, frame counter %s; sound %s, %s, %s buffer, "
+             "volume %d%%",
              s.fullscreen ? "full screen" : "a window",
              s.window_w ? (std::to_string(s.window_w) + "x" + std::to_string(s.window_h)).c_str() : "sized to the display",
              s.vsync ? "on" : "off", s.fps > 0 ? std::to_string(static_cast<int>(s.fps)).c_str() : "the display's",
              s.render_scale, kUpscalers[static_cast<int>(s.upscaler)], kAntiAliasing[static_cast<int>(s.anti_aliasing)],
+             kCorners[static_cast<int>(s.show_fps)],
              s.audio_device.empty() ? "the default device" : "a chosen device", s.audio_exclusive ? "exclusive" : "shared",
              s.audio_buffer == 0 ? "a low" : s.audio_buffer == 1 ? "a normal" : "a safe", s.volume);
     return true;

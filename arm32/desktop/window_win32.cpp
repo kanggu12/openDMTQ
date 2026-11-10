@@ -1143,6 +1143,8 @@ bool open_window(const std::string& title) {
         arm32::desktop_live_paused(held);
     };
     overlay::start(g_frame, g_window, hooks, host_locale().first == "ko");
+    // The frame counter in the corner the PC's settings name, from the count of frames shown (none: no counter).
+    overlay::show_fps(static_cast<int>(settings().show_fps), [] { return static_cast<unsigned long long>(frames_shown()); });
     // A check's planned keys (PLAYER_KEYS), from now on.
     plan_keys();
     // This thread waits for window messages and its looper's jobs together: a job posted wakes it.

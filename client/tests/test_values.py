@@ -37,6 +37,14 @@ class Values(unittest.TestCase):
             with self.assertRaises(choices.ChoiceError, msg=(name, value)):
                 choices.normalize({name: value})
 
+    def test_the_frame_counter(self):
+        # None by default; each corner by its name; a place that is no corner refused.
+        self.assertEqual(choices.normalize({})["show_fps"], "off")
+        for corner in ("top_left", "top_right", "bottom_left", "bottom_right"):
+            self.assertEqual(choices.normalize({"show_fps": corner.upper()})["show_fps"], corner)
+        with self.assertRaises(choices.ChoiceError):
+            choices.normalize({"show_fps": "middle"})
+
     def test_a_bad_value_keeps_the_default_when_not_strict(self):
         filled = choices.normalize({"fps": "999", "volume": 40}, strict=False)
         self.assertEqual(filled["fps"], "auto")
@@ -49,12 +57,12 @@ class Values(unittest.TestCase):
 
     def test_settings_file(self):
         text = choices.settings_text({"display": "window", "window": "1600x900", "vsync": "off", "fps": "unlimited",
-                                      "render_scale": "75", "upscaler": "nis", "anti_aliasing": "smaa",
+                                      "render_scale": "75", "upscaler": "nis", "anti_aliasing": "smaa", "show_fps": "top_left",
                                       "audio_device": "{0.0.0.00000000}.{x}",
                                       "audio_mode": "exclusive", "audio_buffer": "low", "volume": 35})
         lines = [line for line in text.splitlines() if not line.startswith("#")]
         self.assertEqual(lines, ["display=window", "window=1600x900", "vsync=off", "fps=unlimited", "render_scale=75",
-                                 "upscaler=nis", "anti_aliasing=smaa", "audio_device={0.0.0.00000000}.{x}",
+                                 "upscaler=nis", "anti_aliasing=smaa", "show_fps=top_left", "audio_device={0.0.0.00000000}.{x}",
                                  "audio_mode=exclusive", "audio_buffer=low", "volume=35"])
 
     def test_the_player_reads_every_key_and_value(self):

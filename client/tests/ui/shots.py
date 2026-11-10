@@ -366,6 +366,7 @@ def variants_check(app, site, out, tag, problems):
     app.changed("render_scale", "50")
     app.changed("upscaler", "fsr1")
     app.changed("anti_aliasing", "msaa4")
+    app.changed("show_fps", "bottom_right")
     app.go("screen")
     settle(app)
     # Scrolled to its end, where the Quality card is.

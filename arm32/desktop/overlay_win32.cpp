@@ -16,6 +16,10 @@
 //   same header's look that slides down at the top of the game, stays for a few seconds and fades. A red LIVE mark
 //   while broadcasting, a grey one when the broadcast has ended.
 // - The cursor: a dart in the logo's chrome and lime, all lime while the mouse's finger is down on the game.
+// - The frame counter: when the PC's settings ask for it, a small chip of the header's look in the corner the player
+//   picks, 8 pixels in at 720 lines: the frames a second as the game's lime numbers with "FPS" beside them, and the mean
+//   frame time under them, over the last half second, drawn twice a second from the count of frames shown that the
+//   player keeps anyway (frames.cpp). It lets clicks through, and stays under the question's dim while that is up.
 #include "overlay_win32.h"
 
 // GDI+ and the picture it draws into, which the error box before the game draws with too (error_box_win32.cpp, where
@@ -24,6 +28,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cwchar>
 #include <map>
 #include <memory>
 #include <string>
@@ -235,6 +240,125 @@ void notice_frame() {
 LRESULT CALLBACK notice_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     if (msg == WM_TIMER && w == kNoticeTimer) {
         notice_frame();
+        return 0;
+    }
+    // Clicks go through it to the game: it only tells.
+    if (msg == WM_NCHITTEST) return HTTRANSPARENT;
+    return DefWindowProcW(h, msg, w, l);
+}
+
+// ---- the frame counter
+
+HWND g_fps = nullptr;
+// Its corner (Settings::ShowFps's order, 0 none) and the count of frames shown it reads.
+int g_fps_corner = 0;
+unsigned long long (*g_fps_frames)() = nullptr;
+constexpr UINT_PTR kFpsTimer = 3;
+// Twice a second.
+constexpr UINT kFpsMs = 500;
+// The count and the time (the performance counter's) at the last look, and what it showed (-1: nothing yet).
+unsigned long long g_fps_count = 0;
+LONGLONG g_fps_at = 0;
+int g_fps_shown = -1;
+float g_fps_shown_ms = 0;
+std::unique_ptr<Canvas> g_fps_canvas;
+// The look: the header's dark at about 80 %, its thin edge, the game's lime for the number.
+const Color kCounter(204, 28, 28, 28);
+const Color kCounterEdge(150, 90, 92, 98);
+
+// The counter's picture showing `fps` frames a second and `ms` a frame (fps below 0: not known yet, dashes). Its size
+// does not change with the numbers: room for three digits and "99.9 ms".
+std::unique_ptr<Canvas> make_fps(int fps, float ms) {
+    // Digits and Latin letters: the UI face of either language.
+    const auto family = face(false);
+    Font number_font(family.get(), static_cast<REAL>(px(20)), FontStyleBold, UnitPixel);
+    Font unit_font(family.get(), static_cast<REAL>(px(11)), FontStyleBold, UnitPixel);
+    Font time_font(family.get(), static_cast<REAL>(px(11)), FontStyleRegular, UnitPixel);
+    const float pad = static_cast<float>(px(8)), gap = static_cast<float>(px(4));
+    RectF number_box, unit_box, time_box;
+    {
+        // A one-pixel picture to measure the widest numbers on.
+        Bitmap probe(1, 1, PixelFormat32bppPARGB);
+        Graphics g(&probe);
+        text_setup(g);
+        g.MeasureString(L"888", -1, &number_font, PointF(0, 0), &number_box);
+        g.MeasureString(L"FPS", -1, &unit_font, PointF(0, 0), &unit_box);
+        g.MeasureString(L"88.8 ms", -1, &time_font, PointF(0, 0), &time_box);
+    }
+    // The number's line a little tighter than the face's own height: the time sits close under it.
+    const float number_h = number_box.Height * 0.86f;
+    const int w = static_cast<int>(std::ceil(pad * 2 + std::max(number_box.Width + gap + unit_box.Width, time_box.Width)));
+    const int h = static_cast<int>(std::ceil(pad * 1.5f + number_h + time_box.Height));
+    auto canvas = std::make_unique<Canvas>(w, h);
+    auto bmp = canvas->surface();
+    Graphics g(bmp.get());
+    text_setup(g);
+    // The chip on whole pixels, its edge half a pixel in.
+    const RectF box(0.5f, 0.5f, static_cast<REAL>(w) - 1, static_cast<REAL>(h) - 1);
+    GraphicsPath chip;
+    rounded(chip, box, static_cast<float>(px(4)));
+    SolidBrush fill(kCounter);
+    g.FillPath(&fill, &chip);
+    Pen edge(kCounterEdge, 1.0f);
+    g.DrawPath(&edge, &chip);
+    // The number, then "FPS" small on its baseline's side, then the time under them.
+    const std::wstring number = fps < 0 ? L"--" : std::to_wstring(fps);
+    wchar_t time[32];
+    // No frame in the half second (the game held still): no time between frames either.
+    if (fps <= 0) std::swprintf(time, 32, L"-- ms");
+    else std::swprintf(time, 32, L"%.1f ms", static_cast<double>(ms));
+    SolidBrush lime(kChosen), quiet(kQuiet);
+    RectF drawn;
+    g.MeasureString(number.c_str(), -1, &number_font, PointF(0, 0), &drawn);
+    const float top = pad * 0.6f;
+    g.DrawString(number.c_str(), -1, &number_font, PointF(pad - px(2), top), &lime);
+    // "FPS" at the number's foot: the bottom of its box less the face's own room below the digits.
+    const float foot = top + number_box.Height * 0.78f;
+    g.DrawString(L"FPS", -1, &unit_font, PointF(pad - px(2) + drawn.Width, foot - unit_box.Height * 0.78f), &quiet);
+    g.DrawString(time, -1, &time_font, PointF(pad - px(2), top + number_h), &quiet);
+    return canvas;
+}
+
+// The counter's place: its corner of the game's area, 8 pixels in at 720 lines.
+POINT fps_place(const Canvas& c) {
+    const RECT a = area();
+    const int in = px(8);
+    const bool right = g_fps_corner == 2 || g_fps_corner == 4, bottom = g_fps_corner == 3 || g_fps_corner == 4;
+    return POINT{right ? a.right - in - c.w : a.left + in, bottom ? a.bottom - in - c.h : a.top + in};
+}
+
+// A look at the count: the frames since the last look over the time since it, and the counter drawn again when what it
+// shows changed (or its scale did, after a resize), and placed where its corner is now.
+void fps_frame(bool redraw) {
+    if (!g_fps || !g_fps_frames) return;
+    LARGE_INTEGER now{}, rate{};
+    QueryPerformanceCounter(&now);
+    QueryPerformanceFrequency(&rate);
+    const unsigned long long count = g_fps_frames();
+    int fps = g_fps_shown;
+    float ms = g_fps_shown_ms;
+    if (g_fps_at) {
+        const double seconds = static_cast<double>(now.QuadPart - g_fps_at) / static_cast<double>(rate.QuadPart);
+        const unsigned long long frames = count - g_fps_count;
+        // The frames a second over this half second, and the mean time between them; none shown: none a second.
+        fps = seconds > 0 ? static_cast<int>(std::lround(static_cast<double>(frames) / seconds)) : fps;
+        ms = frames ? static_cast<float>(seconds * 1000.0 / static_cast<double>(frames)) : 0.0f;
+        fps = std::min(fps, 999);
+    }
+    g_fps_count = count;
+    g_fps_at = now.QuadPart;
+    if (redraw || !g_fps_canvas || fps != g_fps_shown || std::fabs(ms - g_fps_shown_ms) >= 0.05f) {
+        g_fps_canvas = make_fps(fps, ms);
+        g_fps_shown = fps;
+        g_fps_shown_ms = ms;
+    }
+    const POINT at = fps_place(*g_fps_canvas);
+    g_fps_canvas->show(g_fps, at.x, at.y, 255);
+}
+
+LRESULT CALLBACK fps_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
+    if (msg == WM_TIMER && w == kFpsTimer) {
+        fps_frame(false);
         return 0;
     }
     // Clicks go through it to the game: it only tells.
@@ -880,7 +1004,9 @@ void start(HWND frame, HWND game, const Hooks& hooks, bool korean) {
     g_korean = korean;
     GdiplusStartupInput input;
     GdiplusStartup(&g_gdiplus, &input, nullptr);
-    // The notice lets clicks through to the game; the bar and the question take theirs.
+    // The notice and the frame counter let clicks through to the game; the bar and the question take theirs. The counter
+    // first, so that the windows made after it are above it.
+    g_fps = make_window(L"OpenDMTQFrameCounter", fps_proc, true);
     g_notice = make_window(L"OpenDMTQNotice", notice_proc, true);
     g_bar = make_window(L"OpenDMTQBar", bar_proc, false);
     g_ask = make_window(L"OpenDMTQQuestion", ask_proc, false);
@@ -929,6 +1055,8 @@ void ask_quit() {
     if (IsIconic(g_frame)) ShowWindow(g_frame, SW_RESTORE);
     draw_ask();
     ShowWindow(g_ask, SW_SHOWNOACTIVATE);
+    // Above everything else of the overlay: the frame counter stays, under its dim.
+    SetWindowPos(g_ask, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
 void minimised(bool now) {
@@ -965,6 +1093,18 @@ void place() {
     // The bar across the game's top at its new width, if it is up.
     if (g_bar && IsWindowVisible(g_bar)) bar_frame();
     if (g_notice_canvas) notice_frame();
+    // The frame counter in its corner, at the new scale.
+    if (g_fps_corner) fps_frame(true);
+}
+
+void show_fps(int corner, unsigned long long (*frames)()) {
+    if (!g_fps || corner <= 0 || corner > 4 || !frames) return;
+    g_fps_corner = corner;
+    g_fps_frames = frames;
+    // Shown at once, with dashes until the first half second has been counted.
+    fps_frame(true);
+    ShowWindow(g_fps, SW_SHOWNOACTIVATE);
+    SetTimer(g_fps, kFpsTimer, kFpsMs, nullptr);
 }
 
 #ifdef OVERLAY_TEST_HOOKS
@@ -1019,6 +1159,21 @@ void test_save(const std::wstring& prefix) {
                                             : "Your broadcast has ended\nWatch the replay under LIVE on My Server";
     save(*make_notice(live_text, true), L"notice-live.png");
     save(*make_notice(ended_text, false), L"notice-ended.png");
+}
+#endif
+
+#ifdef OVERLAY_TEST_HOOKS
+void test_save_fps(const std::wstring& path, int fps, float ms) {
+    CLSID png{0x557cf406, 0x1a04, 0x11d3, {0x9a, 0x73, 0x00, 0x00, 0xf8, 0x1e, 0xf3, 0x2e}};
+    auto c = make_fps(fps, ms);
+    // The premultiplied picture into a plain one with its alpha, which PNG keeps.
+    Bitmap out(c->w, c->h, PixelFormat32bppARGB);
+    Graphics g(&out);
+    g.Clear(Color(0, 0, 0, 0));
+    g.SetCompositingMode(CompositingModeSourceCopy);
+    auto picture = c->surface();
+    g.DrawImage(picture.get(), 0, 0, c->w, c->h);
+    out.Save(path.c_str(), &png, nullptr);
 }
 #endif
 

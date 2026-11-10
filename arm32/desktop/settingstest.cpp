@@ -39,6 +39,7 @@ int main() {
     const player::Settings& all = read(path,
                                        "# written by the PC client\n"
                                        "display=fullscreen\nwindow=1600x900\nvsync=off\nfps=144\nrender_scale=75\nupscaler=fsr1\nanti_aliasing=smaa\n"
+                                       "show_fps=bottom_right\n"
                                        "audio_device={0.0.0.00000000}.{abc}\naudio_mode=exclusive\naudio_buffer=low\nvolume=40\n");
     check(all.fullscreen, "display=fullscreen is full screen");
     check(all.window_w == 1600 && all.window_h == 900, "window=1600x900 is that size");
@@ -47,10 +48,19 @@ int main() {
     check(all.render_scale == 75, "render_scale=75 is 75");
     check(all.upscaler == player::Settings::Upscaler::kFsr1, "upscaler=fsr1 is AMD FSR 1");
     check(all.anti_aliasing == player::Settings::AntiAliasing::kSmaa, "anti_aliasing=smaa is SMAA");
+    check(all.show_fps == player::Settings::ShowFps::kBottomRight, "show_fps=bottom_right is the bottom right corner");
     check(all.audio_device == "{0.0.0.00000000}.{abc}", "audio_device keeps the id whole, braces and dots");
     check(all.audio_exclusive, "audio_mode=exclusive is the device alone");
     check(all.audio_buffer == 0, "audio_buffer=low is 0");
     check(all.volume == 40, "volume=40 is 40");
+    // Each corner by its name, and none by default.
+    check(player::Settings{}.show_fps == player::Settings::ShowFps::kOff, "no frame counter is the default");
+    const char* const corners[] = {"off", "top_left", "top_right", "bottom_left", "bottom_right"};
+    for (int i = 0; i < 5; ++i) {
+        const std::string text = std::string("show_fps=") + corners[i] + "\n";
+        check(read(path, text).show_fps == static_cast<player::Settings::ShowFps>(i), corners[i]);
+    }
+    check(read(path, "show_fps=middle\n").show_fps == player::Settings::ShowFps::kOff, "a corner it does not know shows no frame counter");
     // The other words each key takes.
     const player::Settings& words = read(path, "display=window\nwindow=auto\nvsync=on\nfps=unlimited\naudio_device=default\n"
                                                "audio_mode=shared\naudio_buffer=safe\n");

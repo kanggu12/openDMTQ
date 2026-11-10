@@ -201,3 +201,6 @@ void live_audio_source(const void*, int, int, int) {}
 void live_audio(const void*, const void*, std::size_t) {}
 
 }  // namespace arm32
+
+// The count live_frame keeps, for the overlay's frame counter (player.h).
+std::uint64_t player::frames_shown() { return g_shown.load(std::memory_order_relaxed); }

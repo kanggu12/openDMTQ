@@ -60,6 +60,10 @@ struct Settings {
     // (CMAA 2, SMAA 1x), or by drawing the frame with that many samples a pixel (MSAA).
     enum class AntiAliasing { kOff, kCmaa2, kSmaa, kMsaa2, kMsaa4, kMsaa8 };
     AntiAliasing anti_aliasing = AntiAliasing::kOff;
+    // A counter of the frames a second in a corner of the game (overlay_win32.cpp): none, or the corner the player picks
+    // (each corner has some of the game's own controls).
+    enum class ShowFps { kOff, kTopLeft, kTopRight, kBottomLeft, kBottomRight };
+    ShowFps show_fps = ShowFps::kOff;
     // The sound's device ("" Windows' default output), the device alone, how much is kept ahead (0 low, 1 normal,
     // 2 safe) and the game's volume in percent.
     std::string audio_device;
@@ -247,6 +251,9 @@ void define_input();
 void finger(int id, int what, float x, float y, std::int64_t at_ns = -1);
 void touch(int action, float x, float y);
 void frame_shown(std::uint64_t n);
+// The frames shown so far (frames.cpp's count at each swap), for the frame counter in the game's corner: read from any
+// thread, one atomic load.
+std::uint64_t frames_shown();
 // The mouse wheel at window pixels x,y, turned by notches (positive: away from the user; sideways: to the right), as a
 // finger's drag that scrolls what is under it; on the UI thread.
 void wheel(float x, float y, float notches_x, float notches_y);

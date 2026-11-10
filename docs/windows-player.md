@@ -29,7 +29,7 @@ closed); while a game runs it installs nothing and ends with 3.
 | Page | What it has |
 | :--- | :--- |
 | **Play** | The server and the account, the checks before a start (the player, the server, the sign-in, the app), how to play, the last play, and **PLAY** |
-| **Screen** | Full screen or a window, the window's size, VSync, the frame limit, the render scale and its upscaler, anti-aliasing |
+| **Screen** | Full screen or a window, the window's size, VSync, the frame limit, the FPS counter, the render scale and its upscaler, anti-aliasing |
 | **Sound** | The volume, the device, shared or the device alone, the buffer |
 | **Controls** | What the touch screen, the mouse and the keyboard do |
 | **Online** | The servers, the sign-in, the app on this PC and a check for a newer one |
@@ -48,7 +48,7 @@ game ends.
 `--update`, `--forget URL`, `--reset`, `--repair`, `--clear-game-data` and `--uninstall [--delete-data]`, with `--yes`
 to answer their questions (`--help` lists them all). `--set` takes `display`, `window`, `vsync`, `fps`,
 `render_scale`, `upscaler` (`bilinear`, `fsr1`, `nis`), `anti_aliasing` (`off`, `cmaa2`, `smaa`, `msaa2`, `msaa4`,
-`msaa8`), `audio_device`, `audio_mode`, `audio_buffer` and `volume`, with the values the **Screen** and **Sound** pages
+`msaa8`), `show_fps` (`off`, `top_left`, `top_right`, `bottom_left`, `bottom_right`), `audio_device`, `audio_mode`, `audio_buffer` and `volume`, with the values the **Screen** and **Sound** pages
 offer. While the launcher's window is open, the flags that change what it keeps are refused.
 
 ### In the game
@@ -96,6 +96,11 @@ offer. While the launcher's window is open, the flags that change what it keeps 
   display); another limit is held by the clock, with each frame still on a refresh (144 on a 240 Hz display).
 - **VSync off:** frames go out as soon as they are drawn, evenly at the limit, which may be above the display's rate, or
   as fast as the PC draws without one. A little less delay, and the picture may tear.
+- **The FPS counter**, off by default: a small chip in the corner chosen (each corner has some of the game's own
+  controls), with the frames a second in the game's lime and the mean frame time under them, over the last half second,
+  twice a second. It counts the frames the player shows, sits over the game as the bar does and lets clicks through, and
+  stays under the dim of the question before quitting. It is drawn apart from the game's picture: it costs the game
+  nothing, and the broadcast does not show it.
 - **The render scale** draws the game at a share of the window's pixels (100 % down to 50 %), stretched to fill it:
   lighter for the graphics card, and softer.
 - **The upscaler**, below 100 %: how the smaller picture reaches the window's size. **Bilinear** (the default) is the

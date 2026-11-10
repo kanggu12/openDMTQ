@@ -23,6 +23,8 @@ UPSCALER = ("bilinear", "fsr1", "nis")
 # How the edges of the game's shapes are smoothed: not at all, by Intel's CMAA 2 or SMAA over the finished picture, or by
 # drawing each frame with 2, 4 or 8 samples a pixel.
 ANTI_ALIASING = ("off", "cmaa2", "smaa", "msaa2", "msaa4", "msaa8")
+# A counter of the frames a second in a corner of the game, or none: each corner has some of the game's own controls.
+SHOW_FPS = ("off", "top_left", "top_right", "bottom_left", "bottom_right")
 # The sound shared with the PC's other sound, or the device alone (less latency).
 AUDIO_MODE = ("shared", "exclusive")
 # How much sound is kept ahead of the device: less latency, or fewer breaks on a busy PC.
@@ -38,17 +40,18 @@ DEFAULTS = {
     "render_scale": "100",
     "upscaler": "bilinear",
     "anti_aliasing": "off",
+    "show_fps": "off",
     "audio_device": "default",
     "audio_mode": "shared",
     "audio_buffer": "normal",
     "volume": 100,
 }
 # The order the settings file lists them in, the player's own order.
-ORDER = ("display", "window", "vsync", "fps", "render_scale", "upscaler", "anti_aliasing", "audio_device", "audio_mode",
-         "audio_buffer", "volume")
+ORDER = ("display", "window", "vsync", "fps", "render_scale", "upscaler", "anti_aliasing", "show_fps", "audio_device",
+         "audio_mode", "audio_buffer", "volume")
 # The choices of each setting that has a fixed list.
 CHOICES = {"display": DISPLAY, "vsync": VSYNC, "fps": FPS, "render_scale": RENDER_SCALE, "upscaler": UPSCALER,
-           "anti_aliasing": ANTI_ALIASING, "audio_mode": AUDIO_MODE, "audio_buffer": AUDIO_BUFFER}
+           "anti_aliasing": ANTI_ALIASING, "show_fps": SHOW_FPS, "audio_mode": AUDIO_MODE, "audio_buffer": AUDIO_BUFFER}
 # A window size the player takes (its own bounds: 320x180 to 16384 a side).
 SIZE = re.compile(r"^(\d{3,5})x(\d{3,5})$")
 

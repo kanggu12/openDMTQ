@@ -10,6 +10,7 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 - The player for Windows offers two upscalers for a render scale below 100 %, beside the plain stretch: AMD FidelityFX Super Resolution 1 (its edge-adaptive upscaling, then its sharpening) and NVIDIA Image Scaling. The game draws at the scaled size into a frame of the player's own, and the upscaler draws it to the window's full size. The launcher's Screen page offers them under the render scale (Upscaler, shown below 100 %), and `--set upscaler=bilinear|fsr1|nis` sets the same.
 - The player for Windows offers anti-aliasing: Intel's CMAA 2 and SMAA over the finished picture, or MSAA at 2x, 4x or 8x as the game draws. The launcher's Screen page offers it (Anti-aliasing), and `--set anti_aliasing=off|cmaa2|smaa|msaa2|msaa4|msaa8` sets the same. CMAA 2 runs on OpenGL ES 3.1's compute shaders; where the graphics card has none, the player uses SMAA and says so in its log. With an upscaler, the anti-aliasing comes first, at the size the game draws at.
+- The player for Windows can show an FPS counter in a corner of the game: the frames a second and the frame time, twice a second, in the look of the game's own dialogs. The launcher's Screen page offers it (FPS counter: off, or a corner), and `--set show_fps=off|top_left|top_right|bottom_left|bottom_right` sets the same.
 
 ## [0.8.2] - 2026-11-11
 
