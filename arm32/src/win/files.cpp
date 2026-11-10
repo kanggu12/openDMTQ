@@ -833,6 +833,21 @@ int wait_ready(Watch&& watch, long long deadline, Check&& check) {
 // A Linux path as a Windows one: forward slashes as they are (Win32 takes them), the devices the layer gives itself.
 std::wstring host_path(const char* path) { return wide(path); }
 
+// The layer's own names: /dev and /proc and what is under them, which it answers by name where it can (open_device,
+// access, readlink). On Windows nothing of the guest's stands behind any of them, and Windows would read one as the
+// current drive's \dev or \proc, another program's folder or none: no call hands one to Windows' file system, and each
+// fails there as on a missing file.
+bool own_name(const std::string& p) {
+    // The folder itself, or a name below it ("/devices" is not one).
+    auto in = [&p](const std::string& top) { return p.compare(0, top.size(), top) == 0 && (p.size() == top.size() || p[top.size()] == '/'); };
+    return in("/dev") || in("/proc");
+}
+
+// Whether a path stays as it is beside a folder descriptor: a Linux absolute one ("/..."), or one made for Windows
+// ("C:/...", "\\server\..."), which the player's mapping of the guest's names gives (desktop/guest_paths.h). Any other
+// is below the descriptor's folder.
+bool absolute_path(const std::string& p) { return !p.empty() && (p[0] == '/' || p[0] == '\\' || (p.size() > 1 && p[1] == ':')); }
+
 // A thread's name: its description, which prctl(PR_SET_NAME) gives it (sys.cpp); "thread" for one without.
 std::string thread_description(HANDLE thread) {
     std::string name = thread_name(thread);
@@ -940,6 +955,8 @@ int open(const char* path, int flags, ...) {
         if (d >= 0) fd_set_cloexec(d, flags & O_CLOEXEC);
         return d;
     }
+    // One of the layer's names it has no answer for: missing, not the current drive's file by that name.
+    if (own_name(p)) return fail(ENOENT);
     std::wstring w = host_path(path);
     DWORD attrs = GetFileAttributesW(w.c_str());
     bool is_dir = attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY);
@@ -970,8 +987,7 @@ int openat(int dirfd, const char* path, int flags, ...) {
     }
     // A relative path under a directory descriptor: that directory's path in front.
     std::string p = path;
-    bool absolute = !p.empty() && (p[0] == '/' || p[0] == '\\' || (p.size() > 1 && p[1] == ':'));
-    if (!absolute && dirfd != AT_FDCWD) {
+    if (!absolute_path(p) && dirfd != AT_FDCWD) {
         std::shared_ptr<Fd> d = fd_get(dirfd);
         if (!d) return fail(EBADF);
         p = d->path + "/" + p;
@@ -1239,6 +1255,8 @@ int flock(int fd, int) { return fd_get(fd) ? 0 : fail(EBADF); }
 int access(const char* path, int mode) {
     std::string p = path;
     if (p == "/dev/null" || p == "/dev/zero" || p == "/dev/urandom" || p == "/dev/random" || !proc_text(p).empty()) return 0;
+    // The layer's other names: missing (own_name).
+    if (own_name(p)) return fail(ENOENT);
     DWORD attrs = GetFileAttributesW(host_path(path).c_str());
     if (attrs == INVALID_FILE_ATTRIBUTES) return fail_win32();
     if ((mode & W_OK) && (attrs & FILE_ATTRIBUTE_READONLY) && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) return fail(EACCES);
@@ -1247,7 +1265,7 @@ int access(const char* path, int mode) {
 
 int faccessat(int dirfd, const char* path, int mode, int) {
     std::string p = path;
-    if (!p.empty() && p[0] != '/' && dirfd != AT_FDCWD) {
+    if (!p.empty() && !absolute_path(p) && dirfd != AT_FDCWD) {
         std::shared_ptr<Fd> d = fd_get(dirfd);
         if (!d) return fail(EBADF);
         p = d->path + "/" + p;
@@ -1256,6 +1274,8 @@ int faccessat(int dirfd, const char* path, int mode, int) {
 }
 
 int unlink(const char* path) {
+    // Not a file of Windows' by one of the layer's names (own_name).
+    if (own_name(path)) return fail(ENOENT);
     std::wstring w = host_path(path);
     // Read-only files go too, as Linux deletes them by the folder's permission.
     DWORD attrs = GetFileAttributesW(w.c_str());
@@ -1266,7 +1286,7 @@ int unlink(const char* path) {
 
 int unlinkat(int dirfd, const char* path, int flags) {
     std::string p = path;
-    if (!p.empty() && p[0] != '/' && dirfd != AT_FDCWD) {
+    if (!p.empty() && !absolute_path(p) && dirfd != AT_FDCWD) {
         std::shared_ptr<Fd> d = fd_get(dirfd);
         if (!d) return fail(EBADF);
         p = d->path + "/" + p;
@@ -1275,13 +1295,15 @@ int unlinkat(int dirfd, const char* path, int flags) {
 }
 
 int mkdir(const char* path, unsigned int) {
+    // No folder of Windows' by one of the layer's names (own_name).
+    if (own_name(path)) return fail(ENOENT);
     if (CreateDirectoryW(host_path(path).c_str(), nullptr)) return 0;
     return fail_win32();
 }
 
 int mkdirat(int dirfd, const char* path, unsigned int mode) {
     std::string p = path;
-    if (!p.empty() && p[0] != '/' && dirfd != AT_FDCWD) {
+    if (!p.empty() && !absolute_path(p) && dirfd != AT_FDCWD) {
         std::shared_ptr<Fd> d = fd_get(dirfd);
         if (!d) return fail(EBADF);
         p = d->path + "/" + p;
@@ -1289,12 +1311,16 @@ int mkdirat(int dirfd, const char* path, unsigned int mode) {
     return mkdir(p.c_str(), mode);
 }
 
-int rmdir(const char* path) { return RemoveDirectoryW(host_path(path).c_str()) ? 0 : fail_win32(); }
+int rmdir(const char* path) {
+    // Not a folder of Windows' by one of the layer's names (own_name).
+    if (own_name(path)) return fail(ENOENT);
+    return RemoveDirectoryW(host_path(path).c_str()) ? 0 : fail_win32();
+}
 
 int renameat(int fromfd, const char* from, int tofd, const char* to) {
     auto full = [](int dirfd, const char* path) {
         std::string p = path;
-        if (!p.empty() && p[0] != '/' && dirfd != AT_FDCWD)
+        if (!p.empty() && !absolute_path(p) && dirfd != AT_FDCWD)
             if (std::shared_ptr<Fd> d = fd_get(dirfd)) p = d->path + "/" + p;
         return p;
     };
@@ -1317,7 +1343,11 @@ ssize_t readlink(const char* path, char* buf, std::size_t n) {
 
 ssize_t readlinkat(int, const char* path, char* buf, std::size_t n) { return readlink(path, buf, n); }
 
-int chdir(const char* path) { return SetCurrentDirectoryW(host_path(path).c_str()) ? 0 : fail_win32(); }
+int chdir(const char* path) {
+    // Not into a folder of Windows' by one of the layer's names (own_name).
+    if (own_name(path)) return fail(ENOENT);
+    return SetCurrentDirectoryW(host_path(path).c_str()) ? 0 : fail_win32();
+}
 
 int fchdir(int fd) {
     std::shared_ptr<Fd> f = fd_get(fd);
@@ -1373,6 +1403,8 @@ int utimensat(int dirfd, const char* path, const struct timespec times[2], int) 
 }
 
 int chmod(const char* path, unsigned int mode) {
+    // Not a file of Windows' by one of the layer's names (own_name).
+    if (own_name(path)) return fail(ENOENT);
     std::wstring w = host_path(path);
     DWORD attrs = GetFileAttributesW(w.c_str());
     if (attrs == INVALID_FILE_ATTRIBUTES) return fail_win32();
@@ -1389,7 +1421,7 @@ int fchmod(int fd, unsigned int mode) {
 
 int fchmodat(int dirfd, const char* path, unsigned int mode, int) {
     std::string p = path;
-    if (!p.empty() && p[0] != '/' && dirfd != AT_FDCWD)
+    if (!p.empty() && !absolute_path(p) && dirfd != AT_FDCWD)
         if (std::shared_ptr<Fd> d = fd_get(dirfd)) p = d->path + "/" + p;
     return chmod(p.c_str(), mode);
 }
@@ -1524,6 +1556,8 @@ int stat(const char* path, struct stat* st) {
 int statfs(const char*, struct statfs* st) { return arm32::posix::fstatfs(-1, st); }
 
 int arm32_rename(const char* from, const char* to) {
+    // Neither side a file of Windows' by one of the layer's names (own_name).
+    if (own_name(from) || own_name(to)) return fail(ENOENT);
     std::wstring f = wide(from), t = wide(to);
     // Replaces what is there, as Linux's rename does.
     if (MoveFileExW(f.c_str(), t.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED)) return 0;

@@ -1111,9 +1111,19 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
         return res(fdatasync(static_cast<int>(a0)));
     case 217:  // getdents64: same record layout on every Linux architecture
         return res(syscall(__NR_getdents64, static_cast<int>(a0), H(a1), a2));
-    case 183:  // getcwd: the kernel's call, which returns the length including the NUL (the C
-               // library's getcwd would allocate a buffer of its own for NULL)
-        return res(syscall(__NR_getcwd, H(a0), a1));
+    case 183: {  // getcwd: the kernel's call, which returns the length including the NUL (the C
+                 // library's getcwd would allocate a buffer of its own for NULL)
+        // The host's current folder by the guest's name for it (name_hook: the desktop player's folders by their guest
+        // names, on Windows the guest's root as "/"), so that a name the guest makes from it leads back there.
+        char host[PATH_MAX];
+        if (syscall(__NR_getcwd, host, sizeof host) < 0) return err(errno);
+        const std::string name = p.guest_name(host);
+        // As the kernel answers: a buffer too small is ERANGE, one the guest has no memory at is EFAULT.
+        if (name.size() + 1 > a1) return err(ERANGE);
+        if (!mem_ok(a0, static_cast<std::uint32_t>(name.size() + 1))) return err(EFAULT);
+        std::memcpy(m.host(a0), name.c_str(), name.size() + 1);
+        return static_cast<std::uint32_t>(name.size() + 1);
+    }
     case 12: {  // chdir
         std::string hp;
         if (!path_arg(a0, hp)) return err(EFAULT);

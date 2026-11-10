@@ -34,6 +34,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <sys/stat.h>
 #include <thread>
 #include <unistd.h>
@@ -43,15 +44,38 @@ namespace player {
 
 namespace {
 
-// The log socket the guest's liblog writes to, where /dev/socket/logdw points.
-std::string g_logd;
+// Whether the guest's names are fenced in (guest_paths.h): on Windows, where the app is a server's and the player is
+// what a person runs; not in the desktop player for Linux, a developer's tool that reads the host's own /proc and /dev.
+#ifdef _WIN32
+constexpr bool kFenced = true;
+#else
+constexpr bool kFenced = false;
+#endif
 
-// True when path is base or inside it; rest is then what follows base ("" or "/...").
-bool under(const std::string& path, const std::string& base, std::string& rest) {
-    if (path.compare(0, base.size(), base) != 0) return false;
-    if (path.size() != base.size() && path[base.size()] != '/') return false;
-    rest = path.substr(base.size());
-    return true;
+// How many of the names the fence refused or put in the guest's root the log names: enough for a game's few, not a
+// line for each name of a game that walks a folder tree.
+constexpr std::size_t kFencedNamesLogged = 32;
+
+// A name of the guest's that the fence refused or put in the guest's root (`host` is where it went): in the log once
+// each, the first kFencedNamesLogged of them, so that a run shows what the game names outside its own folders.
+void note_fenced(const std::string& guest, const std::string& host) {
+    const App& a = app();
+    // Anything outside the data folder, or in one of the app's own folders there, is no news.
+    if (host.compare(0, a.host_data.size(), a.host_data) != 0) return;
+    const std::string_view rest = std::string_view(host).substr(a.host_data.size());
+    const bool refused = rest == "/<refused>";
+    if (!refused && rest != "/root" && !rest.starts_with("/root/")) return;
+    // Guest threads ask at once: the names seen so far under a lock.
+    static std::mutex lock;
+    static std::set<std::string> seen;
+    std::lock_guard<std::mutex> guard(lock);
+    // Past the limit, one line says that the log stops naming them.
+    if (seen.size() > kFencedNamesLogged || !seen.insert(guest).second) return;
+    if (seen.size() > kFencedNamesLogged) {
+        arm32::log("player: more of the guest's names outside its folders, not logged");
+        return;
+    }
+    arm32::log("player: the guest's name %s %s", guest.c_str(), refused ? "is refused" : "is in the guest's root folder");
 }
 
 }  // namespace
@@ -62,39 +86,16 @@ App& app() {
 }
 
 std::string host_of(const std::string& path) {
-    const App& a = app();
-    std::string rest;
-    // The guest's system: its linker and libraries in the sysroot, the agent where it was built. No vendor libraries.
-    if (path == "/system/bin/arm32-agent") return a.host_agent;
-    if (path == "/system/bin/linker") return a.host_sysroot + "/bin/linker";
-    if (under(path, "/system/lib", rest)) return a.host_sysroot + "/lib" + rest;
-    if (under(path, "/vendor/lib", rest)) return a.host_sysroot + "/vendor-lib" + rest;
-    // The game's libraries, under the linker's search path and under the folder the package installer would use.
-    if (under(path, "/arm32/lib", rest) || under(path, a.lib_dir, rest)) return a.host_libs + rest;
-    if (path == a.apk) return a.host_apk;
-    if (path == "/dev/socket/logdw" && !g_logd.empty()) return g_logd;
-    // Internal storage, under both of the names Android gives it.
-    if (under(path, a.data_dir, rest) || under(path, "/data/user/0/" + a.package, rest)) return a.host_data + "/internal" + rest;
-    // The app's folder on external storage, and the rest of external storage, under each of its names.
-    if (under(path, a.external_dir, rest) || under(path, "/sdcard/Android/data/" + a.package, rest)) return a.host_data + "/external" + rest;
-    if (under(path, "/storage/emulated/0", rest) || under(path, "/sdcard", rest)) return a.host_data + "/sdcard" + rest;
-    return path;
-}
-
-std::string guest_of(const std::string& host) {
-    const App& a = app();
-    std::string rest;
-    if (under(host, a.host_libs, rest)) return a.lib_dir + rest;
-    if (under(host, a.host_sysroot + "/lib", rest)) return "/system/lib" + rest;
-    if (host == a.host_apk) return a.apk;
-    if (under(host, a.host_data + "/internal", rest)) return a.data_dir + rest;
-    if (under(host, a.host_data + "/external", rest)) return a.external_dir + rest;
-    if (under(host, a.host_data + "/sdcard", rest)) return "/storage/emulated/0" + rest;
+    std::string host = paths::host_of(app(), path, kFenced);
+    // On Windows a name outside the app's folders goes in the log, once.
+    if (kFenced) note_fenced(path, host);
     return host;
 }
 
+std::string guest_of(const std::string& host) { return paths::guest_of(app(), host, kFenced); }
+
 // Points /dev/socket/logdw at the player's log socket.
-void set_log_socket(const std::string& path) { g_logd = path; }
+void set_log_socket(const std::string& path) { app().log_socket = path; }
 
 
 bool load_library(const std::string& guest_path) {
@@ -304,7 +305,9 @@ int main(int argc, char** argv) {
         // UTF-8 in and out: a narrow string's conversion would go through Windows' ANSI code page.
         std::filesystem::path abs = std::filesystem::absolute(player::utf8_path(*p), ec);
         if (!ec) {
-            const std::u8string u = abs.lexically_normal().u8string();
+            // With "/" between the parts on Windows too (Win32 takes them): the runtime joins paths with "/", and the
+            // folder the Windows layer's getcwd gives is spelt so, which guest_of must find the guest's root in.
+            const std::u8string u = abs.lexically_normal().generic_u8string();
             *p = std::string(u.begin(), u.end());
         }
         // A folder's own trailing slash goes, for the prefix tests in host_of and guest_of.
@@ -315,10 +318,14 @@ int main(int argc, char** argv) {
     a.lib_dir = "/data/app/" + a.package + "-1/lib/arm";
     a.data_dir = "/data/data/" + a.package;
     a.external_dir = "/storage/emulated/0/Android/data/" + a.package;
-    for (const char* sub : {"/internal", "/external", "/sdcard", "/cwd"}) make_dirs(a.host_data + sub);
-    // The current folder: a phone app's is /, where it may not write; here an empty folder of the data's, so that a file
-    // the game names by a relative path lands there and nowhere else.
-    if (chdir((a.host_data + "/cwd").c_str()) != 0) log("player: cannot enter %s/cwd", a.host_data.c_str());
+    for (const char* sub : {"/internal", "/external", "/sdcard"}) make_dirs(a.host_data + sub);
+    // The current folder: a phone app's is /, where it may not write. On Windows it is the guest's root in the data
+    // folder, where its names outside the app's folders lie (guest_paths.h) and which getcwd names "/" as a phone does;
+    // on Linux an empty folder of the data's. Either way a file the game names by a relative path lands there and
+    // nowhere else.
+    const std::string cwd = player::kFenced ? player::paths::root_folder(a) : a.host_data + "/cwd";
+    make_dirs(cwd);
+    if (chdir(cwd.c_str()) != 0) log("player: cannot enter %s", cwd.c_str());
     // The VM's log in the runtime's, one stream to read; the guest's own log lines too.
     jvm::set_log_sink([](const char* line) { log("%s", line); });
     player::set_log_socket(player::start_logd(a.host_data));

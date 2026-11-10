@@ -2,6 +2,7 @@
 // What its files share.
 #pragma once
 
+#include "guest_paths.h"
 #include "jvm.h"
 
 #include <atomic>
@@ -23,16 +24,9 @@ namespace player {
 // 1903 on; this holds on any Windows).
 inline std::filesystem::path utf8_path(const std::string& s) { return std::filesystem::path(std::u8string(s.begin(), s.end())); }
 
-// The app as the game sees it on a phone: its package, where Android would have put its files (guest paths, which
-// host_of maps to folders on this computer), and its screen.
-struct App {
-    std::string package;
-    // The APK and the 32-bit library folder, where the package installer puts them.
-    std::string apk, lib_dir;
-    // Internal storage (Context.getFilesDir's parent) and the app's folder on external storage.
-    std::string data_dir, external_dir;
-    // On this computer: the guest's system, the agent, the game's libraries, the APK, and the folder for the app's data.
-    std::string host_sysroot, host_agent, host_libs, host_apk, host_data;
+// The app as the game sees it on a phone: its package, where Android would have put its files and where they are on
+// this computer (the layout host_of maps guest paths by, guest_paths.h), and its screen.
+struct App : paths::Layout {
     // The window in pixels, the display's refresh rate, and Android's density (DisplayMetrics.density: 1 at 160 dpi).
     int width = 1920, height = 1080;
     // The window's title, and whether its size is the screen's to decide (a start with no size asked for).
@@ -69,7 +63,8 @@ Settings& settings();
 // Reads a settings file into settings(); false when there is none (the defaults stay).
 bool load_settings(const std::string& path);
 
-// The host path of a guest path (the runtime's path_hook), and the guest name of a host file.
+// The host path of a guest path (the runtime's path_hook), and the guest name of a host file (guest_paths.h: on Windows
+// nothing the guest names reaches past the player's folders and the app's data folder).
 std::string host_of(const std::string& guest);
 std::string guest_of(const std::string& host);
 

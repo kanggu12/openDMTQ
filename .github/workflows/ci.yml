@@ -46,6 +46,11 @@ jobs:
       - name: Unit tests (CLI) on Python 3.9, the oldest README and install.sh accept
         run: docker run --rm -e PYTHONDONTWRITEBYTECODE=1 -v "$PWD:/r:ro" -w /r/cli python:3.9-slim python -m unittest discover -s tests -t .
 
+      # The guest's file names in the player for Windows (arm32/desktop/guest_paths.h): the app's folders where they were,
+      # and no name of the app's reaching past them.
+      - name: The guest's file names
+        run: c++ -std=c++20 -Wall -Wextra -Iarm32/desktop arm32/tests/host/guest_paths_test.cpp -o /tmp/guest_paths_test && /tmp/guest_paths_test
+
       - name: Live view's transport stream writer
         run: c++ -std=c++20 -Wall -Wextra -Iarm32/src arm32/tests/host/live_ts_test.cpp arm32/src/live_ts.cpp -o /tmp/live_ts_test && /tmp/live_ts_test
       # The colours of a computer's broadcast in its stream's sequence header (arm32/src/live_sps.cpp).
