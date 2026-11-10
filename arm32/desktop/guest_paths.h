@@ -138,7 +138,8 @@ inline bool runtime_name(std::string_view path) { return path.starts_with("/dev/
 // name), so that every call on it fails as on a missing file (ENOENT), a folder made on its way included.
 inline std::string refused(const Layout& a) { return a.host_data + "/<refused>"; }
 
-// The guest's root folder on Windows, where every name outside the app's folders lies: the data folder's root.
+// The guest's root folder on Windows, where every name outside the app's folders lies, and the player's current folder
+// there (main.cpp), which getcwd names "/" (guest_of).
 inline std::string root_folder(const Layout& a) { return a.host_data + "/root"; }
 
 // True when `path` is in one of the folders that stand for the guest's, with `host` its name on this computer. With
@@ -179,8 +180,8 @@ inline std::string host_of(const Layout& a, const std::string& given, bool fence
     // A drive or a stream ("C:/", "//?/C:/", "name:stream") or Windows' own separator: neither is in a name of the
     // guest's, and either leads past the folders below.
     if (given.find_first_of(":\\") != std::string::npos) return refused(a);
-    // A relative name: the layer puts it below the current folder (the data folder's, or one the guest moved to among its
-    // own) or below a folder descriptor's, where it stays unless its ".." climb above that.
+    // A relative name: the layer puts it below the current folder (the guest's root at the start, main.cpp, or one the
+    // guest moved to among its own) or below a folder descriptor's, where it stays unless its ".." climb above that.
     if (given[0] != '/') return climbs(given) || windows_reads_otherwise(given) ? refused(a) : given;
     // An absolute name, "." and ".." and repeated slashes gone first, so that no folder below can be climbed out of.
     const std::string path = normal(given);
