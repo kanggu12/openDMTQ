@@ -441,6 +441,25 @@ async function portalFlows(contexts) {
   await noFindings(login, 'wrong password on a phone');
   await login.close();
 
+  // The text face in two files by script (style.css, unicode-range): the sign-in in English, every visitor's first page,
+  // takes the Latin one alone; in Korean the Hangul one too, its Korean drawn in the site's face. Each in a browser of its
+  // own, with nothing kept from before.
+  const facesOf = async lang => {
+    const own = await contexts.browser.createBrowserContext();
+    const p = await own.newPage();
+    const got = [];
+    p.on('response', r => { if (/\/fonts\/dmtq-text-/.test(r.url())) got.push(r.url().split('/').pop()); });
+    await p.setCookie({ name: 'opendmtq_lang', value: lang, url: SITE });
+    await p.goto(`${P}/login.php`, { waitUntil: 'networkidle0' });
+    const drawn = await p.evaluate(() => document.fonts.ready.then(() => document.fonts.check('16px "DMTQ Text"', '로그인')));
+    await own.close();
+    return [got.sort(), drawn];
+  };
+  const faces = [await facesOf('en'), await facesOf('ko')];
+  check('a page in English takes the Latin half of the text face alone, a page in Korean the Hangul half too',
+    JSON.stringify(faces[0][0]) === '["dmtq-text-2-latin.woff2"]' && JSON.stringify(faces[1][0]) === '["dmtq-text-2-hangul.woff2","dmtq-text-2-latin.woff2"]'
+    && faces[1][1], JSON.stringify(faces));
+
   // A field left empty: the page's own check says what is missing, in the page's language and the site's error box, and
   // the field takes the focus (forms.js), where the browser's bubble said it in the browser's language. The form stays.
   for (const [lang, noId, noPassword] of [['en', 'Enter your ID.', 'Enter your password.'], ['ko', '아이디를 입력하세요.', '비밀번호를 입력하세요.']]) {
