@@ -192,12 +192,12 @@ def made_up_library(content, custom):
     with open(os.path.join(patch, "table/us/song_desc_us.csv"), "wb") as f:
         f.write(files["table/us/song_desc_us.csv"])
     # The manifest names every one of them, the files of the song not imported (its preview and tile) and a screen the
-    # import did not bring.
+    # import did not bring. In the form the client data's has: no byte-order mark, CRLF, a final one.
     names = sorted(files) + ["preview/made_five.p.opus", "dlc/d3_e5.unity3d", "dlc/d_ui1.unity3d"]
-    manifest = "file_name,file_size,checksum,compressed_file_size,compressed_checksum,acquire_on_demand,compressed,platform,tag,"
-    manifest += "".join(f"\r\n{rel},1,x,1,x,0,1,,," for rel in names)
+    manifest = "file_name,file_size,checksum,compressed_file_size,compressed_checksum,acquire_on_demand,compressed,platform,tag,\r\n"
+    manifest += "".join(f"{rel},1,x,1,x,0,1,,,\r\n" for rel in names)
     with open(os.path.join(patch, "patch_new.csv.lz4"), "wb") as f:
-        f.write(songs.lz4_encode(("﻿" + manifest).encode("utf-8")))
+        f.write(songs.lz4_encode(manifest.encode("utf-8")))
     # The added song and the hidden one.
     folder = os.path.join(custom, "songs", str(ADDED["song_id"]))
     os.makedirs(os.path.join(folder, "patterns"))
@@ -306,6 +306,168 @@ class OneRebuildAtATimeTest(LibraryCase):
         # The overlay is whole, with nothing left of a build beside it.
         self.assertTrue(os.path.isfile(self.overlay("patch_new.csv.lz4")))
         self.assertEqual(sorted(n for n in os.listdir(self.custom) if n.startswith("web.")), [])
+
+
+# ------------------------------------------------------------------------------ what a rebuild writes
+
+class RebuildOutputTest(LibraryCase):
+    """What rebuild() makes of the made-up library for phones and the game server: the client's tables in both language
+    folders (the song not imported out, the added one in, the hidden one flagged), the manifest with the new files' sizes
+    and checksums and without the files the server lacks, the song list and catalog.json."""
+
+    def setUp(self):
+        super().setUp()
+        self.result = songs.rebuild()
+
+    def written(self, rel, root=None):
+        """A file of the overlay (or of the patch folder root) unpacked from its .lz4, as text with its byte-order mark."""
+        with open(os.path.join(root or self.overlay(), rel + ".lz4"), "rb") as f:
+            return songs.lz4_decode(f.read()).decode("utf-8")
+
+    def text(self, rel):
+        """A table of the overlay as phones get it, decoded from its .lz4."""
+        return self.written(rel).lstrip("﻿")
+
+    def column(self, rel, name):
+        """One column of an overlay table, row by row."""
+        header, rows = songs._table_rows(self.text(rel))
+        return [r[header.index(name)] for r in rows]
+
+    def row(self, rel, key, value):
+        """The row of an overlay table whose column key is value, by column name."""
+        header, rows = songs._table_rows(self.text(rel))
+        return next(dict(zip(header, r)) for r in rows if r[header.index(key)] == value)
+
+    def test_the_song_table_has_the_imported_songs_the_added_one_and_the_hidden_flag(self):
+        for loc in LOCALES:
+            rel = f"table/{loc}/song_song.csv"
+            with self.subTest(loc):
+                # Song 5 was listed but not imported: its row goes. 2 stays, hidden.
+                self.assertEqual(self.column(rel, "song_id"), ["1", "2", "1001"])
+                self.assertEqual(self.column(rel, "hidden_yn"), ["N", "Y", "N"])
+                added = self.row(rel, "song_id", "1001")
+                # Numbered after the highest track of the table as shipped (15, the song taken out), dated as its last row.
+                self.assertEqual((added["item_id"], added["name"], added["full_name"], added["track_id"], added["mod_date"]),
+                                 ("1001", "made_added", "Made Up Added", "16", "20200101"))
+                self.assertEqual((added["free_yn"], added["open_yn"], added["original_bga_yn"]), ("Y", "Y", "N"))
+                # The rows kept are byte for byte the shipped ones, in the shipped form: a byte-order mark, CRLF, no final break.
+                written, shipped = self.written(rel), self.written(rel, root=self.patch)
+                self.assertTrue(written.startswith("﻿"))
+                self.assertEqual(written.split("\r\n")[:2], shipped.split("\r\n")[:2])
+                self.assertFalse(written.endswith("\n"))
+                # The hidden song's row differs in its flag alone.
+                ours, theirs = written.split("\r\n")[2].split(","), shipped.split("\r\n")[2].split(",")
+                flag = SONG_HEADER.index("hidden_yn")
+                self.assertEqual((ours[:flag] + ours[flag + 1:], theirs[flag], ours[flag]), (theirs[:flag] + theirs[flag + 1:], "N", "Y"))
+
+    def test_the_chart_table_keeps_every_row_and_gains_the_added_charts(self):
+        for loc in LOCALES:
+            rel = f"table/{loc}/song_songPattern.csv"
+            with self.subTest(loc):
+                # The client refuses an empty chart table: the song not imported keeps its chart rows (501), never offered.
+                self.assertEqual(self.column(rel, "pattern_id"), ["101", "102", "201", "501", "20001", "20002"])
+                added = self.row(rel, "pattern_id", "20002")
+                self.assertEqual([added[h] for h in PATTERN_HEADER], ["20002", "1001", "2", "4", "9", "0", "0", "Y", "0"])
+        # The language folder whose table has line feeds and a final one keeps them.
+        written = self.written("table/kr/song_songPattern.csv")
+        self.assertTrue(written.endswith("\n"))
+        self.assertNotIn("\r", written)
+
+    def test_the_items_products_and_categories_lose_the_song_not_imported_and_gain_the_added_one(self):
+        for loc in LOCALES:
+            with self.subTest(loc):
+                items = f"table/{loc}/product_item.csv"
+                # Song 5's item goes; every other item stays, the added song's comes last with its tile's sprite.
+                self.assertEqual(self.column(items, "item_id"), ["1", "2", "30001", "40001", "39001", "80002", "1001"])
+                added = self.row(items, "item_id", "1001")
+                self.assertEqual((added["item_name"], added["img_url_1"], added["item_type"], added["summary"]),
+                                 ("made_added", "e1001_made_added", "S", "Made Up Added"))
+                # Its product goes with it, and the added song's comes in the form of a free song's.
+                products = f"table/{loc}/product_product.csv"
+                self.assertEqual(self.column(products, "product_id"),
+                                 ["1000001", "1000002", "30001", "40001", "39001", "80002", "2001001"])
+                self.assertEqual(songs._table_rows(self.text(products))[1][-1], songs._product_row(PRODUCT_HEADER, 1001))
+                # The music shop's categories list the products there are, the added one in both.
+                categories = f"table/{loc}/category_categoryproduct.csv"
+                header, rows = songs._table_rows(self.text(categories))
+                self.assertEqual([(r[0], r[1]) for r in rows],
+                                 [("3", "1000001"), ("103", "1000001"), ("3", "1000002"), ("103", "1000002"), ("7", "80002"),
+                                  ("3", "2001001"), ("103", "2001001")])
+
+    def test_the_song_descriptions_follow_the_song_table(self):
+        for loc in LOCALES:
+            rel = f"table/{loc}/song_desc_{loc}.csv"
+            with self.subTest(loc):
+                self.assertEqual(self.column(rel, "song_id"), ["1", "2", "1001"])
+                self.assertEqual(self.row(rel, "song_id", "1001")["fullname"], "Made Up Added")
+        # Where the content has the table plain beside its .lz4, the overlay has both, the same.
+        with open(self.overlay("table/us/song_desc_us.csv"), "rb") as f:
+            self.assertEqual(f.read().decode("utf-8-sig"), self.text("table/us/song_desc_us.csv"))
+        self.assertFalse(os.path.exists(self.overlay("table/kr/song_desc_kr.csv")))
+
+    def test_the_manifest_has_every_written_files_sizes_and_checksums_and_not_what_the_server_lacks(self):
+        manifest = self.written("patch_new.csv")
+        # The content's form: its header first, CRLF, a final one.
+        self.assertTrue(manifest.startswith("file_name,"))
+        self.assertTrue(manifest.endswith(",\r\n"))
+        lines = manifest[:-2].split("\r\n")
+        names = [ln.split(",", 1)[0] for ln in lines[1:]]
+        # The song not imported, its preview and tile, and the screen the import lacks are not offered.
+        for gone in ("preview/made_five.p.opus", "dlc/d3_e5.unity3d", "dlc/d_ui1.unity3d"):
+            self.assertNotIn(gone, names)
+        self.assertEqual(self.result["missing_game_files"], ["dlc/d_ui1.unity3d"])
+        # What did not change keeps its line as the content has it.
+        for kept in ("dlc/d_ui0.unity3d", "preview/made_one.p.opus", "dlc/d3_e1.unity3d", songs.TILE_TEMPLATE):
+            self.assertIn(f"{kept},1,x,1,x,0,1,,,", lines)
+        # Every file written: the six tables of each language folder, the added song's tile and preview.
+        tables = [f"table/{loc}/{t}.csv" for loc in LOCALES
+                  for t in ("song_song", "song_songPattern", "product_item", "product_product", "category_categoryproduct", f"song_desc_{loc}")]
+        self.assertEqual(self.result["client_files"], sorted(tables + ["dlc/d3_e1001.unity3d", "preview/made_added.p.opus"]))
+        for rel in self.result["client_files"]:
+            with self.subTest(rel):
+                with open(self.overlay(rel + ".lz4"), "rb") as f:
+                    packed = f.read()
+                raw = songs.lz4_decode(packed)
+                # Its sizes and checksums are of the bytes phones get, packed and unpacked.
+                self.assertIn(f"{rel},{len(raw)},{songs._md5(raw)},{len(packed)},{songs._md5(packed)},0,1,,,", lines)
+        # The lines kept stay in the content's order (the made-up manifest's is by name), each once; the new files' come
+        # last.
+        kept = sorted([*made_up_tables("us"), *made_up_tables("kr"), "dlc/d_ui0.unity3d", "preview/made_one.p.opus",
+                       "dlc/d3_e1.unity3d", songs.TILE_TEMPLATE])
+        self.assertEqual(names, kept + ["dlc/d3_e1001.unity3d", "preview/made_added.p.opus"])
+
+    def test_the_catalog_is_of_the_tables_as_phones_get_them(self):
+        with open(os.path.join(self.custom, "catalog.json"), encoding="utf-8") as f:
+            catalog = json.load(f)
+        # Song 1's chart that costs MAX POINT; song 5's is not counted, as the server has not got the song.
+        self.assertEqual(catalog["point_charts"], [{"pattern_id": 102, "song_id": 1, "point_type": 1, "point_value": 300}])
+        # Every item a player owns: neither songs, nor packages, nor those never handed out.
+        self.assertEqual(catalog["items"], [30001, 80002])
+        # The level unlock's product, its keys in the order the client reads them, numbers as numbers.
+        self.assertEqual(list(catalog["unlock_product"].items()), [
+            ("product_id", 80002), ("platform_product_id", 1080002), ("store_product_id", ""), ("product_type", "I"),
+            ("cost_game_point", 1), ("cost_game_cash", 0), ("item_id", 80002), ("item_name", "made_unlock"),
+            ("img_url_1", ""), ("img_url_2", ""), ("summary", ""), ("description", ""), ("repeat_count", 0),
+            ("item_type", "U"), ("limit_minute", 0), ("status", "N"), ("buy_level", 0), ("buy_limit_count", 1),
+            ("buy_limit_type", "F"), ("reg_date", ""), ("sale_start_date", ""), ("sale_end_date", ""), ("display_order", 0)])
+
+    def test_the_song_list_and_the_added_songs_files(self):
+        with open(os.path.join(self.custom, "songList.json"), encoding="utf-8") as f:
+            listed = json.load(f)
+        self.assertEqual([(s["song_id"], s["hidden_yn"]) for s in listed], [(1, "N"), (2, "Y"), (1001, "N")])
+        self.assertEqual(listed[-1]["song_patterns"], [{k: c[k] for k in ("pattern_id", "line", "difficulty", "signature")}
+                                                        for c in ADDED["charts"]])
+        # The added song's files in the overlay, as the game asks for them, are its own (a chart twice: with earphones too).
+        folder = os.path.join(self.custom, "songs", "1001")
+        web = os.path.join(self.custom, "web")
+        for theirs, ours in (("DMQ/Songs/1001/1001.fpk", "song.fpk"), ("DMQ/Patterns/20001", "patterns/20001"),
+                             ("DMQ/Patterns/20001_EARPHONE", "patterns/20001"), ("DMQ/Patterns/20002_EARPHONE", "patterns/20002"),
+                             ("viewImg/eye/made_added.png", "jacket.png")):
+            with self.subTest(theirs):
+                with open(os.path.join(web, theirs), "rb") as a, open(os.path.join(folder, ours), "rb") as b:
+                    self.assertEqual(a.read(), b.read())
+        # And its picture for the web pages.
+        self.assertTrue(os.path.isfile(os.path.join(self.custom, "thumbs", "made_added.jpg")))
 
 
 if __name__ == "__main__":
