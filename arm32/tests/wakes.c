@@ -7,6 +7,10 @@
 //     the poster's host thread, and that interrupt must not cancel a wake either.
 // sem_post issues the futex wake only when the other side sleeps, and a wake that never reaches it
 // leaves it asleep for good: the rounds stop moving.
+// The signals come for the first 20 seconds: how many rounds a flood lets through varies a lot from one
+// run to the next (from 1 to 70 seconds for all of them on one PC), and the rounds left finish without
+// it, so a run takes about as long on any machine. Progress is printed every 5 seconds, so that a run a
+// time limit stops still says how far it got.
 #include <errno.h>
 #include <pthread.h>
 #include <semaphore.h>
@@ -17,7 +21,7 @@
 #include <time.h>
 #include <unistd.h>
 
-enum { kRounds = 4000 };
+enum { kRounds = 4000, kFloodMs = 20000, kProgressMs = 5000 };
 
 static sem_t ping, pong;
 static atomic_int rounds, handled;
@@ -81,8 +85,9 @@ int main(void) {
     // Signal the poster as fast as possible, alternating the two kinds, until every round is done
     // or the rounds stop moving for three seconds.
     int last = -1, sent = 0;
-    struct timespec moved;
+    struct timespec moved, began, said;
     clock_gettime(CLOCK_MONOTONIC, &moved);
+    began = said = moved;
     for (;;) {
         int r = atomic_load(&rounds);
         if (r >= kRounds) break;
@@ -96,7 +101,11 @@ int main(void) {
             // The two threads sleep for good; exit without joining them.
             _exit(1);
         }
-        pthread_kill(p, (sent++ & 1) ? SIGUSR2 : SIGUSR1);
+        if (ms_since(&said) > kProgressMs) {
+            printf("     %d rounds, %d signals\n", r, sent);
+            clock_gettime(CLOCK_MONOTONIC, &said);
+        }
+        if (ms_since(&began) < kFloodMs) pthread_kill(p, (sent++ & 1) ? SIGUSR2 : SIGUSR1);
     }
     pthread_join(p, NULL);
     pthread_join(w, NULL);
