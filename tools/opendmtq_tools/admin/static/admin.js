@@ -1,4 +1,144 @@
-// Small helps on every admin page: the charts' tooltips, copy buttons, tables sorted by a click on a heading.
+// The admin pages' script: one file that every page loads (defer, after the page is read) and the browser keeps. First what
+// every page does (the bar, its forms, upload boxes, tooltips, copy buttons, lists that sort), then what one page does,
+// each part only where its page has what it works on, and last the way back to where a form was sent from. The page's
+// words come from the page itself, in its language (data-* attributes).
+
+// The bar's shadow once the page has moved under it.
+(() => {
+  const bar = document.querySelector('.bar');
+  const under = () => bar.classList.toggle('under', scrollY > 2);
+  addEventListener('scroll', under, { passive: true });
+  // Also at once: a page shown again may come back scrolled.
+  under();
+})();
+
+// A form the page checks itself (novalidate): what is wrong is said in the page's own look and language, not in the
+// browser's bubble in the browser's. A field with a rule carries the words for it (data-bad): the server's own for the same
+// check, which the server still makes. The first field that breaks its rule is said just above its form and gets the
+// focus, and nothing is sent. In the capture phase: before the question of what cannot be undone and the busy button.
+document.addEventListener('submit', e => {
+  const form = e.target;
+  if (!form.noValidate) return;
+  // The first field that breaks its rule: empty, too short, not the pattern, out of range, a date typed in part.
+  const wrong = [...form.elements].find(f => f.willValidate && !f.validity.valid);
+  if (!wrong) return;
+  e.preventDefault();
+  // Nothing else hears of this press: no question opens, no button says it is busy.
+  e.stopPropagation();
+  // One message per form, said again for the next field. On the sign-in, in place of the server's last one.
+  let says = form.previousElementSibling;
+  if (!says || !says.matches('.form-says, .signin .error, .signin .done')) {
+    says = document.createElement('p');
+    form.before(says);
+  }
+  // The sign-in box's own error look, as its server message has; the message look of the other pages.
+  says.className = form.closest('.signin') ? 'form-says error' : 'form-says flash bad';
+  says.setAttribute('role', 'alert');
+  // The rule's words; the browser's own only for a field that has none.
+  says.textContent = wrong.dataset.bad || wrong.validationMessage;
+  // The field itself, marked and in reach of the keyboard.
+  wrong.setAttribute('aria-invalid', 'true');
+  wrong.focus();
+}, true);
+// A field put right: its mark and its form's message go.
+document.addEventListener('input', e => {
+  const field = e.target;
+  if (!field.form || field.getAttribute('aria-invalid') !== 'true' || !field.validity.valid) return;
+  field.removeAttribute('aria-invalid');
+  const says = field.form.previousElementSibling;
+  if (says && says.classList.contains('form-says')) says.remove();
+});
+
+// Upload boxes: name the chosen or dropped file, refuse one over the size limit, and enable the form's button only when
+// there is something to send. The box says its limit (data-max) and its words for a file that is too big (data-too-big,
+// with {size} and {max}) and for its button once a file is there (data-change).
+for (const box of document.querySelectorAll('.drop')) {
+  const input = box.querySelector('input[type=file]');
+  const title = box.querySelector('.drop-title'), hint = box.querySelector('.drop-hint');
+  // The box's own texts, markup included (the hint's drop-only part hides on touch screens).
+  const blank = [title.innerHTML, hint.innerHTML];
+  // The visible "Choose file" button: "Change" once a file is there.
+  const pick = box.querySelector('.drop-pick'), pickLabel = pick ? pick.textContent : '';
+  const button = box.closest('form').querySelector('button');
+  const max = Number(box.dataset.max) || Infinity;
+  const size = n => n < 1048576 ? Math.max(1, Math.round(n / 1024)) + ' KB'
+    : n < 1073741824 ? (n / 1048576).toFixed(1).replace(/\.0$/, '') + ' MB' : (n / 1073741824).toFixed(1).replace(/\.0$/, '') + ' GB';
+  const show = () => {
+    const f = input.files[0];
+    const tooBig = !!f && f.size > max;
+    box.classList.toggle('has-file', !!f && !tooBig);
+    box.classList.toggle('too-big', tooBig);
+    button.disabled = !f || tooBig;
+    // A file's name and size go in as text; only the box's own markup is put back as HTML.
+    if (f) {
+      title.textContent = f.name;
+      hint.textContent = tooBig ? box.dataset.tooBig.replace('{size}', size(f.size)).replace('{max}', size(max)) : size(f.size);
+    } else {
+      title.innerHTML = blank[0];
+      hint.innerHTML = blank[1];
+    }
+    if (pick) pick.textContent = f ? box.dataset.change : pickLabel;
+  };
+  input.addEventListener('change', show);
+  box.addEventListener('dragover', e => { e.preventDefault(); box.classList.add('over'); });
+  box.addEventListener('dragleave', () => box.classList.remove('over'));
+  box.addEventListener('drop', e => {
+    e.preventDefault();
+    box.classList.remove('over');
+    if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; show(); }
+  });
+  // Also right after a reload, when the browser may have kept the file. At once: the button's colours ease from one
+  // state to the other, and it would show in the main colour first and fade to grey on every load.
+  button.style.transition = 'none';
+  show();
+  // (Reading its size makes the browser lay it out as it now is, before the easing comes back.)
+  void button.offsetWidth;
+  button.style.transition = '';
+}
+
+// What cannot be undone asks first, in the site's own look: data-ask on the button or its form says what is lost, data-yes
+// names the button that goes ahead. A form that was asked about comes back through here with its answer.
+document.addEventListener('submit', e => {
+  const form = e.target, button = e.submitter, ask = document.getElementById('ask');
+  if (form.method === 'dialog') return;
+  const question = (button && button.dataset.ask) || form.dataset.ask;
+  if (!question || form.dataset.answered) { delete form.dataset.answered; return; }
+  e.preventDefault();
+  ask.querySelector('p').textContent = question.replace('{n}', form.querySelectorAll('input[name=sel]:checked').length);
+  const yes = ask.querySelector('[value=yes]');
+  yes.textContent = (button && button.dataset.yes) || form.dataset.yes || yes.dataset.word;
+  ask.returnValue = '';
+  ask.onclose = () => {
+    if (ask.returnValue !== 'yes') return;
+    form.dataset.answered = '1';
+    form.requestSubmit(button || undefined);
+  };
+  ask.showModal();
+});
+
+// Forms: a button that was pressed shows that it is working (a backup or an upload takes a while; its data-busy says what
+// is happening), and a second press sends nothing.
+document.addEventListener('submit', e => {
+  const form = e.target, button = e.submitter;
+  if (e.defaultPrevented || form.method === 'dialog') return;
+  if (form.dataset.sent) { e.preventDefault(); return; }
+  form.dataset.sent = '1';
+  if (button) {
+    button.setAttribute('aria-busy', 'true');
+    if (button.dataset.busy) button.textContent = button.dataset.busy;
+  }
+  // After a change the page comes back as it was: same place in the list, same search (the end of this file).
+  if (form.method === 'post') {
+    const search = document.querySelector('input[type=search]');
+    sessionStorage.setItem('odq-back', JSON.stringify({ path: location.pathname, y: scrollY, q: search ? search.value : '' }));
+  }
+});
+// Back to a page whose form was sent: it may be shown again as it was, and works again.
+addEventListener('pageshow', e => {
+  if (!e.persisted) return;
+  for (const f of document.forms) delete f.dataset.sent;
+  for (const b of document.querySelectorAll('[aria-busy]')) b.removeAttribute('aria-busy');
+});
 
 // One tooltip for every mark with data-tip, under the pointer or the finger, and on keyboard focus. Its words go in as text.
 (() => {
@@ -70,43 +210,6 @@ for (const box of document.querySelectorAll('textarea')) {
   box.addEventListener('input', fit);
   addEventListener('resize', fit);
 }
-
-// A form the page checks itself (novalidate): what is wrong is said in the page's own look and language, not in the
-// browser's bubble in the browser's. A field with a rule carries the words for it (data-bad): the server's own for the same
-// check, which the server still makes. The first field that breaks its rule is said just above its form and gets the
-// focus, and nothing is sent. In the capture phase: before the question of what cannot be undone and the busy button.
-document.addEventListener('submit', e => {
-  const form = e.target;
-  if (!form.noValidate) return;
-  // The first field that breaks its rule: empty, too short, not the pattern, out of range, a date typed in part.
-  const wrong = [...form.elements].find(f => f.willValidate && !f.validity.valid);
-  if (!wrong) return;
-  e.preventDefault();
-  // Nothing else hears of this press: no question opens, no button says it is busy.
-  e.stopPropagation();
-  // One message per form, said again for the next field. On the sign-in, in place of the server's last one.
-  let says = form.previousElementSibling;
-  if (!says || !says.matches('.form-says, .signin .error, .signin .done')) {
-    says = document.createElement('p');
-    form.before(says);
-  }
-  // The sign-in box's own error look, as its server message has; the message look of the other pages.
-  says.className = form.closest('.signin') ? 'form-says error' : 'form-says flash bad';
-  says.setAttribute('role', 'alert');
-  // The rule's words; the browser's own only for a field that has none.
-  says.textContent = wrong.dataset.bad || wrong.validationMessage;
-  // The field itself, marked and in reach of the keyboard.
-  wrong.setAttribute('aria-invalid', 'true');
-  wrong.focus();
-}, true);
-// A field put right: its mark and its form's message go.
-document.addEventListener('input', e => {
-  const field = e.target;
-  if (!field.form || field.getAttribute('aria-invalid') !== 'true' || !field.validity.valid) return;
-  field.removeAttribute('aria-invalid');
-  const says = field.form.previousElementSibling;
-  if (says && says.classList.contains('form-says')) says.remove();
-});
 
 // A job a page started (the app's build, the setup's import, a backup, a restore, a change to the songs), followed in its
 // log box until it ends. The box says where to ask (data-job), where to go once the job is done (data-done) or has failed
@@ -183,3 +286,214 @@ for (const table of document.querySelectorAll('table.sortable')) {
     if (kept && kept[0] === col) { go(); if (!kept[1]) go(); }
   });
 }
+
+// A list narrowed to a word as it is typed (the Players and Songs pages): the rows whose data-k has it, a count of those
+// shown (the count's data-of says it, with {shown} and {all}; the number alone without), and the line that says none was
+// found. The page's own search box names them: data-rows, data-count, data-none, and data-scroll for a box to hide too.
+for (const search of document.querySelectorAll('input[type=search][data-rows]')) {
+  search.addEventListener('input', () => {
+    const q = search.value.trim().toLowerCase(), rows = document.querySelectorAll(search.dataset.rows);
+    let shown = 0;
+    for (const r of rows) {
+      const hit = !q || r.dataset.k.includes(q);
+      r.style.display = hit ? '' : 'none';
+      shown += hit;
+    }
+    const count = document.querySelector(search.dataset.count);
+    count.textContent = q ? (count.dataset.of || '{shown} / {all}').replace('{shown}', shown).replace('{all}', rows.length) : rows.length;
+    document.querySelector(search.dataset.none).hidden = shown > 0;
+    // No empty table under the message.
+    if (search.dataset.scroll) document.querySelector(search.dataset.scroll).hidden = !shown;
+  });
+}
+
+// The Players page's More: one open at a time, and it closes by a press anywhere else. Rename does nothing until the name
+// has changed.
+for (const more of document.querySelectorAll('.row-more')) {
+  more.addEventListener('toggle', () => {
+    if (!more.open) return;
+    for (const other of document.querySelectorAll('.row-more[open]')) if (other !== more) other.open = false;
+  });
+  const field = more.querySelector('input[name=name]'), rename = more.querySelector('.rename button'), was = field.value;
+  const check = () => { rename.disabled = field.value.trim() === was; };
+  field.addEventListener('input', check);
+  check();
+}
+if (document.querySelector('.row-more')) {
+  document.addEventListener('pointerdown', e => {
+    if (e.target.closest('.row-more') || document.getElementById('ask').open) return;
+    for (const open of document.querySelectorAll('.row-more[open]')) open.open = false;
+  });
+}
+
+// The Recordings page's delete of those ticked: the button says how many it would delete (data-n, with {n}; data-none
+// before any), waits until there is at least one, and stays at the screen's foot once something is ticked.
+(() => {
+  const bulk = document.getElementById('rec-bulk');
+  if (!bulk) return;
+  const count = () => {
+    const n = bulk.form.querySelectorAll('input[name=sel]:checked').length;
+    bulk.disabled = n === 0;
+    bulk.parentElement.classList.toggle('on', n > 0);
+    bulk.textContent = n ? bulk.dataset.n.replace('{n}', n) : bulk.dataset.none;
+  };
+  bulk.form.addEventListener('change', count);
+  count();
+})();
+
+// A recording to watch (the Recordings page, data-src): hls.js where it works; Safari plays HLS itself.
+(() => {
+  const video = document.getElementById('rec-video');
+  if (!video) return;
+  const url = video.dataset.src;
+  // The box takes the recording's shape (admin.css has the usual phone stream's).
+  video.addEventListener('resize', () => {
+    if (video.videoWidth && video.videoHeight) video.style.setProperty('--ar', video.videoWidth / video.videoHeight);
+  });
+  if (window.Hls && Hls.isSupported()) {
+    // Ten seconds fetched ahead, as on the portal: left alone hls.js fetches half a minute at once, right as the sound starts.
+    const ahead = 10;
+    // The sound is AAC-LC, as phones encode it. Unnamed, hls.js takes it for HE-AAC in Chrome and fills the gap where a
+    // recording's sound starts after its picture with HE-AAC silence, which garbles all the sound after it (as on the portal).
+    const hls = new Hls({ defaultAudioCodec: 'mp4a.40.2', maxBufferLength: ahead, maxMaxBufferLength: ahead * 2 });
+    hls.loadSource(url);
+    hls.attachMedia(video);
+    // Watch was just clicked: straight on, if the browser lets it, once that stretch is in. If that takes a while, the
+    // network paces the fetching: a few seconds in hand are enough then (or after a while what there is: a very short
+    // recording). From where the media starts, which can be a little after 0: hls.js would stall there and seek over it.
+    const clicked = performance.now();
+    let started = false;
+    const begin = () => {
+      if (started) return;
+      started = true;
+      if (video.buffered.length && video.currentTime < video.buffered.start(0)) video.currentTime = video.buffered.start(0);
+      video.play().catch(() => {});
+    };
+    setTimeout(begin, 6000);
+    hls.on(Hls.Events.FRAG_BUFFERED, () => {
+      if (!video.buffered.length) return;
+      const left = video.buffered.end(video.buffered.length - 1) - video.currentTime;
+      if (left >= 3 && (left >= ahead - 2 || performance.now() - clicked > 1500)) begin();
+    });
+  } else {
+    video.src = url;
+  }
+})();
+
+// The status page's tiles and resources look again by themselves: an owner may keep this page open on the side. A new
+// point every five minutes in the resources' charts.
+if (document.getElementById('tiles')) {
+  setInterval(async () => {
+    if (document.hidden) return;
+    try {
+      const page = new DOMParser().parseFromString(await (await fetch(location.href, { headers: { 'X-Requested-With': 'fetch' } })).text(), 'text/html');
+      const fresh = page.getElementById('tiles');
+      if (fresh) document.getElementById('tiles').replaceChildren(...fresh.children);
+      const res = page.getElementById('resources');
+      if (res) document.getElementById('resources').replaceChildren(...res.children);
+    } catch (_) { /* The next look. */ }
+  }, 30000);
+}
+
+// The Logs page's requests: new ones come in by themselves while Keep updating is ticked, and a tap on an address filters
+// by it.
+(() => {
+  const box = document.getElementById('log-rows'), follow = document.getElementById('log-follow');
+  if (!box || !follow) return;
+  const url = () => { const u = new URL(location.href); u.searchParams.set('rows', '1'); return u; };
+  try { follow.checked = !!localStorage.getItem('opendmtq.follow'); } catch (_) { /* No storage here. */ }
+  follow.addEventListener('change', () => { try { localStorage.setItem('opendmtq.follow', follow.checked ? '1' : ''); } catch (_) { /* No storage here. */ } });
+  setInterval(async () => {
+    if (!follow.checked || document.hidden) return;
+    try {
+      const r = await fetch(url());
+      // Signed out meanwhile, or the page failed: the whole page finds out, not a sign-in form in the middle of the list.
+      if (r.redirected || !r.ok) { location.reload(); return; }
+      box.innerHTML = await r.text();
+    } catch (_) { /* The next look. */ }
+  }, 4000);
+  box.addEventListener('click', e => {
+    const ip = e.target.dataset && e.target.dataset.filter;
+    if (!ip) return;
+    document.querySelector('#log-form [name=q]').value = ip;
+    document.getElementById('log-form').submit();
+  });
+})();
+
+// The Maintenance page: a ready-made message in the field, to change or send as it is.
+for (const b of document.querySelectorAll('.presets button')) {
+  b.addEventListener('click', () => { const f = document.querySelector('textarea[name=message]'); f.value = b.dataset.text; f.focus(); });
+}
+
+// The setup's first step. A typed path that named a file: that file in sight in the list.
+(() => {
+  const picked = document.getElementById('picked');
+  if (picked) picked.scrollIntoView({ block: 'nearest' });
+})();
+// What each file is, two at a time: an archive's look takes 7-Zip a moment, and the page is usable meanwhile. Asked of the
+// address its card names (data-what-at).
+(() => {
+  const queue = Array.from(document.querySelectorAll('[data-what]'));
+  async function next() {
+    const el = queue.shift();
+    if (!el) return;
+    try {
+      const r = await fetch(el.closest('[data-what-at]').dataset.whatAt + '?path=' + encodeURIComponent(el.dataset.what));
+      const j = await r.json();
+      el.textContent = j.text;
+      el.classList.add(j.ok ? 'ok' : 'bad');
+      // A file of no use here: its own import button goes (the import would find nothing in it).
+      const own = el.closest('li.file');
+      if (!j.ok && own) for (const b of own.querySelectorAll('button')) b.disabled = true;
+    } catch (e) {
+      el.textContent = '';
+    }
+    next();
+  }
+  next();
+  next();
+})();
+
+// A page that looks again by itself after a while (data-reload, in milliseconds): the setup's step while the server's own
+// build at its start runs, which has no output to follow.
+for (const el of document.querySelectorAll('[data-reload]')) setTimeout(() => location.reload(), Number(el.dataset.reload));
+
+// A restart the setup asked for (a new address): which process answers is asked (data-ping) until it is a new one (not
+// data-instance), then the page goes on (data-back), signed in by the one-time key it carries. After a minute it says that
+// this takes longer than usual.
+(() => {
+  const wait = document.getElementById('restart-wait');
+  if (!wait) return;
+  const started = Date.now();
+  (async function look() {
+    try {
+      const r = await fetch(wait.dataset.ping, { cache: 'no-store' });
+      if (r.ok && (await r.json()).instance !== wait.dataset.instance) { location.replace(wait.dataset.back); return; }
+    } catch (e) {
+      // Not answering yet: it is starting.
+    }
+    if (Date.now() - started > 60000) document.getElementById('slow').hidden = false;
+    setTimeout(look, 1500);
+  })();
+})();
+
+// Back to a page whose form was sent (the busy button's part above kept where it was): the same search, the same place in
+// the list. Last, once the lists above can narrow to a search.
+(() => {
+  const back = JSON.parse(sessionStorage.getItem('odq-back') || 'null');
+  sessionStorage.removeItem('odq-back');
+  if (!back || back.path !== location.pathname) return;
+  const search = document.querySelector('input[type=search]');
+  if (search && back.q) { search.value = back.q; search.dispatchEvent(new Event('input')); }
+  scrollTo(0, back.y);
+  // Further down the page, the message about what was done comes to the screen's foot: it would be out of sight at the
+  // top. A good one leaves by itself.
+  if (scrollY > 0) {
+    for (const m of document.querySelectorAll('.flash')) {
+      m.classList.add('float');
+      // It lies over the page: a click takes it away, and it leaves by itself, a good one sooner.
+      m.addEventListener('click', () => m.remove());
+      setTimeout(() => m.remove(), m.classList.contains('ok') ? 5000 : 15000);
+    }
+  }
+})();

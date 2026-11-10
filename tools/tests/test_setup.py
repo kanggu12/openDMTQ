@@ -824,8 +824,7 @@ class AddressTest(unittest.TestCase):
             body = r.get_data(as_text=True)
             with open(inst.path("run/signin.token"), encoding="ascii") as f:
                 key = f.read()
-            self.assertIn(f'{BASE}/setup/start?key={key}\\u0026step=players', body)
-            self.assertIn(setup.STARTED, body)
+            self.assertIn(f'data-instance="{setup.STARTED}" data-back="{BASE}/setup/start?key={key}&amp;step=players"', body)
 
     def test_nothing_else_starts_while_an_import_runs(self):
         running = {"j": {"id": "j", "kind": "import", "state": "running", "log": [], "started": time.time()}}
@@ -1173,7 +1172,8 @@ class AppStepTest(unittest.TestCase):
             self.assertEqual(job, {})
             page = inst.page(BASE + "/setup?step=app")
             self.assertIn("Building the app.", page)
-            self.assertIn("location.reload()", page)
+            # The page looks again every 5 seconds (admin.js, data-reload) until it is done.
+            self.assertIn('data-reload="5000"', page)
             self.assertRegex(page, r'data-again data-label="[^"]*"\s+disabled')
             # A status left by a run that was cut off is no build, and neither is one for another address.
             inst.status(state="building", time=int(time.time()) - admin.apps.STALE_BUILD - 5)

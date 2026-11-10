@@ -33,7 +33,8 @@
 {% macro what(path, first=None) %}<span class="setup-what" data-what="{{ path }}">{{ first or t('setup.what_checking') }}</span>{% endmacro %}
 
 {% if step == 'files' %}
-<section class="card">
+{# What each file is comes after the page shows, asked of setup_what two at a time (admin.js). #}
+<section class="card" data-what-at="{{ url_for('setup_what') }}">
   <h2>{{ t('setup.files_title') }}</h2>
   <p class="lead">{{ t('setup.files_lead') }}</p>
   {# The two kinds of file and the forms each comes in: what the import takes. #}
@@ -111,35 +112,6 @@
   {% endif %}
   {% if done.files %}<div class="btn-line"><a class="btn btn-primary" href="{{ url_for('setup_page', step='address') }}">{{ t('setup.next') }}</a></div>{% endif %}
 </section>
-{% if host_install %}
-<script>
-  // A typed path that named a file: that file in sight in the list.
-  const picked = document.getElementById('picked');
-  if (picked) picked.scrollIntoView({ block: 'nearest' });
-  // What each file is, two at a time: an archive's look takes 7-Zip a moment, and the page is usable meanwhile.
-  (function () {
-    const queue = Array.from(document.querySelectorAll('[data-what]'));
-    async function next() {
-      const el = queue.shift();
-      if (!el) return;
-      try {
-        const r = await fetch("{{ url_for('setup_what') }}?path=" + encodeURIComponent(el.dataset.what));
-        const j = await r.json();
-        el.textContent = j.text;
-        el.classList.add(j.ok ? 'ok' : 'bad');
-        // A file of no use here: its own import button goes (the import would find nothing in it).
-        const own = el.closest('li.file');
-        if (!j.ok && own) for (const b of own.querySelectorAll('button')) b.disabled = true;
-      } catch (e) {
-        el.textContent = '';
-      }
-      next();
-    }
-    next();
-    next();
-  })();
-</script>
-{% endif %}
 
 {% elif step == 'address' %}
 <section class="card">
@@ -217,9 +189,9 @@
   </form>
   {% if job %}<p class="meta">{{ t('setup.app_running') }}</p>{{ follow(job, 'app') }}
   {% elif running %}
-  {# The server's own build (at its start): no output to follow here, so the page looks again until it is done. #}
-  <p class="meta">{{ t('setup.app_running') }}</p>
-  <script>setTimeout(() => location.reload(), 5000)</script>
+  {# The server's own build (at its start): no output to follow here, so the page looks again until it is done, every 5
+     seconds (data-reload, admin.js). #}
+  <p class="meta" data-reload="5000">{{ t('setup.app_running') }}</p>
   {% endif %}
   {% if done.app %}
   <h3>{{ t('setup.phone_title') }}</h3>

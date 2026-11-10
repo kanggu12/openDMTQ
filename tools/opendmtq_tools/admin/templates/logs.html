@@ -34,30 +34,6 @@
   </form>
   <div id="log-rows">{% include "log_rows.html" %}</div>
 </section>
-<script>
-  // New requests come in by themselves while this is ticked; a tap on an address filters by it.
-  (() => {
-    const box = document.getElementById('log-rows'), follow = document.getElementById('log-follow');
-    const url = () => { const u = new URL(location.href); u.searchParams.set('rows', '1'); return u; };
-    try { follow.checked = !!localStorage.getItem('opendmtq.follow'); } catch (_) { /* No storage here. */ }
-    follow.addEventListener('change', () => { try { localStorage.setItem('opendmtq.follow', follow.checked ? '1' : ''); } catch (_) { /* No storage here. */ } });
-    setInterval(async () => {
-      if (!follow.checked || document.hidden) return;
-      try {
-        const r = await fetch(url());
-        // Signed out meanwhile, or the page failed: the whole page finds out, not a sign-in form in the middle of the list.
-        if (r.redirected || !r.ok) { location.reload(); return; }
-        box.innerHTML = await r.text();
-      } catch (_) { /* The next look. */ }
-    }, 4000);
-    box.addEventListener('click', e => {
-      const ip = e.target.dataset && e.target.dataset.filter;
-      if (!ip) return;
-      document.querySelector('#log-form [name=q]').value = ip;
-      document.getElementById('log-form').submit();
-    });
-  })();
-</script>
 {% elif tab == 'plays' %}
 <section class="card">
   <h2>{{ t('logs.plays') }} <span class="meta-inline">{{ total }}</span>{% if total %}<a class="more" href="{{ url_for('logs_page', tab='plays', csv=1, **shown) }}">{{ t('players.csv') }}</a>{% endif %}</h2>

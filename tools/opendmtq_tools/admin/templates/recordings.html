@@ -3,50 +3,14 @@
 {% if watch %}
 <section class="card">
   <h2>{{ names.get(watch.guid) or t('player.fallback', id=watch.guid) }} <span class="meta-inline">{{ watch.started|rec_date }}</span></h2>
-  <video class="rec-video" id="rec-video" controls playsinline></video>
+  {# Played by admin.js: hls.js where it works, the browser itself on Safari. #}
+  <video class="rec-video" id="rec-video" controls playsinline data-src="{{ url_for('recording_media', guid=watch.guid, rid=watch.id, name='index.m3u8') }}"></video>
   <p class="meta">{{ watch.duration_ms|rec_length }} · {{ watch.size|human }}{% if watch.songs %} · {{ watch.songs|map(attribute='title')|unique|join(', ') }}{% endif %}</p>
   <div class="btn-line"><a class="btn btn-sm" href="{{ url_for('recordings_page') }}#rec-{{ watch.guid }}-{{ watch.id }}">{{ t('rec.close') }}</a></div>
 </section>
 {# The portal's own copy of hls.js: through the game server it is the server's file, on this service's own
    port public_hls() brings it. No internet needed either way. #}
-<script src="/opendmtq/hls/hls-1.5.17.min.js"></script>
-<script>
-  // hls.js where it works; Safari plays HLS itself.
-  const video = document.getElementById('rec-video');
-  const url = {{ url_for('recording_media', guid=watch.guid, rid=watch.id, name='index.m3u8')|tojson }};
-  // The box takes the recording's shape (admin.css has the usual phone stream's).
-  video.addEventListener('resize', () => {
-    if (video.videoWidth && video.videoHeight) video.style.setProperty('--ar', video.videoWidth / video.videoHeight);
-  });
-  if (window.Hls && Hls.isSupported()) {
-    // Ten seconds fetched ahead, as on the portal: left alone hls.js fetches half a minute at once, right as the sound starts.
-    const ahead = 10;
-    // The sound is AAC-LC, as phones encode it. Unnamed, hls.js takes it for HE-AAC in Chrome and fills the gap where a
-    // recording's sound starts after its picture with HE-AAC silence, which garbles all the sound after it (as on the portal).
-    const hls = new Hls({ defaultAudioCodec: 'mp4a.40.2', maxBufferLength: ahead, maxMaxBufferLength: ahead * 2 });
-    hls.loadSource(url);
-    hls.attachMedia(video);
-    // Watch was just clicked: straight on, if the browser lets it, once that stretch is in. If that takes a while, the
-    // network paces the fetching: a few seconds in hand are enough then (or after a while what there is: a very short
-    // recording). From where the media starts, which can be a little after 0: hls.js would stall there and seek over it.
-    const clicked = performance.now();
-    let started = false;
-    const begin = () => {
-      if (started) return;
-      started = true;
-      if (video.buffered.length && video.currentTime < video.buffered.start(0)) video.currentTime = video.buffered.start(0);
-      video.play().catch(() => {});
-    };
-    setTimeout(begin, 6000);
-    hls.on(Hls.Events.FRAG_BUFFERED, () => {
-      if (!video.buffered.length) return;
-      const left = video.buffered.end(video.buffered.length - 1) - video.currentTime;
-      if (left >= 3 && (left >= ahead - 2 || performance.now() - clicked > 1500)) begin();
-    });
-  } else {
-    video.src = url;
-  }
-</script>
+<script src="/opendmtq/hls/hls-1.5.17.min.js" defer></script>
 {% endif %}
 
 {# The server's broadcasts as a whole: on or off, with what that means now, then what new players start with and the
@@ -163,23 +127,9 @@
       </tbody>
     </table></div>
     {% endfor %}
-    <p class="rec-bulk"><button class="btn btn-danger" id="rec-bulk" name="action" value="delete" data-ask="{{ tp('rec.confirm_n', n='{n}') }}" data-yes="{{ tp('btn.delete') }}">{{ t('rec.delete_selected') }}</button></p>
+    {# It says how many it would delete, and waits until there is at least one (admin.js). #}
+    <p class="rec-bulk"><button class="btn btn-danger" id="rec-bulk" name="action" value="delete" data-ask="{{ tp('rec.confirm_n', n='{n}') }}" data-yes="{{ tp('btn.delete') }}" data-n="{{ tp('rec.delete_n', n='{n}') }}" data-none="{{ tp('rec.delete_selected') }}">{{ t('rec.delete_selected') }}</button></p>
   </form>
-  <script>
-    // The button says how many it would delete, and waits until there is at least one.
-    (() => {
-      const bulk = document.getElementById('rec-bulk');
-      const count = () => {
-        const n = bulk.form.querySelectorAll('input[name=sel]:checked').length;
-        bulk.disabled = n === 0;
-        // It stays at the screen's foot once something is ticked, with the list as long as it is.
-        bulk.parentElement.classList.toggle('on', n > 0);
-        bulk.textContent = n ? {{ tp('rec.delete_n', n='{n}')|tojson }}.replace('{n}', n) : {{ tp('rec.delete_selected')|tojson }};
-      };
-      bulk.form.addEventListener('change', count);
-      count();
-    })();
-  </script>
   {% endif %}
 </section>
 {% endblock %}

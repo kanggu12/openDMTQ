@@ -39,10 +39,4 @@
   <pre class="log">./opendmtq down</pre>
 </section>
 {% endif %}
-<script>
-  // A ready-made message in the field, to change or send as it is.
-  for (const b of document.querySelectorAll('.presets button')) {
-    b.addEventListener('click', () => { const f = document.querySelector('textarea[name=message]'); f.value = b.dataset.text; f.focus(); });
-  }
-</script>
 {% endblock %}

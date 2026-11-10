@@ -7,7 +7,8 @@
   {# Broadcasts off for the whole server: the switches below wait for them, and the way to turn them on. #}
   {% if not broadcasts_on %}<p class="flash note">{{ t('players.live_master_off', url=url_for('recordings_page') ~ '#broadcasts') }}</p>{% endif %}
   {% if not players %}<p class="empty">{{ t('players.none') }}</p>{% else %}
-  <input class="search list-search" id="player-search" type="search" placeholder="{{ t('players.search') }}" aria-label="{{ t('players.search') }}">
+  {# The list narrows to a word as it is typed (admin.js). #}
+  <input class="search list-search" id="player-search" type="search" placeholder="{{ t('players.search') }}" aria-label="{{ t('players.search') }}" data-rows="table.players tbody tr" data-count="#player-count" data-none="#player-none">
   <p class="empty" id="player-none" role="status" hidden>{{ t('players.nomatch') }}</p>
   <table class="data players sortable">
     <thead><tr><th class="rank" data-sort="num">ID</th><th data-sort="text">{{ t('players.th_name') }}</th><th data-sort="num">{{ t('players.th_last') }}</th><th class="r wide-only" data-sort="num">{{ t('players.th_charts') }}</th><th class="r wide-only" data-sort="num">{{ t('players.th_total') }}</th><th>{{ t('players.th_broadcast') }}</th><th></th></tr></thead>
@@ -52,37 +53,4 @@
   </table>
   {% endif %}
 </section>
-<script>
-  // More: one open at a time, and it closes by a press anywhere else. Rename does nothing until the name has changed.
-  for (const more of document.querySelectorAll('.row-more')) {
-    more.addEventListener('toggle', () => {
-      if (!more.open) return;
-      for (const other of document.querySelectorAll('.row-more[open]')) if (other !== more) other.open = false;
-    });
-    const field = more.querySelector('input[name=name]'), rename = more.querySelector('.rename button'), was = field.value;
-    const check = () => { rename.disabled = field.value.trim() === was; };
-    field.addEventListener('input', check);
-    check();
-  }
-  document.addEventListener('pointerdown', e => {
-    if (e.target.closest('.row-more') || document.getElementById('ask').open) return;
-    for (const open of document.querySelectorAll('.row-more[open]')) open.open = false;
-  });
-  // The list narrows to a word as it is typed.
-  (() => {
-    const box = document.getElementById('player-search');
-    if (!box) return;
-    box.addEventListener('input', () => {
-      const q = box.value.trim().toLowerCase(), rows = document.querySelectorAll('table.players tbody tr');
-      let shown = 0;
-      for (const r of rows) {
-        const hit = !q || r.dataset.k.includes(q);
-        r.style.display = hit ? '' : 'none';
-        shown += hit;
-      }
-      document.getElementById('player-count').textContent = q ? `${shown} / ${rows.length}` : rows.length;
-      document.getElementById('player-none').hidden = shown > 0;
-    });
-  })();
-</script>
 {% endblock %}

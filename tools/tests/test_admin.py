@@ -2361,3 +2361,20 @@ class PageJobsTest(unittest.TestCase):
                 import flask
                 self.assertEqual(flask.get_flashed_messages(with_categories=True),
                                  [("bad", "That did not work. The server's log has the details: ./opendmtq logs admin")])
+
+
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class PageScriptTest(unittest.TestCase):
+    """What the pages do in the browser is admin.js, one file the browser keeps: no page sends it again inside itself."""
+
+    def test_the_pages_carry_no_script_of_their_own(self):
+        templates = os.path.join(os.path.dirname(admin.__file__), "templates")
+        inline = []
+        for name in sorted(os.listdir(templates)):
+            with open(os.path.join(templates, name), encoding="utf-8") as f:
+                text = f.read()
+            # A script in the page, or a handler in an attribute (oninput="..."), anywhere.
+            inline += [(name, body.strip()[:60]) for body in re.findall(r"<script\b[^>]*>(.*?)</script>", text, re.S) if body.strip()]
+            inline += [(name, handler) for handler in re.findall(r"\son[a-z]+=\"", text)]
+        # Only the line that marks a page as arriving, which must be on before the page is first drawn.
+        self.assertEqual(inline, [("base.html", 'document.documentElement.classList.add("arriving");setTimeou')])

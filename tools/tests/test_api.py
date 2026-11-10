@@ -1688,6 +1688,10 @@ GET_ARGS = {
 # Functions that read a page's address for it, with the page (and its tab) they read it for.
 ARG_HELPERS = {"plays_tab": "logs_page?tab=plays", "recordings_view": "recordings_page"}
 
+# What the pages' script (static/admin.js) adds to a page's own address, with the page it does that on: the Logs page's
+# look at new requests asks for its rows alone.
+SCRIPT_ARGS = {"rows": "logs_page"}
+
 
 def page_actions():
     """What the admin pages have, as PAGE_ACTIONS keys: every endpoint Flask has for them, every action of every form,
@@ -1719,6 +1723,12 @@ def page_actions():
         # What its scripts add to the page's own address.
         for arg in re.findall(r"searchParams\.set\('(\w+)'", text):
             found.add(f"{TEMPLATE_PAGES.get(name)}?{arg}")
+    # What the pages' script adds, on the page SCRIPT_ARGS names (one it does not name fails here).
+    with open(os.path.join(ADMIN_DIR, "static", "admin.js"), encoding="utf-8") as f:
+        for arg in re.findall(r"searchParams\.set\('(\w+)'", f.read()):
+            if arg not in SCRIPT_ARGS:
+                raise AssertionError(f"admin.js adds ?{arg}= to a page SCRIPT_ARGS does not name")
+            found.add(f"{SCRIPT_ARGS[arg]}?{arg}")
     # A page's own variants: what its links, and the redirects of the pages' code, ask of it by name.
     sources = [os.path.join(templates, n) for n in os.listdir(templates)] + [os.path.join(ADMIN_DIR, n) for n in os.listdir(ADMIN_DIR) if n.endswith(".py")]
     for path in sources:

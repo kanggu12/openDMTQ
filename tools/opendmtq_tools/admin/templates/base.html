@@ -8,7 +8,8 @@
 <link rel="stylesheet" href="/opendmtq/style.css">
 <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
 {# A page just arriving: its meters and charts fill in once (admin.css and style.css, "motion"). The class goes after
-   1.6 s, so that what the page redraws later (the status tiles every 30 s) stays still. #}
+   1.6 s, so that what the page redraws later (the status tiles every 30 s) stays still. Here, not in admin.js: it must be
+   on before the page is first drawn. #}
 <script>document.documentElement.classList.add("arriving");setTimeout(()=>document.documentElement.classList.remove("arriving"),1600)</script>
 </head>
 <body data-section="admin">
@@ -50,117 +51,7 @@
   {% endif %}
   {% block body %}{% endblock %}
 </main>
-<script>
-  // Upload boxes: name the chosen or dropped file, refuse one over the size limit, and enable the
-  // form's button only when there is something to send.
-  const tooLarge = {{ tp('drop.too_big', size='{size}', max='{max}')|tojson }}, changeLabel = {{ tp('drop.change')|tojson }};
-  for (const box of document.querySelectorAll('.drop')) {
-    const input = box.querySelector('input[type=file]');
-    const title = box.querySelector('.drop-title'), hint = box.querySelector('.drop-hint');
-    // The box's own texts, markup included (the hint's drop-only part hides on touch screens).
-    const blank = [title.innerHTML, hint.innerHTML];
-    // The visible "Choose file" button: "Change" once a file is there.
-    const pick = box.querySelector('.drop-pick'), pickLabel = pick ? pick.textContent : '';
-    const button = box.closest('form').querySelector('button');
-    const max = Number(box.dataset.max) || Infinity;
-    const size = n => n < 1048576 ? Math.max(1, Math.round(n / 1024)) + ' KB'
-      : n < 1073741824 ? (n / 1048576).toFixed(1).replace(/\.0$/, '') + ' MB' : (n / 1073741824).toFixed(1).replace(/\.0$/, '') + ' GB';
-    const show = () => {
-      const f = input.files[0];
-      const tooBig = !!f && f.size > max;
-      box.classList.toggle('has-file', !!f && !tooBig);
-      box.classList.toggle('too-big', tooBig);
-      button.disabled = !f || tooBig;
-      // A file's name and size go in as text; only the box's own markup is put back as HTML.
-      if (f) {
-        title.textContent = f.name;
-        hint.textContent = tooBig ? tooLarge.replace('{size}', size(f.size)).replace('{max}', size(max)) : size(f.size);
-      } else {
-        title.innerHTML = blank[0];
-        hint.innerHTML = blank[1];
-      }
-      if (pick) pick.textContent = f ? changeLabel : pickLabel;
-    };
-    input.addEventListener('change', show);
-    box.addEventListener('dragover', e => { e.preventDefault(); box.classList.add('over'); });
-    box.addEventListener('dragleave', () => box.classList.remove('over'));
-    box.addEventListener('drop', e => {
-      e.preventDefault();
-      box.classList.remove('over');
-      if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; show(); }
-    });
-    // Also right after a reload, when the browser may have kept the file. At once: the button's colours ease from one
-    // state to the other, and it would show in the main colour first and fade to grey on every load.
-    button.style.transition = 'none';
-    show();
-    // (Reading its size makes the browser lay it out as it now is, before the easing comes back.)
-    void button.offsetWidth;
-    button.style.transition = '';
-  }
-
-  // What cannot be undone asks first, in the site's own look: data-ask on the button or its form says what is lost, data-yes
-  // names the button that goes ahead. A form that was asked about comes back through here with its answer.
-  document.addEventListener('submit', e => {
-    const form = e.target, button = e.submitter, ask = document.getElementById('ask');
-    if (form.method === 'dialog') return;
-    const question = (button && button.dataset.ask) || form.dataset.ask;
-    if (!question || form.dataset.answered) { delete form.dataset.answered; return; }
-    e.preventDefault();
-    ask.querySelector('p').textContent = question.replace('{n}', form.querySelectorAll('input[name=sel]:checked').length);
-    const yes = ask.querySelector('[value=yes]');
-    yes.textContent = (button && button.dataset.yes) || form.dataset.yes || yes.dataset.word;
-    ask.returnValue = '';
-    ask.onclose = () => {
-      if (ask.returnValue !== 'yes') return;
-      form.dataset.answered = '1';
-      form.requestSubmit(button || undefined);
-    };
-    ask.showModal();
-  });
-
-  // Forms: a button that was pressed shows that it is working (a backup or an upload takes a while; its
-  // data-busy says what is happening), and a second press sends nothing.
-  document.addEventListener('submit', e => {
-    const form = e.target, button = e.submitter;
-    if (e.defaultPrevented || form.method === 'dialog') return;
-    if (form.dataset.sent) { e.preventDefault(); return; }
-    form.dataset.sent = '1';
-    if (button) {
-      button.setAttribute('aria-busy', 'true');
-      if (button.dataset.busy) button.textContent = button.dataset.busy;
-    }
-    // After a change the page comes back as it was: same place in the list, same search.
-    if (form.method === 'post') {
-      const search = document.querySelector('input[type=search]');
-      sessionStorage.setItem('odq-back', JSON.stringify({ path: location.pathname, y: scrollY, q: search ? search.value : '' }));
-    }
-  });
-  // Back to a page whose form was sent: it may be shown again as it was, and works again.
-  addEventListener('pageshow', e => {
-    if (!e.persisted) return;
-    for (const f of document.forms) delete f.dataset.sent;
-    for (const b of document.querySelectorAll('[aria-busy]')) b.removeAttribute('aria-busy');
-  });
-  (() => {
-    const back = JSON.parse(sessionStorage.getItem('odq-back') || 'null');
-    sessionStorage.removeItem('odq-back');
-    if (!back || back.path !== location.pathname) return;
-    const search = document.querySelector('input[type=search]');
-    if (search && back.q) { search.value = back.q; search.dispatchEvent(new Event('input')); }
-    scrollTo(0, back.y);
-    // Further down the page, the message about what was done comes to the screen's foot: it would
-    // be out of sight at the top. A good one leaves by itself.
-    if (scrollY > 0) {
-      for (const m of document.querySelectorAll('.flash')) {
-        m.classList.add('float');
-        // It lies over the page: a click takes it away, and it leaves by itself, a good one sooner.
-        m.addEventListener('click', () => m.remove());
-        setTimeout(() => m.remove(), m.classList.contains('ok') ? 5000 : 15000);
-      }
-    }
-  })();
-</script>
-{# The one question the page asks before what cannot be undone (see above). #}
+{# The one question the page asks before what cannot be undone (admin.js asks it, for a button or form with data-ask). #}
 <dialog id="ask" class="ask">
   <p></p>
   <form method="dialog" class="btn-line"><button class="btn" value="no">{{ t('btn.cancel') }}</button><button class="btn btn-danger" value="yes" data-word="{{ t('btn.continue') }}">{{ t('btn.continue') }}</button></form>
@@ -175,7 +66,7 @@
     <a class="key" aria-label="{{ t('foot.public') }}" href="{{ public_url }}/opendmtq/">PLAYERS' SITE</a>
   </nav>
 </div></footer>
-<script>(()=>{const b=document.querySelector('.bar'),f=()=>b.classList.toggle('under',scrollY>2);addEventListener('scroll',f,{passive:true});f()})()</script>
+{# Everything the pages do in the browser, in one file the browser keeps: its words come from the pages (data-*). #}
 <script src="{{ url_for('static', filename='admin.js') }}" defer></script>
 </body>
 </html>
