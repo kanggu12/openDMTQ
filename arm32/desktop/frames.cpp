@@ -1,7 +1,8 @@
 // What the runtime's EGL bridge hands live view on a phone (live.h), on the desktop: each frame just before it is
-// shown. Live view itself is not here yet; the frames are counted, the first one logged, and the ones asked for
-// (PLAYER_SHOTS="60,600,@12.5": frame numbers, and seconds from the first frame, which hold whatever the frame rate)
-// saved as PNG files in the data folder's shots/, for checks to look at.
+// shown. The computer's broadcast takes it first (live_desktop.cpp, on Windows); then the frames are counted, the first
+// one logged, what the display showed noted every five seconds with stats on, the taps a check planned by frame given
+// (input.cpp), and the ones asked for (PLAYER_SHOTS="60,600,@12.5": frame numbers, and seconds from the first frame,
+// which hold whatever the frame rate) saved as PNG files in the data folder's shots/, for checks to look at.
 #include "live.h"
 #include "player.h"
 
