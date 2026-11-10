@@ -95,7 +95,7 @@ jobs:
           helm template t deploy/helm/opendmtq -f deploy/kind/values.yaml --set publicHost=10.0.0.5 > /tmp/kind.yaml
           helm template t deploy/helm/opendmtq --set publicHost=10.0.0.5 --set data.existingClaim=game \
             --set litestream.s3.endpoint=https://s3.example.com --set litestream.s3.existingSecret=s3 \
-            --set assets.autoscaling.enabled=true > /tmp/prod.yaml
+            --set assets.autoscaling.enabled=true --set networkPolicy.enabled=true > /tmp/prod.yaml
           helm template t deploy/helm/opendmtq --set publicHost=game.example.com:8790 --set data.existingClaim=game \
             --set litestream.s3.endpoint=https://s3.example.com --set litestream.s3.existingSecret=s3 \
             --set router.tls.secretName=game-tls > /tmp/tls.yaml
