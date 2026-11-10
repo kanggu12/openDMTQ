@@ -603,7 +603,10 @@ SHAPES = {
     "SiteLive": Shape("The site's broadcasts.", [
         Field("on", "boolean", "True while broadcasts are on for the server; while off, the site shows none of them."),
         Field("live", "[LiveNow]", "Who is on air now."),
-        Field("past", "[PastBroadcast]", "The recordings players may watch, newest first (300 at most).")]),
+        Field("past", "[PastBroadcast]", "The recordings players may watch, newest first (300 at most)."),
+        Field("past_rev", "string", "The sign of `past`, as the site's live page has it (`live.php?list=1`): the first 16 hex digits "
+              "of the SHA-256 of its keys in order, joined by commas. It changes when a recording ends, is hidden, shown again or "
+              "deleted: a client that keeps the list asks for it again only then.")]),
     "LiveNow": Shape("A player on air.", [
         Field("player", "integer", "Their number (live.php?p=)."), Field("name", "string", "Their name."),
         Field("song", "string", "The song they play, while in one.", nullable=True), Field("chart", "string", "Its chart.", nullable=True),

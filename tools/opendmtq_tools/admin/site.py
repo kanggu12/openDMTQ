@@ -7,6 +7,7 @@ SCORE_SQL caps them. Names are the site's, in English: a player without a name i
 
 import calendar
 import datetime
+import hashlib
 import json
 import os
 import sqlite3
@@ -442,6 +443,13 @@ def live_past(con):
         out.append({"key": f"{r['guid']}-{r['id']}", "player": int(r["guid"]), "name": player_name(names.get(int(r["guid"]), ""), r["guid"]),
                     "started": started, "seconds": int(int(r.get("duration_ms") or 0) / 1000 + 0.5), "songs": listed})
     return out
+
+
+def past_rev(past):
+    """What a list of recordings (live_past()) is, in sixteen letters, as the site's live page compares it (live.php?list=1,
+    live_past_rev_of() in lib.php): the first 16 hex digits of the SHA-256 of their keys in order, joined by commas. It
+    changes when one ends, is hidden, shown again or deleted: the live page asks for the list itself only then."""
+    return hashlib.sha256(",".join(r["key"] for r in past).encode()).hexdigest()[:16]
 
 
 def home(con):

@@ -1223,6 +1223,49 @@ class InstallerDownloadTest(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class LiveListSignTest(unittest.TestCase):
+    """GET /site/live gives the sign of its list of recordings (past_rev), as the site's live.php?list=1 does: a client that
+    keeps the list, as the live page does, asks for it again only when the sign changed."""
+
+    # The sign of a list with no recording in it: broadcasts off, or every recording hidden.
+    NONE = "e3b0c44298fc1c14"
+
+    def broadcasts(self, on):
+        """Broadcasts on or off for the server, as the Broadcasts page leaves them (the site shows no recording while off)."""
+        with sqlite3.connect(admin.core.DB) as con:
+            admin.recordings.setting_rows(con)
+            admin.recordings.write_settings(con, {"on": on})
+
+    def test_the_sign_is_the_sites_for_the_same_keys(self):
+        # What lib.php's live_past_rev_of() gives for these keys, newest first, and for none (PHP 8.3).
+        self.assertEqual(admin.site.past_rev([{"key": "8-1794200000"}, {"key": "7-1794100000"}]), "9099656869752324")
+        self.assertEqual(admin.site.past_rev([{"key": "7-1794100000"}]), "3146b2c89f972a6d")
+        self.assertEqual(admin.site.past_rev([]), self.NONE)
+
+    def test_it_follows_the_list_as_a_recording_is_hidden_and_shown_again(self):
+        closed = Server.names["closed"]
+        with Server() as inst:
+            self.broadcasts(True)
+            # Sena's closed recording is the list (Yuna's is still being made); the sign is of its key.
+            first = inst.ask("GET", "/site/live").get_json()
+            self.assertEqual([r["key"] for r in first["past"]], [f"7-{closed}"])
+            self.assertEqual(first["past_rev"], hashlib.sha256(f"7-{closed}".encode()).hexdigest()[:16])
+            # Hidden: another list, another sign; shown again: the first sign again.
+            self.assertEqual(inst.ask("POST", f"/recordings/7/{closed}/hide").status_code, 200)
+            hidden = inst.ask("GET", "/site/live").get_json()
+            self.assertEqual((hidden["past"], hidden["past_rev"]), ([], self.NONE))
+            self.assertEqual(inst.ask("POST", f"/recordings/7/{closed}/show").status_code, 200)
+            self.assertEqual(inst.ask("GET", "/site/live").get_json()["past_rev"], first["past_rev"])
+
+    def test_with_broadcasts_off_it_is_the_sign_of_no_list(self):
+        # As the site's live_past_rev() with broadcasts off: no recording is shown, whatever there is.
+        with Server() as inst:
+            self.broadcasts(False)
+            answer = inst.ask("GET", "/site/live").get_json()
+            self.assertEqual((answer["on"], answer["past"], answer["past_rev"]), (False, [], self.NONE))
+
+
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class OneRecordingTest(unittest.TestCase):
     """A recording's routes read that recording's folder, and a player's delete their recordings, not every one there is
     (rec_all() reads each recording's files)."""

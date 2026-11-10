@@ -1289,10 +1289,13 @@ def site_plays_recent(args):
 
 @handler
 def site_live(args):
-    """GET /site/live: the site's broadcasts (live.php): who is on air now, and the past ones players may watch."""
+    """GET /site/live: the site's broadcasts (live.php): who is on air now, and the past ones players may watch, with the
+    sign of that list the live page compares (past_rev, as live.php?list=1 gives it)."""
     with db() as con:
-        # With broadcasts off for the server the site shows none, and says why.
-        return {"on": recordings.live_settings()["on"], "live": site.live_now(con), "past": site.live_past(con)}
+        past = site.live_past(con)
+        # With broadcasts off for the server the site shows none, and says why. The sign is of the list sent, as the site's
+        # is with the list: the two always go together.
+        return {"on": recordings.live_settings()["on"], "live": site.live_now(con), "past": past, "past_rev": site.past_rev(past)}
 
 
 @handler

@@ -2597,6 +2597,7 @@ The site's broadcasts.
 - `on` (boolean): True while broadcasts are on for the server; while off, the site shows none of them.
 - `live` (list of [LiveNow](#livenow)): Who is on air now.
 - `past` (list of [PastBroadcast](#pastbroadcast)): The recordings players may watch, newest first (300 at most).
+- `past_rev` (string): The sign of `past`, as the site's live page has it (`live.php?list=1`): the first 16 hex digits of the SHA-256 of its keys in order, joined by commas. It changes when a recording ends, is hidden, shown again or deleted: a client that keeps the list asks for it again only then.
 
 #### LiveNow
 
