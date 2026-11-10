@@ -90,7 +90,7 @@ install the app; on a Windows PC, download the installer from the same page.
 | **Server** | 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker; 2 GB of memory | 2 cores, 4 GB |
 | **Disk** | 1 GB without the songs | 7 GB with every song |
 | **Phones** | Android 5.0 | Android 8 or newer to broadcast |
-| **PCs** | The PC client: 64-bit Windows 10 or 11 on an x64 processor (Intel or AMD), Direct3D 11, 350 MB of disk | A touch screen, for several fingers at once |
+| **PCs** | The PC client: 64-bit Windows 10 or 11 on an x64 processor (Intel or AMD), Direct3D 11, 390 MB of disk | A touch screen, for several fingers at once |
 
 ## Features
 

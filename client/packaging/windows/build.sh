@@ -4,7 +4,7 @@
 #   2. PyInstaller under Wine with a Windows Python -> one folder with OpenDMTQ.exe and OpenDMTQ-cmd.exe
 #   3. the player for Windows (opendmtq-player-windows.zip, arm32/bundle_windows.sh) into that folder as player\, and
 #      the licence texts of what the program carries into its licenses\ (docs/notice.md)
-#   4. Velopack's vpk (.NET) -> Velopack's setup, a portable zip and the update packages
+#   4. Velopack's vpk (.NET) -> Velopack's setup and the update packages
 #   5. PyInstaller again -> OpenDMTQ-Setup.exe: the installer's dialogs with Velopack's setup inside
 # Usage: [OPENDMTQ_UPDATE_SOURCE=<where releases are published>] [PLAYER_ZIP=<zip>] client/packaging/windows/build.sh OUT_DIR
 #   The version is the project's (deploy/helm/opendmtq/Chart.yaml). OPENDMTQ_UPDATE_SOURCE is a GitHub repository URL
@@ -140,6 +140,8 @@ docker run --rm --network none -v "$OUT:/out" opendmtq-client-vpk:local vpk "[wi
   --packId OpenDMTQ.Client --packVersion "$VERSION" --packDir /out/dist/OpenDMTQ --mainExe OpenDMTQ.exe \
   --packTitle OpenDMTQ --packAuthors OpenDMTQ --icon /out/assets/OpenDMTQ.ico \
   --splashImage /out/assets/splash.png --outputDir /out/releases > "$OUT/vpk.log" 2>&1 || { cat "$OUT/vpk.log"; exit 1; }
+# The portable zip vpk also makes is no part of a release: OpenDMTQ-Setup.exe installs, and the packages update.
+rm -f "$OUT/releases/"*-Portable.zip
 ls -la "$OUT/releases"
 
 # ---- 5. the installer people run: the launcher's dialogs around Velopack's setup, in one file

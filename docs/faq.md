@@ -54,7 +54,7 @@ Android 5.0 or newer, phones and tablets. Newer ones without 32-bit support (Pix
 work too: the server adds what they need to the app. iPhones do not ([why](game-files.md#iphones)).
 
 **Can I play on a computer?**
-On a PC with 64-bit Windows 10 or 11: the site's Download page has the PC client, an installer set up for the server.
+On a PC with 64-bit Windows 10 or 11 on an x64 processor (Intel or AMD): the site's Download page has the PC client, an installer set up for the server.
 It installs for your Windows account without administrator rights; sign in there with your site ID, and it downloads the
 game and keeps it up to date. The PC is a player of its own, apart from your phone, and the game's account transfer
 carries a player from one to the other ([the PC client](windows-player.md)).
@@ -77,8 +77,10 @@ client data and the song data together, or the `DMQ` folder alone, with **Import
 
 **What leaves my computer?**
 Accounts, scores, recordings and backups stay on the server's computer, in `data/`, and phones talk to the server alone.
-The server asks the internet for one thing: the runtime for newer phones, from this repository's latest release, when
-it builds the app without one (the Windows bundle carries its own). `./opendmtq check` on a server reachable from the
+The server asks the internet for two things, from this repository's latest release, and only when it lacks them: the
+runtime for newer phones, when it builds the app without one, and the PC client's installer, when none came with it (a
+release's images and the Windows bundle carry both). The PC client asks the same releases when **Check for updates** is
+pressed, and nothing else on its own. `./opendmtq check` on a server reachable from the
 internet asks check-host.net to open its page from outside, which tells that site the server's address. The game's own
 app, and Android, also look up a few Google and ad addresses; the game plays the same without them
 ([without internet](closed-network.md)).

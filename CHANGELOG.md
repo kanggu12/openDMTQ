@@ -32,20 +32,20 @@ one that only fixes raises the patch number. Each release's section here is its 
 - A menu in the player for Windows, over the game: back to the game, full screen or a window, and quitting the game. It
   comes up from a round button at the top right, from Esc held, from a finger drawn down from the top edge of the game,
   and from Alt+F4 or the window's close button. The button shows while the mouse moves in the top quarter of the game
-  with its button up, not while a song is played with the mouse. The game holds still while the menu is open, as a
+  with its button up, so it stays out of the way of a song played with the mouse. The game holds still while the menu is open, as a
   phone's game does when its owner leaves it, a broadcast with it, and the arrow keys and Enter choose in it. Minimised,
   the game holds still behind the menu, which is there when the game comes back.
 - Over the game, the player for Windows shows its own pointer: a dart in the logo's chrome and lime, all lime while the
   button is down, sized for the display's scaling.
 - `client.php` on the site answers the PC client: whether the address is an OpenDMTQ server, a sign-in that gives the
   site's cookie, and the app on offer for a signed-in player.
-- The PC client for Windows (`OpenDMTQ-Setup.exe`): an installer, and a launcher between the player and the game. It
+- The PC client for Windows (`OpenDMTQ-Setup.exe`): an installer, and a launcher that starts the game in the player. It
   connects to a server, signs in, downloads the server's app and keeps it up to date, sets the picture and the sound up
   for the computer before PLAY, and starts the player. It updates itself from the project's releases. Downloaded from a
   server's site, it comes with that server already set; from the releases, it asks for the address on first start.
   Downloaded over HTTPS, it keeps the address with its port, and the server's own certificate authority where the
-  server has one, which the launcher trusts for that server alone. The installer and the launcher speak English or
-  Korean, as Windows does, and the launcher can be set to either. `OpenDMTQ-cmd.exe` does the same from the command
+  server has one, which the launcher trusts for that server alone. The launcher speaks English or Korean, as
+  Windows does until one is chosen, and the installer speaks the launcher's. `OpenDMTQ-cmd.exe` does the same from the command
   line.
 - The PC client's Help page repairs, clears and removes, each with the same flag of `OpenDMTQ-cmd.exe`: Repair puts the
   program's files that are missing or changed back from the package it was installed from (`--repair`); Clear game
@@ -63,7 +63,7 @@ one that only fixes raises the patch number. Each release's section here is its 
   Turned to start new players on, it leaves every player already there as they are: only those who come after start
   on.
 - `GET /broadcasts` and `PUT /broadcasts` in the admin API read and change those settings.
-- An upgrade is tested on every push: the last release's images are used as people use them, then the new ones start on
+- An upgrade is tested in CI and in the local gate: the last release's images are used as people use them, then the new ones start on
   the same data and must have lost nothing (`tests/upgrade/run.sh`).
 
 ### Changed
@@ -74,6 +74,8 @@ one that only fixes raises the patch number. Each release's section here is its 
   place of a zip with the player and the app in it. The installer is the same for every server: the builder keeps it
   beside the app (`windows.json`), from the release, from `data/apk`, or fetched from the latest release, and removes
   the zips of 0.6 and 0.7 and what they kept in `data/apk` for their player.
+- Without internet, a host install takes the PC client's installer from the kit (`OpenDMTQ-Setup.exe` and
+  `OpenDMTQ-Setup.exe.version`) in place of `opendmtq-player-windows.zip`.
 - `player --refresh` sets the display's rate that the frame pacing follows too, for a display that gives none.
 - The notice in the game when a broadcast starts or ends reads as two lines: what happened, then where the broadcast and
   its replay can be watched (the site's LIVE page, by the server's name). Phones show it for longer. A player on air

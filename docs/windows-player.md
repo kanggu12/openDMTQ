@@ -5,14 +5,14 @@ the PC client sits between the player and the person: an installer, and a launch
 in, downloads the server's app (the same app its phones install) and keeps it up to date, sets the picture and the
 sound up for the PC, and starts the game. The game then plays against the server as it does on a phone.
 
-![The launcher's PLAY page: the server, the checks before a start, how to play, and PLAY](images/client-play.png)
+![The launcher's PLAY page: the server and the sign-in, the ready check, how to play, the last game, and PLAY](images/client-play.png)
 
 ## For players
 
 1. On the server's site, sign in and open **Download**. Under **On a computer (Windows)**, choose **Download the
    installer for Windows**. The file it gives, `OpenDMTQ-Setup-<address>.exe`, is set up for that server.
-2. Run it and choose **Install**. It installs for your Windows user, with a desktop shortcut and no administrator
-   rights, and starts the launcher. If Windows says it protected your PC from an unknown app: **More info**, then **Run
+2. Run it and choose **Install**. It installs for your Windows user, with shortcuts on the desktop and in the Start
+   menu and no administrator rights, and starts the launcher. If Windows says it protected your PC from an unknown app: **More info**, then **Run
    anyway**. The installer is not signed by a publisher Windows knows. Windows 11's Smart App Control, when it is on,
    blocks unsigned programs, this one among them, and has no **Run anyway**.
 3. The launcher's first start walks through the server (already filled in), the sign-in with your site ID, the app's
@@ -21,6 +21,8 @@ sound up for the PC, and starts the game. The game then plays against the server
 The installer from the project's [releases](https://github.com/kanggu12/openDMTQ/releases/latest) (`OpenDMTQ-Setup.exe`)
 is the same program without a server: its first start asks for the server's address. One launcher keeps several
 servers, each with its own sign-in and app, and plays on the one chosen on the **Online** page.
+`OpenDMTQ-Setup.exe --silent` installs or updates with no dialog and starts the launcher (`--no-start` leaves it
+closed); while a game runs it installs nothing and ends with 3.
 
 ### The launcher
 
@@ -36,11 +38,17 @@ servers, each with its own sign-in and app, and plays on the one chosen on the *
 
 **PLAY** asks the server for a newer app first and downloads it when there is one; when the server cannot be asked, the
 game starts with the app this PC has. The launcher updates itself from the project's releases: **Launcher**, **Check for
-updates**. While the game runs the launcher steps aside, and comes back when the game ends.
+updates**. Without internet, the installer from the server's **Download** page updates it instead, once the server has
+a newer one; the servers and the settings stay. While the game runs the launcher steps aside, and comes back when the
+game ends.
 
-`OpenDMTQ-cmd.exe`, next to the launcher in its folder, does the same from the command line, each step a flag
-(`OpenDMTQ-cmd.exe --help`): connect, sign in and out, download, the settings, the sound devices, **PLAY**, updates,
-repairing, clearing the game's data, starting over and uninstalling.
+`OpenDMTQ-cmd.exe`, in `%LOCALAPPDATA%\OpenDMTQ.Client\current`, does the same from the command line: `--status`
+(exit 0 when PLAY can go), `--server URL`, `--sign-in ID` (the password from standard input), `--sign-out`, `--app`,
+`--set NAME=VALUE`, `--audio-devices`, `--language en|ko|system`, `--guide`, `--open-log player|launcher`, `--play`,
+`--update`, `--forget URL`, `--reset`, `--repair`, `--clear-game-data` and `--uninstall [--delete-data]`, with `--yes`
+to answer their questions (`--help` lists them all). `--set` takes `display`, `window`, `vsync`, `fps`,
+`render_scale`, `audio_device`, `audio_mode`, `audio_buffer` and `volume`, with the values the **Screen** and **Sound**
+pages offer. While the launcher's window is open, the flags that change what it keeps are refused.
 
 ### In the game
 
@@ -109,14 +117,16 @@ says when a broadcast starts and ends, and where it can be watched.
 ### What it needs, and what it keeps
 
 - **What it needs:** 64-bit Windows 10 or 11 on an x64 PC (Intel or AMD), and a graphics card with Direct3D 11. About
-  350 MB of disk to start: the program about 85 MB, each server's app about 110 MB, the app's libraries about 40 MB, and
+  390 MB of disk to start: the program about 125 MB with the package **Repair** takes its files from, each server's app
+  about 110 MB, the app's libraries about 40 MB, and
   the game's data 111 MB after a first start and one song, more with each song it downloads. The installer itself is
   about 60 MB.
 - **The videos** need Windows' Media Foundation. The N and KN editions of Windows come without it: there, install the
   Media Feature Pack, under Settings, Optional features (in Apps or in System, by the version of Windows). Without it
   the videos are black and silent, and the game goes on.
-- **The language** is Windows' display language: Korean or English for the installer, the launcher and the menu over
-  the game (the launcher's can be changed on its **Launcher** page), and the game's among those it has.
+- **The language:** the launcher speaks Windows' display language, Korean or English, until one is chosen on the
+  first-start guide's first step or the **Launcher** page, and the installer speaks the launcher's. The menu over the
+  game follows Windows' display language, and so does the game, among the languages it has.
 - **What it keeps on the PC,** per Windows user:
   - the program, in `%LOCALAPPDATA%\OpenDMTQ.Client`;
   - the launcher's settings and logs, and each server's app, in `%LOCALAPPDATA%\OpenDMTQ\client`;
@@ -130,8 +140,8 @@ says when a broadcast starts and ends, and where it can be watched.
     changed (`--repair`). Running `OpenDMTQ-Setup.exe` again repairs too.
   - **Clear game data** deletes what the game keeps, all but the device id: the game downloads its data again at the
     next start, and the PC stays the same player (`--clear-game-data`).
-  - **Start over** forgets the servers, the sign-ins, the apps and the settings, and opens the first-start guide
-    (`--reset`). **Forget** on the **Online** page does that for one server (`--forget URL`).
+  - **Start over** forgets the servers, the sign-ins, the apps and the settings, and opens the first-start guide; the
+    game's data and the language stay (`--reset`). **Forget** on the **Online** page does that for one server (`--forget URL`).
   - **Uninstall** removes the program, its shortcuts and its entry in Windows' Apps (`--uninstall`). It asks whether
     the settings, sign-ins and game data stay for a later install or go too (`--uninstall --delete-data`). With them
     goes the device id, and a later install is a new player, unless the account transfer below brings this one back.
@@ -186,6 +196,7 @@ server's app, `--settings` the file).
 - **The game does not start:** the launcher says why on its bottom line, with a link to the player's log; **Help**
   opens it too. The log is `player.log` in the game's folder in `%LOCALAPPDATA%\OpenDMTQ`; the launcher's own is in
   `%LOCALAPPDATA%\OpenDMTQ\client\logs`.
+- **The launcher says the server runs an older OpenDMTQ:** the PC client needs a server of 0.8 or newer.
 - **The player is missing or a file of the program is damaged:** **Help**, **Repair** puts the program's files back
   from the package it was installed from.
 - **The installer says a game is going on:** finish it and close the game; installing replaces the player it plays in.
