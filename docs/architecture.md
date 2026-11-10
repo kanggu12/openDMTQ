@@ -362,8 +362,8 @@ hand.
   server makes for itself, limited to the server's own names ([internet.md](internet.md#https)). Only the edge holds
   the certificate's key, and no running container holds the authority's.
 - The import opens the owner's archives with 7-Zip in a container of its own, which sees the folder it imports from,
-  `data/content` and `data/apk/base`; the keys, the backups, the database and what phones download are hidden from it
-  (compose service `importer`).
+  `data/content` and `data/apk/base`; the keys, the backups, the database and what phones download are hidden from it,
+  and it has no network (compose service `importer`).
 - The admin pages are published on `127.0.0.1:8791` only (`ADMIN_BIND`, `ADMIN_PORT`). The server also passes
   `/opendmtq/admin` to them unless `ADMIN_ON_PUBLIC_PORT=no`; once HTTPS is set up a plain-HTTP visit is sent to
   HTTPS.

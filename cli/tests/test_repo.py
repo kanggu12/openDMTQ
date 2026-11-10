@@ -510,6 +510,8 @@ class ImporterTest(unittest.TestCase):
         # None of the other services' wider views.
         self.assertNotIn("./data/apk:/apk", block)
         self.assertNotIn("./data/custom:/custom", block)
+        # No network either: nothing to fetch, nobody to reach.
+        self.assertIn("\n    network_mode: none\n", block)
 
     def test_the_hidden_folders_exist_before_it_runs(self):
         # Docker would make a missing mount point as root, inside data/: ./opendmtq makes them first.

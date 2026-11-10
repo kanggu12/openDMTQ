@@ -222,6 +222,9 @@ services:
     user: "${OPENDMTQ_UID:-33}:${OPENDMTQ_GID:-33}"
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
+    # No network: the import reads a folder and writes data/, and an archive crafted to break 7-Zip reaches nothing from
+    # here, neither the other services nor the internet.
+    network_mode: none
     environment:
       # Which files of the folder to take (setup passes the files its search matched).
       IMPORT_ONLY: ${IMPORT_ONLY:-}
