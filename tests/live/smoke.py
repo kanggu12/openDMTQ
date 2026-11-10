@@ -793,6 +793,33 @@ broadcasts_post(action="broadcasts-on")
 check("and nothing waits once broadcasts are on again", state()["toast"] == "")
 rec_post(action="delete-player " + str(guid))
 
+
+def poll(udid):
+    """What a phone with this one device id is told when it polls."""
+    return json.loads(request(plain, f"{SITE}/live/state?ids={udid}")[2])
+
+
+# New players start on, as the owner sets it on the Broadcasts page, through the server itself: the players already there
+# stay off, a device the server meets after that is on at its first poll, with its key and the notice (which names the
+# server as the site does), and a player the owner then turns off stays off.
+before_udid = f"live-smoke-before-{random.randrange(10**9):09d}"
+new_player(before_udid)
+broadcasts_post(action="settings", new_players="on", quality="standard")
+s = poll(before_udid)
+check("new players starting on leaves the players already there off", s["on"] is False and "token" not in s and s["toast"] == "", s)
+newcomer_udid = f"live-smoke-new-{random.randrange(10**9):09d}"
+newcomer = new_player(newcomer_udid)
+s = poll(newcomer_udid)
+site_name = json.loads(request(plain, SITE + "/opendmtq/client.php?about")[2])["name"]
+check("a new device's first poll: on, its key, and the notice naming the server as the site does",
+      s["on"] is True and re.fullmatch(r"[0-9a-f]{32}", s.get("token", "")) is not None
+      and s["toast"] == f"Your play is live now\nWatch it live or later under LIVE on {site_name}", s)
+switch("live-off", newcomer)
+s = poll(newcomer_udid)
+check("a new player the owner turns off stays off at the next poll, and the one after",
+      s["on"] is False and "token" not in s and poll(newcomer_udid)["on"] is False, s)
+broadcasts_post(action="settings", new_players="off", quality="standard")
+
 # A real stream for the browser check (tests/live/browser.js), left in place.
 media = os.environ.get("LIVE_TS_DIR")
 if media:
