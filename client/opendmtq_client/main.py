@@ -40,6 +40,8 @@ from opendmtq_client import state as st
 from opendmtq_client import values as choices
 
 log = logging.getLogger("opendmtq_client")
+# The launcher window's mutex while this process holds it (_single_instance): the window is open.
+_window_mutex = None
 
 
 def _velopack_hooks(argv):
@@ -101,13 +103,16 @@ def _thread_failed(args):
 
 def _single_instance():
     """True when no other launcher window is open; otherwise bring that one forward and return False."""
-    if sys.platform != "win32":
+    from opendmtq_client import mutex
+    global _window_mutex
+    # The mutex lives as long as the first launcher; a second one finds it held already.
+    _window_mutex, held_before = mutex.hold(mutex.LAUNCHER)
+    if not held_before:
         return True
+    # Not this launcher's to keep: the other window's stays open as long as it is.
+    mutex.release(_window_mutex)
+    _window_mutex = None
     import ctypes
-    # A named mutex lives as long as the first launcher; a second one sees it already exists.
-    ctypes.windll.kernel32.CreateMutexW(None, False, "Local\\OpenDMTQ.launcher")
-    if ctypes.windll.kernel32.GetLastError() != 183:   # ERROR_ALREADY_EXISTS
-        return True
     hwnd = ctypes.windll.user32.FindWindowW(None, "OpenDMTQ")
     if hwnd:
         ctypes.windll.user32.ShowWindow(hwnd, 9)        # SW_RESTORE

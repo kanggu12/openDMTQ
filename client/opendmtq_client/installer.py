@@ -30,8 +30,6 @@ log = logging.getLogger("opendmtq_client.installer")
 
 # Velopack's setup, next to this program inside the frozen installer (sys._MEIPASS) or given by a test.
 SETUP_NAME = "velopack-setup.exe"
-# The launcher's named mutex (main.py): it exists while a launcher window is open.
-LAUNCHER_MUTEX = "Local\\OpenDMTQ.launcher"
 # How long Velopack's setup may take before the installer stops waiting for it.
 SETUP_LIMIT = 300
 # Velopack's logs of earlier runs kept in the temporary folder.
@@ -68,21 +66,10 @@ def version_key(text):
     return numbers, 0, parts
 
 
-def _mutex_exists(name):
-    if sys.platform != "win32":
-        return False
-    import ctypes
-    synchronize = 0x00100000
-    handle = ctypes.windll.kernel32.OpenMutexW(synchronize, False, name)
-    if handle:
-        ctypes.windll.kernel32.CloseHandle(handle)
-        return True
-    return False
-
-
 def launcher_open():
     """True while a launcher window is open (its mutex exists); False on other systems."""
-    return _mutex_exists(LAUNCHER_MUTEX)
+    from opendmtq_client import mutex
+    return mutex.exists(mutex.LAUNCHER)
 
 
 def game_running():
