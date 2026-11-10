@@ -11,6 +11,9 @@ import threading
 import urllib.parse
 
 ACCOUNT, PASSWORD = "player1", "pass-1234"
+# How often the server looks whether stop() wants it to end (seconds): stop() waits for that look, and at
+# serve_forever's own half second it was most of the unit tests' time, once per test with a site.
+POLL = 0.01
 # The made-up app: what /apk hands out, and its description.
 APP = b"PK\x03\x04 made-up app " * 4096
 
@@ -116,7 +119,7 @@ class Site:
 
         self.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.url = "http://127.0.0.1:%d" % self.httpd.server_address[1]
-        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self.thread = threading.Thread(target=self.httpd.serve_forever, kwargs={"poll_interval": POLL}, daemon=True)
         self.thread.start()
         return self
 

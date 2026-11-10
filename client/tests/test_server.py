@@ -219,7 +219,8 @@ class OwnAuthority(Folder):
         self.httpd.socket = context.wrap_socket(self.httpd.socket, server_side=True)
         self.port = self.httpd.server_address[1]
         self.base = "https://127.0.0.1:%d" % self.port
-        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+        # Stopped within the stand-in site's look (stub.POLL), not serve_forever's own half second.
+        threading.Thread(target=self.httpd.serve_forever, kwargs={"poll_interval": stub.POLL}, daemon=True).start()
 
     def tearDown(self):
         self.httpd.shutdown()
