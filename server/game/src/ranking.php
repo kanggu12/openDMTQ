@@ -2,7 +2,8 @@
 /*
  * The in-game rankings: this month's, from the log of every play (PlayLog). The game counts down to the moment
  * they start anew (odq_month_start() in util.php, which the site's months share); the web pages and a player's own best
- * keep every month.
+ * keep every month. The monthly board itself (odq_month_board()) is the site's too: its This month tab and the months
+ * before (portal/ranking_lib.php).
  */
 
 require_once __DIR__ . '/db.php';
@@ -32,55 +33,66 @@ function odq_patterns($line, $songId = NULL)
 }
 
 /*
- * Ranked players for a set of charts this month: [[guid, score], ...], best first. A player's score is
- * the sum of their best scores this month on those charts, from the log of every play (PlayLog); for the
- * total ranking ($patterns null) every chart counts. Ties go to the older account, as on the web. Players
- * who did not play these charts this month are not ranked. The web rankings and a player's own best (MAX
- * SCORE, NEW RECORD) keep every month: they come from the best scores (Play), not from here.
+ * One month's ranked players for a set of charts, from the plays from $since to before $until: [[guid, score, charts],
+ * ...], best first. The one monthly board of the game and the site: the in-game rankings (odq_board(), this month) and
+ * the site's This month tab and the months before (portal/ranking_lib.php), on the handle the caller passes (the site's
+ * is read-only). A player's score is the sum of their best scores that month on those charts, from the log of every
+ * play (PlayLog), and charts is how many charts that is; for the total ranking ($patterns null) every chart counts.
+ * Ties go to the older account. Players who did not play these charts that month are not ranked, nor players without
+ * an account, nor the server's own check account. A player's own best (MAX SCORE, NEW RECORD) and the site's other
+ * rankings keep every month: they come from the best scores (Play), not from here.
  *
  * PlayLog.user_id is the player's guid (the game saves with it); after a transfer code a second Member
  * row shares the guid, so players are matched by guid, not by Member.id. The log is read through its indexes
  * with the time of the play in them: by the player (PlayLog_board, which holds all a board reads), or for a chart
  * of its own (PlayLog_chart).
  */
-function odq_board($patterns)
+function odq_month_board(SQLite3 $db, int $since, int $until, ?array $patterns): array
 {
     // A line or song with no charts in the list has nobody ranked.
     if ($patterns !== NULL && !$patterns) {
         return [];
     }
-    $q = odq_db()->prepare(odq_month_board_sql($patterns));
+    $q = $db->prepare(odq_month_board_sql($patterns));
     // A database problem (or one older than the play log) ranks nobody rather than breaking the reply.
     if (!$q) {
         return [];
     }
-    $q->bindValue(':since', odq_month_start(), SQLITE3_INTEGER);
+    $q->bindValue(':since', $since, SQLITE3_INTEGER);
+    $q->bindValue(':until', $until, SQLITE3_INTEGER);
     $q->bindValue(':check', OPENDMTQ_CHECK_UDID, SQLITE3_TEXT);
     $r = $q->execute();
     $board = [];
     while ($r && ($row = $r->fetchArray(SQLITE3_ASSOC))) {
-        $board[] = [(int)$row['guid'], (int)$row['score']];
+        $board[] = [(int)$row['guid'], (int)$row['score'], (int)$row['charts']];
     }
     return $board;
 }
 
 /*
- * The statement of a monthly board for a set of charts ($patterns null: every chart), with :since and :check to bind.
- * Each player's best on each chart this month, each stored score capped (odq_sql_score) so that old forged rows cannot
- * overflow the sum; then those added up per player. tests/game/protocol.sh checks the plan SQLite makes of it.
+ * The statement of a monthly board for a set of charts ($patterns null: every chart), with :since, :until and :check
+ * to bind. Each player's best on each chart that month, each stored score capped (odq_sql_score) so that old forged rows
+ * cannot overflow the sum; then those added up per player, and counted. tests/game/protocol.sh checks the plan SQLite
+ * makes of it.
  */
 function odq_month_board_sql(?array $patterns): string
 {
     // The chart filter, from ints only (safe to write into the query).
     $filter = $patterns === NULL ? '' : ' AND l.pattern_id IN (' . implode(',', array_map('intval', $patterns)) . ')';
-    return 'SELECT guid, SUM(best) AS score FROM ('
+    return 'SELECT guid, SUM(best) AS score, COUNT(*) AS charts FROM ('
         . 'SELECT l.user_id AS guid, MAX(' . odq_sql_score('l.score') . ') AS best FROM PlayLog l'
-        . ' WHERE l.played_at >= :since'
+        . ' WHERE l.played_at >= :since AND l.played_at < :until'
         // Only players who still have an account, without the server's own check account.
         . ' AND l.user_id IN (SELECT CAST(guid AS INTEGER) FROM Member WHERE udid IS NOT :check)'
         . $filter
         . ' GROUP BY l.user_id, l.pattern_id)'
         . ' GROUP BY guid ORDER BY score DESC, guid ASC';
+}
+
+/* This month's board, as the game's ranking screens show it: from the first of the month at midnight UTC, with no end. */
+function odq_board($patterns)
+{
+    return odq_month_board(odq_db(), odq_month_start(), PHP_INT_MAX, $patterns);
 }
 
 /*

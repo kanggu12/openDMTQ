@@ -80,7 +80,7 @@ more, its FREE PASS, and goes on without it (`rpc.php`). It needs PHP 8.1 or new
 | `server/game/index.php` | The door: sends each path to the part below |
 | `src/rpc.php` | `POST /DMQ/rpc`: the list of calls in, a list of results out; `odq_methods()` names every method and its handler |
 | `src/game.php` | The `game.*` methods: assets, song and chart addresses, saving a play |
-| `src/ranking.php` | The in-game rankings, this month's |
+| `src/ranking.php` | The in-game rankings, this month's, and the monthly board the site's months read too |
 | `src/achievement.php` | MY PAGE's achievements and the dates they were earned |
 | `src/shop.php` | The `shop.*` methods: everything is owned, nothing is sold |
 | `src/user.php` | The `user.*` methods, the news, the mail and `service.getInfo` |
@@ -121,8 +121,10 @@ What the replies rely on, as the client behaves:
 The in-game rankings are this month's: each player's best score per chart since the first of the month at midnight UTC
 (09:00 in Korea), from the log of every play. The game's ranking screens count down to that moment, so the boards start
 anew then. TOTAL sums every chart, the 2/3/4 LINE tabs the charts of that line, a song's ranking the song's charts on
-that line (all difficulties). A player's own best (MAX SCORE, NEW RECORD) and the web rankings keep every month. Ties
-go to the older account, and the server's own check account is never ranked.
+that line (all difficulties). A player's own best (MAX SCORE, NEW RECORD) and the web rankings keep every month, but
+for the site's This month tab and the months before it, which are the game's own board of each month
+(`odq_month_board()`, with the site's read-only database handle). Ties go to the older account, and the server's own
+check account is never ranked.
 
 The achievements on MY PAGE come from what the server knows (level 99 and 999,999 MAX POINT for every player, the best
 scores, the play log), and each keeps the date it was earned on: the save that earns one stores it in

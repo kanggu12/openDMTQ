@@ -583,7 +583,7 @@ status, headers, _ = request(portal, window)
 check("signed in: the game's window opens the site", status == 302 and headers.get("Location", "").startswith("/opendmtq/"), headers.get("Location"))
 status, headers, _ = request(plain, SITE + "/djmaxQ/index?userId=1")
 check("the old score viewer address leads to the game's window", status == 302 and headers.get("Location") == "/score/", headers.get("Location"))
-check("what the pages load is never a page", all(request(plain, f"{SITE}/opendmtq/{name}")[0] == 403 for name in ("lib.php", "auth.php", "live_lib.php", "strings.php")))
+check("what the pages load is never a page", all(request(plain, f"{SITE}/opendmtq/{name}")[0] == 403 for name in ("lib.php", "auth.php", "live_lib.php", "ranking_lib.php", "strings.php")))
 check("nor is the game server's code", all(request(plain, f"{SITE}{path}")[0] in (403, 404) for path in ("/opendmtq/../game/src/rpc.php", "/game/src/rpc.php", "/src/config.php")))
 
 # ---------------------------------------------------------------- recordings
@@ -902,6 +902,12 @@ check("a player's page gives the rank the rankings list them at",
       f"{rank_of(scorer_page)}, {rank_of(second_page)}, {listed}")
 ingame = call("game.getLineTopRankWithLevel", [0, 1, 100, [scorer]])["ranks"]
 check("the game's total ranking has that order too", [r["guid"] for r in ingame][:len(listed)] == listed[:len(ingame)], f"{ingame} {listed}")
+# The site's This month tab is the game's own board of the month (odq_month_board()): the same players in the same order,
+# above the months before.
+this_month = request(portal, f"{SITE}/opendmtq/ranking.php?sort=month")[2].decode().split('class="past-months"')[0]
+monthly = [int(x) for x in re.findall(r'player\.php\?id=(\d+)', this_month)]
+check("the site's This month tab ranks the month as the game does", monthly and monthly == [r["guid"] for r in ingame][:len(monthly)],
+      f"{monthly} {[r['guid'] for r in ingame]}")
 home = request(portal, f"{SITE}/opendmtq/")[2].decode()
 check("the front page lists the top of the rankings", [int(x) for x in re.findall(r'player\.php\?id=(\d+)', home.split('id="records"')[0])][:8] == listed[:8])
 # The achievements on MY PAGE (after the rankings' checks: the plays here change the rankings): a new player has those every player has (level 99, MAX POINT 999,999); one who has

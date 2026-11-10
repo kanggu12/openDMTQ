@@ -26,8 +26,8 @@ require_once __DIR__ . '/../game/src/config.php';
 // The stream folders (data/state/live on the host) and the game database.
 define('LIVE_DIR', odq_state_dir() . '/live');
 define('LIVE_DB', odq_db_path());
-// The server's own check account never goes live, as it is never ranked.
-const LIVE_CHECK_UDID = 'opendmtq-check';
+// The server's own check account never goes live, as it is never ranked: the game's (config.php).
+const LIVE_CHECK_UDID = OPENDMTQ_CHECK_UDID;
 // The owner's settings for broadcasts as a whole, which the admin pages' Broadcasts page writes
 // (tools/opendmtq_tools/admin/recordings.py): a row each of LiveSetting in the game database (server/game/bin/setup-db.php
 // makes the table), its value as text. "on": "1" or "0", broadcasts at all; "new_players": "1" or "0", a new player's
