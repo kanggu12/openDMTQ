@@ -43,10 +43,17 @@ if ! docker image inspect opendmtq-client-winbuild:local >/dev/null 2>&1; then
 fi
 docker image inspect opendmtq-client-ui:local >/dev/null 2>&1 \
   || docker build -q -t opendmtq-client-ui:local "$REPO/client/tests/ui" >/dev/null
+# What a container wrote in OUT, back to whoever runs this script: the containers run as root, and the steps after them
+# write into what they made (CI's runner is no root; as root this changes nothing).
+own() {
+  [ "$(id -u)" = 0 ] && return 0
+  docker run --rm --network none -v "$OUT:/out" --entrypoint chown opendmtq-client-ui:local -R "$(id -u):$(id -g)" /out
+}
 
 # ---- 1. pictures, the version and the update address
 docker run --rm --network none -e PYTHONDONTWRITEBYTECODE=1 -v "$REPO:/src:ro" -v "$OUT/assets:/out" -w /src/client \
   opendmtq-client-ui:local python packaging/windows/assets.py /out "$VERSION"
+own
 # The version and the update address go into the launcher as files (an empty address: this build looks for none).
 printf '%s' "$VERSION" > "$OUT/assets/version.txt"
 printf '%s' "${OPENDMTQ_UPDATE_SOURCE:-}" > "$OUT/assets/update-source.txt"
@@ -59,6 +66,7 @@ docker run --rm --network none -e PYTHONDONTWRITEBYTECODE=1 -e OPENDMTQ_BUILD_DI
     wine 'C:\\python\\python.exe' -m PyInstaller --noconfirm --log-level WARN \
       --distpath 'Z:\\out\\dist' --workpath 'Z:\\out\\work' 'Z:\\src\\client\\packaging\\windows\\OpenDMTQ.spec' \
       > /out/pyinstaller.log 2>&1; code=\$?; wineserver -w; exit \$code" || { tail -n 30 "$OUT/pyinstaller.log"; exit 1; }
+own
 ls "$OUT/dist/OpenDMTQ/OpenDMTQ.exe" "$OUT/dist/OpenDMTQ/OpenDMTQ-cmd.exe" >/dev/null
 
 # ---- 3. the player for Windows beside the launcher, as player\ (the launcher looks for it there)
@@ -83,6 +91,7 @@ docker run --rm --network none -v "$OUT:/out" --entrypoint sh opendmtq-client-wi
   cp "$site"/pillow-*.dist-info/licenses/LICENSE "$lic/Pillow-LICENSE.txt"
   cp "$site"/pyinstaller-*.dist-info/licenses/COPYING.txt "$lic/PyInstaller-COPYING.txt"
   cp "$site"/velopack-*.dist-info/sboms/velopack_python.cyclonedx.json "$lic/Velopack-sbom.cyclonedx.json"'
+own
 # From the repository: OpenDMTQ's own, the fonts', and those the build machine does not have (licenses/README.md).
 cp "$REPO/LICENSE" "$LIC/OpenDMTQ-LICENSE.txt"
 cp "$REPO/client/opendmtq_client/assets/fonts/Saira-OFL.txt" "$REPO/client/opendmtq_client/assets/fonts/Pretendard-OFL.txt" \
@@ -140,6 +149,7 @@ docker run --rm --network none -v "$OUT:/out" opendmtq-client-vpk:local vpk "[wi
   --packId OpenDMTQ.Client --packVersion "$VERSION" --packDir /out/dist/OpenDMTQ --mainExe OpenDMTQ.exe \
   --packTitle OpenDMTQ --packAuthors OpenDMTQ --icon /out/assets/OpenDMTQ.ico \
   --splashImage /out/assets/splash.png --outputDir /out/releases > "$OUT/vpk.log" 2>&1 || { cat "$OUT/vpk.log"; exit 1; }
+own
 # The portable zip vpk also makes is no part of a release: OpenDMTQ-Setup.exe installs, and the packages update.
 rm -f "$OUT/releases/"*-Portable.zip
 ls -la "$OUT/releases"
@@ -153,6 +163,7 @@ docker run --rm --network none -e PYTHONDONTWRITEBYTECODE=1 -e OPENDMTQ_BUILD_DI
     wine 'C:\\python\\python.exe' -m PyInstaller --noconfirm --log-level WARN \
       --distpath 'Z:\\out\\setup\\dist' --workpath 'Z:\\out\\setup\\work' 'Z:\\src\\client\\packaging\\windows\\setup.spec' \
       > /out/pyinstaller-setup.log 2>&1; code=\$?; wineserver -w; exit \$code" || { tail -n 30 "$OUT/pyinstaller-setup.log"; exit 1; }
+own
 cp "$OUT/setup/dist/OpenDMTQ-Setup.exe" "$OUT/releases/OpenDMTQ-Setup.exe"
 # The version beside it, which a server reads when it hands the installer out (tools/opendmtq_tools/windows_client.py).
 printf '%s\n' "$VERSION" > "$OUT/releases/OpenDMTQ-Setup.exe.version"
