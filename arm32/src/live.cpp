@@ -15,7 +15,8 @@
 //   It also mixes the rings for a hardware AAC encoder and packs both into MPEG-TS segments (live_ts.cpp), cut
 //   at a key frame every two seconds or so. Only this thread can block on the encoder.
 // - The upload thread: posts the segments, a few at a time at most; a slow network drops segments
-//   rather than holding on to them, and turns the quality down (below).
+//   rather than holding on to them, and turns the quality down (below). It and the requests are
+//   live_net.cpp's, which the player for Windows shares.
 // - The control thread: asks the server about every 15 seconds, while the game is on screen, whether
 //   live view is on for this player, and shows the server's two-line notice as a toast.
 //
@@ -32,28 +33,22 @@
 #include "live.h"
 
 #include "host.h"
+#include "live_net.h"
 #include "live_ts.h"
 
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
 #include <algorithm>
-#include <cctype>
 #include <android/native_window.h>
-#include <arpa/inet.h>
 #include <atomic>
-#include <cerrno>
-#include <condition_variable>
 #include <csignal>
 #include <cstring>
-#include <deque>
 #include <dlfcn.h>
 #include <fstream>
 #include <memory>
 #include <mutex>
-#include <netdb.h>
 #include <sstream>
 #include <sys/resource.h>
-#include <sys/socket.h>
 #include <sys/system_properties.h>
 #include <system_error>
 #include <thread>
@@ -72,10 +67,6 @@ constexpr Nanos kPollEvery = 15 * kSecond;
 constexpr Nanos kAwayAfter = 5 * kSecond;
 // No picture for this long (a pause, a load): the stream starts over from a new first segment.
 constexpr Nanos kRestartAfter = 3 * kSecond;
-// Segments waiting for the network, at most: the oldest goes when another comes.
-constexpr std::size_t kUploadQueue = 3;
-// The server takes up to 4 MB; at these bitrates only a fault gets this far.
-constexpr std::size_t kMaxSegment = 4 * 1024 * 1024 - 1024;
 // The stream's sound: 48 kHz stereo, as AAC at this bitrate whatever the picture's step is.
 constexpr int kAudioRate = 48000;
 constexpr int kAudioChunk = 1024;
@@ -287,9 +278,6 @@ const Gl& gl() {
 // ---- state shared by the threads
 
 std::atomic<bool> g_enabled{false};    // a server address, not turned off
-std::string g_host;                    // the server's name
-std::string g_host_header;             // and how a request names it
-int g_port = 80;
 JavaVM* g_vm = nullptr;
 jclass g_device_class = nullptr;       // com.pmangplus.device.PPDevice
 jclass g_base_class = nullptr;         // com.pmangplus.base.PPBase
@@ -300,13 +288,17 @@ std::atomic<bool> g_on{false};         // the server has live view on for this p
 std::atomic<bool> g_gave_up{false};    // this phone cannot do it: the server is still asked, for notices
 std::atomic<int> g_failures{0};        // encoder start-ups that failed; three end the attempts
 
+// The requests to the server, the upload thread and the network's quality step (live_net.cpp), with the phone's names:
+// its log's prefix, its User-Agent, and its upload thread's name and start.
+live::Link g_link({"arm32: live", "arm32-live", "arm32-liveup", background_thread});
+
 // What the server asks for (the top step).
 std::atomic<int> g_fps{30}, g_height{720}, g_bitrate{2000000}, g_segment{2};
-// The quality step: the worse of the network's and the phone's temperature's.
-std::atomic<int> g_network_step{0}, g_thermal_step{0};
-constexpr int kLastStep = 3;
+// The quality step: the worse of the network's (g_link) and the phone's temperature's.
+std::atomic<int> g_thermal_step{0};
+constexpr int kLastStep = live::kLastStep;
 
-int step() { return std::max(g_network_step.load(std::memory_order_relaxed), g_thermal_step.load(std::memory_order_relaxed)); }
+int step() { return std::max(g_link.network_step.load(std::memory_order_relaxed), g_thermal_step.load(std::memory_order_relaxed)); }
 int step_fps(int s) { return s == 0 ? g_fps.load() : s == 1 ? std::max(g_fps.load() * 2 / 3, 1) : std::max(g_fps.load() / 2, 1); }
 int step_height(int s) { return s <= 1 ? g_height.load() : s == 2 ? g_height.load() * 3 / 4 : g_height.load() / 2; }
 int step_bitrate(int s) {
@@ -314,12 +306,8 @@ int step_bitrate(int s) {
     return static_cast<int>(static_cast<std::int64_t>(g_bitrate.load()) * percent[s] / 100);
 }
 
-// The identity and the key, set by the control thread.
-std::mutex g_identity_lock;
-std::string g_ids, g_token;
-
-// For the log, once a minute while live (every ten seconds with stats on).
-std::atomic<std::uint64_t> g_captures{0}, g_capture_ns{0}, g_capture_max_ns{0}, g_skipped{0}, g_dropped{0}, g_uploaded{0}, g_audio_frames{0};
+// For the log, once a minute while live (every ten seconds with stats on); the segments' counts are g_link's.
+std::atomic<std::uint64_t> g_captures{0}, g_capture_ns{0}, g_capture_max_ns{0}, g_skipped{0}, g_audio_frames{0};
 
 // ---- the audio: a ring per player, each with one writer (its mixer's thread) and one reader (the
 // encoder thread)
@@ -365,228 +353,6 @@ struct Session {
 
 // From the render thread to the encoder thread.
 std::atomic<std::shared_ptr<Session>*> g_handoff{nullptr};
-
-// ---- HTTP: plain, one request per connection, a blocking socket with time limits
-
-struct HttpResult {
-    int status = 0;  // 0: no answer
-    std::string body;
-};
-
-int connect_to_server() {
-    addrinfo hints{};
-    hints.ai_socktype = SOCK_STREAM;
-    addrinfo* list = nullptr;
-    const std::string port = std::to_string(g_port);
-    if (getaddrinfo(g_host.c_str(), port.c_str(), &hints, &list) != 0) return -1;
-    int fd = -1;
-    for (addrinfo* a = list; a; a = a->ai_next) {
-        fd = socket(a->ai_family, a->ai_socktype | SOCK_CLOEXEC, a->ai_protocol);
-        if (fd < 0) continue;
-        // Both limits, and the send one also limits connect.
-        timeval limit{10, 0};
-        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &limit, sizeof limit);
-        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &limit, sizeof limit);
-        if (connect(fd, a->ai_addr, a->ai_addrlen) == 0) break;
-        close(fd);
-        fd = -1;
-    }
-    freeaddrinfo(list);
-    return fd;
-}
-
-bool send_all(int fd, const void* data, std::size_t size) {
-    auto* p = static_cast<const char*>(data);
-    while (size > 0) {
-        ssize_t n = send(fd, p, size, MSG_NOSIGNAL);
-        if (n < 0 && errno == EINTR) continue;
-        if (n <= 0) return false;
-        p += n;
-        size -= static_cast<std::size_t>(n);
-    }
-    return true;
-}
-
-// HTTP/1.0, so the answer needs no chunk decoding: it ends where the connection does.
-HttpResult http(const char* method, const std::string& path, const std::string& extra_headers, const void* body, std::size_t body_size) {
-    HttpResult r;
-    int fd = connect_to_server();
-    if (fd < 0) return r;
-    std::string head = std::string(method) + " " + path + " HTTP/1.0\r\nHost: " + g_host_header + "\r\nUser-Agent: arm32-live\r\n" + extra_headers;
-    if (body) head += "Content-Length: " + std::to_string(body_size) + "\r\n";
-    head += "\r\n";
-    if (send_all(fd, head.data(), head.size()) && (!body || send_all(fd, body, body_size))) {
-        std::string in;
-        char buffer[4096];
-        ssize_t n;
-        // A notice and a few numbers: an answer past this is not one of ours.
-        while (in.size() < 65536 && ((n = recv(fd, buffer, sizeof buffer, 0)) > 0 || (n < 0 && errno == EINTR))) {
-            if (n > 0) in.append(buffer, static_cast<std::size_t>(n));
-        }
-        std::size_t space = in.find(' ');
-        std::size_t end = in.find("\r\n\r\n");
-        if (in.rfind("HTTP/", 0) == 0 && space != std::string::npos && end != std::string::npos) {
-            r.status = std::atoi(in.c_str() + space + 1);
-            r.body = in.substr(end + 4);
-        }
-    }
-    close(fd);
-    return r;
-}
-
-// ---- reading the server's small JSON answer: flat, with known keys
-
-// Where the value of "key" starts, or npos.
-std::size_t json_value(const std::string& json, const char* key) {
-    const std::string quoted = std::string("\"") + key + "\"";
-    std::size_t at = json.find(quoted);
-    if (at == std::string::npos) return at;
-    at = json.find(':', at + quoted.size());
-    if (at == std::string::npos) return at;
-    ++at;
-    while (at < json.size() && (json[at] == ' ' || json[at] == '\t' || json[at] == '\n' || json[at] == '\r')) ++at;
-    return at < json.size() ? at : std::string::npos;
-}
-
-bool json_bool(const std::string& json, const char* key) {
-    std::size_t at = json_value(json, key);
-    return at != std::string::npos && json.compare(at, 4, "true") == 0;
-}
-
-int json_int(const std::string& json, const char* key, int fallback) {
-    std::size_t at = json_value(json, key);
-    if (at == std::string::npos || !(json[at] >= '0' && json[at] <= '9')) return fallback;
-    return std::atoi(json.c_str() + at);
-}
-
-void append_utf8(std::string& out, unsigned c) {
-    if (c < 0x80) {
-        out += static_cast<char>(c);
-    } else if (c < 0x800) {
-        out += static_cast<char>(0xC0 | (c >> 6));
-        out += static_cast<char>(0x80 | (c & 0x3F));
-    } else {
-        out += static_cast<char>(0xE0 | (c >> 12));
-        out += static_cast<char>(0x80 | ((c >> 6) & 0x3F));
-        out += static_cast<char>(0x80 | (c & 0x3F));
-    }
-}
-
-// A string value, with the escapes PHP's json_encode writes (\uXXXX for Korean).
-std::string json_string(const std::string& json, const char* key) {
-    std::string out;
-    std::size_t at = json_value(json, key);
-    if (at == std::string::npos || json[at] != '"') return out;
-    for (++at; at < json.size() && json[at] != '"'; ++at) {
-        if (json[at] != '\\') {
-            out += json[at];
-            continue;
-        }
-        if (++at >= json.size()) break;
-        switch (json[at]) {
-        case 'n': out += '\n'; break;
-        case 't': out += '\t'; break;
-        case 'u':
-            if (at + 4 < json.size()) {
-                append_utf8(out, static_cast<unsigned>(std::strtoul(json.substr(at + 1, 4).c_str(), nullptr, 16)));
-                at += 4;
-            }
-            break;
-        default: out += json[at];
-        }
-    }
-    return out;
-}
-
-// ---- the upload thread
-
-struct Segment {
-    std::vector<std::uint8_t> bytes;
-    int seq = 0;
-    int duration_ms = 0;
-};
-
-std::mutex g_upload_lock;
-std::condition_variable g_upload_wake;
-std::deque<Segment> g_uploads;
-std::atomic<bool> g_end_due{false};  // tell the server the stream has ended, once what is queued is out
-
-void queue_segment(Segment&& s) {
-    if (s.bytes.empty() || s.bytes.size() > kMaxSegment) return;
-    std::lock_guard<std::mutex> l(g_upload_lock);
-    // A network this slow: the newest pictures matter most, and the quality has to come down.
-    if (g_uploads.size() >= kUploadQueue) {
-        g_uploads.pop_front();
-        g_dropped.fetch_add(1, std::memory_order_relaxed);
-        g_network_step.store(std::min(g_network_step.load() + 1, kLastStep));
-    }
-    g_uploads.push_back(std::move(s));
-    g_upload_wake.notify_one();
-}
-
-void upload_main() {
-    background_thread("arm32-liveup");
-    int slow = 0, fast = 0;
-    for (;;) {
-        Segment s;
-        bool end = false;
-        {
-            std::unique_lock<std::mutex> l(g_upload_lock);
-            g_upload_wake.wait(l, [] { return !g_uploads.empty() || g_end_due.load(); });
-            if (!g_uploads.empty()) {
-                s = std::move(g_uploads.front());
-                g_uploads.pop_front();
-            } else {
-                end = g_end_due.exchange(false);
-            }
-        }
-        std::string ids, token;
-        {
-            std::lock_guard<std::mutex> l(g_identity_lock);
-            ids = g_ids;
-            token = g_token;
-        }
-        const std::string header = "X-Live-Token: " + token + "\r\n";
-        if (end) {
-            if (!token.empty()) http("POST", "/live/end?ids=" + ids, header, "", 0);
-            continue;
-        }
-        const Nanos start = now_ns();
-        HttpResult r = http("POST", "/live/upload?ids=" + ids + "&seq=" + std::to_string(s.seq) + "&dur=" + std::to_string(s.duration_ms),
-                            header + "Content-Type: video/mp2t\r\n", s.bytes.data(), s.bytes.size());
-        const Nanos took = now_ns() - start;
-        if (r.status == 403) {
-            // The server's owner turned it off, or a new key is out: the control thread asks next.
-            log("arm32: live: the server refused a segment");
-            g_on.store(false);
-            g_want.store(false);
-            continue;
-        }
-        if (r.status / 100 != 2) {
-            log("arm32: live: upload failed, status %d", r.status);
-            g_dropped.fetch_add(1, std::memory_order_relaxed);
-        } else {
-            g_uploaded.fetch_add(1, std::memory_order_relaxed);
-        }
-        // The share of a segment's own length its upload took. Two near the whole length: a step
-        // down. A long good run (a minute of them): a step back up.
-        const double share = s.duration_ms > 0 ? static_cast<double>(took) / (static_cast<double>(s.duration_ms) * 1e6) : 0;
-        // A refusal (a full disk, say) says nothing about the network: only no answer or a slow one does.
-        if (r.status == 0 || share > 0.8) {
-            fast = 0;
-            if (++slow >= 2) {
-                slow = 0;
-                g_network_step.store(std::min(g_network_step.load() + 1, kLastStep));
-            }
-        } else {
-            slow = 0;
-            if (share < 0.3 && ++fast >= 30) {
-                fast = 0;
-                g_network_step.store(std::max(g_network_step.load() - 1, 0));
-            }
-        }
-    }
-}
 
 // ---- the encoder thread
 
@@ -801,12 +567,12 @@ private:
     }
 
     void cut(std::int64_t end_us) {
-        Segment s;
+        live::Segment s;
         s.bytes = std::move(ts_.bytes());
         ts_.bytes().clear();
         s.seq = seq_++;
         s.duration_ms = static_cast<int>((end_us - segment_start_us_) / 1000);
-        queue_segment(std::move(s));
+        g_link.queue_segment(std::move(s));
     }
 
     // A second in, so the clock reference, which runs behind the frames, never goes below zero.
@@ -999,7 +765,7 @@ void log_stats_if_due(Nanos* next) {
     log("arm32: live: step %d, %llu pictures, %llu skipped, render thread %llu us each (worst %llu), %llu segments up, %llu lost, %llu AAC frames", step(),
         static_cast<unsigned long long>(n), static_cast<unsigned long long>(g_skipped.exchange(0)),
         static_cast<unsigned long long>(n ? total / n / 1000 : 0), static_cast<unsigned long long>(g_capture_max_ns.exchange(0) / 1000),
-        static_cast<unsigned long long>(g_uploaded.exchange(0)), static_cast<unsigned long long>(g_dropped.exchange(0)),
+        static_cast<unsigned long long>(g_link.uploaded.exchange(0)), static_cast<unsigned long long>(g_link.dropped.exchange(0)),
         static_cast<unsigned long long>(g_audio_frames.exchange(0)));
     if (g_stats) {
         for (const AudioSource& source : g_sources)
@@ -1216,13 +982,8 @@ void add_static_string(JNIEnv* e, jclass c, const char* name, std::string& ids) 
     clear_exception(e);
     if (!value) return;
     if (const char* chars = e->GetStringUTFChars(value, nullptr)) {
-        // Only what the login's ids are made of: this goes straight in a URL.
-        std::string id(chars);
-        const bool plain = !id.empty() && std::all_of(id.begin(), id.end(), [](char x) { return std::isalnum(static_cast<unsigned char>(x)) || x == '-' || x == '_'; });
-        if (plain && ids.find(id) == std::string::npos) {
-            if (!ids.empty()) ids += ',';
-            ids += id;
-        }
+        // Into the list once, and only when made of what the login's ids are (live_net.cpp): it goes straight in a URL.
+        live::add_id(ids, chars);
         e->ReleaseStringUTFChars(value, chars);
     }
     e->DeleteLocalRef(value);
@@ -1325,7 +1086,7 @@ void start_workers_once() {
     if (started) return;
     started = true;
     for (AudioSource& source : g_sources) source.ring = std::make_unique<std::uint8_t[]>(kRingBytes);
-    if (!start_thread(encoder_main) || !start_thread(upload_main)) g_gave_up.store(true);
+    if (!start_thread(encoder_main) || !start_thread([] { g_link.run(); })) g_gave_up.store(true);
 }
 
 void control_main() {
@@ -1368,38 +1129,23 @@ void control_main() {
         char locale[PROP_VALUE_MAX] = "";
         __system_property_get("persist.sys.locale", locale);
         const char* lang = std::strncmp(locale, "ko", 2) == 0 ? "ko" : "en";
-        HttpResult r = http("GET", "/live/state?ids=" + ids + "&lang=" + lang, "", nullptr, 0);
-        // No answer: as things were. A server without live view (an older one) answers 404: off.
-        if (r.status == 0) continue;
-        const std::string token = json_string(r.body, "token");
-        // It goes into a request header: only what a token is made of.
-        const bool token_ok = !token.empty() && token.size() <= 128 &&
-                              std::all_of(token.begin(), token.end(), [](char x) { return std::isalnum(static_cast<unsigned char>(x)) || x == '-' || x == '_'; });
-        const bool on = r.status == 200 && json_bool(r.body, "on") && token_ok;
-        {
-            std::lock_guard<std::mutex> l(g_identity_lock);
-            g_ids = ids;
-            if (on) g_token = token;
-        }
-        if (on) {
-            g_fps.store(std::clamp(json_int(r.body, "fps", 30), 5, 60));
-            g_height.store(std::clamp(json_int(r.body, "height", 720), 144, 1080));
-            g_bitrate.store(std::clamp(json_int(r.body, "bitrate", 2000000), 100000, 20000000));
-            g_segment.store(std::clamp(json_int(r.body, "segment", 2), 1, 10));
+        // The answer, checked (live_net.cpp parse_state). None: as things were.
+        const live::State state = g_link.ask_state(ids, lang);
+        if (!state.answered) continue;
+        g_link.set_identity(ids, state);
+        if (state.on) {
+            g_fps.store(state.fps);
+            g_height.store(state.height);
+            g_bitrate.store(state.bitrate);
+            g_segment.store(state.segment);
             start_workers_once();
             if (g_failures.load() >= 3) g_gave_up.store(true);
         }
-        if (was_on && !on) {
-            g_end_due.store(true);
-            std::lock_guard<std::mutex> l(g_upload_lock);
-            g_upload_wake.notify_one();
-            // Back at the top step for the next time.
-            g_network_step.store(0);
-        }
-        g_on.store(on);
-        was_on = on;
-        const std::string notice = json_string(r.body, "toast");
-        if (!notice.empty()) start_thread(toast_thread, notice);
+        // Gone off: the stream's end once its last segments are out, and the top step for the next time.
+        if (was_on && !state.on) g_link.end_stream();
+        g_on.store(state.on);
+        was_on = state.on;
+        if (!state.toast.empty()) start_thread(toast_thread, state.toast);
     }
 }
 
@@ -1425,10 +1171,12 @@ void live_load(JavaVM* vm, JNIEnv* env, const std::string& lib_dir) {
         log("arm32: live: this Android has no media encoder API");
         return;
     }
-    const std::size_t colon = server.rfind(':');
-    g_host = server.substr(0, colon);
-    if (colon != std::string::npos) g_port = std::atoi(server.c_str() + colon + 1);
-    g_host_header = server;
+    g_link.set_server(live::parse_server(server));
+    // A refused segment (403): off until the control thread's next request says otherwise.
+    g_link.on_refused = [] {
+        g_on.store(false);
+        g_want.store(false);
+    };
     g_vm = vm;
     auto keep_class = [&](const char* name) -> jclass {
         jclass local = env->FindClass(name);
