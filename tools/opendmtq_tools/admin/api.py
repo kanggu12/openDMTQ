@@ -996,35 +996,9 @@ def backup_download(args):
 
 @handler
 def backup_restore(args):
-    """POST /backups/{backup}/restore: the Backups page's Restore (backups.restore_backup), as a job: a restore can
-    take longer than a request may wait."""
-    name = args["backup"]
-    path = backups.backup_path(name)
-    # One restore at a time, as on the page: the lock is taken here and given back by the job when it ends.
-    if not backups._restoring.acquire(blocking=False):
-        raise Refused(409, "busy", plain(core.t("bak.busy")))
-    who, state = g.api_who, os.path.dirname(core.DB)
-
-    def work(say):
-        # The restore, in the job's thread: what the page would flash goes into the job's log, and the lock is given
-        # back whatever happens.
-        try:
-            said, done = backups.restore_backup(name, path)
-        finally:
-            backups._restoring.release()
-        for _, words in said:
-            say(plain(words))
-        # The log of changes, as the page notes it: the request has ended by now, so straight to the file.
-        if done:
-            insights.audit_note(state, "backup_action:restore", name, who=who)
-        return None if done else plain(said[0][1])
-
-    try:
-        job = jobs.start_task("restore", work, backup=name)
-    except Exception:
-        backups._restoring.release()
-        raise
-    return started(job)
+    """POST /backups/{backup}/restore: the Backups page's Restore, the same job (backups.start_restore): a restore can
+    take longer than a request may wait. What the page would say goes into the job's log, in English."""
+    return started(backups.start_restore(args["backup"]))
 
 
 @handler

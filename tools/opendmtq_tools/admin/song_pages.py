@@ -11,7 +11,7 @@ import time
 from flask import flash, redirect, render_template, request, session, url_for
 
 from .. import songs
-from . import core
+from . import core, jobs
 from .core import Refused, ago, app, BASE, changed, db, t, tp, why
 
 
@@ -75,15 +75,12 @@ def songs_page():
     if request.method == "POST":
         action = request.form.get("action")
         try:
+            # Each makes the song list again, which takes a while with many songs: a job, which the page follows when it
+            # takes longer than its form waits (jobs.answer). The package itself comes with the request.
             if action == "upload":
-                rec = add_package(request.files.get("package"))
-                flash(t("songs.done_add", title=rec["full_name"], id=rec["song_id"], n=len(rec["charts"])), "ok")
-            elif action in ("hide", "show"):
-                title = set_hidden(int(request.form["song_id"]), action == "hide")
-                flash(t("songs.done_hide" if action == "hide" else "songs.done_show", title=title), "ok")
-            elif action == "remove":
-                title = remove(int(request.form["song_id"]))
-                flash(t("songs.done_remove", title=title), "ok")
+                return jobs.answer(jobs.start_page_task("songs", page_work(action, path=save_package(request.files.get("package")))), "songs_page")
+            if action in ("hide", "show", "remove"):
+                return jobs.answer(jobs.start_page_task("songs", page_work(action, song_id=int(request.form["song_id"]))), "songs_page")
         except Refused as e:
             flash(e.words, e.tone)
         except (ValueError, KeyError) as e:
@@ -91,6 +88,11 @@ def songs_page():
             flash(core.said(e), "bad")
         except Exception as e:  # noqa: BLE001 - anything else still gets a readable answer
             flash(failed(e).words, "bad")
+        return redirect(url_for("songs_page"))
+    # A change of this page's that took longer than its form waited: followed here until it ends, then what it said, on
+    # the page without it.
+    wanted = request.args.get("job", "")
+    if wanted and jobs.nothing_to_follow(wanted):
         return redirect(url_for("songs_page"))
     # A song whose tile image could not be made still plays; the owner should know why it looks bare.
     for failure in songs.tile_failures():
@@ -103,7 +105,27 @@ def songs_page():
     no_game_data = not songs.has_game_data()
     for s in listed:
         s["last"] = ago(s["last_at"]) if s["last_at"] else ""
-    return render_template("songs.html", songs=listed, no_tree=False, no_game_data=no_game_data)
+    return render_template("songs.html", songs=listed, no_tree=False, no_game_data=no_game_data, job=wanted or None)
+
+
+def page_work(action, song_id=None, path=None):
+    """The work of one of the Songs page's forms, as its job runs it (jobs.start_page_task): a package saved from the
+    request (path), or a song to hide, show or remove. It returns what the page says of it, and whether it worked."""
+    def work(say):
+        try:
+            if action == "upload":
+                rec = add_saved(path)
+                return [("ok", t("songs.done_add", title=rec["full_name"], id=rec["song_id"], n=len(rec["charts"])))], True
+            if action in ("hide", "show"):
+                title = set_hidden(song_id, action == "hide")
+                return [("ok", t("songs.done_hide" if action == "hide" else "songs.done_show", title=title))], True
+            return [("ok", t("songs.done_remove", title=remove(song_id)))], True
+        except Refused as e:
+            # A refusal of its own words: nothing changed.
+            return [(e.tone, e.words)], e.tone == "ok"
+        except Exception as e:  # noqa: BLE001 - anything else still gets a readable answer
+            return [("bad", failed(e).words)], False
+    return work
 
 
 def failed(e):
@@ -115,15 +137,36 @@ def failed(e):
 
 def add_package(storage):
     """Adds a song package, as the Songs page's form does: the file uploaded (a .zip). Returns the new song's record."""
+    return add_saved(save_package(storage))
+
+
+def save_package(storage):
+    """A song package that came with a request, saved where the work that adds it can read it after the request has
+    ended (the page's job): the file's path, which add_saved removes. Refused: no .zip file."""
     if not storage or not storage.filename.lower().endswith(".zip"):
         raise Refused(400, "no_package", tp("songs.choose"))
-    with tempfile.NamedTemporaryFile(suffix=".zip") as tmp:
-        storage.save(tmp.name)
-        try:
-            rec = songs.add_package(tmp.name)
-        except songs.SongError as e:
-            # A song that was refused: the reason alone does not say that nothing was added.
-            raise Refused(422, "package_refused", t("songs.add_failed", reason=core.said(e)))
+    # A name of its own in the temporary folder: the request's own copy goes when the request ends, the job reads it later.
+    fd, path = tempfile.mkstemp(suffix=".zip")
+    # Only the name is wanted: saving opens it again.
+    os.close(fd)
+    try:
+        storage.save(path)
+    except BaseException:
+        # Half a file (a full disk) is nobody's to read.
+        os.remove(path)
+        raise
+    return path
+
+
+def add_saved(path):
+    """Adds the song package save_package kept at path, and removes that file. Returns the new song's record."""
+    try:
+        rec = songs.add_package(path)
+    except songs.SongError as e:
+        # A song that was refused: the reason alone does not say that nothing was added.
+        raise Refused(422, "package_refused", t("songs.add_failed", reason=core.said(e)))
+    finally:
+        os.remove(path)
     changed("songs_page:upload", rec["full_name"])
     return rec
 

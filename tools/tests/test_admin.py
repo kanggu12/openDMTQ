@@ -66,6 +66,10 @@ class Install:
         self._copies.start()
         self._songs = mock.patch.object(admin.songs, "CUSTOM", self.path("custom"))
         self._songs.start()
+        # A page's form waits for its job (a backup, a restore, a change to the songs) long enough on any machine: the
+        # tests read what it did right after. PageJobsTest takes the wait away to follow one.
+        self._wait = mock.patch.object(admin.jobs, "PAGE_WAIT", 30)
+        self._wait.start()
         self.client = admin.app.test_client()
         return self
 
@@ -74,6 +78,7 @@ class Install:
         assert r.status_code == 302, r.status_code
 
     def __exit__(self, *exc):
+        self._wait.stop()
         self._songs.stop()
         self._copies.stop()
         self._patch.stop()
@@ -2271,3 +2276,88 @@ class FormChecksTest(unittest.TestCase):
             page = inst.client.post("/opendmtq/admin/accounts", data={"csrf": page_token(inst), "action": "create", "name": "x"},
                                     follow_redirects=True).get_data(as_text=True)
             self.assertIn("An ID is 3 to 20 Latin letters, digits, dots, dashes or underscores.", page)
+
+
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class PageJobsTest(unittest.TestCase):
+    """A backup, a restore and a change to the songs run as jobs from their pages, as a restore through the API does: what
+    is quick answers as it always did, and a longer one is followed on its page and says the same when it ends."""
+
+    def test_a_quick_backup_answers_as_before_and_is_noted_by_who_sent_it(self):
+        with Install() as inst:
+            old_game_database(admin.core.DB, [])
+            r = inst.client.post("/opendmtq/admin/backups", data={"csrf": page_token(inst), "action": "create"})
+            self.assertEqual(r.headers["Location"], "/opendmtq/admin/backups")
+            page = inst.client.get("/opendmtq/admin/backups").get_data(as_text=True)
+            self.assertRegex(page, r'class="flash ok" role="status">Backup <code>opendmtq-\d{8}-\d{6}-admin\.tar\.gz</code> created\.')
+            job = admin.jobs.listing()[0]
+            self.assertEqual((job["kind"], job["state"]), ("backup", "done"))
+            # The API's view of it holds nothing of the page's own (its words with their markup, its signal).
+            self.assertEqual(json.loads(json.dumps(admin.jobs.view(job)))["log"], [job["log"][0]])
+            self.assertTrue(job["log"][0].startswith("Backup opendmtq-"), job["log"])
+            # Noted by the admin who pressed it, though the job noted it after the request.
+            notes = admin.insights.audit_read(inst.path("state"))
+            self.assertEqual((notes[0]["what"], notes[0]["who"]), ("backups_page:create", "admin"))
+
+    def test_a_long_one_is_followed_on_its_page_and_says_its_words_once_in_its_language(self):
+        release = threading.Event()
+
+        def slow(song_id, hide):
+            # A song list that takes a while to make again.
+            release.wait(10)
+            return "Paper Planes"
+
+        with Install() as inst, mock.patch.object(admin.jobs, "PAGE_WAIT", 0), mock.patch.object(admin.song_pages, "set_hidden", slow):
+            csrf = page_token(inst)
+            inst.client.set_cookie("opendmtq_lang", "ko")
+            r = inst.client.post("/opendmtq/admin/songs", data={"csrf": csrf, "action": "hide", "song_id": "1"})
+            job = re.fullmatch(r"/opendmtq/admin/songs\?job=(\w+)", r.headers["Location"]).group(1)
+            # Its log on the page, which goes back to the page with the job's words once it ends, done or failed.
+            page = inst.client.get(r.headers["Location"]).get_data(as_text=True)
+            self.assertIn(f'data-job="/opendmtq/admin/jobs/{job}" data-done="/opendmtq/admin/songs?job={job}" '
+                          f'data-failed="/opendmtq/admin/songs?job={job}" data-gone="/opendmtq/admin/songs"', page)
+            self.assertIn("곡 목록을 바꾸는 중…", page)
+            release.set()
+            self.assertTrue(admin.jobs._jobs[job]["ended"].wait(10))
+            r = inst.client.get(f"/opendmtq/admin/songs?job={job}")
+            self.assertEqual(r.headers["Location"], "/opendmtq/admin/songs")
+            # In the page's language, though the job ran after its request.
+            self.assertIn("Paper Planes 곡을 숨겼습니다.", inst.client.get("/opendmtq/admin/songs").get_data(as_text=True))
+            # Said once: the same address again says nothing more.
+            inst.client.get(f"/opendmtq/admin/songs?job={job}")
+            self.assertNotIn("곡을 숨겼습니다", inst.client.get("/opendmtq/admin/songs").get_data(as_text=True))
+            # A job this service does not know (it started again): the page without it.
+            self.assertEqual(inst.client.get("/opendmtq/admin/songs?job=gone").headers["Location"], "/opendmtq/admin/songs")
+
+    def test_a_restore_on_its_page_is_the_apis_job(self):
+        with Install() as inst:
+            old_game_database(admin.core.DB, [])
+            csrf = page_token(inst)
+            name = admin.backups.make_backup("manual")
+            r = inst.client.post(f"/opendmtq/admin/backups/{name}", data={"csrf": csrf, "action": "restore"})
+            self.assertEqual(r.headers["Location"], "/opendmtq/admin/backups")
+            self.assertIn(f"Restored <code>{name}</code>", inst.client.get("/opendmtq/admin/backups").get_data(as_text=True))
+            job = admin.jobs.listing()[0]
+            self.assertEqual((job["kind"], job["state"], job["backup"]), ("restore", "done", name))
+            self.assertFalse(admin.backups._restoring.locked())
+            notes = admin.insights.audit_read(inst.path("state"))
+            self.assertEqual((notes[0]["what"], notes[0]["target"], notes[0]["who"]), ("backup_action:restore", name, "admin"))
+
+    def test_a_job_stopped_by_an_error_of_its_own_says_it_did_not_work(self):
+        with Install() as inst:
+            inst.sign_in()
+
+            def broken(say):
+                raise RuntimeError("a bug")
+
+            # (The error goes to this service's log, kept out of the tests' output here.)
+            with admin.app.test_request_context(), mock.patch.object(admin.app.logger, "exception") as logged:
+                job = admin.jobs._jobs[admin.jobs.start_page_task("backup", broken)]
+                self.assertTrue(job["ended"].wait(10))
+            logged.assert_called_once()
+            self.assertEqual(job["state"], "failed")
+            with admin.app.test_request_context():
+                admin.jobs.flash_said(job)
+                import flask
+                self.assertEqual(flask.get_flashed_messages(with_categories=True),
+                                 [("bad", "That did not work. The server's log has the details: ./opendmtq logs admin")])

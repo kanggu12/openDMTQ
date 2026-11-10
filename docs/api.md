@@ -120,7 +120,8 @@ still belongs to the player you saw.
 What takes longer than a request answers `202` with the job: an app build (`POST /builds`, `POST /setup/build`), an
 import (`POST /setup/import`) and a restore (`POST /backups/{backup}/restore`). Ask `GET /jobs/{job}` until its state is
 `done` or `failed`. Its `log` holds the last 200 lines of its output, and `why` says why it failed when that can be said
-in words.
+in words. A backup made, or a change to the songs, on the admin pages is a job there too (`backup`, `songs`), which
+`GET /jobs` lists; through the API the same is done when it answers.
 
 ```json
 {"job": {"id": "6b0c3e1a9f24", "kind": "build", "state": "running", "started": 1794200000, "log": ["patching ..."], "why": null, "host": "192.168.0.10"}}
@@ -1586,10 +1587,10 @@ A refusal.
 
 #### Job
 
-Work that runs in the background: an app build, an import, a restore.
+Work that runs in the background: an app build, an import, a restore, and on the admin pages a backup made or a change to the songs.
 
 - `id` (string): Its id, for GET /jobs/{job}.
-- `kind` (string): What it does. One of `build`, `import`, `restore`.
+- `kind` (string): What it does. One of `build`, `import`, `restore`, `backup`, `songs`.
 - `state` (string): Where it is. One of `running`, `done`, `failed`.
 - `started` (integer): When it started (Unix time).
 - `log` (list of string): Its last 200 lines of output.

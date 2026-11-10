@@ -621,6 +621,8 @@ STRINGS = {
         "app.build": "Build",
         "app.building": "Building…",
         "app.starting": "Starting…",
+        # A job of a page's form that stopped on an error of its own (in the log of this service).
+        "job.failed": "That did not work. The server's log has the details: ./opendmtq logs admin",
         "app.builds": "Other builds",
         "app.built": "Built",
         "app.runtime": "arm32 runtime {v}",
@@ -639,6 +641,8 @@ STRINGS = {
         "songs.package": "Song package (.zip)",
         "songs.add_button": "Add song",
         "songs.adding": "Adding…",
+        # A change to the songs that takes a while (the list made again): over its log on the page.
+        "songs.working": "Changing the song list…",
         "songs.search": "Search title, artist or ID",
         "songs.search_label": "Search songs",
         "songs.of": "{shown} of {all}",
@@ -1430,6 +1434,7 @@ STRINGS = {
         "app.build": "빌드",
         "app.building": "빌드 중…",
         "app.starting": "시작하는 중…",
+        "job.failed": "처리하지 못했습니다. 자세한 내용은 서버 로그에 있습니다: ./opendmtq logs admin",
         "app.builds": "다른 빌드",
         "app.built": "빌드 시각",
         "app.runtime": "arm32 런타임 {v}",
@@ -1447,6 +1452,7 @@ STRINGS = {
         "songs.package": "곡 패키지 (.zip)",
         "songs.add_button": "곡 추가",
         "songs.adding": "추가하는 중…",
+        "songs.working": "곡 목록을 바꾸는 중…",
         "songs.search": "곡명, 아티스트, 곡 ID로 검색",
         "songs.search_label": "곡 검색",
         "songs.of": "{all}곡 중 {shown}곡",

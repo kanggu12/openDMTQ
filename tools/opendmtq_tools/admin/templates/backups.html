@@ -1,5 +1,13 @@
 {% extends "base.html" %}{% block title %}{{ t('bak.title') }}{% endblock %}
 {% block body %}
+{# A backup or a restore that took longer than its form waited: its log until it ends, then this page again with what it
+   said, whether it worked or not (followJob in admin.js); gone with a restart of this service, the page as it is now. #}
+{% if job %}
+<section class="card" aria-live="polite">
+  <h2>{{ t('bak.restoring') if job_kind == 'restore' else t('bak.working') }}</h2>
+  <pre class="log" id="log" data-job="{{ url_for('job_status', job_id=job) }}" data-done="{{ url_for('backups_page', job=job) }}" data-failed="{{ url_for('backups_page', job=job) }}" data-gone="{{ url_for('backups_page') }}">{{ t('app.starting') }}</pre>
+</section>
+{% endif %}
 <section class="card">
   <h2>{{ t('bak.title') }}</h2>
   <p class="lead">{{ t('bak.lead') }}</p>

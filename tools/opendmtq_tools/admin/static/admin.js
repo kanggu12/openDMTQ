@@ -108,10 +108,11 @@ document.addEventListener('input', e => {
   if (says && says.classList.contains('form-says')) says.remove();
 });
 
-// A job a page started (the app's build, the setup's import), followed in its log box until it ends. The box says where to
-// ask (data-job), where to go once the job is done (data-done), and where once this service no longer knows it
-// (data-gone: it started again). A look that fails, on the network or in a reply that does not read, is tried again 3
-// seconds later: one blip, or this service starting again, must not leave the log frozen and the buttons waiting.
+// A job a page started (the app's build, the setup's import, a backup, a restore, a change to the songs), followed in its
+// log box until it ends. The box says where to ask (data-job), where to go once the job is done (data-done) or has failed
+// (data-failed, where the page itself says why), and where once this service no longer knows it (data-gone: it started
+// again). A look that fails, on the network or in a reply that does not read, is tried again 3 seconds later: one blip,
+// or this service starting again, must not leave the log frozen and the buttons waiting.
 function followJob(log) {
   const look = async () => {
     try {
@@ -130,8 +131,9 @@ function followJob(log) {
       if (j.state === 'running') { setTimeout(look, 1000); return; }
       // Its end in the box's colour: done or failed.
       log.classList.add(j.state);
-      // Done: the page again, which now says what came of it.
-      if (j.state === 'done') { setTimeout(() => location.replace(log.dataset.done), 800); return; }
+      // Done: the page again, which now says what came of it; failed too where the page says why itself (data-failed).
+      const next = j.state === 'done' ? log.dataset.done : log.dataset.failed;
+      if (next) { setTimeout(() => location.replace(next), 800); return; }
       // Failed: the log stays, and the buttons work again with their own words back (a build's said "Building…").
       for (const b of document.querySelectorAll('button[disabled][data-again]')) {
         b.disabled = false;

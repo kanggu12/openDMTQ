@@ -1507,6 +1507,8 @@ PAGE_ACTIONS = {
     "app_delete": ["build_delete"],
     "job_status": ["job_get"],
     "songs_page": ["songs_list"],
+    # A change to the songs, followed while it runs.
+    "songs_page?job": ["job_get"],
     "songs_page:upload": ["songs_add"],
     "songs_page:hide": ["song_hide"],
     "songs_page:show": ["song_show"],
@@ -1547,6 +1549,8 @@ PAGE_ACTIONS = {
     "recording_download": ["recording_download"],
     "recording_media": ["recording_file"],
     "backups_page": ["backups_list", "backups_auto_get"],
+    # A backup or a restore of the page's, followed while it runs.
+    "backups_page?job": ["job_get"],
     "backups_page:create": ["backups_create"],
     "backups_page:upload": ["backups_upload"],
     "backups_auto": ["backups_auto_set"],
@@ -1630,6 +1634,9 @@ GET_ARGS = {
     "app_page?job": ("path", "job_get", "job"),
     "app_page?built": ("path", "job_get", "job"),
     "app_page?host": ("body", "builds_start", "host"),
+    # A backup, a restore or a change to the songs that its page follows.
+    "backups_page?job": ("path", "job_get", "job"),
+    "songs_page?job": ("path", "job_get", "job"),
     # The Players page's spreadsheet.
     "players_page?csv": ("view", "players_download"),
     # The Logs page: its tabs, the Requests tab's filter form, the rows it fetches again while it follows the log.

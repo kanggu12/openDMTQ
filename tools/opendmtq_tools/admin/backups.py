@@ -16,7 +16,7 @@ from flask import flash, redirect, render_template, request, send_file, url_for
 from werkzeug.exceptions import NotFound
 
 from .. import songs
-from . import auth, core, insights, recordings, status, tokens
+from . import auth, core, insights, jobs, recordings, status, tokens
 from .core import Refused, ago, app, BASE, changed, db, private_file, safe_name, t, tp, why
 
 # Backups made here are kept up to this many, like the CLI's.
@@ -230,11 +230,17 @@ def backups_page():
         action = request.form.get("action")
         try:
             if action == "create":
-                flash(t("bak.created", name=create()), "ok")
-            elif action == "upload":
+                # A job: with gigabytes of added songs it takes a while, which the page then follows (jobs.answer).
+                return jobs.answer(jobs.start_page_task("backup", made_now), "backups_page")
+            if action == "upload":
                 flash(t("bak.uploaded", name=upload(request.files.get("file"))), "ok")
         except Refused as e:
             flash(e.words, e.tone)
+        return redirect(url_for("backups_page"))
+    # A backup or a restore of this page's that took longer than its form waited: followed here until it ends, then what
+    # it said, on the page without it.
+    wanted = request.args.get("job", "")
+    if wanted and jobs.nothing_to_follow(wanted):
         return redirect(url_for("backups_page"))
     files = listing()
     daily, next_due = dailies(files)
@@ -242,7 +248,15 @@ def backups_page():
     slots = [None] * (KEEP_AUTO_BACKUPS - len(daily)) + daily[::-1]
     next_at = datetime.datetime.fromtimestamp(next_due).strftime("%m-%d %H:%M") if next_due else ""
     return render_template("backups.html", files=files, auto=core.settings().get("auto_backup"), slots=slots, next_at=next_at,
-                           others=len(files) - len(daily))
+                           others=len(files) - len(daily), job=wanted or None, job_kind=jobs._jobs[wanted]["kind"] if wanted else None)
+
+
+def made_now(say):
+    """Back up now, as its job (jobs.start_page_task): what the page says of it, and whether it worked."""
+    try:
+        return [("ok", t("bak.created", name=create()))], True
+    except Refused as e:
+        return [(e.tone, e.words)], False
 
 
 def listing():
@@ -335,23 +349,42 @@ def backup_action(name):
             delete(name)
             flash(t("bak.deleted", name=name), "ok")
         elif action == "restore":
-            path = backup_path(name)
-            if not _restoring.acquire(blocking=False):
-                raise Refused(409, "busy", t("bak.busy"))
-            try:
-                said, done = restore_backup(name, path)
-            finally:
-                _restoring.release()
-            if done:
-                changed("backup_action:restore", name)
-            for tone, words in said:
-                flash(words, tone)
+            # A job, as through the API: a restore can take longer than a request may wait (jobs.answer).
+            return jobs.answer(start_restore(name), "backups_page")
         else:
             # Any other button on a backup that is gone says so too; one that is there changes nothing.
             backup_path(name)
     except Refused as e:
         flash(e.words, e.tone)
     return redirect(url_for("backups_page"))
+
+
+def start_restore(name):
+    """Starts restoring a backup as a job, for the Backups page and the API alike: the job's id. It says what the page says
+    of a restore (restore_backup), and notes the change by whoever asked for it. Refused: no such backup, or a restore
+    running already."""
+    path = backup_path(name)
+    # One restore at a time: the lock is taken here and given back by the job when it ends.
+    if not _restoring.acquire(blocking=False):
+        raise Refused(409, "busy", t("bak.busy"))
+
+    def work(say):
+        # The lock is given back whatever happens.
+        try:
+            said, done = restore_backup(name, path)
+        finally:
+            _restoring.release()
+        # The log of changes: only a restore that happened.
+        if done:
+            changed("backup_action:restore", name)
+        return said, done
+
+    try:
+        return jobs.start_page_task("restore", work, backup=name)
+    except Exception:
+        # No job to give the lock back: given back here.
+        _restoring.release()
+        raise
 
 
 def backup_path(name):

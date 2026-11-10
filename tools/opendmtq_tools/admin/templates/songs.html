@@ -1,5 +1,13 @@
 {% extends "base.html" %}{% block title %}{{ t('songs.title') }}{% endblock %}
 {% block body %}
+{# A change to the songs that took longer than its form waited: its log until it ends, then this page again with what it
+   said, whether it worked or not (followJob in admin.js); gone with a restart of this service, the page as it is now. #}
+{% if job %}
+<section class="card" aria-live="polite">
+  <h2>{{ t('songs.working') }}</h2>
+  <pre class="log" id="log" data-job="{{ url_for('job_status', job_id=job) }}" data-done="{{ url_for('songs_page', job=job) }}" data-failed="{{ url_for('songs_page', job=job) }}" data-gone="{{ url_for('songs_page') }}">{{ t('app.starting') }}</pre>
+</section>
+{% endif %}
 {% if no_game_data %}<p class="flash bad" role="status">{{ t('songs.no_game_data_host' if host_install else 'songs.no_game_data') }}</p>
 {% elif not songs %}<p class="flash note" role="status">{{ t('songs.none_yet_host' if host_install else 'songs.none_yet') }}</p>{% endif %}
 {% if host_install %}

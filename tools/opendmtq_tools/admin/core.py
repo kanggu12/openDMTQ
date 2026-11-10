@@ -5,6 +5,7 @@ Run: gunicorn -w 1 --threads 8 -b 0.0.0.0:8000 opendmtq_tools.admin:app
 (one worker: build jobs and the sign-in throttle live in memory)
 """
 
+import contextlib
 import datetime
 import errno
 import hmac
@@ -18,6 +19,7 @@ import sqlite3
 import sys
 import tarfile
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -193,9 +195,28 @@ LANG_COOKIE = "opendmtq_lang"
 LANG_DAYS = 365
 
 
+# Who acts, and in which language, in the work of a form that runs as a job (jobs.start_page_task): it runs in a thread of
+# its own, after the request that started it has ended.
+_acting = threading.local()
+
+
+@contextlib.contextmanager
+def acting_as(language, who):
+    """Inside, in this thread: lang() is language and changed() notes the change by who, as in the request that started
+    the job."""
+    _acting.lang, _acting.who = language, who
+    try:
+        yield
+    finally:
+        _acting.lang = _acting.who = None
+
+
 def lang():
     """The page language: what the visitor chose in the switch, else English. The browser's language does not decide:
-    the switch is on every page. Outside a request (a test, a job), English. The API speaks English to every caller."""
+    the switch is on every page. A job of a form speaks the language of the request that started it (acting_as). Outside
+    a request otherwise (a test, a command's job), English. The API speaks English to every caller."""
+    if getattr(_acting, "lang", None):
+        return _acting.lang
     if not has_request_context() or in_api():
         return "en"
     return "ko" if request.cookies.get(LANG_COOKIE) == "ko" else "en"
@@ -556,15 +577,23 @@ def save_settings(**changes):
 
 # The record of changes (the Logs page's third tab). Written where a change has really happened, not guessed afterwards from
 # the answer: a refused form, a failed upload or a question back to the owner also come back as a page or a redirect.
+def acting_who():
+    """Who acts in this request, as the log of changes names them: the admin signed in, or through the API the admin whose
+    token it was, with the token's name (api.py sets api_who)."""
+    if in_api():
+        return g.get("api_who", "")
+    return str(session.get("who", "")) if session.get("ok") else ""
+
+
 def changed(what, target=""):
     """Notes a change that has happened, at the end of the request: what is the page and the form's action, target the words
     for who or what it was about, as they are now. No values beyond those: no passwords, no messages. Through the API the
-    same page and action, by the admin whose token it was, with the token's name (api.py sets api_who)."""
-    if in_api():
-        who = g.get("api_who", "")
-    else:
-        who = str(session.get("who", "")) if session.get("ok") else ""
-    g.changes = getattr(g, "changes", []) + [(what, target[:100], who)]
+    same page and action, by the admin whose token it was. In a form's job, after its request has ended, at once, by
+    whoever sent the form (acting_as)."""
+    if not has_request_context():
+        insights.audit_note(os.path.dirname(DB), what, target[:100], who=getattr(_acting, "who", None) or "")
+        return
+    g.changes = getattr(g, "changes", []) + [(what, target[:100], acting_who())]
 
 
 @app.after_request

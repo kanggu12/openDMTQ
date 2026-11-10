@@ -92,9 +92,10 @@ SHAPES = {
         Field("message", "string", "The same in an English sentence, for a person."),
         Field("nearest", "string", "With 404 cannot_open from GET /setup/folder: the folder the setup's picker opens instead, "
               "the nearest one above that can be read.", optional=True)]),
-    "Job": Shape("Work that runs in the background: an app build, an import, a restore.", [
+    "Job": Shape("Work that runs in the background: an app build, an import, a restore, and on the admin pages a backup made "
+                 "or a change to the songs.", [
         Field("id", "string", "Its id, for GET /jobs/{job}."),
-        Field("kind", "string", "What it does.", enum=["build", "import", "restore"]),
+        Field("kind", "string", "What it does.", enum=["build", "import", "restore", "backup", "songs"]),
         Field("state", "string", "Where it is.", enum=["running", "done", "failed"]),
         Field("started", "integer", "When it started (Unix time)."),
         Field("log", "[string]", "Its last 200 lines of output."),

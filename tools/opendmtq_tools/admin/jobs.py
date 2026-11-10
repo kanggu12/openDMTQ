@@ -1,27 +1,34 @@
-"""Work in the background (the import, a build of the app, a restore through the API): its output kept in memory for the
-page, or the API, to follow."""
+"""Work in the background (the import, a build of the app, a restore, a backup made on its page, a change to the songs): its
+output kept in memory for the page, or the API, to follow."""
 
 import subprocess
 import threading
 import time
 import uuid
 
-from flask import abort, jsonify
+from flask import abort, flash, jsonify, redirect, url_for
 
+from . import core
 from .core import app, BASE
 
 _jobs = {}
 _jobs_lock = threading.Lock()
 
-# What a job's view leaves out: its function for the words of a failure.
-PRIVATE = ("explain",)
+# What a job's view leaves out: its function for the words of a failure, the sign that it has ended, and what a page's
+# job says on its page (in that page's language, with its markup).
+PRIVATE = ("explain", "ended", "said", "shown")
+
+# How long a page's form waits for the job it started: one that ends in this time answers as it always did, with the page
+# and what it says; a longer one (a backup with gigabytes of added songs) is followed on the page (?job=), and holds no
+# request while it runs.
+PAGE_WAIT = 3
 
 
 def _new(kind, explain, details):
     """A new job, running, kept with the others."""
     job_id = uuid.uuid4().hex[:12]
     job = {"id": job_id, "kind": kind, "state": "running", "log": [], "started": time.time(), "explain": explain,
-           **details}
+           "ended": threading.Event(), **details}
     with _jobs_lock:
         _jobs[job_id] = job
     return job
@@ -59,6 +66,9 @@ def start_job(kind, cmd, env=None, explain=None, **details):
         except OSError as e:
             job["log"].append(str(e))
             job["state"] = "failed"
+        finally:
+            # Whoever waits for it (a page's form) hears at once.
+            job["ended"].set()
 
     threading.Thread(target=run, daemon=True).start()
     _forget_old()
@@ -70,7 +80,12 @@ def start_task(kind, work, **details):
     it did what it was for, or the words of why it did not (the job then failed, and says that as its why). An exception
     fails the job too, and is in the log of this service. details stay with the job, as start_job's do."""
     job = _new(kind, None, details)
+    _run(job, work)
+    return job["id"]
 
+
+def _run(job, work):
+    """work(say) for job in a thread of its own, as start_task describes."""
     def run():
         try:
             why = work(lambda line: job["log"].append(str(line)))
@@ -80,10 +95,72 @@ def start_task(kind, work, **details):
         if why:
             job["why"] = str(why)
         job["state"] = "failed" if why else "done"
+        # Whoever waits for it (a page's form) hears at once.
+        job["ended"].set()
 
     threading.Thread(target=run, daemon=True).start()
     _forget_old()
+
+
+def start_page_task(kind, work, **details):
+    """A form's work as a job, for a page and the API alike (start_task): work(say) runs in the language of the request
+    that started it, and notes its changes by whoever sent it, as it would in that request, which has ended by then
+    (core.acting_as). It returns what the page says of it, [(tone, words)] in the page's words, and whether it did what it
+    was for. Those words are the job's log as plain text, its why when it failed, and what its page shows once it has
+    ended (flash_said)."""
+    speaking, who = core.lang(), core.acting_who()
+    job = _new(kind, None, details)
+
+    def run(say):
+        with core.acting_as(speaking, who):
+            said, ok = work(say)
+        # What the page shows once the job has ended, and the same words in its log for the API.
+        job["said"] = said
+        for _, words in said:
+            say(core.plain(words))
+        if ok:
+            return None
+        # Failed: why, in its own words, the first that says what went wrong.
+        bad = [words for tone, words in said if tone == "bad"] or [words for _, words in said]
+        return core.plain(bad[0]) if bad else "failed"
+
+    _run(job, run)
     return job["id"]
+
+
+def answer(job_id, endpoint):
+    """The answer to a page's form that started a job (start_page_task): its page with what the job said once it ends
+    within PAGE_WAIT, as a quick one always answered; otherwise its page following it (?job=)."""
+    job = _jobs.get(job_id)
+    if job and job["ended"].wait(PAGE_WAIT):
+        flash_said(job)
+        return redirect(url_for(endpoint))
+    return redirect(url_for(endpoint, job=job_id))
+
+
+def nothing_to_follow(job_id):
+    """For a page's ?job=: True when there is no job to follow there, as it has ended (what it said is now on the page) or
+    this service no longer knows it (it started again); the page is then shown without it. False while it runs."""
+    job = _jobs.get(job_id)
+    if job and job["state"] == "running":
+        return False
+    if job:
+        flash_said(job)
+    return True
+
+
+def flash_said(job):
+    """What a page's job said, on its page, once: its own words, or for one stopped by an error of its own (in this
+    service's log), that it did not work."""
+    if job.get("shown"):
+        return
+    job["shown"] = True
+    said = job.get("said")
+    if said is None:
+        said = [("bad", core.t("job.failed"))] if job["state"] == "failed" else []
+    for tone, words in said:
+        if words is not None:
+            flash(words, tone)
 
 
 def running_build():
