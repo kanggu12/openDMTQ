@@ -4,6 +4,7 @@ Everything here is drawn in code: no game art ships with the client. Shapes are 
 down, because Tk's own canvas does not smooth diagonal edges.
 """
 
+import collections
 import math
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -207,6 +208,15 @@ def _half_plane(box, normal, limit):
     return out
 
 
+# The page's top as backdrop() last drew it, for the last few widths and looks: the header and the page area take their
+# rows from it each time they are drawn again (the page moved off its top and back, another page, the guide's next
+# step), instead of drawing the shards again, which takes a good part of a second at 200 %. A few only: at 200 % one is
+# about 13 MB, and the window draws from two (the header's width and the page area's).
+TOPS_KEPT = 4
+# Key (width, scale, accent, reach of the light) -> the picture of the page's first rows, the newest last.
+_tops = collections.OrderedDict()
+
+
 def backdrop(width, height, scale=1.0, accent=theme.OK, offset=0, top=None):
     """The page behind the cards, as the site's: its field with the faint perforated metal all over, two pale panes and
     the section's light at the top (body::before), and the green shards at the left and right edges (.facets).
@@ -214,23 +224,68 @@ def backdrop(width, height, scale=1.0, accent=theme.OK, offset=0, top=None):
     The picture is the part of the page from `offset` down, `height` tall: the header draws the page's top and the
     page area the rest, and they meet without a seam. `top` is how far down the page the panes and the light reach
     before they have faded (the site's 620 px; less when the cards would cover them anyway).
+
+    The rows the light and the shards reach are cut from the page's top as drawn once for this width and look (_top);
+    the rows under them are the field alone. Either way the picture is the one _whole() draws, pixel for pixel.
     """
     width, height = max(1, int(width)), max(1, int(height))
     offset = max(0, int(offset))
+    top_h = int(top if top is not None else 620 * scale)
+    # How far down the page anything but the field reaches: the light, and the shards' 900 CSS pixels.
+    reach = max(top_h, int(900 * scale))
+    if offset >= reach:
+        # All of it under the top: the field and its dots, which cost little to draw.
+        return _field(width, height, scale, offset)
+    whole = _top(width, scale, accent, top_h, reach)
+    if offset + height <= reach:
+        # All of it in the top: its rows, as a picture of its own (the caller may draw on it).
+        return whole.crop((0, offset, width, offset + height))
+    # The top's rows from `offset` down, then the field for the rest, its dots on the same grid.
+    img = Image.new("RGB", (width, height))
+    img.paste(whole.crop((0, offset, width, reach)), (0, 0))
+    img.paste(_field(width, offset + height - reach, scale, reach), (0, reach - offset))
+    return img
+
+
+def _top(width, scale, accent, top_h, reach):
+    """The page's first `reach` rows drawn whole, kept for the next picture of the same width and look."""
+    key = (width, scale, accent, top_h)
+    # Taken out and put back last: the one used longest ago goes first.
+    found = _tops.pop(key, None)
+    if found is None:
+        found = _whole(width, reach, scale, accent, 0, top_h)
+    _tops[key] = found
+    while len(_tops) > TOPS_KEPT:
+        # The oldest goes, so the kept pictures never hold more than a few widths' worth.
+        _tops.popitem(last=False)
+    return found
+
+
+def _field(width, height, scale, offset):
+    """The page's field with its dots: one in each 6 px square, white at 4.5 %, on the page's own grid whatever part
+    of the page this is (`offset` rows from its top)."""
     img = Image.new("RGB", (width, height), _rgb(theme.BG))
-    # The dots: one in each 6 px square, white at 4.5 %, on the page's own grid whatever part this is.
     step = max(4, int(round(6 * scale)))
+    # One dot in its square, then a row of squares across, lit on the field's colour once.
     tile = Image.new("L", (step, step), 0)
     ImageDraw.Draw(tile).ellipse([step / 2 - scale, step / 2 - scale, step / 2 + scale, step / 2 + scale], fill=11)
     strip = Image.new("L", (width, step), 0)
     for x in range(0, width, step):
         strip.paste(tile, (x, 0))
-    dots = Image.new("L", (width, height), 0)
+    row = Image.new("RGB", (width, step), _rgb(theme.BG))
+    row.paste((255, 255, 255), (0, 0), strip)
+    # Then that row copied down from the grid's line above the picture: the same pixels as lighting each row on its own,
+    # for a fraction of the work.
     for y in range(-(offset % step), height, step):
-        dots.paste(strip, (0, y))
-    img.paste((255, 255, 255), (0, 0), dots)
+        img.paste(row, (0, y))
+    return img
+
+
+def _whole(width, height, scale, accent, offset, top_h):
+    """The page's picture from `offset` down, every layer drawn for every row: the field, the lit top while `offset`
+    is above `top_h`, the shards in the first 900 CSS pixels. backdrop() keeps its top; the tests compare the two."""
+    img = _field(width, height, scale, offset)
     # The top: full to 45 % of its reach, then fading; drawn whole, the part in this picture kept.
-    top_h = int(top if top is not None else 620 * scale)
     if offset < top_h:
         fade = Image.new("L", (1, top_h), 0)
         for y in range(top_h):

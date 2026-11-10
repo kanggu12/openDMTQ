@@ -49,6 +49,37 @@ class Wheel(unittest.TestCase):
         self.assertEqual(steps, [-3])
 
 
+class Backdrop(unittest.TestCase):
+    """The page's picture behind the cards, cut from the top it keeps (art.backdrop), against the same part drawn whole
+    (art._whole): the same pixels, at any part of the page, scale and colour."""
+
+    def test_the_kept_top_gives_the_picture_drawn_whole(self):
+        from PIL import ImageChops
+        from opendmtq_client import art, theme
+        art._tops.clear()
+        # 1.25: the dots' grid (8 px) does not divide the shards' 1125 rows, so the field under the top must keep it.
+        for scale in (1.0, 1.25, 2.0):
+            px = lambda n: int(round(n * scale))  # noqa: E731
+            width, light = px(240), px(64) + px(260)
+            # The header's picture, the guide's taller one, the page under the header, a long page past the shards,
+            # and a part below the top altogether; then the site's own reach of the light, in another colour.
+            for offset, height, top, accent in ((0, px(64), light, theme.OK), (0, px(128), light, theme.OK),
+                                                (px(64), px(600), light, theme.OK), (px(64), px(1300), light, theme.OK),
+                                                (px(950), px(90), light, theme.OK), (0, px(700), None, theme.BAD)):
+                kept = art.backdrop(width, height, scale, accent, offset=offset, top=top)
+                reach = int(top if top is not None else 620 * scale)
+                whole = art._whole(width, height, scale, accent, offset, reach)
+                # The same size, and no pixel apart (the box where they differ, when they do).
+                self.assertEqual(kept.size, whole.size)
+                self.assertIsNone(ImageChops.difference(kept, whole).getbbox(), (scale, offset, height, top, accent))
+        # A few tops are kept, the newest; one drawn again comes from them.
+        self.assertEqual(len(art._tops), art.TOPS_KEPT)
+        key = next(reversed(art._tops))
+        before = art._tops[key]
+        art.backdrop(key[0], 10, key[1], key[2], offset=0, top=key[3])
+        self.assertIs(art._tops[key], before)
+
+
 if __name__ == "__main__":
     unittest.main()
 
