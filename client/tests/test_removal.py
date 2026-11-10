@@ -235,3 +235,31 @@ class Uninstall(Folder):
             popen.assert_not_called()
         finally:
             os.rmdir(elsewhere)
+
+
+class WindowFlow(Folder):
+    """Help's Uninstall with Delete all as the window runs it, its dialogs and Velopack's uninstaller stood in for."""
+
+    def test_closing_the_window_after_delete_all_writes_nothing(self):
+        import types
+        from opendmtq_client import dialogs, i18n, pages
+        os.environ.pop("OPENDMTQ_CLIENT_DIR", None)
+        state = st.LauncherState()
+        state.add_server("http://127.0.0.1:1", "Somewhere")
+        state.save()
+        write(os.path.join(removal.data_root(), "com.example.game"), GAME)
+        app = types.SimpleNamespace(words=i18n.Words("en"), state=state, busy=False, download=None, session=None,
+                                    set_status=lambda *a, **k: None)
+        said = []
+
+        def tell(app, kind, title, message, detail=None, ok=None):
+            # The player closes the window while this dialog is up: what the window's close does.
+            said.append(message)
+            app.state.save()
+
+        with mock.patch.object(dialogs, "choose", return_value="all"), mock.patch.object(dialogs, "tell", tell), \
+                mock.patch.object(pages, "_in_background", lambda app, words, glyph, job, then: then(job(), None)), \
+                mock.patch.object(removal, "uninstall", side_effect=OSError("Update.exe did not start")):
+            pages.uninstall_program(app)
+        self.assertEqual(said, [app.words("help.uninstall.failed")])
+        self.assertFalse(os.path.exists(removal.data_root()))
