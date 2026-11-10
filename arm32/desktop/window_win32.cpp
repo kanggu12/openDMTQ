@@ -83,6 +83,9 @@ bool g_last_touch = false;
 int g_area_w = 0, g_area_h = 0;
 // The menu's Quit, to the frame: the window's own close (Alt+F4, its X) opens the menu instead.
 constexpr UINT kQuitMessage = WM_APP + 1;
+// A check's character for the input method (PLAYER_KEYS ime=): composed on the text field's own thread, where the input
+// context lives. wParam the character, lParam 1 to compose it and 2 to finish it.
+constexpr UINT kImeMessage = WM_APP + 2;
 // Esc held for the menu: when it went down (0: not held now), and whether the hold opened the menu. A short press is the
 // phone's Back key, sent when Esc comes up.
 constexpr UINT_PTR kEscTimer = 7;
@@ -572,17 +575,26 @@ void ime_cancel(HWND h) {
 
 // Checks press keys at seconds of their choosing (PLAYER_KEYS="@seconds:key[/hold_ms];...", the seconds from the window's
 // first showing): esc, enter, space, up, down, f11, alt+enter, alt+f4, each posted to the frame as Windows would send it,
-// down, then up after hold_ms (50 when not given). Nothing goes through Windows' own input, and the keys reach the window
-// while the game is held still (the planned taps follow the game's frames, which stop then).
+// down, then up after hold_ms (50 when not given). Two more act as the mouse and the keyboard do: click=x,y presses and
+// lifts the mouse's first button at x,y of the game's pixels on the game's area; text=... types into whichever window has
+// the keyboard then (the text field while the game asks for text), a key at a time, \uXXXX for a character cmd's own
+// set would not carry and \b for Backspace; ime=... the same, each character composed and finished by the input method
+// of the text field. Nothing goes through Windows' own input, and the keys reach the window while the game is held still
+// (the planned taps follow the game's frames, which stop then).
 void plan_keys() {
     const char* list = std::getenv("PLAYER_KEYS");
     if (!list || !*list) return;
+    // What a press is: a key, a click or text.
+    enum class Kind { key, click, text, ime };
     struct Press {
         double at;
+        Kind kind;
         UINT vk;
         bool alt;
         int hold;
         std::string name;
+        float x, y;
+        std::wstring text;
     };
     std::vector<Press> presses;
     for (const char* p = list; *p == '@';) {
@@ -591,7 +603,11 @@ void plan_keys() {
         if (*end != ':') break;
         const char* name = end + 1;
         const char* stop = name;
-        while (*stop && *stop != ';' && *stop != '/') ++stop;
+        // Text runs to the next item: a '/' in it is the text's, not a hold.
+        const bool is_text = std::strncmp(name, "text=", 5) == 0 || std::strncmp(name, "ime=", 4) == 0;
+        // ime= is text the input method composes: the same reading after its shorter name.
+        const bool is_ime = std::strncmp(name, "ime=", 4) == 0;
+        while (*stop && *stop != ';' && (is_text || *stop != '/')) ++stop;
         const std::string key(name, static_cast<std::size_t>(stop - name));
         int hold = 50;
         if (*stop == '/') hold = static_cast<int>(std::strtol(stop + 1, const_cast<char**>(&stop), 10));
@@ -599,7 +615,35 @@ void plan_keys() {
             {"esc", {VK_ESCAPE, false}}, {"enter", {VK_RETURN, false}}, {"space", {VK_SPACE, false}}, {"up", {VK_UP, false}},
             {"down", {VK_DOWN, false}}, {"f11", {VK_F11, false}}, {"alt+enter", {VK_RETURN, true}}, {"alt+f4", {VK_F4, true}}};
         if (auto it = names.find(key); it != names.end()) {
-            presses.push_back({at, it->second.first, it->second.second, hold, key});
+            presses.push_back({at, Kind::key, it->second.first, it->second.second, hold, key, 0, 0, {}});
+        } else if (key.rfind("click=", 0) == 0) {
+            // x,y in the game's pixels, as PLAYER_TAPS takes them.
+            float x = 0, y = 0;
+            if (std::sscanf(key.c_str() + 6, "%f,%f", &x, &y) == 2) presses.push_back({at, Kind::click, 0, false, hold, key, x, y, {}});
+            else jvm::log("player: PLAYER_KEYS: no click in \"%s\"", key.c_str());
+        } else if (is_text) {
+            // UTF-8 as given, with \uXXXX read as the character it names.
+            std::string utf8;
+            for (std::size_t i = is_ime ? 4 : 5; i < key.size(); ++i) {
+                if (key[i] == '\\' && i + 5 < key.size() && key[i + 1] == 'u') {
+                    const unsigned code = static_cast<unsigned>(std::strtoul(key.substr(i + 2, 4).c_str(), nullptr, 16));
+                    wchar_t one[2] = {static_cast<wchar_t>(code), 0};
+                    char bytes[8] = {};
+                    const int n = WideCharToMultiByte(CP_UTF8, 0, one, 1, bytes, sizeof bytes, nullptr, nullptr);
+                    utf8.append(bytes, static_cast<std::size_t>(n > 0 ? n : 0));
+                    i += 5;
+                } else if (key[i] == '\\' && i + 1 < key.size() && key[i + 1] == 'b') {
+                    // \b: the Backspace key, as when a field's text is taken back.
+                    utf8 += '\b';
+                    ++i;
+                } else {
+                    utf8 += key[i];
+                }
+            }
+            const int n = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, nullptr, 0);
+            std::wstring wide(static_cast<std::size_t>(n > 0 ? n - 1 : 0), L'\0');
+            if (n > 1) MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, wide.data(), n);
+            presses.push_back({at, is_ime ? Kind::ime : Kind::text, 0, false, hold, (is_ime ? "composed \"" : "text \"") + utf8 + "\"", 0, 0, wide});
         } else {
             // A name it does not know: said, and the rest still read.
             jvm::log("player: PLAYER_KEYS: no key \"%s\"", key.c_str());
@@ -611,6 +655,50 @@ void plan_keys() {
         const auto start = std::chrono::steady_clock::now();
         for (const Press& k : presses) {
             std::this_thread::sleep_until(start + std::chrono::milliseconds(static_cast<long long>(k.at * 1000)));
+            if (k.kind == Kind::click) {
+                // The game's pixels on the area's own, as the mouse would give them there.
+                const int cx = g_area_w > 0 ? static_cast<int>(k.x * static_cast<float>(g_area_w) / static_cast<float>(app().width)) : static_cast<int>(k.x);
+                const int cy = g_area_h > 0 ? static_cast<int>(k.y * static_cast<float>(g_area_h) / static_cast<float>(app().height)) : static_cast<int>(k.y);
+                jvm::log("player: %.1f s: a click at %.0f,%.0f (%d,%d on the window)", k.at, k.x, k.y, cx, cy);
+                PostMessageW(g_window, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM(cx, cy));
+                std::this_thread::sleep_for(std::chrono::milliseconds(k.hold));
+                PostMessageW(g_window, WM_LBUTTONUP, 0, MAKELPARAM(cx, cy));
+                continue;
+            }
+            if (k.kind == Kind::ime) {
+                // Each character composed by the input method, then finished, as a syllable typed in Hangul mode is.
+                jvm::log("player: %.1f s: %s by the input method", k.at, k.name.c_str());
+                for (const wchar_t c : k.text) {
+                    PostMessageW(g_edit, kImeMessage, c, 1);
+                    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+                    PostMessageW(g_edit, kImeMessage, c, 2);
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+                continue;
+            }
+            if (k.kind == Kind::text) {
+                // The window with the keyboard on the game's thread: the text field while the game asks for text.
+                GUITHREADINFO gui{};
+                gui.cbSize = sizeof gui;
+                const HWND to = GetGUIThreadInfo(GetWindowThreadProcessId(g_frame, nullptr), &gui) && gui.hwndFocus ? gui.hwndFocus : g_frame;
+                jvm::log("player: %.1f s: %s into the %s", k.at, k.name.c_str(), to == g_edit ? "text field" : "window");
+                for (const wchar_t c : k.text) {
+                    const SHORT scan = VkKeyScanW(c);
+                    if (scan != -1 && HIBYTE(scan) == 0) {
+                        // A key of its own, as typed: its character made by TranslateMessage in the window's loop.
+                        const UINT vk = LOBYTE(scan);
+                        const LPARAM down = 1 | (static_cast<LPARAM>(MapVirtualKeyW(vk, MAPVK_VK_TO_VSC)) << 16);
+                        PostMessageW(to, WM_KEYDOWN, vk, down);
+                        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+                        PostMessageW(to, WM_KEYUP, vk, down | (1L << 30) | static_cast<LPARAM>(1UL << 31));
+                    } else {
+                        // Shifted, or no key on this layout (Hangul without its input method): the character itself.
+                        PostMessageW(to, WM_CHAR, c, 1);
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(60));
+                }
+                continue;
+            }
             // The scan code in bits 16-23, Alt held in bit 29; coming up, bits 30 and 31 too, as Windows sets them.
             const LPARAM down = 1 | (static_cast<LPARAM>(MapVirtualKeyW(k.vk, MAPVK_VK_TO_VSC)) << 16) | (k.alt ? (1L << 29) : 0);
             const LPARAM up = down | (1L << 30) | static_cast<LPARAM>(1UL << 31);
@@ -640,6 +728,28 @@ WNDPROC g_edit_default = nullptr;
 // The text field's keys and characters while the game asks for text: to the game's text as the frame's would go; the
 // rest (an input method composing, a touch keyboard's own keys) as an edit control has them.
 LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
+    // A check's character for the input method: given to the field's input context, which answers with the same
+    // WM_IME_COMPOSITION messages as a key typed in Hangul mode.
+    if (msg == kImeMessage) {
+        HIMC imc = ImmGetContext(h);
+        if (!imc) {
+            jvm::log("player: no input method on the text field");
+            return 0;
+        }
+        const wchar_t one[2] = {static_cast<wchar_t>(w), 0};
+        BOOL done = FALSE;
+        if (l == 1) {
+            // Open, then the character shown as being composed.
+            ImmSetOpenStatus(imc, TRUE);
+            done = ImmSetCompositionStringW(imc, SCS_SETSTR, const_cast<wchar_t*>(one), sizeof(wchar_t), nullptr, 0);
+        } else {
+            // Finished: the input method hands it over as its result.
+            done = ImmNotifyIME(imc, NI_COMPOSITIONSTR, CPS_COMPLETE, 0);
+        }
+        if (!done) jvm::log("player: the input method did not take U+%04X (%s)", static_cast<unsigned>(w), l == 1 ? "compose" : "finish");
+        ImmReleaseContext(h, imc);
+        return 0;
+    }
     switch (msg) {
     case WM_CHAR:
         if (typing() && w >= 0x20 && !overlay::menu_open()) typed(static_cast<wchar_t>(w));
