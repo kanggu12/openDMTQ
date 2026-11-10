@@ -219,6 +219,72 @@ def wheel_check(app, problems):
         problems.append("the wheel changed a setting: %r -> %r" % (before, app.state.values))
 
 
+def wheel_bindings_check(app, problems):
+    """The page area binds the wheel for the whole window while the pointer is over it: its commands do not pile up as
+    the pointer comes and goes, and after a rebuild of the window (a language switch) a turn of the wheel calls nothing
+    that is gone (callback_error records any error it raises)."""
+    import gc
+    import tkinter as tk
+    root = app.root
+    commands = lambda: len(root.tk.splitlist(root.tk.call("info", "commands")))  # noqa: E731
+    # The pointer away from the window, so that only the crossings made here reach the page area.
+    root.event_generate("<Motion>", warp=True, x=-400, y=-400)
+    root.update()
+    # Counted with no update between: timers that come and go (the task pump) would move the count. Python's collector
+    # runs first and then waits: freeing an old page's pictures (each one a Tcl command too) would move it as well.
+    gc.collect()
+    gc.disable()
+    try:
+        before = commands()
+        for _ in range(50):
+            app.body.event_generate("<Enter>")
+            app.body.event_generate("<Leave>")
+        after = commands()
+    finally:
+        gc.enable()
+    if after != before:
+        problems.append("the page area's wheel left %d Tcl commands after 50 crossings" % (after - before))
+    # The pointer over the page, then the window rebuilt in the other language with the pointer away: the first turn of
+    # the wheel comes before the new page area has seen the pointer.
+    app.body.event_generate("<Enter>")
+    # The commands the wheel's bindings call now (each binding's script runs "[command %# ...]"): the page area's own.
+    held = [root.tk.call("bind", "all", s).split("[", 1)[1].split(" ", 1)[0]
+            for s in ("<MouseWheel>", "<Button-4>", "<Button-5>") if "[" in root.tk.call("bind", "all", s)]
+    if len(held) != 3:
+        problems.append("the page area bound %d of the wheel's 3 events for the pointer over it" % len(held))
+    # Gone with the page area, or they would keep the area that is gone alive, its pictures with it. Looked for at once
+    # after the area's own <Destroy> (bindings run in the order they were made): later, a command of the rebuilt window
+    # may have the same name, as a name is the address of a function Python has freed and given to a new one.
+    old, seen = app.body, {}
+
+    def gone(event):
+        if event.widget is old:
+            seen["left"] = [c for c in held if root.tk.call("info", "commands", c)]
+
+    old.bind("<Destroy>", gone, add="+")
+    language = app.state.picked_language
+    app.set_language("ko" if language == "en" else "en")
+    settle(app)
+    if "left" not in seen:
+        problems.append("the language switch did not rebuild the page area")
+    elif seen["left"]:
+        problems.append("the wheel's commands outlived the page area: %r" % seen["left"])
+    errors = len(problems)
+    for sequence in ("<Button-4>", "<Button-5>"):
+        app.header.event_generate(sequence, x=5, y=5)
+    try:
+        app.header.event_generate("<MouseWheel>", delta=-120, x=5, y=5)
+    except tk.TclError:
+        # A Tk without wheel events to make: X11's buttons above are the wheel there.
+        pass
+    root.update()
+    if len(problems) != errors:
+        problems.append("a turn of the wheel after a language switch failed")
+    # Back in the run's own language for what follows.
+    app.set_language(language)
+    settle(app)
+
+
 def pages_check(app, out, tag, problems):
     from opendmtq_client.app import NAV
     for page in NAV:
@@ -681,6 +747,7 @@ def main():
     guide.finish(play=False)
     settle(app)
     pages_check(app, args.out, tag, problems)
+    wheel_bindings_check(app, problems)
     variants_check(app, site, args.out, tag, problems)
     app.root.geometry("%dx%d+0+0" % (w, h))
     settle(app)

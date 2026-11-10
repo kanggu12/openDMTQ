@@ -304,9 +304,14 @@ class ScrollArea(tk.Frame):
         self.inner.bind("<Configure>", lambda e: self._relayout())
         # The column is as wide as the area less its margins, so text wraps instead of running off.
         self.canvas.bind("<Configure>", self._on_resize)
-        # The wheel scrolls whatever is under the pointer, so bind only while the pointer is over this area.
+        # The wheel scrolls whatever is under the pointer, so bind only while the pointer is over this area. Each binding
+        # is a Tcl command that holds this area: its commands go when the pointer leaves and when the area itself goes (a
+        # rebuild of the window), or they would pile up, keep the area alive, and a turn of the wheel after a rebuild
+        # would call a canvas that is gone. Sequence -> the command bound to it.
+        self._wheel_commands = {}
         self.bind("<Enter>", lambda e: self._wheel(True))
         self.bind("<Leave>", lambda e: self._wheel(False))
+        self.bind("<Destroy>", lambda e: e.widget is self and self._wheel(False), add="+")
 
     def _bar_set(self, first, last):
         """Show the scroll bar only when the content is taller than the area, in the room the strip keeps for it; tell
@@ -415,14 +420,27 @@ class ScrollArea(tk.Frame):
         self.canvas.odq_picture = picture
 
     def _wheel(self, on):
+        """The wheel bound for the whole window to this area (on), or no longer (off); the last binding's commands go
+        either way, so that a second <Enter> without a <Leave> leaves nothing behind."""
+        root = self._root()
+        for sequence, command in self._wheel_commands.items():
+            try:
+                # The window's binding goes only while it still calls this area's command (its script runs
+                # "[command %# ...]"): a new page area the pointer reached first has bound the wheel to itself since.
+                if "[%s " % command in self.tk.call("bind", "all", sequence):
+                    self.unbind_all(sequence)
+                # Deleted through the root: Python 3.12 keeps bind_all's commands on the root's own list to delete when
+                # the window closes, and a command deleted behind its back would make that close fail.
+                root.deletecommand(command)
+            except tk.TclError:
+                # The command is gone already: the window closed first, its bindings and commands with it.
+                pass
+        self._wheel_commands = {}
         if on:
-            self.bind_all("<MouseWheel>", self._on_wheel)          # Windows and macOS
-            self.bind_all("<Button-4>", lambda e: self.canvas.yview_scroll(-3, "units"))   # X11 wheel up
-            self.bind_all("<Button-5>", lambda e: self.canvas.yview_scroll(3, "units"))    # X11 wheel down
-        else:
-            self.unbind_all("<MouseWheel>")
-            self.unbind_all("<Button-4>")
-            self.unbind_all("<Button-5>")
+            for sequence, handler in (("<MouseWheel>", self._on_wheel),                                # Windows, macOS
+                                      ("<Button-4>", lambda e: self.canvas.yview_scroll(-3, "units")),  # X11 wheel up
+                                      ("<Button-5>", lambda e: self.canvas.yview_scroll(3, "units"))):  # X11 wheel down
+                self._wheel_commands[sequence] = self.bind_all(sequence, handler)
 
     def _on_wheel(self, event):
         # Windows reports 120 a notch (3 steps), a touchpad much less at a time: what does not make a whole step yet is
