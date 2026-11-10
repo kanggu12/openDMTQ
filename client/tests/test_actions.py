@@ -248,6 +248,39 @@ class Actions(Folder):
         # The language stays as it was chosen: the guide that follows speaks it.
         self.assertEqual(self.state.picked_language, "ko")
 
+    def test_each_change_is_made_where_it_is_handed(self):
+        # The window's workers hand every change to the window's own thread (app.post), the one that saves: until that
+        # thread makes it, the state is as it was. The command line makes each at once (actions.at_once).
+        handed = []
+
+        def made():
+            # The window's task pump: what was handed over, in order.
+            while handed:
+                handed.pop(0)()
+
+        actions.connect(self.state, self.site.url, change=handed.append)
+        self.assertEqual((self.state.servers, self.state.current), ([], None))
+        made()
+        self.assertEqual(self.state.server()["name"], "Stand-in")
+        actions.sign_in(self.state, stub.ACCOUNT, stub.PASSWORD, change=handed.append)
+        self.assertFalse(self.state.signed_in())
+        made()
+        self.assertTrue(self.state.signed_in())
+        # PLAY: the app the server offers is kept with the server on that thread too, the download and the game alike.
+        session = actions.play(self.state, change=handed.append)
+        actions.finish(self.state, session)
+        self.assertIsNotNone(self.started())
+        self.assertIsNone(self.state.server()["app"])
+        made()
+        self.assertEqual(self.state.server()["app"]["sha256"], self.site.describe()["sha256"])
+        # A sign-in the server no longer takes is forgotten there as well.
+        self.site.signed_cookies.clear()
+        with self.assertRaises(srv.SignedOut):
+            actions.get_app(self.state, change=handed.append)
+        self.assertTrue(self.state.signed_in())
+        made()
+        self.assertFalse(self.state.signed_in())
+
     def test_sign_in_needs_a_server(self):
         with self.assertRaises(srv.ServerError):
             actions.sign_in(self.state, stub.ACCOUNT, stub.PASSWORD)

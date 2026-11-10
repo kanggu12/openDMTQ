@@ -98,7 +98,10 @@ def _server(entry):
 
 
 class LauncherState:
-    """The remembered settings. Each field has a safe default, so a missing file means a first start."""
+    """The remembered settings. Each field has a safe default, so a missing file means a first start.
+
+    One thread changes and saves them: the command line's, or the window's own (its worker threads hand every change
+    to it, actions.py's `change`), so a save never meets a change half made. Other threads only read them."""
 
     def __init__(self):
         self.picked_language = None             # the language the player chose; None: Windows' display language

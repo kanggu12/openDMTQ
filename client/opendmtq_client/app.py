@@ -2,7 +2,8 @@
 
 Slow work (asking the server, downloading its app, listing the sound devices, update checks) runs on worker threads;
 they hand results back through a queue the window empties every 50 ms, because Tk may only be touched from the thread
-that created it.
+that created it. Their changes to the remembered state go the same way (actions.py's `change`): the window's thread
+alone changes and saves it, so a save never catches a change half made.
 """
 
 import logging
@@ -239,7 +240,8 @@ class LauncherApp:
 
         def work():
             try:
-                session = actions.play(self.state, report=report, cancel=cancel)
+                # What the server offers and a sign-in that ended are changes to the state: made on this thread.
+                session = actions.play(self.state, report=report, cancel=cancel, change=self.post)
                 self.post(lambda: self._started(session))
             except srv.Cancelled:
                 log.info("PLAY's download was stopped")
@@ -527,7 +529,8 @@ class LauncherApp:
 
         def work():
             try:
-                actions.get_app(self.state, progress=progress, cancel=cancel)
+                # The app's details and a sign-in that ended are changed on the window's thread, as every change is.
+                actions.get_app(self.state, progress=progress, cancel=cancel, change=self.post)
                 self.post(lambda: self._download_ended(None, done_then))
             except srv.Cancelled:
                 self.post(lambda: self._download_ended("cancelled", done_then))

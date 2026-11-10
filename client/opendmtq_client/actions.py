@@ -1,7 +1,9 @@
 """What the launcher's buttons do, without any window: check, connect, sign in, get the app, play.
 
 The window and the command line (OpenDMTQ-cmd.exe) both call these, so a button and its command always run the same
-checks.
+checks. Those that change the launcher's state take `change`, which makes each change: at once by default (the command
+line has one thread), on the window's own thread when the window's workers call them (they pass app.post). That thread
+alone changes and saves the state while the window is open, so a save never catches a change half made.
 """
 
 import logging
@@ -38,6 +40,11 @@ class NotReady(Exception):
     def __init__(self, checks):
         super().__init__("; ".join("%s: %s" % (c.key, c.detail) for c in checks))
         self.checks = checks
+
+
+def at_once(change):
+    """Make a change to the state now, on the thread that asks: the command line's way, as it has no other thread."""
+    change()
 
 
 def can_play(checks):
@@ -84,22 +91,24 @@ def when(details):
     return built[:16].replace("T", " ") if built else str((details or {}).get("file") or "")
 
 
-def connect(state, address):
+def connect(state, address, change=at_once):
     """Find the server at an address the player typed (or an installer brought) and play on it from now on; returns
     what it said of itself. A server already known keeps its sign-in."""
     base = srv.normalize(address)
     found = srv.about(base)
-    state.add_server(base, found["name"], found["address"])
+    # Known, and the one PLAY plays on, once `change` makes it so (the window's own thread, for the window).
+    change(lambda: state.add_server(base, found["name"], found["address"]))
     return found
 
 
-def sign_in(state, user, password):
+def sign_in(state, user, password, change=at_once):
     """Sign in to the current server; the launcher keeps the cookie it gives, never the password."""
     server = state.server()
     if server is None:
         raise srv.ServerError("connect to a server first", "error.server.none")
     answer = srv.sign_in(server["url"], user.strip(), password)
-    server.update(account=answer["account"], cookie=answer["cookie"], expires=answer["expires"])
+    # The account, the cookie and when it ends, together in one change, made where `change` makes it.
+    change(lambda: server.update(account=answer["account"], cookie=answer["cookie"], expires=answer["expires"]))
     return answer
 
 
@@ -126,8 +135,9 @@ def reset(state):
     state.picked_language = picked
 
 
-def check_app(state):
-    """The app the current server offers now, kept with the server; SignedOut forgets the sign-in."""
+def check_app(state, change=at_once):
+    """The app the current server offers now, kept with the server; SignedOut forgets the sign-in. Either change is
+    made where `change` makes it."""
     server = state.server()
     if server is None:
         raise srv.ServerError("connect to a server first", "error.server.none")
@@ -136,34 +146,37 @@ def check_app(state):
     try:
         info = srv.app_info(server["url"], server["cookie"])
     except srv.SignedOut:
-        state.forget_sign_in(server)
+        change(lambda: state.forget_sign_in(server))
         raise
-    server["app"] = info
+    # What the server offers, kept for the ready check (a newer app than this PC's) and the Online page.
+    change(lambda: server.update(app=info))
     return info
 
 
-def get_app(state, info=None, progress=None, cancel=None):
-    """The current server's app on this PC, downloaded when it lacks it or a newer one is on offer; returns it."""
+def get_app(state, info=None, progress=None, cancel=None, change=at_once):
+    """The current server's app on this PC, downloaded when it lacks it or a newer one is on offer; returns it. Each
+    change to the state is made where `change` makes it."""
     server = state.server()
-    info = info or check_app(state)
+    info = info or check_app(state, change)
     if apps.current(server["url"], info):
         return apps.local(server["url"])
     try:
         path = srv.download_app(server["url"], server["cookie"], info, apps.folder(server["url"]), progress, cancel)
     except srv.SignedOut:
-        state.forget_sign_in(server)
+        change(lambda: state.forget_sign_in(server))
         raise
     log.info("downloaded the app of %s (%d bytes)", server["url"], info["size"])
     return apps.install(server["url"], info, path)
 
 
-def play(state, report=lambda step, done=None, total=None: None, cancel=None):
+def play(state, report=lambda step, done=None, total=None: None, cancel=None, change=at_once):
     """Get ready and start the game: the newest app when the server can be asked, the settings file, the player.
 
     report(step, done, total) is told each step as it starts ("app", "download" with its progress, "offline" when the
     server did not answer, "starting"). A server that cannot be reached, or a sign-in that ended, still plays the app
     this PC has; an app the server says is built for its old address does not start (it would not reach the server).
-    Returns the Session.
+    Each change to the state (what the server offers, a sign-in that ended) is made where `change` makes it. Returns
+    the Session.
     """
     checks = readiness(state)
     if not can_play(checks):
@@ -172,9 +185,9 @@ def play(state, report=lambda step, done=None, total=None: None, cancel=None):
     if state.signed_in(server):
         report("app")
         try:
-            info = check_app(state)
+            info = check_app(state, change)
             if not apps.current(server["url"], info):
-                get_app(state, info, lambda done, total: report("download", done, total), cancel)
+                get_app(state, info, lambda done, total: report("download", done, total), cancel, change)
         except srv.SignedOut:
             # The game itself needs no site sign-in: the app this PC has plays, the Online page asks to sign in again.
             log.info("the server no longer takes the sign-in; playing the app this PC has")

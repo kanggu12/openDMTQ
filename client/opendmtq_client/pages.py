@@ -355,7 +355,8 @@ def check_server(app, address, then=None):
 
     def work():
         try:
-            actions.connect(app.state, address)
+            # Known and played on from the window's own thread (app.post), before answered() below runs there.
+            actions.connect(app.state, address, change=app.post)
             app.post(lambda: answered({"url": app.state.current, "state": "ok"}))
         except Exception as e:  # noqa: BLE001  (ServerError, or anything else: shown, never a silent stop)
             # The system's own words for it go to the log; the window says it plainly.
@@ -467,7 +468,8 @@ def signin_panel(app, parent, rerender, bg=theme.BG):
 
         def work():
             try:
-                actions.sign_in(app.state, user, password)
+                # The sign-in is kept on the window's own thread, before signed_in() saves it there.
+                actions.sign_in(app.state, user, password, change=app.post)
                 app.post(signed_in)
             except Exception as e:  # noqa: BLE001
                 # The server's own words for it go to the log (never the password); the form says it plainly.

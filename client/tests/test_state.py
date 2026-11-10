@@ -2,10 +2,17 @@
 
 import contextlib
 import io
+import itertools
 import json
 import os
+import queue
+import threading
+import time
+import types
+from unittest import mock
 
 from opendmtq_client import preset
+from opendmtq_client import server as srv
 from opendmtq_client import state as st
 from tests.base import Folder
 
@@ -119,3 +126,52 @@ class State(Folder):
         preset.hand_over({"url": "http://example.test:8790", "name": "Club"})
         self.assertEqual(preset.take(), {"url": "http://example.test:8790", "name": "Club"})
         self.assertIsNone(preset.take())
+
+
+class WindowThread(Folder):
+    """The window saves the state on its own thread while its worker threads ask servers (app.py)."""
+
+    def test_a_save_never_catches_a_connect_half_made(self):
+        # The window's Connect (the Online page's and the guide's) gets its answer on a worker thread while the
+        # window's thread saves (a setting changed, a language picked, a game that ended). Each answer takes a moment,
+        # as a server's does, so it comes among the saves; fifty rounds. A worker that changed the state itself left
+        # saves listing the new server while "current" still named the one before, or naming a server without its own
+        # name yet: the file half of one change.
+        from opendmtq_client import i18n, pages
+        state = st.LauncherState()
+        # The window's task pump: what the worker threads hand over (app.post), run on this thread.
+        tasks = queue.Queue()
+        app = types.SimpleNamespace(words=i18n.Words("en"), state=state, post=tasks.put, server_check=None,
+                                    download_error=None, app_note=None, user_acted=lambda: None,
+                                    refresh_checks=lambda: None)
+        rounds = 50
+
+        # Up to 2 ms, a different wait each round: where the answer lands among the saves differs too.
+        waits = itertools.cycle([n / 10000.0 for n in range(20)])
+
+        def about(base):
+            time.sleep(next(waits))
+            # Each server named after its own address: a name that is not its own was saved before it was set.
+            return {"opendmtq": "0.8.0", "name": "Club at " + base, "address": base[len("http://"):], "app": True}
+
+        half_made = []
+        with mock.patch.object(srv, "about", about):
+            for i in range(rounds):
+                answered = threading.Event()
+                pages.check_server(app, "http://club%d.test" % i, then=answered.set)
+                while not answered.is_set():
+                    # The window's thread meanwhile: a save, then the task pump's turn.
+                    state.save()
+                    with open(st.LauncherState.path(), encoding="utf-8") as f:
+                        saved = json.load(f)
+                    servers = saved["servers"]
+                    # Each Connect adds a server and plays on it: a whole save lists it last and names it current.
+                    if servers and (saved["current"] != servers[-1]["url"]
+                                    or any(s["name"] != "Club at " + s["url"] for s in servers)):
+                        half_made.append((i, saved["current"], servers[-1]["url"], servers[-1]["name"]))
+                    while not tasks.empty():
+                        tasks.get_nowait()()
+        self.assertEqual(half_made, [])
+        # Every Connect went through, the last one played on.
+        self.assertEqual(len(state.servers), rounds)
+        self.assertEqual(state.current, "http://club%d.test" % (rounds - 1))
