@@ -187,7 +187,9 @@ limit and a frame needs no more than four refreshes (`src/pacing_math.h`, which 
 on the build machine): 120 on a 240 Hz display is every second refresh. Any other limit, such as 144 on 240 Hz, goes by
 the clock, each frame still waiting for a refresh. A step back up never passes the limit. With VSync off the swap
 interval is 0 whatever the game asks, and the frames go out by the clock at the limit: the display's rate, the number
-chosen, or 1000 a second for No limit.
+chosen, or 1000 a second for No limit. By the clock, each frame goes one frame's time after the one before, however
+unevenly the game's own limiter hands them over; a frame later than that by more than a frame's time starts the count
+again from itself, so that no burst follows a load (`clock_due`, checked by the same test).
 
 **Resolution** (`src/pacing.cpp`, `debug.arm32.lowres`, unset). The game draws at the panel's own resolution (an edit to the game:
 it used to write its low resolution option on at every start, 960 lines on a 1440 line panel), in 32-bit colour and with its

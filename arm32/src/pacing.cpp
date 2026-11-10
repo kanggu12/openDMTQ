@@ -805,9 +805,8 @@ EGLBoolean paced_swap(EGLDisplay d, EGLSurface s) {
         if (follow) ask_again = follow_display(now, interval, gap, true);
         // Vsync off: no refreshes per frame, the game's limiter keeps the rate and the swap waits for none.
         if (pace && vsync) {
-            const double ratio = 1e9 / (static_cast<double>(app_frame_rate()) * static_cast<double>(interval));
-            host_n = std::llround(ratio);
-            if (host_n < 1 || std::fabs(ratio - static_cast<double>(host_n)) > 0.1 || host_n > kMaxHostInterval) host_n = 0;
+            // The refreshes each frame stays for, 0 for a rate no whole fraction of the display's (pacing_math.h).
+            host_n = host_refreshes(static_cast<double>(app_frame_rate()), interval);
             // Once per display and rate (the window may move to another display).
             if (interval != p.logged_interval || host_n != p.logged_n) {
                 log("arm32: pacing: the display refreshes every %.3f ms; %lld refreshes per frame%s", static_cast<double>(ms(interval)),
@@ -984,10 +983,9 @@ EGLBoolean paced_swap(EGLDisplay d, EGLSurface s) {
         const float rate = followed_frame_rate();
         Nanos due = 0;
         if (rate > 0) {
-            const auto period = static_cast<Nanos>(1e9 / static_cast<double>(rate));
             const Nanos done = now_ns();
-            due = p.target ? p.target + period : done;
-            if (due < done - period) due = done;
+            // One frame's time after the last one went out, or now after a frame that late (pacing_math.h).
+            due = clock_due(p.target, rate, done);
             p.target = due;
             g_active_until.store(done + kSecond, std::memory_order_relaxed);
         }

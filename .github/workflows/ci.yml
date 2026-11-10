@@ -68,7 +68,7 @@ jobs:
         run: c++ -std=c++20 -Wall -Wextra -pthread -Iarm32/src arm32/tests/host/live_net_test.cpp arm32/src/live_net.cpp -o /tmp/live_net_test && /tmp/live_net_test
 
       # The frame limit on a computer's display (arm32/src/pacing_math.h): which displays and limits keep every frame on
-      # the same number of refreshes, and which go by the clock.
+      # the same number of refreshes, and which go by the clock, and when each frame goes out by the clock.
       - name: Frame limits on computer displays
         run: c++ -std=c++20 -Wall -Wextra -Iarm32/src arm32/tests/host/pacing_math_test.cpp -o /tmp/pacing_math_test && /tmp/pacing_math_test
 
