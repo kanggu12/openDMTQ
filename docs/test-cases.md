@@ -39,6 +39,16 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 | PAGE-24 | The site with a linked account | The top shows the player's own name, leading to their page; the rankings mark their place | `tests/ui/audit.js#a linked account shows its player and marks their place` | ui |
 | PAGE-25 | The site's pages with a linked account | Home, rankings, this month and a player's page at 412 and 1280 px in both languages: no layout findings (the name in the bar is a key a finger can hit; the marked rows and podium card carry their ring) | `tests/ui/audit.js#Measured while linked too` | ui |
 | PAGE-16 | The site's look on a real phone's browser | Nothing out of place; fonts, glass and the bottom menu as on the emulated phone | | hand |
+| PAGE-26 | The hall of fame on a server west of UTC, in both languages | Last month named as the rankings count it, in five time zones | `tests/game/protocol.sh#the hall of fame names last month as the rankings count it` | ui |
+| PAGE-27 | A broken download of the app or the installer | Goes on where it stopped: one range in 206, kept to the same file by If-Range or If-Match, 416 past the end | `tests/ui/audit.js#a broken download of the app or the installer goes on where it stopped` | ui |
+| PAGE-28 | The site's stylesheet, scripts, icon and fonts | Named by their versions and kept a year; asked for without a version, checked again | `tests/ui/audit.js#the site names its own files by their versions` | ui |
+| PAGE-29 | A sign-in field left empty | Said by the site in its own words and look, in the page's language | `tests/ui/audit.js#a field left empty is said by the site in its own words` | ui |
+| PAGE-30 | An empty sign-in form | Not counted as a wrong password | `tests/ui/audit.js#an empty form is not counted as a wrong password` | ui |
+| PAGE-31 | A page in English | Takes the Latin half of the text face alone | `tests/ui/audit.js#a page in English takes the Latin half of the text face alone` | ui |
+| PAGE-32 | A player's levels with hidden songs | Hidden songs' charts count in no level | `tests/ui/audit.js#a player's levels count only the songs players can see` | ui |
+| PAGE-33 | Answers that depend on the Accept header, and those that do not | Only the first say Vary: Accept | `tests/ui/audit.js#only the answers that depend on Accept say so` | ui |
+| PAGE-34 | Every answer of the site | Never framed or sniffed, and its address never sent to another site | `tests/ui/audit.js#the site is never framed, sniffed or named to another site` | ui |
+| PAGE-35 | The site's This month tab, with the game's own rankings | The same players in the game's TOTAL order | `tests/live/smoke.py#the site's This month tab ranks the month as the game does` | qa |
 
 ## TS-LIVE: broadcasts and replays
 
@@ -79,6 +89,9 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 | LIVE-34 | The broadcast state answer: odd JSON, numbers too large for an int, escapes | On only with 200 and a plain key; numbers within range, the most when too large; a cut string is none; a phone's notice in modified UTF-8 | `arm32/tests/host/live_net_test.cpp#the state answer, odd JSON`, `arm32/tests/host/live_net_test.cpp#the notice for a phone's Java` | unit |
 | LIVE-35 | The upload queue full, slow and quick uploads, a refusal, the stream's end | Oldest dropped with a step down; two slow uploads step down, thirty quick ones step up; a 403 stops the stream; the end goes last | `arm32/tests/host/live_net_test.cpp#a full upload queue`, `arm32/tests/host/live_net_test.cpp#the uploads' steps`, `arm32/tests/host/live_net_test.cpp#a refusal and the stream's end` | unit |
 | LIVE-36 | A phone's encoder that breaks mid-broadcast, or that the system takes back | The session ends; another 10 s later; three in a row give up |  | hand |
+| LIVE-37 | A live page left open | Asks for the recordings' list only when it changed | `tests/ui/audit.js#an open live page asks for the recordings' list only when it changed` | ui |
+| LIVE-38 | The home page with players on air | Pictures only of the broadcasts on the screen, every two and a half minutes | `tests/ui/audit.js#the home page takes pictures of the broadcasts on the screen only` | ui |
+| LIVE-39 | New players starting with broadcasts on | The players already there stay off | `tests/live/smoke.py#new players starting on leaves the players already there off` | qa |
 
 ## TS-ADMIN: the owner's pages
 
@@ -196,6 +209,7 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 | API-27 | A player's levels with hidden songs, and month names on a server west of UTC | Hidden songs count in no level; months named in UTC | `tools/tests/test_api.py#test_a_hidden_song_counts_in_no_level`, `tools/tests/test_api.py#test_the_months_are_named_in_utc_west_of_it` | unit |
 | API-28 | A broken download of the installer through the API | 206 for one part, kept to the same file by If-Range or If-Match, 416 past the end; the ETag changes with the server's details | `tools/tests/test_api.py#class InstallerDownloadTest` | unit |
 | API-29 | The sign of the recordings' list | past_rev as the site's live page makes it, following a recording hidden and shown again | `tools/tests/test_api.py#class LiveListSignTest` | unit |
+| API-30 | The API's This month and the game's own board, on one database | The same players, order, scores and chart counts | `tools/tests/test_api.py#class SameMonthAsTheGameTest` | unit |
 
 ## TS-GAME: the patched client
 
@@ -229,9 +243,9 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 | GAME-15 | Real phones (64-bit only, 32-bit) | Installs, plays a song, broadcasts | | hand |
 | GAME-31 | A phone's first start: platform login, game login, the start batch | An account per phone, the same one at the next start; the player id as text and the signing key; every reply of the batch without an error | `tests/game/protocol.py#the start batch comes back whole, in order, without errors` | ui |
 | GAME-32 | The lists the client turns into arrays of entries | Never empty where the client needs an entry (news): an empty one closes the game | `tests/game/protocol.py#one news entry at least: the client closes on an empty news list` | ui |
-| GAME-33 | A play saved signed, a worse one, one without notes, one unsigned | Score, accuracy, grade, bonuses and new record as the official server worked them out; the best kept; no notes handled without a popup; unsigned refused whole | `tests/game/protocol.py#a perfect first play: 100 notes at 100 %, the ALL COMBO and PERFECT PLAY bonuses, S, a new record` | ui |
-| GAME-34 | The month's rankings after a play | The player in the total and the song's line ranking, with the name they picked; no row on a line they did not play | `tests/game/protocol.py#the month's total ranking has the player, with the name they picked` | ui |
-| GAME-35 | A method or body the server does not know | SVC.05008, which the client handles without a popup; never SVC.001 | `tests/game/protocol.py#a method this server does not have is handled without a popup (SVC.05008)` | ui |
+| GAME-33 | A play saved signed, a worse one, one without notes, one unsigned; a play of mixed judgements | Score, accuracy, grade, bonuses and new record as the official server worked them out; the best kept; no notes handled without a popup; unsigned refused whole; the mixed play worked out to the point, and the worse play an A at exactly 90.0 % | `tests/game/protocol.py#a perfect first play: 100 notes at 100 %, the ALL COMBO and PERFECT PLAY bonuses, S, a new record`, `tests/game/protocol.py#a play of mixed judgements, 70 notes at 100 %, 20 at 90 % and 10 at 1 %`, `tests/game/protocol.py#the worse play, 90 notes at 100 % and 10 breaks, is an A at exactly 90.0 %` | ui |
+| GAME-34 | The month's rankings after a play; several players, the asking one ranked lower, and the check account | The player in the total and the song's line ranking, with the name they picked; no row on a line they did not play; a tie goes to the older account; TOTAL's first rank, then the asking player's own row; the check account never ranked | `tests/game/protocol.py#the month's total ranking has the player, with the name they picked`, `tests/game/protocol.py#a tie goes to the older account, and the server's check account is never ranked`, `tests/game/protocol.py#TOTAL's first rank, then the asking player's own row (MY RANK)`, `tests/game/protocol.py#the check account is not in TOTAL, not even as the row it asks for` | ui |
+| GAME-35 | A method or body the server does not know | SVC.05008, which the client handles without a popup; never SVC.001 in any reply of the run | `tests/game/protocol.py#a method this server does not have is handled without a popup (SVC.05008)`, `tests/game/protocol.py#SVC.001 is never sent: the client would quit for an update`, `tests/game/protocol.py#no reply of the run opens the client's retry popup: every error is SVC.05008` | ui |
 | GAME-36 | The platform SDK's calls | A one-product price list (the SDK waits for one), OK to its reports, the push choice echoed, no maintenance unless set | `tests/game/protocol.py#the price list the SDK waits for has one product, not on sale` | ui |
 | GAME-37 | The game server's own files | Never served, whatever the address | `tests/game/protocol.py#the game server's code is never served` | ui |
 | GAME-38 | A server with the client data and no songs | The game starts with an empty song list; songs imported later reach installed apps at their next start | `tests/closed/game.sh#the game starts with no songs`, `tests/closed/game.sh#the installed app fetches what changed` | hand |
@@ -246,6 +260,9 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 | GAME-47 | The project settings | Each is found in its object, by the object's class and size, wherever the file has it; an object of another size or byte keeps its setting; no other byte changes | `tools/tests/test_patch_apk.py#test_each_setting_is_found_in_its_object_wherever_that_is`, `tools/tests/test_patch_apk.py#test_an_object_of_another_size_or_byte_keeps_its_setting`, `tools/tests/test_patch_apk.py#test_the_settings_land_and_the_rest_of_the_file_stays` | unit |
 | GAME-48 | Following a phone's 120 Hz panel, and heat | 90, 72, 60 as the panel follows; a fixed 120 Hz panel ends at 60; a SEVERE step every 30 s | `arm32/tests/host/follow_test.cpp#phone: the window asked 90, 72, 60 in turn`, `arm32/tests/host/follow_test.cpp#hot: a step every 30 s` | unit |
 | GAME-49 | Signing the app | The key's password is never on a command line | `tools/tests/test_patch_apk.py#test_the_signer_does_not_get_the_password_on_its_command_line`, `tools/tests/test_pack_arm64.py#test_an_app_comes_out_signed_with_the_key_through_the_file` | unit |
+| GAME-50 | A signed save whose counts no play gives (negative, too large, not whole), or for an id without an account | SVC.05008, handled without a popup, and nothing stored; 10,000 notes of one judgement are still a play | `tests/game/protocol.py#none of them is kept: the player's best scores are as they were, and the id without an account has none`, `tests/game/protocol.py#10,000 notes of one judgement are still a play` | ui |
+| GAME-51 | A player's name with bytes that are no UTF-8, as an older server's database can hold | The start batch comes back whole, with U+FFFD in the name; the next start stores a CP949 name as UTF-8 | `tests/game/names.php#a start batch that lists a name that is no UTF-8 comes back whole, as JSON`, `tests/game/names.php#the next start stores a name in CP949 as UTF-8` | ui |
+| GAME-52 | The monthly rankings' queries | Read the play log from one index alone, never the table once per play | `tests/game/protocol.sh#the monthly rankings read the play log from one index alone` | ui |
 
 ## TS-SERVER: the server and its songs
 
@@ -278,6 +295,9 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 | SRV-25 | Two song-list rebuilds at once, and a restore's | One waits for the other and both get through; a restore copies and rebuilds under one lock | `tools/tests/test_songs.py#class OneRebuildAtATimeTest` | unit |
 | SRV-26 | What a rebuild writes: a song not imported, one hidden, one added, two language folders | The client tables, the manifest's sizes and checksums, catalog.json of the songs the server has | `tools/tests/test_songs.py#class RebuildOutputTest` | unit |
 | SRV-27 | Rebuilds with added songs | Each tile made once and served byte for byte; made again for a new jacket, name, template or maker | `tools/tests/test_songs.py#class KeptTileTest` | unit |
+| SRV-28 | A sign-in or sign-out form posted from another site | The empty sign-in page; nobody signed in or out | `tests/live/smoke.py#a sign-in form on another site leads to the empty sign-in page` | qa |
+| SRV-29 | Wrong passwords at an account with admin rights, from many addresses | Thirty in ten minutes for the whole server, and no more | `tests/live/smoke.py#thirty wrong guesses at an account with admin rights from anywhere, and no more` | qa |
+| SRV-30 | The live page's script | Comes compressed, and is checked again | `tests/live/smoke.py#the live page's script comes compressed, and revalidates` | qa |
 
 ## TS-CLI: the command line
 
