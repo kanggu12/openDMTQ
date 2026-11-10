@@ -87,7 +87,7 @@ more, its FREE PASS, and goes on without it (`rpc.php`). It needs PHP 8.1 or new
 | `src/platform.php` | The platform SDK: its login (one account per phone), push registration, price list, reports |
 | `src/live.php` | Who is in a song, for the live view (watches the game's own calls) |
 | `src/content.php` | The song list and the facts of the client's tables (`data/custom/songList.json`, `catalog.json`) |
-| `src/config.php`, `src/db.php`, `src/util.php` | Folders and addresses from the environment, the database handle, number rules |
+| `src/config.php`, `src/db.php`, `src/util.php` | Folders and addresses from the environment, the database handle, number rules and where a month's rankings begin (the site's months too) |
 | `pages/score.php`, `pages/help.php` | The game's window (the player's page of the site) and the customer centre page |
 | `live/*.php` | The live view's endpoints ([live.md](live.md)) |
 | `bin/setup-db.php` | Prepares the database before the server starts (below) |

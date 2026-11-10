@@ -15,7 +15,7 @@ $past_months = [];
 if ($month) {
     // This month's players as the game ranks them (month_players() orders them), and the first three of the months
     // before, for the hall of fame under the table.
-    $players = ($db && has_playlog($db)) ? month_players($db, month_start(), PHP_INT_MAX) : [];
+    $players = ($db && has_playlog($db)) ? month_players($db, odq_month_start(), PHP_INT_MAX) : [];
     $past_months = ($db && has_playlog($db)) ? past_months($db) : [];
 } else {
     // Then by total, then the older account first (lower id), as on every other page: PHP 7.4's sort
@@ -44,7 +44,7 @@ $first_rank = 4;
 page_header(t('rank.title'), 'ranking');
 ?>
   <?php // This month's line says when it starts anew, in the server's own time. ?>
-  <?= masthead('RANKINGS', $month ? t('rank.line.month', ['when' => h(month_moment(month_start(-1)))]) : t('rank.line.' . $sort)) ?>
+  <?= masthead('RANKINGS', $month ? t('rank.line.month', ['when' => h(month_moment(odq_month_start(-1)))]) : t('rank.line.' . $sort)) ?>
   <?php // Nothing to put in order: no tabs above the message. ?>
   <?php if ($everyone): ?>
     <p class="tabs">

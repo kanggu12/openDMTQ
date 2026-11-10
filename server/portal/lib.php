@@ -6,6 +6,8 @@ require_once __DIR__ . '/live_lib.php';
 
 // Where everything is: the game server's settings, which every part of the server shares.
 require_once __DIR__ . '/../game/src/config.php';
+// The game server's small rules, for where a month's rankings begin (odq_month_start()): the in-game rankings' own bounds.
+require_once __DIR__ . '/../game/src/util.php';
 // The database, and the folder the APK builder writes to.
 if (!defined('DB')) {
     define('DB', odq_db_path());
@@ -434,14 +436,6 @@ function players(SQLite3 $db): array
     return $rows;
 }
 
-/* Where a month's rankings begin, $back months ago (-1: the next): the first of the month at midnight UTC, the moment
-   the game's own ranking screens count down to ("until the ranking resets"). */
-function month_start(int $back = 0): int
-{
-    // gmmktime() takes a month before January or after December into the year before or after.
-    return gmmktime(0, 0, 0, (int)gmdate('n') - $back, 1, (int)gmdate('Y'));
-}
-
 /* A moment of the server's clock in the page's words: "1 Dec at 09:00", "12월 1일 9:00". */
 function month_moment(int $at): string
 {
@@ -449,7 +443,7 @@ function month_moment(int $at): string
     return lang() === 'ko' ? date('n', $at) . "월\u{00A0}" . date('j', $at) . '일 ' . date('G:i', $at) : date('j', $at) . "\u{00A0}" . date('M', $at) . ' at ' . date('H:i', $at);
 }
 
-/* A month by its first moment (month_start()), in the page's words: "October 2026", "2026년 10월". Named in UTC, as its
+/* A month by its first moment (odq_month_start()), in the page's words: "October 2026", "2026년 10월". Named in UTC, as its
    bounds are: west of UTC that first moment is still the evening before on the server's clock (October's is 30 September
    at 20:00 in New York), which would name every month of the hall of fame one month early. */
 function month_name(int $at): string
@@ -484,9 +478,9 @@ function past_months(SQLite3 $db, int $count = 6): array
 {
     $out = [];
     for ($back = 1; $back <= $count; $back++) {
-        $top = array_slice(month_players($db, month_start($back), month_start($back - 1)), 0, 3);
+        $top = array_slice(month_players($db, odq_month_start($back), odq_month_start($back - 1)), 0, 3);
         if ($top) {
-            $out[] = [month_name(month_start($back)), $top];
+            $out[] = [month_name(odq_month_start($back)), $top];
         }
     }
     return $out;
@@ -1115,79 +1109,5 @@ function dl_take_start(): bool
         return false;
     }
     setcookie(DL_START_COOKIE, '', ['expires' => 1, 'path' => '/opendmtq/', 'httponly' => true, 'samesite' => 'Lax']);
-    return true;
-}
-
-// Sign-in failures of the last ten minutes, for the throttle below, in the server's scratch folder.
-define('DL_ATTEMPTS', odq_run_dir() . '/download-signin.json');
-// Failures in ten minutes: from one address, and at accounts with admin rights from all addresses together (as many as
-// the admin pages' own sign-in allows through the server: OVERALL in tools/opendmtq_tools/admin/auth.py).
-const DL_PER_ADDRESS = 10;
-const DL_ADMIN_OVERALL = 30;
-
-/* Sign-in attempts, for the account named $name: at most DL_PER_ADDRESS failures in ten minutes from one address (the
-   edge proxy passes each visitor's own), and every failure waits a second (login.php). For the whole server, a limit on
-   the accounts with admin rights alone: they open the admin pages too, whose own sign-in holds guesses from everywhere
-   together to DL_ADMIN_OVERALL, and this sign-in must not be the way around that. No such limit on the other accounts:
-   the whole site is behind this sign-in, and it would let anyone lock every player out.
-
-   An attempt takes its place in the count before the password is compared, under a lock, so
-   attempts sent at the same moment cannot all pass the check before any is counted; a right
-   password gives the place back (dl_attempt_succeeded()). Returns the attempt's id, or null when
-   this address, or the account's admin rights, is throttled. */
-function dl_attempt_begin(string $name = ''): ?string
-{
-    $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '?');
-    $id = bin2hex(random_bytes(8));
-    // Whether the name typed is an account with admin rights, switched off or not: a guess at its password is one all the same.
-    $row = site_account($name);
-    $admin = $row !== null && !empty($row['admin']);
-    $granted = false;
-    $counted = dl_attempts(function (array $fails) use ($ip, $id, $admin, &$granted): array {
-        $mine = count(array_filter($fails, fn($f) => ($f[1] ?? '') === $ip));
-        // The failures at accounts with admin rights, from anywhere (entries from before this count carry no such mark).
-        $at_admins = count(array_filter($fails, fn($f) => !empty($f[3])));
-        if ($mine >= DL_PER_ADDRESS || ($admin && $at_admins >= DL_ADMIN_OVERALL)) {
-            return $fails;
-        }
-        $granted = true;
-        $fails[] = [time(), $ip, $id, $admin ? 1 : 0];
-        return $fails;
-    });
-    // Nowhere to count (the run folder is not writable): let it through, as before the throttle.
-    return ($granted || !$counted) ? $id : null;
-}
-
-/* The password was right: the attempt is not a failure. */
-function dl_attempt_succeeded(string $id): void
-{
-    dl_attempts(fn(array $fails): array => array_filter($fails, fn($f) => ($f[2] ?? '') !== $id));
-}
-
-/* Runs $change on the failures of the last ten minutes ([[time, address, attempt id, 1 when at an
-   account with admin rights], ...]) and saves what it returns, all under an exclusive lock on the
-   file. False when the file cannot be used. */
-function dl_attempts(callable $change): bool
-{
-    $h = @fopen(DL_ATTEMPTS, 'c+');
-    if (!$h) {
-        return false;
-    }
-    if (!flock($h, LOCK_EX)) {
-        fclose($h);
-        return false;
-    }
-    $now = time();
-    // Only entries of the last ten minutes (an older file held bare times, or [time, address]).
-    $fails = array_filter((array)json_decode((string)stream_get_contents($h), true),
-        fn($f) => is_array($f) && $now - (int)($f[0] ?? 0) < 600);
-    $fails = array_values($change(array_values($fails)));
-    // Rewritten in place while the lock is held, so no other attempt reads it half-written.
-    ftruncate($h, 0);
-    rewind($h);
-    fwrite($h, json_encode($fails));
-    fflush($h);
-    flock($h, LOCK_UN);
-    fclose($h);
     return true;
 }

@@ -1,7 +1,8 @@
 <?php
 /*
- * Small rules the replies share: how a request's numbers are read, and the limits of what the client can read
- * back. The client reads every number as a 32-bit int and stops on a larger one.
+ * Small rules the replies share: how a request's numbers are read, the limits of what the client can read back, and
+ * where a month's rankings begin. The client reads every number as a 32-bit int and stops on a larger one. The site
+ * (portal/lib.php) loads this file too, for the months.
  */
 
 // The level every player has: the server gives everyone the highest (game.getUserAsset), and the rankings show it.
@@ -49,6 +50,18 @@ function odq_clamp($value, $min, $max)
 function odq_clamp_score($score)
 {
     return odq_clamp($score, 0, OPENDMTQ_INT_MAX);
+}
+
+/*
+ * Where a month's rankings begin, $back months ago (0: this month, -1: the next): the first of the month at midnight UTC
+ * (09:00 in Korea). The game's ranking screens say how long until the rankings start anew and count down to that moment,
+ * in UTC, so the boards start anew then and the countdown is true. The one place for it: the in-game rankings
+ * (ranking.php) and the site's (portal/lib.php: this month's tab, the months before) take their bounds from here.
+ */
+function odq_month_start(int $back = 0): int
+{
+    // gmmktime() takes a month before January or after December into the year before or after.
+    return gmmktime(0, 0, 0, (int)gmdate('n') - $back, 1, (int)gmdate('Y'));
 }
 
 /*

@@ -62,7 +62,7 @@ for var in OPENDMTQ_APK_OUT APK_DIR; do
   fi
 done
 # The hall of fame's months (portal/lib.php month_name()) are the months the rankings count, which begin at midnight UTC
-# (month_start()): last month by its own name in zones west of UTC too, where that midnight is still the evening before,
+# (odq_month_start()): last month by its own name in zones west of UTC too, where that midnight is still the evening before,
 # as in UTC and east of it. In both of the site's languages; the test stack itself runs in Asia/Seoul, east of UTC.
 for lang in en ko; do
   # Last month in UTC by the shell's own calendar, in the site's words for it (C: English month names on any machine).
@@ -76,7 +76,7 @@ for lang in en ko; do
     require "/opt/opendmtq/portal/lib.php";
     foreach (["America/Los_Angeles", "America/New_York", "UTC", "Asia/Seoul", "Pacific/Kiritimati"] as $zone) {
         date_default_timezone_set($zone);
-        echo $zone, "=", month_name(month_start(1)), "\n";
+        echo $zone, "=", month_name(odq_month_start(1)), "\n";
     }')
   # Every zone's line must end in the month UTC names; none may name another.
   wrong=$(grep -v "=$want\$" <<<"$got" || true)

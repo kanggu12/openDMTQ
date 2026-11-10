@@ -1,7 +1,8 @@
 <?php
 /*
  * The in-game rankings: this month's, from the log of every play (PlayLog). The game counts down to the moment
- * they start anew (odq_month_start()); the web pages and a player's own best keep every month.
+ * they start anew (odq_month_start() in util.php, which the site's months share); the web pages and a player's own best
+ * keep every month.
  */
 
 require_once __DIR__ . '/db.php';
@@ -28,16 +29,6 @@ function odq_patterns($line, $songId = NULL)
         }
     }
     return $ids;
-}
-
-/*
- * Where this month's rankings begin: the first of the month at midnight UTC (09:00 in Korea). The game's
- * ranking screens say how long until the rankings start anew and count down to that moment, in UTC, so
- * the boards start anew then and the countdown is true.
- */
-function odq_month_start()
-{
-    return gmmktime(0, 0, 0, (int)gmdate('n'), 1, (int)gmdate('Y'));
 }
 
 /*
