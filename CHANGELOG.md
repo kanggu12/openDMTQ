@@ -6,6 +6,115 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-10
+
+### Security
+
+- The player for Windows keeps the server's app in its own folders: a name with "..", a drive, a backslash, a device's
+  name or a relative ".." above where it starts is refused as a missing file, the runtime's own names stay, and any
+  other name lies in the game's own `data\root`, which is its "/" and its current folder. The game's system, its
+  libraries and its APK are read-only to it, as on a phone.
+- The player for Windows starts only when the app's package is a package name as Android's are made, and says why in
+  its log and its error box otherwise. The PC client takes from a server only an app with a proper package and file
+  name, stops a download at the size the server gave, and downloads again an app kept with no proper package name.
+- The player's video reader keeps to what the file holds: a box size stepping back, a sample count or size the file
+  only states, or many chunks and runs no longer hang the player or take gigabytes.
+- The game server refuses a signed save whose counts no play gives (each is a whole number from 0 to 10,000), one for a
+  player without an account, or one of a chart no song of the server has, with SVC.05008, which the game handles without
+  a popup, and stores none of them. A play finished while the owner hides its song is kept.
+- A sign-in or sign-out form on another site signs nobody in or out.
+- Wrong passwords at accounts with admin rights count for the whole server, on the site's sign-in and the PC client's:
+  30 in ten minutes.
+- The site, the admin pages and the API may not be framed or sniffed, and keep their addresses from other sites.
+- The importer leaves out links and linked folders, wherever they point, and its container has no network.
+- On Windows the setup takes only a drive letter's path, and its looks at folders need an API token that writes.
+- A password typed for an account with admin rights has 10 characters at least.
+- A restore keeps today's site accounts and their passwords, as it keeps the API's tokens.
+- A host install's `.env`, one-time sign-in and download key are readable by their owner only.
+- The app's signer gets the key's password from a file, never on its command line.
+- The firewall script runs from its elevated command itself, not from a copy in the temporary folder.
+- The admin port's copy of the video player takes its own file name only.
+
+### Added
+
+- `networkPolicy.enabled` in the Helm chart, off by default: only the router's pods reach the api pod's port 8080.
+  CI renders and checks it.
+- A broken download goes on where it stopped: the app (`/apk`), and the installer for Windows from the site
+  (`/windows`), the API (`GET /app/windows`) and the App page (`Range`, `If-Range`, `If-Match`; 206, 412, 416).
+- `GET /site/live` gives `past_rev`, the sign of its list of recordings, as the live page has it.
+
+### Changed
+
+- The PC client switches pages, scrolls and changes language faster at 200 %: the picture behind its pages is drawn
+  once for each width (the page area's background from about 200 to 31 ms). Its dialogs open faster, it keeps no copy
+  of the page's picture (13.6 MB less at 200 %), and it asks for the ready check once at start. Its screens are checked
+  at 200 % too.
+- The player for Windows asks the game server for compressed answers, as the game on a phone does: the song list comes
+  in 17 KB instead of 145 KB, and a heavy player's scores in 4 KB instead of 148 KB. A compressed answer cut short,
+  broken or past 64 MB fails as a lost connection does.
+- The Players page with many players opens three times as fast on a computer and twice as fast on a phone (400 players:
+  1.7 s to 0.5 s and 0.8 s to 0.4 s, 1.37 MB to 0.78 MB). More's rename, reset and delete are made for a row when it
+  opens.
+- Making a backup, restoring one, and adding, hiding, showing or removing a song on the admin pages run as jobs: one
+  that takes more than 3 seconds shows its progress on its page, then how it ended. `GET /jobs` lists them.
+- The Accounts page sends the player list once (562 to 108 KB with 32 accounts and 400 players); the admin pages'
+  scripts are one file the browser keeps; the admin port answers 304 for its copies of the site's files; Keep updating
+  on the Logs page gets nothing until a request comes in, then a compressed list.
+- The recordings count on the status page and in `GET /status` comes with the disk figures, at most a minute old and
+  fresh after a deletion.
+- Starting the server, or adding, hiding, removing or restoring songs, no longer remakes every added song's tile: each
+  is made once and kept beside the song's files (with 100 added songs a song-list rebuild takes 0.4 s, not 4.8 s).
+- The site's pages cost less to keep open: an open live page fetches the recordings' list only when it changed (7.3 to
+  0.24 MB an hour), the home page takes pictures only of the broadcasts on the screen, every two and a half minutes (45
+  to 11 MB an hour), and the site reads only the recordings it shows. Its stylesheet, scripts, icon and fonts are named
+  by their versions and kept a year, and its scripts are compressed.
+- A page in English loads 33 KB of the text font instead of 444 KB: the first visit to the sign-in page takes 83 KB
+  instead of 491 KB.
+- The site's sign-in says what is missing in its own words and look, and an empty form is not a wrong password.
+- The monthly rankings read the play log from one index (TOTAL from 14.4 to 9.9 ms with 600 players and 15,000 plays
+  in the month), and the site's This month is the game's own board (17.0 to 10.9 ms).
+- The broadcast's encoder threads sleep while broadcasts are off. The player for Windows compiles its broadcast's
+  shaders at the game's first screens, so a broadcast that starts mid-song no longer stalls a frame; each start's cost
+  is in the log.
+- The menu button over the game is drawn once, and fades by its opacity.
+- For contributors: the PC client's unit tests take about 3 s instead of 38 s; `arm32/test_windows.sh` also runs the
+  broadcast requests' test under Wine; the broadcast of the player for Windows is in `live_desktop.cpp`,
+  `live_capture.cpp`, `live_mf.cpp` and `live_state.h`; the song list's rebuild runs in steps of its own.
+
+### Fixed
+
+- Each broadcast request has ten seconds in all, the server's name lookup included: a server that answers slowly or
+  not at all no longer holds a phone's or a PC's uploads.
+- A phone's encoder that breaks while it broadcasts, or that the system takes back, is tried again 10 s later and given
+  up after three, instead of leaving the broadcast silent.
+- Numbers from the server too large for an int count as the highest quality, not the lowest, and the server's notice
+  keeps characters beyond U+FFFF. The player for Windows puts only letters, digits, '-' and '_' of its device id in a
+  URL.
+- The shared sound output of the player for Windows gives up on a device that takes nothing for two seconds, and moves
+  at once when the devices change. AudioTrack.write checks its range without an int's overflow. Where its error box
+  cannot be drawn, Windows' message box says the error.
+- In the PC client: its settings are never saved with a Connect, a sign-in or the app's details half made; a ready check
+  that answers after a newer one no longer leaves PLAY and the check's rows as they were before; a download stopped
+  while the Online page or the guide's download step is drawn again says it is stopping, as the status line does.
+- Also in the PC client: a turn of the wheel after a language switch no longer opens the error dialog; Clear game data
+  and Uninstall count the data in the background instead of freezing, and Uninstall's size includes a data folder moved
+  to another disk; PLAY has no frame on the bottom bar; Start over, Forget, `--reset` and `--forget` wait for a game
+  started from the command line; a dialog over a scrolled page shows that page behind it; worker errors, refused
+  sign-ins, app folders that cannot go and failed sound-device listings are in the log, and an update answer that cannot
+  be read is a failed check.
+- A player's name with bytes that are not UTF-8, as an older server's database can hold, emptied the game's start
+  batch for every player who saw it and broke every admin page and API answer that lists players. It goes out with
+  U+FFFD, and the server's next start stores it as UTF-8 (from CP949 when it reads as that).
+- On servers west of UTC, the hall of fame named every month one month early.
+- A player's levels, on the site and in the API, counted hidden songs' charts.
+- The admin's routes for one recording, switching a player off and deleting a player's recordings read only that
+  recording or player: switching a player off no longer holds the game's saves while every recording is read.
+- The App and setup pages kept following a job's log only until one look failed.
+- The admin pages' forms are checked in the pages' own look and language, not in the browser's bubbles.
+- Two song-list rebuilds at once could fail or leave the added songs half made: every rebuild takes the songs' lock,
+  and a restore puts the songs back and rebuilds under it, the command line's restore too.
+- The PC client's build, run by a user other than root, can write into what its containers made.
+
 ## [0.8.0] - 2026-11-10
 
 ### Added
@@ -331,7 +440,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 - Four ways to run it: the Windows bundle, one command on Linux or macOS, Docker Compose, and a Helm chart for
   Kubernetes.
 
-[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/kanggu12/openDMTQ/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/kanggu12/openDMTQ/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/kanggu12/openDMTQ/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/kanggu12/openDMTQ/compare/v0.5.0...v0.6.0
