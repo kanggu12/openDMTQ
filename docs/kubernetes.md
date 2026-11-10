@@ -39,6 +39,10 @@ The Helm chart in `deploy/helm/opendmtq` splits the server by what each part nee
   `baseApk` names the client in the base folder when it holds more than one.
 - **Locked down.** Every pod runs unprivileged with a read-only root filesystem, no capabilities and
   the RuntimeDefault seccomp profile. Service account tokens are not mounted.
+- **Network policy.** The api takes a visitor's address from `X-Forwarded-For` when a private address passes it on,
+  as the router does. With `networkPolicy.enabled` a NetworkPolicy lets only the router's pods reach the api pod's port
+  8080, so no other pod of the cluster can pass on an address. The cluster's network plugin enforces it. Off by
+  default.
 
 What this gives and what it does not:
 
@@ -213,3 +217,4 @@ The main ones; see `values.yaml` for all.
 | `live.recordings.persistence.*` | off | A claim for recordings, see [Live broadcasts](#live-broadcasts). |
 | `timeZone` | UTC | IANA zone for logs, the in-game ranking's day and app file names. |
 | `baseApk` | | Which client in `apk/base` to patch when it holds several. |
+| `networkPolicy.enabled` | false | Only the router's pods reach the api pod's port 8080 (a NetworkPolicy). |

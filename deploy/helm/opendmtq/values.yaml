@@ -151,6 +151,11 @@ admin:
     requests: {cpu: 20m, memory: 96Mi}
     limits: {memory: 1536Mi}
 
+# A NetworkPolicy that lets only the router's pods reach the api pod's port 8080, where the api takes a visitor's address
+# from X-Forwarded-For when a private address passes it on. Enforced by the cluster's network plugin.
+networkPolicy:
+  enabled: false
+
 # Builds the patched app for publicHost after every install or upgrade.
 builder:
   enabled: true

@@ -1,0 +1,24 @@
+{{- if .Values.networkPolicy.enabled }}
+# Only the router's pods reach the api pod's port 8080. The api takes a visitor's address from X-Forwarded-For when a
+# private address passes it on, as the router does: any other pod of the cluster could otherwise pass on an address of
+# its choosing (past the sign-in throttle, which counts by address). The kubelet's probes come from the pod's own node,
+# which a policy always lets in, and the admin pages in the same pod use 127.0.0.1, which no policy sees.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendmtq.fullname" . }}-api
+  labels: {{- include "opendmtq.labels" (dict "ctx" $ "component" "api") | nindent 4 }}
+spec:
+  # The api pod, by the labels its Deployment selects it with.
+  podSelector:
+    matchLabels: {{- include "opendmtq.selector" (dict "ctx" $ "component" "api") | nindent 6 }}
+  # What comes in only: the api's own connections out (to the object store, and DNS) stay as they are.
+  policyTypes: [Ingress]
+  ingress:
+    # From the router's pods of this release, to the server's port, and nothing else.
+    - from:
+        - podSelector:
+            matchLabels: {{- include "opendmtq.selector" (dict "ctx" $ "component" "router") | nindent 14 }}
+      ports:
+        - {protocol: TCP, port: 8080}
+{{- end }}
