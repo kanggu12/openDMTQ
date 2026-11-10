@@ -58,17 +58,18 @@ pages offer. While the launcher's window is open, the flags that change what it 
 | The mouse's left button | One finger on the screen: tap, hold and drag |
 | The mouse wheel | Scrolls what is under the pointer, as a finger's drag; with Shift, across |
 | A pen | One finger |
-| Esc | The phone's Back key: pauses a song, closes what is open. Held, the menu |
+| Esc | The phone's Back key: pauses a song, closes what is open |
 | The keyboard | Text where the game asks for it (Enter ends it, Esc cancels it), Hangul too |
 | The touch keyboard | Comes up when a touch opens the game's text, and types into it |
 | F11, or Alt+Enter | Full screen, and back |
 
-- **The menu** comes up from the round button at the top right; from Esc held; from a finger drawn down from the top
-  edge of the game; and from Alt+F4 or the window's close button. The button shows while the mouse moves in the top
-  quarter of the game with its button up, so it stays out of the way of a song played with the mouse. The menu has
-  **Back to the game**, full screen or a window, and **Quit the game**, the one way the game ends. The game holds still
-  while the menu is open, as a phone's game does when its owner leaves it: a song stops where it was, with the game's
-  own pause screen on return. The arrow keys and Enter choose in it, and Esc closes it. Minimised, the game holds still
+- **Quitting and the menu**: two round buttons show at the top right while the mouse moves in the top quarter of the
+  game with its button up, so they stay out of the way of a song played with the mouse. The **X** quits: it asks first,
+  **Keep playing** or **Quit the game**, so a click by mistake does not end a song; the window's own close button asks
+  the same. The other button opens the menu, as does a finger drawn down from the top edge of the game: **Back to the
+  game**, full screen or a window, and **Quit the game**. Alt+F4 does nothing. The game holds still while the question
+  or the menu is open, as a phone's game does when its owner leaves it: a song stops where it was, with the game's own
+  pause screen on return. The arrow keys and Enter choose in them, and Esc closes them. Minimised, the game holds still
   behind the menu the same way, and the menu is there when the game comes back.
 - **The pointer** over the game is a dart in the logo's look: a chrome left face and a lime right face with a dark rim.
   While the button is down it is all lime and a little smaller. It is sized for the display's scaling.

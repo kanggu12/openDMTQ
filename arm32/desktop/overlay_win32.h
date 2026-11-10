@@ -26,8 +26,9 @@ void notice(const std::string& text, bool live);
 void pointer_moved(int y, bool pressed);
 bool menu_open();
 void open_menu();
+// The X's question on the menu's card: keep playing (first, Enter at once) or quit.
+void ask_quit();
 void close_menu();
-void toggle_menu();
 // The game's window was minimised (true) or came back (false): minimised, the game holds still and the menu waits for
 // its return.
 void minimised(bool now);

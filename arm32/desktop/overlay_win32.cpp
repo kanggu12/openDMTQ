@@ -7,9 +7,10 @@
 // - The notice: the server's two-line notice about a broadcast (a title, then where to watch), as a card that slides
 //   down at the top of the game, stays for a few seconds and fades. A red LIVE mark while broadcasting, a grey one when
 //   the broadcast has ended.
-// - The menu: a PC has no phone's buttons around the game, so a small round button shows at the top right while the
-//   mouse moves and opens a menu: back to the game, full screen or a window, quit (the only way out: Alt+F4 and the
-//   window's X open it too). Holding Esc and, on a touch screen, a finger drawn down from the top edge open it as well.
+// - The buttons: a PC has no phone's buttons around the game, so two small round buttons show at the top right while
+//   the mouse moves near the top: the menu (back to the game, full screen or a window, quit) and an X that quits, after
+//   asking on the same card (a click by mistake mid-song would lose the play). The window's own X asks the same; Alt+F4
+//   does nothing. On a touch screen a finger drawn down from the top edge opens the menu as well.
 // - The cursor: a dart in the logo's chrome and lime, all lime while the mouse's finger is down on the game.
 #include "overlay_win32.h"
 
@@ -157,7 +158,11 @@ LRESULT CALLBACK notice_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
 // ---- the menu button and the menu
 
 HWND g_button = nullptr, g_menu = nullptr;
-bool g_button_hover = false;
+// The button under the pointer: kNone, the menu's or the X's. Both are drawn in the one window, side by side.
+constexpr int kNone = -1, kMenuButton = 0, kQuitButton = 1;
+int g_button_hover = kNone;
+// The card asks whether to quit (the X, the window's own close) instead of showing the menu.
+bool g_asking_quit = false;
 UINT64 g_moved = 0;  // when the mouse last moved over the game
 // The button's one timer: due when its fade begins, then at each step of the fade.
 constexpr UINT_PTR kButtonTimer = 2;
@@ -166,7 +171,7 @@ constexpr UINT64 kButtonStayMs = 2500, kButtonFadeMs = 400, kButtonStepMs = 30;
 // The button's picture, kept while it looks the same (the pointer on it or not, the overlay's scale): its fade and its
 // moves with the game show the same picture at another opacity or place (Canvas::show), as the notice's do.
 std::unique_ptr<Canvas> g_button_canvas;
-bool g_button_canvas_hover = false;
+int g_button_canvas_hover = kNone;
 float g_button_canvas_scale = 0;
 int g_menu_hover = -1;
 // Where the pointer was in the menu's window as it came: the move Windows reports for a window that just showed is no
@@ -182,6 +187,11 @@ struct Item {
     bool quit;
 };
 std::vector<Item> items() {
+    // Asked whether to quit: going on first, so that Enter at once keeps the game.
+    if (g_asking_quit) {
+        if (g_korean) return {{L"계속하기", false}, {L"게임 끝내기", true}};
+        return {{L"Keep playing", false}, {L"Quit the game", true}};
+    }
     const bool full = g_hooks.fullscreen && g_hooks.fullscreen();
     if (g_korean) return {{L"게임으로 돌아가기", false}, {full ? L"창 모드로" : L"전체 화면으로", false}, {L"게임 끝내기", true}};
     return {{L"Back to the game", false}, {full ? L"Windowed" : L"Full screen", false}, {L"Quit the game", true}};
@@ -204,35 +214,55 @@ Layout menu_layout(int w, int h) {
     return l;
 }
 
-// The button's picture as it looks now, drawn only when its look changed.
+// The size of one round button, the gap between the two and the room around them for the shadow, at this scale.
+int button_size() { return px(38); }
+int button_gap() { return px(10); }
+int button_room() { return px(6); }
+
+// Which button a point of the buttons' window is on: the menu's on the left, the X on the right.
+int button_at(int x) { return x < button_room() + button_size() + button_gap() / 2 ? kMenuButton : kQuitButton; }
+
+// The buttons' picture as it looks now, drawn only when its look changed.
 Canvas& button_canvas() {
     const float now_scale = scale();
     if (g_button_canvas && g_button_canvas_hover == g_button_hover && g_button_canvas_scale == now_scale) return *g_button_canvas;
-    const int size = px(38);
-    g_button_canvas = std::make_unique<Canvas>(size + px(12), size + px(12));
+    const int size = button_size(), gap = button_gap(), o = button_room();
+    g_button_canvas = std::make_unique<Canvas>(size * 2 + gap + o * 2, size + o * 2);
     g_button_canvas_hover = g_button_hover;
     g_button_canvas_scale = now_scale;
     {
         auto bmp = g_button_canvas->surface();
         Graphics g(bmp.get());
         text_setup(g);
-        const float o = static_cast<float>(px(6));
-        GraphicsPath circle;
-        circle.AddEllipse(o, o, static_cast<float>(size), static_cast<float>(size));
-        SolidBrush shadow(Color(40, 0, 0, 0));
-        g.TranslateTransform(0, static_cast<float>(px(2)));
-        g.FillPath(&shadow, &circle);
-        g.ResetTransform();
-        SolidBrush fill(g_button_hover ? kRaisedHover : kSurface);
-        g.FillPath(&fill, &circle);
-        Pen edge(kEdge, 1.0f);
-        g.DrawPath(&edge, &circle);
-        // Three short lines: a menu.
-        Pen line(kText, static_cast<float>(px(2)));
-        line.SetStartCap(LineCapRound);
-        line.SetEndCap(LineCapRound);
-        const float cx = o + size / 2.0f, cy = o + size / 2.0f, half = static_cast<float>(px(8)), step = static_cast<float>(px(5));
-        for (int i = -1; i <= 1; ++i) g.DrawLine(&line, cx - half, cy + i * step, cx + half, cy + i * step);
+        for (int which : {kMenuButton, kQuitButton}) {
+            const float left = static_cast<float>(o + which * (size + gap)), top = static_cast<float>(o);
+            const bool hover = g_button_hover == which;
+            GraphicsPath circle;
+            circle.AddEllipse(left, top, static_cast<float>(size), static_cast<float>(size));
+            // A soft shadow a little below, the dark surface, the thin light edge: the overlay's look.
+            SolidBrush shadow(Color(40, 0, 0, 0));
+            g.TranslateTransform(0, static_cast<float>(px(2)));
+            g.FillPath(&shadow, &circle);
+            g.ResetTransform();
+            SolidBrush fill(hover ? kRaisedHover : kSurface);
+            g.FillPath(&fill, &circle);
+            Pen edge(kEdge, 1.0f);
+            g.DrawPath(&edge, &circle);
+            Pen line(which == kQuitButton && hover ? kQuit : kText, static_cast<float>(px(2)));
+            line.SetStartCap(LineCapRound);
+            line.SetEndCap(LineCapRound);
+            const float cx = left + size / 2.0f, cy = top + size / 2.0f;
+            if (which == kMenuButton) {
+                // Three short lines: a menu.
+                const float half = static_cast<float>(px(8)), step = static_cast<float>(px(5));
+                for (int i = -1; i <= 1; ++i) g.DrawLine(&line, cx - half, cy + i * step, cx + half, cy + i * step);
+            } else {
+                // An X: quitting, red under the pointer (the overlay's colour for it).
+                const float half = static_cast<float>(px(6.5f));
+                g.DrawLine(&line, cx - half, cy - half, cx + half, cy + half);
+                g.DrawLine(&line, cx - half, cy + half, cx + half, cy - half);
+            }
+        }
     }
     return *g_button_canvas;
 }
@@ -243,7 +273,7 @@ Canvas& button_canvas() {
 void show_button() {
     const UINT64 idle = GetTickCount64() - g_moved;
     float alpha = 1;
-    if (!g_button_hover && idle > kButtonStayMs) alpha = 1 - std::min(1.0f, static_cast<float>(idle - kButtonStayMs) / kButtonFadeMs);
+    if (g_button_hover == kNone && idle > kButtonStayMs) alpha = 1 - std::min(1.0f, static_cast<float>(idle - kButtonStayMs) / kButtonFadeMs);
     if (alpha <= 0 || menu_open()) {
         ShowWindow(g_button, SW_HIDE);
         KillTimer(g_button, kButtonTimer);
@@ -253,11 +283,11 @@ void show_button() {
     Canvas& c = button_canvas();
     const int margin = px(14);
     const RECT a = area();
-    c.show(g_button, a.right - c.w - margin + px(6), a.top + margin - px(6), static_cast<BYTE>(alpha * 255));
+    c.show(g_button, a.right - c.w - margin + button_room(), a.top + margin - button_room(), static_cast<BYTE>(alpha * 255));
     ShowWindow(g_button, SW_SHOWNOACTIVATE);
     // Under the pointer it stays as it is with no timer (leaving it starts its time again, button_proc); otherwise the
     // timer wakes it when its fade begins, and every step of the fade after.
-    if (g_button_hover) KillTimer(g_button, kButtonTimer);
+    if (g_button_hover != kNone) KillTimer(g_button, kButtonTimer);
     else SetTimer(g_button, kButtonTimer, static_cast<UINT>(idle < kButtonStayMs ? kButtonStayMs - idle : kButtonStepMs), nullptr);
 }
 
@@ -287,7 +317,9 @@ void draw_menu() {
         centre.SetAlignment(StringAlignmentCenter);
         centre.SetLineAlignment(StringAlignmentCenter);
         const float pad = static_cast<float>(px(18));
-        g.DrawString(L"OpenDMTQ", -1, &title, RectF(l.card.X, l.card.Y + pad, l.card.Width, static_cast<REAL>(px(30))), &centre, &text);
+        // The menu's name, or the question the X asks.
+        const wchar_t* heading = !g_asking_quit ? L"OpenDMTQ" : g_korean ? L"게임을 끝낼까요?" : L"Quit the game?";
+        g.DrawString(heading, -1, &title, RectF(l.card.X, l.card.Y + pad, l.card.Width, static_cast<REAL>(px(30))), &centre, &text);
         const auto list = items();
         for (std::size_t i = 0; i < list.size(); ++i) {
             GraphicsPath row;
@@ -322,7 +354,13 @@ bool in_card(int x, int y) {
 }
 
 void choose(int i) {
+    const bool asking = g_asking_quit;
     close_menu();
+    // Asked whether to quit: the second row quits, the first goes on.
+    if (asking) {
+        if (i == 1 && g_hooks.quit) g_hooks.quit();
+        return;
+    }
     if (i == 1 && g_hooks.toggle_fullscreen) g_hooks.toggle_fullscreen();
     if (i == 2 && g_hooks.quit) g_hooks.quit();
 }
@@ -332,22 +370,29 @@ LRESULT CALLBACK button_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     case WM_TIMER:
         if (w == kButtonTimer) show_button();
         return 0;
-    case WM_MOUSEMOVE:
-        if (!g_button_hover) {
-            g_button_hover = true;
+    case WM_MOUSEMOVE: {
+        // The button under the pointer lights up; the window hears when the pointer leaves it.
+        const int now = button_at(static_cast<short>(LOWORD(l)));
+        if (g_button_hover == kNone) {
             TRACKMOUSEEVENT t{sizeof t, TME_LEAVE, h, 0};
             TrackMouseEvent(&t);
+        }
+        if (now != g_button_hover) {
+            g_button_hover = now;
             show_button();
         }
         return 0;
+    }
     case WM_MOUSELEAVE:
-        g_button_hover = false;
+        g_button_hover = kNone;
         g_moved = GetTickCount64();
         show_button();
         return 0;
     case WM_LBUTTONUP:
+        // The keyboard back to the game's window, then the menu or the question to quit.
         SetForegroundWindow(g_frame);
-        open_menu();
+        if (button_at(static_cast<short>(LOWORD(l))) == kQuitButton) ask_quit();
+        else open_menu();
         return 0;
     case WM_SETCURSOR:
         // The game's pointer over the button too.
@@ -606,8 +651,24 @@ void show_menu() {
 
 void open_menu() {
     if (!g_menu || menu_open()) return;
+    g_asking_quit = false;
     // Over a minimised game it would show nowhere: the game comes back first.
     if (IsIconic(g_frame)) ShowWindow(g_frame, SW_RESTORE);
+    show_menu();
+    if (g_hooks.shown) g_hooks.shown(true);
+}
+
+void ask_quit() {
+    if (!g_menu) return;
+    // The menu up already: it becomes the question.
+    if (menu_open()) {
+        g_asking_quit = true;
+        g_menu_hover = 0;
+        draw_menu();
+        return;
+    }
+    if (IsIconic(g_frame)) ShowWindow(g_frame, SW_RESTORE);
+    g_asking_quit = true;
     show_menu();
     if (g_hooks.shown) g_hooks.shown(true);
 }
@@ -651,11 +712,6 @@ bool menu_key(UINT vk) {
     return true;
 }
 
-void toggle_menu() {
-    if (menu_open()) close_menu();
-    else open_menu();
-}
-
 void place() {
     if (menu_open()) draw_menu();
     // The button's kept picture where the game's area went (drawn again only at another scale).
@@ -664,8 +720,8 @@ void place() {
 }
 
 #ifdef OVERLAY_TEST_HOOKS
-// For the overlay's own probe only (_work/winprobe): the notice's and the menu's pictures as PNGs, over the game's dark,
-// where a locked or busy screen cannot be captured.
+// For the overlay's own probe only (_work/winprobe): the notice's, the buttons' and the card's pictures as PNGs, over the
+// game's dark, with no window shown: a locked or busy screen cannot be captured, and a check shows nothing on it.
 void test_save(const std::wstring& prefix) {
     CLSID png{0x557cf406, 0x1a04, 0x11d3, {0x9a, 0x73, 0x00, 0x00, 0xf8, 0x1e, 0xf3, 0x2e}};
     auto save = [&](Canvas* c, const wchar_t* name) {
@@ -679,7 +735,22 @@ void test_save(const std::wstring& prefix) {
         out.Save((prefix + name).c_str(), &png, nullptr);
     };
     save(g_notice_canvas.get(), L"notice.png");
-    if (menu_open()) save(g_menu_canvas.get(), L"menu.png");
+    // The two buttons with neither, the menu's or the X under the pointer.
+    const wchar_t* button_names[] = {L"buttons.png", L"buttons-menu.png", L"buttons-quit.png"};
+    for (int which : {kNone, kMenuButton, kQuitButton}) {
+        g_button_hover = which;
+        save(&button_canvas(), button_names[which + 1]);
+    }
+    g_button_hover = kNone;
+    // The card as the menu and as the X's question, its first row chosen; drawn into its window's picture, which stays
+    // hidden (only show_menu shows it).
+    for (bool asking : {false, true}) {
+        g_asking_quit = asking;
+        g_menu_hover = 0;
+        draw_menu();
+        save(g_menu_canvas.get(), asking ? L"quit.png" : L"menu.png");
+    }
+    g_asking_quit = false;
 }
 #endif
 

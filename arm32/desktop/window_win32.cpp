@@ -81,15 +81,13 @@ bool g_last_touch = false;
 // scale below 100 % in the PC's settings, that share of it, and ANGLE stretches its picture over the area (pacing.h's
 // g_window_fixed_size). Input comes in the area's pixels and goes to the game in its own.
 int g_area_w = 0, g_area_h = 0;
-// The menu's Quit, to the frame: the window's own close (Alt+F4, its X) opens the menu instead.
+// The quit chosen on the overlay's card, to the frame: the window's own close (its X) asks there first.
 constexpr UINT kQuitMessage = WM_APP + 1;
 // A check's character for the input method (PLAYER_KEYS ime=): composed on the text field's own thread, where the input
 // context lives. wParam the character, lParam 1 to compose it and 2 to finish it.
 constexpr UINT kImeMessage = WM_APP + 2;
-// Esc held for the menu: when it went down (0: not held now), and whether the hold opened the menu. A short press is the
-// phone's Back key, sent when Esc comes up.
-constexpr UINT_PTR kEscTimer = 7;
-constexpr UINT kEscHoldMs = 600;
+// Esc is the phone's Back key, sent when it comes up: whether it went down over the game, and whether the menu took it
+// (Esc closing the menu is no Back key when it comes up).
 bool g_esc_down = false, g_esc_held = false;
 // A finger that came down on the game's top edge: drawn down, it opens the menu instead of reaching the game; lifted
 // where it was, it is a tap after all. Its pointer id (0: none) and where it started, in the game's window.
@@ -575,17 +573,17 @@ void ime_cancel(HWND h) {
 
 // Checks press keys at seconds of their choosing (PLAYER_KEYS="@seconds:key[/hold_ms];...", the seconds from the window's
 // first showing): esc, enter, space, up, down, f11, alt+enter, alt+f4, each posted to the frame as Windows would send it,
-// down, then up after hold_ms (50 when not given). Two more act as the mouse and the keyboard do: click=x,y presses and
-// lifts the mouse's first button at x,y of the game's pixels on the game's area; text=... types into whichever window has
-// the keyboard then (the text field while the game asks for text), a key at a time, \uXXXX for a character cmd's own
-// set would not carry and \b for Backspace; ime=... the same, each character composed and finished by the input method
-// of the text field. Nothing goes through Windows' own input, and the keys reach the window while the game is held still
-// (the planned taps follow the game's frames, which stop then).
+// down, then up after hold_ms (50 when not given); close, the window's own close (its X). Three more act as the mouse
+// and the keyboard do: click=x,y presses and lifts the mouse's first button at x,y of the game's pixels on the game's
+// area; text=... types into whichever window has the keyboard then (the text field while the game asks for text), a
+// key at a time, \uXXXX for a character cmd's own set would not carry and \b for Backspace; ime=... the same, each
+// character composed and finished by the input method of the text field. Nothing goes through Windows' own input, and
+// the keys reach the window while the game is held still (the planned taps follow the game's frames, which stop then).
 void plan_keys() {
     const char* list = std::getenv("PLAYER_KEYS");
     if (!list || !*list) return;
     // What a press is: a key, a click or text.
-    enum class Kind { key, click, text, ime };
+    enum class Kind { key, click, text, ime, close };
     struct Press {
         double at;
         Kind kind;
@@ -616,6 +614,9 @@ void plan_keys() {
             {"down", {VK_DOWN, false}}, {"f11", {VK_F11, false}}, {"alt+enter", {VK_RETURN, true}}, {"alt+f4", {VK_F4, true}}};
         if (auto it = names.find(key); it != names.end()) {
             presses.push_back({at, Kind::key, it->second.first, it->second.second, hold, key, 0, 0, {}});
+        } else if (key == "close") {
+            // The window's own close, as its X or the taskbar's Close sends it.
+            presses.push_back({at, Kind::close, 0, false, hold, key, 0, 0, {}});
         } else if (key.rfind("click=", 0) == 0) {
             // x,y in the game's pixels, as PLAYER_TAPS takes them.
             float x = 0, y = 0;
@@ -663,6 +664,11 @@ void plan_keys() {
                 PostMessageW(g_window, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM(cx, cy));
                 std::this_thread::sleep_for(std::chrono::milliseconds(k.hold));
                 PostMessageW(g_window, WM_LBUTTONUP, 0, MAKELPARAM(cx, cy));
+                continue;
+            }
+            if (k.kind == Kind::close) {
+                jvm::log("player: %.1f s: the window's close", k.at);
+                PostMessageW(g_frame, WM_CLOSE, 0, 0);
                 continue;
             }
             if (k.kind == Kind::ime) {
@@ -777,12 +783,8 @@ LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             toggle_fullscreen(g_frame);
             return 0;
         }
-        // Alt+F4 while the game asks for text: the menu, as over the game (the field's own handling would not reach the
-        // frame everywhere).
-        if (w == VK_F4 && (HIWORD(l) & KF_ALTDOWN)) {
-            if (!(l & (1L << 30))) overlay::open_menu();
-            return 0;
-        }
+        // Alt+F4 while the game asks for text: nothing, as over the game (quitting is the X's, which asks first).
+        if (w == VK_F4 && (HIWORD(l) & KF_ALTDOWN)) return 0;
         // F10 alone would put the window in Windows' menu mode, which eats the next key: nothing.
         if (w == VK_F10) return 0;
         break;
@@ -803,9 +805,9 @@ LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
 LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     switch (msg) {
     case WM_CLOSE:
-        // Alt+F4 or the window's X: the menu, whose Quit is the one way out, so that a key pressed by mistake mid-song
+        // The window's X (or the taskbar's close): asked first on the overlay's card, so that a click by mistake mid-song
         // never ends the game.
-        overlay::open_menu();
+        overlay::ask_quit();
         return 0;
     case kQuitMessage:
         // The menu's Quit.
@@ -858,8 +860,7 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     }
     case WM_KILLFOCUS:
         lift_keys();
-        // An Esc whose coming up goes elsewhere (Ctrl+Shift+Esc, Alt+Tab while held): neither a hold nor a Back.
-        KillTimer(h, kEscTimer);
+        // An Esc whose coming up goes elsewhere (Ctrl+Shift+Esc, Alt+Tab while held): no Back.
         g_esc_down = false;
         return 0;
     case WM_SETFOCUS:
@@ -877,15 +878,6 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         // Text while the game asks for it: printable characters only; the keys that end or edit it come as keys.
         if (typing() && w >= 0x20 && !overlay::menu_open()) typed(static_cast<wchar_t>(w));
         return 0;
-    case WM_TIMER:
-        if (w == kEscTimer) {
-            // Esc held long enough: the menu, and no Back key when it comes up.
-            KillTimer(h, kEscTimer);
-            g_esc_held = true;
-            overlay::toggle_menu();
-            return 0;
-        }
-        break;
     case WM_SYSKEYUP:
         // F10's coming up: no menu mode either.
         if (w == VK_F10) return 0;
@@ -893,6 +885,8 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     case WM_SYSKEYDOWN:
         // F10 alone would put the window in Windows' menu mode, which eats the next key (a note): nothing.
         if (w == VK_F10) return 0;
+        // Alt+F4: nothing. Windows would close the window with it; quitting is the X's, which asks first.
+        if (w == VK_F4 && (HIWORD(l) & KF_ALTDOWN)) return 0;
         // Alt+Enter: full screen, as Windows games switch; once per press, not again while held.
         if (w == VK_RETURN && (HIWORD(l) & KF_ALTDOWN)) {
             if (!(l & (1L << 30))) toggle_fullscreen(h);
@@ -912,14 +906,13 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             else if (w == VK_BACK) type_key(kKeyBackspace);
             return 0;
         }
-        // Esc: held, the menu; a short press, the Back key when it comes up.
+        // Esc: the Back key when it comes up.
         if (w == VK_ESCAPE) {
             // With Ctrl, Shift or Alt it is Windows' (Ctrl+Shift+Esc), not the game's.
             if (GetKeyState(VK_CONTROL) < 0 || GetKeyState(VK_SHIFT) < 0 || GetKeyState(VK_MENU) < 0) return 0;
             if (!(l & (1L << 30))) {
                 g_esc_down = true;
                 g_esc_held = false;
-                SetTimer(h, kEscTimer, kEscHoldMs, nullptr);
             }
             return 0;
         }
@@ -938,8 +931,7 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     case WM_KEYUP: {
         if (w == VK_ESCAPE && g_esc_down) {
             g_esc_down = false;
-            KillTimer(h, kEscTimer);
-            // A short press: the phone's Back key, down and up.
+            // The phone's Back key, down and up, unless the menu took this Esc.
             if (!g_esc_held) {
                 int unicode = 0;
                 if (int code = phone_key(VK_ESCAPE, unicode)) {
