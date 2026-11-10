@@ -863,8 +863,17 @@ void encoder_main() {
             if (!failed) {
                 log("arm32: live: on, %dx%d", session->width, session->height);
                 const Nanos started = now_ns();
+                // debug.arm32.livebreak <seconds>: the encoder taken as broken that long into each session, as a codec the
+                // system takes back is, to try the ending, the retry and the giving up out on a phone (0 or unset: never).
+                const long break_after = std::strtol(setting("ARM32_LIVEBREAK", "debug.arm32.livebreak").c_str(), nullptr, 10);
                 while (!session->stop.load(std::memory_order_acquire) && g_want.load(std::memory_order_relaxed) &&
                        !session->failed.load(std::memory_order_relaxed)) {
+                    // The break asked for: once, after its seconds.
+                    if (break_after > 0 && now_ns() - started >= static_cast<Nanos>(break_after) * 1000000000) {
+                        log("arm32: live: debug.arm32.livebreak: the encoder taken as broken after %ld s", break_after);
+                        session->failed.store(true);
+                        break;
+                    }
                     // Pictures come every 33 ms and AAC frames about every 21: a few milliseconds' rest
                     // when there is nothing to do is plenty.
                     if (!encoder.pump()) sleep_ns(4000000);

@@ -238,7 +238,9 @@ warm phone steps the quality down from what the server asks for: to two thirds o
 with three quarters of its lines, then to half its lines, with the bitrate at 60, 35 and 20 % (the Standard
 quality's 30 fps and 720 lines go to 20 fps, then to 15 fps and 540 lines, then to 360). The network's step comes
 back up after a minute of quick uploads, the phone's as it cools, and nothing is sent from thermal status CRITICAL
-on. The notice comes as a toast. All the threads run at low priority
+on. An encoder that breaks while it runs (a codec the system takes back) ends the session, another is tried ten seconds
+later, and three in a row give up; a session that ran a minute starts the count over. `debug.arm32.livebreak <seconds>`
+takes each session's encoder as broken that long in, to try this out on a phone. The notice comes as a toast. All the threads run at low priority
 and only the encoder thread can block on the encoder; a picture with no free texture is left out.
 
 On a Galaxy S26 Ultra at 120 fps, one play of the same song each, with and without live view: 0 of 237 frames
