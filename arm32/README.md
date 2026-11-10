@@ -250,7 +250,10 @@ the graphics card, and a later swap copies it out once the GPU is done, so the g
 H.264 and AAC encoders (Media Foundation) make the stream from those pictures and the player's mix, before its volume.
 Windows' H.264 encoder leaves the colours out of its sequence header, so `src/live_sps.cpp` writes BT.709 into it
 (`tests/host/live_sps_test.cpp`). The quality steps down as on a phone for a slow upload, and for an encoder that does
-not keep up, and comes back up after a minute with time to spare.
+not keep up, and comes back up after a minute with time to spare. The conversion's shaders are compiled as soon as the
+server first answers, at the game's title: a broadcast that starts later, in a song too, then makes only its textures
+and buffers on the render thread (under Wine 2 ms, where the compile had taken 762 of the start's 763 ms). Each start's
+cost is in the log.
 
 **The shim** (`shim/shim.cpp`, `debug.arm32.shim`, on). Phones that can run 32-bit apps never start this
 runtime: the manifest's `use32bitAbi` sends them to `lib/armeabi-v7a`, and the game's own libraries run

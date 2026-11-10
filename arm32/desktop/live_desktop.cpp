@@ -136,6 +136,7 @@ std::atomic<bool> g_want{false};     // pictures and sound are to be sent right 
 std::atomic<bool> g_on{false};       // the server has live view on for this player
 std::atomic<bool> g_gave_up{false};  // this PC cannot do it: the server is still asked, for notices
 std::atomic<bool> g_paused{false};   // the game is held still behind the player's menu: nothing is sent meanwhile
+std::atomic<bool> g_warm_due{false};  // the server has answered: the render thread makes the conversion's program (warm_up)
 std::atomic<int> g_failures{0};      // encoder start-ups that failed; three end the attempts
 
 // The requests to the server, the upload thread and the network's quality step (src/live_net.cpp, a phone's too), with
@@ -1183,6 +1184,61 @@ bool target(const Gl& g, int width, int height, GLuint* texture, GLuint* fbo) {
     return g.check_framebuffer(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
 }
 
+// The conversion's program and vertex array in `context`, the current one, unless they are there already: made once and
+// kept for the context's life (g_conversion; a context before this one took its own along). The program in use changes
+// (the caller has the game's saved). What it took, 0 when they were there.
+Nanos make_conversion(const Gl& g, EGLContext context) {
+    Conversion& v = g_conversion;
+    if (v.context == context && v.program) return 0;
+    const Nanos began = now_ns();
+    v = Conversion{};
+    GLuint vertex = compile(g, GL_VERTEX_SHADER, kVertex);
+    GLuint fragment = vertex ? compile(g, GL_FRAGMENT_SHADER, kFragment) : 0;
+    if (vertex && fragment) {
+        v.program = g.create_program();
+        g.attach_shader(v.program, vertex);
+        g.attach_shader(v.program, fragment);
+        g.link_program(v.program);
+        GLint linked = 0;
+        g.get_program(v.program, GL_LINK_STATUS, &linked);
+        if (linked) {
+            g.use_program(v.program);
+            g.uniform_int(g.uniform_location(v.program, "picture"), 0);
+            v.scale_uniform = g.uniform_location(v.program, "scale");
+            v.chroma_uniform = g.uniform_location(v.program, "chroma");
+            g.gen_vertex_arrays(1, &v.vertex_array);
+            v.context = context;
+        } else {
+            g.delete_program(v.program);
+            v.program = 0;
+        }
+    }
+    if (vertex) g.delete_shader(vertex);
+    if (fragment) g.delete_shader(fragment);
+    return now_ns() - began;
+}
+
+// The conversion's program made ahead, as soon as the server has answered (control_main), which is at the game's title as
+// a rule, about a second before a broadcast the server already has on could start: a broadcast that starts later,
+// perhaps in a song, then has no compiling to do on this thread (under Wine the program was 762 of the first start's
+// 763 ms). False when it cannot be made at this swap (no context current, another surface): the next swap tries again.
+bool warm_up(EGLDisplay d, EGLSurface s, EGLContext context, EGLSurface drawn) {
+    if (context == EGL_NO_CONTEXT || drawn != s) return false;
+    // The program is OpenGL ES 3's: on a context of another version a capture says why it cannot start.
+    static auto query_context = reinterpret_cast<EGLBoolean (*)(EGLDisplay, EGLContext, EGLint, EGLint*)>(egl_proc("eglQueryContext"));
+    EGLint version = 0;
+    if (query_context) query_context(d, context, EGL_CONTEXT_CLIENT_VERSION, &version);
+    if (version < 3) return true;
+    const Gl& g = gl();
+    // The game's state as it was after: the program in use is all the making changes of it.
+    Saved saved;
+    save_state(g, saved);
+    const Nanos took = make_conversion(g, context);
+    restore_state(g, saved);
+    log("player: live: the conversion's program made ahead of a broadcast: %llu us on the render thread", static_cast<unsigned long long>(took / 1000));
+    return true;
+}
+
 // The capture's objects in the game's context, for pictures of the stream's size. The game's state as it was after.
 bool begin_capture(Capture& c, EGLDisplay d, EGLContext context, EGLSurface s, int source_width, int source_height, Nanos now) {
     const Gl& g = gl();
@@ -1217,36 +1273,9 @@ bool begin_capture(Capture& c, EGLDisplay d, EGLContext context, EGLSurface s, i
     bool ok = target(g, c.width * c.scale, c.height * c.scale, &c.picture, &c.picture_fbo);
     ok = ok && target(g, c.width / 4, c.height, &c.luma, &c.luma_fbo);
     ok = ok && target(g, c.width / 4, c.height / 2, &c.chroma, &c.chroma_fbo);
+    // The program, unless warm_up or a capture before made it in this context.
+    if (ok) program_ns = make_conversion(g, context);
     Conversion& v = g_conversion;
-    if (ok && (v.context != context || !v.program)) {
-        // The first capture in this context: the program made once (a context before this one took its own along).
-        const Nanos compile_began = now_ns();
-        v = Conversion{};
-        GLuint vertex = compile(g, GL_VERTEX_SHADER, kVertex);
-        GLuint fragment = vertex ? compile(g, GL_FRAGMENT_SHADER, kFragment) : 0;
-        if (vertex && fragment) {
-            v.program = g.create_program();
-            g.attach_shader(v.program, vertex);
-            g.attach_shader(v.program, fragment);
-            g.link_program(v.program);
-            GLint linked = 0;
-            g.get_program(v.program, GL_LINK_STATUS, &linked);
-            if (linked) {
-                g.use_program(v.program);
-                g.uniform_int(g.uniform_location(v.program, "picture"), 0);
-                v.scale_uniform = g.uniform_location(v.program, "scale");
-                v.chroma_uniform = g.uniform_location(v.program, "chroma");
-                g.gen_vertex_arrays(1, &v.vertex_array);
-                v.context = context;
-            } else {
-                g.delete_program(v.program);
-                v.program = 0;
-            }
-        }
-        if (vertex) g.delete_shader(vertex);
-        if (fragment) g.delete_shader(fragment);
-        program_ns = now_ns() - compile_began;
-    }
     ok = ok && v.context == context && v.program;
     if (ok) {
         // This capture's scale, set in the program (its state, restored with the rest below).
@@ -1450,6 +1479,11 @@ void control_main() {
         // The answer, checked (live_net.cpp parse_state). None: as things were.
         const live::State state = g_link.ask_state(ids, lang.c_str());
         if (!state.answered) continue;
+        // The server answers: the render thread makes the conversion's program now, once (warm_up), ahead of any
+        // broadcast and its first capture.
+        static bool warmed = false;
+        if (!warmed) g_warm_due.store(true, std::memory_order_relaxed);
+        warmed = true;
         g_link.set_identity(ids, state);
         if (state.on) {
             g_fps.store(state.fps);
@@ -1522,9 +1556,15 @@ void desktop_live_frame(EGLDisplay d, EGLSurface s) {
     g_last_swap.store(start, std::memory_order_relaxed);
     Capture& c = g_capture;
     const bool want = g_want.load(std::memory_order_relaxed);
+    // The conversion's program to make ahead of any broadcast (warm_up), once.
+    const bool warm = g_warm_due.load(std::memory_order_relaxed);
     // The usual case, by far.
-    if (!want && !c.live) return;
-    if (!gl().ok) return;
+    if (!want && !c.live && !warm) return;
+    if (!gl().ok) {
+        // Nothing to make the program with: nothing to make ahead either.
+        g_warm_due.store(false, std::memory_order_relaxed);
+        return;
+    }
     static auto current_context = reinterpret_cast<EGLContext (*)()>(egl_proc("eglGetCurrentContext"));
     static auto current_surface = reinterpret_cast<EGLSurface (*)(EGLint)>(egl_proc("eglGetCurrentSurface"));
     static auto query_surface = reinterpret_cast<EGLBoolean (*)(EGLDisplay, EGLSurface, EGLint, EGLint*)>(egl_proc("eglQuerySurface"));
@@ -1536,6 +1576,9 @@ void desktop_live_frame(EGLDisplay d, EGLSurface s) {
         // With no capture to end, nothing else waits for it: a new context at the same address is a new one.
         if (!c.live) g_destroyed_context.store(nullptr, std::memory_order_relaxed);
     }
+    // Made ahead while no capture runs, on the frame going to the window; a capture that runs has made it already.
+    if (warm && (c.live || warm_up(d, s, context, current_surface(EGL_DRAW)))) g_warm_due.store(false, std::memory_order_relaxed);
+    if (!want && !c.live) return;
     if (c.live) {
         // Each of these means this capture is over: a new one follows at a later frame if wanted.
         const bool gone = g_destroyed_context.load(std::memory_order_relaxed) == c.context;
