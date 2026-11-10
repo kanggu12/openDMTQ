@@ -221,8 +221,15 @@ LRESULT CALLBACK notice_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
 HWND g_button = nullptr, g_menu = nullptr;
 bool g_button_hover = false;
 UINT64 g_moved = 0;  // when the mouse last moved over the game
+// The button's one timer: due when its fade begins, then at each step of the fade.
 constexpr UINT_PTR kButtonTimer = 2;
-constexpr UINT64 kButtonStayMs = 2500;
+// Whole for this long after the mouse moved, then fading out over the next, a step at a time.
+constexpr UINT64 kButtonStayMs = 2500, kButtonFadeMs = 400, kButtonStepMs = 30;
+// The button's picture, kept while it looks the same (the pointer on it or not, the overlay's scale): its fade and its
+// moves with the game show the same picture at another opacity or place (Canvas::show), as the notice's do.
+std::unique_ptr<Canvas> g_button_canvas;
+bool g_button_canvas_hover = false;
+float g_button_canvas_scale = 0;
 int g_menu_hover = -1;
 // Where the pointer was in the menu's window as it came: the move Windows reports for a window that just showed is no
 // choice of a row.
@@ -259,11 +266,16 @@ Layout menu_layout(int w, int h) {
     return l;
 }
 
-void draw_button() {
-    const int size = px(38), margin = px(14);
-    Canvas c(size + px(12), size + px(12));
+// The button's picture as it looks now, drawn only when its look changed.
+Canvas& button_canvas() {
+    const float now_scale = scale();
+    if (g_button_canvas && g_button_canvas_hover == g_button_hover && g_button_canvas_scale == now_scale) return *g_button_canvas;
+    const int size = px(38);
+    g_button_canvas = std::make_unique<Canvas>(size + px(12), size + px(12));
+    g_button_canvas_hover = g_button_hover;
+    g_button_canvas_scale = now_scale;
     {
-        auto bmp = c.surface();
+        auto bmp = g_button_canvas->surface();
         Graphics g(bmp.get());
         text_setup(g);
         const float o = static_cast<float>(px(6));
@@ -284,17 +296,31 @@ void draw_button() {
         const float cx = o + size / 2.0f, cy = o + size / 2.0f, half = static_cast<float>(px(8)), step = static_cast<float>(px(5));
         for (int i = -1; i <= 1; ++i) g.DrawLine(&line, cx - half, cy + i * step, cx + half, cy + i * step);
     }
-    const RECT a = area();
+    return *g_button_canvas;
+}
+
+// The button at the game's top right at the opacity its time gives it (whole under the pointer, and for kButtonStayMs
+// after the mouse moved, then fading over kButtonFadeMs), or hidden once it faded or while the menu is up; its one timer
+// set for its next change.
+void show_button() {
     const UINT64 idle = GetTickCount64() - g_moved;
     float alpha = 1;
-    if (!g_button_hover && idle > kButtonStayMs) alpha = 1 - std::min(1.0f, static_cast<float>(idle - kButtonStayMs) / 400.0f);
+    if (!g_button_hover && idle > kButtonStayMs) alpha = 1 - std::min(1.0f, static_cast<float>(idle - kButtonStayMs) / kButtonFadeMs);
     if (alpha <= 0 || menu_open()) {
         ShowWindow(g_button, SW_HIDE);
         KillTimer(g_button, kButtonTimer);
         return;
     }
+    // The kept picture, shown again at this opacity and where the game's area is now.
+    Canvas& c = button_canvas();
+    const int margin = px(14);
+    const RECT a = area();
     c.show(g_button, a.right - c.w - margin + px(6), a.top + margin - px(6), static_cast<BYTE>(alpha * 255));
     ShowWindow(g_button, SW_SHOWNOACTIVATE);
+    // Under the pointer it stays as it is with no timer (leaving it starts its time again, button_proc); otherwise the
+    // timer wakes it when its fade begins, and every step of the fade after.
+    if (g_button_hover) KillTimer(g_button, kButtonTimer);
+    else SetTimer(g_button, kButtonTimer, static_cast<UINT>(idle < kButtonStayMs ? kButtonStayMs - idle : kButtonStepMs), nullptr);
 }
 
 void draw_menu() {
@@ -366,20 +392,20 @@ void choose(int i) {
 LRESULT CALLBACK button_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     switch (msg) {
     case WM_TIMER:
-        if (w == kButtonTimer) draw_button();
+        if (w == kButtonTimer) show_button();
         return 0;
     case WM_MOUSEMOVE:
         if (!g_button_hover) {
             g_button_hover = true;
             TRACKMOUSEEVENT t{sizeof t, TME_LEAVE, h, 0};
             TrackMouseEvent(&t);
-            draw_button();
+            show_button();
         }
         return 0;
     case WM_MOUSELEAVE:
         g_button_hover = false;
         g_moved = GetTickCount64();
-        draw_button();
+        show_button();
         return 0;
     case WM_LBUTTONUP:
         SetForegroundWindow(g_frame);
@@ -620,10 +646,9 @@ void pointer_moved(int y, bool pressed) {
     if (y > (a.bottom - a.top) / 4) return;
     const bool shown = IsWindowVisible(g_button) && GetTickCount64() - g_moved < kButtonStayMs;
     g_moved = GetTickCount64();
-    // Already there at full strength: only its time moves on.
+    // Already there at full strength: only its time moves on, which its timer, due at the old time, finds then.
     if (shown) return;
-    draw_button();
-    SetTimer(g_button, kButtonTimer, 50, nullptr);
+    show_button();
 }
 
 bool menu_open() { return g_menu && (IsWindowVisible(g_menu) || g_menu_pending); }
@@ -695,7 +720,8 @@ void toggle_menu() {
 
 void place() {
     if (menu_open()) draw_menu();
-    if (g_button && IsWindowVisible(g_button)) draw_button();
+    // The button's kept picture where the game's area went (drawn again only at another scale).
+    if (g_button && IsWindowVisible(g_button)) show_button();
     if (g_notice_canvas) notice_frame();
 }
 
