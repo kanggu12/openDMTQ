@@ -166,14 +166,13 @@ class Guide:
 
     def _language(self, language):
         """Switching language rebuilds the guide in the other language, on the same step ("system": Windows')."""
-        index = self.index
         self.app.state.language = None if language == "system" else language
         self.app.state.save()
         self.app._setup_fonts()
         for child in self.app.root.winfo_children():
             child.destroy()
+        # build() shows the step the guide is on (self.index), once.
         self.build()
-        self.show(index)
 
     # ------------------------------------------------------------------------------ 2 SERVER
 

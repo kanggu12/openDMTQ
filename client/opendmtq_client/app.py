@@ -45,6 +45,7 @@ class LauncherApp:
         self.tasks = queue.Queue()      # functions from worker threads, run on the Tk thread
         self.session = None             # the running game, while it runs
         self.checks = None              # the last ready check (None: being made)
+        self.checks_asked = 0           # ready checks started in this run (show() looks whether a page started one)
         self.page = "play"              # the page on show
         self.busy = False               # PLAY is getting ready (asking the server, downloading its app)
         self.status_text, self.status_tone = "", "normal"
@@ -107,8 +108,11 @@ class LauncherApp:
             return
         self.guide = None
         self._build_main()
+        asked = self.checks_asked
         self.go(self.page)
-        self.refresh_checks()
+        if self.checks_asked == asked:
+            # The page did not ask for the ready check itself (PLAY and Help do): the bar's PLAY needs one too.
+            self.refresh_checks()
 
     def _build_main(self):
         ui, px = self.ui, self.ui.px
@@ -450,6 +454,7 @@ class LauncherApp:
     def refresh_checks(self):
         """Make the ready check again on a worker thread; the PLAY page and button follow it."""
         self.checks = None
+        self.checks_asked += 1
 
         def work():
             try:
