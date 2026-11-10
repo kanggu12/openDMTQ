@@ -62,15 +62,18 @@ pages offer. While the launcher's window is open, the flags that change what it 
 | The keyboard | Text where the game asks for it (Enter ends it, Esc cancels it), Hangul too |
 | The touch keyboard | Comes up when a touch opens the game's text, and types into it |
 | F11, or Alt+Enter | Full screen, and back |
+| The pointer at the game's top edge | The bar: full screen, and the X that quits after asking |
+| Alt+F4 | Nothing: the bar's X quits |
 
-- **Quitting and the menu**: two round buttons show at the top right while the mouse moves in the top quarter of the
-  game with its button up, so they stay out of the way of a song played with the mouse. The **X** quits: it asks first,
-  **Keep playing** or **Quit the game**, so a click by mistake does not end a song; the window's own close button asks
-  the same. The other button opens the menu, as does a finger drawn down from the top edge of the game: **Back to the
-  game**, full screen or a window, and **Quit the game**. Alt+F4 does nothing. The game holds still while the question
-  or the menu is open, as a phone's game does when its owner leaves it: a song stops where it was, with the game's own
-  pause screen on return. The arrow keys and Enter choose in them, and Esc closes them. Minimised, the game holds still
-  behind the menu the same way, and the menu is there when the game comes back.
+- **The bar and quitting**: a PC has no phone's buttons around the game, so a bar in the look of the game's own dialog
+  header shows across the top of the game when the pointer touches the game's very top edge with its button up, or
+  when a finger is drawn down from that edge on a touch screen. It stays while the pointer is on it and fades soon
+  after the pointer leaves, so it never sits on the game's own controls at the top while they are used; no key opens
+  it. On its right: **full screen** (or back to a window) and an **X** that quits. The X asks first, **Keep playing** or
+  **Quit the game**, so a click by mistake does not end a song; the window's own close button asks the same, and
+  Alt+F4 does nothing. The game holds still while it asks, as a phone's game does when its owner leaves it: a song
+  stops where it was, with the game's own pause screen after. In the question, Left, Right and Tab move the choice,
+  Enter takes it and Esc keeps playing. Minimised, the game holds still the same way, and goes on when it comes back.
 - **The pointer** over the game is a dart in the logo's look: a chrome left face and a lime right face with a dark rim.
   While the button is down it is all lime and a little smaller. It is sized for the display's scaling.
 - **A touch screen** is the player's first input, as a phone's screen is the game's. Windows' own touch feedback stays
@@ -126,8 +129,8 @@ says when a broadcast starts and ends, and where it can be watched.
   Media Feature Pack, under Settings, Optional features (in Apps or in System, by the version of Windows). Without it
   the videos are black and silent, and the game goes on.
 - **The language:** the launcher speaks Windows' display language, Korean or English, until one is chosen on the
-  first-start guide's first step or the **Launcher** page, and the installer speaks the launcher's. The menu over the
-  game follows Windows' display language, and so does the game, among the languages it has.
+  first-start guide's first step or the **Launcher** page, and the installer speaks the launcher's. What the player draws
+  over the game follows Windows' display language, and so does the game, among the languages it has.
 - **What it keeps on the PC,** per Windows user:
   - the program, in `%LOCALAPPDATA%\OpenDMTQ.Client`;
   - the launcher's settings and logs, and each server's app, in `%LOCALAPPDATA%\OpenDMTQ\client`;
@@ -187,8 +190,8 @@ The player runs the game's own 32-bit Android code, as the app does on phones th
 calls on Windows. In place of Android's Java side, the player has its own stand-in for the classes the game calls. The
 game draws with OpenGL ES, which ANGLE runs on Direct3D 11; its sound goes out through WASAPI, and its videos are
 decoded by Media Foundation. Its requests to the server go out as a phone's do, asking for the server's answers
-compressed, which makes its lists of songs and scores many times smaller on the way. The menu, the notice and the
-pointer are drawn by the player over the game's window.
+compressed, which makes its lists of songs and scores many times smaller on the way. The bar, the question before
+quitting, the notice and the pointer are drawn by the player over the game's window.
 
 The launcher is Python with Tk, made into a Windows program with PyInstaller; Velopack installs it and updates it. The
 launcher writes the player's settings into a file and starts the player with it (`--app` names the folder of the

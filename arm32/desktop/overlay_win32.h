@@ -1,5 +1,5 @@
-// What the player for Windows draws over the game: the server's notice, the menu and its button, the cursor (see
-// overlay_win32.cpp). All of it on the UI thread.
+// What the player for Windows draws over the game: the bar at the top edge with full screen and the X, the question
+// before quitting, the server's notice, the cursor (see overlay_win32.cpp). All of it on the UI thread.
 #pragma once
 
 #include <windows.h>
@@ -8,38 +8,43 @@
 
 namespace player::overlay {
 
-// What the menu does, which the window owns.
+// What the bar and the question do, which the window owns.
 struct Hooks {
+    // The bar's full screen chip: full screen and back.
     void (*toggle_fullscreen)() = nullptr;
+    // The question's Quit the game.
     void (*quit)() = nullptr;
+    // Whether the frame is in full screen now: the chip's icon shows the other way.
     bool (*fullscreen)() = nullptr;
-    // The menu came up (true) or went (false): the game is held still meanwhile.
-    void (*shown)(bool) = nullptr;
+    // The game held still (true: a question is up, or the window is minimised) or let go on (false).
+    void (*hold)(bool) = nullptr;
 };
 
-// Once the frame and the game's window are made; `korean` for the menu's words.
+// Once the frame and the game's window are made; `korean` for the words.
 void start(HWND frame, HWND game, const Hooks& hooks, bool korean);
 // The server's notice ("title\ndetail"), with the LIVE mark while broadcasting, or the ended one.
 void notice(const std::string& text, bool live);
-// The mouse moved over the game, `y` pixels from its top, with its button down or not: near the top, and not while
-// playing, the menu's button shows for a while.
+// The mouse moved over the game, `y` pixels from its top, with its button down or not: at the very top edge, with the
+// button up, the bar shows.
 void pointer_moved(int y, bool pressed);
-bool menu_open();
-void open_menu();
-// The X's question on the menu's card: keep playing (first, Enter at once) or quit.
+// A finger drawn down from the game's top edge: the bar shows for a few seconds.
+void show_bar();
+// Whether the question before quitting is up (the game is held still and the keys are the question's meanwhile).
+bool asking();
+// The question before quitting (the bar's X, the window's own close): Keep playing first, so that Enter at once goes on.
 void ask_quit();
-void close_menu();
-// The game's window was minimised (true) or came back (false): minimised, the game holds still and the menu waits for
-// its return.
+// The game's window was minimised (true) or came back (false): minimised, the game holds still until it is back.
 void minimised(bool now);
-// A key while the menu is open: the arrows choose a row, Enter or Space does it, Esc closes. True when it was the menu's.
-bool menu_key(UINT vk);
+// A key while the question is up: Left, Right and Tab move the choice, Enter takes it, Esc keeps playing. True when it
+// was the question's (every key is, while it is up).
+bool ask_key(UINT vk);
 // The game's area moved or changed size: everything shown follows it.
 void place();
 // The cursor over the game, pressed or not, at the display's scale.
 HCURSOR cursor(bool pressed);
 #ifdef OVERLAY_TEST_HOOKS
-// The probe's look at the notice and the menu: their pictures as PNGs named after `prefix`.
+// The probe's look at the bar, the question and the notice: their pictures as PNGs named after `prefix`, with no window
+// shown.
 void test_save(const std::wstring& prefix);
 #endif
 

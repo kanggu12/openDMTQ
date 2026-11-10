@@ -47,7 +47,7 @@
 #include <vector>
 
 namespace arm32 {
-// live_desktop.cpp: the game held still behind the menu, or going on.
+// live_desktop.cpp: the game held still (the question before quitting is up, or the window is minimised), or going on.
 void desktop_live_paused(bool paused);
 }  // namespace arm32
 
@@ -81,16 +81,16 @@ bool g_last_touch = false;
 // scale below 100 % in the PC's settings, that share of it, and ANGLE stretches its picture over the area (pacing.h's
 // g_window_fixed_size). Input comes in the area's pixels and goes to the game in its own.
 int g_area_w = 0, g_area_h = 0;
-// The quit chosen on the overlay's card, to the frame: the window's own close (its X) asks there first.
+// Quit the game chosen on the overlay's question, to the frame: the bar's X and the window's own close ask it first.
 constexpr UINT kQuitMessage = WM_APP + 1;
 // A check's character for the input method (PLAYER_KEYS ime=): composed on the text field's own thread, where the input
 // context lives. wParam the character, lParam 1 to compose it and 2 to finish it.
 constexpr UINT kImeMessage = WM_APP + 2;
-// Esc is the phone's Back key, sent when it comes up: whether it went down over the game, and whether the menu took it
-// (Esc closing the menu is no Back key when it comes up).
+// Esc is the phone's Back key, sent when it comes up: whether it went down over the game, and whether the question took
+// it (Esc answering Keep playing is no Back key when it comes up).
 bool g_esc_down = false, g_esc_held = false;
-// A finger that came down on the game's top edge: drawn down, it opens the menu instead of reaching the game; lifted
-// where it was, it is a tap after all. Its pointer id (0: none) and where it started, in the game's window.
+// A finger that came down on the game's top edge: drawn down, it shows the overlay's bar instead of reaching the game;
+// lifted where it was, it is a tap after all. Its pointer id (0: none) and where it started, in the game's window.
 UINT32 g_edge_finger = 0;
 POINT g_edge_from{};
 // When it came down, for the tap's own time if it is one.
@@ -358,7 +358,9 @@ void toggle_fullscreen(HWND h) {
         SetWindowPos(h, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
         g_fullscreen = false;
     }
-    // What is drawn over the game, again with the new state: the menu's row says the other way now.
+    // Said in the log, which a check reads (the end-to-end test clicks the bar's chip).
+    jvm::log("player: %s", g_fullscreen ? "full screen" : "in a window");
+    // What is drawn over the game, again with the new state: the bar's chip shows the other way now.
     overlay::place();
 }
 
@@ -445,8 +447,8 @@ void lift_keys() {
 // The wheel at screen point p turned by `delta` (WHEEL_DELTA a notch), sideways or not: the game's finger drag, when the
 // point is on the game and no mouse button holds a finger down already.
 void wheel_at(POINT p, int delta, bool sideways) {
-    // While the menu is open the game holds still: nothing of the wheel's piles up for it.
-    if (g_pressed || !g_window || overlay::menu_open()) return;
+    // While the question is up the game holds still: nothing of the wheel's piles up for it.
+    if (g_pressed || !g_window || overlay::asking()) return;
     ScreenToClient(g_window, &p);
     if (p.x < 0 || p.y < 0 || p.x >= g_area_w || p.y >= g_area_h) return;
     float notches = static_cast<float>(delta) / WHEEL_DELTA;
@@ -716,16 +718,16 @@ void plan_keys() {
     }).detach();
 }
 
-// While the menu is open the keys are its own, even with the game asking for text: Esc or Enter is back to the game,
-// the rest waits. True when the key was the menu's.
-bool menu_key(WPARAM w, LPARAM l) {
-    if (!overlay::menu_open()) return false;
-    // Enter, Space and Esc act once per press, not again while held (the arrows repeat, as in a list).
+// While the question before quitting is up the keys are its own, even with the game asking for text: Left, Right and
+// Tab move its choice, Enter takes it, Esc keeps playing, the rest waits. True when the key was the question's.
+bool ask_key(WPARAM w, LPARAM l) {
+    if (!overlay::asking()) return false;
+    // Enter and Esc act once per press, not again while held (a held Enter must not quit after keeping on).
     const bool repeat = (l & (1L << 30)) != 0;
-    if (repeat && (w == VK_RETURN || w == VK_SPACE || w == VK_ESCAPE)) return true;
-    // Esc closing the menu: its coming up is no Back key.
+    if (repeat && (w == VK_RETURN || w == VK_ESCAPE)) return true;
+    // Esc answering the question: its coming up is no Back key.
     if (w == VK_ESCAPE) g_esc_held = true;
-    return overlay::menu_key(static_cast<UINT>(w));
+    return overlay::ask_key(static_cast<UINT>(w));
 }
 
 // The edit control's own window procedure, which edit_proc hands on to.
@@ -758,7 +760,7 @@ LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     }
     switch (msg) {
     case WM_CHAR:
-        if (typing() && w >= 0x20 && !overlay::menu_open()) typed(static_cast<wchar_t>(w));
+        if (typing() && w >= 0x20 && !overlay::asking()) typed(static_cast<wchar_t>(w));
         return 0;
     case WM_IME_COMPOSITION:
         // An input method's done text goes in as typed; what it still composes shows after it (a Hangul syllable before
@@ -770,7 +772,7 @@ LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         type_composing("");
         break;
     case WM_KEYDOWN:
-        if (menu_key(w, l)) return 0;
+        if (ask_key(w, l)) return 0;
         // Enter takes what is being composed along (finish adds it).
         if (w == VK_RETURN) type_key(kKeyEnter);
         else if (w == VK_ESCAPE) type_key(kKeyEscape);
@@ -783,7 +785,7 @@ LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             toggle_fullscreen(g_frame);
             return 0;
         }
-        // Alt+F4 while the game asks for text: nothing, as over the game (quitting is the X's, which asks first).
+        // Alt+F4 while the game asks for text: nothing, as over the game (quitting is the bar's X's, which asks first).
         if (w == VK_F4 && (HIWORD(l) & KF_ALTDOWN)) return 0;
         // F10 alone would put the window in Windows' menu mode, which eats the next key: nothing.
         if (w == VK_F10) return 0;
@@ -805,16 +807,16 @@ LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
 LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     switch (msg) {
     case WM_CLOSE:
-        // The window's X (or the taskbar's close): asked first on the overlay's card, so that a click by mistake mid-song
-        // never ends the game.
+        // The window's X (or the taskbar's close): asked first in the overlay's question, so that a click by mistake
+        // mid-song never ends the game.
         overlay::ask_quit();
         return 0;
     case kQuitMessage:
-        // The menu's Quit.
+        // The question's Quit the game.
         g_closed = true;
         return 0;
     case WM_SIZE:
-        // Minimised, the game holds still behind the menu; back, the menu shows (overlay_win32.cpp).
+        // Minimised, the game holds still; back, it goes on, to its own pause screen mid-song (overlay_win32.cpp).
         if (w == SIZE_MINIMIZED) {
             overlay::minimised(true);
             return 0;
@@ -876,7 +878,7 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         break;
     case WM_CHAR:
         // Text while the game asks for it: printable characters only; the keys that end or edit it come as keys.
-        if (typing() && w >= 0x20 && !overlay::menu_open()) typed(static_cast<wchar_t>(w));
+        if (typing() && w >= 0x20 && !overlay::asking()) typed(static_cast<wchar_t>(w));
         return 0;
     case WM_SYSKEYUP:
         // F10's coming up: no menu mode either.
@@ -885,7 +887,7 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     case WM_SYSKEYDOWN:
         // F10 alone would put the window in Windows' menu mode, which eats the next key (a note): nothing.
         if (w == VK_F10) return 0;
-        // Alt+F4: nothing. Windows would close the window with it; quitting is the X's, which asks first.
+        // Alt+F4: nothing. Windows would close the window with it; quitting is the bar's X's, which asks first.
         if (w == VK_F4 && (HIWORD(l) & KF_ALTDOWN)) return 0;
         // Alt+Enter: full screen, as Windows games switch; once per press, not again while held.
         if (w == VK_RETURN && (HIWORD(l) & KF_ALTDOWN)) {
@@ -899,7 +901,7 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             return 0;
         }
         g_last_touch = false;
-        if (menu_key(w, l)) return 0;
+        if (ask_key(w, l)) return 0;
         if (typing()) {
             if (w == VK_RETURN) type_key(kKeyEnter);
             else if (w == VK_ESCAPE) type_key(kKeyEscape);
@@ -919,7 +921,7 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         int unicode = 0;
         const int code = phone_key(w, unicode);
         if (!code) return 0;
-        // A key that came down while the menu had the keys (Enter on "Back to the game", held): its repeats are no new
+        // A key that came down while the question had the keys (Enter on Keep playing, held): its repeats are no new
         // press for the game.
         if ((l & (1L << 30)) && !g_keys_down.count(w)) return 0;
         // Held, it repeats: Windows says so in bit 30 (it was down before).
@@ -931,7 +933,7 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     case WM_KEYUP: {
         if (w == VK_ESCAPE && g_esc_down) {
             g_esc_down = false;
-            // The phone's Back key, down and up, unless the menu took this Esc.
+            // The phone's Back key, down and up, unless the question took this Esc.
             if (!g_esc_held) {
                 int unicode = 0;
                 if (int code = phone_key(VK_ESCAPE, unicode)) {
@@ -981,7 +983,8 @@ LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         touch(0, game_x(static_cast<short>(LOWORD(l))), game_y(static_cast<short>(HIWORD(l))));
         return 0;
     case WM_MOUSEMOVE:
-        // The mouse moving over the game: the menu's button shows for a while (a touch's moves are pointer messages).
+        // The mouse moving over the game: at its very top edge the overlay's bar shows (a touch's moves are pointer
+        // messages, and their copies as mouse moves are marked).
         if ((GetMessageExtraInfo() & 0xFFFFFF00) != 0xFF515700) overlay::pointer_moved(static_cast<short>(HIWORD(l)), g_pressed);
         if (g_pressed) touch(2, game_x(static_cast<short>(LOWORD(l))), game_y(static_cast<short>(HIWORD(l))));
         return 0;
@@ -1013,7 +1016,7 @@ LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         // Screen pixels, into the window's, then the game's.
         POINT p{static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l))};
         ScreenToClient(h, &p);
-        // A finger that comes down on the top edge waits: drawn down, it opens the menu; lifted, it is a tap.
+        // A finger that comes down on the top edge waits: drawn down, it shows the bar; lifted, it is a tap.
         if (msg == WM_POINTERDOWN && !g_edge_finger && p.y < std::max(8, g_area_h / 40)) {
             g_edge_finger = id;
             g_edge_from = p;
@@ -1023,7 +1026,7 @@ LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         if (id == g_edge_finger) {
             if (msg == WM_POINTERUPDATE && p.y - g_edge_from.y > g_area_h / 12) {
                 g_edge_finger = 0;
-                overlay::open_menu();
+                overlay::show_bar();
             } else if (msg == WM_POINTERUP) {
                 g_edge_finger = 0;
                 finger(static_cast<int>(id), 0, game_x(g_edge_from.x), game_y(g_edge_from.y), g_edge_time);
@@ -1128,15 +1131,15 @@ bool open_window(const std::string& title) {
         place_game();
         g_edit_default = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(g_edit, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(edit_proc)));
     }
-    // What is drawn over the game: the server's notice, the menu, the cursor.
+    // What is drawn over the game: the bar at its top edge, the question before quitting, the server's notice, the cursor.
     overlay::Hooks hooks;
     hooks.toggle_fullscreen = [] { toggle_fullscreen(g_frame); };
     hooks.quit = [] { PostMessageW(g_frame, kQuitMessage, 0, 0); };
     hooks.fullscreen = [] { return g_fullscreen; };
-    hooks.shown = [](bool shown) {
-        pause_game(shown);
+    hooks.hold = [](bool held) {
+        pause_game(held);
         // The broadcast holds too: what viewers see stops with the game, and starts again with it.
-        arm32::desktop_live_paused(shown);
+        arm32::desktop_live_paused(held);
     };
     overlay::start(g_frame, g_window, hooks, host_locale().first == "ko");
     // A check's planned keys (PLAYER_KEYS), from now on.

@@ -1,16 +1,20 @@
-// What the player for Windows draws over the game itself (window_win32.cpp places and feeds it), in OpenDMTQ's own look:
-// dark opaque surfaces with rounded corners and a thin light edge, white text, and colour only where it means something
-// (red for a live broadcast and for quitting). Each is a layered window of its own above the game's window, drawn with
-// GDI+ into a premultiplied 32-bit bitmap and shown with UpdateLayeredWindow, so its edges are smooth and its fades
-// cost the game nothing.
+// What the player for Windows draws over the game itself (window_win32.cpp places and feeds it), in the game's own look:
+// the dark header of its dialogs (#1C1C1C) with the lime glow along its bottom edge, its grey body, its square OFF chips
+// and its green buttons, nearly square corners, white bold text. Red only for a live broadcast. Each is a layered window
+// of its own above the game's window, drawn with GDI+ into a premultiplied 32-bit bitmap and shown with
+// UpdateLayeredWindow, so its edges are smooth and its fades cost the game nothing.
 //
-// - The notice: the server's two-line notice about a broadcast (a title, then where to watch), as a card that slides
-//   down at the top of the game, stays for a few seconds and fades. A red LIVE mark while broadcasting, a grey one when
-//   the broadcast has ended.
-// - The buttons: a PC has no phone's buttons around the game, so two small round buttons show at the top right while
-//   the mouse moves near the top: the menu (back to the game, full screen or a window, quit) and an X that quits, after
-//   asking on the same card (a click by mistake mid-song would lose the play). The window's own X asks the same; Alt+F4
-//   does nothing. On a touch screen a finger drawn down from the top edge opens the menu as well.
+// - The bar: a PC has no phone's buttons around the game, so a bar across the top of the game's area, as the game's
+//   dialog header, shows when the pointer touches the very top edge with its button up, or when a finger is drawn down
+//   from the top edge. "OpenDMTQ" on its left; on its right two chips, full screen (or back to a window) and an X that
+//   quits after asking. It stays while the pointer is on it and fades soon after it leaves, so it never sits on the
+//   game's own controls at the top while they are used. No key opens it.
+// - The question before quitting: the bar's X and the window's own close ask it, as the game's dialogs ask (the game
+//   dimmed behind, a header with the title and a thin X, the glow line, the grey body, a green Keep playing and a grey
+//   Quit the game), and the game holds still meanwhile; a click by mistake mid-song loses nothing. Alt+F4 does nothing.
+// - The notice: the server's two-line notice about a broadcast (a title, then where to watch), as a small card of the
+//   same header's look that slides down at the top of the game, stays for a few seconds and fades. A red LIVE mark
+//   while broadcasting, a grey one when the broadcast has ended.
 // - The cursor: a dart in the logo's chrome and lime, all lime while the mouse's finger is down on the game.
 #include "overlay_win32.h"
 
@@ -36,34 +40,63 @@ Hooks g_hooks{};
 bool g_korean = false;
 ULONG_PTR g_gdiplus = 0;
 
-// The look, at 96 dpi: the surfaces, the lines and the text.
-const Color kSurface(250, 27, 30, 35);
-const Color kRaised(255, 42, 47, 55);
-const Color kRaisedHover(255, 54, 60, 70);
-const Color kChosen(255, 140, 242, 61);   // the ring of the row the keys or the pointer chose: the logo's lime
-const Color kEdge(40, 255, 255, 255);
-const Color kText(255, 243, 244, 246);
-const Color kQuiet(255, 174, 180, 190);
-const Color kLive(255, 209, 58, 64);    // #D13A40: white bold text on it at 4.8:1
+// The look, taken from the game's own screens at 1280x720 (its "Select Game Screen Type!" dialog, its OFF chips).
+// The header of its dialogs, a little see-through over the game as the bar.
+const Color kHeader(250, 28, 28, 28);
+// The body of its dialogs, under the header.
+const Color kBody(255, 48, 50, 55);
+// The lime of the glow under a dialog's header, at its brightest.
+const Color kGlow(255, 90, 200, 20);
+// A chip at rest, as the game's OFF chips: the fill and its one-pixel edge.
+const Color kChip(255, 52, 54, 58);
+const Color kChipEdge(255, 78, 80, 86);
+// The game's green button (its OK): light at the top, deep at the bottom, a darker edge; lighter under the pointer.
+const Color kGreenTop(255, 69, 163, 8), kGreenBottom(255, 36, 97, 0), kGreenEdge(255, 22, 64, 0);
+const Color kGreenTopHover(255, 88, 188, 22), kGreenBottomHover(255, 48, 120, 6);
+// The grey button beside it, for the choice that is not the game's way on; lighter under the pointer.
+const Color kGreyTop(255, 85, 88, 94), kGreyBottom(255, 58, 60, 65), kGreyEdge(255, 34, 36, 40);
+const Color kGreyTopHover(255, 104, 108, 115), kGreyBottomHover(255, 72, 75, 81);
+// The ring of the button the keys chose: the logo's lime, plain to see on the grey body.
+const Color kChosen(255, 140, 242, 61);
+// The dialogs' white text, and the quiet grey of a line that only explains.
+const Color kText(255, 255, 255, 255);
+const Color kQuiet(255, 178, 182, 190);
+// The light line along the top of the game's dialogs, and the dark one around them.
+const Color kTopLight(34, 255, 255, 255);
+const Color kOutline(170, 8, 8, 8);
+// The broadcast's mark: red while live (white bold text on it at 4.8:1), grey once it ended.
+const Color kLive(255, 209, 58, 64);
 const Color kEnded(255, 108, 116, 128);
-const Color kQuit(255, 255, 122, 122);
+
 // The scale of the game's display (Windows' own, 1 at 96 dpi).
 float dpi_scale() {
     using DpiOf = UINT(WINAPI*)(HWND);
+    // Windows 10 1607 has the call; an older one is taken as 96 dpi.
     static auto dpi_of = reinterpret_cast<DpiOf>(GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetDpiForWindow"));
     return (dpi_of && g_frame ? static_cast<float>(dpi_of(g_frame)) : 96.0f) / 96.0f;
 }
-RECT area();
+
+// The game's area on the screen.
+RECT area() {
+    RECT r{};
+    // The game's own window, or the frame before it is made.
+    GetWindowRect(g_game ? g_game : g_frame, &r);
+    return r;
+}
+
 // The overlay's scale: Windows' own, or the game's when that is larger (a 4K display at 100 %, where the game draws its
-// own buttons twice as large as at 1080 lines), so that the menu and the notice keep their size beside the game's.
+// own buttons twice as large as at 1080 lines), so that the bar, the question and the notice keep their size beside
+// the game's.
 float scale() {
     const RECT a = area();
     return std::max(dpi_scale(), static_cast<float>(a.bottom - a.top) / 1080.0f);
 }
+// A length at 96 dpi as pixels at the overlay's scale, whole (edges on whole pixels stay sharp).
 int px(float at96) { return static_cast<int>(std::lround(at96 * scale())); }
 
 // A rounded rectangle as a path.
 void rounded(GraphicsPath& path, RectF r, float radius) {
+    // The corners' arcs no larger than the rectangle allows.
     const float d = std::min(radius * 2, std::min(r.Width, r.Height));
     path.AddArc(r.X, r.Y, d, d, 180, 90);
     path.AddArc(r.X + r.Width - d, r.Y, d, d, 270, 90);
@@ -72,28 +105,73 @@ void rounded(GraphicsPath& path, RectF r, float radius) {
     path.CloseFigure();
 }
 
-// A card: a soft shadow under it, the surface, a thin light edge.
-void card(Graphics& g, RectF r, float radius, const Color& fill) {
+// A soft shadow under a card, a few rings each wider and fainter, a little lower than the card: it lifts the card off
+// the game as the game's own dialogs sit on it.
+void shadow(Graphics& g, RectF r, float radius) {
     for (int i = 3; i >= 1; --i) {
-        GraphicsPath shadow;
+        GraphicsPath ring;
         const float grow = static_cast<float>(px(2.0f * i));
-        rounded(shadow, RectF(r.X - grow, r.Y - grow + px(2), r.Width + grow * 2, r.Height + grow * 2), radius + grow);
-        SolidBrush b(Color(static_cast<BYTE>(14 * (4 - i)), 0, 0, 0));
-        g.FillPath(&b, &shadow);
+        rounded(ring, RectF(r.X - grow, r.Y - grow + px(2), r.Width + grow * 2, r.Height + grow * 2), radius + grow);
+        SolidBrush b(Color(static_cast<BYTE>(16 * (4 - i)), 0, 0, 0));
+        g.FillPath(&b, &ring);
     }
-    GraphicsPath path;
-    rounded(path, r, radius);
-    SolidBrush surface(fill);
-    g.FillPath(&surface, &path);
-    Pen edge(kEdge, 1.0f);
-    g.DrawPath(&edge, &path);
 }
 
-// The game's area on the screen.
-RECT area() {
-    RECT r{};
-    GetWindowRect(g_game ? g_game : g_frame, &r);
-    return r;
+// The game's lime glow along the line from x to x + w whose top is at y: a line of two pixels, brightest in the middle
+// and fading to nothing at both ends, with a faint haze above it as the game's dialog header has.
+void glow(Graphics& g, float x, float y, float w) {
+    // How strong the glow is along the line: a bell, whole in the middle, nothing at the ends (sampled from the game's
+    // dialog, where it is gone a fifth of the width either side of the middle; a little wider here, for a long bar).
+    const REAL at[] = {0.0f, 0.12f, 0.28f, 0.5f, 0.72f, 0.88f, 1.0f};
+    const float bell[] = {0.0f, 0.05f, 0.4f, 1.0f, 0.4f, 0.05f, 0.0f};
+    // One band of the glow, `height` pixels from `top`, at `strength` of the whole.
+    auto band = [&](float top, float height, float strength) {
+        Color colours[7];
+        for (int i = 0; i < 7; ++i) colours[i] = Color(static_cast<BYTE>(255 * strength * bell[i]), kGlow.GetR(), kGlow.GetG(), kGlow.GetB());
+        // Across the line's whole width, so that the bell's ends fall on its ends.
+        LinearGradientBrush brush(PointF(x, 0), PointF(x + w, 0), colours[0], colours[6]);
+        brush.SetInterpolationColors(colours, at, 7);
+        g.FillRectangle(&brush, x, top, w, height);
+    };
+    // The haze: a row at a time above the line, each fainter than the one under it (as sampled: a third, a fifth, a
+    // tenth of the line, then almost nothing).
+    const float haze[] = {0.34f, 0.2f, 0.1f, 0.05f};
+    const float row = static_cast<float>(std::max(1, px(1)));
+    for (int i = 0; i < 4; ++i) band(y - row * static_cast<float>(i + 1), row, haze[i]);
+    // The line itself.
+    band(y, static_cast<float>(std::max(2, px(2))), 1.0f);
+}
+
+// A button of the game's: a vertical gradient from `top` to `bottom` in a rectangle with nearly square corners, a darker
+// edge one pixel inside it, and a faint light line along its top as the game's green OK has.
+void button(Graphics& g, RectF r, float radius, const Color& top, const Color& bottom, const Color& edge) {
+    GraphicsPath path;
+    rounded(path, r, radius);
+    // A pixel beyond both ends, so that the gradient's own ends do not wrap over the first and last rows.
+    LinearGradientBrush fill(PointF(0, r.Y - 1), PointF(0, r.Y + r.Height + 1), top, bottom);
+    g.FillPath(&fill, &path);
+    // The edge on the button's outermost pixels: half a pixel in, so that the pen's width falls inside it.
+    GraphicsPath rim;
+    rounded(rim, RectF(r.X + 0.5f, r.Y + 0.5f, r.Width - 1, r.Height - 1), radius);
+    Pen pen(edge, 1.0f);
+    g.DrawPath(&pen, &rim);
+    // The light along its top, inside the edge and clear of the corners.
+    Pen light(Color(46, 255, 255, 255), 1.0f);
+    g.DrawLine(&light, r.X + radius, r.Y + 1.5f, r.X + r.Width - radius, r.Y + 1.5f);
+}
+
+// Text centred in a box, on one line, in the face for the language.
+void centred(Graphics& g, const wchar_t* text, float size, bool bold, const Color& colour, RectF box) {
+    const auto family = face(g_korean);
+    Font font(family.get(), static_cast<REAL>(size), bold ? FontStyleBold : FontStyleRegular, UnitPixel);
+    StringFormat format;
+    format.SetAlignment(StringAlignmentCenter);
+    format.SetLineAlignment(StringAlignmentCenter);
+    // One line: a narrow box cuts it with an ellipsis rather than breaking it under itself.
+    format.SetFormatFlags(StringFormatFlagsNoWrap);
+    format.SetTrimming(StringTrimmingEllipsisCharacter);
+    SolidBrush brush(colour);
+    g.DrawString(text, -1, &font, box, &format, &brush);
 }
 
 // A layered popup owned by the frame: above the game, never taking the focus; `see_through` lets input pass.
@@ -105,9 +183,14 @@ HWND make_window(const wchar_t* name, WNDPROC proc, bool see_through) {
     c.hCursor = LoadCursorA(nullptr, IDC_ARROW);
     c.lpszClassName = name;
     RegisterClassExW(&c);
+    // A tool window: none of its own on the taskbar or in Alt+Tab.
     const DWORD ex = WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | (see_through ? WS_EX_TRANSPARENT : 0);
     return CreateWindowExW(ex, name, L"", WS_POPUP, 0, 0, 1, 1, g_frame, nullptr, c.hInstance, nullptr);
 }
+
+// The mark Windows leaves on a mouse message it made from a touch or a pen (GetMessageExtraInfo): such a message is no
+// mouse's.
+bool from_touch() { return (GetMessageExtraInfo() & 0xFFFFFF00) == 0xFF515700; }
 
 // ---- the notice
 
@@ -115,6 +198,7 @@ HWND g_notice = nullptr;
 std::unique_ptr<Canvas> g_notice_canvas;
 UINT64 g_notice_shown = 0;  // GetTickCount64 when it came
 constexpr UINT_PTR kNoticeTimer = 1;
+// Sliding in, staying, fading out.
 constexpr UINT64 kSlideMs = 220, kStayMs = 6000, kFadeMs = 350;
 
 void notice_frame() {
@@ -137,6 +221,7 @@ void notice_frame() {
         g_notice_canvas.reset();
         return;
     }
+    // Centred at the top of the game's area, a little down from its edge.
     const RECT a = area();
     const int x = (a.left + a.right - g_notice_canvas->w) / 2;
     const int y = a.top + px(14) - static_cast<int>(drop);
@@ -151,254 +236,252 @@ LRESULT CALLBACK notice_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         notice_frame();
         return 0;
     }
+    // Clicks go through it to the game: it only tells.
     if (msg == WM_NCHITTEST) return HTTRANSPARENT;
     return DefWindowProcW(h, msg, w, l);
 }
 
-// ---- the menu button and the menu
+// ---- the bar
 
-HWND g_button = nullptr, g_menu = nullptr;
-// The button under the pointer: kNone, the menu's or the X's. Both are drawn in the one window, side by side.
-constexpr int kNone = -1, kMenuButton = 0, kQuitButton = 1;
-int g_button_hover = kNone;
-// The card asks whether to quit (the X, the window's own close) instead of showing the menu.
-bool g_asking_quit = false;
-UINT64 g_moved = 0;  // when the mouse last moved over the game
-// The button's one timer: due when its fade begins, then at each step of the fade.
-constexpr UINT_PTR kButtonTimer = 2;
-// Whole for this long after the mouse moved, then fading out over the next, a step at a time.
-constexpr UINT64 kButtonStayMs = 2500, kButtonFadeMs = 400, kButtonStepMs = 30;
-// The button's picture, kept while it looks the same (the pointer on it or not, the overlay's scale): its fade and its
-// moves with the game show the same picture at another opacity or place (Canvas::show), as the notice's do.
-std::unique_ptr<Canvas> g_button_canvas;
-int g_button_canvas_hover = kNone;
-float g_button_canvas_scale = 0;
-int g_menu_hover = -1;
-// Where the pointer was in the menu's window as it came: the move Windows reports for a window that just showed is no
-// choice of a row.
-POINT g_menu_opened_at{-1, -1};
-// The game was minimised: the menu is due (the game held still) and shows once the game is back.
-bool g_menu_pending = false;
-// The menu's picture, kept while the game's area keeps its size: at 4K it is 33 MB, made again only for a new size.
-std::unique_ptr<Canvas> g_menu_canvas;
+HWND g_bar = nullptr;
+// What is under the pointer on the bar: nothing, the X (at the right end) or the full screen chip (left of it).
+constexpr int kNone = -1, kQuitChip = 0, kScreenChip = 1;
+int g_bar_hover = kNone;
+// When the bar last had the pointer on it (or came), and how long it stays whole after that before it fades.
+UINT64 g_bar_since = 0, g_bar_stay = 0;
+// The bar's one timer: a look at the pointer while it is whole, each step of its fade after.
+constexpr UINT_PTR kBarTimer = 2;
+// Whole for 600 ms after the pointer leaves it, then fading over 300 ms a step at a time; shown by a finger, whole for
+// 4 s (a finger has no pointer that stays on it). While whole it looks for the pointer ten times a second.
+constexpr UINT64 kBarStayMs = 600, kBarFadeMs = 300, kBarTouchStayMs = 4000, kBarStepMs = 30, kBarLookMs = 100;
+// Shown by a finger: the pointer Windows parks where the finger was is no mouse on the bar, until the mouse moves.
+bool g_bar_by_touch = false;
+// The bar's picture, kept while it looks the same (its width, the overlay's scale, the chip under the pointer, full
+// screen or not): its fade and its moves with the game show the same picture at another opacity or place.
+std::unique_ptr<Canvas> g_bar_canvas;
+int g_bar_canvas_w = 0, g_bar_canvas_hover = kNone;
+float g_bar_canvas_scale = 0;
+bool g_bar_canvas_full = false;
+// What was shown last (the picture's version, the opacity, the place): the same again is not sent to Windows again.
+int g_bar_version = 0, g_bar_shown_version = -1;
+BYTE g_bar_shown_alpha = 0;
+POINT g_bar_shown_at{};
 
-struct Item {
-    std::wstring label;
-    bool quit;
-};
-std::vector<Item> items() {
-    // Asked whether to quit: going on first, so that Enter at once keeps the game.
-    if (g_asking_quit) {
-        if (g_korean) return {{L"계속하기", false}, {L"게임 끝내기", true}};
-        return {{L"Keep playing", false}, {L"Quit the game", true}};
+// The bar's height, the chips' size, the gap between them and their room from the bar's right end, at this scale.
+int bar_height() { return px(48); }
+int chip_size() { return px(32); }
+int chip_gap() { return px(8); }
+int chip_margin() { return px(12); }
+
+// A chip's square on a bar `w` pixels wide: the X at the right end, the full screen chip left of it; both centred in
+// the bar's height.
+RectF chip_rect(int which, int w) {
+    const float size = static_cast<float>(chip_size());
+    const float x = static_cast<float>(w - chip_margin() - chip_size() - which * (chip_size() + chip_gap()));
+    return RectF(x, static_cast<float>((bar_height() - chip_size()) / 2), size, size);
+}
+
+// The chip under a point of the bar's window, or kNone.
+int chip_at(int x, int y) {
+    const RECT a = area();
+    for (int which : {kQuitChip, kScreenChip}) {
+        if (chip_rect(which, a.right - a.left).Contains(static_cast<REAL>(x), static_cast<REAL>(y))) return which;
     }
-    const bool full = g_hooks.fullscreen && g_hooks.fullscreen();
-    if (g_korean) return {{L"게임으로 돌아가기", false}, {full ? L"창 모드로" : L"전체 화면으로", false}, {L"게임 끝내기", true}};
-    return {{L"Back to the game", false}, {full ? L"Windowed" : L"Full screen", false}, {L"Quit the game", true}};
+    return kNone;
 }
 
-// The menu's layout in its window: the card and each item's row.
-struct Layout {
-    RectF card;
-    std::vector<RectF> rows;
-};
-Layout menu_layout(int w, int h) {
-    Layout l;
-    const float width = static_cast<float>(px(300)), row = static_cast<float>(px(46)), gap = static_cast<float>(px(8)),
-                pad = static_cast<float>(px(18)), head = static_cast<float>(px(44)), foot = static_cast<float>(px(30));
-    const auto n = static_cast<float>(items().size());
-    const float height = pad + head + n * row + (n - 1) * gap + foot + pad;
-    l.card = RectF((w - width) / 2, (h - height) / 2, width, height);
-    for (std::size_t i = 0; i < items().size(); ++i)
-        l.rows.emplace_back(l.card.X + pad, l.card.Y + pad + head + static_cast<float>(i) * (row + gap), width - pad * 2, row);
-    return l;
+// Whether the frame is in full screen, as the window says.
+bool full_screen() { return g_hooks.fullscreen && g_hooks.fullscreen(); }
+
+// The full screen chip's icon in a chip centred at (cx, cy): four corner brackets, their corners out (to full screen)
+// or in (back to a window, when `full`).
+void screen_icon(Graphics& g, Pen& line, float cx, float cy, bool full) {
+    // The brackets' reach from the centre and the length of each arm.
+    const float outer = static_cast<float>(px(7)), inner = static_cast<float>(px(2.5f)), arm = static_cast<float>(px(4));
+    for (int sx : {-1, 1}) {
+        for (int sy : {-1, 1}) {
+            // Out: the corner at the outer point, the arms going back in; in: the corner near the centre, the arms
+            // going out, as the corners of a smaller square pushed in.
+            const float corner = full ? inner : outer;
+            const float back = full ? arm : -arm;
+            const PointF bracket[] = {PointF(cx + sx * corner, cy + sy * (corner + back)), PointF(cx + sx * corner, cy + sy * corner),
+                                      PointF(cx + sx * (corner + back), cy + sy * corner)};
+            g.DrawLines(&line, bracket, 3);
+        }
+    }
 }
 
-// The size of one round button, the gap between the two and the room around them for the shadow, at this scale.
-int button_size() { return px(38); }
-int button_gap() { return px(10); }
-int button_room() { return px(6); }
+// An X centred at (cx, cy), `half` from its centre to each end.
+void cross(Graphics& g, Pen& line, float cx, float cy, float half) {
+    g.DrawLine(&line, cx - half, cy - half, cx + half, cy + half);
+    g.DrawLine(&line, cx - half, cy + half, cx + half, cy - half);
+}
 
-// Which button a point of the buttons' window is on: the menu's on the left, the X on the right.
-int button_at(int x) { return x < button_room() + button_size() + button_gap() / 2 ? kMenuButton : kQuitButton; }
-
-// The buttons' picture as it looks now, drawn only when its look changed.
-Canvas& button_canvas() {
+// The bar's picture as it looks now, drawn only when its look changed.
+Canvas& bar_canvas() {
+    const RECT a = area();
+    const int w = std::max(1, static_cast<int>(a.right - a.left));
     const float now_scale = scale();
-    if (g_button_canvas && g_button_canvas_hover == g_button_hover && g_button_canvas_scale == now_scale) return *g_button_canvas;
-    const int size = button_size(), gap = button_gap(), o = button_room();
-    g_button_canvas = std::make_unique<Canvas>(size * 2 + gap + o * 2, size + o * 2);
-    g_button_canvas_hover = g_button_hover;
-    g_button_canvas_scale = now_scale;
+    const bool full = full_screen();
+    if (g_bar_canvas && g_bar_canvas_w == w && g_bar_canvas_hover == g_bar_hover && g_bar_canvas_scale == now_scale && g_bar_canvas_full == full) {
+        return *g_bar_canvas;
+    }
+    const int h = bar_height();
+    g_bar_canvas = std::make_unique<Canvas>(w, h);
+    g_bar_canvas_w = w;
+    g_bar_canvas_hover = g_bar_hover;
+    g_bar_canvas_scale = now_scale;
+    g_bar_canvas_full = full;
+    ++g_bar_version;
     {
-        auto bmp = g_button_canvas->surface();
+        auto bmp = g_bar_canvas->surface();
         Graphics g(bmp.get());
         text_setup(g);
-        for (int which : {kMenuButton, kQuitButton}) {
-            const float left = static_cast<float>(o + which * (size + gap)), top = static_cast<float>(o);
-            const bool hover = g_button_hover == which;
-            GraphicsPath circle;
-            circle.AddEllipse(left, top, static_cast<float>(size), static_cast<float>(size));
-            // A soft shadow a little below, the dark surface, the thin light edge: the overlay's look.
-            SolidBrush shadow(Color(40, 0, 0, 0));
-            g.TranslateTransform(0, static_cast<float>(px(2)));
-            g.FillPath(&shadow, &circle);
-            g.ResetTransform();
-            SolidBrush fill(hover ? kRaisedHover : kSurface);
-            g.FillPath(&fill, &circle);
-            Pen edge(kEdge, 1.0f);
-            g.DrawPath(&edge, &circle);
-            Pen line(which == kQuitButton && hover ? kQuit : kText, static_cast<float>(px(2)));
-            line.SetStartCap(LineCapRound);
-            line.SetEndCap(LineCapRound);
-            const float cx = left + size / 2.0f, cy = top + size / 2.0f;
-            if (which == kMenuButton) {
-                // Three short lines: a menu.
-                const float half = static_cast<float>(px(8)), step = static_cast<float>(px(5));
-                for (int i = -1; i <= 1; ++i) g.DrawLine(&line, cx - half, cy + i * step, cx + half, cy + i * step);
-            } else {
-                // An X: quitting, red under the pointer (the overlay's colour for it).
-                const float half = static_cast<float>(px(6.5f));
-                g.DrawLine(&line, cx - half, cy - half, cx + half, cy + half);
-                g.DrawLine(&line, cx - half, cy + half, cx + half, cy - half);
-            }
-        }
-    }
-    return *g_button_canvas;
-}
-
-// The button at the game's top right at the opacity its time gives it (whole under the pointer, and for kButtonStayMs
-// after the mouse moved, then fading over kButtonFadeMs), or hidden once it faded or while the menu is up; its one timer
-// set for its next change.
-void show_button() {
-    const UINT64 idle = GetTickCount64() - g_moved;
-    float alpha = 1;
-    if (g_button_hover == kNone && idle > kButtonStayMs) alpha = 1 - std::min(1.0f, static_cast<float>(idle - kButtonStayMs) / kButtonFadeMs);
-    if (alpha <= 0 || menu_open()) {
-        ShowWindow(g_button, SW_HIDE);
-        KillTimer(g_button, kButtonTimer);
-        return;
-    }
-    // The kept picture, shown again at this opacity and where the game's area is now.
-    Canvas& c = button_canvas();
-    const int margin = px(14);
-    const RECT a = area();
-    c.show(g_button, a.right - c.w - margin + button_room(), a.top + margin - button_room(), static_cast<BYTE>(alpha * 255));
-    ShowWindow(g_button, SW_SHOWNOACTIVATE);
-    // Under the pointer it stays as it is with no timer (leaving it starts its time again, button_proc); otherwise the
-    // timer wakes it when its fade begins, and every step of the fade after.
-    if (g_button_hover != kNone) KillTimer(g_button, kButtonTimer);
-    else SetTimer(g_button, kButtonTimer, static_cast<UINT>(idle < kButtonStayMs ? kButtonStayMs - idle : kButtonStepMs), nullptr);
-}
-
-void draw_menu() {
-    const RECT a = area();
-    const int w = a.right - a.left, h = a.bottom - a.top;
-    if (w <= 0 || h <= 0) return;
-    if (!g_menu_canvas || g_menu_canvas->w != w || g_menu_canvas->h != h) g_menu_canvas = std::make_unique<Canvas>(w, h);
-    Canvas& c = *g_menu_canvas;
-    {
-        auto bmp = c.surface();
-        Graphics g(bmp.get());
-        // What the last picture had goes first.
-        g.Clear(Color(0, 0, 0, 0));
-        text_setup(g);
-        // The game dimmed behind it.
-        SolidBrush dim(Color(150, 0, 0, 0));
-        g.FillRectangle(&dim, 0, 0, w, h);
-        const Layout l = menu_layout(w, h);
-        card(g, l.card, static_cast<float>(px(16)), kSurface);
+        // The game's dialog header, across the game's whole width.
+        SolidBrush header(kHeader);
+        g.FillRectangle(&header, 0, 0, w, h);
+        // The glow along its bottom edge, its two pixels the bar's last.
+        const float line = static_cast<float>(std::max(2, px(2)));
+        glow(g, 0, static_cast<float>(h) - line, static_cast<float>(w));
+        // The name on the left, in the game's white bold, over the bar's height above the glow.
         const auto family = face(g_korean);
-        Font title(family.get(), static_cast<REAL>(px(15)), FontStyleBold, UnitPixel);
-        Font label(family.get(), static_cast<REAL>(px(14)), FontStyleBold, UnitPixel);
-        Font hint(family.get(), static_cast<REAL>(px(11.5f)), FontStyleRegular, UnitPixel);
-        SolidBrush text(kText), quiet(kQuiet), quit(kQuit);
-        StringFormat centre;
-        centre.SetAlignment(StringAlignmentCenter);
-        centre.SetLineAlignment(StringAlignmentCenter);
-        const float pad = static_cast<float>(px(18));
-        // The menu's name, or the question the X asks.
-        const wchar_t* heading = !g_asking_quit ? L"OpenDMTQ" : g_korean ? L"게임을 끝낼까요?" : L"Quit the game?";
-        g.DrawString(heading, -1, &title, RectF(l.card.X, l.card.Y + pad, l.card.Width, static_cast<REAL>(px(30))), &centre, &text);
-        const auto list = items();
-        for (std::size_t i = 0; i < list.size(); ++i) {
-            GraphicsPath row;
-            rounded(row, l.rows[i], static_cast<float>(px(11)));
-            const bool chosen = static_cast<int>(i) == g_menu_hover;
-            SolidBrush fill(chosen ? kRaisedHover : kRaised);
-            g.FillPath(&fill, &row);
-            // The chosen row is plain to see, for the keys too: a ring of the lime.
-            if (chosen) {
-                Pen ring(kChosen, static_cast<REAL>(px(2)));
-                g.DrawPath(&ring, &row);
+        Font name(family.get(), static_cast<REAL>(px(15)), FontStyleBold, UnitPixel);
+        StringFormat middle;
+        middle.SetLineAlignment(StringAlignmentCenter);
+        middle.SetFormatFlags(StringFormatFlagsNoWrap);
+        SolidBrush white(kText);
+        g.DrawString(L"OpenDMTQ", -1, &name, RectF(static_cast<REAL>(px(16)), 0, static_cast<REAL>(px(200)), static_cast<REAL>(h) - line), &middle, &white);
+        // The two chips: at rest as the game's OFF chips, under the pointer as its green button; a white glyph on both.
+        const float radius = static_cast<float>(px(5));
+        for (int which : {kQuitChip, kScreenChip}) {
+            const RectF r = chip_rect(which, w);
+            if (which == g_bar_hover) {
+                button(g, r, radius, kGreenTop, kGreenBottom, kGreenEdge);
+            } else {
+                GraphicsPath path;
+                rounded(path, RectF(r.X + 0.5f, r.Y + 0.5f, r.Width - 1, r.Height - 1), radius);
+                SolidBrush fill(kChip);
+                g.FillPath(&fill, &path);
+                Pen edge(kChipEdge, 1.0f);
+                g.DrawPath(&edge, &path);
             }
-            g.DrawString(list[i].label.c_str(), -1, &label, l.rows[i], &centre, list[i].quit ? &quit : &text);
+            // The glyph's line: 2.2 pixels at 96 dpi, square ends for the brackets' corners, round for the X.
+            Pen line_pen(kText, 2.2f * scale());
+            line_pen.SetLineJoin(LineJoinMiter);
+            const float cx = r.X + r.Width / 2, cy = r.Y + r.Height / 2;
+            if (which == kQuitChip) {
+                line_pen.SetStartCap(LineCapRound);
+                line_pen.SetEndCap(LineCapRound);
+                cross(g, line_pen, cx, cy, static_cast<float>(px(5.5f)));
+            } else {
+                screen_icon(g, line_pen, cx, cy, full);
+            }
         }
-        const wchar_t* keys = g_korean ? L"방향키와 Enter로 고르고 Esc로 닫아요" : L"Arrow keys and Enter to choose, Esc to close";
-        g.DrawString(keys, -1, &hint, RectF(l.card.X, l.card.Y + l.card.Height - pad - px(26), l.card.Width, static_cast<REAL>(px(26))), &centre, &quiet);
     }
-    c.show(g_menu, a.left, a.top, 255);
+    return *g_bar_canvas;
 }
 
-// The item under a point of the menu's window, or -1.
-int item_at(int x, int y) {
-    const RECT a = area();
-    const Layout l = menu_layout(a.right - a.left, a.bottom - a.top);
-    for (std::size_t i = 0; i < l.rows.size(); ++i)
-        if (l.rows[i].Contains(static_cast<REAL>(x), static_cast<REAL>(y))) return static_cast<int>(i);
-    return -1;
-}
-bool in_card(int x, int y) {
-    const RECT a = area();
-    return menu_layout(a.right - a.left, a.bottom - a.top).card.Contains(static_cast<REAL>(x), static_cast<REAL>(y));
+// The bar gone: hidden, its timer stopped, nothing under the pointer.
+void hide_bar() {
+    if (!g_bar) return;
+    ShowWindow(g_bar, SW_HIDE);
+    KillTimer(g_bar, kBarTimer);
+    g_bar_hover = kNone;
+    g_bar_shown_version = -1;
 }
 
-void choose(int i) {
-    const bool asking = g_asking_quit;
-    close_menu();
-    // Asked whether to quit: the second row quits, the first goes on.
-    if (asking) {
-        if (i == 1 && g_hooks.quit) g_hooks.quit();
+// Whether the mouse's pointer is on the bar's strip at the top of the game's area (shown by a finger, it is not until
+// the mouse moves).
+bool pointer_on_bar() {
+    if (g_bar_by_touch || !IsWindowVisible(g_bar)) return false;
+    POINT p{};
+    GetCursorPos(&p);
+    const RECT a = area();
+    return p.x >= a.left && p.x < a.right && p.y >= a.top && p.y < a.top + bar_height();
+}
+
+// The bar at the opacity its time gives it (whole while the pointer is on it and for g_bar_stay after, then fading),
+// at the top of the game's area, or hidden once it faded or while the question is up; its one timer set for its next
+// look.
+void bar_frame() {
+    if (!g_bar) return;
+    const UINT64 now = GetTickCount64();
+    if (pointer_on_bar()) {
+        // On it: its time starts again, and it stays whole for kBarStayMs after the pointer leaves.
+        g_bar_since = now;
+        g_bar_stay = kBarStayMs;
+    } else {
+        // Off it, perhaps between two of its moves: no chip is under the pointer.
+        g_bar_hover = kNone;
+    }
+    const UINT64 idle = now - g_bar_since;
+    float alpha = 1;
+    if (idle > g_bar_stay) alpha = 1 - std::min(1.0f, static_cast<float>(idle - g_bar_stay) / kBarFadeMs);
+    if (alpha <= 0 || asking()) {
+        hide_bar();
         return;
     }
-    if (i == 1 && g_hooks.toggle_fullscreen) g_hooks.toggle_fullscreen();
-    if (i == 2 && g_hooks.quit) g_hooks.quit();
+    // The kept picture (drawn again only when its look changed), shown again only when it, its opacity or its place
+    // changed: a look at the pointer that finds all as it was costs nothing.
+    Canvas& c = bar_canvas();
+    const RECT a = area();
+    const auto byte = static_cast<BYTE>(alpha * 255);
+    if (g_bar_shown_version != g_bar_version || g_bar_shown_alpha != byte || g_bar_shown_at.x != a.left || g_bar_shown_at.y != a.top) {
+        c.show(g_bar, a.left, a.top, byte);
+        g_bar_shown_version = g_bar_version;
+        g_bar_shown_alpha = byte;
+        g_bar_shown_at = POINT{a.left, a.top};
+    }
+    if (!IsWindowVisible(g_bar)) ShowWindow(g_bar, SW_SHOWNOACTIVATE);
+    // Fading: the next step. Whole: the next look at the pointer, or the fade's start if that comes first.
+    const UINT64 next = alpha < 1 ? kBarStepMs : std::min(kBarLookMs, g_bar_stay - idle + 1);
+    SetTimer(g_bar, kBarTimer, static_cast<UINT>(std::max<UINT64>(1, next)), nullptr);
 }
 
-LRESULT CALLBACK button_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
+// The bar shown whole, staying `stay` ms (more while the pointer is on it).
+void reveal(UINT64 stay) {
+    g_bar_since = GetTickCount64();
+    g_bar_stay = stay;
+    bar_frame();
+}
+
+LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     switch (msg) {
     case WM_TIMER:
-        if (w == kButtonTimer) show_button();
+        if (w == kBarTimer) bar_frame();
         return 0;
     case WM_MOUSEMOVE: {
-        // The button under the pointer lights up; the window hears when the pointer leaves it.
-        const int now = button_at(static_cast<short>(LOWORD(l)));
-        if (g_button_hover == kNone) {
-            TRACKMOUSEEVENT t{sizeof t, TME_LEAVE, h, 0};
-            TrackMouseEvent(&t);
-        }
-        if (now != g_button_hover) {
-            g_button_hover = now;
-            show_button();
+        // A mouse's own move: the pointer is the mouse's again (a finger's moves are Windows' copies, marked).
+        if (!from_touch()) g_bar_by_touch = false;
+        // The chip under the pointer lights up as the game's green button.
+        const int now = chip_at(static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l)));
+        if (now != g_bar_hover) {
+            g_bar_hover = now;
+            bar_frame();
         }
         return 0;
     }
-    case WM_MOUSELEAVE:
-        g_button_hover = kNone;
-        g_moved = GetTickCount64();
-        show_button();
-        return 0;
-    case WM_LBUTTONUP:
-        // The keyboard back to the game's window, then the menu or the question to quit.
+    case WM_LBUTTONUP: {
+        const int chip = chip_at(static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l)));
+        // A finger's tap: the bar stays for the finger's time after it, not while Windows' parked pointer sits there.
+        if (from_touch()) {
+            g_bar_by_touch = true;
+            g_bar_since = GetTickCount64();
+            g_bar_stay = kBarTouchStayMs;
+        }
+        // The keyboard back to the game's window: the bar never takes it, another program may have.
         SetForegroundWindow(g_frame);
-        if (button_at(static_cast<short>(LOWORD(l))) == kQuitButton) ask_quit();
-        else open_menu();
+        // The X asks before quitting; the full screen chip switches at once (the window redraws the bar for it).
+        if (chip == kQuitChip) ask_quit();
+        else if (chip == kScreenChip && g_hooks.toggle_fullscreen) g_hooks.toggle_fullscreen();
         return 0;
+    }
     case WM_SETCURSOR:
-        // The game's pointer over the button too.
+        // The game's pointer over the bar too.
         SetCursor(cursor(false));
         return TRUE;
     case WM_MOUSEACTIVATE:
+        // A click on the bar leaves the game's window active.
         return MA_NOACTIVATE;
     default:
         break;
@@ -406,31 +489,185 @@ LRESULT CALLBACK button_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     return DefWindowProcW(h, msg, w, l);
 }
 
-LRESULT CALLBACK menu_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
+// ---- the question before quitting
+
+HWND g_ask = nullptr;
+// Whether it is up, the button the keys chose (Keep playing first) and what is under the pointer.
+bool g_asking = false;
+constexpr int kKeep = 0, kQuit = 1, kClose = 2;
+int g_choice = kKeep;
+int g_ask_hover = kNone;
+// Whether the window is minimised with the game held for it, and whether the game is held now (for either).
+bool g_minimised_hold = false, g_held = false;
+// The question's picture, kept while the game's area keeps its size: at 4K it is 33 MB, made again only for a new size.
+std::unique_ptr<Canvas> g_ask_canvas;
+
+// The game held still while the question is up or the window is minimised, and let go on when neither is: the window
+// is told only of a change.
+void update_hold() {
+    const bool want = g_asking || g_minimised_hold;
+    if (want == g_held) return;
+    g_held = want;
+    if (g_hooks.hold) g_hooks.hold(want);
+}
+
+// The question's layout in a window w by h: the card in the middle, its header, its thin X, its two buttons.
+struct AskLayout {
+    RectF card, header, close, text, keep, quit;
+};
+AskLayout ask_layout(int w, int h) {
+    AskLayout l;
+    // At 96 dpi: 440 wide; the header 46 high, the glow's two pixels under it; the line of text, then the buttons 44
+    // high side by side with 12 between, 20 in from the card's sides and bottom.
+    const float width = static_cast<float>(px(440)), head = static_cast<float>(px(46)), line = static_cast<float>(std::max(2, px(2)));
+    const float text = static_cast<float>(px(68)), tall = static_cast<float>(px(44)), gap = static_cast<float>(px(12)), pad = static_cast<float>(px(20));
+    const float height = head + line + text + tall + pad;
+    // On whole pixels, so that its edges stay sharp.
+    l.card = RectF(std::floor((static_cast<float>(w) - width) / 2), std::floor((static_cast<float>(h) - height) / 2), width, height);
+    l.header = RectF(l.card.X, l.card.Y, width, head);
+    // The thin X's square at the header's right end.
+    l.close = RectF(l.card.X + width - head, l.card.Y, head, head);
+    l.text = RectF(l.card.X + pad, l.card.Y + head + line, width - pad * 2, text);
+    const float each = std::floor((width - pad * 2 - gap) / 2);
+    l.keep = RectF(l.card.X + pad, l.text.Y + text, each, tall);
+    l.quit = RectF(l.card.X + width - pad - each, l.keep.Y, each, tall);
+    return l;
+}
+
+// The question's words in the language of the PC.
+const wchar_t* ask_title() { return g_korean ? L"게임을 끝낼까요?" : L"Quit the game?"; }
+const wchar_t* ask_text() { return g_korean ? L"하던 곡의 기록은 남지 않아요." : L"A song in progress is not kept."; }
+const wchar_t* keep_label() { return g_korean ? L"계속하기" : L"Keep playing"; }
+const wchar_t* quit_label() { return g_korean ? L"게임 끝내기" : L"Quit the game"; }
+
+void draw_ask() {
+    const RECT a = area();
+    const int w = a.right - a.left, h = a.bottom - a.top;
+    if (w <= 0 || h <= 0) return;
+    if (!g_ask_canvas || g_ask_canvas->w != w || g_ask_canvas->h != h) g_ask_canvas = std::make_unique<Canvas>(w, h);
+    Canvas& c = *g_ask_canvas;
+    {
+        auto bmp = c.surface();
+        Graphics g(bmp.get());
+        // What the last picture had goes first.
+        g.Clear(Color(0, 0, 0, 0));
+        text_setup(g);
+        // The game dimmed behind it, as the game dims itself behind its own dialogs.
+        SolidBrush dim(Color(153, 0, 0, 0));
+        g.FillRectangle(&dim, 0, 0, w, h);
+        const AskLayout l = ask_layout(w, h);
+        const float radius = static_cast<float>(px(4));
+        shadow(g, l.card, radius);
+        // The card: its grey body, then its header within the card's corners.
+        GraphicsPath card_path;
+        rounded(card_path, l.card, radius);
+        SolidBrush body(kBody);
+        g.FillPath(&body, &card_path);
+        g.SetClip(&card_path);
+        SolidBrush header(kHeader.GetValue() | 0xFF000000);
+        g.FillRectangle(&header, l.header);
+        // The light line along its top, as the game's dialog has.
+        Pen top_light(kTopLight, 1.0f);
+        g.DrawLine(&top_light, l.card.X, l.card.Y + 0.5f, l.card.X + l.card.Width, l.card.Y + 0.5f);
+        // The glow under the header.
+        glow(g, l.card.X, l.header.Y + l.header.Height, l.card.Width);
+        g.ResetClip();
+        // The dark line around it, which keeps it apart from a dark game behind.
+        GraphicsPath outline;
+        rounded(outline, RectF(l.card.X - 0.5f, l.card.Y - 0.5f, l.card.Width + 1, l.card.Height + 1), radius + 0.5f);
+        Pen dark(kOutline, 1.0f);
+        g.DrawPath(&dark, &outline);
+        // The title in the middle of the header, clear of the thin X at its right.
+        const float side = l.close.Width;
+        centred(g, ask_title(), static_cast<float>(px(17)), true, kText,
+                RectF(l.header.X + side, l.header.Y, l.header.Width - side * 2, l.header.Height));
+        // The thin X that closes it (keep playing): white, whole under the pointer, with a faint square behind it.
+        if (g_ask_hover == kClose) {
+            SolidBrush lit(Color(28, 255, 255, 255));
+            const float inset = static_cast<float>(px(7));
+            GraphicsPath spot;
+            rounded(spot, RectF(l.close.X + inset, l.close.Y + inset, l.close.Width - inset * 2, l.close.Height - inset * 2), radius);
+            g.FillPath(&lit, &spot);
+        }
+        Pen thin(g_ask_hover == kClose ? kText : Color(215, 255, 255, 255), 1.8f * scale());
+        thin.SetStartCap(LineCapRound);
+        thin.SetEndCap(LineCapRound);
+        cross(g, thin, l.close.X + l.close.Width / 2, l.close.Y + l.close.Height / 2, static_cast<float>(px(8)));
+        // The one quiet line that says what quitting loses.
+        centred(g, ask_text(), static_cast<float>(px(14)), false, kQuiet, l.text);
+        // Keep playing as the game's green button, Quit the game as a grey one; lighter under the pointer.
+        const bool keep_lit = g_ask_hover == kKeep, quit_lit = g_ask_hover == kQuit;
+        button(g, l.keep, radius, keep_lit ? kGreenTopHover : kGreenTop, keep_lit ? kGreenBottomHover : kGreenBottom, kGreenEdge);
+        button(g, l.quit, radius, quit_lit ? kGreyTopHover : kGreyTop, quit_lit ? kGreyBottomHover : kGreyBottom, kGreyEdge);
+        centred(g, keep_label(), static_cast<float>(px(15)), true, kText, l.keep);
+        centred(g, quit_label(), static_cast<float>(px(15)), true, kText, l.quit);
+        // The keys' choice: a lime ring a little outside its button, plain to see for a person without a mouse.
+        const RectF chosen = g_choice == kKeep ? l.keep : l.quit;
+        const float out = static_cast<float>(px(3));
+        GraphicsPath ring;
+        rounded(ring, RectF(chosen.X - out, chosen.Y - out, chosen.Width + out * 2, chosen.Height + out * 2), radius + out);
+        Pen lime(kChosen, static_cast<REAL>(std::max(2, px(2))));
+        g.DrawPath(&lime, &ring);
+    }
+    c.show(g_ask, a.left, a.top, 255);
+}
+
+// What is under a point of the question's window: a button, the thin X, or kNone.
+int ask_at(int x, int y) {
+    const RECT a = area();
+    const AskLayout l = ask_layout(a.right - a.left, a.bottom - a.top);
+    const auto px_x = static_cast<REAL>(x), px_y = static_cast<REAL>(y);
+    if (l.keep.Contains(px_x, px_y)) return kKeep;
+    if (l.quit.Contains(px_x, px_y)) return kQuit;
+    if (l.close.Contains(px_x, px_y)) return kClose;
+    return kNone;
+}
+bool in_card(int x, int y) {
+    const RECT a = area();
+    return ask_layout(a.right - a.left, a.bottom - a.top).card.Contains(static_cast<REAL>(x), static_cast<REAL>(y));
+}
+
+// The question gone; the game goes on (unless minimised), or ends when `quit`.
+void answer(bool quit) {
+    if (!g_asking) return;
+    g_asking = false;
+    ShowWindow(g_ask, SW_HIDE);
+    update_hold();
+    if (quit && g_hooks.quit) g_hooks.quit();
+}
+
+LRESULT CALLBACK ask_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     const int x = static_cast<short>(LOWORD(l)), y = static_cast<short>(HIWORD(l));
     switch (msg) {
     case WM_MOUSEMOVE: {
-        // The move Windows reports as the menu shows, with the pointer where it was: the keys' choice stays.
-        if (x == g_menu_opened_at.x && y == g_menu_opened_at.y) return 0;
-        g_menu_opened_at = POINT{-1, -1};
-        const int hover = item_at(x, y);
-        if (hover != g_menu_hover) {
-            g_menu_hover = hover;
-            draw_menu();
+        // The window hears when the pointer leaves it (off the game), to light nothing then.
+        TRACKMOUSEEVENT t{sizeof t, TME_LEAVE, h, 0};
+        TrackMouseEvent(&t);
+        // What is under the pointer is lighter; the keys' choice stays where the keys put it.
+        const int hover = ask_at(x, y);
+        if (hover != g_ask_hover) {
+            g_ask_hover = hover;
+            draw_ask();
         }
         return 0;
     }
+    case WM_MOUSELEAVE:
+        if (g_ask_hover != kNone) {
+            g_ask_hover = kNone;
+            draw_ask();
+        }
+        return 0;
     case WM_LBUTTONUP: {
-        // The keyboard back to the game's window: the menu never takes it, another program may have.
+        // The keyboard back to the game's window: the question never takes it, another program may have.
         SetForegroundWindow(g_frame);
-        const int i = item_at(x, y);
-        if (i >= 0) choose(i);
-        // A press beside the card is back to the game.
-        else if (!in_card(x, y)) close_menu();
+        const int at = ask_at(x, y);
+        // Quit the game quits; Keep playing, the thin X and a click beside the card all keep playing.
+        if (at == kQuit) answer(true);
+        else if (at == kKeep || at == kClose || !in_card(x, y)) answer(false);
         return 0;
     }
     case WM_SETCURSOR:
-        // The game's pointer over the menu as well.
+        // The game's pointer over the question as well.
         SetCursor(cursor(false));
         return TRUE;
     case WM_MOUSEACTIVATE:
@@ -539,22 +776,10 @@ std::wstring joined(const std::vector<std::wstring>& lines) {
     return out;
 }
 
-}  // namespace
-
-void start(HWND frame, HWND game, const Hooks& hooks, bool korean) {
-    g_frame = frame;
-    g_game = game;
-    g_hooks = hooks;
-    g_korean = korean;
-    GdiplusStartupInput input;
-    GdiplusStartup(&g_gdiplus, &input, nullptr);
-    g_notice = make_window(L"OpenDMTQNotice", notice_proc, true);
-    g_button = make_window(L"OpenDMTQMenuButton", button_proc, false);
-    g_menu = make_window(L"OpenDMTQMenu", menu_proc, false);
-}
-
-void notice(const std::string& text, bool live) {
-    if (!g_notice) return;
+// The notice's picture for "title\ndetail": a small card of the game's dialog header (#1C1C1C, nearly square corners,
+// the light line along its top, the lime glow along its bottom), the broadcast's mark as a pill on its left (red while
+// live, grey once ended), the title in white bold and where to watch under it, quiet.
+std::unique_ptr<Canvas> make_notice(const std::string& text, bool live) {
     const std::wstring all = wide(text);
     const std::size_t cut = all.find(L'\n');
     std::wstring title = all.substr(0, cut), detail = cut == std::wstring::npos ? L"" : all.substr(cut + 1);
@@ -564,11 +789,16 @@ void notice(const std::string& text, bool live) {
     Font detail_font(family.get(), static_cast<REAL>(px(12.5f)), FontStyleRegular, UnitPixel);
     Font mark_font(family.get(), static_cast<REAL>(px(11.5f)), FontStyleBold, UnitPixel);
     const wchar_t* mark = live ? L"LIVE" : (g_korean ? L"방송 종료" : L"ENDED");
-    const float pad = static_cast<float>(px(16)), gap = static_cast<float>(px(12)), dot = static_cast<float>(px(6));
+    // The room inside the card, between the mark and the words, the mark's dot, and the room around the card for its
+    // shadow.
+    const float pad = static_cast<float>(px(14)), gap = static_cast<float>(px(12)), dot = static_cast<float>(px(6));
     const float margin = static_cast<float>(px(10));
+    // The glow's two pixels at the card's bottom, kept clear of the words.
+    const float line = static_cast<float>(std::max(2, px(2)));
     RectF title_box, detail_box, mark_box;
     float mark_w = 0, room = 0;
     {
+        // A one-pixel picture to measure the words on.
         Bitmap probe(1, 1, PixelFormat32bppPARGB);
         Graphics g(&probe);
         text_setup(g);
@@ -589,32 +819,73 @@ void notice(const std::string& text, bool live) {
     const float text_w = std::max(title_box.Width, detail_box.Width);
     const float text_h = title_box.Height + (detail.empty() ? 0 : detail_box.Height + px(2));
     const int w = static_cast<int>(std::ceil(pad * 2 + mark_w + gap + text_w + margin * 2));
-    const int h = static_cast<int>(std::ceil(pad * 2 + std::max(text_h, mark_h) + margin * 2));
-    g_notice_canvas = std::make_unique<Canvas>(w, h);
+    const int h = static_cast<int>(std::ceil(pad * 2 + line + std::max(text_h, mark_h) + margin * 2));
+    auto canvas = std::make_unique<Canvas>(w, h);
     {
-        auto bmp = g_notice_canvas->surface();
+        auto bmp = canvas->surface();
         Graphics g(bmp.get());
         text_setup(g);
-        const RectF box(margin, margin, w - margin * 2, h - margin * 2);
-        card(g, box, static_cast<float>(px(14)), kSurface);
+        // The card on whole pixels, its shadow under it.
+        const RectF box(margin, margin, std::floor(w - margin * 2), std::floor(h - margin * 2));
+        const float radius = static_cast<float>(px(4));
+        shadow(g, box, radius);
+        GraphicsPath card_path;
+        rounded(card_path, box, radius);
+        SolidBrush header(kHeader);
+        g.FillPath(&header, &card_path);
+        // The light line along its top and the glow along its bottom, within its corners.
+        g.SetClip(&card_path);
+        Pen top_light(kTopLight, 1.0f);
+        g.DrawLine(&top_light, box.X, box.Y + 0.5f, box.X + box.Width, box.Y + 0.5f);
+        glow(g, box.X, box.Y + box.Height - line, box.Width);
+        g.ResetClip();
+        // The dark line around it, which keeps it apart from a dark game behind.
+        GraphicsPath outline;
+        rounded(outline, RectF(box.X - 0.5f, box.Y - 0.5f, box.Width + 1, box.Height + 1), radius + 0.5f);
+        Pen dark(kOutline, 1.0f);
+        g.DrawPath(&dark, &outline);
+        // The inside of the card above the glow: the mark and the words are centred in it.
+        const float inside = box.Height - line;
         // The mark: a pill with a dot, red while live.
-        const RectF pill(box.X + pad, box.Y + (box.Height - mark_h) / 2, mark_w, mark_h);
+        const RectF pill(box.X + pad, box.Y + (inside - mark_h) / 2, mark_w, mark_h);
         GraphicsPath path;
         rounded(path, pill, mark_h / 2);
         SolidBrush pill_fill(live ? kLive : kEnded);
         g.FillPath(&pill_fill, &path);
-        SolidBrush white(Color(255, 255, 255, 255));
+        SolidBrush white(kText);
         g.FillEllipse(&white, pill.X + px(9), pill.Y + (mark_h - dot) / 2, dot, dot);
         StringFormat middle;
         middle.SetLineAlignment(StringAlignmentCenter);
         g.DrawString(mark, -1, &mark_font, RectF(pill.X + px(9) + dot + px(5), pill.Y, mark_box.Width + px(4), mark_h), &middle, &white);
         // The title, and where to watch under it.
-        const float tx = pill.X + mark_w + gap, ty = box.Y + (box.Height - text_h) / 2;
-        SolidBrush text(kText), quiet(kQuiet);
+        const float tx = pill.X + mark_w + gap, ty = box.Y + (inside - text_h) / 2;
+        SolidBrush quiet(kQuiet);
         // Their lines as broken above: drawn as they were measured.
-        g.DrawString(title.c_str(), -1, &title_font, PointF(tx, ty), &text);
+        g.DrawString(title.c_str(), -1, &title_font, PointF(tx, ty), &white);
         if (!detail.empty()) g.DrawString(detail.c_str(), -1, &detail_font, PointF(tx, ty + title_box.Height + px(2)), &quiet);
     }
+    return canvas;
+}
+
+}  // namespace
+
+void start(HWND frame, HWND game, const Hooks& hooks, bool korean) {
+    g_frame = frame;
+    g_game = game;
+    g_hooks = hooks;
+    g_korean = korean;
+    GdiplusStartupInput input;
+    GdiplusStartup(&g_gdiplus, &input, nullptr);
+    // The notice lets clicks through to the game; the bar and the question take theirs.
+    g_notice = make_window(L"OpenDMTQNotice", notice_proc, true);
+    g_bar = make_window(L"OpenDMTQBar", bar_proc, false);
+    g_ask = make_window(L"OpenDMTQQuestion", ask_proc, false);
+}
+
+void notice(const std::string& text, bool live) {
+    if (!g_notice) return;
+    g_notice_canvas = make_notice(text, live);
+    // From its first step, sliding in.
     g_notice_shown = GetTickCount64();
     notice_frame();
     ShowWindow(g_notice, SW_SHOWNOACTIVATE);
@@ -622,135 +893,127 @@ void notice(const std::string& text, bool live) {
 }
 
 void pointer_moved(int y, bool pressed) {
-    // Not while the mouse plays (its button down), and only in the top quarter of the game: where a menu is looked for,
-    // away from the notes.
-    if (!g_button || menu_open() || pressed) return;
-    const RECT a = area();
-    if (y > (a.bottom - a.top) / 4) return;
-    const bool shown = IsWindowVisible(g_button) && GetTickCount64() - g_moved < kButtonStayMs;
-    g_moved = GetTickCount64();
-    // Already there at full strength: only its time moves on, which its timer, due at the old time, finds then.
-    if (shown) return;
-    show_button();
+    // Not while the mouse plays (its button down), not over the question, and only at the very top edge of the game:
+    // the game's own controls under the bar's place stay the game's while they are used.
+    if (!g_bar || asking() || pressed) return;
+    // A mouse's move: the pointer is the mouse's again.
+    g_bar_by_touch = false;
+    if (y >= std::max(1, px(4))) return;
+    reveal(kBarStayMs);
 }
 
-bool menu_open() { return g_menu && (IsWindowVisible(g_menu) || g_menu_pending); }
-
-// The menu on the screen, with the first row chosen, so that Enter at once is back to the game.
-void show_menu() {
-    g_menu_hover = 0;
-    ShowWindow(g_button, SW_HIDE);
-    draw_menu();
-    // Where the pointer is now, in the menu's window (which covers the game's area).
-    POINT p{};
-    GetCursorPos(&p);
-    const RECT a = area();
-    g_menu_opened_at = POINT{p.x - a.left, p.y - a.top};
-    ShowWindow(g_menu, SW_SHOWNOACTIVATE);
+void show_bar() {
+    if (!g_bar || asking()) return;
+    // A finger has no pointer that stays on the bar: whole for a few seconds, then fading.
+    g_bar_by_touch = true;
+    reveal(kBarTouchStayMs);
 }
 
-void open_menu() {
-    if (!g_menu || menu_open()) return;
-    g_asking_quit = false;
-    // Over a minimised game it would show nowhere: the game comes back first.
-    if (IsIconic(g_frame)) ShowWindow(g_frame, SW_RESTORE);
-    show_menu();
-    if (g_hooks.shown) g_hooks.shown(true);
-}
+bool asking() { return g_ask && g_asking; }
 
 void ask_quit() {
-    if (!g_menu) return;
-    // The menu up already: it becomes the question.
-    if (menu_open()) {
-        g_asking_quit = true;
-        g_menu_hover = 0;
-        draw_menu();
-        return;
-    }
+    if (!g_ask || g_asking) return;
+    g_asking = true;
+    // Keep playing chosen first, so that Enter at once goes on; nothing lit until the pointer moves over it.
+    g_choice = kKeep;
+    g_ask_hover = kNone;
+    hide_bar();
+    // The game held before anything else happens to it (minimised, it is held already).
+    update_hold();
+    // Over a minimised game it would show nowhere: the game comes back first, still held for the question.
     if (IsIconic(g_frame)) ShowWindow(g_frame, SW_RESTORE);
-    g_asking_quit = true;
-    show_menu();
-    if (g_hooks.shown) g_hooks.shown(true);
+    draw_ask();
+    ShowWindow(g_ask, SW_SHOWNOACTIVATE);
 }
 
 void minimised(bool now) {
-    if (!g_menu) return;
     if (now) {
-        // Minimised mid-song: the game holds still as a phone's does when its owner leaves it, the menu waiting for the
-        // game's return (shown now, it would stand alone on the desktop).
-        if (menu_open()) return;
-        g_menu_pending = true;
-        if (g_hooks.shown) g_hooks.shown(true);
-    } else if (g_menu_pending) {
-        // Back: the menu, the game still held until the player chooses.
-        g_menu_pending = false;
-        show_menu();
+        // Minimised mid-song: the game holds still as a phone's does when its owner leaves it; the bar goes with it.
+        g_minimised_hold = true;
+        hide_bar();
+    } else {
+        // Back: the game goes on (to its own pause screen mid-song), unless the question is up.
+        g_minimised_hold = false;
     }
+    update_hold();
 }
 
-void close_menu() {
-    if (!menu_open()) return;
-    g_menu_pending = false;
-    ShowWindow(g_menu, SW_HIDE);
-    if (g_hooks.shown) g_hooks.shown(false);
-}
-
-bool menu_key(UINT vk) {
-    if (!menu_open()) return false;
-    const int n = static_cast<int>(items().size());
-    if (vk == VK_UP || vk == VK_DOWN || vk == VK_TAB) {
-        // Round the rows, as a list does.
-        const int step = vk == VK_UP ? -1 : 1;
-        g_menu_hover = g_menu_hover < 0 ? 0 : (g_menu_hover + step + n) % n;
-        draw_menu();
-    } else if (vk == VK_RETURN || vk == VK_SPACE) {
-        choose(g_menu_hover < 0 ? 0 : g_menu_hover);
+bool ask_key(UINT vk) {
+    if (!asking()) return false;
+    if (vk == VK_LEFT || vk == VK_RIGHT || vk == VK_TAB) {
+        // Two buttons side by side: each of these keys moves the choice to the other.
+        g_choice = g_choice == kKeep ? kQuit : kKeep;
+        draw_ask();
+    } else if (vk == VK_RETURN) {
+        answer(g_choice == kQuit);
     } else if (vk == VK_ESCAPE) {
-        close_menu();
+        // Esc is keep playing, as the thin X is.
+        answer(false);
     }
-    // Every other key waits while the menu is open.
+    // Every other key waits while the question is up.
     return true;
 }
 
 void place() {
-    if (menu_open()) draw_menu();
-    // The button's kept picture where the game's area went (drawn again only at another scale).
-    if (g_button && IsWindowVisible(g_button)) show_button();
+    // The question over the game's area as it is now.
+    if (asking()) draw_ask();
+    // The bar across the game's top at its new width, if it is up.
+    if (g_bar && IsWindowVisible(g_bar)) bar_frame();
     if (g_notice_canvas) notice_frame();
 }
 
 #ifdef OVERLAY_TEST_HOOKS
-// For the overlay's own probe only (_work/winprobe): the notice's, the buttons' and the card's pictures as PNGs, over the
-// game's dark, with no window shown: a locked or busy screen cannot be captured, and a check shows nothing on it.
+// For the overlay's own probe only (_work/winprobe): the bar, the question and the notice as PNGs with their own
+// transparency, drawn into pictures whose windows stay hidden (nothing here shows one): a locked or busy screen cannot
+// be captured, and a check shows nothing on it.
 void test_save(const std::wstring& prefix) {
     CLSID png{0x557cf406, 0x1a04, 0x11d3, {0x9a, 0x73, 0x00, 0x00, 0xf8, 0x1e, 0xf3, 0x2e}};
-    auto save = [&](Canvas* c, const wchar_t* name) {
-        if (!c) return;
-        Bitmap out(c->w, c->h, PixelFormat32bppARGB);
+    auto save = [&](Canvas& c, const std::wstring& name) {
+        // The premultiplied picture into a plain one with its alpha, which PNG keeps.
+        Bitmap out(c.w, c.h, PixelFormat32bppARGB);
         Graphics g(&out);
-        SolidBrush dark(Color(255, 22, 24, 26));
-        g.FillRectangle(&dark, 0, 0, c->w, c->h);
-        auto picture = c->surface();
-        g.DrawImage(picture.get(), 0, 0, c->w, c->h);
+        g.Clear(Color(0, 0, 0, 0));
+        g.SetCompositingMode(CompositingModeSourceCopy);
+        auto picture = c.surface();
+        g.DrawImage(picture.get(), 0, 0, c.w, c.h);
         out.Save((prefix + name).c_str(), &png, nullptr);
     };
-    save(g_notice_canvas.get(), L"notice.png");
-    // The two buttons with neither, the menu's or the X under the pointer.
-    const wchar_t* button_names[] = {L"buttons.png", L"buttons-menu.png", L"buttons-quit.png"};
-    for (int which : {kNone, kMenuButton, kQuitButton}) {
-        g_button_hover = which;
-        save(&button_canvas(), button_names[which + 1]);
+    const Hooks kept = g_hooks;
+    // The bar in a window and in full screen (its chip's icon the other way), at rest and with each chip lit.
+    for (bool full : {false, true}) {
+        g_hooks.fullscreen = full ? +[] { return true; } : +[] { return false; };
+        const std::wstring state = full ? L"full" : L"window";
+        for (int which : {kNone, kScreenChip, kQuitChip}) {
+            g_bar_hover = which;
+            const wchar_t* lit = which == kNone ? L"" : which == kScreenChip ? L"-screen" : L"-quit";
+            save(bar_canvas(), L"bar-" + state + lit + L".png");
+        }
     }
-    g_button_hover = kNone;
-    // The card as the menu and as the X's question, its first row chosen; drawn into its window's picture, which stays
-    // hidden (only show_menu shows it).
-    for (bool asking : {false, true}) {
-        g_asking_quit = asking;
-        g_menu_hover = 0;
-        draw_menu();
-        save(g_menu_canvas.get(), asking ? L"quit.png" : L"menu.png");
+    g_hooks = kept;
+    g_bar_hover = kNone;
+    // The question with each choice of the keys, then the pointer on each button and on the thin X; drawn into its
+    // window's picture, which stays hidden (only ask_quit shows it).
+    struct Look {
+        int choice, hover;
+        const wchar_t* name;
+    };
+    for (const Look& look : {Look{kKeep, kNone, L"ask-keep.png"}, Look{kQuit, kNone, L"ask-quit.png"}, Look{kKeep, kKeep, L"ask-hover-keep.png"},
+                             Look{kKeep, kQuit, L"ask-hover-quit.png"}, Look{kKeep, kClose, L"ask-hover-close.png"}}) {
+        g_choice = look.choice;
+        g_ask_hover = look.hover;
+        draw_ask();
+        save(*g_ask_canvas, look.name);
     }
-    g_asking_quit = false;
+    g_choice = kKeep;
+    g_ask_hover = kNone;
+    // The notice while live and once ended, in the server's own words (server/game/live/state.php), a server's name in
+    // its place.
+    const std::string live_text = g_korean ? "지금 이 플레이를 라이브로 방송하고 있어요\nMy Server 사이트의 LIVE에서 지금도, 끝난 뒤에도 볼 수 있어요"
+                                           : "Your play is live now\nWatch it live or later under LIVE on My Server";
+    const std::string ended_text = g_korean ? "방송을 마쳤어요\n지난 방송은 My Server 사이트의 LIVE에서 다시 볼 수 있어요"
+                                            : "Your broadcast has ended\nWatch the replay under LIVE on My Server";
+    save(*make_notice(live_text, true), L"notice-live.png");
+    save(*make_notice(ended_text, false), L"notice-ended.png");
 }
 #endif
 
