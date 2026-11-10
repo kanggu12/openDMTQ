@@ -393,6 +393,20 @@ def game_prefix(paths):
     return host[: -len(HOST) - 1] if host.rstrip("/").endswith(HOST) else host
 
 
+def unlinked(path, top):
+    """True when no link lies between the folder top and path, path itself included: its real path is the one the
+    import spelled. A folder or an archive may hold a link named like one of the game's files that points at any
+    file the importer can read (the server's keys, the owner's own files), and data/content would hand that file to
+    every phone. top is the folder the import reads (the folder chosen, or an archive's extraction), which may be a
+    link itself."""
+    # Compared in the system's own spelling: Windows ignores letter case, and gives real paths in the disk's.
+    real = os.path.normcase(os.path.realpath(path))
+    # Where path is when nothing on the way is a link: top's real path, then the rest as the import spelled it. A ".."
+    # the import spells itself (the jackets beside a songs' folder chosen by itself) is part of that spelling.
+    spelled = os.path.normpath(os.path.join(os.path.realpath(top), os.path.relpath(path, top)))
+    return real == os.path.normcase(spelled)
+
+
 def _put(src, dest):
     """One file into the content: a hard link where the system allows one (the same disk: no second copy of
     gigabytes, and the files never change), else a copy. What is at dest goes first: it may be a hard link to the
@@ -471,12 +485,17 @@ def made_song_list(host):
     return out
 
 
-def collect(root, dest, parts, song_list=None, replaced=None):
+def collect(root, dest, parts, song_list=None, replaced=None, top=None):
     """Copy the files of the given parts ("game", "songs") that TAKE names from the game host's folder root into the
     content folder being built, with the song list (the old server's, at song_list, else made from the game's tables).
     replaced: for part of the files, the places of the content it replaces (keep_others'): nothing else is taken.
-    Returns how many songs, charts and other files came."""
+    top: the folder the import reads (root when not given): a file reached through a link from it is left out, as
+    is a song list that is a link (unlinked). Returns how many songs, charts and other files came."""
     counts = {"songs": 0, "charts": 0, "files": 0}
+    # The folder the files must be in, without a link on the way.
+    top = top or root
+    # How many links were left out, said once at the end.
+    links = 0
     for there, here, keep in TAKE:
         # Each folder where it is: the patch folder in the game host's folder or by itself, the songs' folder in it or
         # by itself (with the images' folder beside it then).
@@ -490,12 +509,25 @@ def collect(root, dest, parts, song_list=None, replaced=None):
             base = os.path.join(root, there)
         if not os.path.isdir(base):
             continue
-        for d, _, files in os.walk(base):
+        for d, dirs, files in os.walk(base):
+            # A folder reached through a link (base itself, a folder above it, or a junction on Windows, which the
+            # walk enters) is passed by with all it holds: its files may be anywhere. Asked once per folder.
+            if not unlinked(d, top):
+                links += 1
+                dirs[:] = []
+                continue
+            # Linked folders in it, which the walk does not enter: left out too, and counted.
+            links += sum(1 for x in dirs if os.path.islink(os.path.join(d, x)))
             for f in files:
                 rel = os.path.relpath(os.path.join(d, f), base).replace(os.sep, "/")
                 if not keep.fullmatch(rel) or part_of(here + rel) not in parts:
                     continue
                 if replaced is not None and not any((here + rel).startswith(r) for r in replaced if r.endswith("/")):
+                    continue
+                # A link named like a game file is none: its target may be any file. The folder is known to be no
+                # link, so the file's own name is all there is left to ask (a quick look, not a resolve, per file).
+                if os.path.islink(os.path.join(d, f)):
+                    links += 1
                     continue
                 _put(os.path.join(d, f), os.path.join(dest, here, rel))
                 if here == "web/DMQ/Songs/" and rel.endswith(".fpk"):
@@ -504,8 +536,15 @@ def collect(root, dest, parts, song_list=None, replaced=None):
                     counts["charts"] += 1
                 else:
                     counts["files"] += 1
+    if links:
+        # Said, so that a file the owner sees in the folder and not on the server has its reason.
+        log(f"  left out {links} link(s): the game's files and folders are never links")
     if "songs" not in parts:
         return counts
+    # A song list that is a link, or in a linked folder, is left out like the files: made from the tables instead.
+    if song_list and not unlinked(song_list, top):
+        log(f"  left out the song list {os.path.basename(song_list)}: a link")
+        song_list = None
     # The song list, as the server reads it (a Windows editor's byte-order mark taken off), or made from the tables.
     if song_list:
         with open(song_list, encoding="utf-8-sig") as f:
@@ -586,7 +625,8 @@ def import_folder(path, host, parts, kind=WHOLE):
     replaced = replaced_by(kind, bool(view) and os.path.isdir(os.path.join(view, "eye")))
     built = os.path.join(DATA, "content.new")
     keep_others(built, parts, replaced)
-    counts = collect(host, built, parts, song_list_of(host), replaced)
+    # Read from the folder found (host is in it, or is it): nothing reached through a link from there comes in.
+    counts = collect(host, built, parts, song_list_of(host), replaced, top=path)
     install_content(built)
     report(parts, counts)
     return True
@@ -620,7 +660,8 @@ def import_archive(path, found, parts, kind=WHOLE):
         view = viewimg_of(root)
         replaced = replaced_by(kind, bool(view) and os.path.isdir(os.path.join(view, "eye")))
         keep_others(built, parts, replaced)
-        counts = collect(root, built, parts, os.path.join(tmp, listed) if listed else None, replaced)
+        # Read from the extraction alone: a link 7-Zip restored is left out, wherever it points.
+        counts = collect(root, built, parts, os.path.join(tmp, listed) if listed else None, replaced, top=tmp)
         install_content(built)
         report(parts, counts)
     finally:

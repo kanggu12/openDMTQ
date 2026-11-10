@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+import zipfile
 from unittest import mock
 
 from opendmtq_tools import importer
@@ -133,6 +134,99 @@ class PartsTest(unittest.TestCase):
         self.assertEqual(content_files(self.data), set())
 
 
+@unittest.skipUnless(hasattr(os, "symlink"), "needs links")
+class LinksTest(unittest.TestCase):
+    """A link named like one of the game's files, or a linked folder, in the folder chosen: left out wherever it points.
+    data/content is served to every phone, and a link could hand it the server's key or the owner's own files."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.tmp = tmp.name
+        self.src = os.path.join(tmp.name, "in")
+        self.host = os.path.join(self.src, importer.HOST)
+        self.data = os.path.join(tmp.name, "data")
+        game_folder(self.src)
+        # A file outside the folder chosen, as the server's own key is: in data/, beside the content.
+        self.secret = os.path.join(self.data, "state", "download.key")
+        os.makedirs(os.path.dirname(self.secret))
+        with open(self.secret, "w") as f:
+            f.write("the server's key")
+        self.said = []
+        for patcher in (mock.patch.object(importer, "DATA", self.data), mock.patch.object(importer, "log", self.said.append)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def link(self, rel, target):
+        """Puts a link at rel in the game host's folder, in place of what is there."""
+        path = os.path.join(self.host, rel)
+        if os.path.isdir(path) and not os.path.islink(path):
+            shutil.rmtree(path)
+        elif os.path.lexists(path):
+            os.remove(path)
+        os.symlink(target, path)
+
+    def served(self):
+        """What every file of data/content holds."""
+        out = []
+        for rel in content_files(self.data):
+            with open(os.path.join(self.data, "content", rel), errors="replace") as f:
+                out.append(f.read())
+        return out
+
+    def test_a_link_to_a_file_outside_the_folder_is_left_out(self):
+        # A picture and a song's music named as the game names them, each a link to the key.
+        self.link("static/dmq/banner/x/howtoplay_play.png", self.secret)
+        self.link("DMQ/Songs/2/2.fpk", self.secret)
+        self.assertTrue(importer.import_game_files([self.src], {"game", "songs"}))
+        got = content_files(self.data)
+        self.assertNotIn("web/static/dmq/banner/x/howtoplay_play.png", got)
+        self.assertNotIn("web/DMQ/Songs/2/2.fpk", got)
+        self.assertNotIn("the server's key", self.served())
+        # Everything else came as it would have, and the owner is told why two files did not.
+        self.assertIn("web/DMQ/Songs/1/1.fpk", got)
+        self.assertIn("web/viewImg/news/phone1.png", got)
+        self.assertIn("  left out 2 link(s): the game's files and folders are never links", self.said)
+
+    def test_a_linked_folder_is_left_out_with_all_it_holds(self):
+        # The owner's own pictures, in a folder outside: linked in as a folder of news pictures, and as the whole
+        # folder of the pictures of HOW TO PLAY.
+        outside = os.path.join(self.tmp, "photos")
+        write(outside, {"phone2.png": "the owner's photo", "dmq/banner/x/howtoplay_play.png": "the owner's photo"})
+        self.link("viewImg/news2", outside)
+        self.link("static", outside)
+        self.assertTrue(importer.import_game_files([self.src], {"game"}))
+        got = content_files(self.data)
+        self.assertFalse([rel for rel in got if rel.startswith(("web/viewImg/news2/", "web/static/"))], got)
+        self.assertNotIn("the owner's photo", self.served())
+        self.assertIn("web/viewImg/news/phone1.png", got)
+
+    def test_a_link_inside_the_folder_is_left_out_too(self):
+        # Pointing at a file of the folder itself: no game file is a link, wherever it points.
+        self.link("viewImg/news/phone2.png", os.path.join(self.host, "viewImg", "news", "phone1.png"))
+        importer.import_game_files([self.src], {"game"})
+        self.assertNotIn("web/viewImg/news/phone2.png", content_files(self.data))
+
+    def test_a_song_list_that_is_a_link_is_left_out(self):
+        # A list of songs that is a link to a file outside: the list is made from the game's own tables instead.
+        other = os.path.join(self.data, "state", "list.json")
+        with open(other, "w") as f:
+            json.dump([{"song_id": 1, "name": "the server's key"}], f)
+        os.remove(os.path.join(self.src, "_info", "songList.json"))
+        os.symlink(other, os.path.join(self.src, "_info", "songList.json"))
+        self.assertTrue(importer.import_game_files([self.src], {"game", "songs"}))
+        self.assertIn("  left out the song list songList.json: a link", self.said)
+        with open(os.path.join(self.data, "content", "songs.json")) as f:
+            self.assertNotIn("the server's key", f.read())
+
+    def test_the_folder_chosen_may_be_a_link_itself(self):
+        # The owner may reach the game's files through a link of their own: what is in it still comes.
+        chosen = os.path.join(self.tmp, "chosen")
+        os.symlink(self.src, chosen)
+        self.assertTrue(importer.import_game_files([chosen], {"game", "songs"}))
+        self.assertIn("web/DMQ/Songs/2/2.fpk", content_files(self.data))
+
+
 class OnlyTest(unittest.TestCase):
     def run_main(self, only, environ=None):
         """importer.main over a folder with three downloads; returns (exit code, files it considered, parts asked)."""
@@ -244,7 +338,7 @@ class OnlyTest(unittest.TestCase):
             said = []
             listing = [importer.SONG_LIST, importer.GAME_DIR + "/a"]
             with mock.patch.multiple(importer, DATA=data, IN=src, archive_paths=lambda p: listing, keep_others=lambda *a, **kw: None,
-                                     collect=lambda *a: {}, install_content=lambda *a: None, report=lambda *a: None,
+                                     collect=lambda *a, **k: {}, install_content=lambda *a: None, report=lambda *a: None,
                                      log=said.append), \
                     mock.patch.object(importer.subprocess, "run", run):
                 self.assertTrue(importer.import_game_files(paths, {"game"}))
@@ -843,6 +937,25 @@ class ArchiveFormsTest(unittest.TestCase):
                                lambda p: {"kind": infos[os.path.basename(p)], "version": "1.3.4", "hosts": [], "known": True}):
             self.assertEqual(importer.import_apks([os.path.join(self.src, "game.xapk")]), 1)
         self.assertEqual(os.listdir(os.path.join(self.data, "apk", "base")), ["base.apk"])
+
+    def test_a_link_in_an_archive_is_left_out(self):
+        # A zip whose picture is a link: 7-Zip restores a link that stays in the extraction (one that leaves it, it
+        # refuses), and the import leaves it out whatever it points at.
+        tree = self.files()
+        archive = os.path.join(self.src, "dmtq.zip")
+        with zipfile.ZipFile(archive, "w") as z:
+            for d, _, names in os.walk(tree):
+                for name in names:
+                    z.write(os.path.join(d, name), os.path.relpath(os.path.join(d, name), tree))
+            # The link, as a zip made on Linux or macOS stores one: the file type in the high bits, its target as the data.
+            link = zipfile.ZipInfo(importer.HOST + "/static/dmq/banner/x/linked.png")
+            link.create_system = 3
+            link.external_attr = 0o120777 << 16
+            z.writestr(link, "howtoplay_play.png")
+        self.assertTrue(importer.import_game_files([archive], {"game", "songs"}))
+        got = content_files(self.data)
+        self.assertIn("web/static/dmq/banner/x/howtoplay_play.png", got)
+        self.assertNotIn("web/static/dmq/banner/x/linked.png", got)
 
 
 if __name__ == "__main__":
