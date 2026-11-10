@@ -14,6 +14,8 @@
 //     written through a UAV that converts by hand): read through the sRGB curve to linear, written back through it;
 //   - the output is a separate texture holding a copy of the frame, written where CMAA 2 changes a pixel, as the
 //     reference writes into its input.
+//   - the candidates and the blend are dispatched at their most groups, each thread past the count stopping at once,
+//     where the reference dispatches them indirectly by the counts (its arguments are still written, and unread).
 #include "cmaa2.h"
 
 #include "host.h"
@@ -587,7 +589,6 @@ struct Gl {
     PFNGLTEXSTORAGE2DPROC tex_storage;
     PFNGLBINDIMAGETEXTUREPROC bind_image;
     PFNGLDISPATCHCOMPUTEPROC dispatch;
-    PFNGLDISPATCHCOMPUTEINDIRECTPROC dispatch_indirect;
     PFNGLMEMORYBARRIERPROC memory_barrier;
     PFNGLGETERRORPROC get_error;
     bool ok = false;
@@ -637,7 +638,6 @@ const Gl& gl() {
         look_up(x.tex_storage, "glTexStorage2D", ok);
         look_up(x.bind_image, "glBindImageTexture", ok);
         look_up(x.dispatch, "glDispatchCompute", ok);
-        look_up(x.dispatch_indirect, "glDispatchComputeIndirect", ok);
         look_up(x.memory_barrier, "glMemoryBarrier", ok);
         look_up(x.get_error, "glGetError", ok);
         x.ok = ok;
@@ -665,6 +665,8 @@ struct Cmaa2 {
     int width = 0, height = 0;
     GLuint work = 0, edges = 0;
     // The buffer's layout in 32-bit words (cmaa2.cpp's header says what is where).
+    // The size its programs' uniforms were last set for: set again only when it changes.
+    int uniforms_w = 0, uniforms_h = 0;
     std::uint32_t candidates_at = 0, candidates_max = 0, locations_at = 0, locations_max = 0, items_at = 0, items_max = 0, heads_at = 0,
                   heads_pitch = 0;
 };
@@ -820,27 +822,26 @@ Cmaa2* cmaa2_make() {
 bool cmaa2_run(Cmaa2* c, unsigned source, unsigned out, int width, int height) {
     const Gl& g = gl();
     if (!size_buffers(g, *c, width, height)) return false;
-    // The compute state it binds, as the game left it: the storage buffer's generic and first indexed binding, the
-    // indirect dispatch buffer, and image units 0 and 1.
-    GLint was_storage = 0, was_storage0 = 0, was_indirect = 0;
+    // The compute state it binds, as the game left it: the storage buffer's generic and first indexed binding, and image
+    // units 0 and 1.
+    GLint was_storage = 0, was_storage0 = 0;
     GLint64 was_start = 0, was_size = 0;
     g.get_integer(GL_SHADER_STORAGE_BUFFER_BINDING, &was_storage);
     g.get_integer_i(GL_SHADER_STORAGE_BUFFER_BINDING, 0, &was_storage0);
     g.get_integer64_i(GL_SHADER_STORAGE_BUFFER_START, 0, &was_start);
     g.get_integer64_i(GL_SHADER_STORAGE_BUFFER_SIZE, 0, &was_size);
-    g.get_integer(GL_DISPATCH_INDIRECT_BUFFER_BINDING, &was_indirect);
     ImageUnit was_images[2];
     save_image(g, 0, was_images[0]);
     save_image(g, 1, was_images[1]);
     // Its own: the buffer for every pass, the output and the edges as images, the frame on texture unit 0.
     g.bind_buffer_base(GL_SHADER_STORAGE_BUFFER, 0, c->work);
-    g.bind_buffer(GL_DISPATCH_INDIRECT_BUFFER, c->work);
     g.bind_image(0, out, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
     g.bind_image(1, c->edges, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
     g.active_texture(GL_TEXTURE0);
     g.bind_texture(GL_TEXTURE_2D, source);
-    // Each pass's uniforms: the picture's size and the buffer's layout.
-    for (int p = 0; p < kPasses; ++p) {
+    // Each pass's uniforms: the picture's size and the buffer's layout, set when the size changed (they are the
+    // programs' own state, which nothing else changes).
+    for (int p = 0; p < kPasses && (c->uniforms_w != width || c->uniforms_h != height); ++p) {
         g.use_program(c->programs[p]);
         const GLint* u = c->uniforms[p];
         g.uniform_ivec2(u[kSize], width, height);
@@ -853,6 +854,8 @@ bool cmaa2_run(Cmaa2* c, unsigned source, unsigned out, int width, int height) {
         g.uniform_uint(u[kHeadsAt], c->heads_at);
         g.uniform_uint(u[kHeadsPitch], c->heads_pitch);
     }
+    c->uniforms_w = width;
+    c->uniforms_h = height;
     // The reference's order: edges in 2x2 blocks (14 x 14 blocks a group), the candidates' dispatch, the candidates, the
     // blend's dispatch, the blend; each pass sees what the one before wrote.
     const GLbitfield written = GL_SHADER_STORAGE_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT;
@@ -862,21 +865,23 @@ bool cmaa2_run(Cmaa2* c, unsigned source, unsigned out, int width, int height) {
     g.memory_barrier(written);
     g.use_program(c->programs[kDispatchArgs]);
     g.dispatch(2, 1, 1);
-    g.memory_barrier(written | GL_COMMAND_BARRIER_BIT);
+    g.memory_barrier(written);
+    // The candidates and the blend by a dispatch of their most groups, each thread past the count going at once, in
+    // place of the reference's indirect dispatch: ANGLE's Direct3D 11 backend keeps a storage buffer apart from the
+    // copy an indirect dispatch reads, and brings them together at each dispatch.
     g.use_program(c->programs[kProcessCandidates]);
-    g.dispatch_indirect(16 * 4);
+    g.dispatch((c->candidates_max + 127) / 128, 1, 1);
     g.memory_barrier(written);
     g.use_program(c->programs[kDispatchArgs]);
     g.dispatch(1, 2, 1);
-    g.memory_barrier(written | GL_COMMAND_BARRIER_BIT);
+    g.memory_barrier(written);
     g.use_program(c->programs[kDeferredApply]);
-    g.dispatch_indirect(16 * 4);
+    g.dispatch(1, (c->locations_max + 31) / 32, 1);
     // The output as the passes after read it: sampled, or blitted.
     g.memory_barrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     // The game's compute state back.
     restore_image(g, 1, was_images[1]);
     restore_image(g, 0, was_images[0]);
-    g.bind_buffer(GL_DISPATCH_INDIRECT_BUFFER, static_cast<GLuint>(was_indirect));
     if (was_size > 0) g.bind_buffer_range(GL_SHADER_STORAGE_BUFFER, 0, static_cast<GLuint>(was_storage0), static_cast<GLintptr>(was_start),
                                           static_cast<GLsizeiptr>(was_size));
     else g.bind_buffer_base(GL_SHADER_STORAGE_BUFFER, 0, static_cast<GLuint>(was_storage0));

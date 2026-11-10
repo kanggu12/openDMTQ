@@ -7,6 +7,7 @@
 #include <EGL/egl.h>
 
 #include <atomic>
+#include <cstdint>
 
 namespace arm32 {
 
@@ -20,6 +21,14 @@ extern std::atomic<int> g_offscreen_samples;
 // Whether the game's contexts of OpenGL ES 3.0 are made 3.1 instead (a computer player's CMAA 2 runs as compute
 // shaders, which 3.1 has; 3.1 keeps everything of 3.0 the game uses). egl_bridge.cpp reads it at eglCreateContext.
 extern std::atomic<bool> g_offscreen_es31;
+// The size the game draws at, as width << 32 | height, set by the computer player whenever its area changes (0: not
+// known, the surface is asked): the swap and eglQuerySurface read it with no call into EGL.
+extern std::atomic<std::int64_t> g_offscreen_size;
+
+// What the redirection did, for the player's stats (each a running count): swaps of a redirected frame and the time
+// they took on the render thread (the resolve, the passes and the size's check), the game's eglMakeCurrent calls on the
+// redirected surface, and the resolves the game's own reads of a multisampled frame made.
+extern std::atomic<std::uint64_t> g_offscreen_swaps, g_offscreen_swap_ns, g_offscreen_make_currents, g_offscreen_read_resolves;
 
 // A finished frame, handed to the player's passes at the swap with the game's context current on its render thread.
 struct OffscreenFrame {

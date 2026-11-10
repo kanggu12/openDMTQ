@@ -29,6 +29,8 @@
 
 #include <EGL/egl.h>
 #include <GLES3/gl31.h>
+// EXT_disjoint_timer_query's names, for the GPU times in the stats.
+#include <GLES2/gl2ext.h>
 
 #include <atomic>
 #include <cmath>
@@ -846,6 +848,7 @@ struct Passes {
     int in_w = 0, in_h = 0, out_w = 0, out_h = 0;
     GLuint edges = 0, edges_fbo = 0, weights = 0, weights_fbo = 0, aa_out = 0, aa_fbo = 0, easu_out = 0, easu_fbo = 0;
     GLuint read_fbo = 0;           // a framebuffer for a plain copy's source
+    GLuint read_texture = 0;       // the texture attached to it now: attached again only when another is read
 };
 Passes g_passes;
 
@@ -857,6 +860,8 @@ bool size_targets(const Gl& g, Passes& p, int in_w, int in_h, int out_w, int out
     GLuint fbos[4] = {p.edges_fbo, p.weights_fbo, p.aa_fbo, p.easu_fbo};
     g.delete_framebuffers(4, fbos);
     p.edges = p.weights = p.aa_out = p.easu_out = p.edges_fbo = p.weights_fbo = p.aa_fbo = p.easu_fbo = 0;
+    // The plain copy's source is attached again: a new texture may have the name of one that went.
+    p.read_texture = 0;
     bool ok = true;
     if (p.aa == 2) {
         // SMAA's edges (two channels) and blending weights, at the frame's size.
@@ -982,11 +987,224 @@ void bind_unit(const Gl& g, int unit, GLuint texture) {
     g.bind_sampler(static_cast<GLuint>(unit), 0);
 }
 
-// What the passes have taken, for the log every 600 frames.
-struct Costs {
-    int frames = 0;
-    std::int64_t total = 0, most = 0;
-} g_costs;
+// ---- what the passes cost, for the player's stats (every 5 s, with ARM32_STATS) and once in the log
+
+// The steps of a frame's picture timed apart: the resolve and the passes, each on the CPU (this thread's time) and on
+// the GPU (EXT_disjoint_timer_query, where the driver has it). kStepGame is the GPU's time from the end of the last frame's
+// passes to the start of this one's: the game's own drawing of the frame (timestamps only).
+enum Step { kStepGame, kStepCopy, kStepCmaa2, kStepSmaaEdges, kStepSmaaWeights, kStepSmaaBlend, kStepEasu, kStepRcas, kStepNis, kSteps };
+const char* const kStepNames[kSteps] = {"game", "copy", "CMAA 2", "SMAA edges", "SMAA weights", "SMAA blend", "EASU", "RCAS", "NIS"};
+
+// The GPU's clock by EXT_disjoint_timer_query: a timestamp at each step's start and at the end, in a ring of frames read
+// back a few frames later when they are there (never waited for); where the driver has no timestamps, the time of each
+// step by its own elapsed-time query instead (the game's own time is then not known).
+struct GpuTimes {
+    PFNGLGENQUERIESEXTPROC gen = nullptr;
+    PFNGLQUERYCOUNTEREXTPROC counter = nullptr;
+    PFNGLBEGINQUERYEXTPROC begin = nullptr;
+    PFNGLENDQUERYEXTPROC end = nullptr;
+    PFNGLGETQUERYOBJECTUIVEXTPROC available = nullptr;
+    PFNGLGETQUERYOBJECTUI64VEXTPROC result = nullptr;
+    PFNGLGETQUERYIVEXTPROC query_iv = nullptr;
+    EGLContext context = EGL_NO_CONTEXT;
+    bool on = false, stamps = false;
+    static constexpr int kRing = 4;
+    // Per frame of the ring: the queries of each step (start stamps, or elapsed times), the end stamp, and which steps ran.
+    GLuint queries[kRing][kSteps] = {}, ends[kRing] = {};
+    bool used[kRing][kSteps] = {}, pending[kRing] = {};
+    int frame = 0;
+    int open = -1;  // the step whose elapsed-time query is open, -1 none
+    // The sums since the last report, per step: GPU nanoseconds and the frames they cover.
+    std::uint64_t gpu_ns[kSteps] = {}, gpu_frames[kSteps] = {};
+    bool disjoint = false;
+} g_gpu;
+
+// The timer queries in this context, when the driver has the extension; said once either way.
+void gpu_times_start(const Gl& g, EGLContext context) {
+    GpuTimes& t = g_gpu;
+    if (t.context == context) return;
+    t = GpuTimes{};
+    t.context = context;
+    // The extension, by name among the context's.
+    auto get_stringi = reinterpret_cast<const GLubyte* (*)(GLenum, GLuint)>(arm32::gl_proc("glGetStringi"));
+    GLint count = 0;
+    g.get_integer(GL_NUM_EXTENSIONS, &count);
+    bool has = false;
+    for (GLint i = 0; get_stringi && i < count; ++i) {
+        const char* name = reinterpret_cast<const char*>(get_stringi(GL_EXTENSIONS, static_cast<GLuint>(i)));
+        if (name && std::strcmp(name, "GL_EXT_disjoint_timer_query") == 0) has = true;
+    }
+    t.gen = reinterpret_cast<PFNGLGENQUERIESEXTPROC>(arm32::gl_proc("glGenQueriesEXT"));
+    t.counter = reinterpret_cast<PFNGLQUERYCOUNTEREXTPROC>(arm32::gl_proc("glQueryCounterEXT"));
+    t.begin = reinterpret_cast<PFNGLBEGINQUERYEXTPROC>(arm32::gl_proc("glBeginQueryEXT"));
+    t.end = reinterpret_cast<PFNGLENDQUERYEXTPROC>(arm32::gl_proc("glEndQueryEXT"));
+    t.available = reinterpret_cast<PFNGLGETQUERYOBJECTUIVEXTPROC>(arm32::gl_proc("glGetQueryObjectuivEXT"));
+    t.result = reinterpret_cast<PFNGLGETQUERYOBJECTUI64VEXTPROC>(arm32::gl_proc("glGetQueryObjectui64vEXT"));
+    t.query_iv = reinterpret_cast<PFNGLGETQUERYIVEXTPROC>(arm32::gl_proc("glGetQueryivEXT"));
+    t.on = has && t.gen && t.begin && t.end && t.available && t.result;
+    if (!t.on) {
+        arm32::log("player: picture: no GPU timer here (no EXT_disjoint_timer_query): the passes' stats say their CPU time alone");
+        return;
+    }
+    // Timestamps where the driver counts them: then the game's own time between the frames' passes too.
+    GLint bits = 0;
+    if (t.counter && t.query_iv) t.query_iv(GL_TIMESTAMP_EXT, GL_QUERY_COUNTER_BITS_EXT, &bits);
+    t.stamps = bits > 0;
+    for (int f = 0; f < GpuTimes::kRing; ++f) {
+        t.gen(kSteps, t.queries[f]);
+        t.gen(1, &t.ends[f]);
+    }
+    arm32::log("player: picture: GPU times by EXT_disjoint_timer_query (%s)", t.stamps ? "timestamps" : "elapsed time per pass; the game's own not known");
+}
+
+// The results of the ring's frames that are there, added to the sums; a frame whose results are not there yet stays.
+void gpu_times_collect() {
+    GpuTimes& t = g_gpu;
+    if (!t.on) return;
+    GLint disjoint = 0;
+    // A clock change on the GPU (its speed, a power state) makes these results meaningless: they are dropped.
+    static auto get_integer = reinterpret_cast<void (*)(GLenum, GLint*)>(arm32::gl_proc("glGetIntegerv"));
+    if (get_integer) get_integer(GL_GPU_DISJOINT_EXT, &disjoint);
+    if (disjoint) t.disjoint = true;
+    for (int f = 0; f < GpuTimes::kRing; ++f) {
+        if (!t.pending[f] || f == t.frame) continue;
+        // Ready when its last query is (they finish in order).
+        GLuint ready = 0;
+        t.available(t.stamps ? t.ends[f] : t.queries[f][kSteps - 1], GL_QUERY_RESULT_AVAILABLE_EXT, &ready);
+        if (t.stamps) {
+            if (!ready) continue;
+            GLuint64 end = 0;
+            t.result(t.ends[f], GL_QUERY_RESULT_EXT, &end);
+            // Each step from its start stamp to the next one's (or the end).
+            GLuint64 next = end;
+            for (int k = kSteps - 1; k >= 0; --k) {
+                if (!t.used[f][k]) continue;
+                GLuint64 at = 0;
+                t.result(t.queries[f][k], GL_QUERY_RESULT_EXT, &at);
+                if (!disjoint && next >= at) {
+                    t.gpu_ns[k] += next - at;
+                    ++t.gpu_frames[k];
+                }
+                next = at;
+            }
+        } else {
+            // Each step's own elapsed time, when every one of them is there.
+            bool all = true;
+            for (int k = 0; k < kSteps && all; ++k) {
+                if (!t.used[f][k]) continue;
+                GLuint r = 0;
+                t.available(t.queries[f][k], GL_QUERY_RESULT_AVAILABLE_EXT, &r);
+                all = r != 0;
+            }
+            if (!all) continue;
+            for (int k = 0; k < kSteps; ++k) {
+                if (!t.used[f][k]) continue;
+                GLuint64 ns = 0;
+                t.result(t.queries[f][k], GL_QUERY_RESULT_EXT, &ns);
+                if (!disjoint) {
+                    t.gpu_ns[k] += ns;
+                    ++t.gpu_frames[k];
+                }
+            }
+        }
+        t.pending[f] = false;
+        for (bool& u : t.used[f]) u = false;
+    }
+}
+
+// The CPU's time of each step since the last report, and the frames.
+std::uint64_t g_cpu_ns[kSteps] = {};
+std::uint64_t g_cpu_frames = 0, g_cpu_total_ns = 0;
+// Where the current step started on the CPU.
+std::int64_t g_step_from = 0;
+int g_step = -1;
+
+// A step of this frame's picture starts (the one before it ends): its CPU time from here, its GPU time by a timestamp or
+// an elapsed-time query.
+void step(int which) {
+    const std::int64_t t = now_ns();
+    if (g_step >= 0) g_cpu_ns[g_step] += static_cast<std::uint64_t>(t - g_step_from);
+    g_step = which;
+    g_step_from = t;
+    GpuTimes& gt = g_gpu;
+    if (!gt.on || which < 0) return;
+    if (gt.stamps) {
+        gt.counter(gt.queries[gt.frame][which], GL_TIMESTAMP_EXT);
+    } else {
+        if (gt.open >= 0) gt.end(GL_TIME_ELAPSED_EXT);
+        gt.begin(GL_TIME_ELAPSED_EXT, gt.queries[gt.frame][which]);
+        gt.open = which;
+    }
+    gt.used[gt.frame][which] = true;
+}
+
+// This frame's picture is done: the last step ends, the frame's end stamp, and the ring moves on.
+void steps_done() {
+    if (g_step >= 0) g_cpu_ns[g_step] += static_cast<std::uint64_t>(now_ns() - g_step_from);
+    g_step = -1;
+    GpuTimes& gt = g_gpu;
+    if (!gt.on) return;
+    if (gt.stamps) {
+        gt.counter(gt.ends[gt.frame], GL_TIMESTAMP_EXT);
+        // The game's time for the next frame: from here to its first step.
+        const int next = (gt.frame + 1) % GpuTimes::kRing;
+        gt.pending[gt.frame] = true;
+        gt.frame = next;
+        // A frame of the ring still waiting for its results is let go: its queries are about to be used again.
+        gt.pending[next] = false;
+        for (bool& u : gt.used[next]) u = false;
+        gt.counter(gt.queries[next][kStepGame], GL_TIMESTAMP_EXT);
+        gt.used[next][kStepGame] = true;
+    } else {
+        if (gt.open >= 0) gt.end(GL_TIME_ELAPSED_EXT);
+        gt.open = -1;
+        gt.pending[gt.frame] = true;
+        gt.frame = (gt.frame + 1) % GpuTimes::kRing;
+        gt.pending[gt.frame] = false;
+        for (bool& u : gt.used[gt.frame]) u = false;
+    }
+}
+
+// Every 5 s with the player's stats on: each step's mean CPU and GPU time a frame, and the bridge's own share (the swap
+// as a whole, the game's make-currents and the resolves its reads of a multisampled frame made).
+void report_steps(const char* what) {
+    static std::int64_t last = 0;
+    static std::uint64_t swaps0 = 0, swap_ns0 = 0, makes0 = 0, reads0 = 0;
+    const std::int64_t t = now_ns();
+    if (!last) last = t;
+    if (t - last < 5000000000LL || !g_cpu_frames) return;
+    const double seconds = static_cast<double>(t - last) / 1e9;
+    last = t;
+    gpu_times_collect();
+    const std::uint64_t swaps = arm32::g_offscreen_swaps.load(), swap_ns = arm32::g_offscreen_swap_ns.load();
+    const std::uint64_t makes = arm32::g_offscreen_make_currents.load(), reads = arm32::g_offscreen_read_resolves.load();
+    std::string line;
+    char part[96];
+    for (int k = 0; k < kSteps; ++k) {
+        const bool cpu = g_cpu_ns[k] > 0, gpu = g_gpu.gpu_frames[k] > 0;
+        if (!cpu && !gpu) continue;
+        if (k == kStepGame) std::snprintf(part, sizeof part, " game GPU %.3f;", static_cast<double>(g_gpu.gpu_ns[k]) / static_cast<double>(g_gpu.gpu_frames[k]) / 1e6);
+        else if (gpu)
+            std::snprintf(part, sizeof part, " %s CPU %.3f GPU %.3f;", kStepNames[k], static_cast<double>(g_cpu_ns[k]) / static_cast<double>(g_cpu_frames) / 1e6,
+                          static_cast<double>(g_gpu.gpu_ns[k]) / static_cast<double>(g_gpu.gpu_frames[k]) / 1e6);
+        else std::snprintf(part, sizeof part, " %s CPU %.3f;", kStepNames[k], static_cast<double>(g_cpu_ns[k]) / static_cast<double>(g_cpu_frames) / 1e6);
+        line += part;
+    }
+    const std::uint64_t n = swaps - swaps0;
+    arm32::log("stats: picture (%s), ms a frame:%s the swap's whole CPU %.3f (the passes' %.3f), %.1f make-currents/s, %.1f read resolves/s%s%s",
+               what, line.c_str(), n ? static_cast<double>(swap_ns - swap_ns0) / static_cast<double>(n) / 1e6 : 0.0,
+               static_cast<double>(g_cpu_total_ns) / static_cast<double>(g_cpu_frames) / 1e6, static_cast<double>(makes - makes0) / seconds,
+               static_cast<double>(reads - reads0) / seconds, g_gpu.on ? "" : "; no GPU timer here", g_gpu.disjoint ? "; a GPU clock change dropped some" : "");
+    swaps0 = swaps;
+    swap_ns0 = swap_ns;
+    makes0 = makes;
+    reads0 = reads;
+    for (std::uint64_t& v : g_cpu_ns) v = 0;
+    g_cpu_frames = g_cpu_total_ns = 0;
+    for (std::uint64_t& v : g_gpu.gpu_ns) v = 0;
+    for (std::uint64_t& v : g_gpu.gpu_frames) v = 0;
+    g_gpu.disjoint = false;
+}
 
 // The names of the passes in use, for the log.
 std::string names(const Passes& p, bool scaled, int samples) {
@@ -1000,6 +1218,17 @@ std::string names(const Passes& p, bool scaled, int samples) {
     // No pass of its own drew the picture: the copy (MSAA's frame is resolved in the bridge, before this).
     else if (p.aa != 1 && p.aa != 2) s += s.empty() ? "a plain copy" : ", a plain copy";
     return s;
+}
+
+// `texture` bound for reading through the passes' own framebuffer, attached again only when it is another texture than
+// last time (a new attachment makes the driver check the framebuffer again).
+void read_from(const Gl& g, Passes& p, GLuint texture) {
+    if (!p.read_fbo) g.gen_framebuffers(1, &p.read_fbo);
+    g.bind_framebuffer(GL_READ_FRAMEBUFFER, p.read_fbo);
+    if (p.read_texture != texture) {
+        g.framebuffer_texture(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+        p.read_texture = texture;
+    }
 }
 
 // The bridge's hook (offscreen.h): the frame through the passes to the window's framebuffer.
@@ -1022,6 +1251,11 @@ bool present(const arm32::OffscreenFrame& f) {
     }();
     if (finish) g.finish();
     const std::int64_t began = now_ns();
+    // The GPU timer in this context (with the stats on), the results that are there taken in.
+    if (arm32::g_stats) {
+        gpu_times_start(g, f.context);
+        gpu_times_collect();
+    }
     const bool scaled = f.width != f.out_width || f.height != f.out_height;
     // Said once, then at each change of sizes: what the game draws at and what makes the window's picture of it.
     static int said_w = 0, said_h = 0, said_ow = 0, said_oh = 0;
@@ -1051,9 +1285,8 @@ bool present(const arm32::OffscreenFrame& f) {
     bool drawn = false;
     if (p.aa == 1 && p.cmaa2) {
         // CMAA 2 writes only the pixels it changes: its picture starts as a copy of the frame.
-        if (!p.read_fbo) g.gen_framebuffers(1, &p.read_fbo);
-        g.bind_framebuffer(GL_READ_FRAMEBUFFER, p.read_fbo);
-        g.framebuffer_texture(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, source, 0);
+        if (arm32::g_stats) step(kStepCmaa2);
+        read_from(g, p, source);
         g.bind_framebuffer(GL_DRAW_FRAMEBUFFER, p.aa_fbo);
         g.blit(0, 0, f.width, f.height, 0, 0, f.width, f.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         // Then CMAA 2 from the frame into it.
@@ -1063,6 +1296,7 @@ bool present(const arm32::OffscreenFrame& f) {
                                   static_cast<float>(f.height)};
         g.clear_color(0, 0, 0, 0);
         // 1. Edges by luma: only the pixels on an edge are written (the rest are discarded), so cleared first.
+        if (arm32::g_stats) step(kStepSmaaEdges);
         g.bind_framebuffer(GL_DRAW_FRAMEBUFFER, p.edges_fbo);
         g.clear(GL_COLOR_BUFFER_BIT);
         bind_unit(g, 0, source);
@@ -1070,6 +1304,7 @@ bool present(const arm32::OffscreenFrame& f) {
         g.uniform_vec4s(p.smaa_metrics[0], 1, metrics);
         draw(g, p.smaa_edges, p.edges_fbo, f.width, f.height);
         // 2. Blending weights from the edges and the tables.
+        if (arm32::g_stats) step(kStepSmaaWeights);
         g.bind_framebuffer(GL_DRAW_FRAMEBUFFER, p.weights_fbo);
         g.clear(GL_COLOR_BUFFER_BIT);
         bind_unit(g, 0, p.edges);
@@ -1079,6 +1314,7 @@ bool present(const arm32::OffscreenFrame& f) {
         g.uniform_vec4s(p.smaa_metrics[1], 1, metrics);
         draw(g, p.smaa_weights, p.weights_fbo, f.width, f.height);
         // 3. Neighbourhood blending of the frame by the weights: straight to the window when nothing is scaled after.
+        if (arm32::g_stats) step(kStepSmaaBlend);
         bind_unit(g, 0, source);
         bind_unit(g, 1, p.weights);
         g.use_program(p.smaa_blend);
@@ -1090,6 +1326,7 @@ bool present(const arm32::OffscreenFrame& f) {
     }
     if (!drawn && scaled && p.easu) {
         // AMD FSR 1: EASU to the window's size, then RCAS from that to the window.
+        if (arm32::g_stats) step(kStepEasu);
         bind_unit(g, 0, source);
         g.use_program(p.easu);
         // FsrEasuCon's con0 for a viewport of the whole frame.
@@ -1097,11 +1334,13 @@ bool present(const arm32::OffscreenFrame& f) {
         const float sy = static_cast<float>(f.height) / static_cast<float>(f.out_height);
         g.uniform_vec4(p.easu_con, sx, sy, 0.5f * sx - 0.5f, 0.5f * sy - 0.5f);
         draw(g, p.easu, p.easu_fbo, f.out_width, f.out_height);
+        if (arm32::g_stats) step(kStepRcas);
         bind_unit(g, 0, p.easu_out);
         draw(g, p.rcas, 0, f.out_width, f.out_height);
         drawn = true;
     } else if (!drawn && scaled && p.nis) {
         // NVIDIA NIS: its scaler straight to the window, with its tables.
+        if (arm32::g_stats) step(kStepNis);
         bind_unit(g, 0, source);
         bind_unit(g, 1, p.nis_scaler);
         bind_unit(g, 2, p.nis_usm);
@@ -1122,24 +1361,27 @@ bool present(const arm32::OffscreenFrame& f) {
     }
     if (!drawn) {
         // A plain copy of the picture to the window, stretched when its size differs (no upscaler, or none here).
-        if (!p.read_fbo) g.gen_framebuffers(1, &p.read_fbo);
-        g.bind_framebuffer(GL_READ_FRAMEBUFFER, p.read_fbo);
-        g.framebuffer_texture(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, source, 0);
+        if (arm32::g_stats) step(kStepCopy);
+        read_from(g, p, source);
         g.bind_framebuffer(GL_DRAW_FRAMEBUFFER, 0);
         g.blit(0, 0, f.width, f.height, 0, 0, f.out_width, f.out_height, GL_COLOR_BUFFER_BIT, scaled ? GL_LINEAR : GL_NEAREST);
     }
+    if (arm32::g_stats) steps_done();
     restore_state(g, saved);
     if (finish) g.finish();
-    // The cost on this thread, every 600 frames.
+    // The cost on this thread: once in the log after the first 600 frames; with the stats on, every 5 s by step.
     const std::int64_t took = now_ns() - began;
-    g_costs.total += took;
-    if (took > g_costs.most) g_costs.most = took;
-    if (++g_costs.frames == 600) {
-        arm32::log("player: picture: %s took %.3f ms a frame on the render thread on average over 600 frames (at most %.3f)%s",
-                   names(p, scaled, f.samples).c_str(), static_cast<double>(g_costs.total) / 600.0 / 1e6, static_cast<double>(g_costs.most) / 1e6,
-                   finish ? ", with the GPU's work waited for" : "");
-        g_costs = Costs{};
+    g_cpu_total_ns += static_cast<std::uint64_t>(took);
+    ++g_cpu_frames;
+    static std::uint64_t first_ns = 0, first_frames = 0;
+    if (first_frames < 600) {
+        first_ns += static_cast<std::uint64_t>(took);
+        if (++first_frames == 600) {
+            arm32::log("player: picture: %s took %.3f ms a frame on the render thread on average over its first 600 frames%s",
+                       names(p, scaled, f.samples).c_str(), static_cast<double>(first_ns) / 600.0 / 1e6, finish ? ", with the GPU's work waited for" : "");
+        }
     }
+    if (arm32::g_stats) report_steps(names(p, scaled, f.samples).c_str());
     return true;
 }
 
@@ -1152,8 +1394,10 @@ void post_configure(int upscaler, int anti_aliasing, int render_scale) {
     g_anti_aliasing.store(anti_aliasing);
     // MSAA's samples (Settings::AntiAliasing 3 to 5), drawn by the bridge itself.
     const int samples = anti_aliasing == 3 ? 2 : anti_aliasing == 4 ? 4 : anti_aliasing == 5 ? 8 : 0;
-    // The frames go offscreen for any of these; with none, the bridge is as it was without them.
-    const bool offscreen = up != 0 || anti_aliasing != 0;
+    // The frames go offscreen for any of these; with none, the bridge is as it was without them. A check can have them go
+    // offscreen with neither (PLAYER_OFFSCREEN=1: a plain copy to the window), to measure the redirection by itself.
+    const char* forced = std::getenv("PLAYER_OFFSCREEN");
+    const bool offscreen = up != 0 || anti_aliasing != 0 || (forced && *forced == '1');
     arm32::g_offscreen_samples.store(samples);
     // With an upscaler the window's surface keeps its own size, the picture drawn to it from the scaled frame.
     arm32::g_offscreen_window_size.store(up != 0);

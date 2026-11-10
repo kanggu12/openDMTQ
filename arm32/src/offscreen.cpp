@@ -26,6 +26,7 @@
 #include "gl_bridge.h"
 #include "pacing.h"
 
+#include <ctime>
 #include <dlfcn.h>
 #include <mutex>
 #include <unordered_map>
@@ -42,6 +43,8 @@ std::atomic<bool> g_offscreen{false};
 std::atomic<bool> g_offscreen_window_size{false};
 std::atomic<int> g_offscreen_samples{0};
 std::atomic<bool> g_offscreen_es31{false};
+std::atomic<std::int64_t> g_offscreen_size{0};
+std::atomic<std::uint64_t> g_offscreen_swaps{0}, g_offscreen_swap_ns{0}, g_offscreen_make_currents{0}, g_offscreen_read_resolves{0};
 std::atomic<OffscreenPresent> g_offscreen_present{nullptr};
 
 namespace {
@@ -145,6 +148,7 @@ struct Target {
     GLuint depth = 0;        // the depth and stencil renderbuffer, when the window config has either
     GLuint resolve_fbo = 0;  // with MSAA: the framebuffer of `color`, the resolve's target
     int width = 0, height = 0, samples = 0;
+    int asked_samples = 0;  // the samples asked when its objects were made: a change makes them again
     GLenum color_format = GL_RGBA8;  // the window config's colour: RGB8 without alpha, RGBA8 with it
     GLenum depth_format = 0;         // its depth and stencil (0: none)
     EGLint config_samples = 0, config_sample_buffers = 0;  // the window config's own, which the game is told
@@ -170,9 +174,11 @@ GLuint bound(GLenum target) {
     return static_cast<GLuint>(v);
 }
 
-// The size the game draws at for the redirected surface: the render scale's (g_window_fixed_size), else the surface's own.
+// The size the game draws at for the redirected surface: the player's (g_offscreen_size), else the render scale's
+// (g_window_fixed_size), else the surface's own, asked of EGL.
 void wanted_size(EGLDisplay d, EGLSurface s, int* w, int* h) {
-    const std::int64_t fixed = g_window_fixed_size.load(std::memory_order_relaxed);
+    const std::int64_t known = g_offscreen_size.load(std::memory_order_relaxed);
+    const std::int64_t fixed = known ? known : g_window_fixed_size.load(std::memory_order_relaxed);
     if (fixed) {
         *w = static_cast<int>(fixed >> 32);
         *h = static_cast<int>(fixed & 0xffffffff);
@@ -304,6 +310,7 @@ bool make_objects(const Gl& g, Target& t, int w, int h) {
     t.width = w;
     t.height = h;
     t.samples = samples;
+    t.asked_samples = asked;
     return true;
 }
 
@@ -346,6 +353,7 @@ public:
         Target* t = t_target;
         if (!t || !t->samples || bound(GL_READ_FRAMEBUFFER) != t->fbo) return;
         resolve(gl(), *t);
+        g_offscreen_read_resolves.fetch_add(1, std::memory_order_relaxed);
         gl().bind_framebuffer(GL_READ_FRAMEBUFFER, t->resolve_fbo);
         fbo_ = t->fbo;
     }
@@ -492,6 +500,7 @@ void offscreen_before_make_current() {
 
 void offscreen_made_current(EGLDisplay d, EGLSurface draw, EGLContext context) {
     if (!g_offscreen.load(std::memory_order_relaxed) || context == EGL_NO_CONTEXT) return;
+    if (draw != EGL_NO_SURFACE) g_offscreen_make_currents.fetch_add(1, std::memory_order_relaxed);
     const Gl& g = gl();
     if (!g.ok) return;
     EGLConfig config = nullptr;
@@ -546,9 +555,12 @@ bool offscreen_query(EGLSurface surface, EGLint attribute, EGLint* value) {
         std::lock_guard<std::mutex> l(g_lock);
         if (surface != g_surface || surface == EGL_NO_SURFACE) return false;
     }
-    static auto current_display = reinterpret_cast<EGLDisplay (*)()>(egl_fn("eglGetCurrentDisplay"));
-    if (current_display) d = current_display();
     int w = 0, h = 0;
+    // The player says the size (no call into EGL at all); before it has, the display the surface is current on.
+    if (!g_offscreen_size.load(std::memory_order_relaxed)) {
+        static auto current_display = reinterpret_cast<EGLDisplay (*)()>(egl_fn("eglGetCurrentDisplay"));
+        if (current_display) d = current_display();
+    }
     wanted_size(d, surface, &w, &h);
     if (w <= 0 || h <= 0) return false;
     // The size the game draws at, as a surface of a fixed size answers it.
@@ -559,6 +571,19 @@ bool offscreen_query(EGLSurface surface, EGLint attribute, EGLint* value) {
 void offscreen_swap(EGLDisplay d, EGLSurface s) {
     Target* t = t_target;
     if (!t || s != t->surface) return;
+    // What the swap takes on this thread, for the stats.
+    timespec began{};
+    clock_gettime(CLOCK_MONOTONIC, &began);
+    struct Count {
+        timespec from;
+        ~Count() {
+            timespec now{};
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            g_offscreen_swaps.fetch_add(1, std::memory_order_relaxed);
+            g_offscreen_swap_ns.fetch_add(static_cast<std::uint64_t>((now.tv_sec - from.tv_sec) * 1000000000LL + (now.tv_nsec - from.tv_nsec)),
+                                          std::memory_order_relaxed);
+        }
+    } count{began};
     const Gl& g = gl();
     const GLuint was_read = bound(GL_READ_FRAMEBUFFER), was_draw = bound(GL_DRAW_FRAMEBUFFER);
     // The frame as a single-sampled texture.
@@ -588,7 +613,9 @@ void offscreen_swap(EGLDisplay d, EGLSurface s) {
     // the stand-in was bound.
     int w = 0, h = 0;
     wanted_size(d, s, &w, &h);
-    if (w > 0 && h > 0 && (w != t->width || h != t->height || t->samples != usable_samples(g, *t, g_offscreen_samples.load()))) {
+    // The samples asked compared with those asked before, not with what the driver offers: asking the driver at every
+    // frame is a round of format queries.
+    if (w > 0 && h > 0 && (w != t->width || h != t->height || t->asked_samples != g_offscreen_samples.load(std::memory_order_relaxed))) {
         const GLuint old = t->fbo;
         free_objects(g, *t);
         if (!make_objects(g, *t, w, h)) {

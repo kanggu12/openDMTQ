@@ -24,6 +24,7 @@
 
 #include "overlay_win32.h"
 #include "post_pass.h"
+#include "offscreen.h"
 #include "pacing.h"
 
 #include <windows.h>
@@ -173,6 +174,8 @@ void place_game() {
     g_area_w = w;
     g_area_h = h;
     arm32::g_window_fixed_size.store(scale < 100 ? (static_cast<std::int64_t>(dw) << 32) | dh : 0);
+    // The size the game draws at, always: a redirected frame's size with no call into EGL at each swap (offscreen.h).
+    arm32::g_offscreen_size.store((static_cast<std::int64_t>(dw) << 32) | dh);
     const bool changed = dw != app().width || dh != app().height;
     app().width = dw;
     app().height = dh;

@@ -122,7 +122,12 @@ draws at, which stands in for the window's own framebuffer in every call the gam
 reading, invalidating and the questions about it), and the window's surface keeps the window's size. At each swap the
 player's passes draw that frame to the window, the game's GL state saved before and put back after. The broadcast takes
 the picture after them: what players see. The log says once what is in use (`the game draws at 640x360, upscaled by AMD
-FSR 1 to 1280x720`, `anti-aliasing: SMAA`), and every 600 frames what the passes took on the render thread.
+FSR 1 to 1280x720`, `anti-aliasing: SMAA`), and what the passes took on the render thread over the first 600 frames.
+With the player's stats on (`ARM32_STATS=1`), every 5 seconds a `stats: picture` line gives each pass's mean time a frame
+on the render thread and on the graphics card (by `EXT_disjoint_timer_query`, which ANGLE has; with its timestamps the
+game's own time on the graphics card too), the swap's whole cost, and how often the game made its context current and
+read its multisampled frame. `PLAYER_OFFSCREEN=1` has the frames drawn offscreen with no pass at all (a plain copy), to
+measure the redirection by itself.
 
 Measured on a 240 Hz display (4K, RTX 4090): 240 frames a second with VSync, none late in 480, in full screen at 100 %
 and at 50 %; a limit of 120, 120.0 frames a second, none late; VSync off, 240.6 frames a second, 95 % of the frames
