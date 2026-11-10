@@ -325,10 +325,17 @@ async function portalFlows(contexts) {
   // The front page: the big logo carries the server's version, and what the site is for comes first, the app one press
   // away (its size and date, the way to the steps) and the way to the broadcasts.
   const front = await contexts.signed.newPage();
-  await front.goto(`${P}/`, { waitUntil: 'domcontentloaded' });
+  const arrived = await front.goto(`${P}/`, { waitUntil: 'domcontentloaded' });
   check('the home page shows the version beside the logo', /v\d{4}\.\d{2}\.\d{2}/.test(await textOf(front, '.stage-mark')), await textOf(front, '.stage-mark'));
   check('the front page offers the app and the broadcasts first',
     await front.$eval('.stage-acts .button', a => new URL(a.href).pathname).catch(() => '') === '/apk' && await visible(front, '#watch-live') && await visible(front, '.stage-meta a[href="download.php"]'));
+  // The site's answers, its pages, files and JSON alike, are never shown inside another site's page, never taken for
+  // another type than they say, and never tell another site the address of the page they were on (site.conf).
+  const guarded = ['x-frame-options', 'x-content-type-options', 'referrer-policy'];
+  const fetched = await front.evaluate(async names => Promise.all(['/opendmtq/style.css', '/opendmtq/thumbs.js', '/opendmtq/client.php?about']
+    .map(async u => { const r = await fetch(u); return names.map(n => r.headers.get(n)).join(' '); })), guarded);
+  const said = [guarded.map(n => arrived.headers()[n]).join(' '), ...fetched];
+  check('the site is never framed, sniffed or named to another site', said.every(s => s === 'DENY nosniff same-origin'), JSON.stringify(said));
   await front.close();
   // The download page's part for computers: the installer for Windows (the PC client), its button the site's /windows,
   // which hands a signed-in visitor the installer with this server's address on its end and sends a stranger to the
