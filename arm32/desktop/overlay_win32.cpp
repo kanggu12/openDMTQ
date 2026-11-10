@@ -84,15 +84,16 @@ RECT area() {
     return r;
 }
 
-// The overlay's scale: Windows' own, or the game's when that is larger (a 4K display at 100 %, where the game draws its
-// own buttons twice as large as at 1080 lines), so that the bar, the question and the notice keep their size beside
-// the game's.
+// The overlay's scale: the game's, which lays itself out for 720 lines and grows with its area (1.5 at 1080 lines, 3 at
+// 4K), or Windows' own when that is larger (a small window on a display at 200 %), so that the bar, the question and the
+// notice keep their size beside the game's own dialogs and buttons.
 float scale() {
     const RECT a = area();
-    return std::max(dpi_scale(), static_cast<float>(a.bottom - a.top) / 1080.0f);
+    return std::max(dpi_scale(), static_cast<float>(a.bottom - a.top) / 720.0f);
 }
-// A length at 96 dpi as pixels at the overlay's scale, whole (edges on whole pixels stay sharp).
-int px(float at96) { return static_cast<int>(std::lround(at96 * scale())); }
+// A length of the game's at 720 lines as pixels at the overlay's scale, whole (edges on whole pixels stay sharp). Every
+// size of the overlay goes through here.
+int px(float at720) { return static_cast<int>(std::lround(at720 * scale())); }
 
 // A rounded rectangle as a path.
 void rounded(GraphicsPath& path, RectF r, float radius) {
@@ -268,10 +269,10 @@ BYTE g_bar_shown_alpha = 0;
 POINT g_bar_shown_at{};
 
 // The bar's height, the chips' size, the gap between them and their room from the bar's right end, at this scale.
-int bar_height() { return px(48); }
-int chip_size() { return px(32); }
-int chip_gap() { return px(8); }
-int chip_margin() { return px(12); }
+int bar_height() { return px(52); }
+int chip_size() { return px(36); }
+int chip_gap() { return px(10); }
+int chip_margin() { return px(14); }
 
 // A chip's square on a bar `w` pixels wide: the X at the right end, the full screen chip left of it; both centred in
 // the bar's height.
@@ -297,7 +298,7 @@ bool full_screen() { return g_hooks.fullscreen && g_hooks.fullscreen(); }
 // or in (back to a window, when `full`).
 void screen_icon(Graphics& g, Pen& line, float cx, float cy, bool full) {
     // The brackets' reach from the centre and the length of each arm.
-    const float outer = static_cast<float>(px(7)), inner = static_cast<float>(px(2.5f)), arm = static_cast<float>(px(4));
+    const float outer = static_cast<float>(px(8)), inner = static_cast<float>(px(3)), arm = static_cast<float>(px(4.5f));
     for (int sx : {-1, 1}) {
         for (int sy : {-1, 1}) {
             // Out: the corner at the outer point, the arms going back in; in: the corner near the centre, the arms
@@ -345,12 +346,12 @@ Canvas& bar_canvas() {
         glow(g, 0, static_cast<float>(h) - line, static_cast<float>(w));
         // The name on the left, in the game's white bold, over the bar's height above the glow.
         const auto family = face(g_korean);
-        Font name(family.get(), static_cast<REAL>(px(15)), FontStyleBold, UnitPixel);
+        Font name(family.get(), static_cast<REAL>(px(17)), FontStyleBold, UnitPixel);
         StringFormat middle;
         middle.SetLineAlignment(StringAlignmentCenter);
         middle.SetFormatFlags(StringFormatFlagsNoWrap);
         SolidBrush white(kText);
-        g.DrawString(L"OpenDMTQ", -1, &name, RectF(static_cast<REAL>(px(16)), 0, static_cast<REAL>(px(200)), static_cast<REAL>(h) - line), &middle, &white);
+        g.DrawString(L"OpenDMTQ", -1, &name, RectF(static_cast<REAL>(px(18)), 0, static_cast<REAL>(px(240)), static_cast<REAL>(h) - line), &middle, &white);
         // The two chips: at rest as the game's OFF chips, under the pointer as its green button; a white glyph on both.
         const float radius = static_cast<float>(px(5));
         for (int which : {kQuitChip, kScreenChip}) {
@@ -365,14 +366,14 @@ Canvas& bar_canvas() {
                 Pen edge(kChipEdge, 1.0f);
                 g.DrawPath(&edge, &path);
             }
-            // The glyph's line: 2.2 pixels at 96 dpi, square ends for the brackets' corners, round for the X.
-            Pen line_pen(kText, 2.2f * scale());
+            // The glyph's line: 2.6 pixels at 720 lines, square ends for the brackets' corners, round for the X.
+            Pen line_pen(kText, 2.6f * scale());
             line_pen.SetLineJoin(LineJoinMiter);
             const float cx = r.X + r.Width / 2, cy = r.Y + r.Height / 2;
             if (which == kQuitChip) {
                 line_pen.SetStartCap(LineCapRound);
                 line_pen.SetEndCap(LineCapRound);
-                cross(g, line_pen, cx, cy, static_cast<float>(px(5.5f)));
+                cross(g, line_pen, cx, cy, static_cast<float>(px(6.5f)));
             } else {
                 screen_icon(g, line_pen, cx, cy, full);
             }
@@ -517,10 +518,12 @@ struct AskLayout {
 };
 AskLayout ask_layout(int w, int h) {
     AskLayout l;
-    // At 96 dpi: 440 wide; the header 46 high, the glow's two pixels under it; the line of text, then the buttons 44
-    // high side by side with 12 between, 20 in from the card's sides and bottom.
-    const float width = static_cast<float>(px(440)), head = static_cast<float>(px(46)), line = static_cast<float>(std::max(2, px(2)));
-    const float text = static_cast<float>(px(68)), tall = static_cast<float>(px(44)), gap = static_cast<float>(px(12)), pad = static_cast<float>(px(20));
+    // At 720 lines, as the game's own dialog there: 600 wide; the header 62 high, the glow's two pixels under it; the
+    // line of text with 24 above and below it (26 for the line), then the buttons 220 by 56 side by side with 16
+    // between, centred, and 24 under them.
+    const float width = static_cast<float>(px(600)), head = static_cast<float>(px(62)), line = static_cast<float>(std::max(2, px(2)));
+    const float text = static_cast<float>(px(74)), tall = static_cast<float>(px(56)), gap = static_cast<float>(px(16)), pad = static_cast<float>(px(24));
+    const float each = static_cast<float>(px(220));
     const float height = head + line + text + tall + pad;
     // On whole pixels, so that its edges stay sharp.
     l.card = RectF(std::floor((static_cast<float>(w) - width) / 2), std::floor((static_cast<float>(h) - height) / 2), width, height);
@@ -528,9 +531,8 @@ AskLayout ask_layout(int w, int h) {
     // The thin X's square at the header's right end.
     l.close = RectF(l.card.X + width - head, l.card.Y, head, head);
     l.text = RectF(l.card.X + pad, l.card.Y + head + line, width - pad * 2, text);
-    const float each = std::floor((width - pad * 2 - gap) / 2);
-    l.keep = RectF(l.card.X + pad, l.text.Y + text, each, tall);
-    l.quit = RectF(l.card.X + width - pad - each, l.keep.Y, each, tall);
+    l.keep = RectF(std::floor(l.card.X + (width - each * 2 - gap) / 2), l.text.Y + text, each, tall);
+    l.quit = RectF(l.keep.X + each + gap, l.keep.Y, each, tall);
     return l;
 }
 
@@ -557,6 +559,8 @@ void draw_ask() {
         g.FillRectangle(&dim, 0, 0, w, h);
         const AskLayout l = ask_layout(w, h);
         const float radius = static_cast<float>(px(4));
+        // The buttons' corners, a little rounder than the card's, as the game's OK.
+        const float button_radius = static_cast<float>(px(5));
         shadow(g, l.card, radius);
         // The card: its grey body, then its header within the card's corners.
         GraphicsPath card_path;
@@ -579,33 +583,33 @@ void draw_ask() {
         g.DrawPath(&dark, &outline);
         // The title in the middle of the header, clear of the thin X at its right.
         const float side = l.close.Width;
-        centred(g, ask_title(), static_cast<float>(px(17)), true, kText,
+        centred(g, ask_title(), static_cast<float>(px(24)), true, kText,
                 RectF(l.header.X + side, l.header.Y, l.header.Width - side * 2, l.header.Height));
         // The thin X that closes it (keep playing): white, whole under the pointer, with a faint square behind it.
         if (g_ask_hover == kClose) {
             SolidBrush lit(Color(28, 255, 255, 255));
-            const float inset = static_cast<float>(px(7));
+            const float inset = static_cast<float>(px(10));
             GraphicsPath spot;
             rounded(spot, RectF(l.close.X + inset, l.close.Y + inset, l.close.Width - inset * 2, l.close.Height - inset * 2), radius);
             g.FillPath(&lit, &spot);
         }
-        Pen thin(g_ask_hover == kClose ? kText : Color(215, 255, 255, 255), 1.8f * scale());
+        Pen thin(g_ask_hover == kClose ? kText : Color(215, 255, 255, 255), 2.0f * scale());
         thin.SetStartCap(LineCapRound);
         thin.SetEndCap(LineCapRound);
-        cross(g, thin, l.close.X + l.close.Width / 2, l.close.Y + l.close.Height / 2, static_cast<float>(px(8)));
+        cross(g, thin, l.close.X + l.close.Width / 2, l.close.Y + l.close.Height / 2, static_cast<float>(px(9)));
         // The one quiet line that says what quitting loses.
-        centred(g, ask_text(), static_cast<float>(px(14)), false, kQuiet, l.text);
+        centred(g, ask_text(), static_cast<float>(px(18)), false, kQuiet, l.text);
         // Keep playing as the game's green button, Quit the game as a grey one; lighter under the pointer.
         const bool keep_lit = g_ask_hover == kKeep, quit_lit = g_ask_hover == kQuit;
-        button(g, l.keep, radius, keep_lit ? kGreenTopHover : kGreenTop, keep_lit ? kGreenBottomHover : kGreenBottom, kGreenEdge);
-        button(g, l.quit, radius, quit_lit ? kGreyTopHover : kGreyTop, quit_lit ? kGreyBottomHover : kGreyBottom, kGreyEdge);
-        centred(g, keep_label(), static_cast<float>(px(15)), true, kText, l.keep);
-        centred(g, quit_label(), static_cast<float>(px(15)), true, kText, l.quit);
+        button(g, l.keep, button_radius, keep_lit ? kGreenTopHover : kGreenTop, keep_lit ? kGreenBottomHover : kGreenBottom, kGreenEdge);
+        button(g, l.quit, button_radius, quit_lit ? kGreyTopHover : kGreyTop, quit_lit ? kGreyBottomHover : kGreyBottom, kGreyEdge);
+        centred(g, keep_label(), static_cast<float>(px(21)), true, kText, l.keep);
+        centred(g, quit_label(), static_cast<float>(px(21)), true, kText, l.quit);
         // The keys' choice: a lime ring a little outside its button, plain to see for a person without a mouse.
         const RectF chosen = g_choice == kKeep ? l.keep : l.quit;
         const float out = static_cast<float>(px(3));
         GraphicsPath ring;
-        rounded(ring, RectF(chosen.X - out, chosen.Y - out, chosen.Width + out * 2, chosen.Height + out * 2), radius + out);
+        rounded(ring, RectF(chosen.X - out, chosen.Y - out, chosen.Width + out * 2, chosen.Height + out * 2), button_radius + out);
         Pen lime(kChosen, static_cast<REAL>(std::max(2, px(2))));
         g.DrawPath(&lime, &ring);
     }
@@ -785,13 +789,13 @@ std::unique_ptr<Canvas> make_notice(const std::string& text, bool live) {
     std::wstring title = all.substr(0, cut), detail = cut == std::wstring::npos ? L"" : all.substr(cut + 1);
     // The card's size from its text: the mark, then the title over the detail.
     const auto family = face(g_korean);
-    Font title_font(family.get(), static_cast<REAL>(px(15)), FontStyleBold, UnitPixel);
-    Font detail_font(family.get(), static_cast<REAL>(px(12.5f)), FontStyleRegular, UnitPixel);
-    Font mark_font(family.get(), static_cast<REAL>(px(11.5f)), FontStyleBold, UnitPixel);
+    Font title_font(family.get(), static_cast<REAL>(px(18)), FontStyleBold, UnitPixel);
+    Font detail_font(family.get(), static_cast<REAL>(px(15)), FontStyleRegular, UnitPixel);
+    Font mark_font(family.get(), static_cast<REAL>(px(13)), FontStyleBold, UnitPixel);
     const wchar_t* mark = live ? L"LIVE" : (g_korean ? L"방송 종료" : L"ENDED");
     // The room inside the card, between the mark and the words, the mark's dot, and the room around the card for its
     // shadow.
-    const float pad = static_cast<float>(px(14)), gap = static_cast<float>(px(12)), dot = static_cast<float>(px(6));
+    const float pad = static_cast<float>(px(16)), gap = static_cast<float>(px(14)), dot = static_cast<float>(px(7));
     const float margin = static_cast<float>(px(10));
     // The glow's two pixels at the card's bottom, kept clear of the words.
     const float line = static_cast<float>(std::max(2, px(2)));
@@ -804,18 +808,18 @@ std::unique_ptr<Canvas> make_notice(const std::string& text, bool live) {
         text_setup(g);
         g.MeasureString(mark, -1, &mark_font, PointF(0, 0), &mark_box);
         mark_w = mark_box.Width + dot + px(20);
-        // The words' room: at most 520 pixels at 96 dpi, and within the game's area however small its window; a long
+        // The words' room: at most 680 pixels at 720 lines, and within the game's area however small its window; a long
         // server name wraps there.
         const RECT a = area();
         const float beside = pad * 2 + mark_w + gap + margin * 2 + px(16);
-        room = std::max(static_cast<float>(px(160)), std::min(static_cast<float>(px(520)), static_cast<float>(a.right - a.left) - beside));
+        room = std::max(static_cast<float>(px(160)), std::min(static_cast<float>(px(680)), static_cast<float>(a.right - a.left) - beside));
         // Each line broken at its spaces within the room, then measured as the lines it became.
         title = joined(wrap_words(g, title, title_font, room));
         if (!detail.empty()) detail = joined(wrap_words(g, detail, detail_font, room));
         g.MeasureString(title.c_str(), -1, &title_font, PointF(0, 0), &title_box);
         if (!detail.empty()) g.MeasureString(detail.c_str(), -1, &detail_font, PointF(0, 0), &detail_box);
     }
-    const float mark_h = static_cast<float>(px(22));
+    const float mark_h = static_cast<float>(px(26));
     const float text_w = std::max(title_box.Width, detail_box.Width);
     const float text_h = title_box.Height + (detail.empty() ? 0 : detail_box.Height + px(2));
     const int w = static_cast<int>(std::ceil(pad * 2 + mark_w + gap + text_w + margin * 2));
@@ -893,7 +897,8 @@ void notice(const std::string& text, bool live) {
 }
 
 void pointer_moved(int y, bool pressed) {
-    // Not while the mouse plays (its button down), not over the question, and only at the very top edge of the game:
+    // Not while the mouse plays (its button down), not over the question, and only at the very top edge of the game
+    // (within 4 pixels at 720 lines):
     // the game's own controls under the bar's place stay the game's while they are used.
     if (!g_bar || asking() || pressed) return;
     // A mouse's move: the pointer is the mouse's again.

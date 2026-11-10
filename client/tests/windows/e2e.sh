@@ -130,55 +130,66 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   sleep 45; snap game-menu
   # 4. Alt+F4 does nothing: the game runs on, not held still. The pointer at the game's top edge shows the bar; its full
   # screen chip switches to a window and back; its X asks first and holds the game still, Keep playing lets it go on,
-  # and the X again with Quit the game ends the game, and the launcher comes back. The overlay's sizes at 96 dpi with
-  # the game 1080 lines high or less (a scale of 1, so they are these pixels; full screen here is 1920x1080, the window
-  # 1440x810): the bar is 48 high and shows for a pointer within 4 of the top (y 0 here); its chips are 32 square, 12
-  # in from the right end and 8 apart, centred in its height: the X's centre 12 + 16 = 28 in from the right and 24
-  # down, the full screen chip's 12 + 32 + 8 + 16 = 68 in. The question's card is 440 wide and 46 + 2 + 68 + 44 + 20 =
-  # 180 high, centred; its buttons are 44 high, 194 wide with 12 between and 20 in from the card's sides, their top
-  # 46 + 2 + 68 = 116 below the card's: centred 116 + 22 = 138 below its top, Keep playing 220 - 20 - 97 = 103 left of
-  # the middle and Quit the game 103 right of it. Wine's window for the game is its client area (no window manager
-  # draws a frame), so its geometry is the game's area, in a window as in full screen.
+  # and the X again with Quit the game ends the game, and the launcher comes back. The overlay's sizes are the game's at
+  # 720 lines, times the game's height over 720 (Wine is at 96 dpi): 1.5 in full screen here (1920x1080), 1.125 in the
+  # window (1440x810), each length rounded as the player rounds it (opx below). The bar is 52 high and shows for a
+  # pointer within 4 of the top (y 0 here); its chips are 36 square, 14 in from the right end and 10 apart, centred in
+  # its height. The question's card is 600 wide and 62 + 2 + 74 + 56 + 24 high, centred, its two buttons 220 by 56 with
+  # 16 between, centred, their top 62 + 2 + 74 below the card's. In full screen: the X's centre 21 + 27 = 48 in from
+  # the right and 12 + 27 = 39 down, the full screen chip's 21 + 54 + 15 + 27 = 117 in; the card 900 by 327 at y 376, its
+  # buttons centred at y 376 + 207 + 42 = 625, Keep playing at x 618 + 165 = 783 (the middle less 177) and Quit the game
+  # at 1137 (the middle and 177). Wine's window for the game is its client area (no window manager draws a frame), so
+  # its geometry is the game's area, in a window as in full screen.
   game=\$(xdotool search --name 'TECHNIKA' 2>/dev/null | tail -n 1)
   [ -n \"\$game\" ] && xdotool windowfocus --sync \"\$game\" 2>/dev/null; xdotool key alt+F4
   sleep 5; snap alt-f4
   player_running || { echo 'FAIL: Alt+F4 ended the game'; exit 1; }
   if player_said \"the game is paused\"; then echo 'FAIL: Alt+F4 held the game still'; exit 1; fi
   echo 'Alt+F4 did nothing'
-  # The bar: the pointer from the middle of the game to its top edge, then onto a chip of the bar (x in from the
-  # right end). The game's place and size read again first: the full screen chip changes them.
+  # The bar: the pointer from the middle of the game to its top edge, then onto a chip of the bar. The game's place and size read again first: the full screen chip changes them.
+  # A length of the overlay's at 720 lines in the game's pixels now: times HEIGHT / 720, rounded half up as lround.
+  opx() { echo \$(( (2 * \$1 * HEIGHT + 720) / 1440 )); }
+  # The bar's chip (0 the X, 1 full screen): its centre's distance from the right end and from the top.
   bar_chip() {
     eval \$(xdotool getwindowgeometry --shell \"\$game\")
+    local size=\$(opx 36) gap=\$(opx 10) margin=\$(opx 14) bar=\$(opx 52)
     xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5
     xdotool mousemove \$((X + WIDTH / 2)) \$Y; sleep 1
-    xdotool mousemove \$((X + WIDTH - \$1)) \$((Y + 24)); sleep 1
+    xdotool mousemove \$((X + WIDTH - margin - size / 2 - \$1 * (size + gap))) \$((Y + (bar - size) / 2 + size / 2)); sleep 1
+  }
+  # The pointer on the question's button (0 Keep playing, 1 Quit the game), the game's place and size as last read.
+  ask_button() {
+    local width=\$(opx 600) high=\$((\$(opx 62) + \$(opx 2) + \$(opx 74) + \$(opx 56) + \$(opx 24))) each=\$(opx 220) gap=\$(opx 16)
+    local left=\$(( (WIDTH - width) / 2 )) top=\$(( (HEIGHT - high) / 2 ))
+    local keep=\$((left + (width - 2 * each - gap) / 2))
+    xdotool mousemove \$((X + keep + \$1 * (each + gap) + each / 2)) \$((Y + top + \$(opx 62) + \$(opx 2) + \$(opx 74) + \$(opx 56) / 2)); sleep 1
   }
   # How many times the player has said it switched between full screen and a window.
   switches() { cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | grep -cE 'player: (full screen|in a window)'; }
   # The full screen chip, twice: to a window, then back, each said in the player's log.
   for way in window full-screen; do
     before=\$(switches); size_before=\$(xdotool getwindowgeometry \"\$game\" | grep Geometry)
-    bar_chip 68; snap \"bar-to-\$way\"; xdotool click 1; sleep 3
+    bar_chip 1; snap \"bar-to-\$way\"; xdotool click 1; sleep 3
     wait_for 10 '[ \"\$(switches)\" -gt \"\$before\" ]' || { snap no-switch; echo \"FAIL: the bar's full screen chip did not switch to \$way\"; exit 1; }
     echo \"the bar switched to \$way: \$size_before, now \$(xdotool getwindowgeometry \"\$game\" | grep Geometry)\"
     sleep 2; snap \"in-\$way\"
   done
   # The X asks first, and the game holds still while it asks.
-  bar_chip 28; snap bar-quit
+  bar_chip 0; snap bar-quit
   xdotool click 1; sleep 2; snap quit-asked
   player_running || { echo 'FAIL: the X ended the game without asking'; exit 1; }
   echo 'the X asked first'
   wait_for 10 'player_said \"the game is paused\"' || { echo 'FAIL: the question did not hold the game still'; exit 1; }
   echo 'the question held the game still'
   # Keep playing: the game goes on, and still runs well after.
-  xdotool mousemove \$((X + WIDTH / 2 - 103)) \$((Y + (HEIGHT - 180) / 2 + 138)); sleep 1; snap keep-playing; xdotool click 1
+  ask_button 0; snap keep-playing; xdotool click 1
   wait_for 10 'player_said \"the game goes on\"' || { echo 'FAIL: Keep playing did not let the game go on'; exit 1; }
   echo 'the game went on'
   sleep 15; player_running || { echo 'FAIL: the game ended after Keep playing'; exit 1; }
   snap after-keep-playing
   # The X again, and Quit the game.
-  bar_chip 28; xdotool click 1; sleep 2
-  xdotool mousemove \$((X + WIDTH / 2 + 103)) \$((Y + (HEIGHT - 180) / 2 + 138)); sleep 1; snap quit-the-game; xdotool click 1
+  bar_chip 0; xdotool click 1; sleep 2
+  ask_button 1; snap quit-the-game; xdotool click 1
   wait_for 60 '! player_running' || { snap player-stays; echo 'FAIL: the X did not end the game'; exit 1; }
   echo 'player closed'
   # Back in sight, with how the game went.
@@ -231,8 +242,8 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   eval \$(xdotool getwindowgeometry --shell \"\$game\")
   xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5
   # The bar's X, then its question's Quit the game (as in step 4).
-  bar_chip 28; xdotool click 1; sleep 2
-  xdotool mousemove \$((X + WIDTH / 2 + 103)) \$((Y + (HEIGHT - 180) / 2 + 138)); sleep 1; xdotool click 1
+  bar_chip 0; xdotool click 1; sleep 2
+  ask_button 1; xdotool click 1
   wait_for 60 '! player_running' || { snap player-stays-again; echo 'FAIL: the X did not end the game'; exit 1; }
   wait_for 20 '[ -n \"\$(xdotool search --onlyvisible --name \"^OpenDMTQ\$\" 2>/dev/null)\" ]' \\
     || { snap launcher-hidden-again; echo 'FAIL: the launcher did not come back'; exit 1; }
