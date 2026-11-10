@@ -29,7 +29,7 @@ closed); while a game runs it installs nothing and ends with 3.
 | Page | What it has |
 | :--- | :--- |
 | **Play** | The server and the account, the checks before a start (the player, the server, the sign-in, the app), how to play, the last play, and **PLAY** |
-| **Screen** | Full screen or a window, the window's size, VSync, the frame limit, the render scale |
+| **Screen** | Full screen or a window, the window's size, VSync, the frame limit, the render scale and its upscaler, anti-aliasing |
 | **Sound** | The volume, the device, shared or the device alone, the buffer |
 | **Controls** | What the touch screen, the mouse and the keyboard do |
 | **Online** | The servers, the sign-in, the app on this PC and a check for a newer one |
@@ -47,8 +47,9 @@ game ends.
 `--set NAME=VALUE`, `--audio-devices`, `--language en|ko|system`, `--guide`, `--open-log player|launcher`, `--play`,
 `--update`, `--forget URL`, `--reset`, `--repair`, `--clear-game-data` and `--uninstall [--delete-data]`, with `--yes`
 to answer their questions (`--help` lists them all). `--set` takes `display`, `window`, `vsync`, `fps`,
-`render_scale`, `audio_device`, `audio_mode`, `audio_buffer` and `volume`, with the values the **Screen** and **Sound**
-pages offer. While the launcher's window is open, the flags that change what it keeps are refused.
+`render_scale`, `upscaler` (`bilinear`, `fsr1`, `nis`), `anti_aliasing` (`off`, `cmaa2`, `smaa`, `msaa2`, `msaa4`,
+`msaa8`), `audio_device`, `audio_mode`, `audio_buffer` and `volume`, with the values the **Screen** and **Sound** pages
+offer. While the launcher's window is open, the flags that change what it keeps are refused.
 
 ### In the game
 
@@ -97,6 +98,26 @@ pages offer. While the launcher's window is open, the flags that change what it 
   as fast as the PC draws without one. A little less delay, and the picture may tear.
 - **The render scale** draws the game at a share of the window's pixels (100 % down to 50 %), stretched to fill it:
   lighter for the graphics card, and softer.
+- **The upscaler**, below 100 %: how the smaller picture reaches the window's size. **Bilinear** (the default) is the
+  plain stretch of the window's surface. **AMD FSR 1** (FidelityFX Super Resolution 1) enlarges it with its
+  edge-adaptive filter (EASU) and sharpens the result (RCAS, at AMD's sample's 0.25 stops). **NVIDIA NIS** (Image
+  Scaling) enlarges and sharpens in one pass, at the SDK's default sharpness of 50 %. Both are spatial: they need only the
+  finished picture. At 100 % no upscaler is used, and the row is not shown.
+- **Anti-aliasing** smooths the jagged edges of the game's shapes. **CMAA 2** (Intel's Conservative Morphological
+  Anti-Aliasing 2) smooths them over the finished picture and keeps text and thin lines sharp; it runs on compute shaders
+  (OpenGL ES 3.1), and where the graphics card has none the player uses SMAA instead and says so in its log. **SMAA**
+  (SMAA 1x, High preset) smooths them with three light passes over the finished picture. **MSAA** at 2x, 4x or 8x draws
+  each frame with that many samples a pixel: smoother shapes, more work for the graphics card as the number grows; a card
+  that draws fewer samples gets the most it has, and the log says how many. With an upscaler, anti-aliasing comes first,
+  at the size the game draws at. Temporal methods (DLSS, FSR 2 and 3, TAA, DLAA) need what a closed game does not hand
+  over (its motion vectors and depth), and frame generation adds delay: none of them is offered.
+
+How it works: with an upscaler or anti-aliasing, the game draws into a framebuffer of the player's own, of the size it
+draws at, which stands in for the window's own framebuffer in every call the game makes that names or reads it (binding,
+reading, invalidating and the questions about it), and the window's surface keeps the window's size. At each swap the
+player's passes draw that frame to the window, the game's GL state saved before and put back after. The broadcast takes
+the picture after them: what players see. The log says once what is in use (`the game draws at 640x360, upscaled by AMD
+FSR 1 to 1280x720`, `anti-aliasing: SMAA`), and every 600 frames what the passes took on the render thread.
 
 Measured on a 240 Hz display (4K, RTX 4090): 240 frames a second with VSync, none late in 480, in full screen at 100 %
 and at 50 %; a limit of 120, 120.0 frames a second, none late; VSync off, 240.6 frames a second, 95 % of the frames
