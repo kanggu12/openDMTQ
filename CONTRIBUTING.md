@@ -97,7 +97,7 @@ You do not have to run them all: pick the line for what you changed, and CI runs
 | `server/portal/`, `server/game/pages/`, `tools/opendmtq_tools/admin/` | `tests/ui/run.sh` | Docker on Linux |
 | the database, or what is kept in `data/` | `tests/upgrade/run.sh`: the last release's images used as people use them, then this tree's on the same data | Docker, Python 3, and the last release's images (pulled, or loaded with `docker load`) |
 | `tools/` | `docker build -t opendmtq-tools:local tools`, then `docker run --rm -v "$PWD/tools:/t:ro" -v "$PWD/server/portal:/server/portal:ro" -v "$PWD/arm32:/arm32:ro" --entrypoint sh opendmtq-tools:local -c 'cd /t && python3 -m unittest discover -s tests -t .'` | Docker |
-| `client/` | `docker build -t opendmtq-client-ui:local client/tests/ui`, then `docker run --rm --network none -v "$PWD:/src:ro" -w /src/client opendmtq-client-ui:local python -m unittest discover -s tests -t .`, and `client/tests/ui/run.sh <folder>` (every page and dialog on a virtual screen, in both languages at three window sizes) | Docker |
+| `client/` | `docker build -t opendmtq-client-ui:local client/tests/ui`, then `docker run --rm --network none -v "$PWD:/src:ro" -w /src/client opendmtq-client-ui:local python -m unittest discover -s tests -t .`, and `client/tests/ui/run.sh <folder>` (every page and dialog on a virtual screen, in both languages at three window sizes and at 200 %) | Docker |
 | `host/`, `tools/opendmtq_tools/admin/setup.py` | `tests/host/run.sh` (`DISTRO=debian:12` for Debian; it goes through the setup in the browser) | Docker on Linux (it uses the host's network) |
 | `host/windows/` | `tests/windows/wine.sh` (builds the bundle and runs it under Wine) | Docker |
 | how a server gets its programs | `tests/closed/run.sh` does [Without internet](docs/closed-network.md) step by step, all but the PC client's installer, on a network with no way out | Docker on Linux; kind, Helm and root for Kubernetes |
@@ -145,7 +145,7 @@ error messages of the Windows bundle's `host/windows/launcher.c`, the dates and 
 `server/portal/lib.php`, and one word each in `server/portal/player.php`, `tools/opendmtq_tools/admin/static/admin.css`,
 `admin/templates/base.html` and `client/opendmtq_client/pages.py`. `tests/ui/run.sh` checks every page at five widths in
 both languages, empty and full, and fails on text that is cut off or runs over another box. `client/tests/ui/run.sh` does
-the same for the PC client's pages and dialogs at three window sizes.
+the same for the PC client's pages and dialogs at three window sizes and at 200 %.
 
 ## Adding an admin page
 
