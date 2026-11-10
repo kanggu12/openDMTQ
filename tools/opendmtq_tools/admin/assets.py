@@ -84,7 +84,9 @@ def public_hls(name):
     """The video player the Recordings page loads, for when these pages are served on their own port.
     One copy, the portal's, kept like the stylesheet. Open like the stylesheet too: the session cookie
     only goes to these pages' own address, and this is a published file that the public site serves to anyone."""
-    if not name.startswith("hls-") or not name.endswith(".min.js") or "/" in name:
+    # The player's own name and nothing else (hls-1.5.17.min.js): the name is part of a path on the data disk too,
+    # where a backslash is a separator on Windows.
+    if not re.fullmatch(r"hls-[0-9.]+\.min\.js", name):
         abort(404)
     return _cached(name, f"{core.SERVER_URL}/opendmtq/hls/{name}", "text/javascript")
 

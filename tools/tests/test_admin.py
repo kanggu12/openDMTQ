@@ -1236,6 +1236,11 @@ class VideoPlayerCopyTest(unittest.TestCase):
             with mock.patch("urllib.request.urlopen", side_effect=urllib.error.URLError("down")):
                 self.assertEqual(inst.client.get("/opendmtq/hls/hls-1.5.17.min.js").get_data(), b"var Hls;")
                 self.assertEqual(inst.client.get("/opendmtq/hls/other.js").status_code, 404)
+            # Nothing but the player's own name: a backslash is a separator on Windows, where the copy is a file too.
+            with mock.patch("urllib.request.urlopen") as asked:
+                for name in ("hls-..%5C..%5Cx.min.js", "hls-1.5.17.min.js%5Cx.min.js", "hls-a.min.js", "hls-.min.jsx"):
+                    self.assertEqual(inst.client.get("/opendmtq/hls/" + name).status_code, 404, name)
+            asked.assert_not_called()
 
 
 def member_rows(path, rows):
