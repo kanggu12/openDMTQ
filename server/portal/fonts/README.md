@@ -10,3 +10,6 @@ modified version, and both licenses reserve the original name, so each file here
 | `dmtq-text-1.woff2` (DMTQ Text) | [Pretendard](https://github.com/orioncactus/pretendard) 1.3.9, variable, KS X 1001 syllables, Latin and punctuation | [OFL-Pretendard.txt](OFL-Pretendard.txt) |
 
 These modified versions are under the same license as the fonts they come from.
+
+Browsers keep these files for a year without asking again (`server/apache/site.conf`): a font that changes takes a new
+name, which is what the number in the text face's name is for.

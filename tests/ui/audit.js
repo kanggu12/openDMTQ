@@ -336,6 +336,18 @@ async function portalFlows(contexts) {
     .map(async u => { const r = await fetch(u); return names.map(n => r.headers.get(n)).join(' '); })), guarded);
   const said = [guarded.map(n => arrived.headers()[n]).join(' '), ...fetched];
   check('the site is never framed, sniffed or named to another site', said.every(s => s === 'DENY nosniff same-origin'), JSON.stringify(said));
+  // The site's own files come by their versions (lib.php asset_url()), which a browser keeps a year without asking, so
+  // that an upgrade's pages never meet an older stylesheet; without a version it asks each time (the admin pages' way to
+  // them); fonts carry their versions in their names (site.conf).
+  const kept = await front.evaluate(async () => {
+    const css = document.querySelector('link[rel=stylesheet]').getAttribute('href');
+    const scripts = [...document.scripts].map(x => x.getAttribute('src')).filter(Boolean);
+    const said = async u => (await fetch(u, { cache: 'no-store' })).headers.get('cache-control');
+    return { css, scripts, versioned: await said(css), bare: await said('/opendmtq/style.css'), font: await said('/opendmtq/fonts/dmtq-wide-800.woff2') };
+  });
+  check('the site names its own files by their versions, and a browser keeps them a year',
+    /^\/opendmtq\/style\.css\?v=\d+$/.test(kept.css) && kept.scripts.length > 0 && kept.scripts.every(x => /^\/opendmtq\/[a-z]+\.js\?v=\d+$/.test(x))
+    && kept.versioned === 'max-age=31536000, immutable' && kept.bare === 'no-cache' && kept.font === 'max-age=31536000, immutable', JSON.stringify(kept));
   await front.close();
   // The download page's part for computers: the installer for Windows (the PC client), its button the site's /windows,
   // which hands a signed-in visitor the installer with this server's address on its end and sends a stranger to the

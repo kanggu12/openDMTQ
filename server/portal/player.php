@@ -209,5 +209,5 @@ if (!$me): ?>
     </section>
     <?php endif; ?>
   </div>
-  <script src="/opendmtq/tips.js" defer></script>
+  <script src="<?= asset_url('tips.js') ?>" defer></script>
 <?php page_footer();

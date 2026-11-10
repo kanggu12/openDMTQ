@@ -217,14 +217,14 @@ page_header($replay !== '' ? t('live.replay') : t('live.title'), 'live');
   <?php // hls.js at an exact version, served from here: a server on a local network without internet
         // must play video too. Copied as it was published (see hls/LICENSE, docs/architecture.md). ?>
   <script src="/opendmtq/hls/hls-1.5.17.min.js"></script>
-  <script src="/opendmtq/thumbs.js"></script>
-  <script src="/opendmtq/tips.js" defer></script>
+  <script src="<?= asset_url('thumbs.js') ?>"></script>
+  <script src="<?= asset_url('tips.js') ?>" defer></script>
   <?php // What the server knows at page load (with the sign of its list of recordings, which the page's looks compare),
         // and the page's words, for the page's script (live.js): data, never run. JSON_HEX_TAG keeps a name with
         // </script> in it from ending the block. ?>
   <script type="application/json" id="live-data"><?= json_encode(['cards' => $cards, 'past' => $past, 'past_rev' => live_past_rev_of(array_column($past, 'key')), 'current' => $current, 'pinned' => $pinned, 'replay' => $replay,
       'words' => ['title' => t('live.title'), 'replay' => t('live.replay'), 'ended' => t('live.ended'), 'ended_of' => t('live.ended_of', ['name' => '{name}']), 'reconnecting' => t('live.reconnecting'), 'count' => t('live.count', ['n' => '{n}']), 'nav' => t('live.nav'), 'profile' => t('live.profile', ['name' => '{name}']), 'gone' => t('live.gone'), 'unsupported' => t('live.unsupported'), 'watch' => t('live.watch'), 'playing' => t('live.playing'), 'ctl_play' => t('live.ctl_play'), 'ctl_pause' => t('live.ctl_pause'), 'ctl_mute' => t('live.ctl_mute'), 'ctl_unmute' => t('live.ctl_unmute'), 'ctl_full' => t('live.ctl_full'), 'ctl_exit' => t('live.ctl_exit'), 'ctl_back' => t('live.ctl_back'), 'ctl_fwd' => t('live.ctl_fwd'), 'ctl_pip' => t('live.ctl_pip'), 'ctl_wide' => t('live.ctl_theater'), 'ctl_stats' => t('live.ctl_stats'), 'resume' => t('live.resume', ['time' => '{time}']), 'share' => t('live.share'), 'stats_size' => t('live.stats_size'), 'stats_buffer' => t('live.stats_buffer'), 'stats_rate' => t('live.stats_rate'), 'stats_stream' => t('live.stats_stream'), 'stats_frames' => t('live.stats_frames'), 'stats_behind' => t('live.stats_behind')]], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
-  <?php // The script itself, the same for every visit: its address changes with the file, so that a browser that kept it
-        // gets the new one with a new page. ?>
-  <script src="/opendmtq/live.js?v=<?= (int)@filemtime(__DIR__ . '/live.js') ?>"></script>
+  <?php // The script itself, the same for every visit: its address changes with the file (asset_url()), so that a browser
+        // that kept it gets the new one with a new page. ?>
+  <script src="<?= asset_url('live.js') ?>"></script>
 <?php page_footer();

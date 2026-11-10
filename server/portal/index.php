@@ -121,7 +121,7 @@ page_header('OpenDMTQ', 'home', '', $stage);
       </div>
     <?php endif; ?>
   </section>
-  <script src="/opendmtq/thumbs.js"></script>
+  <script src="<?= asset_url('thumbs.js') ?>"></script>
   <script>liveThumbs.home(<?= json_encode($live, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>, <?= dl_signed_in() ? 'true' : 'false' ?>, <?= json_encode(['count' => t('live.count', ['n' => '{n}']), 'nav' => t('live.nav')], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>);</script>
   <?php endif; ?>
 

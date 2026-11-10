@@ -435,3 +435,8 @@ A host install (`host/install.sh`, then `./opendmtq setup`) and the Windows bund
 hls.js, the live and recording pages' video player, is in `server/portal/hls/` (version 1.5.17 as published, Apache
 License 2.0), served by the site (`server/portal`), and by the admin pages from a copy they keep. Video therefore works on a server
 without internet.
+
+The site's pages name its stylesheet, scripts and icon with their versions (`style.css?v=<the file's time>`), and its
+fonts and hls.js have theirs in their names: browsers keep all of them for a year without asking again, and an
+upgrade's pages come with the new files' addresses. Asked for without a version, as the admin pages ask for the
+stylesheet, they are checked at every page.

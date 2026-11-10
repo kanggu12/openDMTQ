@@ -533,6 +533,14 @@ function player_figures(SQLite3 $db, int $guid): ?array
     return $row;
 }
 
+/* The address of one of the site's own files beside this one ($file: style.css, a script, the icon), with its version in
+   it: the file's time, which an upgrade changes. A browser keeps such an address a year without asking again (site.conf),
+   so that a page never meets the copy of an older version: a new version is a new address. */
+function asset_url(string $file): string
+{
+    return '/opendmtq/' . $file . '?v=' . (int)@filemtime(__DIR__ . '/' . $file);
+}
+
 /* HTML-escape. */
 function h($s): string
 {
@@ -726,8 +734,9 @@ function page_header(string $title, string $active = '', string $refresh = '', s
         echo '<meta http-equiv="refresh" content="' . h($refresh) . '">';
     }
     echo '<title>' . h($title === 'OpenDMTQ' ? $title : "$title · OpenDMTQ") . '</title>';
-    echo '<link rel="icon" href="/opendmtq/favicon.svg" type="image/svg+xml">';
-    echo '<link rel="stylesheet" href="/opendmtq/style.css">';
+    // The icon and the stylesheet by their versions (asset_url()): kept a year, and new with an upgrade's pages.
+    echo '<link rel="icon" href="' . asset_url('favicon.svg') . '" type="image/svg+xml">';
+    echo '<link rel="stylesheet" href="' . asset_url('style.css') . '">';
     // A page just arriving: what it measures fills in once and the player's own row glows once (style.css,
     // "motion"). The class goes after 1.6 s, so that nothing the page redraws later moves again.
     echo '<script>document.documentElement.classList.add("arriving");setTimeout(()=>document.documentElement.classList.remove("arriving"),1600)</script></head>';
