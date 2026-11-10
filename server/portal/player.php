@@ -72,8 +72,8 @@ foreach ($best as $r) {
     }
 }
 ksort($levels);
-// Their broadcasts, the newest few: on the live page all of them, narrowed to them.
-$casts = $me ? array_slice(array_values(array_filter(live_past($db), fn($x) => (int)$x['id'] === $id)), 0, 4) : [];
+// Their broadcasts, the newest few: on the live page all of them, narrowed to them. Only those four are read.
+$casts = $me ? live_past($db, 4, $id) : [];
 
 /* The last weeks as a grid, a column per week from Monday to Sunday, the newest at the right: one colour, stronger with
    more plays that day. Over the columns the month where one begins, and under them what the colours mean. */

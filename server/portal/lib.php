@@ -752,20 +752,43 @@ function live_cards(?SQLite3 $db): array
     return $out;
 }
 
+// The recordings a list goes through at most: as many as anyone would page through on the live page, which shows them a
+// screenful at a time (PAST_SHOWN in tools/opendmtq_tools/admin/site.py).
+const LIVE_PAST_SHOWN = 300;
+
 /* The recordings players may watch, newest first: key, player, how long, when, and its songs with where each begins and
    the first one's jacket. Closed and not hidden only, read fresh each time, so one the owner hides or deletes goes from
-   the next look on. */
-function live_past(?SQLite3 $db): array
+   the next look on. $count of them at most; with $guid, the player's own among the list's LIVE_PAST_SHOWN (those the live
+   page has, narrowed to them). Found by their folders' names, which say when each began, so that only those shown are
+   read: four for the home page out of the thousands a server may keep. */
+function live_past(?SQLite3 $db, int $count = LIVE_PAST_SHOWN, int $guid = 0): array
 {
     // Broadcasts off for the server: no recording is shown to players either (the admin pages still have them).
-    if (!live_enabled()) {
+    if (!live_enabled() || !$db) {
         return [];
     }
-    $recs = array_filter(live_rec_all(), fn($r) => !$r['open'] && !$r['hidden']);
-    if (!$db || !$recs) {
+    $recs = [];
+    $listed = 0;
+    foreach (live_rec_folders() as [$rec, $player, $id]) {
+        // Running and hidden ones are never on the list: two small looks, nothing read.
+        if (is_file("$rec/.open") || is_file("$rec/.hidden")) {
+            continue;
+        }
+        // The list ends here, for every page alike.
+        if (++$listed > LIVE_PAST_SHOWN) {
+            break;
+        }
+        if ($guid > 0 && $player !== $guid) {
+            continue;
+        }
+        $recs[] = live_rec_read($rec, $player, $id);
+        if (count($recs) >= $count) {
+            break;
+        }
+    }
+    if (!$recs) {
         return [];
     }
-    usort($recs, fn($a, $b) => $b['id'] <=> $a['id']);
     $names = [];
     foreach (rows($db, 'SELECT guid, nickname FROM (' . PLAYER_ROWS . ')', [':check' => CHECK_UDID]) as $m) {
         $names[(int)$m['guid']] = $m['nickname'];
@@ -776,8 +799,8 @@ function live_past(?SQLite3 $db): array
         $jackets[song_title($song)] = jacket($song);
     }
     $out = [];
-    // As many as anyone would page through; the page shows them a screenful at a time.
-    foreach (array_slice($recs, 0, 300) as $r) {
+    // Already no more than the list holds (above).
+    foreach ($recs as $r) {
         $sec = (int)round((int)$r['duration_ms'] / 1000);
         $length = $sec >= 3600 ? sprintf('%d:%02d:%02d', $sec / 3600, $sec / 60 % 60, $sec % 60) : sprintf('%d:%02d', $sec / 60, $sec % 60);
         $songs = [];

@@ -613,27 +613,52 @@ function live_rec_remove(string $rec): void
 }
 
 /*
- * Every recording: its meta.json with 'dir', 'open' and 'hidden' added. An open one's size comes from
- * its segment list, as its meta.json is not finished. Folder names are checked to be the numbers this
+ * The recordings' folders as [folder, player, id], newest first by their names alone (a recording's id is
+ * the moment it started), with nothing in them read: what a list of the newest few looks through before
+ * reading those few. Folder names are checked to be the numbers this code makes.
+ */
+function live_rec_folders(): array
+{
+    $out = [];
+    foreach (glob(LIVE_REC_DIR . '/*/*', GLOB_ONLYDIR) ?: [] as $rec) {
+        if (preg_match('#/(\d+)/(\d+)$#', $rec, $m)) {
+            $out[] = [$rec, (int)$m[1], (int)$m[2]];
+        }
+    }
+    // Newest first; those that started in the same second keep glob's order, by their folders' names.
+    usort($out, fn($a, $b) => $b[2] <=> $a[2]);
+    return $out;
+}
+
+/*
+ * One recording, from its folder and the player and id its name gives: its meta.json with 'dir', 'open'
+ * and 'hidden' added. An open one's size comes from its segment list, as its meta.json is not finished.
+ */
+function live_rec_read(string $rec, int $guid, int $id): array
+{
+    $meta = json_decode((string)@file_get_contents("$rec/meta.json"), true);
+    $meta = is_array($meta) ? $meta : [];
+    $meta += ['guid' => $guid, 'id' => $id, 'started' => $id, 'songs' => [], 'duration_ms' => 0];
+    $meta['dir'] = $rec;
+    $meta['open'] = is_file("$rec/.open");
+    $meta['hidden'] = is_file("$rec/.hidden");
+    if ($meta['open']) {
+        $meta['size'] = live_rec_size("$rec/segs.log");
+    }
+    return $meta;
+}
+
+/*
+ * Every recording, each as live_rec_read() gives it. Folder names are checked to be the numbers this
  * code makes.
  */
 function live_rec_all(): array
 {
     $out = [];
     foreach (glob(LIVE_REC_DIR . '/*/*', GLOB_ONLYDIR) ?: [] as $rec) {
-        if (!preg_match('#/(\d+)/(\d+)$#', $rec, $m)) {
-            continue;
+        if (preg_match('#/(\d+)/(\d+)$#', $rec, $m)) {
+            $out[] = live_rec_read($rec, (int)$m[1], (int)$m[2]);
         }
-        $meta = json_decode((string)@file_get_contents("$rec/meta.json"), true);
-        $meta = is_array($meta) ? $meta : [];
-        $meta += ['guid' => (int)$m[1], 'id' => (int)$m[2], 'started' => (int)$m[2], 'songs' => [], 'duration_ms' => 0];
-        $meta['dir'] = $rec;
-        $meta['open'] = is_file("$rec/.open");
-        $meta['hidden'] = is_file("$rec/.hidden");
-        if ($meta['open']) {
-            $meta['size'] = live_rec_size("$rec/segs.log");
-        }
-        $out[] = $meta;
     }
     return $out;
 }
@@ -644,9 +669,10 @@ function live_rec_all(): array
  * the largest running ones are closed instead (their next upload starts a new one) and go as the oldest
  * next time, so the disk cannot fill however long and however many phones stay on. The disk's free space
  * counts as a limit as well. One pass at a time; a pass that finds another running leaves it to that one
- * (or to the next sweep). Call it holding no player's lock: closing takes one.
+ * (or to the next sweep). Call it holding no player's lock: closing takes one. $recs: every recording as
+ * live_rec_all() lists it, when the caller has just read them (the sweep); read here otherwise.
  */
-function live_rec_enforce(): void
+function live_rec_enforce(?array $recs = null): void
 {
     $pass = @fopen(LIVE_REC_DIR . '/.enforce', 'c');
     if (!$pass || !flock($pass, LOCK_EX | LOCK_NB)) {
@@ -658,7 +684,7 @@ function live_rec_enforce(): void
     $total = 0;
     $closed = [];
     $open = [];
-    foreach (live_rec_all() as $r) {
+    foreach ($recs ?? live_rec_all() as $r) {
         if ($r['open']) {
             $open[] = $r;
             $total += (int)$r['size'];
@@ -733,8 +759,10 @@ function live_sweep(): void
             @rmdir($dir);
         }
     }
+    // Every recording, read once for both of what follows: the closing and the limits.
+    $recs = live_rec_all();
     // Recordings left open by a phone that vanished, or that the owner's switch ended.
-    foreach (live_rec_all() as $r) {
+    foreach ($recs as $i => $r) {
         if (!$r['open']) {
             continue;
         }
@@ -753,9 +781,16 @@ function live_sweep(): void
                     live_rec_close($guid, $id);
                 }
             });
+            // The list as the recording is now, for the limits: closed, still open, or gone with nothing in it.
+            clearstatcache();
+            if (is_dir($dir)) {
+                $recs[$i] = live_rec_read($dir, $guid, $id);
+            } else {
+                unset($recs[$i]);
+            }
         }
     }
-    live_rec_enforce();
+    live_rec_enforce($recs);
 }
 
 /*

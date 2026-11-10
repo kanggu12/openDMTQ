@@ -43,8 +43,8 @@ $records = ($db && has_playlog($db)) ? rows($db,
 
 // Players on air now: their own section above everything else, only then.
 $live = live_cards($db);
-// The newest recordings, a row of them under it.
-$past = array_slice(live_past($db), 0, 4);
+// The newest recordings, a row of them under it: those four alone are read.
+$past = live_past($db, 4);
 // Broadcasts off for the server: nothing of them on the page, neither the way to watch nor the box for them.
 $casting = live_enabled();
 
