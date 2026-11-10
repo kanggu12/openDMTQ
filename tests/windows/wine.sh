@@ -225,7 +225,10 @@ if [ -n "$lan" ]; then
   before=$(web "$A/setup/ping")
   page=$(web --data-urlencode "csrf=$(web "$A/setup?step=address" | token)" -d "host=$lan" "$A/setup/address")
   expect "the setup saves the new address to .env" grep -q "^PUBLIC_HOST=$lan:$PORT" .env
-  back=$(grep -o '"/opendmtq/admin/setup/start?key=[^"]*"' <<<"$page" | tr -d '"' | sed 's/\\u0026/\&/g')
+  # The way back, as the page's script reads it: its data-back attribute, its HTML escapes undone as a browser does.
+  back=$(grep -o 'data-back="[^"]*"' <<<"$page" | sed -e 's/^data-back="//' -e 's/"$//' -e 's/&amp;/\&/g')
+  expect "the page that waits for the restart carries the way back, with its one-time key" \
+    test "${back#/opendmtq/admin/setup/start?key=}" != "$back"
   restarted=no
   for _ in $(seq 1 90); do
     now=$(curl -s -m 3 "$A/setup/ping" || true)

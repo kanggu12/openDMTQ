@@ -248,7 +248,10 @@ if [ -n "$lan" ]; then
   page=$(web "$admin" --data-urlencode "csrf=$(web "$admin" "$A/setup?step=address" | token)" -d "host=$lan" "$A/setup/address")
   expect "the setup saves the new address to .env" inside "grep -qx 'PUBLIC_HOST=$lan:$PORT' OpenDMTQ/.env"
   # The page waits for another process to answer, then goes on with the key it carries.
-  back=$(grep -o '"/opendmtq/admin/setup/start?key=[^"]*"' <<<"$page" | tr -d '"' | sed 's/\\u0026/\&/g')
+  # The way back, as the page's script reads it: its data-back attribute, its HTML escapes undone as a browser does.
+  back=$(grep -o 'data-back="[^"]*"' <<<"$page" | sed -e 's/^data-back="//' -e 's/"$//' -e 's/&amp;/\&/g')
+  expect "the page that waits for the restart carries the way back, with its one-time key" \
+    test "${back#/opendmtq/admin/setup/start?key=}" != "$back"
   restarted=no
   for _ in $(seq 90); do
     # A short wait for each look: a closed port may swallow the connection rather than refuse it (WSL).
