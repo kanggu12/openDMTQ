@@ -289,25 +289,48 @@ function odq_game_user_asset(array $p)
     ];
 }
 
+// The most notes of one judgement a save may count: far more than any chart has (a long one has a few thousand), so that
+// no real play is refused, and few enough that the score of a save stays far inside what the client reads.
+const OPENDMTQ_NOTES_MAX = 10000;
+
 /*
- * True when a save's parameters describe a play: a player, a chart and at least one judged note. The client
- * always sends all of that; anything else would store a row nobody can rank, and the accuracy divides by the
- * number of notes.
+ * True when a save's parameters describe a play: a player, a chart and the 12 counts of judged notes the score is made
+ * of, each a whole number from 0 to OPENDMTQ_NOTES_MAX, at least one note in all. The client always sends that. Anything
+ * else is no play and would store one nobody made: negative breaks gave an S at 100 %, a count of 1e308 a score of 0
+ * with PERFECT PLAY; and the accuracy divides by the number of notes.
  */
 function odq_save_valid($guid, $pattern, $stat): bool
 {
     if (!is_numeric($guid) || (int)$guid <= 0 || !is_numeric($pattern) || (int)$pattern <= 0 || !is_array($stat)) {
         return false;
     }
-    // The 12 counters the score is made of, 1 to 12; all there and numbers.
+    // The 12 counters the score is made of, 1 to 12; all there.
     $notes = 0;
     for ($i = 1; $i <= 12; $i++) {
-        if (!isset($stat[$i]) || !is_numeric($stat[$i])) {
+        // An int, as JSON gives a whole number: a float (1e308, 0.5) or a text counts no notes.
+        if (!isset($stat[$i]) || !is_int($stat[$i]) || $stat[$i] < 0 || $stat[$i] > OPENDMTQ_NOTES_MAX) {
             return false;
         }
         $notes += $stat[$i];
     }
     return $notes > 0;
+}
+
+/*
+ * True when the server has an account for the player id, false when it has none, null when the database could not say.
+ * Only a player with an account is ever ranked: a save for anyone else would be kept for nobody.
+ */
+function odq_account_known(int $guid): ?bool
+{
+    $q = @odq_db()->prepare('SELECT 1 FROM Member WHERE guid = :g LIMIT 1');
+    if (!$q) {
+        return null;
+    }
+    // As text, as the column holds the id.
+    $q->bindValue(':g', (string)$guid, SQLITE3_TEXT);
+    $r = @$q->execute();
+    // A failed read is no answer: the caller must not take it for "no account".
+    return $r ? $r->fetchArray(SQLITE3_NUM) !== false : null;
 }
 
 /*
@@ -336,6 +359,16 @@ function odq_game_save_play(array $p)
     }
     $guid = (int)$guid;
     $pattern = (int)$pattern;
+    $known = odq_account_known($guid);
+    // A player the server has no account for (an id made up, or a player the owner deleted): handled the same way.
+    if ($known === false) {
+        return odq_error('SVC.05008', 'OpenDMTQ: no player has this id on this server; the result is not stored');
+    }
+    // The database could not say: the code the client retries, as when the database does not take the save (below).
+    if ($known === null) {
+        error_log('opendmtq: savePlayResult: ' . odq_db()->lastErrorMsg());
+        return odq_save_failed();
+    }
     // Points per judgement, 1 % to 100 %: the notes' share of the score.
     $raw = $s[2] * 1 + $s[3] * 20 + $s[4] * 40 + $s[5] * 60 + $s[6] * 80 + $s[7] * 100 + $s[8] * 120
          + $s[9] * 140 + $s[10] * 160 + $s[11] * 180 + $s[12] * 200;

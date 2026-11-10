@@ -112,7 +112,9 @@ What the replies rely on, as the client behaves:
   Someone who has read the app can still sign requests.
 - **Saving a play.** The score, the accuracy and the grade are worked out from the counts of each judgement, as the
   official server did. The best row (`Play`) and the log row (`PlayLog`) go in one transaction; a save the database did
-  not take answers `SVC.05099`. Scores are kept within what the client reads (32-bit) and accuracies within 100 %.
+  not take answers `SVC.05099`. Scores are kept within what the client reads (32-bit) and accuracies within 100 %. A
+  result no play gives (a count of notes below 0, above 10,000 or not a whole number, no notes at all, a player id
+  without an account) answers `SVC.05008` and is not stored.
 - **Everyone has everything.** Level 99, 999,999 MAX POINT, every song from 1 to the highest id, every item. No quests,
   no coupons (every code is invalid, in the client's own popup), no terms popup.
 

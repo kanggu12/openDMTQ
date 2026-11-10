@@ -255,6 +255,32 @@ board = rows(one("game.getLineTopRankWithLevel", [0, 1, 20, [checker]])[0]["rank
 check("the check account is not in TOTAL, not even as the row it asks for", board == [(1, "Proto", 65000), (2, "Ann", 65000),
       (3, "Ben", 65000), (4, "Cid", 32610)], str(board))
 
+# ------------------------------------------------------------------ results no play gives
+
+# Signed as the game signs them, but no play gives them: a count below 0 (negative breaks made an S at 100 %), a count
+# of 1e308 (a score of 0 with PERFECT PLAY), more notes of one judgement than a save may count, a count that is no whole
+# number, a player the server has no account for. Each is answered as handled, and nothing of it is kept.
+before = one("game.getOwnPatternScore", [int(guid)])[0]
+# A player id no account has: the accounts of this run are numbered from 1.
+nobody = 999999
+odd_saves = {
+    "a negative count": (int(guid), 2, notes(breaks=-50, at100=51)),
+    "a count of 1e308": (int(guid), 2, notes(at100=1e308)),
+    "a count of 10,001": (int(guid), 2, notes(at100=10001)),
+    "a count that is no whole number": (int(guid), 2, notes(at100=50.5)),
+    "a player the server has no account for": (nobody, 2, notes(at100=100)),
+}
+for what, (who, chart, stat) in odd_saves.items():
+    result, error = save(who, chart, stat)
+    check(f"a result with {what} is handled without a popup (SVC.05008)", result is None and (error or {}).get("code") == "SVC.05008",
+          json.dumps([result, error])[:200])
+check("none of them is kept: the player's best scores are as they were, and the id without an account has none",
+      one("game.getOwnPatternScore", [int(guid)])[0] == before and one("game.getOwnPatternScore", [nobody])[0] == [])
+# The most a save may count is still a play: 10,000 notes at 100 %, by the check account, which no ranking shows.
+result, error = save(checker, 11, notes(at100=10000))
+check("10,000 notes of one judgement are still a play", error is None and result["score"] == 10000 * 200 + 45000,
+      json.dumps([result, error])[:200])
+
 # ------------------------------------------------------------------ what the client also relies on
 
 result, error = one("game.noSuchMethod", [])
