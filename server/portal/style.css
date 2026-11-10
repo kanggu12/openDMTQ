@@ -523,6 +523,8 @@ code { font-family: var(--mono); font-size: 0.86em; background: rgba(255, 255, 2
 .field textarea { height: auto; min-height: 96px; padding: 10px 13px; line-height: 1.5; resize: vertical; }
 .input:hover, .field input:hover, .field textarea:hover, input.search:hover { border-color: #55606c; }
 .input:focus, .field input:focus, .field textarea:focus, input.search:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+/* A field the form's check found empty (forms.js, and the server's answer): its edge in the error's red, until typed in. */
+.field input[aria-invalid="true"]:not(:focus) { border-color: color-mix(in srgb, var(--bad) 75%, transparent); }
 .input::placeholder, .field input::placeholder, input.search::placeholder { color: #8d97a2; }
 .input-sm { height: var(--ctl-sm); padding: 0 10px; font-size: 14px; }
 @media (pointer: coarse) { .input-sm { height: var(--ctl); } }

@@ -33,7 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // The ID as typed, without the space a phone's keyboard may add after a word.
     $user = trim((string)($_POST['user'] ?? ''));
     $password = (string)($_POST['password'] ?? '');
-    if (!site_sign_in_works()) {
+    if ($user === '' || $password === '') {
+        // Sent with a field empty (the page's own check, forms.js, stops that first): said as that check says it, and no
+        // guess at any password, so not counted toward the limit.
+        $error = $user === '' ? 'signin.missing_id' : 'signin.missing_password';
+    } elseif (!site_sign_in_works()) {
         // Nothing to check the password against: the server's trouble, said as such, and not counted as a guess.
         $error = 'signin.down';
     } elseif (($attempt = dl_attempt_begin($user)) === null) {
@@ -90,15 +94,21 @@ page_header(t('signin.title'), $from);
         <?php // An error, in red: the yellow box is for notices (maintenance, the app being built). ?>
         <p class="error" role="alert"><?= t($error) ?></p>
       <?php endif; ?>
-      <?php // A wrong password takes a second to answer: the button shows that it is working. ?>
-      <form method="post" action="login.php?next=<?= h(rawurlencode($next)) ?>" class="signin-form" onsubmit="this.querySelector('button').setAttribute('aria-busy', 'true')">
+      <?php // What a field left empty says comes from the site's own check (forms.js), in the page's language and the
+            // error box's look, not from the browser's bubbles (novalidate): each field's words in its data-missing. A
+            // wrong password takes a second to answer: the button shows that it is working meanwhile (forms.js too). ?>
+      <?php $missing = in_array($error, ['signin.missing_id', 'signin.missing_password'], true) ? $error : ''; ?>
+      <form method="post" action="login.php?next=<?= h(rawurlencode($next)) ?>" class="signin-form" novalidate>
         <input type="hidden" name="next" value="<?= h($next) ?>">
-        <?php // The ID is in Latin letters: the email keyboard (Latin, not Hangul), no capitals or corrections. ?>
-        <label class="field"><?= t('signin.id') ?> <input name="user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" lang="en" required value="<?= h($_POST['user'] ?? '') ?>"></label>
-        <label class="field"><?= t('signin.password') ?> <input name="password" type="password" autocomplete="current-password" required<?= $error ? ' autofocus' : '' ?>></label>
+        <?php // The ID is in Latin letters: the email keyboard (Latin, not Hangul), no capitals or corrections. The field the
+              // server found empty is marked, and has the focus. ?>
+        <label class="field"><?= t('signin.id') ?> <input name="user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" lang="en" required data-missing="<?= h(t('signin.missing_id')) ?>"<?= $missing === 'signin.missing_id' ? ' aria-invalid="true" autofocus' : '' ?> value="<?= h($_POST['user'] ?? '') ?>"></label>
+        <label class="field"><?= t('signin.password') ?> <input name="password" type="password" autocomplete="current-password" required data-missing="<?= h(t('signin.missing_password')) ?>"<?= $missing === 'signin.missing_password' ? ' aria-invalid="true"' : '' ?><?= $error && $missing !== 'signin.missing_id' ? ' autofocus' : '' ?>></label>
         <button class="button" type="submit"><?= t('signin.button') ?></button>
       </form>
       </div>
     <?php endif; ?>
   </section>
+  <?php // The form's own check (shared with any form marked novalidate), by its version as the other scripts. ?>
+  <script src="<?= asset_url('forms.js') ?>" defer></script>
 <?php page_footer();

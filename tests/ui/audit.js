@@ -441,6 +441,43 @@ async function portalFlows(contexts) {
   await noFindings(login, 'wrong password on a phone');
   await login.close();
 
+  // A field left empty: the page's own check says what is missing, in the page's language and the site's error box, and
+  // the field takes the focus (forms.js), where the browser's bubble said it in the browser's language. The form stays.
+  for (const [lang, noId, noPassword] of [['en', 'Enter your ID.', 'Enter your password.'], ['ko', '아이디를 입력하세요.', '비밀번호를 입력하세요.']]) {
+    const empty = await contexts.anon.newPage();
+    await empty.setViewport({ width: 360, height: 740, isMobile: true, hasTouch: true });
+    await empty.setCookie({ name: 'opendmtq_lang', value: lang, url: SITE });
+    await empty.goto(`${P}/login.php`, { waitUntil: 'domcontentloaded' });
+    await empty.click('.signin-form button');
+    const first = [await textOf(empty, '.signin .error'), await empty.evaluate(() => document.activeElement.name)];
+    await empty.type('input[name=user]', 'dmtq');
+    await empty.click('.signin-form button');
+    const second = [await textOf(empty, '.signin .error'), await empty.evaluate(() => document.activeElement.name),
+      await empty.$eval('input[name=password]', e => e.getAttribute('aria-invalid'))];
+    check(`a field left empty is said by the site in its own words (${lang})`, first[0] === noId && first[1] === 'user'
+      && second[0] === noPassword && second[1] === 'password' && second[2] === 'true' && new URL(empty.url()).pathname === '/opendmtq/login.php',
+      JSON.stringify([first, second]));
+    await noFindings(empty, `a field left empty on a phone (${lang})`);
+    await empty.close();
+  }
+  // A form sent without that check (a browser without scripts) gets the same words from the server, and an empty form is
+  // no guess at a password: ten of them, more than one address may fail, and the right password still signs in.
+  const blank = await contexts.browser.createBrowserContext();
+  const sender = await blank.newPage();
+  await sender.goto(`${P}/login.php`, { waitUntil: 'domcontentloaded' });
+  const blanks = await sender.evaluate(async password => {
+    const said = [];
+    for (let i = 0; i < 10; i++) {
+      const r = await fetch('/opendmtq/login.php', { method: 'POST', body: new URLSearchParams({ user: i % 2 ? 'dmtq' : '', password: '' }) });
+      said.push((await r.text()).match(/<p class="error"[^>]*>([^<]*)</)?.[1] || '');
+    }
+    const right = await fetch('/opendmtq/login.php', { method: 'POST', body: new URLSearchParams({ user: 'dmtq', password }), redirect: 'manual' });
+    return [said, right.type === 'opaqueredirect' || right.redirected];
+  }, PASSWORD);
+  check('an empty form is not counted as a wrong password', blanks[0].every((s, i) => s === (i % 2 ? 'Enter your password.' : 'Enter your ID.')) && blanks[1],
+    JSON.stringify(blanks));
+  await blank.close();
+
   // The game's own window: its score viewer is behind the sign-in, on a phone held sideways. The form, its button too, is
   // on the screen without scrolling, at a big phone's size and a small one's.
   for (const [width, height] of [[915, 412], [640, 320]]) {
