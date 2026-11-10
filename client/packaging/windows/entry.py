@@ -12,9 +12,9 @@ def launch():
 
 
 def launcher_log():
-    import os
+    # Imported only when an error asks where the log is: what failed may be in what the import brings.
     from opendmtq_client import state as st
-    return os.path.join(st.config_dir(), "logs", "launcher.log")
+    return st.launcher_log()
 
 
 sys.exit(stopped.run(launch, launcher_log))

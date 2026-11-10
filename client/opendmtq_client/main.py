@@ -69,15 +69,15 @@ def _velopack_hooks(argv):
 def _logging(make=True):
     """One log file with a size cap: 1 MB, the two previous ones kept, nothing older. With `make` False the log is
     written only where its folder already is (Velopack's uninstall hook, which runs after Delete all has removed it)."""
-    folder = os.path.join(st.config_dir(), "logs")
+    path = st.launcher_log()
+    folder = os.path.dirname(path)
     root = logging.getLogger("opendmtq_client")
     if not make and not os.path.isdir(folder):
         # Something still listens, so that Python does not print what is logged to the console itself.
         root.addHandler(logging.NullHandler())
         return
     os.makedirs(folder, exist_ok=True)
-    handler = logging.handlers.RotatingFileHandler(os.path.join(folder, "launcher.log"), maxBytes=1_000_000,
-                                                   backupCount=2, encoding="utf-8")
+    handler = logging.handlers.RotatingFileHandler(path, maxBytes=1_000_000, backupCount=2, encoding="utf-8")
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(threadName)s %(message)s"))
     handler.odq_log = True
     root.setLevel(logging.INFO)
@@ -351,8 +351,7 @@ def _log_paths(state):
     """The launcher's log, and the player's for the current server's app (None while there is no app)."""
     server = state.server()
     have = apps.local(server["url"]) if server else None
-    return {"launcher": os.path.join(st.config_dir(), "logs", "launcher.log"),
-            "player": player.app_log(have)}
+    return {"launcher": st.launcher_log(), "player": player.app_log(have)}
 
 
 def _password(prompt):

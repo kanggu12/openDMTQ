@@ -73,6 +73,12 @@ def config_dir():
     return os.path.join(local_dir(), "OpenDMTQ", "client")
 
 
+def launcher_log():
+    """The launcher's log, in its folder's logs (main._logging writes it, the two before it beside it): what Help opens,
+    --open-log launcher and --status name, and the dialogs for an error say."""
+    return os.path.join(config_dir(), "logs", "launcher.log")
+
+
 class StateError(Exception):
     """The settings file is from a newer launcher (`newer`), or broken beyond reading."""
 

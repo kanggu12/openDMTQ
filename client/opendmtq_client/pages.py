@@ -679,7 +679,8 @@ def build_help(app, parent):
                             lambda p: widgets.Button(p, ui, w("common.open"), lambda: actions.show_file(log_file)),
                             w("help.player_log.hint")).pack(fill="x")
         widgets.divider(card.body, ui)
-    logs = os.path.join(st.config_dir(), "logs")
+    # The launcher's log's folder: its older logs are there beside it.
+    logs = os.path.dirname(st.launcher_log())
     widgets.setting_row(card.body, ui, w("help.logs"),
                         lambda p: widgets.Button(p, ui, w("common.open"), lambda: actions.open_folder(logs)),
                         w("help.logs.hint")).pack(fill="x")

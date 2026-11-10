@@ -7,7 +7,6 @@ alone changes and saves it, so a save never catches a change half made.
 """
 
 import logging
-import os
 import queue
 import threading
 import tkinter as tk
@@ -648,10 +647,9 @@ class LauncherApp:
             return
         self.failure_said = True
         from opendmtq_client import dialogs
-        logs = os.path.join(st.config_dir(), "logs", "launcher.log")
         try:
             dialogs.tell(self, "error", self.words("stopped.title"), self.words("failed.message"),
-                         self.words("failed.detail", error=self.words.error(error), path=logs))
+                         self.words("failed.detail", error=self.words.error(error), path=st.launcher_log()))
         except tk.TclError:
             # The window went while the dialog was opening.
             pass
