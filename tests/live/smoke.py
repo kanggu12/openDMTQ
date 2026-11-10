@@ -539,9 +539,12 @@ friend, _ = site_sign_in("Smoke2", renewed)
 account_post(action="delete", name="Smoke2")
 check("deleted, its sign-in ends", request(friend, SITE + "/opendmtq/ranking.php")[0] == 302)
 # An account with admin rights signs in to the admin pages too; one without does not.
-account_post(action="create", name="helper", password="hunter22", note="", admin="1")
+# A password of ten characters at least, as the Accounts page asks of an account with admin rights (ADMIN_PASSWORD_MIN):
+# a shorter one is refused, and there would be no such account to check.
+HELPER_PASSWORD = "helper-pass-10"
+account_post(action="create", name="helper", password=HELPER_PASSWORD, note="", admin="1")
 helper = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
-request(helper, ADMIN + "/opendmtq/admin/login", urllib.parse.urlencode({"name": "helper", "password": "hunter22"}).encode())
+request(helper, ADMIN + "/opendmtq/admin/login", urllib.parse.urlencode({"name": "helper", "password": HELPER_PASSWORD}).encode())
 check("admin rights open the admin pages", 'class="account-form"' in request(helper, ADMIN + "/opendmtq/admin/accounts")[2].decode())
 outsider = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 request(outsider, ADMIN + "/opendmtq/admin/login", urllib.parse.urlencode({"name": "dmtq", "password": SITE_PASSWORD}).encode())
@@ -567,10 +570,10 @@ for g in guessers:
     g.join()
 check("thirty wrong guesses at an account with admin rights from anywhere, and no more", sorted(answers) == ["held"] * 2 + ["wrong"] * 30,
       str(sorted(answers)))
-right = urllib.parse.urlencode({"user": "helper", "password": "hunter22", "next": "/opendmtq/"}).encode()
+right = urllib.parse.urlencode({"user": "helper", "password": HELPER_PASSWORD, "next": "/opendmtq/"}).encode()
 fresh = {"X-Forwarded-For": "198.51.100.200"}
 held = request(plain, SITE + "/opendmtq/login.php", right, fresh)
-client_held = request(plain, SITE + "/opendmtq/client.php?signin", urllib.parse.urlencode({"user": "helper", "password": "hunter22"}).encode(), fresh)[0]
+client_held = request(plain, SITE + "/opendmtq/client.php?signin", urllib.parse.urlencode({"user": "helper", "password": HELPER_PASSWORD}).encode(), fresh)[0]
 check("then that account waits, from a new address and with its right password, on the PC client's sign-in too",
       held[0] == 200 and "Too many failed sign-ins" in held[2].decode() and client_held == 429, f"{held[0]}, {client_held}")
 check("while an account without admin rights signs in as before", site_sign_in("dmtq", SITE_PASSWORD, {"X-Forwarded-For": "198.51.100.201"})[1])
