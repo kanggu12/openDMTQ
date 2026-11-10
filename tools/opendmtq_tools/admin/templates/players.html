@@ -29,28 +29,45 @@
         <td data-label="{{ t('players.th_broadcast') }}" class="live-cell"><div class="live-row">
           <span class="live-state {{ state }}"><span class="lamp {{ state }}"></span>{{ t('players.broadcasting') if state == 'on' else t('players.waiting') if state == 'wait' else t('players.held') if state == 'held' else t('state.off_word') }}</span>
           <div class="btns">
-            <form method="post" action="{{ url_for('player_action', pid=p.id) }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="seen" value="{{ seen[p.id] }}"><input type="hidden" name="action" value="{{ 'live-off' if p.id in live else 'live-on' }}"><button class="btn btn-sm">{{ t('btn.turn_off') if p.id in live else t('btn.turn_on') }}</button></form>
+            {# The page's one form, under the list, sent to this player's address (with whom the page saw the number belong
+               to) with what the switch does. #}
+            <button class="btn btn-sm" form="player-switch" formaction="{{ url_for('player_action', pid=p.id, seen=seen[p.id]) }}" name="action" value="{{ 'live-off' if p.id in live else 'live-on' }}">{{ t('btn.turn_off') if p.id in live else t('btn.turn_on') }}</button>
             {% if state == 'on' %}<a class="btn btn-sm" href="{{ public_url }}/opendmtq/live.php?p={{ p.id }}">{{ t('btn.watch') }}</a>{% endif %}
           </div>
         </div></td>
-        <td class="actions"><details class="row-more">
+        {# More opens the panel below, made for this player when it first opens (admin.js): their address, the name to
+           change (empty for none yet), the name its questions say and their number. #}
+        <td class="actions"><details class="row-more" data-act="{{ url_for('player_action', pid=p.id, seen=seen[p.id]) }}" data-name="{{ p.nickname.strip() }}" data-who="{{ who }}" data-id="{{ p.id }}">
           <summary class="btn btn-sm">{{ t('players.more') }}</summary>
-          <div class="row-more-in">
-            <form method="post" action="{{ url_for('player_action', pid=p.id) }}" class="inline-form rename">
-              <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="seen" value="{{ seen[p.id] }}"><input type="hidden" name="action" value="rename">
-              <input class="input input-sm" name="name" value="{{ p.nickname.strip() }}" placeholder="{{ t('player.fallback', id=p.id) }}" maxlength="20" aria-label="{{ t('players.name_of', id=p.id) }}">
-              <button class="btn btn-sm">{{ t('players.rename') }}</button>
-            </form>
-            <div class="btns">
-              <form method="post" action="{{ url_for('player_action', pid=p.id) }}" data-ask="{{ tp('players.confirm_reset', who=who) }}" data-yes="{{ tp('players.reset') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="seen" value="{{ seen[p.id] }}"><input type="hidden" name="action" value="reset"><button class="btn btn-sm btn-danger">{{ t('players.reset') }}</button></form>
-              <form method="post" action="{{ url_for('player_action', pid=p.id) }}" data-ask="{{ tp('players.confirm_delete', who=who) }}" data-yes="{{ tp('btn.delete') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="seen" value="{{ seen[p.id] }}"><input type="hidden" name="action" value="delete"><button class="btn btn-sm btn-danger">{{ t('btn.delete') }}</button></form>
-            </div>
-          </div>
         </details></td>
       </tr>
     {% endfor %}
     </tbody>
   </table>
+  {# One form for every row's broadcast switch, with the form's token once: four forms in every row (the switch, and
+     More's three) made a page of many players slow to lay out and to style. Each switch names this form and its player's
+     address, whose seen says whom the page saw the number belong to (players.player_seen): a press needs no script. After
+     the list: buttons that name a form the browser has already read cost it work for each one as it reads them (150 ms
+     at 400 players), a form read after them is theirs all at once. No field to type in, so Enter never presses a switch. #}
+  <form id="player-switch" method="post" hidden><input type="hidden" name="csrf" value="{{ csrf }}"></form>
+  {# More's panel, once for the page: a row's own is made from it when its More first opens, so that a row the owner never
+     opens carries none of it. Its words keep a place for the player: {id} their number, {who} their name. One form, with
+     its token: Rename is its first button, so that Enter in the name presses Rename; the two that cannot be undone ask
+     first, in the page's own look (data-ask, admin.js). It goes to the row's address, which the panel takes when it is
+     made; until then to that of player 0, whom no player is: refused as gone, never sent for someone else. #}
+  <template id="player-more">
+    <form method="post" class="row-more-in" action="{{ url_for('player_action', pid=0) }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="inline-form rename">
+        <input class="input input-sm" name="name" placeholder="{{ tp('player.fallback', id='{id}') }}" maxlength="20" aria-label="{{ tp('players.name_of', id='{id}') }}">
+        <button class="btn btn-sm" name="action" value="rename">{{ t('players.rename') }}</button>
+      </div>
+      <div class="btns">
+        <button class="btn btn-sm btn-danger" name="action" value="reset" data-ask="{{ tp('players.confirm_reset', who='{who}') }}" data-yes="{{ tp('players.reset') }}">{{ t('players.reset') }}</button>
+        <button class="btn btn-sm btn-danger" name="action" value="delete" data-ask="{{ tp('players.confirm_delete', who='{who}') }}" data-yes="{{ tp('btn.delete') }}">{{ t('btn.delete') }}</button>
+      </div>
+    </form>
+  </template>
   {% endif %}
 </section>
 {% endblock %}

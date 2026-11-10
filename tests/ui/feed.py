@@ -49,12 +49,15 @@ def sign_in():
 
 
 def switch(guid, on):
-    """The owner's broadcast switch for one player, as the players page sends it, with the row's own token of who it is."""
+    """The owner's broadcast switch for one player, as the players page sends it: the page's one form, with its token, to the
+    address the row's switch names, the player's own with the token of who it is."""
     page = request(SIGNED_IN, ADMIN + "/opendmtq/admin/players")[1].decode()
     csrf = re.search(r'name="csrf" value="([^"]+)"', page).group(1)
-    seen = re.search(rf'action="/opendmtq/admin/players/{guid}"[^>]*>\s*<input type="hidden" name="csrf" value="[^"]+"><input type="hidden" name="seen" value="([^"]*)"', page)
-    fields = {"csrf": csrf, "action": "live-on" if on else "live-off", "seen": seen.group(1) if seen else ""}
-    status, _ = request(SIGNED_IN, f"{ADMIN}/opendmtq/admin/players/{guid}", urllib.parse.urlencode(fields).encode())
+    address = re.search(rf'formaction="(/opendmtq/admin/players/{guid}\?seen=[0-9a-f]+)"', page)
+    fields = {"csrf": csrf, "action": "live-on" if on else "live-off"}
+    # A player the page does not list: their bare address, which the admin refuses as a page out of date.
+    status, _ = request(SIGNED_IN, ADMIN + (address.group(1) if address else f"/opendmtq/admin/players/{guid}"),
+                        urllib.parse.urlencode(fields).encode())
     assert status == 200, status
 
 

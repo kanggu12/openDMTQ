@@ -122,12 +122,14 @@ account_post(action="create", name="dmtq", password=SITE_PASSWORD, note="smoke t
 
 
 def switch(action, who=None):
-    """Flip a player's switch the way the Players page does, with that page's CSRF token."""
+    """Flip a player's switch the way the Players page does: its one form, with its CSRF token, to the address the row's
+    switch names (the player's own, which says who the page was loaded for)."""
     page = request(admin, ADMIN + "/opendmtq/admin/players")[2].decode()
     csrf = re.search(r'name="csrf" value="([^"]+)"', page).group(1)
-    # Each form says who the page was loaded for.
-    seen = re.search(rf'action="/opendmtq/admin/players/{who or guid}"[^>]*>\s*<input type="hidden" name="csrf" value="[^"]+"><input type="hidden" name="seen" value="([^"]+)"', page)
-    request(admin, f"{ADMIN}/opendmtq/admin/players/{who or guid}", urllib.parse.urlencode({"csrf": csrf, "action": action, "seen": seen.group(1) if seen else ""}).encode())
+    address = re.search(rf'formaction="(/opendmtq/admin/players/{who or guid}\?seen=[0-9a-f]+)"', page)
+    # A player the page does not list: the bare address, which the admin refuses as a page out of date.
+    request(admin, ADMIN + (address.group(1) if address else f"/opendmtq/admin/players/{who or guid}"),
+            urllib.parse.urlencode({"csrf": csrf, "action": action}).encode())
 
 
 def admin_page(path):

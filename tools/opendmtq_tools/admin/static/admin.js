@@ -307,24 +307,45 @@ for (const search of document.querySelectorAll('input[type=search][data-rows]'))
   });
 }
 
-// The Players page's More: one open at a time, and it closes by a press anywhere else. Rename does nothing until the name
-// has changed.
-for (const more of document.querySelectorAll('.row-more')) {
-  more.addEventListener('toggle', () => {
-    if (!more.open) return;
+// The Players page's More. A row's panel is made from the page's one (the template player-more) when its More first opens,
+// for that row's player as its data-* say: the address it sends to (data-act), the name to change (data-name), the name
+// its questions say (data-who) and the number in its words (data-id). A row the owner never opens carries none of it: four
+// forms in every row made a page of many players slow to lay out. One open at a time, and it closes by a press anywhere
+// else. Rename does nothing until the name has changed.
+(() => {
+  const made = document.getElementById('player-more');
+  if (!made) return;
+  // A row's own panel: the page's one, its places filled in for the row's player.
+  const panel = more => {
+    const { act, name, who, id } = more.dataset;
+    const form = made.content.firstElementChild.cloneNode(true);
+    // Rename, Reset and Delete go to this player's address, which says whom the page saw the number belong to.
+    form.action = act;
+    const field = form.querySelector('input[name=name]'), rename = form.querySelector('button[value=rename]');
+    // The name as it is now; none yet leaves the field empty, its placeholder the "Player <n>" the pages show.
+    field.value = name;
+    field.placeholder = field.placeholder.replace('{id}', id);
+    field.setAttribute('aria-label', field.getAttribute('aria-label').replace('{id}', id));
+    // The questions before what cannot be undone name the player (by a function: a name with a $ in it stays as typed).
+    for (const b of form.querySelectorAll('[data-ask]')) b.dataset.ask = b.dataset.ask.replace('{who}', () => who);
+    const check = () => { rename.disabled = field.value.trim() === name; };
+    field.addEventListener('input', check);
+    check();
+    return form;
+  };
+  // A details' toggle does not bubble: heard on its way down, once for every row.
+  document.addEventListener('toggle', e => {
+    const more = e.target;
+    if (!more.matches('.row-more') || !more.open) return;
+    // Made once: closed and opened again, the row keeps what was typed in it, as a form of its own did.
+    if (!more.querySelector('.row-more-in')) more.append(panel(more));
     for (const other of document.querySelectorAll('.row-more[open]')) if (other !== more) other.open = false;
-  });
-  const field = more.querySelector('input[name=name]'), rename = more.querySelector('.rename button'), was = field.value;
-  const check = () => { rename.disabled = field.value.trim() === was; };
-  field.addEventListener('input', check);
-  check();
-}
-if (document.querySelector('.row-more')) {
+  }, true);
   document.addEventListener('pointerdown', e => {
     if (e.target.closest('.row-more') || document.getElementById('ask').open) return;
     for (const open of document.querySelectorAll('.row-more[open]')) open.open = false;
   });
-}
+})();
 
 // The Recordings page's delete of those ticked: the button says how many it would delete (data-n, with {n}; data-none
 // before any), waits until there is at least one, and stays at the screen's foot once something is ticked.

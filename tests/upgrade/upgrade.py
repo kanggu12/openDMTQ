@@ -169,13 +169,15 @@ def form(admin, path, to=None, **fields):
 
 
 def switch(admin, guid, action):
-    """A player's broadcast switch flipped as the Players page does it; each form there says whom the page was loaded for."""
+    """A player's broadcast switch flipped as the Players page does it, which says whom the page was loaded for: this tree's
+    in the address its row's switch names (one form for every row), an older release's in each row's own form."""
     html = page(admin, "/opendmtq/admin/players")
     csrf = re.search(r'name="csrf" value="([^"]+)"', html).group(1)
+    address = re.search(rf'formaction="(/opendmtq/admin/players/{guid}\?seen=[0-9a-f]+)"', html)
     seen = re.search(rf'action="/opendmtq/admin/players/{guid}"[^>]*>\s*<input type="hidden" name="csrf" value="[^"]+">'
                      r'<input type="hidden" name="seen" value="([^"]+)"', html)
     fields = {"csrf": csrf, "action": action, "seen": seen.group(1) if seen else ""}
-    request(admin, f"{ADMIN}/opendmtq/admin/players/{guid}", urllib.parse.urlencode(fields).encode())
+    request(admin, ADMIN + (address.group(1) if address else f"/opendmtq/admin/players/{guid}"), urllib.parse.urlencode(fields).encode())
 
 
 def broadcasts(admin):

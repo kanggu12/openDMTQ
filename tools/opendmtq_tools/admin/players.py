@@ -113,8 +113,11 @@ def players_csv(rows, activity):
 @app.route(BASE + "/players/<int:pid>", methods=["POST"])
 def player_action(pid):
     action = request.form.get("action")
+    # Whom the page saw the number belong to: in the address the page's buttons send to (players.html: a button sends one
+    # value of its own, its action), or in the form, as a program may send it. Neither: a stale form, refused below.
+    seen = request.args.get("seen") or request.form.get("seen", "")
     try:
-        done = act(pid, action, request.form.get("seen", ""), request.form.get("name", ""))
+        done = act(pid, action, seen, request.form.get("name", ""))
     except Refused as e:
         flash(e.words, e.tone)
         return redirect(url_for("players_page"))

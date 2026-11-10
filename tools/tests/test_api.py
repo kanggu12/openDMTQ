@@ -1819,6 +1819,9 @@ GET_ARGS = {
     "songs_page?job": ("path", "job_get", "job"),
     # The Players page's spreadsheet.
     "players_page?csv": ("view", "players_download"),
+    # A change to a player from the Players page: whom the page saw the number belong to, in the address, as the API's
+    # writes take it.
+    "player_action?seen": ("query", "player_rename", "seen"),
     # The Logs page: its tabs, the Requests tab's filter form, the rows it fetches again while it follows the log.
     "logs_page?tab": ("view", "logs_requests", "logs_plays", "logs_changes"),
     "logs_page?q": ("query", "logs_requests", "q"),
@@ -1881,6 +1884,17 @@ def page_actions():
         if not rule.endpoint.startswith("api_"):
             found.add(rule.endpoint)
     templates = os.path.join(ADMIN_DIR, "templates")
+
+    def actions_in(markup):
+        """Every action the buttons and fields of a piece of a template name."""
+        actions = set()
+        for value in re.findall(r'name="action"[^>]*value="([^"]*)"|value="([^"]*)"[^>]*name="action"', markup):
+            value = value[0] or value[1]
+            # Literal words, or those a {{ ... }} chooses between; "hide {{ name }}" is hide.
+            literal = re.sub(r"{{.*?}}", "", value).split()
+            actions |= set(literal[:1]) | set(re.findall(r"'([a-z-]+)'", " ".join(re.findall(r"{{(.*?)}}", value))))
+        return actions
+
     for name in sorted(os.listdir(templates)):
         with open(os.path.join(templates, name), encoding="utf-8") as f:
             text = f.read()
@@ -1893,13 +1907,11 @@ def page_actions():
             endpoint = target.group(1) if target else TEMPLATE_PAGES.get(name)
             if endpoint is None:
                 raise AssertionError(f"{name}: a form that posts to its page, which TEMPLATE_PAGES does not name")
-            actions = set()
-            for value in re.findall(r'name="action"[^>]*value="([^"]*)"|value="([^"]*)"[^>]*name="action"', body):
-                value = value[0] or value[1]
-                # Literal words, or those a {{ ... }} chooses between; "hide {{ name }}" is hide.
-                literal = re.sub(r"{{.*?}}", "", value).split()
-                actions |= set(literal[:1]) | set(re.findall(r"'([a-z-]+)'", " ".join(re.findall(r"{{(.*?)}}", value))))
-            found |= {f"{endpoint}:{a}" for a in actions} or {endpoint}
+            found |= {f"{endpoint}:{a}" for a in actions_in(body)} or {endpoint}
+        # A button that sends a form to an address of its own (formaction), wherever it is: the Players page's switches,
+        # each in its row, all of them the page's one form.
+        for button in re.finditer(r"<button\b[^>]*\bformaction=\"\{\{ url_for\('(\w+)'[^>]*>", text):
+            found |= {f"{button.group(1)}:{a}" for a in actions_in(button.group(0))} or {button.group(1)}
         # What its scripts add to the page's own address.
         for arg in re.findall(r"searchParams\.set\('(\w+)'", text):
             found.add(f"{TEMPLATE_PAGES.get(name)}?{arg}")

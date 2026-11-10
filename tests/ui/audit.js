@@ -732,35 +732,57 @@ async function adminFlows(contexts) {
   const errors = watch(page, `${A}/`);
   await page.setViewport({ width: 1280, height: 900 });
 
-  // Renaming shows what happened, in a message with the site's look, and it stays done.
+  // Renaming shows what happened, in a message with the site's look, and it stays done. Player 7's More, whose panel is made
+  // from the page's one when it opens (admin.js): until then the row holds no form.
   await page.goto(`${A}/players`, { waitUntil: 'domcontentloaded' });
-  const row = 'form.rename[action$="/players/7"]';
-  const more = await page.evaluateHandle(sel => document.querySelector(sel).closest('.row-more'), row);
-  check('what is not done every day waits under More', await more.evaluate(e => !e.open));
-  await more.evaluate(e => e.querySelector('summary').click());
+  const row = '.row-more[data-act^="/opendmtq/admin/players/7?"]';
+  const panel = `${row} > form.row-more-in`;
+  const openMore = async p => {
+    await p.$eval(row, e => e.querySelector('summary').click());
+    await p.waitForSelector(panel, { visible: true });
+  };
+  check('what is not done every day waits under More', await page.$eval(row, e => !e.open && !e.querySelector('form')));
+  await openMore(page);
   await noFindings(page, 'the players page with a row opened');
-  check('rename waits for a new name', await page.$eval(`${row} button`, e => e.disabled));
-  await page.$eval(`${row} input[name=name]`, e => { e.value = 'Doyun Two'; e.dispatchEvent(new Event('input', { bubbles: true })); });
-  await press(page, `${row} button`);
+  check('rename waits for a new name', await page.$eval(`${panel} button[value=rename]`, e => e.disabled));
+  await page.$eval(`${panel} input[name=name]`, e => { e.value = 'Doyun Two'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  await press(page, `${panel} button[value=rename]`);
   check('renaming says so', /Doyun Two/.test(await textOf(page, '.flash')));
   await noFindings(page, 'the players page with a message');
-  check('and the new name stays', await page.$eval(`${row} input[name=name]`, e => e.value) === 'Doyun Two');
+  await openMore(page);
+  check('and the new name stays', await page.$eval(`${panel} input[name=name]`, e => e.value) === 'Doyun Two');
   // What cannot be undone asks in the site's own look, and Cancel leaves everything as it was.
-  const reset = `form[action$="/players/7"]:has(input[value=reset]) button`;
-  await page.$eval(`${row}`, e => e.closest('.row-more').querySelector('summary').click());
-  await page.click(reset);
+  await page.click(`${panel} button[value=reset]`);
   await page.waitForSelector('#ask[open]');
   check('a reset asks first, and says a backup comes first', /backup/i.test(await textOf(page, '#ask p')), await textOf(page, '#ask p'));
+  // The panel was made for this row: the question names its player.
+  check('and names the player it is about', (await textOf(page, '#ask p')).includes('Doyun Two'), await textOf(page, '#ask p'));
   await noFindings(page, 'the question before a reset');
   await page.evaluate(() => { window.stillHere = true; });
   await page.click('#ask [value=no]');
   await pause(500);
   check('cancel leaves the page as it was', await page.evaluate(() => window.stillHere === true && !document.getElementById('ask').open));
+  // From the keyboard: More opens with Enter, and the next stop is the name to change.
+  await page.goto(`${A}/players`, { waitUntil: 'domcontentloaded' });
+  await page.focus(`${row} > summary`);
+  await page.keyboard.press('Enter');
+  await page.waitForSelector(panel, { visible: true });
+  await page.keyboard.press('Tab');
+  check('More opens from the keyboard, the name the next stop', await page.evaluate(sel => document.activeElement.name === 'name'
+    && document.activeElement.closest('.row-more') === document.querySelector(sel), row));
+  // A row's switch sends the page's one form to its player's address: on, then off again as it was, each said in a message.
+  const switchOf = `button[form="player-switch"][formaction^="/opendmtq/admin/players/7?"]`;
+  await press(page, switchOf);
+  const on = await textOf(page, '.flash');
+  await press(page, switchOf);
+  const off = await textOf(page, '.flash');
+  check("a row's switch sends the page's one form for its player", /Doyun Two/.test(on) && / on/.test(on) && /Doyun Two/.test(off) && / off/.test(off),
+    `${on} | ${off}`);
   // The same panel on a phone, where it opens across the row.
   const small = await contexts.signed.newPage();
   await small.setViewport({ width: 360, height: 740, isMobile: true, hasTouch: true });
   await small.goto(`${A}/players`, { waitUntil: 'domcontentloaded' });
-  await small.$eval(row, e => e.closest('.row-more').querySelector('summary').click());
+  await openMore(small);
   await pause(200);
   await noFindings(small, 'the players page on a phone with a row opened');
   await small.screenshot({ path: path.join(OUT, 'shots', 'flows-players-more-360.jpg'), type: 'jpeg', quality: 72 });

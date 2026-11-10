@@ -1367,10 +1367,9 @@ class PlayerMessageTest(unittest.TestCase):
         inst.client.get("/opendmtq/admin/backups")
         with inst.client.session_transaction(path="/opendmtq/admin/") as sess:
             form["csrf"] = sess["csrf"]
-        # What the form holds: who the page was loaded for.
+        # Sent where the page sends it: the player's address, which says whom the page was loaded for.
         page = inst.client.get("/opendmtq/admin/players").get_data(as_text=True)
-        form["seen"] = re.search(r'name="seen" value="([^"]+)"', page).group(1)
-        inst.client.post("/opendmtq/admin/players/7", data=form)
+        inst.client.post(re.search(r'data-act="(/opendmtq/admin/players/7\?seen=[0-9a-f]+)"', page).group(1), data=form)
         return inst.client.get("/opendmtq/admin/backups").get_data(as_text=True)
 
     def member(self, name):
@@ -1507,8 +1506,9 @@ class PlayerNumbersComeBackTest(unittest.TestCase):
         member_rows(admin.core.DB, [(7, "Sena", "phone-a")])
 
     def seen(self, inst):
+        # Whom the page was loaded for, as its buttons send it: in player 7's address.
         page = inst.client.get("/opendmtq/admin/players").get_data(as_text=True)
-        return re.search(r'name="seen" value="([^"]+)"', page).group(1)
+        return re.search(r'/opendmtq/admin/players/7\?seen=([0-9a-f]+)"', page).group(1)
 
     def test_a_stale_page_does_not_touch_the_next_owner_of_a_number(self):
         with Install() as inst:
@@ -1564,6 +1564,72 @@ class PlayerNumbersComeBackTest(unittest.TestCase):
                     r = inst.client.get(page)
                     self.assertEqual(r.status_code, 200)
             self.assertIn("Made�", inst.client.get("/opendmtq/admin/players").get_data(as_text=True))
+
+
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class PlayersPageFormsTest(unittest.TestCase):
+    """The Players page with many players: one form for every row's switch, and More's panel once, made for a row when it
+    opens (admin.js). A form for the switch and More's three in every row made the page slow to lay out and to style."""
+
+    def page(self, inst, players, lang="en"):
+        """The page, signed in, with that many players (Player1, Player2...), in that language."""
+        old_game_database(admin.core.DB, [])
+        member_rows(admin.core.DB, [(i, f"Player{i}", f"phone-{i}") for i in range(1, players + 1)])
+        inst.client.set_cookie("opendmtq_lang", lang)
+        inst.sign_in()
+        return inst.client.get("/opendmtq/admin/players").get_data(as_text=True)
+
+    def test_the_rows_share_one_form_whatever_their_number(self):
+        counts = []
+        for players in (1, 40):
+            with Install() as inst:
+                page = self.page(inst, players)
+                # None in the list itself.
+                self.assertNotIn("<form", page[page.index("<tbody>"):page.index("</tbody>")])
+                counts.append(page.count("<form"))
+        # The switches' one, More's in its template, the sign-out and the question's: as many for 1 player as for 40.
+        self.assertEqual(counts, [4, 4])
+
+    def test_a_switch_sends_the_one_form_to_its_players_address(self):
+        with Install() as inst:
+            page = self.page(inst, 3)
+            with sqlite3.connect(admin.core.DB) as con:
+                seen = admin.players.player_seen(con, 2)
+            # Player 2's switch: a button of the one form, sent to their address, which says whom the page saw there.
+            address = f"/opendmtq/admin/players/2?seen={seen}"
+            self.assertIn(f'form="player-switch" formaction="{address}" name="action" value="live-on"', page)
+            # The one form holds the token; a press sends it with the button's action, as a browser does with no script.
+            csrf = re.search(r'<form id="player-switch" method="post" hidden><input type="hidden" name="csrf" value="([^"]+)">', page).group(1)
+            self.assertEqual(inst.client.post(address, data={"csrf": csrf, "action": "live-on"}).status_code, 302)
+            with sqlite3.connect(admin.core.DB) as con:
+                self.assertEqual(con.execute("SELECT guid, live FROM LiveSwitch").fetchall(), [(2, 1)])
+                # The number goes to a new phone while the page stays open: the same press changes nothing for them.
+                con.execute("DELETE FROM Member WHERE id = 2")
+            member_rows(admin.core.DB, [(2, "Next", "phone-new")])
+            inst.client.post(address, data={"csrf": csrf, "action": "live-off"})
+            self.assertIn("That page was out of date", inst.client.get("/opendmtq/admin/players").get_data(as_text=True))
+            with sqlite3.connect(admin.core.DB) as con:
+                self.assertEqual(con.execute("SELECT guid, live FROM LiveSwitch").fetchall(), [(2, 1)])
+
+    def test_more_is_one_panel_with_places_for_the_player_in_the_pages_language(self):
+        for lang, ask, nameless in (("en", "Reset the scores and play history of {who}?", "Player {id}"),
+                                    ("ko", "{who}의 점수와 플레이 기록을 모두 초기화할까요?", "플레이어 {id}")):
+            with Install() as inst:
+                page = self.page(inst, 2, lang)
+                more = re.search(r'<template id="player-more">(.*?)</template>', page, re.S).group(1)
+                # Its words keep a place for the player's name and number, filled in for a row when it opens.
+                self.assertIn(f'data-ask="{ask}', more)
+                self.assertIn(f'placeholder="{nameless}"', more)
+                # A row says what that takes: the player's address, the name to change, the name to say, the number.
+                with sqlite3.connect(admin.core.DB) as con:
+                    seen = admin.players.player_seen(con, 2)
+                self.assertIn(f'<details class="row-more" data-act="/opendmtq/admin/players/2?seen={seen}" data-name="Player2" '
+                              f'data-who="Player2" data-id="2">', page)
+                # Enter in the name presses Rename, the form's first button, and nothing else: the switches' form has no
+                # field to type in.
+                self.assertEqual(re.findall(r'<button[^>]*value="(\w+)"', more), ["rename", "reset", "delete"])
+                switches = re.search(r'<form id="player-switch"[^>]*>(.*?)</form>', page).group(1)
+                self.assertNotRegex(switches, r'<input(?![^>]*type="hidden")')
 
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
