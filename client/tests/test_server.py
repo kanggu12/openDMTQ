@@ -116,6 +116,32 @@ class Talking(Folder):
         with self.assertRaises(srv.SignedOut):
             srv.download_app(self.site.url, self.site.cookie, info, os.path.join(self.home, "app"))
 
+    def test_an_app_without_a_proper_name_is_refused(self):
+        # The package becomes the player's data folder and the file name a line of its settings: names only.
+        for field, value in (("package", "..\\..\\Startup"), ("package", "app"), ("file", "x.apk\npackage=evil"),
+                             ("file", "C:x.apk"), ("size", -5)):
+            described = self.site.describe
+            self.site.describe = lambda field=field, value=value, described=described: dict(described(), **{field: value})
+            try:
+                with self.assertRaises(srv.ServerError) as caught:
+                    srv.app_info(self.site.url, self.site.cookie)
+                self.assertEqual(caught.exception.key, "error.app.named", (field, value))
+            finally:
+                self.site.describe = described
+
+    def test_a_download_longer_than_said_stops(self):
+        info = srv.app_info(self.site.url, self.site.cookie)
+        # The server says the app is smaller than what it sends.
+        info["size"] = len(stub.APP) // 2
+        folder = os.path.join(self.home, "app")
+        seen = []
+        with self.assertRaises(srv.ServerError) as caught:
+            srv.download_app(self.site.url, self.site.cookie, info, folder, progress=lambda d, t: seen.append(d))
+        self.assertEqual(caught.exception.key, "error.app.damaged")
+        self.assertEqual(os.listdir(folder), [])
+        # It stopped at the size said: nothing past it was taken in.
+        self.assertLessEqual(max(seen or [0]), info["size"])
+
     def test_a_page_instead_of_the_app(self):
         info = srv.app_info(self.site.url, self.site.cookie)
         self.site.apk_kind = "text/html"

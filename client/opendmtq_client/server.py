@@ -20,6 +20,7 @@ import hashlib
 import http.cookies
 import json
 import os
+import re
 import socket
 import ssl
 import tempfile
@@ -247,6 +248,13 @@ def sign_in(base, user, password):
     return {"account": str(answer["account"]), "expires": int(answer.get("expires") or 0), "cookie": cookie}
 
 
+# What an Android package name is: the player makes the game's data folder of it, so nothing else may pass (a name with
+# a path in it would put the game's data outside OpenDMTQ's folder).
+PACKAGE = re.compile(r"[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+\Z")
+# Characters no file name of the app may hold: player.conf is one line a setting, and Windows refuses these in a name.
+NOT_IN_A_NAME = re.compile(r'[\x00-\x1f\x7f<>:"/\\|?*]')
+
+
 def app_info(base, cookie):
     """The app the server offers for its address; SignedOut when the sign-in ended, ServerError when there is none."""
     status, answer, _ = _call(base, "/opendmtq/client.php?app", cookie=cookie)
@@ -266,6 +274,10 @@ def app_info(base, cookie):
     info = dict(answer)
     info["file"] = os.path.basename(str(info["file"]).replace("\\", "/"))
     info["size"] = int(info["size"])
+    # The package and the file name go into the player's settings file and its folders: only names that are names.
+    if (not PACKAGE.match(str(info["package"])) or NOT_IN_A_NAME.search(info["file"]) or info["file"] in (".", "..")
+            or info["size"] <= 0):
+        raise ServerError("the server offered an app that has no proper name or size", "error.app.named")
     return info
 
 
@@ -293,9 +305,12 @@ def download_app(base, cookie, info, folder, progress=None, cancel=None):
                     piece = response.read(PIECE)
                     if not piece:
                         break
+                    done += len(piece)
+                    if done > info["size"]:
+                        # More than the server said: not the app it described, and no reason to fill the disk with it.
+                        raise ServerError("the app arrived damaged; try again", "error.app.damaged")
                     f.write(piece)
                     digest.update(piece)
-                    done += len(piece)
                     if progress:
                         progress(done, info["size"])
                 f.flush()
