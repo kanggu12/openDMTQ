@@ -9,7 +9,7 @@ stand-in files of their own.
 | The game, or running a server | [Report what did not work](https://github.com/kanggu12/openDMTQ/issues/new/choose), improve a [guide](docs/README.md) |
 | Another language | The site's and the admin pages' words: [Changing the pages](#changing-the-pages) |
 | HTML, CSS, PHP | The players' site, `server/portal/` |
-| Python | The admin pages and the tools, `tools/opendmtq_tools/` |
+| Python | The admin pages and the tools, `tools/opendmtq_tools/`; the PC client, `client/` |
 | Kubernetes or Docker | `deploy/helm/`, `compose.yaml` |
 | C++ and Android | The runtime for newer phones, `arm32/` |
 
@@ -39,8 +39,9 @@ stand-in files of their own.
 | `opendmtq`, `cli/` | `./opendmtq` with Docker Compose: setup, import, deploy, checks, backups. `install.sh` puts it on the PATH and, with `--service`, starts the server at boot; `firewall.ps1` lets phones reach a server in WSL | `opendmtq_cli/app.py` (`main`) |
 | `host/` | The same server without containers: `get.sh` and `install.sh` for Linux and macOS, `windows/` for the Windows bundle, and the program itself, a package in layers (`paths`, `settings`, `apache`, `server`, `commands`, `setup`) | `opendmtq_host/server.py` (`Server`) |
 | `arm32/` | The runtime that runs the 32-bit game on 64-bit-only phones, and the live broadcast's capture | [arm32/README.md](arm32/README.md) |
+| `client/` | The PC client for Windows: the launcher (Python and Tk), its installer and their tests. The player it starts is in `arm32/desktop/` | [client/README.md](client/README.md) |
 | `deploy/helm/` | The Helm chart for Kubernetes | `values.yaml` |
-| `tests/` | The tests beyond unit tests: the contract, the pages, the live server, the host install, the Windows bundle | [docs/testing.md](docs/testing.md) |
+| `tests/` | The tests beyond unit tests: the contract, the pages, an upgrade, the live server, the host install, the Windows bundle | [docs/testing.md](docs/testing.md) |
 
 A request finds its way like this:
 
@@ -91,26 +92,29 @@ You do not have to run them all: pick the line for what you changed, and CI runs
 
 | You changed | Run | Needs |
 |---|---|---|
-| anything | `(cd cli && python3 -m unittest discover -s tests -t .)`: the command line's tests, and the repository's own checks (every test is in docs/test-cases.md and every pointer there still finds its text, every CSS class has a style, line endings) | Python 3.9 |
+| anything | `(cd cli && python3 -m unittest discover -s tests -t .)`: the command line's tests, and the repository's own checks (every unit test file of the tools, the command line and the PC client is in docs/test-cases.md, every pointer there still finds its text, every CSS class has a style, line endings) | Python 3.9 |
 | `server/game/` | `tests/game/protocol.sh`, and PHP's syntax: `docker run --rm -v "$PWD/server:/s:ro" php:8.3-cli sh -c 'for f in $(find /s -name "*.php"); do php -l "$f" >/dev/null \|\| exit 1; done'` | Docker |
 | `server/portal/`, `server/game/pages/`, `tools/opendmtq_tools/admin/` | `tests/ui/run.sh` | Docker on Linux |
+| the database, or what is kept in `data/` | `tests/upgrade/run.sh`: the last release's images used as people use them, then this tree's on the same data | Docker, Python 3, and the last release's images (pulled, or loaded with `docker load`) |
 | `tools/` | `docker build -t opendmtq-tools:local tools`, then `docker run --rm -v "$PWD/tools:/t:ro" -v "$PWD/server/portal:/server/portal:ro" -v "$PWD/arm32:/arm32:ro" --entrypoint sh opendmtq-tools:local -c 'cd /t && python3 -m unittest discover -s tests -t .'` | Docker |
+| `client/` | `docker build -t opendmtq-client-ui:local client/tests/ui`, then `docker run --rm --network none -v "$PWD:/src:ro" -w /src/client opendmtq-client-ui:local python -m unittest discover -s tests -t .`, and `client/tests/ui/run.sh <folder>` (every page and dialog on a virtual screen, in both languages at three window sizes) | Docker |
 | `host/`, `tools/opendmtq_tools/admin/setup.py` | `tests/host/run.sh` (`DISTRO=debian:12` for Debian; it goes through the setup in the browser) | Docker on Linux (it uses the host's network) |
 | `host/windows/` | `tests/windows/wine.sh` (builds the bundle and runs it under Wine) | Docker |
-| how a server gets its programs | `tests/closed/run.sh` does [Without internet](docs/closed-network.md) step by step on a network with no way out | Docker on Linux; kind, Helm and root for Kubernetes |
+| how a server gets its programs | `tests/closed/run.sh` does [Without internet](docs/closed-network.md) step by step, all but the PC client's installer, on a network with no way out | Docker on Linux; kind, Helm and root for Kubernetes |
 | `arm32/` | `arm32/build.sh arm64-v8a`, then `arm32/test.sh` on a device (see [arm32/README.md](arm32/README.md)) | Docker, git, adb and a phone or an emulator of the same ABI |
+| `arm32/desktop/`, the player for Windows | `arm32/build.sh`, then `arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest player` and `arm32/test_windows.sh` (its tests under Wine) | Docker, git |
 | `deploy/helm/` | `helm lint deploy/helm/opendmtq -f deploy/kind/values.yaml --set publicHost=10.0.0.5` | Helm |
 | a shell script | `shellcheck <the script>`; for `arm32/*.sh`, `shellcheck --severity=warning -x -P arm32 <the script>` | ShellCheck |
 
-CI runs all of these on every pull request, without the game's files, except `arm32/test.sh` (for the runtime, CI
-builds it). What needs the game's files runs in `tests/qa.sh` on a maintainer's machine: the server on the real songs,
-the app built from the real client, and the patcher's tests on it. A change to the patcher (`patch_apk.py`,
-`il2cpp.py`, `axml.py`) passes CI without ever meeting the real client, so say in the pull request that it needs that
-run. [docs/testing.md](docs/testing.md) has the whole picture, and [docs/test-cases.md](docs/test-cases.md) every case
-with the check that covers it.
+CI runs all of these on every pull request, without the game's files, except `tests/closed/run.sh` and `arm32/test.sh`
+(for the runtime, CI builds it). What needs the game's files runs in `tests/qa.sh` on a maintainer's machine: the server
+on the real songs, the app built from the real client, and the patcher's tests on it. A change to the patcher
+(`patch_apk.py`, `il2cpp.py`, `axml.py`) passes CI without ever meeting the real client, so say in the pull request that
+it needs that run. [docs/testing.md](docs/testing.md) has the whole picture, and [docs/test-cases.md](docs/test-cases.md)
+every case with the check that covers it.
 
 <p align="center">
-  <img src="docs/images/fig-testing-gates.svg" alt="Testing. A push or a pull request runs ci.yml on GitHub, without the game's files: the arm32 build, the unit tests and checks, a host install on Ubuntu and Debian, the images, and the contract and pages. tests/qa.sh runs on a machine with the game's files: tools, cli, game, live, ui and host, and the tour on an emulator with EMULATOR=1; it sets the commit status qa/local. With both passed, a tag v* runs release.yml, and ./opendmtq deploy updates a server" width="100%">
+  <img src="docs/images/fig-testing-gates.svg" alt="Testing. A push or a pull request runs ci.yml on GitHub, without the game's files: the arm32 build, the unit tests and checks, a host install on Ubuntu and Debian, the images, the contract, an upgrade from the last release and the pages, the PC client's tests and screens, and three builds for Windows checked on a Windows runner: the player for Windows and the Windows bundle, each under Wine first, and the PC client's installer. tests/qa.sh runs on a machine with the game's files: shell, tools, cli, client, game, live, ui, upgrade and host, and the tour on an emulator with EMULATOR=1; it sets the commit status qa/local. With both passed, a tag v* runs release.yml, and ./opendmtq deploy updates a server" width="100%">
 </p>
 
 ## Changing the game server
@@ -132,11 +136,15 @@ refused with 403: `protocol.py` signs its requests the way the client does.
 
 The site and the admin pages come in English and Korean. The site's text is in the `STRINGS` table of
 `server/portal/strings.php`, the admin pages' in `tools/opendmtq_tools/strings.py`: a new text goes into both languages
-of its table, and `tools/tests/test_strings.py` checks them (and the spacing of Korean particles). A few Korean texts
-live elsewhere: the in-game notices in `server/game/live/state.php`, the help page in `server/game/pages/help.php`,
-and one word each in `server/portal/player.php`, `tools/opendmtq_tools/admin/static/admin.css` and
-`admin/templates/base.html`. `tests/ui/run.sh` checks every page at five widths in both languages, empty and full,
-and fails on text that is cut off or runs over another box.
+of its table, and `tools/tests/test_strings.py` checks them (and the spacing of Korean particles). The PC client's words
+are in the `TEXT` table of `client/opendmtq_client/i18n.py`, both languages side by side, and `client/tests/test_words.py`
+checks them. A few Korean texts live elsewhere: the in-game notices in `server/game/live/state.php`, the help page in
+`server/game/pages/help.php`, the menu, notice card and error messages of the player for Windows in
+`arm32/desktop/overlay_win32.cpp` and `arm32/desktop/own_folder.cpp`, the dates and the language switch in
+`server/portal/lib.php`, and one word each in `server/portal/player.php`, `tools/opendmtq_tools/admin/static/admin.css`,
+`admin/templates/base.html` and `client/opendmtq_client/pages.py`. `tests/ui/run.sh` checks every page at five widths in
+both languages, empty and full, and fails on text that is cut off or runs over another box. `client/tests/ui/run.sh` does
+the same for the PC client's pages and dialogs at three window sizes.
 
 ## Adding an admin page
 
@@ -183,7 +191,8 @@ A release, by a maintainer:
    changed for another server.
 3. Push the tag `v1.2.3`. `.github/workflows/release.yml` checks that the tag, the chart and the changelog name one
    version (`.github/release_notes.py`), runs CI again, checks the mark, and publishes the images, the Helm chart, the
-   Windows bundle and a GitHub release whose notes are that version's section of the changelog. Without the mark it
+   Windows bundle, the PC client (its installer, `OpenDMTQ-Setup.exe`, and the packages installed clients update
+   themselves from) and a GitHub release whose notes are that version's section of the changelog. Without the mark it
    stops: run `tests/qa.sh`, then run the release again (`gh run rerun`).
 
 A release names itself by its number (`0.2.0`): the Windows bundle, the one-command install and the Helm chart. A copy

@@ -56,7 +56,9 @@ class TestCasesTest(unittest.TestCase):
                     self.assertIn(pointer[1], f.read(), f"{row[0]}: {pointer[0]} does not say this")
 
     def test_every_test_file_is_in_some_case(self):
-        for pattern in ("tools/tests/test_*.py", "cli/tests/test_*.py"):
+        # The unit tests of the three Python packages: the tools, the command line and the PC client. The docs say each
+        # of their files is in a row, so a new one fails here until it is.
+        for pattern in ("tools/tests/test_*.py", "cli/tests/test_*.py", "client/tests/test_*.py"):
             for path in glob.glob(os.path.join(ROOT, pattern)):
                 name = os.path.relpath(path, ROOT).replace(os.sep, "/")
                 self.assertIn(name, self.text, f"{name} is in no test case")

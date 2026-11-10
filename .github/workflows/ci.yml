@@ -59,7 +59,7 @@ jobs:
 
       - name: Shell scripts
         run: |
-          shellcheck --severity=warning server/entrypoint.sh server/edge/start.sh cli/install.sh host/get.sh host/install.sh host/windows/build.sh tests/closed/run.sh tests/closed/game.sh tests/ha/failover.sh tests/qa.sh tests/ui/run.sh tests/game/tour.sh tests/game/protocol.sh tests/upgrade/run.sh tests/host/run.sh tests/windows/wine.sh tests/live/run.sh tests/live/sound/run.sh tests/live/sound/card.sh deploy/kind/up.sh
+          shellcheck --severity=warning server/entrypoint.sh server/edge/start.sh cli/install.sh host/get.sh host/install.sh host/windows/build.sh tests/closed/run.sh tests/closed/game.sh tests/ha/failover.sh tests/qa.sh tests/ui/run.sh tests/game/tour.sh tests/game/protocol.sh tests/upgrade/run.sh tests/host/run.sh tests/windows/wine.sh tests/live/run.sh tests/live/sound/run.sh tests/live/sound/card.sh deploy/kind/up.sh client/packaging/windows/build.sh client/tests/ui/run.sh client/tests/windows/e2e.sh
           # The runtime's build scripts: warnings and errors (they keep two style notes).
           shellcheck --severity=warning -x -P arm32 arm32/build.sh arm32/bundle.sh arm32/test.sh arm32/ndk.sh arm32/build_desktop.sh arm32/build_windows.sh arm32/bundle_windows.sh arm32/test_desktop.sh arm32/test_windows.sh
 
@@ -146,7 +146,7 @@ jobs:
   # The PC client's launcher: its unit tests (a stand-in server and player, no screen, no network), then every page, the
   # first-start guide, the installer's dialogs and the launcher's dialogs on a virtual screen, in both languages at three
   # window sizes, with the layout check (client/tests/ui/run.sh). The installer under Wine against a test server needs the
-  # game's files: tests/qa.sh's client step and client/tests/windows/e2e.sh.
+  # game's files: client/tests/windows/e2e.sh, run by hand (tests/qa.sh's client step runs what this job runs).
   client:
     runs-on: ubuntu-24.04
     timeout-minutes: 30

@@ -180,6 +180,15 @@ the wait, up to four minutes: a step on a computer's display shows nothing, wher
 A computer gives up its resolution only at 60 fps: a frame that misses 240 Hz there is the processor's, which
 fewer pixels do not help.
 
+The PC client's settings can set a frame limit and turn VSync off: the player reads them from the file the client
+writes (`desktop/settings.cpp`) and hands them to the runtime (`g_host_fps_cap`, `g_host_vsync`). With VSync on, a limit
+keeps every frame on the fewest refreshes that hold the rate at or under it, when that rate is at most 10 % under the
+limit and a frame needs no more than four refreshes (`src/pacing_math.h`, which `tests/host/pacing_math_test.cpp` checks
+on the build machine): 120 on a 240 Hz display is every second refresh. Any other limit, such as 144 on 240 Hz, goes by
+the clock, each frame still waiting for a refresh. A step back up never passes the limit. With VSync off the swap
+interval is 0 whatever the game asks, and the frames go out by the clock at the limit: the display's rate, the number
+chosen, or 1000 a second for No limit.
+
 **Resolution** (`src/pacing.cpp`, `debug.arm32.lowres`, unset). The game draws at the panel's own resolution (an edit to the game:
 it used to write its low resolution option on at every start, 960 lines on a 1440 line panel), in 32-bit colour and with its
 textures at full size. With all that a Galaxy S26 Ultra keeps 120 fps with no frame late in a song. Frames come before sharpness, so
@@ -207,7 +216,8 @@ platform SDK signed in with: it reads them from `PPDevice`'s static fields and n
 which remember their first answer. With live view off, the swap costs one atomic load and each audio
 buffer another.
 
-With it on, every third or fourth swap scales the frame into a texture with one GPU blit and leaves a
+With it on, a picture is due at the stream's frame rate (every fourth swap of a game at 120 fps for a stream at
+30, every second for one at 60): that swap scales the frame into a texture with one GPU blit and leaves a
 fence behind it. An encoder thread with its own EGL context, sharing that texture, draws it on the
 input surface of the hardware H.264 encoder, so no pixel passes through the CPU. The game has two FMOD
 outputs (48 and 44.1 kHz), so the sound of each OpenSL buffer queue goes through a ring of its own into
@@ -217,8 +227,11 @@ percent to hold that: with 60 ms and no trim, one late burst left a source at em
 of the rounds came up short, which is a click each (clicks in a lobby tune went from 7.9 to 0.9 a
 second). The mix is at 75 %: the two outputs together clipped. Both go into MPEG-TS segments of about two seconds (Android's muxer has no such
 format) posted by an upload thread, over plain HTTP like the game's own requests. A slow upload or a
-warm phone steps the quality down: 30 to 20 to 15 fps and 720 to 540 to 360 lines, and nothing is sent
-from thermal status CRITICAL on. The notice comes as a toast. All the threads run at low priority
+warm phone steps the quality down from what the server asks for: to two thirds of its frame rate, then to half
+with three quarters of its lines, then to half its lines, with the bitrate at 60, 35 and 20 % (the Standard
+quality's 30 fps and 720 lines go to 20 fps, then to 15 fps and 540 lines, then to 360). The network's step comes
+back up after a minute of quick uploads, the phone's as it cools, and nothing is sent from thermal status CRITICAL
+on. The notice comes as a toast. All the threads run at low priority
 and only the encoder thread can block on the encoder; a picture with no free texture is left out.
 
 On a Galaxy S26 Ultra at 120 fps, one play of the same song each, with and without live view: 0 of 237 frames
@@ -226,6 +239,14 @@ late per two seconds both ways, 0 underrun frames, process CPU 125 % without and
 swap 170 us longer for each picture (worst seen 2.3 ms). `arm32/tests/host/live_ts_test.cpp` checks the
 segment writer without a phone (`debug.arm32.liveserver <host:port>` asks another server, with `adb
 reverse` a test server on the computer). Encoding from a surface takes Android 8 or newer.
+
+The player for Windows broadcasts too (`desktop/live_desktop.cpp`), with a phone's requests and the same stream. At a
+swap a picture is due at, the frame is scaled with one blit and turned into the encoder's NV12 by two small draws on
+the graphics card, and a later swap copies it out once the GPU is done, so the game never waits for it. Windows' own
+H.264 and AAC encoders (Media Foundation) make the stream from those pictures and the player's mix, before its volume.
+Windows' H.264 encoder leaves the colours out of its sequence header, so `src/live_sps.cpp` writes BT.709 into it
+(`tests/host/live_sps_test.cpp`). The quality steps down as on a phone for a slow upload, and for an encoder that does
+not keep up, and comes back up after a minute with time to spare.
 
 **The shim** (`shim/shim.cpp`, `debug.arm32.shim`, on). Phones that can run 32-bit apps never start this
 runtime: the manifest's `use32bitAbi` sends them to `lib/armeabi-v7a`, and the game's own libraries run
@@ -298,7 +319,7 @@ built the guest programs:
 ```sh
 arm32/build_desktop.sh      # Linux: the runner, the player and their tests, in _work/arm32/build-desktop-x86_64
 arm32/test_desktop.sh       # the same guest programs and checks on this machine, and the player's parts
-arm32/build_windows.sh arm32run jvmtest audiotest mediatest player    # Windows, cross-built with llvm-mingw
+arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest player    # Windows, cross-built with llvm-mingw
 arm32/test_windows.sh       # the Windows programs' tests under Wine
 arm32/bundle_windows.sh     # the player for Windows as a release ships it
 ```
