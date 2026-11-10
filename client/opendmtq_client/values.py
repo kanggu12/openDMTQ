@@ -17,6 +17,12 @@ VSYNC = ("on", "off")
 FPS = ("auto", "30", "60", "120", "144", "165", "180", "240", "360", "unlimited")
 # The share of the game's area the game draws at, in percent (the picture is stretched to the area).
 RENDER_SCALE = ("100", "85", "75", "67", "50")
+# Below 100 %, how the picture reaches the area's size: the plain stretch, AMD FidelityFX Super Resolution 1, or NVIDIA
+# Image Scaling (arm32/desktop/post_pass.cpp).
+UPSCALER = ("bilinear", "fsr1", "nis")
+# How the edges of the game's shapes are smoothed: not at all, by Intel's CMAA 2 or SMAA over the finished picture, or by
+# drawing each frame with 2, 4 or 8 samples a pixel.
+ANTI_ALIASING = ("off", "cmaa2", "smaa", "msaa2", "msaa4", "msaa8")
 # The sound shared with the PC's other sound, or the device alone (less latency).
 AUDIO_MODE = ("shared", "exclusive")
 # How much sound is kept ahead of the device: less latency, or fewer breaks on a busy PC.
@@ -30,16 +36,19 @@ DEFAULTS = {
     "vsync": "on",
     "fps": "auto",
     "render_scale": "100",
+    "upscaler": "bilinear",
+    "anti_aliasing": "off",
     "audio_device": "default",
     "audio_mode": "shared",
     "audio_buffer": "normal",
     "volume": 100,
 }
 # The order the settings file lists them in, the player's own order.
-ORDER = ("display", "window", "vsync", "fps", "render_scale", "audio_device", "audio_mode", "audio_buffer", "volume")
+ORDER = ("display", "window", "vsync", "fps", "render_scale", "upscaler", "anti_aliasing", "audio_device", "audio_mode",
+         "audio_buffer", "volume")
 # The choices of each setting that has a fixed list.
-CHOICES = {"display": DISPLAY, "vsync": VSYNC, "fps": FPS, "render_scale": RENDER_SCALE, "audio_mode": AUDIO_MODE,
-           "audio_buffer": AUDIO_BUFFER}
+CHOICES = {"display": DISPLAY, "vsync": VSYNC, "fps": FPS, "render_scale": RENDER_SCALE, "upscaler": UPSCALER,
+           "anti_aliasing": ANTI_ALIASING, "audio_mode": AUDIO_MODE, "audio_buffer": AUDIO_BUFFER}
 # A window size the player takes (its own bounds: 320x180 to 16384 a side).
 SIZE = re.compile(r"^(\d{3,5})x(\d{3,5})$")
 

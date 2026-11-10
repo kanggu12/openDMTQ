@@ -52,13 +52,16 @@ class CommandLine(Folder):
         code, said = self.run_main(["--app"])
         self.assertEqual(code, 0, said)
         self.assertIn("Downloaded the app", said)
-        code, said = self.run_main(["--set", "fps=144", "--set", "vsync=off", "--status"])
+        code, said = self.run_main(["--set", "fps=144", "--set", "vsync=off", "--set", "render_scale=50", "--set",
+                                    "upscaler=fsr1", "--set", "anti_aliasing=cmaa2", "--status"])
         self.assertEqual(code, 0, said)
         self.assertIn("fps=144", said)
         self.assertNotIn(self.site.cookie, said)
         code, said = self.run_main(["--play"])
         self.assertEqual(code, 0, said)
-        self.assertIn("vsync=off", self.started()["settings"])
+        # The player's settings file carries them, the upscaler and the anti-aliasing among them.
+        for line in ("vsync=off", "render_scale=50", "upscaler=fsr1", "anti_aliasing=cmaa2"):
+            self.assertIn(line, self.started()["settings"])
 
     def test_a_wrong_password(self):
         self.run_main(["--server", self.site.url])
@@ -70,6 +73,10 @@ class CommandLine(Folder):
         code, said = self.run_main(["--set", "fps=12"])
         self.assertEqual(code, 2)
         self.assertEqual(st.LauncherState.load().values["fps"], "auto")
+        # An upscaler the launcher does not offer is refused the same way.
+        code, said = self.run_main(["--set", "upscaler=dlss"])
+        self.assertEqual(code, 2)
+        self.assertEqual(st.LauncherState.load().values["upscaler"], "bilinear")
 
     def test_audio_devices(self):
         code, said = self.run_main(["--audio-devices"])
@@ -219,7 +226,7 @@ class CommandLine(Folder):
         out = io.StringIO()
         with contextlib.redirect_stdout(out), self.assertRaises(SystemExit):
             main.parse(["--help"])
-        for name in ("vsync", "fps", "render_scale", "audio_device"):
+        for name in ("vsync", "fps", "render_scale", "upscaler", "anti_aliasing", "audio_device"):
             self.assertIn(name, out.getvalue())
 
     def test_a_worker_threads_error_goes_to_the_log(self):

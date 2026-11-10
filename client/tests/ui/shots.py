@@ -362,6 +362,19 @@ def variants_check(app, site, out, tag, problems):
     settle(app)
     shot(app.root, out, tag + "_screen-free")
     measure(app, tag + "_screen-free", problems)
+    # Below 100 %: the upscaler's row and its hint, with an anti-aliasing chosen (the longest hint of each).
+    app.changed("render_scale", "50")
+    app.changed("upscaler", "fsr1")
+    app.changed("anti_aliasing", "msaa4")
+    app.go("screen")
+    settle(app)
+    # Scrolled to its end, where the Quality card is.
+    from opendmtq_client import widgets as wd
+    for area in [w for w in widgets_of(app.root) if isinstance(w, wd.ScrollArea) and w.winfo_ismapped()]:
+        area.canvas.yview_moveto(1)
+    settle(app)
+    shot(app.root, out, tag + "_screen-upscaler")
+    measure(app, tag + "_screen-upscaler", problems)
     # A download under way, drawn from its numbers (the real one is in the guide).
     import threading
     app.download = {"done": 47 << 20, "total": 103 << 20, "cancel": threading.Event()}

@@ -236,10 +236,26 @@ def screen_rows(app, parent, redraw, full=True):
         return
     card = _card(parent, ui, w("screen.picture"), last=True)
     options = [(s, w("screen.scale.full") if s == "100" else "%s%%" % s) for s in choices.RENDER_SCALE]
+    # Drawn again on a change: the upscaler's row is there only below 100 %.
     widgets.setting_row(card.body, ui, w("screen.scale"),
-                        lambda p: widgets.Select(p, ui, options, v["render_scale"],
-                                                 lambda s: app.changed("render_scale", s), width=22),
+                        lambda p: widgets.Select(p, ui, options, v["render_scale"], set_and_redraw("render_scale"),
+                                                 width=22),
                         w("screen.scale.hint")).pack(fill="x")
+    if v["render_scale"] != "100":
+        # What makes the picture of a lower scale the area's size; its hint says what the chosen one does.
+        options = [(u, w("screen.upscaler." + u)) for u in choices.UPSCALER]
+        widgets.divider(card.body, ui)
+        widgets.setting_row(card.body, ui, w("screen.upscaler"),
+                            lambda p: widgets.Select(p, ui, options, v["upscaler"], set_and_redraw("upscaler"), width=22),
+                            w("screen.upscaler.hint." + v["upscaler"])).pack(fill="x")
+    # The edges smoothed, at any scale; its hint says what the chosen one does (the three MSAA counts share one).
+    options = [(a, w("screen.aa." + a)) for a in choices.ANTI_ALIASING]
+    kind = "msaa" if v["anti_aliasing"].startswith("msaa") else v["anti_aliasing"]
+    widgets.divider(card.body, ui)
+    widgets.setting_row(card.body, ui, w("screen.aa"),
+                        lambda p: widgets.Select(p, ui, options, v["anti_aliasing"], set_and_redraw("anti_aliasing"),
+                                                 width=22),
+                        w("screen.aa.hint." + kind)).pack(fill="x")
 
 
 def build_screen(app, parent):
