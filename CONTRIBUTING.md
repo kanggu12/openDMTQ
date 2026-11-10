@@ -85,7 +85,7 @@ coreutils`). The first run builds both images and pulls a headless Chromium and 
 ## Run the tests
 
 <p align="center">
-  <img src="docs/images/chart-checks.svg" alt="1341 automated checks: Tools and admin pages (unit) 439; The server on the real game files 301; Command line and repository (unit) 201; All pages in a real browser 136; Host install on a clean system 111; Windows bundle under Wine 97; The game server's contract 56" width="100%">
+  <img src="docs/images/chart-checks.svg" alt="1872 automated checks: Tools and admin pages (unit) 583; The server on the real game files 317; Command line and repository (unit) 216; An upgrade from the last release 177; All pages in a real browser 173; The PC client (unit) 140; Host install on a clean system 111; Windows bundle under Wine 96; The game server's contract 59" width="100%">
 </p>
 
 You do not have to run them all: pick the line for what you changed, and CI runs the rest on your pull request.
