@@ -52,6 +52,14 @@ constexpr const char* kVendor = "OpenDMTQ";
 // What a player can act on, in their language: English, or Korean on a Korean computer.
 std::string say(const char* english, const char* korean) { return host_locale().first == "ko" ? korean : english; }
 
+// A value the server wrote, as the log and a message box may show it: printable ASCII as it is and any other byte as
+// '?' (no line break of its own in the log), cut to a line of the box.
+std::string shown(const std::string& text) {
+    std::string out;
+    for (char c : text.substr(0, 80)) out += c >= ' ' && c <= '~' ? c : '?';
+    return out;
+}
+
 #ifdef _WIN32
 // UTF-8 of Windows' UTF-16, and back: the runtime's paths are UTF-8, as the user's folder may have any name.
 std::string utf8(const std::wstring& w) {
@@ -279,6 +287,14 @@ bool use_own_folder(const std::string& folder, std::string& error) {
     if (conf["package"].empty() || conf["apk"].empty()) {
         error = say("player.conf names no app: download the app again in the OpenDMTQ launcher (Online).",
                     "player.conf에 앱이 적혀 있지 않습니다. OpenDMTQ 런처의 온라인에서 앱을 다시 받으세요.");
+        return false;
+    }
+    // The package names the app's folder in the user's (below), and the server wrote it: only a name as Android's are
+    // made, which can name no other folder ("..", a slash, a drive).
+    if (!paths::valid_package(conf["package"])) {
+        error = say("The app's package name in player.conf is not a valid one: download the app again in the OpenDMTQ launcher (Online).",
+                    "player.conf에 적힌 앱의 패키지 이름이 올바르지 않습니다. OpenDMTQ 런처의 온라인에서 앱을 다시 받으세요.") +
+                "\n(" + shown(conf["package"]) + ")";
         return false;
     }
     a.package = conf["package"];
