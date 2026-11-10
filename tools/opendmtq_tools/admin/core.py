@@ -372,11 +372,20 @@ def template_globals():
             "app_name_html": app_name_html, "device_words": logs.device_words}
 
 
+def read_text(raw):
+    """A text of the database as these pages and the API read it: UTF-8, with any byte that is no part of it read as
+    U+FFFD. A player's name in an older server's database can hold such bytes (the game stored what the phone sent), and
+    Python's strict reading would stop every page and answer that reads it ("Could not decode to UTF-8")."""
+    return raw.decode("utf-8", "replace")
+
+
 def db():
     # An existing file only: a page asked for while the database is away must not leave an empty one in its place, which
     # would then be taken for the database, and backed up as it.
     con = sqlite3.connect(f"file:{urllib.parse.quote(DB)}?mode=rw", uri=True, timeout=5)
     con.row_factory = sqlite3.Row
+    # Texts read leniently (read_text): about 40 ns more a text than the strict default, which no page notices.
+    con.text_factory = read_text
     return con
 
 # The last answer of the game server's health check: (time, answer or None). Every page's header

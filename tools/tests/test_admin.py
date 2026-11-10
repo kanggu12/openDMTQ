@@ -1544,6 +1544,24 @@ class PlayerNumbersComeBackTest(unittest.TestCase):
             inst.sign_in()
             self.assertEqual(inst.client.get("/opendmtq/admin/players").status_code, 200)
 
+    def test_a_name_with_a_byte_that_is_no_utf8_does_not_break_the_pages(self):
+        with Install() as inst:
+            old_game_database(admin.core.DB, [])
+            # A name ending in byte C0, stored as text, as an older server's database can hold it.
+            con = sqlite3.connect(admin.core.DB)
+            con.execute("INSERT INTO Member (id, nickname, guid, udid) VALUES (7, CAST(? AS TEXT), '7', 'phone-a')", (b"Made\xc0",))
+            con.commit()
+            con.close()
+            # Read with U+FFFD for the byte, the rest as it is.
+            with admin.core.db() as con:
+                self.assertEqual([r["nickname"] for r in con.execute(admin.core.PLAYER_ROWS, (admin.core.CHECK_UDID,))], ["Made�"])
+            inst.sign_in()
+            for page in ("/opendmtq/admin/players", "/opendmtq/admin/"):
+                with self.subTest(page):
+                    r = inst.client.get(page)
+                    self.assertEqual(r.status_code, 200)
+            self.assertIn("Made�", inst.client.get("/opendmtq/admin/players").get_data(as_text=True))
+
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class RestoreRefusesAndRescuesTest(unittest.TestCase):
