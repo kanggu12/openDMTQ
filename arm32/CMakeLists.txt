@@ -129,6 +129,14 @@ if(NOT ANDROID)
   target_include_directories(audiotest PRIVATE desktop)
   target_compile_options(audiotest PRIVATE -Wall -Wextra -Wno-unused-parameter)
   target_link_libraries(audiotest PRIVATE jvm ${PLAYER_POSIX} ${PLAYER_OUTPUT_LIBS})
+  # The broadcast's requests (src/live_net.cpp) on Windows, through the sockets of the runtime's layer the player's own
+  # are: the test CI runs on Linux (tests/host/live_net_test.cpp), with its stand-in servers on 127.0.0.1, under Wine.
+  if(WIN32)
+    add_executable(livenettest tests/host/live_net_test.cpp src/live_net.cpp)
+    target_include_directories(livenettest PRIVATE src)
+    target_compile_options(livenettest PRIVATE -Wall -Wextra)
+    target_link_libraries(livenettest PRIVATE ${PLAYER_POSIX})
+  endif()
   # The desktop player: the runtime and the JNI bridge on that VM (arm32/desktop). The bridges are the app's own (EGL,
   # GL, the Android API and OpenSL ES, with the generated GL thunks); the desktop files stand in for the phone's Java and
   # libandroid.

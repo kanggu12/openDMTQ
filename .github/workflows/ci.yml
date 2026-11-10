@@ -237,7 +237,7 @@ jobs:
         run: arm32/build.sh
 
       - name: The Windows programs
-        run: arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest player
+        run: arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest livenettest player
 
       - name: Their tests under Wine
         run: arm32/test_windows.sh

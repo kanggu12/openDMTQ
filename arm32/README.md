@@ -232,7 +232,8 @@ of the rounds came up short, which is a click each (clicks in a lobby tune went 
 second). The mix is at 75 %: the two outputs together clipped. Both go into MPEG-TS segments of about two seconds (Android's muxer has no such
 format) posted by an upload thread, over plain HTTP like the game's own requests. Each request has ten seconds in all, the lookup of
 the server's name included, which runs on a thread of its own: a server that answers a byte at a time or not at all holds a thread
-no longer (`src/live_net.cpp`, which the player for Windows shares; `tests/host/live_net_test.cpp`). A slow upload or a
+no longer (`src/live_net.cpp`, which the player for Windows shares; `tests/host/live_net_test.cpp`, which `test_windows.sh` runs
+under Wine too, on the player's own sockets). A slow upload or a
 warm phone steps the quality down from what the server asks for: to two thirds of its frame rate, then to half
 with three quarters of its lines, then to half its lines, with the bitrate at 60, 35 and 20 % (the Standard
 quality's 30 fps and 720 lines go to 20 fps, then to 15 fps and 540 lines, then to 360). The network's step comes
@@ -329,7 +330,7 @@ built the guest programs:
 ```sh
 arm32/build_desktop.sh      # Linux: the runner, the player and their tests, in _work/arm32/build-desktop-x86_64
 arm32/test_desktop.sh       # the same guest programs and checks on this machine, and the player's parts
-arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest player    # Windows, cross-built with llvm-mingw
+arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest livenettest player    # Windows, cross-built with llvm-mingw
 arm32/test_windows.sh       # the Windows programs' tests under Wine
 arm32/bundle_windows.sh     # the player for Windows as a release ships it
 ```
