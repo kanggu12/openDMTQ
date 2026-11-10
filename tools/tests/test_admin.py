@@ -310,6 +310,9 @@ class AppPageTest(unittest.TestCase):
             # Under a name that says which server it is for, and as long as it is.
             self.assertIn("OpenDMTQ-Setup-", r.headers["Content-Disposition"])
             self.assertEqual(int(r.headers["Content-Length"]), len(r.data))
+            # A broken download goes on where it stopped here too, as through the API (one function: apps.send_download).
+            part = inst.client.get("/opendmtq/admin/app/windows", headers={"Range": "bytes=1-2", "If-Range": r.headers["ETag"]})
+            self.assertEqual((part.status_code, part.headers["Content-Range"], part.data), (206, f"bytes 1-2/{len(r.data)}", b"Z!"))
 
     def test_over_https_the_installer_carries_the_address_with_its_port_and_the_servers_own_authority(self):
         ca = "-----BEGIN CERTIFICATE-----\nMIIBmadeup/+=\n-----END CERTIFICATE-----"

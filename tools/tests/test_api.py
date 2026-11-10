@@ -18,6 +18,7 @@ import tarfile
 import tempfile
 import threading
 import time
+import types
 import unittest
 import urllib.parse
 import zipfile
@@ -412,6 +413,12 @@ def CASES():
                                     t.assertIn(b'"url":"http://', r.data))),
         C("app_windows", "GET", "/app/windows", 404, "not_found"),
         C("app_windows", "GET", "/app/windows", 404, "not_found", setup=with_windows_half_copied),
+        # A broken download goes on where it stopped (InstallerDownloadTest has the rest): a part, another file, past the end.
+        C("app_windows", "GET", "/app/windows", 206, setup=with_windows, headers={"Range": "bytes=0-1"},
+          check=lambda t, inst, r: (t.assertEqual(r.data, b"MZ"), t.assertTrue(r.headers["Content-Range"].startswith("bytes 0-1/")))),
+        C("app_windows", "GET", "/app/windows", 412, "precondition_failed", setup=with_windows, headers={"If-Match": '"another"'}),
+        C("app_windows", "GET", "/app/windows", 416, "range_not_satisfiable", setup=with_windows, headers={"Range": "bytes=100000-"},
+          check=lambda t, inst, r: t.assertRegex(r.headers["Content-Range"], r"^bytes \*/\d+$")),
         C("app_icon", "GET", "/app/icon", 200),
         C("app_icon", "GET", "/app/icon", 404, "not_found", setup=no_icon),
         C("builds_list", "GET", "/builds", 200, check=lambda t, inst, r: t.assertEqual(len(r.get_json()["items"]), 2)),
@@ -1127,6 +1134,92 @@ class FilesTest(unittest.TestCase):
             r = inst.ask("GET", "/logs/plays/download")
             self.assertEqual(r.mimetype, "text/csv")
             self.assertTrue(r.data.startswith(b"\xef\xbb\xbftime,player_id"))
+
+
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class InstallerDownloadTest(unittest.TestCase):
+    """GET /app/windows goes on where a broken download stopped, by the rules of the site's /windows (lib.php,
+    send_download()): one part asked with Range, kept to the same installer and end by If-Range or If-Match on its ETag,
+    which covers the server's details on the installer's end as well as the installer."""
+
+    # The installer: big enough for its last 200 bytes to reach from its own into the end after it.
+    INSTALLER = bytes(range(256)) * 20
+
+    def installer(self, inst):
+        """The installer beside the app, with windows.json giving its size and hash, as the builder leaves them."""
+        # Bytes, which inst.write (text) does not take.
+        with open(inst.path("apk/out/OpenDMTQ-Setup.exe"), "wb") as f:
+            f.write(self.INSTALLER)
+        inst.write("apk/out/windows.json", json.dumps({"file": "OpenDMTQ-Setup.exe", "size": len(self.INSTALLER),
+                                                       "sha256": hashlib.sha256(self.INSTALLER).hexdigest(), "version": "0.8.0",
+                                                       "copied_at": "2026-11-09T12:00:00"}))
+
+    def test_a_part_goes_on_while_the_installer_and_its_end_stay_the_same(self):
+        with Server() as inst:
+            self.installer(inst)
+            whole = inst.ask("GET", "/app/windows")
+            size, tail = len(whole.data), whole.data[len(self.INSTALLER):]
+            # What a download manager reads before it trusts a part: parts in bytes, a strong tag of the installer and of
+            # its end, the file's time; the whole's length, with no body.
+            head = inst.ask("HEAD", "/app/windows")
+            tag = head.headers["ETag"]
+            self.assertEqual((head.status_code, head.data, head.headers["Content-Length"], head.headers["Accept-Ranges"]),
+                             (200, b"", str(size), "bytes"))
+            self.assertEqual(tag, f'"{hashlib.sha256(self.INSTALLER).hexdigest()}-{hashlib.sha256(tail).hexdigest()[:16]}"')
+            self.assertTrue(head.headers["Last-Modified"].endswith(" GMT"))
+            self.assertEqual((whole.status_code, whole.headers["ETag"]), (200, tag))
+            # The last 200 bytes, from the installer's own into the server's details after them.
+            self.assertLess(size - 200, len(self.INSTALLER))
+            part = inst.ask("GET", "/app/windows", headers={"Range": f"bytes={size - 200}-", "If-Range": tag})
+            self.assertEqual((part.status_code, part.headers["Content-Range"], part.data),
+                             (206, f"bytes {size - 200}-{size - 1}/{size}", whole.data[-200:]))
+            # A part of another file: the whole again.
+            other = inst.ask("GET", "/app/windows", headers={"Range": "bytes=0-9", "If-Range": '"another"'})
+            self.assertEqual((other.status_code, other.data), (200, whole.data))
+            # As Android's downloads ask: 412 for another file, the part for this one.
+            moved = inst.ask("GET", "/app/windows", headers={"Range": "bytes=0-9", "If-Match": '"another"'})
+            self.assertEqual((moved.status_code, moved.get_json()["error"]["code"]), (412, "precondition_failed"))
+            same = inst.ask("GET", "/app/windows", headers={"Range": "bytes=0-9", "If-Match": tag})
+            self.assertEqual((same.status_code, same.data), (206, whole.data[:10]))
+            # Nothing past the end: 416, with the length the next try can go by.
+            past = inst.ask("GET", "/app/windows", headers={"Range": f"bytes={size}-"})
+            self.assertEqual((past.status_code, past.headers["Content-Range"], past.get_json()["error"]["code"]),
+                             (416, f"bytes */{size}", "range_not_satisfiable"))
+
+    def test_the_tag_covers_the_servers_details_on_the_end(self):
+        # The same installer for another address is other bytes: a part kept from before is not added to, the whole comes.
+        with Server() as inst:
+            self.installer(inst)
+            tag = inst.ask("HEAD", "/app/windows").headers["ETag"]
+            with mock.patch.object(admin.core, "PUBLIC_HOST", "10.0.0.99"):
+                moved = inst.ask("GET", "/app/windows", headers={"Range": "bytes=0-9", "If-Range": tag})
+            self.assertEqual(moved.status_code, 200)
+            self.assertIn(b'"url":"http://10.0.0.99', moved.data)
+            # The installer's hash is the same; the end's is not.
+            self.assertEqual(moved.headers["ETag"].split("-")[0], tag.split("-")[0])
+            self.assertNotEqual(moved.headers["ETag"], tag)
+
+    def test_what_is_not_one_part_of_a_get_gets_the_whole(self):
+        # Several parts (multipart answers, which no download manager needs), a last before the first, a HEAD, another
+        # unit, no position at all: the whole, as the site answers them.
+        with Server() as inst:
+            self.installer(inst)
+            size = inst.ask("HEAD", "/app/windows").headers["Content-Length"]
+            for method, asked in (("GET", "bytes=0-0,5-9"), ("GET", "bytes=5-2"), ("HEAD", "bytes=0-9"), ("GET", "items=0-9"),
+                                  ("GET", "bytes=-")):
+                with self.subTest(method=method, asked=asked):
+                    r = inst.ask(method, "/app/windows", headers={"Range": asked})
+                    self.assertEqual((r.status_code, r.headers["Content-Length"]), (200, size))
+                    self.assertNotIn("Content-Range", r.headers)
+
+    def test_the_tag_is_made_as_the_site_makes_it(self):
+        # What lib.php's download_tag() gives for the same manifest, file and end (PHP 8.3).
+        stat = types.SimpleNamespace(st_size=10, st_mtime=1700000000)
+        self.assertEqual(admin.apps.download_tag({"sha256": "AB" * 32, "size": 10}, stat, b"xyz"), '"' + "ab" * 32 + '-3608bca1e44ea6c4"')
+        # A manifest of another size, with no whole hash or with none: the file's size and time in hex.
+        self.assertEqual(admin.apps.download_tag({"sha256": "ab" * 32, "size": 11}, stat, b"xyz"), '"a-6553f100-3608bca1e44ea6c4"')
+        self.assertEqual(admin.apps.download_tag({"sha256": "0", "size": 10}, stat, b""), '"a-6553f100"')
+        self.assertEqual(admin.apps.download_tag({"size": 10}, stat, b"xyz"), '"a-6553f100-3608bca1e44ea6c4"')
 
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")

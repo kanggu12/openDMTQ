@@ -104,7 +104,9 @@ picker opens instead.
 | `404` | Nothing there | `not_found`, and the thing's own (`player_not_found`...) |
 | `405` | Another method of the address | `method_not_allowed` (the `Allow` header lists those it takes) |
 | `409` | It cannot be done as things are now | `stale`, `already_so`, `build_running`, `busy`, `own_account`, `would_delete`... |
+| `412` | A download's `If-Match` names another file than the one there now | `precondition_failed` |
 | `413` | An upload over its limit | `too_large` |
+| `416` | The part of a download that `Range` asks for begins past its end | `range_not_satisfiable` |
 | `422` | A file that fails its checks | `package_refused`, `not_backup` |
 | `429` | A wrong token, after too many wrong tokens or passwords from here | `throttled` |
 | `500` | It could not be done here (the message says why) | `backup_failed`, `upload_failed`, `stop_failed`, `song_action_failed`, `internal_error` |
@@ -142,9 +144,15 @@ Uploads go as `multipart/form-data`, checked as on the pages:
 | `POST /songs` | `package` | A song package, `.zip`, 300 MB at most ([songs.md](songs.md)) |
 | `POST /backups/upload` | `file` | A backup archive, `.tar.gz`, 1 GB at most |
 
-Downloads are the file itself, with its own type: an app build (`.apk`), a backup (`.tar.gz`, with a write token), a
-recording (MPEG-TS), its playlist and segments, the request log, the players and the plays as spreadsheets (CSV, UTF-8),
-the app's icon and QR code.
+Downloads are the file itself, with its own type: an app build (`.apk`), the installer for Windows (`.exe`), a backup
+(`.tar.gz`, with a write token), a recording (MPEG-TS), its playlist and segments, the request log, the players and the
+plays as spreadsheets (CSV, UTF-8), the app's icon and QR code.
+
+The installer for Windows (`GET /app/windows`) goes on where a broken download stopped, as the site's `/windows` does.
+It says `Accept-Ranges: bytes` and a strong `ETag`, which covers the server's details on the installer's end as well as
+the installer: the same installer for another address or name is another file. One part asked with `Range` answers `206`
+with its `Content-Range`, kept to the same file by `If-Range` (the whole otherwise, `200`) or by `If-Match` (`412`
+otherwise); a part that begins past the end is `416`, with `Content-Range: bytes */length`.
 
 ## Examples
 
@@ -334,13 +342,15 @@ Answer: `200` with [AppOnOffer](#apponoffer).
 
 #### `GET /app/windows`
 
-The installer for Windows as the site hands it to computers, set up for this server (its address on the installer's end).
+The installer for Windows as the site hands it to computers, set up for this server (its address on the installer's end). Whole, or the part a broken download asks for to go on, as the site hands it out: it says `Accept-Ranges: bytes` and a strong `ETag`, which covers the server's details on the installer's end as well as the installer. `Range: bytes=first-last` (or `first-`, or `-count` for the last bytes) asks for one part, answered 206 with its `Content-Range`; with `If-Range`, only while the ETag is the same (else the whole, 200). `If-Match` with another ETag is 412. Several parts in one Range get the whole.
 
-Answer: `200` with the file itself (`application/vnd.microsoft.portable-executable`).
+Answer: `200` with the file itself (`application/vnd.microsoft.portable-executable`), or `206` with the part a Range header asks for.
 
 Refusals:
 
 - `404 not_found`: This server keeps no installer for Windows.
+- `412 precondition_failed`: `If-Match` names another file than this server hands out now (another installer, or other details on its end): download it again from the start.
+- `416 range_not_satisfiable`: The part asked for begins past the end; `Content-Range: bytes */length` says the length.
 
 #### `GET /app/icon`
 

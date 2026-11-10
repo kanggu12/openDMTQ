@@ -3,6 +3,7 @@ last build said, and the QR code. Each form's work is a function (start_build, p
 (api.py)."""
 
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -11,6 +12,7 @@ import time
 
 from flask import Response, abort, flash, redirect, render_template, request, send_file, url_for
 from werkzeug.exceptions import NotFound
+from werkzeug.http import http_date
 
 from .. import windows_client
 from . import core, jobs
@@ -313,7 +315,8 @@ def installer_scheme():
 
 def windows_download():
     """The installer for Windows as the site hands it to computers, set up for this server: the server's address on its end
-    (windows_client.preset), under a file name that says which server it is for (404 when there is none)."""
+    (windows_client.preset), under a file name that says which server it is for (404 when there is none). Whole, or from
+    where a broken download stopped (send_download), as the site's windows.php hands it out."""
     made = windows_offer()
     if not made:
         abort(404)
@@ -328,18 +331,111 @@ def windows_download():
         f = open(path, "rb")
     except OSError:
         abort(404)
-    size = os.fstat(f.fileno()).st_size
+    name = windows_client.download_name(core.PUBLIC_HOST)
+    # Its tag covers the installer and the end on it: going on is right only while both are what the part came from.
+    return send_download(f, "application/vnd.microsoft.portable-executable", name,
+                         download_tag(made, os.fstat(f.fileno()), tail), tail)
+
+
+def download_tag(manifest, stat, tail=b""):
+    """A download's ETag, a strong one, as a broken download needs to go on (send_download), made as the site's
+    download_tag() in lib.php makes it: the SHA-256 the manifest gives (windows.json) when that is a whole hash of a file
+    the size of the one opened (stat, its fstat()); else the file's size and time in hex, as Apache tags a file. With the
+    end that goes on the installer (tail), that end's hash too: the same installer from another address, or after a new
+    name, is other bytes."""
+    sha = str(manifest.get("sha256") or "").lower()
+    # The builder's hash stays the same through a copy or a restore, which the file's time does not; a manifest of
+    # another size describes another file (swapped meanwhile), whose hash this one cannot borrow.
+    tag = sha if re.fullmatch(r"[0-9a-f]{64}", sha) and manifest.get("size") == stat.st_size \
+        else f"{stat.st_size:x}-{int(stat.st_mtime):x}"
+    # The end's own hash, short: it only has to tell this server's ends apart.
+    return '"' + tag + ("-" + hashlib.sha256(tail).hexdigest()[:16] if tail else "") + '"'
+
+
+def send_download(f, mimetype, name, tag, tail=b""):
+    """The open file f with tail after it as one download (mimetype, the file name name), whole or the one part a broken
+    download asks for to go on where it stopped, by the rules of the site's send_download() in lib.php: Accept-Ranges,
+    the ETag tag (download_tag()) and the file's time say what it is; Range asks for a part (206), If-Range for it only
+    while the file is still that one (else the whole), If-Match, which Android's own downloads send instead, for nothing
+    but that one (else 412); a part past the end is 416. One part per request: several (multipart answers, which no
+    download manager needs) get the whole, as HTTP allows. A HEAD gets the headers alone. 412 and 416 answer as the API
+    refuses ({"error": ...}), a download manager going by their status alone."""
+    stat = os.fstat(f.fileno())
+    # The file's bytes and the end after them: one length, one range of positions.
+    file_size = stat.st_size
+    size = file_size + len(tail)
+    # The time in the form HTTP dates take (and If-Range by date compares to).
+    modified = http_date(int(stat.st_mtime))
+    # The file name that says which server it is for; never kept on the way (a download manager keeps its own part,
+    # checked by the tag); what it is, and that a part of it may be asked for.
+    headers = {"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store",
+               "Accept-Ranges": "bytes", "ETag": tag, "Last-Modified": modified}
+    # If-Match: going on is only right for the file it began with; another one under this address now is 412, and the
+    # download starts again from nothing. "*" is any file, which there is.
+    match = request.headers.get("If-Match", "").strip()
+    if match and match != "*" and tag not in [m.strip() for m in match.split(",")]:
+        f.close()
+        return core.json_error(412, "precondition_failed", "The file is no longer the one asked for (If-Match): download "
+                               "it again from the start.", headers)
+    # The positions to send, first and last: the whole by default.
+    first, last, status = 0, size - 1, 200
+    asked = request.headers.get("Range", "").strip()
+    # If-Range: the part only while the file is the one the part belongs to, by its tag (exactly: strong), or by its time
+    # where no end follows the file (an end can change at the same time: a new name for the server).
+    if_range = request.headers.get("If-Range", "").strip()
+    same = not if_range or if_range == tag or (not tail and if_range == modified)
+    # Ranges are for GET alone (a HEAD answers for the whole), of one part: bytes=first-last, first- or -how many last.
+    # Digits 0 to 9 only, as the site's pattern takes them (\d here would take other scripts' digits too).
+    part = re.fullmatch(r"bytes=([0-9]*)-([0-9]*)", asked)
+    if asked and same and request.method == "GET" and part and (part.group(1) or part.group(2)):
+        ranged = True
+        if not part.group(1):
+            # The last bytes: as many as asked, or the whole when that is more. None at all is no part.
+            count = int(part.group(2))
+            first = max(0, size - count) if count > 0 else size
+        else:
+            # From a position on, to one or the end; a last before the first is no range at all (the whole goes).
+            first = int(part.group(1))
+            last = size - 1 if not part.group(2) else min(int(part.group(2)), size - 1)
+            if part.group(2) and int(part.group(2)) < first:
+                first, last, ranged = 0, size - 1, False
+        # Nothing of the file in the part asked for: 416, with the length the next try can go by.
+        if ranged and first >= size:
+            f.close()
+            return core.json_error(416, "range_not_satisfiable", f"The file has {size} bytes: the part asked for (Range) "
+                                   "begins past its end.", dict(headers, **{"Content-Range": f"bytes */{size}"}))
+        # The part itself: 206, and where it lies in the whole.
+        if ranged:
+            status = 206
+            headers["Content-Range"] = f"bytes {first}-{last}/{size}"
+    headers["Content-Length"] = str(last - first + 1)
+    # A HEAD (checks, download managers probing) needs the headers only: the file is not read. No body at all, not an
+    # empty one, which would set the length to 0 over the one above.
+    if request.method == "HEAD":
+        f.close()
+        return Response(None, status=status, mimetype=mimetype, headers=headers)
 
     def body():
-        # The installer a megabyte at a time, then its end.
         with f:
-            for block in iter(lambda: f.read(1 << 20), b""):
-                yield block
-        yield tail
+            # The file's share of the part, from the open file (the same one whose length went out above), a megabyte at
+            # a time.
+            if first < file_size:
+                f.seek(first)
+                left = min(last, file_size - 1) - first + 1
+                while left > 0:
+                    block = f.read(min(1 << 20, left))
+                    # A file cut shorter than its length said (never by the builder, which writes beside it and
+                    # renames): the answer ends short of the length it gave, which the browser takes for a broken one.
+                    if not block:
+                        return
+                    left -= len(block)
+                    yield block
+        # And the end's share, where the part reaches past the file.
+        if last >= file_size:
+            start = max(first, file_size) - file_size
+            yield tail[start:last - file_size + 1]
 
-    name = windows_client.download_name(core.PUBLIC_HOST)
-    return Response(body(), mimetype="application/vnd.microsoft.portable-executable",
-                    headers={"Content-Disposition": f'attachment; filename="{name}"', "Content-Length": str(size + len(tail))})
+    return Response(body(), status=status, mimetype=mimetype, headers=headers)
 
 
 @app.route(BASE + "/app/windows")

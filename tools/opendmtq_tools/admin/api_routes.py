@@ -43,14 +43,17 @@ class Route:
     otherwise for this route), the scope a token needs (None: no token), its handler's name in api.py (also its
     operationId), its section, what it does (summary, one sentence; doc, more when there is more to say), its query
     (Fields), its JSON body (Fields), its upload (a multipart field's name and what it is), what it answers (a shape's
-    name, with status), or the file it gives (download, its content types: a playlist's route gives its segments too),
-    and the errors it has besides those every route has: [(status, code, when)]."""
+    name, with status), or the file it gives (download, its content types: a playlist's route gives its segments too; ranges,
+    True where a Range header gets the part it asks for, 206), and the errors it has besides those every route has:
+    [(status, code, when)]."""
 
     def __init__(self, method, path, scope, name, tag, summary, doc="", query=(), body=(), upload=None, answer=None,
-                 status=200, download=None, errors=(), parts=None):
+                 status=200, download=None, errors=(), parts=None, ranges=False):
         self.method, self.path, self.scope, self.name, self.tag = method, path, scope, name, tag
         self.summary, self.doc, self.query, self.body, self.upload = summary, doc, list(query), list(body), upload
         self.answer, self.status, self.errors, self.parts = answer, status, list(errors), dict(parts or {})
+        # A file whose part a broken download may ask for: 206 besides the whole.
+        self.ranges = ranges
         # One content type or several: always a list here.
         self.download = [download] if isinstance(download, str) else list(download) if download else None
 
@@ -667,8 +670,19 @@ ROUTES = [
     Route("GET", "/app", "read", "app_get", "App", "The app players get: its build, whether it is right for this server, a build running now.",
           answer="AppOnOffer"),
     Route("GET", "/app/windows", "read", "app_windows", "App", "The installer for Windows as the site hands it to computers, set up "
-          "for this server (its address on the installer's end).", download="application/vnd.microsoft.portable-executable",
-          errors=[(404, "not_found", "This server keeps no installer for Windows.")]),
+          "for this server (its address on the installer's end).",
+          # A broken download goes on where it stopped, by the same rules as the site's /windows (lib.php, send_download()).
+          "Whole, or the part a broken download asks for to go on, as the site hands it out: it says `Accept-Ranges: bytes` and "
+          "a strong `ETag`, which covers the server's details on the installer's end as well as the installer. "
+          "`Range: bytes=first-last` (or `first-`, or `-count` for the last bytes) asks for one part, answered 206 with its "
+          "`Content-Range`; with `If-Range`, only while the ETag is the same (else the whole, 200). `If-Match` with another "
+          "ETag is 412. Several parts in one Range get the whole.",
+          download="application/vnd.microsoft.portable-executable", ranges=True,
+          errors=[(404, "not_found", "This server keeps no installer for Windows."),
+                  (412, "precondition_failed", "`If-Match` names another file than this server hands out now (another installer, "
+                                               "or other details on its end): download it again from the start."),
+                  (416, "range_not_satisfiable", "The part asked for begins past the end; `Content-Range: bytes */length` says the "
+                                                 "length.")]),
     Route("GET", "/app/icon", "read", "app_icon", "App", "The launcher icon of the app on offer, as the builder kept it.",
           download="image/png", errors=[(404, "not_found", "No icon is kept.")]),
     Route("GET", "/builds", "read", "builds_list", "App", "Every build of the app, newest first.", answer="BuildList"),
@@ -1094,6 +1108,10 @@ def openapi(version="1"):
             # Each type the route gives (a playlist's route gives its segments too).
             responses[str(route.status)] = {"description": route.summary,
                                             "content": {t: {"schema": {"type": "string", "format": "binary"}} for t in route.download}}
+            # The part a Range asks for, in the same types, where the route gives one.
+            if route.ranges:
+                responses["206"] = {"description": "The part a Range header asks for, which Content-Range places in the whole.",
+                                    "content": {t: {"schema": {"type": "string", "format": "binary"}} for t in route.download}}
         else:
             responses[str(route.status)] = {"description": route.summary, "content": {"application/json": {"schema": schema(route.answer)}}}
         for status, codes in grouped(errors_of(route)).items():
@@ -1204,8 +1222,10 @@ def reference():
             if r.upload:
                 out += [f"Upload (multipart/form-data): `{r.upload[0]}`, {prose(r.upload[1][0].lower() + r.upload[1][1:])}", ""]
             if r.download:
-                # Every type the file may come in: a playlist's route gives its segments too.
-                out.append(f"Answer: `{r.status}` with the file itself ({' or '.join(f'`{t}`' for t in r.download)}).")
+                # Every type the file may come in: a playlist's route gives its segments too. And the part a Range asks for,
+                # where the route gives one.
+                out.append(f"Answer: `{r.status}` with the file itself ({' or '.join(f'`{t}`' for t in r.download)})"
+                           + (", or `206` with the part a Range header asks for." if r.ranges else "."))
             elif r.answer == "object":
                 out.append(f"Answer: `{r.status}` with the OpenAPI document.")
             else:
