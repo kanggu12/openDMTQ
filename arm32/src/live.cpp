@@ -113,6 +113,11 @@ struct CodecBufferInfo {
 constexpr std::uint32_t kFlagKeyFrame = 1, kFlagCodecConfig = 2;
 constexpr std::uint32_t kConfigureEncode = 1;
 constexpr int kMediaOk = 0;
+// AMEDIA_ERROR_BASE: a dequeue's answer at or below this is the codec's error (NdkMediaError.h), where -1 is "nothing
+// yet" and -2 and -3 news of the format and buffers.
+constexpr ssize_t kMediaErrorBase = -10000;
+// A session that ran this long before its encoder broke was a good one: the failures in a row start over with it.
+constexpr Nanos kGoodRun = 60 * kSecond;
 // MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface.
 constexpr int kColorFormatSurface = 0x7F000789;
 
@@ -286,7 +291,7 @@ std::atomic<Nanos> g_last_swap{0};     // when the game last swapped
 std::atomic<bool> g_want{false};       // pictures and sound are to be sent right now
 std::atomic<bool> g_on{false};         // the server has live view on for this player
 std::atomic<bool> g_gave_up{false};    // this phone cannot do it: the server is still asked, for notices
-std::atomic<int> g_failures{0};        // encoder start-ups that failed; three end the attempts
+std::atomic<int> g_failures{0};        // encoders that failed in a row, to start or soon after; three end the attempts
 
 // The requests to the server, the upload thread and the network's quality step (live_net.cpp), with the phone's names:
 // its log's prefix, its User-Agent, and the names and start of its upload thread and of the thread that looks the
@@ -515,6 +520,11 @@ private:
         for (;;) {
             CodecBufferInfo info{};
             const ssize_t index = m.dequeue_output(video_, &info, 0);
+            // Broken (a codec reclaimed by the system, a hardware fault): this session ends, and another is tried later.
+            if (index <= kMediaErrorBase) {
+                fail("the H.264 encoder broke");
+                return any;
+            }
             // Nothing yet (-1), or news about the format and buffers (-2, -3).
             if (index == -2 || index == -3) continue;
             if (index < 0) return any;
@@ -653,12 +663,19 @@ private:
         if (audio_next_ == 0 || now - audio_next_ > kSecond / 2) audio_next_ = now;
         while (now >= audio_next_) {
             const ssize_t index = m.dequeue_input(audio_, 0);
+            // Broken: as the picture's encoder (drain_video).
+            if (index <= kMediaErrorBase) {
+                fail("the AAC encoder broke");
+                return any;
+            }
+            // No free buffer yet (-1).
             if (index < 0) return any;
             std::size_t capacity = 0;
             std::uint8_t* in = m.input_buffer(audio_, static_cast<std::size_t>(index), &capacity);
             const std::size_t bytes = kAudioChunk * 4;
             if (!in || capacity < bytes) {
-                m.queue_input(audio_, static_cast<std::size_t>(index), 0, 0, 0, 0);
+                // The buffer back, empty; not even that taken: broken.
+                if (m.queue_input(audio_, static_cast<std::size_t>(index), 0, 0, 0, 0) != kMediaOk) fail("the AAC encoder broke");
                 return any;
             }
             std::int32_t mix[kAudioChunk * 2] = {};
@@ -666,8 +683,12 @@ private:
                 if (source.ring) mix_source(source, mix);
             auto* out = reinterpret_cast<std::int16_t*>(in);
             for (int i = 0; i < kAudioChunk * 2; ++i) out[i] = static_cast<std::int16_t>(std::clamp(mix[i], -32768, 32767));
-            // The time these samples were made, by the same clock the pictures have.
-            m.queue_input(audio_, static_cast<std::size_t>(index), 0, bytes, static_cast<std::uint64_t>((audio_next_ - kAudioDelay) / 1000), 0);
+            // The time these samples were made, by the same clock the pictures have. Not taken: broken.
+            if (m.queue_input(audio_, static_cast<std::size_t>(index), 0, bytes, static_cast<std::uint64_t>((audio_next_ - kAudioDelay) / 1000), 0) !=
+                kMediaOk) {
+                fail("the AAC encoder broke");
+                return any;
+            }
             audio_next_ += chunk;
             any = true;
         }
@@ -681,6 +702,11 @@ private:
         for (;;) {
             CodecBufferInfo info{};
             const ssize_t index = m.dequeue_output(audio_, &info, 0);
+            // Broken: as the picture's encoder (drain_video).
+            if (index <= kMediaErrorBase) {
+                fail("the AAC encoder broke");
+                return any;
+            }
             if (index == -2 || index == -3) continue;
             if (index < 0) return any;
             any = true;
@@ -796,21 +822,29 @@ void encoder_main() {
         }
         {
             Encoder encoder(session);
-            if (encoder.open()) {
-                g_failures.store(0);
+            // An encoder that does not start, or breaks while it runs (the session's failed): one more in a row.
+            bool failed = !encoder.open();
+            if (!failed) {
                 log("arm32: live: on, %dx%d", session->width, session->height);
-                while (!session->stop.load(std::memory_order_acquire) && g_want.load(std::memory_order_relaxed)) {
+                const Nanos started = now_ns();
+                while (!session->stop.load(std::memory_order_acquire) && g_want.load(std::memory_order_relaxed) &&
+                       !session->failed.load(std::memory_order_relaxed)) {
                     // Pictures come every 33 ms and AAC frames about every 21: a few milliseconds' rest
                     // when there is nothing to do is plenty.
                     if (!encoder.pump()) sleep_ns(4000000);
                     log_stats_if_due(&next_stats);
                 }
+                // What the encoders gave until then is a segment as usual.
                 encoder.finish();
                 // In case the render thread has not ended this session itself: it must not go on
-                // filling textures nobody reads.
+                // filling textures nobody reads. A broken one it ends too, and tries again ten seconds later.
                 session->stop.store(true, std::memory_order_release);
-                log("arm32: live: stopped");
-            } else if (g_failures.fetch_add(1) + 1 >= 3) {
+                failed = session->failed.load(std::memory_order_relaxed);
+                log("arm32: live: stopped%s", failed ? ", the encoder broke" : "");
+                // A good run (it ended as asked, or ran a minute before it broke): the failures in a row start over.
+                if (!failed || now_ns() - started >= kGoodRun) g_failures.store(0);
+            }
+            if (failed && g_failures.fetch_add(1) + 1 >= 3) {
                 log("arm32: live: this phone cannot encode the stream, giving up");
                 g_gave_up.store(true);
             }
