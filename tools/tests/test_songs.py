@@ -1,12 +1,15 @@
 """Tests for the client table round trip: decode, rewrite, re-encode without changing shipped rows; and for rebuild() on a
 made-up library: what it writes, one rebuild at a time, and the added songs' tiles made once."""
 
+import contextlib
 import csv
 import io
 import json
 import multiprocessing
 import os
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -309,6 +312,96 @@ class OneRebuildAtATimeTest(LibraryCase):
         # The overlay is whole, with nothing left of a build beside it.
         self.assertTrue(os.path.isfile(self.overlay("patch_new.csv.lz4")))
         self.assertEqual(sorted(n for n in os.listdir(self.custom) if n.startswith("web.")), [])
+
+
+class PutBackCommandTest(LibraryCase):
+    """The command line's restore runs `python3 -m opendmtq_tools.songs put-back /in/custom` in the tools container: the
+    backup's custom/ goes back through put_back, under the songs' lock as on the admin pages, and a folder that is no
+    backup's changes nothing."""
+
+    def backup(self):
+        """A backup's custom folder, unpacked: no added song, song 1 hidden, ids handed out up to 1003."""
+        folder = os.path.join(os.path.dirname(self.custom), "backup")
+        os.makedirs(os.path.join(folder, "songs"))
+        with open(os.path.join(folder, "hidden.json"), "w", encoding="utf-8") as f:
+            json.dump([1], f)
+        with open(os.path.join(folder, "ids.json"), "w", encoding="utf-8") as f:
+            json.dump({"song": 1003, "pattern": 20010}, f)
+        return folder
+
+    def run_main(self, *argv):
+        """main() with these words: its exit code, and what it wrote to its output and its errors."""
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = songs.main(list(argv))
+        return code, out.getvalue(), err.getvalue()
+
+    def assert_todays_songs(self):
+        """The made-up library's own: its added song and its hidden one, as before a refused call."""
+        self.assertTrue(os.path.isfile(os.path.join(self.custom, "songs", str(ADDED["song_id"]), "song.json")))
+        self.assertEqual(songs.hidden(), set(HIDDEN))
+
+    def test_put_back_copies_and_rebuilds_under_one_lock_and_says_so(self):
+        backup = self.backup()
+        with mock.patch.object(songs.filelock, "lock", side_effect=songs.filelock.lock) as lock:
+            code, out, _ = self.run_main("put-back", backup)
+        self.assertEqual(code, 0)
+        # One lock for the copy and the list, as the admin pages' restore takes.
+        self.assertEqual(lock.call_count, 1)
+        self.assertEqual(json.loads(out), {"put_back": backup, "rebuilt": True, "why_not": None})
+        # The backup's flags, no added song any more, and the song list made for them.
+        self.assertEqual(songs.hidden(), {1})
+        self.assertEqual(os.listdir(os.path.join(self.custom, "songs")), [])
+        with open(os.path.join(self.custom, "songList.json"), encoding="utf-8") as f:
+            self.assertEqual({s["song_id"]: s["hidden_yn"] for s in json.load(f)}, {1: "Y", 2: "N"})
+
+    def test_a_list_that_could_not_be_made_is_said_and_the_songs_are_back_all_the_same(self):
+        with mock.patch.object(songs, "rebuild", side_effect=OSError("no client data")):
+            code, out, _ = self.run_main("put-back", self.backup())
+        # Done: the songs are back; the list is made at the next start.
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["why_not"], "no client data")
+        self.assertEqual(songs.hidden(), {1})
+
+    def test_the_custom_folder_itself_is_refused_before_anything_changes(self):
+        # In the container /in is data/ itself when a restore names no folder: /in/custom is then this very folder, by
+        # another path (a link stands in for the second mount here).
+        alias = os.path.join(os.path.dirname(self.custom), "in")
+        os.symlink(self.custom, alias)
+        code, out, err = self.run_main("put-back", alias)
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("custom folder itself", err)
+        self.assert_todays_songs()
+
+    def test_no_folder_or_other_words_are_refused_before_anything_changes(self):
+        for argv in (["put-back", os.path.join(os.path.dirname(self.custom), "nothing")], ["put-back"], ["putback", self.backup()]):
+            with self.subTest(argv=argv):
+                code, out, _ = self.run_main(*argv)
+                self.assertEqual((code, out), (2, ""))
+                self.assert_todays_songs()
+
+    def test_without_words_it_makes_the_list_as_at_every_start(self):
+        code, out, _ = self.run_main()
+        self.assertEqual(code, 0)
+        # rebuild()'s own account, the added song in it.
+        self.assertEqual(json.loads(out)["added"], 1)
+
+    def test_run_as_a_program_it_ends_0_when_done_and_1_when_the_copy_failed(self):
+        # As ./opendmtq runs it (python3 -m), on the made-up library: the command line goes by the exit code alone.
+        tools = os.path.dirname(os.path.dirname(os.path.abspath(songs.__file__)))
+        env = dict(os.environ, OPENDMTQ_CONTENT=self.content, OPENDMTQ_CUSTOM=self.custom, PYTHONPATH=tools)
+        backup = self.backup()
+        done = subprocess.run([sys.executable, "-m", "opendmtq_tools.songs", "put-back", backup], env=env, cwd=tools,
+                              capture_output=True, text=True, timeout=120)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertTrue(json.loads(done.stdout)["rebuilt"])
+        self.assertEqual(songs.hidden(), {1})
+        # A file no copy can take (a pipe) in the backup's songs: the copy raises, the program ends with 1.
+        os.mkfifo(os.path.join(backup, "songs", "pipe"))
+        failed = subprocess.run([sys.executable, "-m", "opendmtq_tools.songs", "put-back", backup], env=env, cwd=tools,
+                                capture_output=True, text=True, timeout=120)
+        self.assertEqual(failed.returncode, 1, failed.stdout)
+        self.assertIn("pipe", failed.stderr)
 
 
 # ------------------------------------------------------------------------------ what a rebuild writes

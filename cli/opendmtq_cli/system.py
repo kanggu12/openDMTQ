@@ -306,7 +306,7 @@ def images_present():
 _tools_built = False
 
 
-def tool(module, *args, extra_env=None, as_invoker=False, service="tools"):
+def tool(module, *args, extra_env=None, as_invoker=False, service="tools", capture=False):
     """Run one tools-container module (opendmtq_tools.<module>).
 
     as_invoker runs it with the caller's own uid, even root: the import must read the user's
@@ -317,6 +317,9 @@ def tool(module, *args, extra_env=None, as_invoker=False, service="tools"):
     import, which unpacks the owner's archives) sees the folder it imports from, data/content and
     data/apk/base, while the keys, the backups, the database and what phones download are hidden
     from it.
+
+    capture keeps its output (stdout and stderr in the result) instead of showing it, for a caller
+    that reads what the module says it did.
     """
     global _tools_built
     # Build (or confirm up to date) once per command, quietly, instead of on every run.
@@ -331,7 +334,7 @@ def tool(module, *args, extra_env=None, as_invoker=False, service="tools"):
         # The import writes data/content and data/apk/base; let the invoking user own them meanwhile.
         own_data_dirs(os.getuid(), os.getgid(), subs=("content", os.path.join("apk", "base")))
     r = compose("--profile", "tools", "run", "--rm", service,
-                f"opendmtq_tools.{module}", *args, extra_env=env, check=False)
+                f"opendmtq_tools.{module}", *args, extra_env=env, check=False, capture=capture)
     if as_invoker:
         # Whatever it wrote goes back to the container user.
         own_data_dirs()

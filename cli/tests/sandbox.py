@@ -57,7 +57,8 @@ class Sandbox:
         # (keep_tokens.keep_accounts), None too when the backup's stayed.
         self.tokens_kept = None
         self.accounts_kept = None
-        # Tool module -> function(args, extra_env) run in its place, returning its exit code.
+        # Tool module -> function(args, extra_env) run in its place, returning its exit code, or its whole result (done())
+        # where what it prints matters.
         self.tools = {}
         # Program name prefix -> result, for the programs a command may run.
         self.programs = {("docker", "info"): done(0, "29.0.0\n"), ("docker", "exec"): done(0),
@@ -162,12 +163,14 @@ class Sandbox:
             else:
                 raise AssertionError(f"the restore's line has a step this sandbox does not know: {step.strip()}")
 
-    def _tool(self, module, *args, extra_env=None, as_invoker=False, service="tools"):
+    def _tool(self, module, *args, extra_env=None, as_invoker=False, service="tools", capture=False):
         self.tool_calls.append((module, args, dict(extra_env or {})))
         # The compose service each module ran in (the import has one of its own).
         self.tool_services.append((module, service))
         fn = self.tools.get(module)
-        return done((fn(args, extra_env or {}) if fn else 0) or 0)
+        result = fn(args, extra_env or {}) if fn else 0
+        # A stand-in's whole result as it is; an exit code, with nothing printed.
+        return result if isinstance(result, subprocess.CompletedProcess) else done(result or 0)
 
     def _run(self, cmd, *args, **kwargs):
         for prefix, result in self.programs.items():

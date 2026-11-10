@@ -38,6 +38,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import threading
 import zipfile
 import zlib
@@ -122,9 +123,9 @@ _depth = threading.local()
 
 def _serialized(fn):
     """One change at a time, across threads (the lock) and processes (a lock file in CUSTOM: a start's or an import's
-    `python -m opendmtq_tools.songs` may rebuild while the admin service adds or hides a song). Nested calls
-    (add_package -> rebuild) take the file lock only once: a second flock on a new descriptor would wait for the first
-    forever."""
+    `python -m opendmtq_tools.songs` may rebuild, and a restore's put the songs back, while the admin service adds or
+    hides a song). Nested calls (add_package -> rebuild) take the file lock only once: a second flock on a new
+    descriptor would wait for the first forever."""
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
         with _lock:
@@ -1072,11 +1073,44 @@ def maintenance():
     return True, html.unescape(m.group(1).replace("<br>", "\n")) if m else ""
 
 
-if __name__ == "__main__":
-    # python3 -m opendmtq_tools.songs : regenerate songList.json and the overlay (used at start-up).
-    print(json.dumps(rebuild()), flush=True)
-
-
 def _html(text):
     import html
     return html.escape(text or "The server is under maintenance. Please try again later.")
+
+
+def main(argv=None):
+    """The command line, as ./opendmtq runs it in the tools container (python3 -m opendmtq_tools.songs):
+
+        (nothing)          songList.json and the overlay made anew: at every start and after an import
+        put-back FOLDER    a restore: a backup's added songs, hidden flags and ids (FOLDER: its custom/, unpacked) in
+                           place of these, and the song list made for them, under one lock (put_back)
+
+    Says what it did as JSON. 0 when done, also when the song list could not be made anew (it says why: the songs are
+    back all the same); 1 when the copy failed; 2 for a FOLDER that is no backup's, before anything changed."""
+    argv = sys.argv[1:] if argv is None else argv
+    # No words: the start's and the import's rebuild, as it always was.
+    if not argv:
+        print(json.dumps(rebuild()), flush=True)
+        return 0
+    if len(argv) == 2 and argv[0] == "put-back":
+        folder = argv[1]
+        # put_back takes today's songs away first: with nothing to put in their place, none would be left.
+        if not os.path.isdir(folder):
+            print(f"songs: {folder} is not a folder", file=sys.stderr)
+            return 2
+        # The custom folder itself, through another mount, is no backup's either: in the tools container /in is data/
+        # itself when the restore names no folder (compose.yaml), and put_back would remove the very songs it copies.
+        if os.path.isdir(CUSTOM) and os.path.samefile(folder, CUSTOM):
+            print(f"songs: {folder} is the custom folder itself, not a backup's", file=sys.stderr)
+            return 2
+        # A copy that fails raises (exit 1, with its traceback); a list that could not be made comes back as why.
+        why = put_back(folder)
+        print(json.dumps({"put_back": folder, "rebuilt": why is None, "why_not": why}), flush=True)
+        return 0
+    # Anything else is a mistake of whoever called it: nothing is changed.
+    print("usage: python3 -m opendmtq_tools.songs [put-back FOLDER]", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

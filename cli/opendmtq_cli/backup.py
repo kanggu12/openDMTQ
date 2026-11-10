@@ -5,10 +5,12 @@ A backup is one .tar.gz in data/backups. The newest KEEP are kept.
 
 import datetime
 import hashlib
+import json
 import os
 import shutil
 import sqlite3
 import subprocess
+import sys
 import tarfile
 import time
 import tempfile
@@ -230,25 +232,44 @@ def restore(name, with_key=False):
                        "&& rm -f /data/state/dmtq.db3-wal /data/state/dmtq.db3-shm /data/state/dmtq.db3-journal "
                        f"&& mv {RESTORING} /data/state/dmtq.db3",
                        extra_env={"IMPORT_FROM": tmp}, capture=True)
-        # Added songs travel with the records that refer to them.
+        # Added songs travel with the records that refer to them. They go back as the admin pages' restore puts them back:
+        # in the tools container, through songs.put_back, which copies them and makes the song list for them in one go
+        # under the songs' lock. The admin pages stay up through a restore, and an add, a hide or a removal there waits
+        # until both are done, instead of reading songs half copied or being undone by the copy. Without client data (a
+        # new machine) the list has the added songs alone until `up`, after the import, makes it again.
         custom = os.path.join(tmp, "custom")
         if os.path.isdir(custom):
-            for name in ("songs", "hidden.json", "ids.json"):
-                src, dst = os.path.join(custom, name), os.path.join(DATA, "custom", name)
-                if os.path.isdir(dst):
-                    shutil.rmtree(dst)
-                elif os.path.exists(dst):
-                    os.remove(dst)
-                if os.path.isdir(src):
-                    shutil.copytree(src, dst)
-                elif os.path.exists(src):
-                    shutil.copyfile(src, dst)
-            system.own_data_dirs()
-            # Regenerate the overlay and song list for the restored songs. Without client data (a new machine) there is
-            # nothing to merge them with yet; `up` does it after the import.
-            import glob
-            if glob.glob(os.path.join(DATA, "content", "web", "patch", "phone_new", "*", "android", "patch_new.csv.lz4")):
-                system.tool("songs")
+            # The container runs unprivileged, as the user data/ is handed to: everything unpacked must be readable to it,
+            # whatever modes the archive gave (one from another server may hold files only their owner could read).
+            for folder, _, files in os.walk(custom):
+                os.chmod(folder, 0o755)
+                for file_name in files:
+                    os.chmod(os.path.join(folder, file_name), 0o644)
+            # /in is this unpacked archive, read-only (IMPORT_FROM); the container's /custom is data/custom. What it
+            # copies is the container user's from the start, as the admin pages' files are. Its output is kept: what it
+            # says it did decides what is said here.
+            job = system.tool("songs", "put-back", "/in/custom", extra_env={"IMPORT_FROM": tmp}, capture=True)
+            said = put_back_said(job.stdout)
+            # The database is the backup's by now; a second restore puts the songs back with it (and saves this state
+            # first, as every restore does). Named as `restore` finds it: by its name in data/backups, else its path.
+            again = os.path.basename(path) if os.path.dirname(os.path.abspath(path)) == os.path.abspath(BACKUPS) else path
+            if job.returncode != 0 or said is None:
+                # What the container said, its traceback included, before why this stops.
+                sys.stderr.write((job.stdout or "") + (job.stderr or ""))
+            if job.returncode != 0:
+                system.die(f"the added songs in {os.path.basename(path)} could not be put back (see above); its database "
+                           f"is restored. Restore it again: ./opendmtq restore {again}")
+            if said is None:
+                # A tools image older than this command line knows no put-back: it ignores the words and makes the song
+                # list of today's songs, and would let this restore pass with them in place of the backup's.
+                system.die(f"the tools image is older than this command line and did not put the added songs in "
+                           f"{os.path.basename(path)} back; its database is restored. Bring the image up to date "
+                           "(./opendmtq up builds it; with images named in .env, load this version's), then restore "
+                           f"again: ./opendmtq restore {again}")
+            if not said.get("rebuilt"):
+                # The songs are back all the same: the next start makes their list.
+                system.warn(f"the added songs are back, but their song list was not made anew ({said.get('why_not')}); "
+                            "./opendmtq up makes it")
         # Without --with-key a key is restored only where none exists, because replacing a live key
         # means apps built since cannot be updated. (The pre-restore backup keeps the current one.)
         ks = os.path.join(tmp, "keystore")
@@ -264,6 +285,20 @@ def restore(name, with_key=False):
                         "move from another PC, its players' phones can only update with that key: restore "
                         f"again with ./opendmtq restore {os.path.basename(path)} --with-key")
     return False
+
+
+def put_back_said(output):
+    """What the tools container's `songs put-back` says it did, from its output: its last line that is JSON, when that has
+    put_back in it. None when there is no such line: a tools image from before put-back says what the start's rebuild
+    did instead."""
+    for line in reversed((output or "").splitlines()):
+        try:
+            said = json.loads(line)
+        except ValueError:
+            # Anything else the job wrote (a warning, compose's own words) is passed over.
+            continue
+        return said if isinstance(said, dict) and "put_back" in said else None
+    return None
 
 
 def key_digest(folder):

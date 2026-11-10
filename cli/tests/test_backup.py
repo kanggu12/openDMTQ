@@ -2,6 +2,7 @@
 and that the server stops and comes back."""
 
 import io
+import json
 import os
 import re
 import sqlite3
@@ -25,6 +26,13 @@ def thirty(sb):
     """Thirty archives, as many as are kept; returns their names, oldest first."""
     return [sb.archive(f"data/backups/opendmtq-202601{i:02d}-120000-manual.tar.gz", {"dmtq.db3": f"old {i}".encode()})
             for i in range(1, 31)]
+
+
+def put_back_said(why_not=None):
+    """The tools container's `songs put-back` when done, as it prints it (tools/opendmtq_tools/songs.py, main()): the songs
+    back, and their song list made, or why not."""
+    said = {"put_back": "/in/custom", "rebuilt": why_not is None, "why_not": why_not}
+    return done(0, json.dumps(said) + "\n")
 
 
 class CreateTest(unittest.TestCase):
@@ -338,6 +346,135 @@ class RestoreTest(unittest.TestCase):
             with mock.patch.object(app, "wait_healthy", return_value=None):
                 self.assertNotEqual(sb.call(app.cmd_restore, name=name, with_key=False), 0)
             self.assertIn("logs", sb.output())
+
+
+class RestoreSongsTest(unittest.TestCase):
+    """A backup's added songs, hidden flags and ids go back as the admin pages' restore puts them back: through the tools
+    container's songs.put_back, which copies them and makes their song list in one go under the songs' lock. The command
+    line copies none of them itself, where an add or a hide on the admin pages (up through a restore) could come between."""
+
+    def archive_with_songs(self, sb):
+        """A backup with an added song, hidden flags and ids, whose files and folders only their owner may read (as one
+        from another server may have them); returns its file name."""
+        path = sb.path("data/backups/opendmtq-20260101-120000-manual.tar.gz")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with tarfile.open(path, "w:gz") as tar:
+            # The folders first, as an archive lists them, custom/ itself among them (create() always writes it).
+            for folder in ("custom", "custom/songs", "custom/songs/1001"):
+                info = tarfile.TarInfo(folder)
+                info.type, info.mode = tarfile.DIRTYPE, 0o700
+                tar.addfile(info)
+            # Then the database and the songs' files.
+            for name, data in (("dmtq.db3", b"old"), ("custom/songs/1001/song.json", b'{"song_id": 1001}'),
+                               ("custom/hidden.json", b"[2]"), ("custom/ids.json", b'{"song": 1001}')):
+                info = tarfile.TarInfo(name)
+                info.size, info.mode = len(data), 0o600
+                tar.addfile(info, io.BytesIO(data))
+        return os.path.basename(path)
+
+    def test_the_songs_go_back_through_the_tools_container_and_are_not_copied_here(self):
+        with Sandbox() as sb:
+            sb.write("data/state/dmtq.db3", b"current")
+            # Today's songs: another added song, another hidden one.
+            sb.write("data/custom/songs/1002/song.json", '{"song_id": 1002}')
+            sb.write("data/custom/hidden.json", "[5]")
+            name = self.archive_with_songs(sb)
+            seen = {}
+
+            def put_back(args, extra_env):
+                """The container's job, looked at when it starts: what it is asked, and what it finds at /in."""
+                folder = os.path.join(extra_env["IMPORT_FROM"], "custom")
+                seen["args"], seen["from"] = args, extra_env["IMPORT_FROM"]
+                # The mode of everything it would read, the folder itself as ".".
+                paths = [folder] + [os.path.join(d, n) for d, dirs, files in os.walk(folder) for n in dirs + files]
+                seen["modes"] = {os.path.relpath(p, folder): stat.S_IMODE(os.stat(p).st_mode) for p in paths}
+                # Today's flags as they were: nothing copied them before the job.
+                seen["today"] = sb.read("data/custom/hidden.json")
+                # The database is the backup's already: the songs follow it.
+                seen["database"] = sb.read("data/state/dmtq.db3")
+                # What the module prints when it put them back and made their list.
+                return put_back_said()
+
+            sb.tools["songs"] = put_back
+            self.assertEqual(sb.call(app.cmd_restore, name=name, with_key=False), 0, sb.output())
+            # Nothing to say about the songs: they are back with their list.
+            self.assertNotIn("song list", sb.output())
+            # One job, in the container that sees all of data/ (the importer's has no data/custom), asked to put back the
+            # archive's custom/ as /in shows it: the archive unpacked under data/, where Docker can mount it from.
+            self.assertEqual([call for call in sb.tool_services if call[0] == "songs"], [("songs", "tools")])
+            self.assertEqual(seen["args"], ("put-back", "/in/custom"))
+            self.assertEqual(os.path.dirname(seen["from"]), sb.data)
+            # Every folder and file readable by the container's user, whoever unpacked them.
+            self.assertEqual(seen["modes"], {".": 0o755, "songs": 0o755, "songs/1001": 0o755, "songs/1001/song.json": 0o644,
+                                             "hidden.json": 0o644, "ids.json": 0o644})
+            self.assertEqual(seen["today"], b"[5]")
+            self.assertEqual(seen["database"], b"old")
+            # And still today's after the restore: here (with the container's job only looked at) nothing copied them.
+            self.assertEqual(sb.read("data/custom/hidden.json"), b"[5]")
+            self.assertTrue(os.path.isfile(sb.path("data/custom/songs/1002/song.json")))
+            self.assertFalse(os.path.exists(sb.path("data/custom/songs/1001")))
+            # The unpacked archive goes once the restore is done.
+            self.assertFalse(os.path.exists(seen["from"]))
+
+    def test_songs_that_could_not_go_back_stop_the_restore_and_say_how_to_try_again(self):
+        with Sandbox() as sb:
+            sb.write("data/state/dmtq.db3", b"current")
+            name = self.archive_with_songs(sb)
+            sb.state = "running"
+            # put_back's copy failed in the container: it ends with 1 and its traceback.
+            sb.tools["songs"] = lambda args, extra_env: done(1, "", "Traceback (most recent call last):\nshutil.Error: made up\n")
+            self.assertEqual(sb.call(app.cmd_restore, name=name, with_key=False), 1)
+            # The traceback is shown, then what to do.
+            self.assertIn("shutil.Error: made up", sb.output())
+            self.assertIn(f"could not be put back (see above); its database is restored. Restore it again: ./opendmtq restore {name}",
+                          sb.output())
+            # The server is started again all the same, on the backup's database.
+            self.assertEqual(sb.state, "running")
+            self.assertEqual(sb.read("data/state/dmtq.db3"), b"old")
+
+    def test_a_tools_image_from_before_put_back_does_not_pass_for_a_restore_of_the_songs(self):
+        # An image older than the command line (built before an update that found no internet to build again, or named in
+        # .env) knows no put-back: it ignores the words, makes today's song list, and ends with 0.
+        with Sandbox() as sb:
+            sb.write("data/state/dmtq.db3", b"current")
+            name = self.archive_with_songs(sb)
+            sb.tools["songs"] = lambda args, extra_env: done(0, '{"added": 1, "hidden": 1, "client_files": []}\n')
+            self.assertEqual(sb.call(app.cmd_restore, name=name, with_key=False), 1)
+            self.assertIn(f"the tools image is older than this command line and did not put the added songs in {name} back",
+                          sb.output())
+            self.assertIn(f"then restore again: ./opendmtq restore {name}", sb.output())
+            # What the old module said, for whoever looks into it.
+            self.assertIn('{"added": 1', sb.output())
+
+    def test_a_song_list_that_could_not_be_made_is_said_and_the_restore_goes_through(self):
+        with Sandbox() as sb:
+            sb.write("data/state/dmtq.db3", b"current")
+            name = self.archive_with_songs(sb)
+            sb.tools["songs"] = lambda args, extra_env: put_back_said(why_not="made up reason")
+            self.assertEqual(sb.call(app.cmd_restore, name=name, with_key=False), 0, sb.output())
+            self.assertIn("the added songs are back, but their song list was not made anew (made up reason); ./opendmtq up makes it",
+                          sb.output())
+
+    def test_an_archive_outside_the_backups_folder_is_named_by_its_path_to_try_again(self):
+        # A backup copied over from another PC and restored where it lies: `restore` finds it by its path alone.
+        with Sandbox() as sb:
+            sb.write("data/state/dmtq.db3", b"current")
+            name = self.archive_with_songs(sb)
+            moved = sb.path("moved/" + name)
+            os.renames(os.path.join(sb.data, "backups", name), moved)
+            sb.tools["songs"] = lambda args, extra_env: 1
+            self.assertEqual(sb.call(app.cmd_restore, name=moved, with_key=False), 1)
+            self.assertIn(f"Restore it again: ./opendmtq restore {moved}", sb.output())
+
+    def test_a_backup_without_the_custom_folder_leaves_todays_songs_alone(self):
+        # A backup of a version from before added songs: it says nothing about them, so today's stay.
+        with Sandbox() as sb:
+            sb.write("data/state/dmtq.db3", b"current")
+            sb.write("data/custom/hidden.json", "[5]")
+            name = sb.archive("data/backups/opendmtq-20260101-120000-manual.tar.gz", {"dmtq.db3": b"old"})
+            self.assertEqual(sb.call(app.cmd_restore, name=name, with_key=False), 0, sb.output())
+            self.assertNotIn("songs", [call[0] for call in sb.tool_calls])
+            self.assertEqual(sb.read("data/custom/hidden.json"), b"[5]")
 
 
 class DownTest(unittest.TestCase):
