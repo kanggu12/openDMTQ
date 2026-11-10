@@ -403,13 +403,18 @@ if (document.getElementById('tiles')) {
   const url = () => { const u = new URL(location.href); u.searchParams.set('rows', '1'); return u; };
   try { follow.checked = !!localStorage.getItem('opendmtq.follow'); } catch (_) { /* No storage here. */ }
   follow.addEventListener('change', () => { try { localStorage.setItem('opendmtq.follow', follow.checked ? '1' : ''); } catch (_) { /* No storage here. */ } });
+  // What the page has of the list, by its tag (ETag): asked with it, the answer is 304 and nothing until a request comes in.
+  let have = box.dataset.have || '';
   setInterval(async () => {
     if (!follow.checked || document.hidden) return;
     try {
-      const r = await fetch(url());
+      const r = await fetch(url(), { headers: have ? { 'If-None-Match': have } : {} });
+      // Nothing new.
+      if (r.status === 304) return;
       // Signed out meanwhile, or the page failed: the whole page finds out, not a sign-in form in the middle of the list.
       if (r.redirected || !r.ok) { location.reload(); return; }
       box.innerHTML = await r.text();
+      have = r.headers.get('ETag') || '';
     } catch (_) { /* The next look. */ }
   }, 4000);
   box.addEventListener('click', e => {

@@ -2509,7 +2509,7 @@ The last weeks, as a player's page draws them.
 A player's records at a level.
 
 - `level` (integer): The level.
-- `charts` (integer): The server's charts of that level.
+- `charts` (integer): The server's charts of that level, of the songs players see (none hidden).
 - `records` (integer): Their records on them.
 - `grades` (object of integer): Those records by grade.
 

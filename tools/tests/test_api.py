@@ -1221,6 +1221,50 @@ class SameFiguresTest(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class AsTheSiteCountsTest(unittest.TestCase):
+    """The players' site's figures as the site counts them (server/portal): what a player's levels count, and how the
+    months of the rankings are named, whatever zone the server's clock is in."""
+
+    def test_a_hidden_song_counts_in_no_level(self):
+        # Sena holds records on both charts of Paper Planes (levels 3 and 7). Hidden, the song is in neither number of
+        # any level, as on player.php: a level would otherwise say more records than the charts players can see.
+        with Server() as inst:
+            before = {lv["level"]: (lv["charts"], lv["records"]) for lv in inst.ask("GET", "/site/players/7").get_json()["levels"]}
+            self.assertEqual((before[3], before[7]), ((1, 1), (1, 1)))
+            listed = admin.site.song_list()
+            for song in listed:
+                if song["song_id"] == 1:
+                    song["hidden_yn"] = "Y"
+            inst.write("custom/songList.json", json.dumps(listed))
+            after = {lv["level"]: (lv["charts"], lv["records"]) for lv in inst.ask("GET", "/site/players/7").get_json()["levels"]}
+            self.assertEqual(after, {k: v for k, v in before.items() if k not in (3, 7)})
+
+    def test_the_months_are_named_in_utc_west_of_it(self):
+        # A month's rankings begin at midnight UTC on its first day (the game counts down to it), and the site names the
+        # month in UTC too (lib.php month_name()): on a clock in New York that moment is still the evening before, which
+        # named every month of the hall of fame one month early there.
+        zone = os.environ.get("TZ")
+        os.environ["TZ"] = "America/New_York"
+        time.tzset()
+        try:
+            with Server() as inst:
+                start = admin.site.month_start(1)
+                with sqlite3.connect(admin.core.DB) as con:
+                    con.execute("INSERT INTO PlayLog (user_id, pattern_id, score, grade, judgement, is_record, played_at) "
+                                "VALUES (7, 11, 1000, 'A', 900, 0, ?)", (start + 3600,))
+                months = inst.ask("GET", "/site/rankings/month").get_json()["past_months"]
+                self.assertEqual(months[0]["month"], time.strftime("%Y-%m", time.gmtime(start)))
+                # Where New York's own clock would have put that moment.
+                self.assertNotEqual(months[0]["month"], time.strftime("%Y-%m", time.localtime(start)))
+        finally:
+            if zone is None:
+                os.environ.pop("TZ", None)
+            else:
+                os.environ["TZ"] = zone
+            time.tzset()
+
+
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class BuildTest(unittest.TestCase):
     """A build waits for an import, and two asked for at once start one builder."""
 

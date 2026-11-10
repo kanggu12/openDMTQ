@@ -7,6 +7,7 @@ Flask is installed in the tools image only; outside it these tests are skipped (
 import csv
 import datetime
 import errno
+import gzip
 import hashlib
 import importlib.util
 import io
@@ -112,6 +113,29 @@ class LogsPageTest(unittest.TestCase):
         # In the list itself (the charts above it count them too).
         rows = page[page.index('id="log-rows"'):]
         self.assertLess(rows.index("new-request"), rows.index("old-request"))
+
+    def test_the_follow_gets_nothing_until_a_request_comes_in(self):
+        # Keep updating asked for the whole list every 4 seconds (263 KB at the most it shows, uncompressed on this port):
+        # now it asks with the tag of what it has, and gets 304 and nothing while no request came in, and the list
+        # compressed when one did.
+        with Install() as inst, mock.patch.object(admin.core, "LOGS", inst.path("state")):
+            inst.write("state/access.log", '203.0.113.5 - - [10/Nov/2026:08:00:00 +0000] "GET /a HTTP/1.1" 200 10 "-" "curl/8"\n')
+            inst.sign_in()
+            page = inst.client.get("/opendmtq/admin/logs").get_data(as_text=True)
+            have = re.search(r'<div id="log-rows" data-have="([^"]+)">', page).group(1).replace("&#34;", '"')
+            self.assertRegex(have, r'^W/"[0-9a-f]{32}"$')
+            r = inst.client.get("/opendmtq/admin/logs?rows=1", headers={"If-None-Match": have})
+            self.assertEqual((r.status_code, r.get_data()), (304, b""))
+            # A new request in the log: the list again, compressed for a browser that takes it, under a new tag.
+            with open(inst.path("state/access.log"), "a", encoding="utf-8") as f:
+                f.write('203.0.113.6 - - [10/Nov/2026:08:00:05 +0000] "GET /b HTTP/1.1" 200 10 "-" "curl/8"\n')
+            r = inst.client.get("/opendmtq/admin/logs?rows=1", headers={"If-None-Match": have, "Accept-Encoding": "gzip, deflate"})
+            self.assertEqual((r.status_code, r.headers["Content-Encoding"]), (200, "gzip"))
+            listed = gzip.decompress(r.get_data()).decode()
+            self.assertIn("/b", listed)
+            self.assertNotEqual(r.headers["ETag"], have)
+            # Without gzip, the list as it is.
+            self.assertIn("/b", inst.client.get("/opendmtq/admin/logs?rows=1").get_data(as_text=True))
 
     def test_the_oldest_file_is_left_out(self):
         # It is about to be overwritten, and the two newest are what the page has room for.
@@ -344,6 +368,30 @@ class SiteCopiesTest(unittest.TestCase):
             down = urllib.error.URLError("server is down")
             with mock.patch("urllib.request.urlopen", side_effect=down):
                 self.assertEqual(inst.client.get("/opendmtq/style.css").get_data(), b"body { color: red }")
+
+    def test_a_browser_that_has_the_copy_gets_a_304(self):
+        # After a minute these pages' own port answered with every byte again (113 KB of stylesheet and half a megabyte of
+        # fonts): now a browser asks with what it has, and gets nothing back while it is the same. As the site keeps them:
+        # the stylesheet asked for each time, a font (its version in its name) kept.
+        with Install() as inst, mock.patch("urllib.request.urlopen", mock.mock_open(read_data=b"body { color: red }")):
+            first = inst.client.get("/opendmtq/style.css")
+            self.assertEqual((first.status_code, first.headers["Cache-Control"]), (200, "no-cache"))
+            self.assertTrue(first.headers["ETag"] and first.headers["Last-Modified"], first.headers)
+            again = inst.client.get("/opendmtq/style.css", headers={"If-None-Match": first.headers["ETag"]})
+            self.assertEqual((again.status_code, again.get_data()), (304, b""))
+            since = inst.client.get("/opendmtq/style.css", headers={"If-Modified-Since": first.headers["Last-Modified"]})
+            self.assertEqual(since.status_code, 304)
+            font = inst.client.get("/opendmtq/fonts/dmtq-text-1.woff2")
+            self.assertEqual(font.headers["Cache-Control"], "max-age=31536000, immutable")
+        # Other bytes from the server, a minute on (an upgrade): the whole file again.
+        with Install() as inst:
+            with mock.patch("urllib.request.urlopen", mock.mock_open(read_data=b"body { color: red }")):
+                tag = inst.client.get("/opendmtq/style.css").headers["ETag"]
+            hit = admin.assets._css["style.css"]
+            admin.assets._css["style.css"] = (hit[0] - admin.assets._CSS_TTL - 1, hit[1], hit[2])
+            with mock.patch("urllib.request.urlopen", mock.mock_open(read_data=b"body { color: blue }")):
+                r = inst.client.get("/opendmtq/style.css", headers={"If-None-Match": tag})
+            self.assertEqual((r.status_code, r.get_data()), (200, b"body { color: blue }"))
 
     def test_without_any_copy_the_own_stylesheet_serves(self):
         with Install() as inst, mock.patch("urllib.request.urlopen", side_effect=urllib.error.URLError("down")):

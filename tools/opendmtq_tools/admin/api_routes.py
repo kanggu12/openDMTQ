@@ -567,7 +567,7 @@ SHAPES = {
         Field("since", "string", "The first day, a Monday (YYYY-MM-DD)."),
         Field("days", "{integer}", "Plays on each day that has any (YYYY-MM-DD).")]),
     "Level": Shape("A player's records at a level.", [
-        Field("level", "integer", "The level."), Field("charts", "integer", "The server's charts of that level."),
+        Field("level", "integer", "The level."), Field("charts", "integer", "The server's charts of that level, of the songs players see (none hidden)."),
         Field("records", "integer", "Their records on them."), Field("grades", "{integer}", "Those records by grade.")]),
     "SitePlay": Shape("A play on the site.", [
         Field("chart", "integer", "The chart."), Field("song", "integer", "Its song.", nullable=True),

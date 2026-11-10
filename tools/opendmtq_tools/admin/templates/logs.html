@@ -32,7 +32,8 @@
     {% if q or status or kind %}<a class="btn" href="{{ url_for('logs_page') }}">{{ t('logs.clear') }}</a>{% endif %}
     <label class="check"><input type="checkbox" id="log-follow"> {{ t('logs.follow') }}</label>
   </form>
-  <div id="log-rows">{% include "log_rows.html" %}</div>
+  {# The newest requests (log_rows.html), with the tag admin.js asks with while it follows them (data-have). #}
+  <div id="log-rows" data-have="{{ listed_tag }}">{{ listed }}</div>
 </section>
 {% elif tab == 'plays' %}
 <section class="card">

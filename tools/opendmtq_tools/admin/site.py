@@ -262,14 +262,17 @@ def player_page(con, guid):
         for (at,) in con.execute("SELECT played_at FROM PlayLog WHERE user_id = ? AND played_at >= ?", (guid, since)):
             day = datetime.date.fromtimestamp(int(at)).isoformat()
             days[day] = days.get(day, 0) + 1
-    # Their records by the chart's level, out of all the charts of that level the server's songs have.
+    # Their records by the chart's level, out of all the charts of that level the server's songs have. Only the songs
+    # players can see, as the site counts them (player.php): a song the owner hid is in neither number, or a level could
+    # say more records than charts.
+    listed = {sid for sid, song in by_id.items() if song.get("hidden_yn", "N") != "Y"}
     levels = {}
     for sid, _line, diff, _sig in charts.values():
-        if sid in by_id and diff > 0:
+        if sid in listed and diff > 0:
             levels.setdefault(diff, {"level": diff, "charts": 0, "records": 0, "grades": {}})["charts"] += 1
     for r in best:
-        diff = charts.get(int(r["pattern_id"] or 0), (0, 0, 0, 0))[2]
-        if diff in levels:
+        sid, _line, diff, _sig = charts.get(int(r["pattern_id"] or 0), (0, 0, 0, 0))
+        if sid in listed and diff in levels:
             levels[diff]["records"] += 1
             levels[diff]["grades"][r["grade"]] = levels[diff]["grades"].get(r["grade"], 0) + 1
     casts = [x for x in live_past(con) if x["player"] == guid][:CASTS_SHOWN]

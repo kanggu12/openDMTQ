@@ -2,6 +2,8 @@
 
 import collections
 import datetime
+import gzip
+import hashlib
 import io
 import os
 import re
@@ -9,6 +11,7 @@ import sqlite3
 import time
 
 from flask import redirect, render_template, request, url_for
+from markupsafe import Markup
 
 from . import charts, core, insights, players, song_pages, status
 from .core import ago, app, BASE, db, t, tp
@@ -110,9 +113,10 @@ def logs_page():
     kind = request.args.get("kind", "")
     rows, picked = requests_found(q, status, kind)
     view = {"tab": "requests", "q": q, "status": status, "kind": kind, "kinds": LOG_KINDS, "rows": picked[-REQUESTS_SHOWN:][::-1], "matched": len(picked), "kept": len(rows)}
-    # The page's own look at new lines, every few seconds: only the list, without the chart and the cards.
+    # The list alone, as the page shows it and as it asks for it again while it follows the log (rows_answer).
+    listed = render_template("log_rows.html", **view)
     if request.args.get("rows"):
-        return render_template("log_rows.html", **view)
+        return rows_answer(listed)
     # The chart and the cards follow the filter as the list does, and all look at the same last 24 hours.
     day, last_day, covered = requests_day(rows, picked)
     covered_from = time.strftime("%m-%d %H:%M", time.localtime(covered)) if covered else ""
@@ -125,7 +129,33 @@ def logs_page():
                  "top_paths": charts.ranked([(path, n, n, None) for path, n in insights.top_pages(last_day)], tp("logs.top_paths")),
                  "top_devices": charts.ranked([(device_words(d), n, n, None) for d, n in insights.top(last_day, "device")], tp("logs.top_devices")),
                  "top_ips": charts.ranked([(ip_words(ip), n, n, None) for ip, n in insights.top(last_day, "ip")], tp("logs.top_ips"))})
+    # The list in the page, with the tag the page asks with while it follows (nothing comes back until a request comes in):
+    # its ETag as rows_answer() sends it, weak (W/) as the bytes sent may be compressed.
+    view.update({"listed": Markup(listed), "listed_tag": f'W/"{rows_tag(listed)}"'})
     return render_template("logs.html", **view)
+
+
+def rows_tag(listed):
+    """What tells one list of requests from another, as the page shows it: the same list, the same tag."""
+    return hashlib.sha256(listed.encode("utf-8")).hexdigest()[:32]
+
+
+def rows_answer(listed):
+    """The list alone, for the page's own look at new lines every few seconds (admin.js): 304 and nothing while the page
+    has it (it asks with its ETag), else the list, compressed where the browser takes it. It was 263 KB every 4 seconds
+    at the most a list shows, on this service's own port, which has nothing else that compresses (through the game server
+    Apache would, and leaves what comes compressed as it is)."""
+    response = app.response_class(listed, mimetype="text/html")
+    response.set_etag(rows_tag(listed), weak=True)
+    # The page has this list already: 304, and nothing.
+    response = response.make_conditional(request)
+    # A new list: compressed for a browser that takes that (its rows repeat a great deal).
+    if response.status_code == 200 and "gzip" in request.headers.get("Accept-Encoding", ""):
+        response.set_data(gzip.compress(response.get_data(), 6))
+        response.headers["Content-Encoding"] = "gzip"
+    # Caches keep one answer for each way of asking.
+    response.vary.add("Accept-Encoding")
+    return response
 
 # How many plays one page of the Plays tab shows.
 PLAYS_PAGE = 50
