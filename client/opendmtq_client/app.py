@@ -333,8 +333,8 @@ class LauncherApp:
         is no log yet (no app, or the game has not run with it)."""
         from opendmtq_client import apps
         server = self.state.server()
-        have = apps.local(server["url"]) if server else None
-        if have is None or not actions.show_file(player.log_path(have["package"])):
+        path = player.app_log(apps.local(server["url"]) if server else None)
+        if path is None or not actions.show_file(path):
             self.go("help")
 
     def _mapped(self, event):

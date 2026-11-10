@@ -68,9 +68,12 @@ def local(url):
 
 
 def current(url, info):
-    """True when this PC has the app the server offers (`info`, from server.app_info)."""
+    """True when this PC has the app the server offers (`info`, from server.app_info). One kept with a package name
+    that is none (by a launcher from before servers' answers were checked) never is: the game does not start with it
+    (player.data_folder), and a download replaces it."""
     have = local(url)
-    return bool(have and str(have.get("sha256", "")).lower() == str(info.get("sha256", "")).lower())
+    return bool(have and srv.PACKAGE.match(str(have.get("package", "")))
+                and str(have.get("sha256", "")).lower() == str(info.get("sha256", "")).lower())
 
 
 def conf_text(info):

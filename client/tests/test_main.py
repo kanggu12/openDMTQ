@@ -2,6 +2,7 @@
 
 import contextlib
 import io
+import json
 import os
 import sys
 import threading
@@ -103,6 +104,24 @@ class CommandLine(Folder):
                 self.assertEqual(code, 2, args)
                 self.assertIn("Close the game first", said)
         self.assertIsNotNone(st.LauncherState.load().server(self.site.url))
+
+    def test_an_app_kept_with_no_package_name_is_got_again(self):
+        # An app an older launcher kept with a package name that is none: --status shows no log for it, and PLAY gets
+        # the server's app again before it starts the game (with the server away it does not start: test_actions).
+        self.run_main(["--server", self.site.url, "--sign-in", stub.ACCOUNT], stdin=stub.PASSWORD + "\n")
+        self.run_main(["--app"])
+        details = os.path.join(apps.folder(self.site.url), apps.DETAILS)
+        with open(details, encoding="utf-8") as f:
+            kept = json.load(f)
+        kept["package"] = "../../elsewhere"
+        with open(details, "w", encoding="utf-8") as f:
+            json.dump(kept, f)
+        code, said = self.run_main(["--status"])
+        self.assertIn("player log: none yet", said)
+        code, said = self.run_main(["--play"])
+        self.assertEqual(code, 0, said)
+        with open(details, encoding="utf-8") as f:
+            self.assertEqual(json.load(f)["package"], self.site.describe()["package"])
 
     def test_the_installers_server_is_taken_at_start(self):
         # Written with a path after it: the launcher keeps it as it writes every address, so connecting finds the same one.

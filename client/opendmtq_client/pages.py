@@ -655,7 +655,7 @@ def build_help(app, parent):
     server = app.state.server()
     have = apps.local(server["url"]) if server else None
     # The first line points at the player's log below, which is there once the game has run with the app.
-    log_file = player.log_path(have["package"]) if have else None
+    log_file = player.app_log(have)
     has_log = bool(log_file and os.path.isfile(log_file))
     first = "help.trouble.1" if has_log else "help.trouble.1.none"
     for i, (key, page) in enumerate(((first, None), ("help.trouble.2", "screen"), ("help.trouble.3", "sound"),

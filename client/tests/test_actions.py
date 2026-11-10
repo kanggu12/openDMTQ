@@ -4,7 +4,7 @@ import json
 import os
 from unittest import mock
 
-from opendmtq_client import actions, apps, player
+from opendmtq_client import actions, apps, i18n, player
 from opendmtq_client import server as srv
 from opendmtq_client import state as st
 from tests import stub
@@ -136,6 +136,38 @@ class Actions(Folder):
             self.site = stub.Site().start()
         self.assertIn("offline", steps)
         self.assertIsNotNone(self.started())
+
+    def test_an_app_kept_with_no_package_name_does_not_start(self):
+        # The game's data folder is made of the app's package name: one an older launcher kept without checking the
+        # server's answer may name a path. With the server away, the app this PC has is what PLAY would start: it does
+        # not, and says why; nothing is shown of a log for it, and a download replaces it.
+        for name in ("com.example.game", "jp.co.example.Game_2"):
+            self.assertTrue(player.data_folder(name).startswith(os.path.join(st.local_dir(), "OpenDMTQ") + os.sep))
+        for name in ("..\\..\\Elsewhere", "../elsewhere", "C:\\Windows", "/tmp/x", "com", "com.example/../x", "",
+                     None):
+            with self.assertRaises(player.NotAPackage):
+                player.data_folder(name)
+        actions.connect(self.state, self.site.url)
+        actions.sign_in(self.state, stub.ACCOUNT, stub.PASSWORD)
+        actions.get_app(self.state)
+        details = os.path.join(apps.folder(self.state.current), apps.DETAILS)
+        with open(details, encoding="utf-8") as f:
+            kept = json.load(f)
+        kept["package"] = "..\\..\\..\\Elsewhere"
+        with open(details, "w", encoding="utf-8") as f:
+            json.dump(kept, f)
+        info = self.site.describe()
+        self.site.stop()
+        try:
+            with self.assertRaises(player.NotAPackage) as caught:
+                actions.play(self.state)
+        finally:
+            # tearDown stops self.site: a fresh one, since this one is stopped already.
+            self.site = stub.Site().start()
+        self.assertIsNone(self.started())
+        self.assertIn("Get the app again", i18n.Words("en").error(caught.exception))
+        self.assertIsNone(player.app_log(apps.local(self.state.current)))
+        self.assertFalse(apps.current(self.state.current, info))
 
     def test_could_not_start_is_no_crash(self):
         # 1 is the player's own "could not start": told apart from a crash, which ends with Windows' fault code.

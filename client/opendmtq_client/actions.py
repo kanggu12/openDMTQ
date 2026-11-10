@@ -191,7 +191,10 @@ def play(state, report=lambda step, done=None, total=None: None, cancel=None):
     report("starting")
     settings = player.write_settings(state.values)
     have = apps.local(server["url"])
-    session = player.start(apps.folder(server["url"]), settings, log_file=player.log_path(have["package"]))
+    # The player makes the game's data folder of the app's package name, its log in it: one that is no package name
+    # stops the start here with its own words (player.NotAPackage), before anything is made of it.
+    log_file = player.log_path(have["package"])
+    session = player.start(apps.folder(server["url"]), settings, log_file=log_file)
     log.info("started the game for %s (process %d)", server["url"], session.process.pid)
     return session
 

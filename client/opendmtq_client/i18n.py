@@ -459,6 +459,8 @@ TEXT = {
     "error.app.damaged": ("The app arrived damaged. Try again.", "앱이 손상된 채로 왔습니다. 다시 해 보세요."),
     "error.app.named": ("The server offered an app without a proper name. Tell the server's admin.",
                         "서버가 이름이 올바르지 않은 앱을 내놓았습니다. 서버 관리자에게 알려 주세요."),
+    "error.app.package": ("The app on this PC has no proper package name, so the game does not start. Get the app again on the Online page.",
+                          "이 PC의 앱에 올바른 패키지 이름이 없어 게임을 시작하지 않습니다. 온라인 페이지에서 앱을 다시 받으세요."),
     "error.repair.not_installed": ("Repair works in the launcher installed by OpenDMTQ-Setup.exe.",
                                    "복구는 OpenDMTQ-Setup.exe로 설치한 런처에서 됩니다."),
     "error.repair.no_package": ("The installed package is not on this PC. Run OpenDMTQ-Setup.exe again and choose Repair.",

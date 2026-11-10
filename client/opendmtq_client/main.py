@@ -352,7 +352,7 @@ def _log_paths(state):
     server = state.server()
     have = apps.local(server["url"]) if server else None
     return {"launcher": os.path.join(st.config_dir(), "logs", "launcher.log"),
-            "player": player.log_path(have["package"]) if have else None}
+            "player": player.app_log(have)}
 
 
 def _password(prompt):
@@ -527,7 +527,7 @@ def main(argv=None):
             log.info("the installer brought the server %s", url)
     try:
         return _run(state, args, jobs)
-    except (srv.ServerError, choices.ChoiceError, actions.NotReady, FileNotFoundError) as e:
+    except (srv.ServerError, choices.ChoiceError, actions.NotReady, player.NotAPackage, FileNotFoundError) as e:
         _say(str(e), error=True)
         return 2
     finally:

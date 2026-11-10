@@ -17,7 +17,8 @@ import subprocess
 import sys
 import time
 
-from opendmtq_client import safety
+from opendmtq_client import errors, safety
+from opendmtq_client import server as srv
 from opendmtq_client import state as st
 from opendmtq_client import values as choices
 
@@ -95,14 +96,33 @@ def write_settings(values):
     return path
 
 
+class NotAPackage(errors.Worded):
+    """An app on this PC whose package name is none (data_folder): the game does not start with it."""
+
+
 def data_folder(package):
-    """The player's own folder for an app: the game's data, its libraries and player.log."""
+    """The player's own folder for an app: the game's data, its libraries and player.log. It is made of the app's
+    package name, as the player makes it, so only an Android package name will do (server.PACKAGE, the rule a server's
+    answer is held to): an app an older launcher kept without that check could name a path, which would lead out of
+    OpenDMTQ's folder. NotAPackage for anything else."""
+    if not isinstance(package, str) or not srv.PACKAGE.match(package):
+        raise NotAPackage("the app on this PC has no proper package name (%r); get the app again" % (package,),
+                          "error.app.package")
     return os.path.join(st.local_dir(), "OpenDMTQ", package)
 
 
 def log_path(package):
-    """The player's log for an app."""
+    """The player's log for an app (NotAPackage, as data_folder, for a package name that is none)."""
     return os.path.join(data_folder(package), "player.log")
+
+
+def app_log(have):
+    """The player's log for an app this PC has (apps.local), to show or open: None without an app, or with one whose
+    package name is none (the game never started with it)."""
+    try:
+        return log_path(have["package"]) if have else None
+    except NotAPackage:
+        return None
 
 
 class Session:
