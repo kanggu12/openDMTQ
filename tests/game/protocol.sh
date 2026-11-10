@@ -52,6 +52,27 @@ docker run --rm -u 33:33 -v "$DATA/state:/data" -v "$ROOT/tests/game:/t:ro" --en
 # Players' names that are no UTF-8, as an older server's database can hold them: the start batch that lists one, and the
 # next start's repair of them (tests/game/names.php), inside the running server, on its database and at its own address.
 docker exec -i "$NAME" php -- /data/dmtq.db3 http://127.0.0.1:8080 < "$ROOT/tests/game/names.php" || failed=1
+# The monthly rankings read the play log from one index alone (PlayLog_board, setup-db.php), never the table once per
+# play: the plan SQLite makes of the statement the server runs (odq_month_board_sql()), for TOTAL and a line's tab, on
+# the server's own database.
+# shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
+plan=$(docker exec "$NAME" php -r '
+  require "/opt/opendmtq/game/src/ranking.php";
+  foreach (["TOTAL" => NULL, "2LINE" => odq_patterns(3)] as $board => $patterns) {
+      $r = odq_db()->query("EXPLAIN QUERY PLAN " . odq_month_board_sql($patterns));
+      while ($r && ($row = $r->fetchArray(SQLITE3_ASSOC))) {
+          echo $board, ": ", $row["detail"], "\n";
+      }
+  }' 2>&1) || true
+# The lines that read the log (its alias is l): one per board, each from the index alone.
+reads=$(grep -E '^[A-Z0-9]+: (SEARCH|SCAN) l( |$)' <<<"$plan" || true)
+if [ "$(grep -c 'USING COVERING INDEX PlayLog_board ' <<<"$reads")" = 2 ] && [ "$(grep -c . <<<"$reads")" = 2 ]; then
+  echo "PASS the monthly rankings read the play log from one index alone"
+else
+  echo "FAIL the monthly rankings read more of the play log than one index:"
+  echo "$plan" | sed 's/^/  /'
+  failed=1
+fi
 # The folder of the built apps that a deployment names (the Helm chart: OPENDMTQ_APK_OUT, APK_DIR in charts from before
 # 2026-11) wins over the image's own default, or the site would find no app there.
 for var in OPENDMTQ_APK_OUT APK_DIR; do

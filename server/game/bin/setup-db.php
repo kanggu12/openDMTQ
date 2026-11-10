@@ -136,7 +136,12 @@ $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS Play_one ON Play (pattern_id, user_
 // what the earlier index on the player alone did too.
 $db->exec('CREATE INDEX IF NOT EXISTS Play_board ON Play (user_id, pattern_id, score)');
 $db->exec('DROP INDEX IF EXISTS Play_user');
-$db->exec('CREATE INDEX IF NOT EXISTS PlayLog_user ON PlayLog (user_id, played_at)');
+// Every monthly ranking, the game's and the site's, adds up each player's best per chart since the month began: from
+// this index alone, without reading the table once per play (the player, the time, the chart and the score are all in
+// it). It also does what the index on the player and the time did, which it replaces: under a new name, as one of the
+// old name would stay as it was made.
+$db->exec('CREATE INDEX IF NOT EXISTS PlayLog_board ON PlayLog (user_id, played_at, pattern_id, score)');
+$db->exec('DROP INDEX IF EXISTS PlayLog_user');
 // A chart's own ranking, and the admin pages' plays per song and last played: from this index, not the whole log.
 $db->exec('CREATE INDEX IF NOT EXISTS PlayLog_chart ON PlayLog (pattern_id, played_at)');
 $db->exec('CREATE INDEX IF NOT EXISTS Member_id ON Member (id)');

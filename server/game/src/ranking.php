@@ -40,7 +40,8 @@ function odq_patterns($line, $songId = NULL)
  *
  * PlayLog.user_id is the player's guid (the game saves with it); after a transfer code a second Member
  * row shares the guid, so players are matched by guid, not by Member.id. The log is read through its indexes
- * with the time of the play in them: by the player (PlayLog_user), or for a chart of its own (PlayLog_chart).
+ * with the time of the play in them: by the player (PlayLog_board, which holds all a board reads), or for a chart
+ * of its own (PlayLog_chart).
  */
 function odq_board($patterns)
 {
@@ -48,19 +49,7 @@ function odq_board($patterns)
     if ($patterns !== NULL && !$patterns) {
         return [];
     }
-    // The chart filter, from ints only (safe to write into the query).
-    $filter = $patterns === NULL ? '' : ' AND l.pattern_id IN (' . implode(',', array_map('intval', $patterns)) . ')';
-    // Each player's best on each chart this month, each stored score capped (odq_sql_score) so that old
-    // forged rows cannot overflow the sum; then those added up per player.
-    $sql = 'SELECT guid, SUM(best) AS score FROM ('
-        . 'SELECT l.user_id AS guid, MAX(' . odq_sql_score('l.score') . ') AS best FROM PlayLog l'
-        . ' WHERE l.played_at >= :since'
-        // Only players who still have an account, without the server's own check account.
-        . ' AND l.user_id IN (SELECT CAST(guid AS INTEGER) FROM Member WHERE udid IS NOT :check)'
-        . $filter
-        . ' GROUP BY l.user_id, l.pattern_id)'
-        . ' GROUP BY guid ORDER BY score DESC, guid ASC';
-    $q = odq_db()->prepare($sql);
+    $q = odq_db()->prepare(odq_month_board_sql($patterns));
     // A database problem (or one older than the play log) ranks nobody rather than breaking the reply.
     if (!$q) {
         return [];
@@ -73,6 +62,25 @@ function odq_board($patterns)
         $board[] = [(int)$row['guid'], (int)$row['score']];
     }
     return $board;
+}
+
+/*
+ * The statement of a monthly board for a set of charts ($patterns null: every chart), with :since and :check to bind.
+ * Each player's best on each chart this month, each stored score capped (odq_sql_score) so that old forged rows cannot
+ * overflow the sum; then those added up per player. tests/game/protocol.sh checks the plan SQLite makes of it.
+ */
+function odq_month_board_sql(?array $patterns): string
+{
+    // The chart filter, from ints only (safe to write into the query).
+    $filter = $patterns === NULL ? '' : ' AND l.pattern_id IN (' . implode(',', array_map('intval', $patterns)) . ')';
+    return 'SELECT guid, SUM(best) AS score FROM ('
+        . 'SELECT l.user_id AS guid, MAX(' . odq_sql_score('l.score') . ') AS best FROM PlayLog l'
+        . ' WHERE l.played_at >= :since'
+        // Only players who still have an account, without the server's own check account.
+        . ' AND l.user_id IN (SELECT CAST(guid AS INTEGER) FROM Member WHERE udid IS NOT :check)'
+        . $filter
+        . ' GROUP BY l.user_id, l.pattern_id)'
+        . ' GROUP BY guid ORDER BY score DESC, guid ASC';
 }
 
 /*
