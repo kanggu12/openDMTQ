@@ -47,6 +47,9 @@ one that only fixes raises the patch number. Each release's section here is its 
   5 seconds after a step down (it was 15), goes straight back when the try falls short, and waits twice as long for the
   next one, a minute at most (it was four). On a 240 Hz display a song now holds 240 frames a second from the page
   before it to its end, where it went down to 120 and 80 on that page and to 60 later, below 240 for most of the song.
+- The player for Windows: a render scale keeps the window's shape exactly where its size has fine enough steps, so the
+  game lays itself out as at full size: 67 % of 1920x1080 is 1280x720 (it was 1286x724, a little wider than 16:9 and
+  stretched to the window a little unevenly).
 - The player for Windows: NVIDIA NIS enlarges with no sharpening added, where it had the SDK's default of 50 %, which
   drew rims around the game's text and lines. The pixels by the edges that stand out of the full-size picture's range
   are 0.5 to 2.8 % at a render scale of 50 % and 0.1 to 0.9 % at 75 % (they were 6.9 to 9.5 % and 4.6 to 5.2 %); the
@@ -62,6 +65,17 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ### Fixed
 
+- The player for Windows with the device alone and the safe buffer (its 20 ms periods): each of the game's sound
+  streams began with a gap of 1.6 ms, as its buffer of 20 ms could not hold a period's worth with what the resampler's
+  filter reaches past it. What a stream's first period lacks is now silence before its first frames, which then play
+  on without a break.
+- The player's settings file: a volume out of 0 to 100 is held to it (a hand-made -5 is silence, where it was the
+  default's full sound); keys and the names of values are read in any case; a byte order mark at the file's start, as
+  Windows' Notepad saves one, no longer hides the first key.
+- The smallest window is 480x270 everywhere, the smallest game area the player's window holds: `--set window=` and the
+  player's file took 320x180, which the player then drew at 480x270.
+- The player's log no longer says "stream latency 0.0 ms" for shared sound, where Windows gives none: it names the audio
+  engine's period instead, what Windows adds then.
 - The player for Windows: the FPS counter stayed at 0 and "-- ms" for the whole game once a half second had passed with
   no frame (the loading at the start does it). It reads the true rate again by its second look after frames come back,
   hides until the game's first frame and while the game holds still (the question before quitting, a minimised window)

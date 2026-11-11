@@ -1,10 +1,12 @@
 // The player's PC settings (player.h): what a computer chooses for the picture and the sound, where a phone's app has
 // its own. The PC client writes them to a file before a start and names it with --settings; each line is key=value,
-// and a line that starts with # is a note. A key it does not know, or a value it cannot read, keeps the default and is
-// said in the log: an older player reads a newer client's file.
+// and a line that starts with # is a note. Keys and the names of values are read in any case, around the spaces of a
+// hand-made line, and past a byte order mark at the file's start (Windows' Notepad saves one). A key it does not know,
+// or a value it cannot read, keeps the default and is said in the log: an older player reads a newer client's file.
 //
 //   display       window | fullscreen        the window, or the whole display it is on (F11 switches either way)
-//   window        auto | WxH                 the game's area in a window: fitted to the display, or this size
+//   window        auto | WxH                 the game's area in a window: fitted to the display, or this size (480x270
+//                                            at least, the smallest area the window holds)
 //   vsync         on | off                   frames on the display's refreshes, or as soon as they are drawn
 //   fps           auto | N | unlimited       the most frames a second: the display's own rate, N (30 to 1000; with vsync
 //                                            on, a whole fraction of the display's rate when one is within 10 % below
@@ -24,7 +26,7 @@
 //                                            (player --audio-devices lists them)
 //   audio_mode    shared | exclusive         with the computer's other sound, or the device alone (less latency)
 //   audio_buffer  low | normal | safe        how much sound is kept ahead of the device: less latency, or fewer breaks
-//   volume        0..100                     the game's sound, in percent
+//   volume        0..100                     the game's sound, in percent (a number out of it held to it)
 //   language      en | ko                    the language the launcher chose for the game and the player's own words, in
 //                                            place of the computer's (host_locale); none: the computer's
 //
@@ -66,6 +68,30 @@ bool number(const std::string& v, int lo, int hi, int& out) {
     return true;
 }
 
+// The text in lower case, for keys and the names of values (ASCII: the names are).
+std::string lower(std::string s) {
+    for (char& c : s) {
+        if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+    }
+    return s;
+}
+
+// The UTF-8 byte order mark, which Notepad puts at a file's start.
+const std::string kBom = "\xEF\xBB\xBF";
+
+// One line of the file as key and value: the mark of the first line gone, spaces around both, the key in lower case;
+// false for a note, an empty line or a line with no '='.
+bool key_value(std::string line, bool first, std::string& key, std::string& value) {
+    if (first && line.compare(0, kBom.size(), kBom) == 0) line.erase(0, kBom.size());
+    line = trim(line);
+    if (line.empty() || line[0] == '#') return false;
+    const auto eq = line.find('=');
+    if (eq == std::string::npos) return false;
+    key = lower(trim(line.substr(0, eq)));
+    value = trim(line.substr(eq + 1));
+    return true;
+}
+
 }  // namespace
 
 bool load_settings(const std::string& path) {
@@ -75,13 +101,14 @@ bool load_settings(const std::string& path) {
         return false;
     }
     Settings& s = settings();
-    std::string line;
+    std::string line, key, raw;
+    bool first = true;
     while (std::getline(f, line)) {
-        line = trim(line);
-        if (line.empty() || line[0] == '#') continue;
-        const auto eq = line.find('=');
-        if (eq == std::string::npos) continue;
-        const std::string key = trim(line.substr(0, eq)), value = trim(line.substr(eq + 1));
+        const bool read = key_value(line, first, key, raw);
+        first = false;
+        if (!read) continue;
+        // The names of values in any case; a device's id as it was written.
+        const std::string value = key == "audio_device" ? raw : lower(raw);
         bool ok = true;
         int n = 0;
         if (key == "display") {
@@ -92,8 +119,8 @@ bool load_settings(const std::string& path) {
             int w = 0, h = 0, used = 0;
             if (value == "auto") {
                 s.window_w = s.window_h = 0;
-            } else if (std::sscanf(value.c_str(), "%dx%d%n", &w, &h, &used) == 2 && used == static_cast<int>(value.size()) && w >= 320 &&
-                       h >= 180 && w <= 16384 && h <= 16384) {
+            } else if (std::sscanf(value.c_str(), "%dx%d%n", &w, &h, &used) == 2 && used == static_cast<int>(value.size()) && w >= 480 &&
+                       h >= 270 && w <= 16384 && h <= 16384) {
                 s.window_w = w;
                 s.window_h = h;
             } else {
@@ -149,7 +176,11 @@ bool load_settings(const std::string& path) {
             ok = value == "low" || value == "normal" || value == "safe";
             if (ok) s.audio_buffer = value == "low" ? 0 : value == "normal" ? 1 : 2;
         } else if (key == "volume") {
-            if ((ok = number(value, 0, 100, n))) s.volume = n;
+            // A number out of 0 to 100 held to it (a hand-made -5 is silence, not the default's full sound).
+            if ((ok = number(value, -2000000000, 2000000000, n))) {
+                s.volume = std::clamp(n, 0, 100);
+                if (s.volume != n) jvm::log("player: settings: volume=%s is out of 0 to 100: %d", value.c_str(), s.volume);
+            }
         } else if (key == "language") {
             // The launcher's languages; another keeps the computer's (host_locale).
             ok = value == "en" || value == "ko";
@@ -180,15 +211,15 @@ bool load_settings(const std::string& path) {
 
 std::string settings_language(const std::string& path) {
     std::ifstream f(utf8_path(path));
-    std::string line, found;
+    std::string line, key, raw, found;
+    bool first = true;
     // The last language= line, as load_settings reads them (a later line wins), and nothing said: the log is not yet
     // in its place.
     while (f && std::getline(f, line)) {
-        line = trim(line);
-        if (line.empty() || line[0] == '#') continue;
-        const auto eq = line.find('=');
-        if (eq == std::string::npos || trim(line.substr(0, eq)) != "language") continue;
-        const std::string value = trim(line.substr(eq + 1));
+        const bool read = key_value(line, first, key, raw);
+        first = false;
+        if (!read || key != "language") continue;
+        const std::string value = lower(raw);
         // Only a language the player speaks; another leaves the computer's.
         if (value == "en" || value == "ko") found = value;
     }

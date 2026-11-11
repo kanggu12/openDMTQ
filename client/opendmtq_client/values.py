@@ -63,8 +63,9 @@ NAMES = ORDER[:ORDER.index("show_fps") + 1] + ("fps_position",) + ORDER[ORDER.in
 CHOICES = {"display": DISPLAY, "vsync": VSYNC, "fps": FPS, "render_scale": RENDER_SCALE, "upscaler": UPSCALER,
            "anti_aliasing": ANTI_ALIASING, "show_fps": SHOW_FPS, "fps_position": FPS_POSITION, "audio_mode": AUDIO_MODE,
            "audio_buffer": AUDIO_BUFFER}
-# A window size the player takes (its own bounds: 320x180 to 16384 a side).
+# A window size the player takes (its own bounds: 480x270, the smallest area its window holds, to 16384 a side).
 SIZE = re.compile(r"^(\d{3,5})x(\d{3,5})$")
+SMALLEST = (480, 270)
 
 
 class ChoiceError(ValueError):
@@ -91,8 +92,8 @@ def _one(name, value):
         found = SIZE.match(text)
         if text == "auto":
             return text
-        if not found or not (320 <= int(found.group(1)) <= 16384 and 180 <= int(found.group(2)) <= 16384):
-            raise ChoiceError("window cannot be %r: it is auto or WIDTHxHEIGHT (320x180 or more)" % (value,), "error.choice",
+        if not found or not (SMALLEST[0] <= int(found.group(1)) <= 16384 and SMALLEST[1] <= int(found.group(2)) <= 16384):
+            raise ChoiceError("window cannot be %r: it is auto or WIDTHxHEIGHT (%dx%d or more)" % ((value,) + SMALLEST), "error.choice",
                               name=name, value=value)
         return "%dx%d" % (int(found.group(1)), int(found.group(2)))
     if name == "volume":

@@ -54,7 +54,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | Setting | Values (the default first) | On the page |
 | :--- | :--- | :--- |
 | `display` | `fullscreen`, `window` | Mode |
-| `window` | `auto` (fitted to the display), `1280x720`, `1600x900`, `1920x1080`, `2560x1440`, `3840x2160`, or any `WIDTHxHEIGHT` from 320x180 that fits the main display with room for the window's title bar and the taskbar, as the page offers them | Window size |
+| `window` | `auto` (fitted to the display), `1280x720`, `1600x900`, `1920x1080`, `2560x1440`, `3840x2160`, or any `WIDTHxHEIGHT` from 480x270 that fits the main display with room for the window's title bar and the taskbar, as the page offers them | Window size |
 | `vsync` | `on`, `off` | VSync |
 | `fps` | `auto` (the display's rate), `30`, `60`, `120`, `144`, `165`, `180`, `240`, `360`, `unlimited` | Frame limit |
 | `show_fps` | `off`, `on` (a corner's name, as `fps_position` takes it, is on in that corner) | FPS counter |
@@ -65,7 +65,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | `audio_device` | `default` (Windows' default output), or a device's id from `--audio-devices` | Device |
 | `audio_mode` | `shared`, `exclusive` (the device alone) | Mode |
 | `audio_buffer` | `normal`, `low`, `safe` | Buffer |
-| `volume` | `100`, or any number from 0 | Volume |
+| `volume` | `100`, or any number from 0 to 100 | Volume |
 | `language` | `system` (Windows' display language), `en`, `ko`: the same as `--language` | Language, on the **Launcher** page; the game and what the player draws over it speak it too |
 
 ### In the game
@@ -156,7 +156,9 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   quitting, a minimised window) instead of counting the stillness. It lets clicks through, and is drawn apart from the
   game's picture: it costs the game nothing, and the broadcast does not show it.
 - **The render scale** draws the game at a share of the window's pixels (100 % down to 50 %), stretched to fill it:
-  lighter for the graphics card, and softer.
+  lighter for the graphics card, and softer. The share keeps the window's shape exactly where its size has fine enough
+  steps (1920x1080 is 120 steps of 16x9): 67 % of 1920x1080 is 1280x720, so the game lays itself out as it does at full
+  size, its parts where they belong.
 - **The upscaler**, below 100 %: how the smaller picture reaches the window's size. **Bilinear** (the default) is the
   plain stretch of the window's surface. **AMD FSR 1** (FidelityFX Super Resolution 1) enlarges it with its
   edge-adaptive filter (EASU) and sharpens the result (RCAS, at AMD's sample's 0.25 stops). **NVIDIA NIS** (Image

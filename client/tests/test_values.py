@@ -78,6 +78,14 @@ class Values(unittest.TestCase):
 
     def test_window_sizes(self):
         self.assertEqual(choices.normalize({"window": "1920X1080"})["window"], "1920x1080")
+        # The smallest area the player's window holds, 480x270: smaller is refused (the player would not take it).
+        self.assertEqual(choices.normalize({"window": "480x270"})["window"], "480x270")
+        for small in ("320x180", "479x270", "480x269"):
+            with self.assertRaises(choices.ChoiceError, msg=small):
+                choices.normalize({"window": small})
+        with self.assertRaises(choices.ChoiceError) as refused:
+            choices.normalize({"window": "320x180"})
+        self.assertIn("480x270 or more", str(refused.exception))
         self.assertEqual(choices.size_of("1280x720"), (1280, 720))
         self.assertIsNone(choices.size_of("auto"))
 
