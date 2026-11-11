@@ -28,7 +28,7 @@ if ($month) {
 // optional ones leave narrow screens.
 $col = fn(string $key, bool $optional = false) => 'r' . ($key === $sort ? ' sorted' : ($optional ? ' opt' : ''));
 // The game's abbreviations in the header, with what they stand for (also in the line under the table).
-$abbr = fn(string $term, string $key) => '<abbr title="' . h(t($key)) . '">' . $term . '</abbr>';
+$abbr = fn(string $term, string $key) => '<abbr title="' . h(tp($key)) . '">' . $term . '</abbr>';
 
 // The value of the chosen order, as the podium shows it under the name.
 $value = function (array $p) use ($sort, $month): string {
@@ -44,7 +44,7 @@ $first_rank = 4;
 page_header(t('rank.title'), 'ranking');
 ?>
   <?php // This month's line says when it starts anew, in the server's own time. ?>
-  <?= masthead('RANKINGS', $month ? t('rank.line.month', ['when' => h(month_moment(odq_month_start(-1)))]) : t('rank.line.' . $sort)) ?>
+  <?= masthead('RANKINGS', $month ? t('rank.line.month', ['when' => month_moment(odq_month_start(-1))]) : t('rank.line.' . $sort)) ?>
   <?php // Nothing to put in order: no tabs above the message. ?>
   <?php if ($everyone): ?>
     <p class="tabs">

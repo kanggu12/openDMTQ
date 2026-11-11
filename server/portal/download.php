@@ -8,7 +8,8 @@ $host = public_host();
 $apk = apk_manifest();
 // Built for another address: the phone would install a client that cannot find this server.
 $stale = $apk && $apk['host'] !== $host;
-// No app for this address, and the builder gave up making one: waiting would not help.
+// No app for this address: whether the builder is making one now, or gave up on it (waiting would not help then).
+$building = (!$apk || $stale) && build_state() === 'building';
 $failed = (!$apk || $stale) && build_failed();
 // The builder draws the QR code next to the app; older builds have none.
 $qr = $apk && !$stale && is_file(APK_DIR . '/download-qr.svg');
@@ -24,8 +25,8 @@ $start = dl_take_start() && $apk && !$stale && !$in_app && !on_ios();
 $win = windows_client();
 
 // The download starts after a second, so the page that says so is on screen first. While the
-// builder is still working (no app yet, or one for the old address), check again on its own.
-page_header(t('dl.title'), 'download', $start ? '1;url=/apk' : ((!$apk || $stale) && !$failed ? '20' : ''));
+// builder is making the app (none yet, or one for the old address), check again on its own; only then.
+page_header(t('dl.title'), 'download', $start ? '1;url=/apk' : ($building ? '20' : ''));
 ?>
   <?= masthead('DOWNLOAD') ?>
   <section class="card install" id="install">
@@ -37,10 +38,12 @@ page_header(t('dl.title'), 'download', $start ? '1;url=/apk' : ((!$apk || $stale
         <?= open_in_browser($in_app, '/opendmtq/download.php') ?>
       <?php elseif ($failed): ?>
         <p class="warn" role="status"><?= t('build.failed') ?></p>
-      <?php elseif (!$apk): ?>
-        <p class="warn"><?= t('build.wait') ?></p>
-      <?php elseif ($stale): ?>
-        <p class="warn"><?= t('build.stale') ?></p>
+      <?php elseif ($building): ?>
+        <?php // Being made now: for this address for the first time, or again for a new one. ?>
+        <p class="warn" role="status"><?= t($stale ? 'build.stale' : 'build.wait') ?></p>
+      <?php elseif (!$apk || $stale): ?>
+        <?php // None for this address, and nothing making one: said once, no waiting. ?>
+        <p class="warn" role="status"><?= t('build.none') ?></p>
       <?php else: ?>
         <?php if ($start): ?>
           <p class="done" role="status"><?= t('dl.starting') ?></p>
@@ -55,7 +58,7 @@ page_header(t('dl.title'), 'download', $start ? '1;url=/apk' : ((!$apk || $stale
       </div>
       <?php if ($qr): ?>
         <figure class="qr get-app"<?= hidden_on_ios() ?>>
-          <img src="qr.php" alt="<?= h(t('qr.alt')) ?>" width="132" height="132">
+          <img src="qr.php" alt="<?= h(tp('qr.alt')) ?>" width="132" height="132">
           <figcaption><?= t('qr.caption') ?></figcaption>
         </figure>
       <?php endif; ?>
@@ -76,7 +79,7 @@ page_header(t('dl.title'), 'download', $start ? '1;url=/apk' : ((!$apk || $stale
               <div class="screen" aria-hidden="true"><span class="screen-row"><span class="screen-file">APK</span><span class="screen-text"><b><?= h($apk['file']) ?></b><small><?= number_format($apk['size'] / 1048576, 1) ?> MB</small></span></span></div>
             </li>
             <li><p class="step-text"><?= t('step.install') ?></p>
-              <div class="screen" aria-hidden="true"><span class="screen-title"><?= t('screen.unknown') ?></span><span class="screen-row"><span class="screen-text"><b><?= preg_match('/SamsungBrowser/', (string)($_SERVER['HTTP_USER_AGENT'] ?? '')) ? 'Samsung Internet' : 'Chrome' ?></b><small><?= t('screen.allow') ?></small></span><span class="screen-switch"></span></span></div>
+              <div class="screen" aria-hidden="true"><span class="screen-title"><?= t('screen.unknown') ?></span><span class="screen-row"><span class="screen-text"><b><?= t(preg_match('/SamsungBrowser/', (string)($_SERVER['HTTP_USER_AGENT'] ?? '')) ? 'screen.samsung' : 'screen.chrome') ?></b><small><?= t('screen.allow') ?></small></span><span class="screen-switch"></span></span></div>
             </li>
             <li><p class="step-text"><?= strtr(t('step.play'), ['{app}' => app_name_html()]) ?></p>
               <div class="screen screen-home" aria-hidden="true"><?php if (is_file(APK_DIR . '/app-icon.png')): ?><span class="screen-icon"><img src="icon.php" alt="" width="56" height="56"></span><?php endif; ?><?= app_name_html() ?></div>

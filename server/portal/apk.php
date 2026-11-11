@@ -21,13 +21,14 @@ function no_app(int $code, string $message): void
 }
 
 $m = apk_manifest();
-// When the builder gave up on this address, only the owner can help.
+// Why there is none: being made (worth a moment's wait), given up on (only the owner can help), or nothing making one.
+$why = fn(string $making) => ['building' => t($making), 'failed' => t('build.failed')][build_state()] ?? t('build.none');
 if (!$m) {
-    no_app(404, build_failed() ? t('build.failed') : t('apk.notyet'));
+    no_app(404, $why('apk.notyet'));
 }
 // An app built for another address cannot reach this server; do not hand it out.
 if ($m['host'] !== public_host()) {
-    no_app(409, build_failed() ? t('build.failed') : t('apk.stale'));
+    no_app(409, $why('apk.stale'));
 }
 $path = APK_DIR . '/' . basename($m['file']);
 // Opened now, as windows.php opens the installer: the length said and the bytes sent are the same file's, even if the
@@ -35,7 +36,7 @@ $path = APK_DIR . '/' . basename($m['file']);
 $f = @fopen($path, 'rb');
 // Gone since the manifest was read: a new build is taking its place.
 if (!$f) {
-    no_app(404, build_failed() ? t('build.failed') : t('apk.notyet'));
+    no_app(404, $why('apk.notyet'));
 }
 // The type Android's installer expects, and a file name that says which server it is for: whole, or the part a broken
 // download asks for to go on, while it is still this build (its SHA-256 says so).

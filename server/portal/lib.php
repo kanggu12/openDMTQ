@@ -40,14 +40,42 @@ function lang(): string
 // Every text of the site, in each language: a file of its own, since it is most of the site's words.
 require_once __DIR__ . '/strings.php';
 
-/* The text for $key in the page language (English when Korean lacks it), with {name} filled in
-   from $vars, escaped. Placeholders without a value stay, for scripts that fill them later. */
+/* The table's text for $key in the page language (English when Korean lacks it, the key itself when neither has it), as
+   it stands in the table. A count of one ({n} is 1) takes the words the table has for one ({key}.one) where it has them:
+   English says "1 play", not "1 plays". */
+function t_table(string $key, array $vars): string
+{
+    // The count as the page prints it: a number, or a placeholder a script fills in later (never one then).
+    $one = isset($vars['n']) && (string)$vars['n'] === '1';
+    // The words for one first, in the page's language, then in English, as for any other text.
+    if ($one && isset(STRINGS[lang()][$key . '.one'])) {
+        return STRINGS[lang()][$key . '.one'];
+    }
+    return STRINGS[lang()][$key] ?? STRINGS['en'][$key] ?? $key;
+}
+
+/* The text for $key in the page language as HTML, with {name} filled in from $vars, escaped: print it as it is, never
+   through h() again. Placeholders without a value stay, for scripts that fill them later. */
 function t(string $key, array $vars = []): string
 {
-    $text = STRINGS[lang()][$key] ?? STRINGS['en'][$key] ?? $key;
     $fill = [];
     foreach ($vars as $name => $value) {
+        // Escaped here, once: a name with & or < in it reads as itself.
         $fill['{' . $name . '}'] = h($value);
+    }
+    return strtr(t_table($key, $vars), $fill);
+}
+
+/* The same text as plain text, for what is not HTML: an attribute (escape it there, once, with h()) or a script's words
+   (JSON). The table's own markup goes and its entities are read back; the values go in as they are. */
+function tp(string $key, array $vars = []): string
+{
+    // The table's markup (<b>, <code>) is for HTML only; &nbsp; and the like become the characters they stand for.
+    $text = html_entity_decode(strip_tags(t_table($key, $vars)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $fill = [];
+    foreach ($vars as $name => $value) {
+        // As they are: whoever prints this escapes it, once.
+        $fill['{' . $name . '}'] = (string)$value;
     }
     return strtr($text, $fill);
 }
@@ -291,20 +319,30 @@ function send_download($f, string $type, string $name, string $tag, string $tail
     exit;
 }
 
-/* True when the builder gave up on the app for this address (data/apk/out/build.json says failed,
-   or still says building long after any build ends): waiting for it is pointless. With no such
-   file (an older builder) the portal keeps waiting as before. */
-function build_failed(): bool
+/* What the builder is doing about the app for this address, from what it last wrote (data/apk/out/build.json):
+   'building' while a build for it runs, 'failed' when it gave up on it (or still says building long after any build
+   ends), '' when no build for it is going on (no such file, a build for another address, or one that is done). Only
+   'building' is worth waiting for: the pages say so and look again, and say plainly otherwise. */
+function build_state(): string
 {
     $s = json_decode((string)@file_get_contents(APK_DIR . '/build.json'), true);
+    // Another address's build, or none written: nothing is being done for this one.
     if (!is_array($s) || ($s['host'] ?? null) !== public_host()) {
-        return false;
+        return '';
     }
-    return ($s['state'] ?? '') === 'failed'
-        || (($s['state'] ?? '') === 'building' && time() - (int)($s['time'] ?? 0) > 15 * 60);
+    $state = (string)($s['state'] ?? '');
+    // A build that said it began fifteen minutes ago and never ended was cut off (STALE_BUILD in builder.py).
+    if ($state === 'building') {
+        return time() - (int)($s['time'] ?? 0) > 15 * 60 ? 'failed' : 'building';
+    }
+    return $state === 'failed' ? 'failed' : '';
 }
 
-// What players read when it did, on the home page and at /apk, is t('build.failed').
+/* True when the builder gave up on the app for this address: only the owner can help (t('build.failed')). */
+function build_failed(): bool
+{
+    return build_state() === 'failed';
+}
 
 // What the admin page writes into the notice when the owner leaves the message empty.
 const DEFAULT_NOTICE = 'The server is under maintenance. Please try again later.';
@@ -535,7 +573,7 @@ function page_header(string $title, string $active = '', string $refresh = '', s
     header('Content-Language: ' . lang());
     // Who is on air: a small count on LIVE, on every page and every width.
     $on_air = $db ? count(live_on_air($db)) : 0;
-    $live_label = 'LIVE' . ($on_air ? ' <span class="onair" title="' . h(t('live.count', ['n' => $on_air])) . '">' . $on_air . '</span>' : '');
+    $live_label = 'LIVE' . ($on_air ? ' <span class="onair" title="' . h(tp('live.count', ['n' => $on_air])) . '">' . $on_air . '</span>' : '');
     // The sections stay in the display face's English, as in the game's menus.
     // What the site is for comes first, watching and getting the app; then the rest. With broadcasts off for the server
     // there is nothing to watch, and no LIVE in the menu.
@@ -550,7 +588,8 @@ function page_header(string $title, string $active = '', string $refresh = '', s
     }
     // Maintenance (the in-game notice is on) comes before anything else: players cannot get in.
     $notice = $inside ? maintenance_notice() : null;
-    [$state, $status] = !$inside ? ['ok', ''] : ($notice !== null ? ['maint', t('state.maint')] : ($db ? ['ok', ''] : ['down', t('state.down')]));
+    // In plain words, for the light's label and title (escaped once, below).
+    [$state, $status] = !$inside ? ['ok', ''] : ($notice !== null ? ['maint', tp('state.maint')] : ($db ? ['ok', ''] : ['down', tp('state.down')]));
     // What a page shows depends on being signed in: Back after signing out must not bring it up from a cache.
     header('Cache-Control: private, no-store');
     echo '<!doctype html><html lang="' . lang() . '"><head><meta charset="utf-8">';
@@ -571,9 +610,9 @@ function page_header(string $title, string $active = '', string $refresh = '', s
     // and a plain sentence under the bar. A server that is fine has nothing to announce.
     $word = ['ok' => '', 'maint' => 'MAINTENANCE', 'down' => 'OFFLINE'][$state];
     echo '<header class="bar"><div class="wrap bar-in"><a class="logo" href="/opendmtq/"><span class="o">OPEN</span><span class="m">DMT<b>Q</b></span></a>';
-    echo $inside ? '<nav class="nav" aria-label="' . h(t('nav.aria')) . '">' . $links . '</nav>' : '';
-    echo '<div class="bar-end">' . ($word !== '' ? '<span class="state ' . $state . '" role="img" aria-label="' . h(strip_tags($status)) . '" title="' . h(strip_tags($status)) . '"><i></i>' . $word . '</span>' : '') . lang_switch() . '</div></div></header>';
-    echo $inside ? '<nav class="tabbar" aria-label="' . h(t('nav.aria')) . '">' . $links . '</nav>' : '';
+    echo $inside ? '<nav class="nav" aria-label="' . h(tp('nav.aria')) . '">' . $links . '</nav>' : '';
+    echo '<div class="bar-end">' . ($word !== '' ? '<span class="state ' . $state . '" role="img" aria-label="' . h($status) . '" title="' . h($status) . '"><i></i>' . $word . '</span>' : '') . lang_switch() . '</div></div></header>';
+    echo $inside ? '<nav class="tabbar" aria-label="' . h(tp('nav.aria')) . '">' . $links . '</nav>' : '';
     if ($state !== 'ok') {
         $own = $notice !== null && $notice !== '' && $notice !== DEFAULT_NOTICE;
         $says = $state === 'down' ? t('state.down_long') : ($own ? t('home.maint_own', ['notice' => $notice]) : t('home.maint'));
@@ -621,7 +660,7 @@ function row_jacket(?array $song, string $class = 'row-jacket'): string
 function lang_switch(): string
 {
     $back = rawurlencode(safe_next((string)($_SERVER['REQUEST_URI'] ?? '/opendmtq/')));
-    $out = '<nav class="lang-switch" aria-label="' . h(t('lang.label')) . '">';
+    $out = '<nav class="lang-switch" aria-label="' . h(tp('lang.label')) . '">';
     // Two keys; each language's own name for those who cannot read the other one's key.
     foreach (['ko' => ['KOR', '한국어'], 'en' => ['ENG', 'English']] as $code => [$key, $word]) {
         $out .= '<a lang="' . $code . '" title="' . $word . '" aria-label="' . $word . '" href="/opendmtq/lang.php?to=' . $code . '&amp;next=' . $back . '"'
@@ -642,7 +681,7 @@ function lang_switch(): string
         $name = $fig ? (string)$fig['name'] : (string)$who;
         $first = mb_strtoupper(mb_substr($name, 0, 1));
         $badge = '<span class="who-badge" aria-hidden="true">' . h($first !== '' ? $first : '?') . '</span>';
-        $sub = $fig ? '<span class="who-sub">' . ($fig['rank'] ? h(t('player.rank_short', ['n' => $fig['rank']])) . ' · ' : '') . h((string)$who) . '</span>' : '';
+        $sub = $fig ? '<span class="who-sub">' . ($fig['rank'] ? h(tp('player.rank_short', ['n' => $fig['rank']])) . ' · ' : '') . h((string)$who) . '</span>' : '';
         $text = '<span class="who-text"><span class="who-name">' . h($name) . '</span>' . $sub . '</span>';
         // Its words again in its title, for the badge alone (below 1100 px) under the pointer.
         $title = h($name . ($fig ? ' · ' . ($fig['rank'] ? t('player.rank_short', ['n' => $fig['rank']]) . ' · ' : '') . $who : ''));
@@ -775,7 +814,7 @@ function live_past(?SQLite3 $db, int $count = LIVE_PAST_SHOWN, int $guid = 0): a
     // Already no more than the list holds (above).
     foreach ($recs as [$player, $id, $r]) {
         $sec = (int)round((int)$r['duration_ms'] / 1000);
-        $length = $sec >= 3600 ? sprintf('%d:%02d:%02d', $sec / 3600, $sec / 60 % 60, $sec % 60) : sprintf('%d:%02d', $sec / 60, $sec % 60);
+        $length = clock_length($sec);
         $songs = [];
         foreach ($r['songs'] as $song) {
             // A song without its moment (an older recording) goes on the list without a place to jump to.
@@ -798,6 +837,14 @@ function live_past(?SQLite3 $db, int $count = LIVE_PAST_SHOWN, int $guid = 0): a
     return $out;
 }
 
+/* How long, as a clock says it and a recording's card shows it: 0:12, 4:05, 1:02:03. */
+function clock_length(int $sec): string
+{
+    // An hour or more takes the hours too; under it, minutes and seconds.
+    return $sec >= 3600 ? sprintf('%d:%02d:%02d', intdiv($sec, 3600), intdiv($sec, 60) % 60, $sec % 60)
+                        : sprintf('%d:%02d', intdiv($sec, 60), $sec % 60);
+}
+
 /* A small LIVE link for next to a player's name, while that player is on air ('' otherwise). Asks
    nothing itself: the menu has already asked who is on air for this page. */
 function live_mark(?SQLite3 $db, int $guid): string
@@ -805,7 +852,7 @@ function live_mark(?SQLite3 $db, int $guid): string
     if (!$db || !isset(live_on_air($db)[$guid])) {
         return '';
     }
-    return ' <a class="live-mark" href="/opendmtq/live.php?p=' . $guid . '" title="' . h(t('live.watch')) . '">LIVE</a>';
+    return ' <a class="live-mark" href="/opendmtq/live.php?p=' . $guid . '" title="' . h(tp('live.watch')) . '">LIVE</a>';
 }
 
 /* Footer: what this site is, in two short lines, then the server's patch and the ways on: the license, and the admin
@@ -816,9 +863,9 @@ function page_footer(): void
     echo '</main><footer class="foot"><div class="wrap foot-in"><div class="foot-note"><p>' . t('foot.line1') . '</p><p>' . t('foot.line2') . '</p></div>'
         // The same three as the admin pages' footer, in the same order: the server's patch, the license, the way to the other
         // side (here the admin pages, when they are on this port).
-        . '<nav class="foot-keys" aria-label="' . h(t('foot.links')) . '"><span class="foot-tag">' . t('foot.patch', ['v' => patch_version()]) . '</span>'
-        . '<a class="key" aria-label="' . h(t('foot.license')) . '" href="/opendmtq/licenses.php">LICENSE</a>'
-        . ($admin ? '<a class="key" aria-label="' . h(t('foot.admin')) . '" href="/opendmtq/admin/">ADMIN</a>' : '')
+        . '<nav class="foot-keys" aria-label="' . h(tp('foot.links')) . '"><span class="foot-tag">' . t('foot.patch', ['v' => patch_version()]) . '</span>'
+        . '<a class="key" aria-label="' . h(tp('foot.license')) . '" href="/opendmtq/licenses.php">LICENSE</a>'
+        . ($admin ? '<a class="key" aria-label="' . h(tp('foot.admin')) . '" href="/opendmtq/admin/">ADMIN</a>' : '')
         . '</nav></div></footer>'
         // The bar is glass once the page has moved, and has no surface of its own at the very top.
         . "<script>(()=>{const b=document.querySelector('.bar'),f=()=>b.classList.toggle('under',scrollY>2);addEventListener('scroll',f,{passive:true});f()})()</script>"
@@ -907,7 +954,7 @@ function hidden_on_ios(): string
 /* The game's AC and PP marks, with what they stand for as a tooltip. */
 function mark(string $kind): string
 {
-    return '<span class="mark ' . $kind . '" title="' . h(strip_tags(t('mark.' . $kind))) . '">' . strtoupper($kind) . '</span>';
+    return '<span class="mark ' . $kind . '" title="' . h(tp('mark.' . $kind)) . '">' . strtoupper($kind) . '</span>';
 }
 
 /* Grade with AC/PP marks, as small labels. */

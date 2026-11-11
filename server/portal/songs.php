@@ -23,11 +23,12 @@ usort($songs, fn($a, $b) => strcasecmp(song_title($a), song_title($b)));
 page_header(t('songs.title'), 'songs');
 ?>
   <?= masthead('SONGS') ?>
-  <?php // data-of: how the count reads while a search narrows the list ({shown} of {all}). ?>
+  <?php // data-of: how the count reads while a search narrows the list ({shown} of {all}); data-all and data-one: without
+        // a search, for many songs and for one. ?>
   <?php if (!$songs): ?><section class="card"><p class="empty"><?= t('songs.none') ?></p></section><?php endif; ?>
   <div class="songs-tools"<?= $songs ? '' : ' hidden' ?>>
-    <input class="search" id="search" type="search" placeholder="<?= h(t('songs.search')) ?>" aria-label="<?= h(t('songs.search_label')) ?>" oninput="filterSongs(this.value)">
-    <span class="meta-inline" id="song-count" role="status" data-of="<?= h(t('songs.of')) ?>" data-all="<?= h(t('songs.all')) ?>"><?= t('songs.all', ['n' => count($songs)]) ?></span>
+    <input class="search" id="search" type="search" placeholder="<?= h(tp('songs.search')) ?>" aria-label="<?= h(tp('songs.search_label')) ?>" oninput="filterSongs(this.value)">
+    <span class="meta-inline" id="song-count" role="status" data-of="<?= h(tp('songs.of')) ?>" data-all="<?= h(tp('songs.all')) ?>" data-one="<?= h(tp('songs.all', ['n' => 1])) ?>"><?= t('songs.all', ['n' => count($songs)]) ?></span>
   </div>
   <p class="empty" id="no-match" role="status" hidden><?= t('songs.nomatch') ?></p>
   <div class="songs" id="songs">
@@ -55,7 +56,8 @@ page_header(t('songs.title'), 'songs');
         shown += hit;
       }
       // The page's own wording for "12 of 191" (data-of), filled in here.
-      count.textContent = q ? count.dataset.of.replace('{shown}', shown).replace('{all}', all.length) : count.dataset.all.replace('{n}', all.length);
+      count.textContent = q ? count.dataset.of.replace('{shown}', shown).replace('{all}', all.length)
+        : all.length === 1 ? count.dataset.one : count.dataset.all.replace('{n}', all.length);
       document.getElementById('no-match').hidden = shown > 0;
     }
   </script>

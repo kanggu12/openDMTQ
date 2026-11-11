@@ -102,8 +102,8 @@ page_header(t('signin.title'), $from);
         <input type="hidden" name="next" value="<?= h($next) ?>">
         <?php // The ID is in Latin letters: the email keyboard (Latin, not Hangul), no capitals or corrections. The field the
               // server found empty is marked, and has the focus. ?>
-        <label class="field"><?= t('signin.id') ?> <input name="user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" lang="en" required data-missing="<?= h(t('signin.missing_id')) ?>"<?= $missing === 'signin.missing_id' ? ' aria-invalid="true" autofocus' : '' ?> value="<?= h($_POST['user'] ?? '') ?>"></label>
-        <label class="field"><?= t('signin.password') ?> <input name="password" type="password" autocomplete="current-password" required data-missing="<?= h(t('signin.missing_password')) ?>"<?= $missing === 'signin.missing_password' ? ' aria-invalid="true"' : '' ?><?= $error && $missing !== 'signin.missing_id' ? ' autofocus' : '' ?>></label>
+        <label class="field"><?= t('signin.id') ?> <input name="user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" lang="en" required data-missing="<?= h(tp('signin.missing_id')) ?>"<?= $missing === 'signin.missing_id' ? ' aria-invalid="true" autofocus' : '' ?> value="<?= h($_POST['user'] ?? '') ?>"></label>
+        <label class="field"><?= t('signin.password') ?> <input name="password" type="password" autocomplete="current-password" required data-missing="<?= h(tp('signin.missing_password')) ?>"<?= $missing === 'signin.missing_password' ? ' aria-invalid="true"' : '' ?><?= $error && $missing !== 'signin.missing_id' ? ' autofocus' : '' ?>></label>
         <button class="button" type="submit"><?= t('signin.button') ?></button>
       </form>
       </div>

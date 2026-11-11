@@ -73,20 +73,21 @@ $ids = array_column($cards, 'id');
 $current = $pinned ? $want : ($ids[0] ?? 0);
 
 // With nobody on air, the box says when someone last was, and how the last two weeks went: a cell a day, stronger with
-// more minutes on air, from the recordings that are kept.
+// more time on air, from the recordings that are kept. In seconds, as the cards count it: a day of short broadcasts is
+// not a day of none.
 $air_days = [];
 for ($back = 13; $back >= 0; $back--) {
-    $air_days[date('Y-m-d', strtotime("-$back day"))] = ['min' => 0, 'n' => 0, 'who' => []];
+    $air_days[date('Y-m-d', strtotime("-$back day"))] = ['sec' => 0, 'n' => 0, 'who' => []];
 }
 foreach ($past as $x) {
     $day = date('Y-m-d', (int)$x['started']);
     if (isset($air_days[$day])) {
-        $air_days[$day]['min'] += intdiv((int)$x['seconds'], 60);
+        $air_days[$day]['sec'] += (int)$x['seconds'];
         $air_days[$day]['n']++;
         $air_days[$day]['who'][$x['name']] = true;
     }
 }
-$air_most = max(array_column($air_days, 'min')) ?: 0;
+$air_most = max(array_column($air_days, 'sec')) ?: 0;
 
 // A recording that is there: the page starts out as it will be, with the box for it in place, and not with "nobody is
 // on" until the script has come over a slow connection.
@@ -106,13 +107,15 @@ page_header($replay !== '' ? t('live.replay') : t('live.title'), 'live');
         <span class="off-air-word" aria-hidden="true">OFF AIR</span>
         <p class="live-empty-head"><?= t('live.none') ?></p>
         <?php if ($past): $last = $past[0]; ?>
-          <p class="last-air"><?= t('live.last', ['name' => h($last['name']), 'ago' => h($last['ago']), 'min' => max(1, (int)round($last['seconds'] / 60))]) ?> <a href="?r=<?= h($last['key']) ?>"><?= t('live.watch_again') ?></a></p>
-          <div class="air-days" role="img" aria-label="<?= h(strip_tags(t('live.days'))) ?>">
+          <?php // Who and when, and how long, as its card says it (0:12): t() escapes the name, once. ?>
+          <p class="last-air"><?= t('live.last', ['name' => $last['name'], 'ago' => $last['ago'], 'length' => $last['length']]) ?> <a href="?r=<?= h($last['key']) ?>"><?= t('live.watch_again') ?></a></p>
+          <div class="air-days" role="img" aria-label="<?= h(tp('live.days')) ?>">
             <?php foreach ($air_days as $day => $d):
-                $step = !$d['min'] || !$air_most ? ($d['n'] ? 1 : 0) : 1 + min(4, intdiv(4 * $d['min'], $air_most));
-                $words = $d['n'] ? t('live.day_tip', ['day' => substr($day, 5), 'n' => $d['n'], 'min' => $d['min'], 'who' => implode(', ', array_keys($d['who']))])
-                                 : t('live.day_none', ['day' => substr($day, 5)]); ?>
-              <i class="c<?= $step ?>" data-tip="<?= h(strip_tags($words)) ?>"></i>
+                $step = !$d['sec'] || !$air_most ? ($d['n'] ? 1 : 0) : 1 + min(4, intdiv(4 * $d['sec'], $air_most));
+                // Plain text for the attribute, escaped once where it is printed; the day's time on air as a card says it.
+                $words = $d['n'] ? tp('live.day_tip', ['day' => substr($day, 5), 'n' => $d['n'], 'length' => clock_length($d['sec']), 'who' => implode(', ', array_keys($d['who']))])
+                                 : tp('live.day_none', ['day' => substr($day, 5)]); ?>
+              <i class="c<?= $step ?>" data-tip="<?= h($words) ?>"></i>
             <?php endforeach; ?>
           </div>
           <div class="air-days-ends" aria-hidden="true"><span><?= t('live.days_ago') ?></span><span><?= t('live.today') ?></span></div>
@@ -137,7 +140,7 @@ page_header($replay !== '' ? t('live.replay') : t('live.title'), 'live');
               // under it, and step back with the controls so as not to sit on the game. ?>
         <div class="live-top" id="live-top" hidden>
           <span class="live-pill" id="top-pill"><i></i><span id="pill-word">LIVE</span></span>
-          <span class="live-clock" id="live-clock" title="<?= h(t('live.since')) ?>"></span>
+          <span class="live-clock" id="live-clock" title="<?= h(tp('live.since')) ?>"></span>
           <button type="button" class="go-live" id="go-live" hidden><?= t('live.go_live') ?></button>
           <span class="live-title"><b id="top-who"></b><span id="top-what"></span></span>
         </div>
@@ -156,7 +159,7 @@ page_header($replay !== '' ? t('live.replay') : t('live.title'), 'live');
         </div>
         <div class="live-ctl" id="live-ctl" hidden>
           <div class="ctl-track" id="ctl-track" hidden>
-            <input type="range" class="ctl-seek" id="ctl-seek" min="0" max="1000" step="1" value="0" aria-label="<?= h(t('live.ctl_seek')) ?>">
+            <input type="range" class="ctl-seek" id="ctl-seek" min="0" max="1000" step="1" value="0" aria-label="<?= h(tp('live.ctl_seek')) ?>">
             <div class="ctl-marks" id="ctl-marks" aria-hidden="true"></div>
             <span class="ctl-bubble" id="ctl-bubble" hidden><img class="bubble-pic" id="bubble-pic" alt="" width="36" height="36" hidden><span class="bubble-text" id="bubble-text"></span></span>
           </div>
@@ -165,10 +168,10 @@ page_header($replay !== '' ? t('live.replay') : t('live.title'), 'live');
             <button type="button" id="ctl-back" class="vod-only" hidden></button>
             <button type="button" id="ctl-fwd" class="vod-only" hidden></button>
             <button type="button" id="ctl-mute"></button>
-            <input type="range" id="ctl-vol" min="0" max="1" step="0.05" value="1" aria-label="<?= h(t('live.ctl_volume')) ?>">
+            <input type="range" id="ctl-vol" min="0" max="1" step="0.05" value="1" aria-label="<?= h(tp('live.ctl_volume')) ?>">
             <span class="ctl-time" id="ctl-time" hidden></span>
             <span class="ctl-gap"></span>
-            <button type="button" id="ctl-rate" class="vod-only ctl-word" aria-label="<?= h(t('live.ctl_speed')) ?>" title="<?= h(t('live.ctl_speed')) ?>" hidden>1×</button>
+            <button type="button" id="ctl-rate" class="vod-only ctl-word" aria-label="<?= h(tp('live.ctl_speed')) ?>" title="<?= h(tp('live.ctl_speed')) ?>" hidden>1×</button>
             <button type="button" id="ctl-stats"></button>
             <button type="button" id="ctl-pip" hidden></button>
             <button type="button" id="ctl-wide"></button>
@@ -181,7 +184,7 @@ page_header($replay !== '' ? t('live.replay') : t('live.title'), 'live');
       <div class="live-info" id="live-info" hidden>
         <div class="live-facts"><a class="live-name" id="info-name"></a><span class="live-doing" id="info-doing"></span></div>
         <div class="live-acts">
-          <button type="button" class="btn btn-sm" id="info-share" data-done="<?= h(t('live.copied')) ?>"><?= t('live.share') ?></button>
+          <button type="button" class="btn btn-sm" id="info-share" data-done="<?= h(tp('live.copied')) ?>"><?= t('live.share') ?></button>
           <a class="btn btn-sm" id="info-profile"><?= t('live.profile_btn') ?></a>
         </div>
       </div>
@@ -199,8 +202,8 @@ page_header($replay !== '' ? t('live.replay') : t('live.title'), 'live');
       <section class="card" id="live-past"<?= $past ? '' : ' hidden' ?>>
         <h2><?= t('live.past') ?> <span class="meta-inline" id="past-count"><?= count($past) ?></span></h2>
         <div class="past-tools">
-          <input class="input" id="past-search" type="search" placeholder="<?= h(t('live.search')) ?>" aria-label="<?= h(t('live.search_label')) ?>">
-          <select class="input" id="past-who" aria-label="<?= h(t('live.player_label')) ?>"><option value=""><?= t('live.all_players') ?></option></select>
+          <input class="input" id="past-search" type="search" placeholder="<?= h(tp('live.search')) ?>" aria-label="<?= h(tp('live.search_label')) ?>">
+          <select class="input" id="past-who" aria-label="<?= h(tp('live.player_label')) ?>"><option value=""><?= t('live.all_players') ?></option></select>
         </div>
         <p class="empty" id="past-none" role="status" hidden><?= t('live.nomatch') ?></p>
         <?php // Here from the start, so that the box is not empty until the script has come. The script makes the same. ?>
@@ -220,10 +223,10 @@ page_header($replay !== '' ? t('live.replay') : t('live.title'), 'live');
   <script src="<?= asset_url('thumbs.js') ?>"></script>
   <script src="<?= asset_url('tips.js') ?>" defer></script>
   <?php // What the server knows at page load (with the sign of its list of recordings, which the page's looks compare),
-        // and the page's words, for the page's script (live.js): data, never run. JSON_HEX_TAG keeps a name with
-        // </script> in it from ending the block. ?>
+        // and the page's words as plain text (tp()), for the page's script (live.js), which sets them as text: data, never
+        // run. JSON_HEX_TAG keeps a name with </script> in it from ending the block. ?>
   <script type="application/json" id="live-data"><?= json_encode(['cards' => $cards, 'past' => $past, 'past_rev' => live_past_rev_of(array_column($past, 'key')), 'current' => $current, 'pinned' => $pinned, 'replay' => $replay,
-      'words' => ['title' => t('live.title'), 'replay' => t('live.replay'), 'ended' => t('live.ended'), 'ended_of' => t('live.ended_of', ['name' => '{name}']), 'reconnecting' => t('live.reconnecting'), 'count' => t('live.count', ['n' => '{n}']), 'nav' => t('live.nav'), 'profile' => t('live.profile', ['name' => '{name}']), 'gone' => t('live.gone'), 'unsupported' => t('live.unsupported'), 'watch' => t('live.watch'), 'playing' => t('live.playing'), 'ctl_play' => t('live.ctl_play'), 'ctl_pause' => t('live.ctl_pause'), 'ctl_mute' => t('live.ctl_mute'), 'ctl_unmute' => t('live.ctl_unmute'), 'ctl_full' => t('live.ctl_full'), 'ctl_exit' => t('live.ctl_exit'), 'ctl_back' => t('live.ctl_back'), 'ctl_fwd' => t('live.ctl_fwd'), 'ctl_pip' => t('live.ctl_pip'), 'ctl_wide' => t('live.ctl_theater'), 'ctl_stats' => t('live.ctl_stats'), 'resume' => t('live.resume', ['time' => '{time}']), 'share' => t('live.share'), 'stats_size' => t('live.stats_size'), 'stats_buffer' => t('live.stats_buffer'), 'stats_rate' => t('live.stats_rate'), 'stats_stream' => t('live.stats_stream'), 'stats_frames' => t('live.stats_frames'), 'stats_behind' => t('live.stats_behind')]], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
+      'words' => ['title' => tp('live.title'), 'replay' => tp('live.replay'), 'ended' => tp('live.ended'), 'ended_of' => tp('live.ended_of', ['name' => '{name}']), 'reconnecting' => tp('live.reconnecting'), 'count' => tp('live.count', ['n' => '{n}']), 'nav' => tp('live.nav'), 'profile' => tp('live.profile', ['name' => '{name}']), 'gone' => tp('live.gone'), 'unsupported' => tp('live.unsupported'), 'watch' => tp('live.watch'), 'playing' => tp('live.playing'), 'ctl_play' => tp('live.ctl_play'), 'ctl_pause' => tp('live.ctl_pause'), 'ctl_mute' => tp('live.ctl_mute'), 'ctl_unmute' => tp('live.ctl_unmute'), 'ctl_full' => tp('live.ctl_full'), 'ctl_exit' => tp('live.ctl_exit'), 'ctl_back' => tp('live.ctl_back'), 'ctl_fwd' => tp('live.ctl_fwd'), 'ctl_pip' => tp('live.ctl_pip'), 'ctl_wide' => tp('live.ctl_theater'), 'ctl_stats' => tp('live.ctl_stats'), 'resume' => tp('live.resume', ['time' => '{time}']), 'share' => tp('live.share'), 'stats_size' => tp('live.stats_size'), 'stats_buffer' => tp('live.stats_buffer'), 'stats_rate' => tp('live.stats_rate'), 'stats_stream' => tp('live.stats_stream'), 'stats_frames' => tp('live.stats_frames'), 'stats_behind' => tp('live.stats_behind')]], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
   <?php // The script itself, the same for every visit: its address changes with the file (asset_url()), so that a browser
         // that kept it gets the new one with a new page. ?>
   <script src="<?= asset_url('live.js') ?>"></script>

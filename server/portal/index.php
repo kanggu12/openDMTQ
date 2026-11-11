@@ -29,8 +29,10 @@ $qr = $apk && $apk['host'] === public_host() && is_file(APK_DIR . '/download-qr.
 // leads to the download page, which says why not (worked out as there).
 $stale = $apk && $apk['host'] !== public_host();
 $ready = $apk && !$stale && !in_app_browser();
-// No app players can get: the line under the buttons says why, as the download page does.
+// No app players can get: the line under the buttons says why, as the download page does (being made, given up on, or
+// nothing making one).
 $failed = (!$apk || $stale) && build_failed();
+$building = (!$apk || $stale) && build_state() === 'building';
 // PlayLog.user_id is the player's guid: one name per player, however many phones (PLAYER_ROWS). As many as go well beside
 // the list of players, which is short on a server with few.
 $records = ($db && has_playlog($db)) ? rows($db,
@@ -80,13 +82,13 @@ ob_start();
       <?php if ($ready): ?>
         <p class="meta stage-meta get-app"<?= hidden_on_ios() ?>><?= t('dl.meta', ['size' => number_format($apk['size'] / 1048576, 1), 'date' => substr($apk['built_at'], 0, 10)]) ?> · <a href="download.php"><?= t('home.howto') ?></a></p>
       <?php elseif (!$apk || $stale): ?>
-        <p class="meta stage-meta get-app"<?= hidden_on_ios() ?>><?= t($failed ? 'home.app_failed' : 'home.app_wait') ?></p>
+        <p class="meta stage-meta get-app"<?= hidden_on_ios() ?>><?= t($failed ? 'home.app_failed' : ($building ? 'home.app_wait' : 'build.none')) ?></p>
       <?php endif; ?>
       <?= android_only() ?>
     </div>
     <?php if ($qr): ?>
       <figure class="qr get-app"<?= hidden_on_ios() ?>>
-        <img src="qr.php" alt="<?= h(t('qr.alt')) ?>" width="132" height="132" loading="lazy">
+        <img src="qr.php" alt="<?= h(tp('qr.alt')) ?>" width="132" height="132" loading="lazy">
         <figcaption><?= t('qr.caption') ?></figcaption>
       </figure>
     <?php endif; ?>
@@ -122,7 +124,7 @@ page_header('OpenDMTQ', 'home', '', $stage);
     <?php endif; ?>
   </section>
   <script src="<?= asset_url('thumbs.js') ?>"></script>
-  <script>liveThumbs.home(<?= json_encode($live, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>, <?= dl_signed_in() ? 'true' : 'false' ?>, <?= json_encode(['count' => t('live.count', ['n' => '{n}']), 'nav' => t('live.nav')], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>);</script>
+  <script>liveThumbs.home(<?= json_encode($live, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>, <?= dl_signed_in() ? 'true' : 'false' ?>, <?= json_encode(['count' => tp('live.count', ['n' => '{n}']), 'nav' => tp('live.nav')], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>);</script>
   <?php endif; ?>
 
   <?php // The rest of what goes on: who leads, and the newest records. One box with two lists, each as long as it is. ?>
@@ -164,7 +166,7 @@ page_header('OpenDMTQ', 'home', '', $stage);
               <span class="what"><?php if ($song): ?><a href="song.php?id=<?= $sid ?>&amp;chart=<?= (int)$r['pattern_id'] ?>"><?= h(song_title($song)) ?></a><span class="what-chart"><?= h(chart_label($line, $diff, $sig)) ?></span><?php else: ?><?= t('player.chart', ['id' => (int)$r['pattern_id']]) ?><?php endif; ?></span>
             </span>
             <?php // The grade before the score; under it, how far over their best before (nothing for a first clear). ?>
-            <span class="feed-end"><span class="feed-score"><span class="grade g<?= h($r['grade']) ?> feed-grade"><?= h($r['grade']) ?></span><?= number_format($r['score']) ?></span><?php if ($r['before'] !== null && (int)$r['score'] > (int)$r['before']): ?><span class="feed-gain" title="<?= h(strip_tags(t('rec.up', ['before' => number_format($r['before'])]))) ?>">+<?= number_format($r['score'] - $r['before']) ?></span><?php endif; ?><span class="feed-when"><?= h(ago((int)$r['played_at'])) ?></span></span>
+            <span class="feed-end"><span class="feed-score"><span class="grade g<?= h($r['grade']) ?> feed-grade"><?= h($r['grade']) ?></span><?= number_format($r['score']) ?></span><?php if ($r['before'] !== null && (int)$r['score'] > (int)$r['before']): ?><span class="feed-gain" title="<?= h(tp('rec.up', ['before' => number_format($r['before'])])) ?>">+<?= number_format($r['score'] - $r['before']) ?></span><?php endif; ?><span class="feed-when"><?= h(ago((int)$r['played_at'])) ?></span></span>
           </li>
         <?php endforeach; ?>
         </ul>

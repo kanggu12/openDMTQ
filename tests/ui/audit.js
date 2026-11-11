@@ -716,6 +716,47 @@ async function replayFlows(contexts) {
 }
 
 // The owner's forms.
+// A name made of the characters HTML is written with, given by the owner's own rename on the Players page: every page
+// shows it as it is, escaped once (the live page said "Sena&#039;s &amp; ..." where t() escaped what h() had escaped
+// already). Player 5 broadcast today (feed.py), so the live page's line about who was last on air, its list and the
+// tooltips of its two weeks name them; their profile and the rankings too. Then the name they had, for the stages after.
+async function escapedOnce(contexts, admin) {
+  const odd = `Ann's & <Co> "1"`;
+  const entity = /&(?:amp|lt|gt|quot|#0*39|#x0*27|apos);/;
+  // The row's More, its name field, and Rename: as the owner does it.
+  const rename = async (to) => {
+    await admin.goto(`${A}/players`, { waitUntil: 'domcontentloaded' });
+    const row = '.row-more[data-act^="/opendmtq/admin/players/5?"]';
+    await admin.$eval(row, e => e.querySelector('summary').click());
+    await admin.waitForSelector(`${row} > form.row-more-in`, { visible: true });
+    const before = await admin.$eval(`${row} input[name=name]`, e => e.value);
+    await admin.$eval(`${row} input[name=name]`, (e, value) => { e.value = value; e.dispatchEvent(new Event('input', { bubbles: true })); }, to);
+    await press(admin, `${row} button[value=rename]`);
+    return before;
+  };
+  const was = await rename(odd);
+  const site = await contexts.signed.newPage();
+  await site.setViewport({ width: 1280, height: 900 });
+  await site.goto(`${P}/live.php`, { waitUntil: 'domcontentloaded' });
+  // Nobody is on air in this stage: the box says who was last, and how the last two weeks went.
+  const box = await site.$eval('#live-none', e => ({ text: e.textContent, tips: [...e.querySelectorAll('[data-tip]')].map(i => i.getAttribute('data-tip')) }));
+  const cards = await site.$$eval('#past-list .who', bs => bs.map(b => b.textContent));
+  const first = cards[0] || '';
+  check('a name with & \' < > " reads as itself on the live page: who was last on air, the list, the days',
+    !entity.test(box.text) && !box.tips.some(t => entity.test(t)) && box.text.includes(first) && cards.includes(odd) && box.tips[box.tips.length - 1].includes(odd),
+    `${box.text.replace(/\s+/g, ' ').slice(0, 140)} | ${box.tips[box.tips.length - 1]} | ${cards.slice(0, 3)}`);
+  await site.goto(`${P}/player.php?id=5`, { waitUntil: 'domcontentloaded' });
+  const head = await textOf(site, '.playerhead h2');
+  await site.goto(`${P}/ranking.php`, { waitUntil: 'domcontentloaded' });
+  const listed = await site.$$eval('.board td.name a, .pod-name', es => es.map(e => e.textContent.trim()));
+  check('and on their page, its tab and the rankings', head.trim().startsWith(odd) && (await site.title()) !== '' && listed.includes(odd),
+    `${head} | ${listed.slice(0, 6)}`);
+  await site.goto(`${P}/player.php?id=5`, { waitUntil: 'domcontentloaded' });
+  check('the tab names them as they are', (await site.title()).startsWith(odd), await site.title());
+  await site.close();
+  await rename(was);
+}
+
 async function adminFlows(contexts) {
   // A wrong password says so.
   const login = await contexts.anon.newPage();
@@ -778,6 +819,7 @@ async function adminFlows(contexts) {
   const off = await textOf(page, '.flash');
   check("a row's switch sends the page's one form for its player", /Doyun Two/.test(on) && / on/.test(on) && /Doyun Two/.test(off) && / off/.test(off),
     `${on} | ${off}`);
+  await escapedOnce(contexts, page);
   // The same panel on a phone, where it opens across the row.
   const small = await contexts.signed.newPage();
   await small.setViewport({ width: 360, height: 740, isMobile: true, hasTouch: true });

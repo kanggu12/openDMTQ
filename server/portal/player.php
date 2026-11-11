@@ -103,7 +103,7 @@ function activity_grid(array $counts, int $weeks): string
             $key = date('Y-m-d', $at);
             $n = $counts[$key] ?? 0;
             $step = !$n || !$top ? 0 : 1 + min(4, (int)(4 * $n / $top));
-            $cells .= '<i class="c' . $step . '" data-tip="' . h(t('player.day_plays', ['day' => $key, 'n' => $n])) . '"></i>';
+            $cells .= '<i class="c' . $step . '" data-tip="' . h(tp('player.day_plays', ['day' => $key, 'n' => $n])) . '"></i>';
         }
     }
     $steps = '';
@@ -111,18 +111,19 @@ function activity_grid(array $counts, int $weeks): string
         $steps .= '<i class="c' . $step . '"></i>';
     }
     return '<div class="activity-months" aria-hidden="true">' . $months . '</div>'
-        . '<div class="activity" role="img" aria-label="' . h(strip_tags(t('player.activity'))) . '">' . $cells . '</div>'
+        . '<div class="activity" role="img" aria-label="' . h(tp('player.activity')) . '">' . $cells . '</div>'
         . '<div class="activity-key" aria-hidden="true">' . t('player.fewer') . '<span class="activity-steps">' . $steps . '</span>' . t('player.more') . '</div>';
 }
 
 $missing = $db ? t('player.notfound') : t('player.unavailable');
-page_header($me ? $me['name'] : strip_tags($missing), 'ranking');
+// The tab's title is plain text, which page_header() escapes once.
+page_header($me ? $me['name'] : tp($db ? 'player.notfound' : 'player.unavailable'), 'ranking');
 if (!$me): ?>
   <?= $db ? lost($missing, t('nf.text'), [['/opendmtq/ranking.php', t('go.rankings')]]) : lost($missing, t('unavailable'), [], false) ?>
 <?php page_footer(); exit; endif; ?>
   <section class="card">
     <div class="playerhead">
-      <?php if ($rank): ?><span class="playerhead-place<?= $rank <= 3 ? ' place-' . (int)$rank : '' ?>" title="<?= h(strip_tags(t('player.rank', ['n' => $rank]))) ?>"><?= t('player.rank_short', ['n' => (int)$rank]) ?></span><?php endif; ?>
+      <?php if ($rank): ?><span class="playerhead-place<?= $rank <= 3 ? ' place-' . (int)$rank : '' ?>" title="<?= h(tp('player.rank', ['n' => $rank])) ?>"><?= t('player.rank_short', ['n' => (int)$rank]) ?></span><?php endif; ?>
       <h2><?= h($me['name']) ?><?= live_mark($db, $id) ?></h2>
       <div class="stats">
         <div class="stat"><span class="lbl"><?= t('player.total') ?></span><span class="num"><?= number_format($me['total']) ?></span></div>
@@ -169,7 +170,7 @@ if (!$me): ?>
         <h2><?= t('player.levels') ?></h2>
         <div class="levels">
           <?php foreach ($levels as $lv => $l): $held = array_sum($l['grades'] ?? []); ?>
-            <div class="level" data-tip="<?= h(strip_tags(t('player.level_tip', ['lv' => $lv, 'n' => $held, 'all' => $l['all']]))) ?>">
+            <div class="level" data-tip="<?= h(tp('player.level_tip', ['lv' => $lv, 'n' => $held, 'all' => $l['all']])) ?>">
               <span class="level-name">Lv <?= (int)$lv ?></span>
               <span class="level-bar" data-layout-ok="segments by grade"><?php foreach (['S', 'A', 'B', 'C', 'D', 'E', 'F'] as $g): if (!empty($l['grades'][$g])): ?><i class="g<?= $g ?>" style="width:<?= round(100 * $l['grades'][$g] / $l['all'], 2) ?>%"></i><?php endif; endforeach; ?></span>
               <b><?= $held ?><small> / <?= (int)$l['all'] ?></small></b>
@@ -193,7 +194,7 @@ if (!$me): ?>
       <?php else: ?>
         <div class="table-scroll"><table class="compact plays"><tbody>
         <?php foreach ($recent as $r): $when = ago((int)$r['played_at']); ?>
-          <tr><?= chart_cells((int)$r['pattern_id'], $charts, $songs, $when) ?><td class="r"><?= number_format($r['score']) ?></td><td class="flag"><?= $r['is_record'] ? '<span class="mark new" title="' . h(t('mark.new')) . '">NEW</span>' : '' ?></td><td class="meta-inline when"><?= h($when) ?></td></tr>
+          <tr><?= chart_cells((int)$r['pattern_id'], $charts, $songs, $when) ?><td class="r"><?= number_format($r['score']) ?></td><td class="flag"><?= $r['is_record'] ? '<span class="mark new" title="' . h(tp('mark.new')) . '">NEW</span>' : '' ?></td><td class="meta-inline when"><?= h($when) ?></td></tr>
         <?php endforeach; ?>
         </tbody></table></div>
       <?php endif; ?>
