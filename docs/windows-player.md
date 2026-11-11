@@ -79,7 +79,6 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | Esc | The phone's Back key: pauses a song, closes what is open |
 | The keyboard | Text where the game asks for it (Enter ends it, Esc cancels it), Hangul too |
 | The touch keyboard | Comes up when a touch opens the game's text, and types into it |
-| F11, or Alt+Enter | Full screen, and back |
 | The pointer resting at the game's top edge, or on the handle at its top centre | The bar: minimise, full screen, and the X that quits after asking |
 | Alt+F4 | Nothing: the bar's X quits |
 | Alt alone, F10 | Nothing (no menu mode that would hold the next key) |

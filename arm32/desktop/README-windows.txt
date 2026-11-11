@@ -21,7 +21,6 @@ If the game cannot start, a message box says why and where its log is.
 Playing
 -------
 
-- Full screen: F11, or Alt+Enter.
 - The bar over the game's top, which comes down with the pointer resting on the small tab at its top centre (or on its
   top edge): minimise, full screen, and X to quit. The window has no buttons of its own.
 - A touch screen is the game's screen: as many fingers at once as it takes, and Windows' touch feedback and edge
