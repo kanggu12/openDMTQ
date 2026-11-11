@@ -20,78 +20,55 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ### Added
 
-- The player for Windows: a small tab at the top centre of the game, in the shape of the game's own tabs with its green
-  line, shows where the bar is. Resting the pointer on it, or on the top edge, brings the bar down once the game has had
-  no click, touch or held note for 1.5 seconds, so a song is never interrupted; clicks pass through it to the game. The
-  bar also shows for 3 seconds when the game's picture first appears and after each switch between a window and full
-  screen.
-- The player for Windows: a minimise button on the bar, left of full screen; the taskbar brings the game back.
+- The player for Windows: a small tab at the top centre of the game shows where the bar is. Resting the pointer on it,
+  or on the top edge, brings the bar down once the game has had no click, touch or held note for 1.5 seconds, so a song
+  is never interrupted; clicks pass through it to the game. The bar also shows for 3 seconds when the game's picture
+  first appears and after each switch between a window and full screen.
+- The player for Windows: a minimise button on the bar.
 - The launcher's command line: `--servers` lists the servers it knows, and `--skip-guide` skips the first-start guide.
-- For contributors: the player logs when the bar comes and goes and why, when the FPS counter shows or hides, and how
-  long each planned key (`PLAYER_KEYS`) waited; `PLAYER_TRACE_INPUT=1` also logs each mouse press reaching the game and
-  each loss of focus.
 
 ### Changed
 
-- The player for Windows: the bar over the game carries the OpenDMTQ wordmark as the launcher's header draws it, and
-  every button over the game is the launcher's own, its shape and depth: on the bar the X is the lime main button from
-  the start, so it is seen at once, and minimise and full screen are quiet secondary buttons; in the question before
-  quitting, Keep playing is the lime main button and Quit the game the secondary one, red under the pointer. The window
-  has no buttons of its own, only its title bar and frame, and its title bar is dark as the launcher's header; the game
-  is minimised, put in full screen and quit from its bar, and the taskbar's Close window still asks before quitting.
-- The player for Windows speaks the launcher's language: the game, the bar, the question before quitting, the broadcast
-  notice and its own messages. "Same as Windows" keeps Windows' display language. The launcher passes it in the settings
-  file as `language=en|ko`.
-- The FPS counter is off by default; on, it sits at the top left beside a song's pause button, and a Position row moves
-  it to another corner. It is fainter (62 %), so the game shows through it. `--set show_fps=on|off` and `--set
-  fps_position=top_left|top_right|bottom_left|bottom_right` do the same; an older corner setting still works.
-- With VSync on, the frame rate steps down only when more than a quarter of the frames are late through three 2-second
-  checks in a row (it was 3 %), and tries the faster rate again sooner. On a 240 Hz display a song now holds 240 frames
-  a second, where it fell to 120 or 60.
-- NVIDIA NIS enlarges without sharpening (it was 50 %), which removes the rims it drew around text and lines; at a
-  render scale of 50 % it is as close to the full-size picture as AMD FSR 1.
+- The player for Windows: the bar carries the OpenDMTQ wordmark, and the buttons over the game are the launcher's: the
+  bar's X is lime from the start, so it is seen at once, and in the question before quitting Keep playing is the main
+  button. The window has a dark title bar and no buttons of its own: the game is minimised, put in full screen and quit
+  from the bar.
+- The player for Windows speaks the launcher's language: the game, what the player shows over it, and its messages.
+  "Same as Windows" keeps Windows' display language.
+- The FPS counter is off by default and fainter, so the game shows through it; on, it sits at the top left, and a
+  Position row moves it to another corner (`--set show_fps=on|off`, `--set fps_position=<corner>`; an older corner
+  setting still works).
+- With VSync on, the frame rate steps down only when more than a quarter of the frames are late (it was 3 %), and tries
+  the faster rate again sooner: on a 240 Hz display a song now holds 240 frames a second, where it fell to 120 or 60.
+- NVIDIA NIS no longer sharpens, which drew rims around text and lines.
 - A render scale keeps the window's exact shape: 67 % of 1920x1080 is 1280x720 (it was 1286x724).
-- The overlay makes its pictures on a thread of its own, so the thread that passes keys and clicks to the game never
-  waits for it.
-- The launcher: buttons stand slightly out and sink when pressed, fields and drop-downs are set in; the wordmark no
-  longer has the lime "PC" after it; text fields are as tall as the buttons beside them; Online shows one main button at
-  a time; with VSync on the Screen page offers no frame limit above the display's rate and names the display's real
-  rate; `--set window=` refuses the sizes the Screen page leaves out.
+- Keys and clicks reach the game without waiting for what the player draws over it.
+- The launcher: buttons stand out and sink when pressed, and fields are set in; the wordmark has no "PC" after it; with
+  VSync on, the Screen page offers no frame limit above the display's rate; `--set window=` refuses the sizes the
+  Screen page leaves out.
 
 ### Removed
 
-- MSAA 2x, 4x and 8x: they changed no pixel of the game's picture, where CMAA 2 and SMAA change thousands. A setting
-  with MSAA reads as CMAA 2.
+- MSAA 2x, 4x and 8x: they left the game's picture as it was, no pixel more than 2 levels off, as between two runs
+  without them. A setting with MSAA reads as CMAA 2.
 
 ### Fixed
 
-- The player for Windows: a song's start could freeze the picture for good while the sound went on, 8 of 142 starts on
-  one PC: the game's own video decoder missed a signal its player sent a moment too early, a race its slower first run
-  here made likely. A wait without a time limit now wakes by itself every 100 ms, as the system may, so the decoder
-  looks again: 0 of 80 starts froze.
-- The FPS counter read 0 for the whole game once the first loading had passed. It now shows the frames over the last
-  second, hides before the game's first frame and while the game is held, and reads 0 only after a whole second without
-  a frame.
-- The overlay's glass was missing in game areas whose size is not a multiple of 4 (1366x768, 1386x780 and others), and
-  the question then waited for a frame read that never came.
-- The glass's frame read could stay stuck when the driver could not wait on it, could reuse objects of a destroyed
-  context, and kept 66 MB at 4K after the question closed; thin lines no longer shimmer in its blur.
-- The broadcast notice no longer repeats its tag: the English title while live is "Broadcasting your play", and a notice
-  that the broadcast ended has no tag.
+- The player for Windows: a song's start could freeze the picture for good while the sound went on (8 of 142 starts on
+  one PC; 0 of 80 now).
+- The FPS counter read 0 for the whole game after the first loading.
+- The overlay's glass was missing at some sizes of the game (1366x768 and others), its picture could stay stuck on a
+  driver that cannot wait on its read, and it kept 66 MB at 4K after the question closed; thin lines no longer shimmer
+  in its blur.
+- The broadcast notice no longer repeats its tag.
 - Sound with the device alone and the safe buffer no longer starts each stream with a 1.6 ms gap.
 - The player's settings file: a volume out of 0 to 100 is held to it (it fell back to full volume), keys and values are
-  read in any case, and a byte order mark no longer hides the first key. The smallest window is 480x270 everywhere
-  (320x180 was taken but drawn at 480x270). The log names the audio engine's period instead of "stream latency 0.0 ms".
-- The launcher: the status line no longer keeps a stale or wrong message once you act (another server, a failure whose
-  cause is gone) and changes language with the window; the Sound page and the guide's sound check keep their place and
-  the keyboard's focus; Tab brings a control out of view into view and goes through the page before the bottom bar; the
-  ready check asks the server, so a server that does not answer no longer shows green (PLAY still starts the app this PC
-  has); the right edge's flat strip and the jump in its green shapes are gone; the ready check has no empty band; the
-  guide's numbers of the steps to come are readable.
-- The launcher's words: shorter Controls lines, no lines about the page itself or advice, "player" only for the one who
-  plays, pages by the menu's names, and plainer Korean.
-- The player for Windows: a timed wait in the game could end early when its timer had fired during an earlier wait that
-  ended for another reason; the player's tests now include a stress test of the game's waits.
+  read in any case, and a byte order mark no longer hides the first key. The smallest window is 480x270 everywhere.
+- The launcher: the status line no longer keeps a stale message once you act, and changes language with the window; the
+  Sound page keeps its place and the keyboard's focus; Tab brings a control out of view into view; a server that does
+  not answer no longer shows green in the ready check (PLAY still starts the app this PC has).
+- The launcher's words are shorter and plainer, in both languages.
+- The player for Windows: a timed wait in the game could end too early.
 
 ## [0.9.1] - 2026-11-11
 
