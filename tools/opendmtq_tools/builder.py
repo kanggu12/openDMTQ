@@ -32,8 +32,8 @@ STALE_BUILD = 15 * 60
 def write_status(state, host, **details):
     """Record where the run stands in out/build.json: "building", "failed" (with the reason, for the
     owner) or "done" (with "file" when this run made a new app), and when (Unix seconds). While there
-    is no app for the address, the portal reloads until it says done, and stops on failed. Not being
-    able to write it never stops a run."""
+    is no app for the address, the portal says it is being made and looks again while this says
+    building, and says plainly otherwise. Not being able to write it never stops a run."""
     status = {"state": state, "host": host, "time": int(time.time()), **details}
     path = os.path.join(OUT, "build.json")
     try:
@@ -163,6 +163,11 @@ def run(args):
     try:
         host = patch_apk.validate_host(args.host)
         base = patch_apk.find_base(os.path.join(patch_apk.APK_DIR, "base"), args.base)
+        # No app for this address: one is built whatever else this run finds, so it says so from here, before the runtime
+        # below, whose download can take a minute. Until then the site would have said that nothing is making one.
+        made = current_manifest()
+        if made is None or made.get("host") != host:
+            write_status("building", host, reason="no app for this address yet")
         # Before the question whether to build: a runtime that has just come is a reason to. Its failure stops nothing, as
         # the app still runs on phones that run 32-bit apps; it is noted for the owner's pages.
         runtime.add_or_note(patch_apk.APK_DIR)

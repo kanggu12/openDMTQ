@@ -371,6 +371,31 @@ class StatusTest(unittest.TestCase):
             self.assertEqual(order, [("runtime", builder.patch_apk.APK_DIR), ("asked", HOST)])
             self.assertEqual(w.status()["state"], "done")
 
+    def test_with_no_app_for_the_address_it_says_building_before_the_runtime(self):
+        # The runtime's download can take a minute: all that time the site said nothing was making an app.
+        with Workshop() as w:
+            seen = []
+            with mock.patch.object(builder.patch_apk, "main", lambda argv: "OpenDMTQ-new.apk"), \
+                    mock.patch.object(builder.runtime, "add_or_note", lambda folder: seen.append(dict(w.status()))), \
+                    mock.patch.object(builder, "reason_to_build", return_value="no app built yet"), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                builder.main(["--host", HOST])
+            self.assertEqual([(s["state"], s["host"]) for s in seen], [("building", HOST)])
+            self.assertEqual(w.status()["state"], "done")
+
+    def test_with_an_app_for_the_address_it_says_nothing_until_it_knows(self):
+        # An app up to date: no "building" at every start, which the site would show for nothing.
+        with Workshop() as w:
+            w.write("out/OpenDMTQ-old.apk", b"PK an app")
+            w.write("out/latest.json", json.dumps({"file": "OpenDMTQ-old.apk", "host": HOST}))
+            seen = []
+            with mock.patch.object(builder.runtime, "add_or_note", lambda folder: seen.append(os.path.exists(w.path("out/build.json")))), \
+                    mock.patch.object(builder, "reason_to_build", return_value=None), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                builder.main(["--host", HOST])
+            self.assertEqual(seen, [False])
+            self.assertEqual(w.status()["state"], "done")
+
     def test_a_runtime_that_cannot_be_had_stops_no_build(self):
         # The whole way through runtime.py, with nothing at hand and the release out of reach, as on a closed network.
         with Workshop() as w:
