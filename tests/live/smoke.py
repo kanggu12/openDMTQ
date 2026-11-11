@@ -215,7 +215,7 @@ call("game.getUserAsset", [guid])
 check("a menu request in the start's batch does not end the song", state()["toast"] == "")
 time.sleep(11)
 call("game.getUserAsset", [guid])
-check("a later menu request does", state()["toast"].startswith("Your play is live\nWatch it now or later under LIVE on "))
+check("a later menu request does", state()["toast"].startswith("Broadcasting your play\nWatch it now or later under LIVE on "))
 
 # Flipping back before the phone read the notice leaves nothing to say.
 switch("live-off")
@@ -818,7 +818,7 @@ s = poll(newcomer_udid)
 site_name = json.loads(request(plain, SITE + "/opendmtq/client.php?about")[2])["name"]
 check("a new device's first poll: on, its key, and the notice naming the server as the site does",
       s["on"] is True and re.fullmatch(r"[0-9a-f]{32}", s.get("token", "")) is not None
-      and s["toast"] == f"Your play is live\nWatch it now or later under LIVE on {site_name}", s)
+      and s["toast"] == f"Broadcasting your play\nWatch it now or later under LIVE on {site_name}", s)
 switch("live-off", newcomer)
 s = poll(newcomer_udid)
 check("a new player the owner turns off stays off at the next poll, and the one after",

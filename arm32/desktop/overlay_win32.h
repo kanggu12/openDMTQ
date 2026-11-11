@@ -38,6 +38,12 @@ void notice(const std::string& text, bool live);
 // The mouse moved over the game, at (x, y) of its window, with its button down or not: resting at the very top edge or
 // on the handle, with the button up, it brings the bar down.
 void pointer_moved(int x, int y, bool pressed);
+// A press or a release on the game (the mouse's button, a finger, a pen), with whether anything is still down on it:
+// the bar comes from the top edge or the handle only after the pointer moved there again, the game quiet for 1.5 s.
+void game_pressed(bool down);
+// Whether the game has had no press or release for 1.5 s and nothing is down on it: a finger drawn down from the top
+// edge brings the bar only then.
+bool game_quiet();
 // A finger drawn down from the game's top edge: the bar shows for a few seconds.
 void show_bar();
 // Whether the question before quitting is up (the game is held still and the keys are the question's meanwhile).

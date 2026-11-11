@@ -32,7 +32,7 @@
 //   game holds still meanwhile, so a click by mistake mid-song loses nothing. Alt+F4 does nothing.
 // - The notice: the server's two-line notice about a broadcast (a title, then where to watch), as a glass card that
 //   slides down at the top of the game, stays for a few seconds and fades. A red LIVE tag with a slanted end, as the
-//   game's tags, while broadcasting, a grey one when the broadcast has ended.
+//   game's tags, while broadcasting; once the broadcast has ended its title says so alone, with no tag.
 // - The cursor: a dart in the logo's chrome and lime, all lime while the mouse's finger is down on the game.
 // - The frame counter: when the PC's settings ask for it, a small glass box like the game's Q and MAX box, at the top
 //   left beside a song's pause button unless another corner is chosen, 8 pixels in at 720 lines: FPS in the game's
@@ -986,9 +986,9 @@ bool in_card(int x, int y) { return ask_layout().card.Contains(static_cast<REAL>
 
 // ---- the notice's look (the painter's)
 
-// The notice's look for "title\ndetail": a glass card with the broadcast's badge on its left (red LIVE while live, grey
-// once ended), the title over where to watch; its window's place goes to the paint, centred at the top of the game's
-// area, clear of a counter in a top corner (`corner`, Settings::ShowFps's order).
+// The notice's look for "title\ndetail": a glass card with the red LIVE tag on its left while live (once ended, the
+// title says so alone: no tag), the title over where to watch; its window's place goes to the paint, centred at the top
+// of the game's area, clear of a counter in a top corner (`corner`, Settings::ShowFps's order).
 void notice_look(Paint& p, const std::string& text, bool live, int corner) {
     const std::wstring all = wide(text);
     const std::size_t cut = all.find(L'\n');
@@ -996,12 +996,12 @@ void notice_look(Paint& p, const std::string& text, bool live, int corner) {
     auto title_font = font(Weight::kBold, fpx(16), g_korean);
     auto detail_font = font(Weight::kRegular, fpx(13), g_korean);
     auto badge_font = font(Weight::kBold, fpx(11), g_korean);
-    const std::wstring badge = live ? L"LIVE" : (g_korean ? L"방송 종료" : L"ENDED");
-    // The room inside the card: to the badge, between it and the words, after the words; the badge's own, the game's tag
-    // (as its MY RANK), whose slanted right end takes a little more room.
-    const float pad = fpx(16), gap = fpx(12), after = fpx(20), badge_h = fpx(22), badge_pad = fpx(9);
+    const std::wstring badge = L"LIVE";
+    // The room inside the card: to the tag, between it and the words, after the words; the tag's own, the game's tag
+    // (as its MY RANK), whose slanted right end takes a little more room. No tag once ended: the words start at the pad.
+    const float pad = fpx(16), gap = live ? fpx(12) : 0.0f, after = fpx(20), badge_h = fpx(22), badge_pad = fpx(9);
     const float slant = badge_h * 0.36f;
-    const float badge_w = measure(badge, *badge_font).Width + badge_pad * 2 + (live ? fpx(0.66f) * 4 : 0) + slant;
+    const float badge_w = live ? measure(badge, *badge_font).Width + badge_pad * 2 + fpx(0.66f) * 4 + slant : 0.0f;
     // The words' room: within 560 at 720 lines, and within the game's area however small its window; a long server name
     // wraps there, into even lines. A counter in a top corner keeps its corner: the card, centred, stays clear of it.
     const int aw = area_w();
@@ -1038,8 +1038,8 @@ void notice_look(Paint& p, const std::string& text, bool live, int corner) {
     look.tint = kTintPiece;
     std::unique_ptr<Bitmap> surface;
     std::unique_ptr<Graphics> g(fresh_fore(look, surface));
-    // The badge in the middle of the glass's height: the game's tag, nearly square on its left, its right end slanted
-    // down to the left; red while live (Windows' close red, white bold words at 5:1 and more), grey once ended.
+    // The tag in the middle of the glass's height while live: the game's tag, nearly square on its left, its right end
+    // slanted down to the left, Windows' close red, white bold words at 5:1 and more.
     const RectF tag(glass.X + pad, glass.Y + (glass_h - badge_h) / 2, badge_w, badge_h);
     GraphicsPath tag_path;
     {
@@ -1055,14 +1055,13 @@ void notice_look(Paint& p, const std::string& text, bool live, int corner) {
     bevel(*g, glass, radius, 40, 90);
     // The game's green line along its foot while live, fading out toward both ends; none once the broadcast ended.
     if (live) game_line(*g, glass.X + radius, glass.X + glass.Width - radius, glass.Y + glass.Height - std::max(1.0f, fpx(1)), game::kLine);
-    {
-        const Color top = live ? game::kRedTop : Color(255, 0x72, 0x79, 0x86), foot = live ? game::kRedFoot : Color(255, 0x56, 0x5C, 0x67);
-        LinearGradientBrush fill(PointF(0, tag.Y - 1), PointF(0, tag.Y + tag.Height + 1), top, foot);
+    if (live) {
+        LinearGradientBrush fill(PointF(0, tag.Y - 1), PointF(0, tag.Y + tag.Height + 1), game::kRedTop, game::kRedFoot);
         g->FillPath(&fill, &tag_path);
     }
     // Its word, spaced a little as a badge's is, white and bold, in the part left of its slant.
-    {
-        const float spacing = live ? fpx(0.66f) : 0.0f;
+    if (live) {
+        const float spacing = fpx(0.66f);
         const RectF word = measure(badge, *badge_font);
         float x = tag.X + (tag.Width - slant - word.Width - spacing * static_cast<float>(badge.size() - 1)) / 2;
         const float y = tag.Y + (tag.Height - word.Height) / 2;
@@ -1503,6 +1502,19 @@ constexpr UINT_PTR kBarEdgeTimer = 4;
 constexpr UINT kBarEdgeMs = 150;
 // Whether the mouse's button was down at its last move over the game (it plays then: no bar).
 bool g_pointer_down = false;
+// The game's own input as the window reports it: whether a mouse button or a finger is down on the game now, and when
+// the last press or release there was. The bar comes from the top edge or the handle only once the game has had none
+// for this long: a player whose clicks or held notes are at the top of a song never brings it.
+bool g_game_down = false;
+UINT64 g_game_pressed = 0;
+constexpr UINT64 kQuietMs = 1500;
+// The pointer came to rest at the top edge or on the handle by moving there (not by a press where it already was):
+// the edge's wait may bring the bar. Any press, and a move away, takes it back.
+bool g_rest_armed = false;
+// Where the last move put the pointer (in the game's window): a move message to the same place is no move.
+int g_moved_x = -1, g_moved_y = -1;
+// Until when a bar that came by itself stays down whatever the pointer does (0: none).
+UINT64 g_bar_reveal_until = 0;
 // The bar is wanted on the screen (its time not over), or may come (the pointer waits at the edge): the frame behind it
 // is read meanwhile, so that it comes as glass rather than its bare tint.
 bool g_bar_wanted = false, g_bar_coming = false;
@@ -1556,6 +1568,7 @@ void hide_bar() {
     hide(g_bar);
     g_bar_up = false;
     g_bar_wanted = false;
+    g_bar_reveal_until = 0;
     KillTimer(g_bar.window, kBarTimer);
     g_bar_hover = kNone;
     // A chip held as it goes is let go of without acting: forgotten before the capture goes, so that the bar's
@@ -1599,9 +1612,11 @@ void bar_frame() {
         // Off it, perhaps between two of its moves: no chip is under the pointer.
         g_bar_hover = kNone;
     }
-    const UINT64 idle = now - g_bar_since;
+    // Whole until the later of its stay after the pointer and a reveal's own time (the pointer leaving it does not
+    // shorten a reveal), then fading.
+    const UINT64 whole_until = std::max(g_bar_since + g_bar_stay, g_bar_reveal_until);
     float alpha = 1;
-    if (idle > g_bar_stay) alpha = 1 - std::min(1.0f, static_cast<float>(idle - g_bar_stay) / kBarFadeMs);
+    if (now > whole_until) alpha = 1 - std::min(1.0f, static_cast<float>(now - whole_until) / kBarFadeMs);
     if (alpha <= 0 || asking()) {
         hide_bar();
         return;
@@ -1635,7 +1650,7 @@ void bar_frame() {
     }
     // Not on the screen yet: a look again soon (its picture, or the end of the glass's wait). Fading: the next step.
     // Whole: the next look at the pointer, or the fade's start if that comes first.
-    UINT64 next = alpha < 1 ? kBarStepMs : std::min(kBarLookMs, g_bar_stay - std::min(g_bar_stay, idle) + 1);
+    UINT64 next = alpha < 1 ? kBarStepMs : std::min(kBarLookMs, whole_until - std::min(whole_until, now) + 1);
     if (!g_bar.up) next = std::min<UINT64>(next, 15);
     SetTimer(g_bar.window, kBarTimer, static_cast<UINT>(std::max<UINT64>(1, next)), nullptr);
 }
@@ -1653,22 +1668,51 @@ void reveal(UINT64 stay, const char* why) {
     bar_frame();
 }
 
+// The bar down by itself for `stay` ms whatever the pointer does meanwhile (the game's first picture, a switch between
+// a window and full screen), then as usual.
+void reveal_for(UINT64 stay, const char* why) {
+    if (!g_bar.window || asking()) return;
+    g_bar_reveal_until = std::max(g_bar_reveal_until, GetTickCount64() + stay);
+    reveal(stay, why);
+}
+
+// The bar's rest at the top edge or on the handle let go of: no bar from it (a press, the pointer gone elsewhere).
+void rest_cancel() {
+    g_rest_armed = false;
+    if (g_bar.window) KillTimer(g_bar.window, kBarEdgeTimer);
+    if (g_bar_coming) {
+        g_bar_coming = false;
+        if (!g_bar.up && !g_bar_wanted) {
+            // The picture made meanwhile goes too (a later bar is made over the frame then).
+            g_bar.picture.reset();
+            g_bar.key.clear();
+            g_bar_ordered.clear();
+        }
+        glass_wish();
+    }
+}
+
 LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     switch (msg) {
     case WM_TIMER:
         if (w == kBarTimer) bar_frame();
         if (w == kBarEdgeTimer) {
             KillTimer(h, kBarEdgeTimer);
-            g_bar_coming = false;
-            if (pointer_at_edge()) {
-                reveal(kBarStayMs, nullptr);
-            } else if (!g_bar.up && !g_bar_wanted) {
-                // The pointer went on: the picture made meanwhile goes too (a later bar is made over the frame then).
-                g_bar.picture.reset();
-                g_bar.key.clear();
-                g_bar_ordered.clear();
-                glass_wish();
+            // Only a rest the pointer came to by moving, still where it rests, no button or finger down on the game.
+            if (!g_rest_armed || !pointer_at_edge()) {
+                rest_cancel();
+                return 0;
             }
+            // A press or a release on the game less than kQuietMs ago: the rest waits for the quiet's end (a click and a
+            // held note at the top of a song are play, not a wish for the bar).
+            const UINT64 since = GetTickCount64() - g_game_pressed;
+            if (since < kQuietMs) {
+                SetTimer(h, kBarEdgeTimer, static_cast<UINT>(kQuietMs - since), nullptr);
+                return 0;
+            }
+            g_rest_armed = false;
+            g_bar_coming = false;
+            reveal(kBarStayMs, nullptr);
         }
         return 0;
     case WM_NCHITTEST: {
@@ -1978,7 +2022,9 @@ void counter_place() {
 // A look at the count now: what it shows, and when to look again (sooner while it waits for frames).
 void fps_look_now() {
     if (!g_fps.window || !g_fps_corner || !g_hooks.frames) return;
-    g_reading = g_rate.look(g_hooks.frames(), g_held || g_minimised_hold);
+    // The count, then the moment of the look on the count's own clock (the steady clock frames.cpp stamps frames with).
+    const FrameCount count = g_hooks.frames();
+    g_reading = g_rate.look(count, now_ns(), g_held || g_minimised_hold);
     // Said when it comes up or goes, with why.
     if (g_reading.shown != g_fps_said_up) {
         g_fps_said_up = g_reading.shown;
@@ -2133,7 +2179,7 @@ LRESULT CALLBACK handle_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
 }
 
 bool pointer_at_edge() {
-    if (asking() || g_pointer_down) return false;
+    if (asking() || g_pointer_down || g_game_down) return false;
     POINT p{};
     GetCursorPos(&p);
     const RECT a = area();
@@ -2258,7 +2304,7 @@ void first_picture(const char* how) {
     std::snprintf(line, sizeof line, "player: the game's first picture is up (%s)", how);
     note(line);
     glass_wish();
-    reveal(kBarRevealMs, "the game's first picture");
+    reveal_for(kBarRevealMs, "the game's first picture");
     handle_update();
 }
 
@@ -2527,20 +2573,35 @@ void notice(const std::string& text, bool live) {
 
 void pointer_moved(int x, int y, bool pressed) {
     g_pointer_down = pressed;
+    // A move message to where the pointer already was (Windows sends some after a click) is no move: a rest only counts
+    // when the pointer came to it by moving.
+    const bool moved = x != g_moved_x || y != g_moved_y;
+    g_moved_x = x;
+    g_moved_y = y;
     // Not while the mouse plays (its button down), not over the question, and only at the very top edge of the game
     // (within 4 pixels at 720 lines) or on the handle: the game's own controls under the bar's place stay the game's
     // while they are used.
-    if (!g_bar.window || asking() || pressed) return;
+    if (!g_bar.window || asking() || pressed) {
+        rest_cancel();
+        return;
+    }
+    if (!moved) return;
     // A mouse's move: the pointer is the mouse's again.
     g_bar_by_touch = false;
     const bool edge = y < std::max(1, px(4));
     const bool handle = g_handle.up && on_handle(x, y);
-    if (!edge && !handle) return;
-    // Down already: it stays. Else the pointer waits a moment, and the bar comes only if it is still there then.
+    if (!edge && !handle) {
+        // Moved away from the edge and the handle: no rest there.
+        if (g_rest_armed) rest_cancel();
+        return;
+    }
+    // Down already: it stays. Else the pointer waits a moment, and the bar comes only if it rests there then, with the
+    // game quiet (no press) for kQuietMs.
     if (g_bar.up) {
         reveal(kBarStayMs, nullptr);
     } else {
         g_bar_why = handle ? "the pointer on the handle" : "the pointer at the top edge";
+        g_rest_armed = true;
         SetTimer(g_bar.window, kBarEdgeTimer, kBarEdgeMs, nullptr);
         // The frame behind the bar read during the wait, and its picture made meanwhile.
         if (!g_bar_coming) {
@@ -2550,6 +2611,16 @@ void pointer_moved(int x, int y, bool pressed) {
         }
     }
 }
+
+void game_pressed(bool down) {
+    // A press or a release on the game: the game is played, and no rest at the edge or on the handle brings the bar
+    // until the pointer moves there again with the game quiet.
+    g_game_down = down;
+    g_game_pressed = GetTickCount64();
+    rest_cancel();
+}
+
+bool game_quiet() { return !g_game_down && GetTickCount64() - g_game_pressed >= kQuietMs; }
 
 void show_bar() {
     if (!g_bar.window || asking()) return;
@@ -2630,10 +2701,11 @@ void place() {
 }
 
 void switched() {
-    // The bar comes down for a few seconds after a switch, its chip the other way, so that a player sees where it went;
+    // The bar comes down for a few seconds after a switch, its chip the other way, so that a player sees where it went
+    // (whatever the pointer does meanwhile: one that leaves the bar after the chip's click does not take it up sooner);
     // not before the game's first picture (the start switches to full screen before anything shows).
     if (!g_first_picture) return;
-    reveal(kBarRevealMs, full_screen() ? "full screen" : "a window");
+    reveal_for(kBarRevealMs, full_screen() ? "full screen" : "a window");
 }
 
 void show_fps(int corner) {
@@ -2847,11 +2919,11 @@ void test_save(const std::wstring& prefix, const std::wstring& frame_png, bool w
     // its place; a long name, which the card wraps within the game's width; each without the bar and under it; and the
     // long one beside a counter in either top corner.
     const std::string live_text = g_korean ? "이 플레이를 방송하고 있어요\nMy Server 사이트 LIVE에서 지금도, 끝난 뒤에도 볼 수 있어요"
-                                           : "Your play is live\nWatch it now or later under LIVE on My Server";
+                                           : "Broadcasting your play\nWatch it now or later under LIVE on My Server";
     const std::string ended_text = g_korean ? "방송을 마쳤어요\nMy Server 사이트 LIVE에서 다시 볼 수 있어요"
                                             : "Your broadcast has ended\nWatch the replay under LIVE on My Server";
     const std::string long_text = g_korean ? "이 플레이를 방송하고 있어요\nOpenDMTQ Community Server Seoul Central 사이트 LIVE에서 지금도, 끝난 뒤에도 볼 수 있어요"
-                                           : "Your play is live\nWatch it now or later under LIVE on OpenDMTQ Community Server Seoul Central";
+                                           : "Broadcasting your play\nWatch it now or later under LIVE on OpenDMTQ Community Server Seoul Central";
     struct NoticeCase {
         const char* name;
         const std::string* text;

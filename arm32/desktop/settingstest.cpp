@@ -72,84 +72,122 @@ void frame_counter_checks() {
     using player::overlay::FrameRate;
     using player::overlay::Reading;
     // 60 frames a second from 2 s on (the game's black start before that), with no frame from 10 s to 12 s (a
-    // loading screen), looks every 500 ms as the counter's own.
+    // loading screen); looks every 500 ms as the counter's own, every 100 ms while it waits.
     Frames sixty;
     sixty.from = ms(2000);
     sixty.period = 16666667;
     sixty.gaps[sixty.gap_count++] = Frames::Gap{ms(10000), ms(12000)};
     FrameRate counter;
-    Reading r = counter.look(sixty.at(ms(500)), false);
+    auto look = [&](FrameRate& c, const Frames& f, long long t, bool held = false) { return c.look(f.at(t), t, held); };
+    Reading r = look(counter, sixty, ms(500));
     check(!r.shown, "the counter is hidden before the game's first frame");
-    r = counter.look(sixty.at(ms(1500)), false);
-    check(!r.shown, "and still hidden while no frame has come");
-    // The first frame: a measure starts, the counter quicker to look (it waits for its first rate), still hidden.
-    r = counter.look(sixty.at(ms(2005)), false);
-    check(!r.shown && counter.waiting(), "the first frame starts a measure, hidden until it gives a rate");
-    r = counter.look(sixty.at(ms(2105)), false);
-    check(r.shown && r.fps == 60 && r.ms > 16.6f && r.ms < 16.7f, "the second look after the first frame reads 60 and 16.7 ms");
+    r = look(counter, sixty, ms(1500));
+    check(!r.shown && counter.waiting(), "and still hidden while no frame has come, looking soon again");
+    // The first frame: a measure starts from it, still hidden until a second frame gives a rate.
+    r = look(counter, sixty, ms(2005));
+    check(!r.shown && counter.waiting(), "the first frame starts a measure, hidden until a second one");
+    r = look(counter, sixty, ms(2105));
+    check(r.shown && r.fps == 60 && r.ms > 16.6f && r.ms < 16.7f, "the next look reads 60 and 16.7 ms, from the first frame");
     check(!counter.waiting(), "measured: the counter looks at its own pace again");
-    // Steady: 60 at every look.
+    // Steady: 60 at every look, the rate over the last second.
     bool steady = true;
-    for (long long t = ms(2605); t < ms(10000); t += ms(500)) steady = steady && counter.look(sixty.at(t), false).fps == 60;
+    for (long long t = ms(2605); t < ms(10000); t += ms(500)) steady = steady && look(counter, sixty, t).fps == 60;
     check(steady, "60 at every look while the game shows 60 frames a second");
-    // The loading screen: no frame for 2 s. A look past its start may still count the frames before it; the looks
-    // within it that see no new frame read 0, shown (the game shows nothing new).
-    r = counter.look(sixty.at(ms(10105)), false);
-    check(r.shown && r.fps > 0, "a look just into the stretch counts the frames before it");
-    r = counter.look(sixty.at(ms(10605)), false);
-    check(r.shown && r.fps == 0 && r.ms == 0, "a look that sees no new frame reads 0 with no frame time");
-    r = counter.look(sixty.at(ms(11105)), false);
+    // The loading screen: no frame for 2 s. Within its first second the counter reads the last second's frames (not 0);
+    // a whole second without a frame reads 0.
+    r = look(counter, sixty, ms(10105));
+    check(r.shown && r.fps > 30, "a look just into the stretch reads the last second's frames");
+    r = look(counter, sixty, ms(10605));
+    check(r.shown && r.fps >= 22 && r.fps <= 26,
+          "0.6 s without a frame is no 0, and the last second's 24 frames read over the whole second, not at their own pace");
+    r = look(counter, sixty, ms(11105));
+    check(r.shown && r.fps == 0 && r.ms == 0, "a whole second without a frame reads 0 with no frame time");
+    r = look(counter, sixty, ms(11605));
     check(r.shown && r.fps == 0, "and 0 again while the stretch goes on");
-    // Frames again from 12 s: the first look after them starts a measure afresh (dashes, never the 0 of before); the
-    // second reads the true rate again (the stuck 0 this check was written for read 0 from here on).
-    r = counter.look(sixty.at(ms(12105)), false);
-    check(r.shown && r.fps == -1, "the first look after frames come again shows dashes, not 0");
-    r = counter.look(sixty.at(ms(12605)), false);
-    check(r.shown && r.fps == 60, "the second look after frames come again reads 60 again");
-    steady = true;
-    for (long long t = ms(13105); t < ms(20000); t += ms(500)) steady = steady && counter.look(sixty.at(t), false).fps == 60;
-    check(steady, "and 60 at every look after it");
+    // Frames again from 12 s: never dashes and never 0 while they come; the frames of the last second over their time,
+    // so the number climbs back to 60 within a second.
+    r = look(counter, sixty, ms(12105));
+    check(r.shown && r.fps > 0, "the first look after frames come again reads a rate, not 0 and not dashes");
+    r = look(counter, sixty, ms(12605));
+    check(r.shown && r.fps > 0, "and the next one too");
+    r = look(counter, sixty, ms(13105));
+    check(r.shown && r.fps == 60, "a second after frames come again: 60");
+    // A loading screen that shows a frame every 300 ms: about 3 at every look, never 0 in turn with it.
+    Frames sparse;
+    sparse.from = ms(1000);
+    sparse.period = ms(300);
+    FrameRate slow;
+    look(slow, sparse, ms(1001));
+    bool few = true;
+    int seen = 0;
+    for (long long t = ms(1101); t < ms(9000); t += slow.waiting() ? ms(100) : ms(500)) {
+        r = look(slow, sparse, t);
+        if (!r.shown) continue;
+        ++seen;
+        few = few && r.fps >= 3 && r.fps <= 4;
+    }
+    check(seen > 10 && few, "a frame every 300 ms reads 3 or 4 at every look, never 0");
     // Held still for the question from 20.1 s to 25.2 s: hidden at once. The game takes a moment to stop (its pause
     // goes through its own thread: frames until 20.2 s) and to start again (from 25.3 s); the frames it shows after the
-    // hold began count for nothing. After the hold, hidden until a frame comes, then the true rate by the next look.
+    // hold began count for nothing. After the hold, hidden until two frames give a rate, which is the true one.
     Frames held = sixty;
     held.gaps[held.gap_count++] = Frames::Gap{ms(20200), ms(25300)};
-    r = counter.look(held.at(ms(20105)), true);
+    for (long long t = ms(13605); t < ms(20105); t += ms(500)) look(counter, held, t);
+    r = look(counter, held, ms(20105), true);
     check(!r.shown, "the counter hides while the game is held");
-    r = counter.look(held.at(ms(25105)), true);
+    r = look(counter, held, ms(25105), true);
     check(!r.shown, "and stays hidden through the hold");
-    r = counter.look(held.at(ms(25200)), false);
+    r = look(counter, held, ms(25200));
     check(!r.shown && counter.waiting(), "let go with no frame yet: still hidden, waiting for one");
-    r = counter.look(held.at(ms(25305)), false);
+    r = look(counter, held, ms(25305));
     check(!r.shown, "the first frame after the hold starts a measure");
-    r = counter.look(held.at(ms(25405)), false);
+    r = look(counter, held, ms(25405));
     check(r.shown && r.fps == 60, "and the next look reads 60: the hold is no long frame");
+    r = look(counter, held, ms(25905));
+    check(r.shown && r.fps == 60, "nor counts in the second after it");
     // 144 frames a second, looked at every 500 ms, and a run so quick its rate is capped at three digits.
     Frames fast;
     fast.from = ms(1000);
     fast.period = 6944444;
     FrameRate quick;
-    quick.look(fast.at(ms(1001)), false);
-    quick.look(fast.at(ms(1101)), false);
-    r = quick.look(fast.at(ms(1601)), false);
+    look(quick, fast, ms(1001));
+    look(quick, fast, ms(1101));
+    look(quick, fast, ms(1601));
+    r = look(quick, fast, ms(2101));
     check(r.fps == 144 && r.ms > 6.9f && r.ms < 7.0f, "144 frames a second read as 144 and 6.9 ms");
     Frames faster;
     faster.from = ms(1000);
     faster.period = 500000;
     FrameRate capped;
-    capped.look(faster.at(ms(1001)), false);
-    r = capped.look(faster.at(ms(1101)), false);
+    look(capped, faster, ms(1001));
+    r = look(capped, faster, ms(1101));
     check(r.fps == 999, "2000 frames a second read as 999, the counter's room");
-    // A stretch with no frame shorter than a look's time: the rate over the look's time takes it in (the true mean).
+    // Frames that stop just after a look: the next look reads the second's few frames over the whole second.
+    Frames stop;
+    stop.from = ms(1000);
+    stop.period = 16666667;
+    stop.gaps[stop.gap_count++] = Frames::Gap{ms(5020), ms(60000)};
+    FrameRate stopped;
+    look(stopped, stop, ms(1001));
+    look(stopped, stop, ms(1101));
+    for (long long t = ms(1501); t <= ms(5001); t += ms(500)) look(stopped, stop, t);
+    r = look(stopped, stop, ms(5501));
+    check(r.fps >= 28 && r.fps <= 34, "frames that stop 20 ms after a look: the next look reads the second's 31 frames over the second, not the 60 they came at");
+    r = look(stopped, stop, ms(6001));
+    check(r.fps == 1, "and the one after it the second's one frame: 1");
+    r = look(stopped, stop, ms(6501));
+    check(r.fps == 0, "a whole second after the last frame, 0");
+    // A stretch with no frame shorter than a second: the last second's frames over their time take it in (its mean).
     Frames hitch = sixty;
     hitch.gaps[hitch.gap_count++] = Frames::Gap{ms(30100), ms(30350)};
     FrameRate counted;
-    counted.look(hitch.at(ms(29505)), false);
-    counted.look(hitch.at(ms(29605)), false);
-    r = counted.look(hitch.at(ms(30105)), false);
+    look(counted, hitch, ms(28505));
+    look(counted, hitch, ms(28605));
+    for (long long t = ms(29105); t < ms(30100); t += ms(500)) look(counted, hitch, t);
+    r = look(counted, hitch, ms(30105));
     check(r.fps == 60, "60 before the hitch");
-    r = counted.look(hitch.at(ms(30605)), false);
-    check(r.fps > 20 && r.fps < 35, "a quarter second without frames in a look's half second reads its mean (about 30)");
+    r = look(counted, hitch, ms(30605));
+    check(r.fps > 40 && r.fps < 52, "a quarter second without frames in the last second reads its mean (about 45)");
 }
 
 }  // namespace

@@ -44,6 +44,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <map>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
@@ -120,6 +121,9 @@ bool g_esc_down = false, g_esc_held = false;
 // A finger that came down on the game's top edge: drawn down, it shows the overlay's bar instead of reaching the game;
 // lifted where it was, it is a tap after all. Its pointer id (0: none) and where it started, in the game's window.
 UINT32 g_edge_finger = 0;
+// The touch screen's fingers and the pens on the game now, by their ids: with the mouse's button, whether anything is
+// down on the game, which the overlay hears of with each press and release (no bar from the top while one is).
+std::set<UINT32> g_contacts;
 POINT g_edge_from{};
 // When it came down, for the tap's own time if it is one.
 std::int64_t g_edge_time = 0;
@@ -1031,6 +1035,8 @@ LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         // The mouse's first button is a finger: pressed, moved while pressed, lifted; held even outside the window.
         SetCapture(h);
         g_pressed = true;
+        // A press on the game: the overlay's bar waits for the game to be quiet.
+        overlay::game_pressed(true);
         SetCursor(overlay::cursor(true));
         g_last_touch = false;
         if (trace_input()) {
@@ -1048,6 +1054,7 @@ LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     case WM_LBUTTONUP:
         if (g_pressed) {
             g_pressed = false;
+            overlay::game_pressed(!g_contacts.empty());
             SetCursor(overlay::cursor(false));
             ReleaseCapture();
             if (trace_input()) jvm::log("player: input: the mouse's button up on the game at %d,%d", static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l)));
@@ -1058,6 +1065,7 @@ LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         // The mouse taken away while pressed (another window, a system dialog): the finger lifts where it was last.
         if (g_pressed && reinterpret_cast<HWND>(l) != h) {
             g_pressed = false;
+            overlay::game_pressed(!g_contacts.empty());
             touch(3, 0, 0);
         }
         return 0;
@@ -1074,8 +1082,23 @@ LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         // Screen pixels, into the window's, then the game's.
         POINT p{static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l))};
         ScreenToClient(h, &p);
-        // A finger that comes down on the top edge waits: drawn down, it shows the bar; lifted, it is a tap.
-        if (msg == WM_POINTERDOWN && !g_edge_finger && p.y < std::max(8, g_area_h / 40)) {
+        // A finger that comes down on the top edge waits: drawn down, it shows the bar; lifted, it is a tap. Only when it is
+        // alone on the game and the game has had no press for a moment: a finger playing at the top of a song plays.
+        const bool edge_alone = g_contacts.empty() && !g_pressed && overlay::game_quiet();
+        if (msg == WM_POINTERDOWN) {
+            g_contacts.insert(id);
+            overlay::game_pressed(true);
+        } else if (msg == WM_POINTERUP) {
+            g_contacts.erase(id);
+            overlay::game_pressed(g_pressed || !g_contacts.empty());
+        }
+        if (msg == WM_POINTERDOWN && g_edge_finger && id != g_edge_finger) {
+            // Another finger while one waits at the edge: that one plays after all, from where and when it came down.
+            const UINT32 waiting = g_edge_finger;
+            g_edge_finger = 0;
+            finger(static_cast<int>(waiting), 0, game_x(g_edge_from.x), game_y(g_edge_from.y), g_edge_time);
+        }
+        if (msg == WM_POINTERDOWN && !g_edge_finger && edge_alone && p.y < std::max(8, g_area_h / 40)) {
             g_edge_finger = id;
             g_edge_from = p;
             g_edge_time = contact_time(id);
@@ -1096,6 +1119,8 @@ LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         return 0;
     }
     case WM_POINTERCAPTURECHANGED:
+        // The finger gone from the game either way.
+        if (g_contacts.erase(GET_POINTERID_WPARAM(w))) overlay::game_pressed(g_pressed || !g_contacts.empty());
         if (GET_POINTERID_WPARAM(w) == g_edge_finger) {
             g_edge_finger = 0;
             return 0;
