@@ -571,9 +571,13 @@ Turns the notice on, or changes what it says while it is on. Players then see it
 
 Body (JSON):
 
-- `message` (string, optional): What it says. Empty or left out: the usual words.
+- `message` (string, optional): What it says, 200 characters at most (a line break is one). Empty or left out: the usual words.
 
 Answer: `200` with [Notice](#notice).
+
+Refusals:
+
+- `400 message_too_long`: The message is longer than 200 characters.
 
 #### `DELETE /maintenance`
 

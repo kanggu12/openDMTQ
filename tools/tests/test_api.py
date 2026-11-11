@@ -457,6 +457,11 @@ def CASES():
         C("maintenance_set", "PUT", "/maintenance", 200, json={"message": "Back at nine."},
           check=lambda t, inst, r: t.assertEqual(r.get_json(), {"on": True, "message": "Back at nine."})),
         C("maintenance_set", "PUT", "/maintenance", 400, "bad_field", json={"message": 5}),
+        # One limit, the page's: 200 characters, a line break one of them; over it, refused in the page's words.
+        C("maintenance_set", "PUT", "/maintenance", 200, json={"message": "x" * 95 + "\r\n" * 10 + "x" * 95},
+          check=lambda t, inst, r: t.assertEqual(r.get_json()["message"], "x" * 95 + "\n" * 10 + "x" * 95)),
+        C("maintenance_set", "PUT", "/maintenance", 400, "message_too_long", json={"message": "x" * 201},
+          check=lambda t, inst, r: t.assertEqual(r.get_json()["error"]["message"], "The message is longer than 200 characters.")),
         C("maintenance_set", "PUT", "/maintenance", 400, "bad_json", data="message=x", content_type="application/x-www-form-urlencoded"),
         C("maintenance_clear", "DELETE", "/maintenance", 200),
         C("maintenance_clear", "DELETE", "/maintenance", 403, "read_only", token="reader"),

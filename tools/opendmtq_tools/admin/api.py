@@ -556,8 +556,8 @@ def maintenance_get(args):
 
 @handler
 def maintenance_set(args):
-    """PUT /maintenance: the Maintenance page's On, with its message (song_pages.set_notice)."""
-    song_pages.set_notice(True, (args.get("message") or "").strip())
+    """PUT /maintenance: the Maintenance page's On, with its message (song_pages.set_notice, which refuses a long one)."""
+    song_pages.set_notice(True, args.get("message") or "")
     return notice()
 
 

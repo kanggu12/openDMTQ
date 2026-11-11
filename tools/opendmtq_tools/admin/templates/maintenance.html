@@ -6,7 +6,7 @@
   <p class="auto-line big"><span class="lamp {{ 'wait' if on else 'off' }}"></span><b>{{ t('maint.is_on') if on else t('maint.is_off') }}</b></p>
   <form method="post">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <label class="field">{{ t('maint.message') }} <textarea name="message" rows="3" placeholder="{{ t('maint.placeholder') }}">{{ message }}</textarea></label>
+    <label class="field">{{ t('maint.message') }} <textarea name="message" rows="3" maxlength="{{ max }}" placeholder="{{ t('maint.placeholder') }}">{{ message }}</textarea></label>
     <p class="presets"><span class="presets-label">{{ t('maint.presets') }}</span>
       {% for name, key in (('maint.p_short_name', 'maint.p_short'), ('maint.p_update_name', 'maint.p_update'), ('maint.p_tonight_name', 'maint.p_tonight')) %}<button type="button" class="btn btn-sm" data-text="{{ tp(key) }}">{{ t(name) }}</button>{% endfor %}
     </p>

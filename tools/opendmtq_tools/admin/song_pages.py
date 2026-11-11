@@ -215,24 +215,43 @@ def song_title(song_id):
         return str(song_id)
 
 
+# The most a maintenance message holds, in characters: a few lines on a phone, where the site shows it on every page while
+# it is on. The page's field stops there, and a longer one from anywhere is refused in the same words.
+MAINT_MAX = 200
+
+
 @app.route(BASE + "/maintenance", methods=["GET", "POST"])
 def maintenance_page():
+    # What sessions before this version kept in the cookie: the last message is kept with the server's settings now.
+    session.pop("maintenance_message", None)
     if request.method == "POST":
         on = request.form.get("action") == "on"
-        message = request.form.get("message", "").strip()
-        was_on = set_notice(on, message)
-        # Back on next time with what it said: in the field for the next time, until something else is typed.
-        session["maintenance_message"] = message
+        message = request.form.get("message", "")
+        try:
+            was_on = set_notice(on, message)
+        except Refused as e:
+            # Too long: the page again with what was typed, to shorten, and why.
+            flash(e.words, e.tone)
+            return render_template("maintenance.html", on=songs.maintenance()[0], message=message, max=MAINT_MAX), e.status
         flash(t("maint.off" if not on else "maint.updated" if was_on else "maint.on"), "ok")
         return redirect(url_for("maintenance_page"))
     on, message = songs.maintenance()
-    return render_template("maintenance.html", on=on, message=message or session.get("maintenance_message", ""))
+    # Off: the field holds the message used last, for the next time, until something else is typed.
+    return render_template("maintenance.html", on=on, message=message or core.settings().get("maintenance_message", ""), max=MAINT_MAX)
 
 
 def set_notice(on, message):
-    """Turns the in-game maintenance notice on with this message (or the usual one when it is empty), or off. Returns
-    whether it was on before."""
+    """Turns the in-game maintenance notice on with this message (or the usual one when it is empty), or off, for the page
+    and the API alike: a message of more than MAINT_MAX characters is refused, and nothing changes. The message turned on
+    is kept with the server's settings, the field's words for the next time. Returns whether it was on before."""
+    # A line break is one character, however the browser sent it (a form's are CR LF), and spaces at the ends are none.
+    message = (message or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    if on and len(message) > MAINT_MAX:
+        raise Refused(400, "message_too_long", t("maint.too_long", max=MAINT_MAX))
     was_on = songs.maintenance()[0]
     songs.set_maintenance(on, message, core.PUBLIC_HOST)
+    if on:
+        # On the server, not in the browser's cookie: a long message made the session cookie near the browsers' limit.
+        core.save_settings(maintenance_message=message)
     changed("maintenance_page:" + ("on" if on else "off"))
     return was_on

@@ -1423,6 +1423,38 @@ if __name__ == "__main__":
 
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class MaintenanceMessageTest(unittest.TestCase):
+    """The maintenance notice's message: one limit for the page and the API, and the last one kept with the server."""
+
+    def send(self, inst, message):
+        inst.sign_in()
+        page = inst.client.get("/opendmtq/admin/maintenance").get_data(as_text=True)
+        csrf = re.search(r'name="csrf" value="([^"]+)"', page).group(1)
+        return inst.client.post("/opendmtq/admin/maintenance", data={"csrf": csrf, "action": "on", "message": message})
+
+    def test_a_long_message_is_refused_in_the_apis_words_and_kept_in_the_field(self):
+        with Install() as inst:
+            r = self.send(inst, "y" * 201)
+            page = r.get_data(as_text=True)
+            self.assertEqual(r.status_code, 400)
+            self.assertIn("The message is longer than 200 characters.", page)
+            # What was typed, to shorten; and the notice still off.
+            self.assertIn("y" * 201 + "</textarea>", page)
+            self.assertEqual(admin.songs.maintenance(), (False, ""))
+            self.assertIn('maxlength="200"', page)
+
+    def test_the_message_stays_on_the_server_not_in_the_cookie(self):
+        with Install() as inst:
+            self.assertEqual(self.send(inst, "Back at nine.\r\nSorry!").status_code, 302)
+            self.assertEqual(admin.songs.maintenance(), (True, "Back at nine.\nSorry!"))
+            with inst.client.session_transaction(path="/opendmtq/admin/") as sess:
+                self.assertNotIn("maintenance_message", sess)
+            # Off again: the field holds it for the next time.
+            admin.song_pages.set_notice(False, "")
+            self.assertIn("Back at nine.\nSorry!</textarea>", inst.client.get("/opendmtq/admin/maintenance").get_data(as_text=True))
+
+
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class PlayerMessageTest(unittest.TestCase):
     def act(self, inst, **form):
         inst.sign_in()
