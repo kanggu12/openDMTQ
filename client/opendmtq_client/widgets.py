@@ -36,7 +36,7 @@ def style_ttk(ui):
     # has the keyboard, as the site's fields.
     s.configure("Dark.TCombobox", fieldbackground=theme.FIELD, background=theme.FIELD, foreground=theme.TEXT,
                 arrowcolor=theme.MUTED, bordercolor=theme.LINE, lightcolor=theme.FIELD, darkcolor=theme.FIELD,
-                selectbackground=theme.FIELD, selectforeground=theme.TEXT, padding=(ui.px(10), ui.px(7)),
+                selectbackground=theme.FIELD, selectforeground=theme.TEXT, padding=(ui.px(10), ui.px(4)),
                 arrowsize=ui.px(13))
     s.map("Dark.TCombobox", fieldbackground=[("readonly", theme.FIELD)], foreground=[("readonly", theme.TEXT)],
           background=[("active", theme.FIELD), ("readonly", theme.FIELD)],
@@ -49,10 +49,43 @@ def style_ttk(ui):
     ui.root.option_add("*TCombobox*Listbox.selectForeground", theme.TEXT)
     ui.root.option_add("*TCombobox*Listbox.font", ui.fonts.body)
     quiet_combobox_wheel(ui.root)
+    # Labels draw their words from their own edge, as fields and buttons draw theirs: Tk's own room round a label's
+    # words (its border and padding, 3 px on Windows) would set every card's words in from the fields under them.
+    ui.root.option_add("*Label.borderWidth", 0)
+    ui.root.option_add("*Label.padX", 0)
+    ui.root.option_add("*Label.padY", 0)
+    combobox_faces(ui, s)
     s.configure("Dark.Vertical.TScrollbar", background=theme.RAIL, troughcolor=theme.BG, bordercolor=theme.BG,
                 lightcolor=theme.RAIL, darkcolor=theme.RAIL, arrowcolor=theme.MUTED, gripcount=0,
                 arrowsize=ui.px(12))
     s.map("Dark.Vertical.TScrollbar", background=[("active", theme.RAIL_UP)])
+
+
+def combobox_faces(ui, style):
+    """The drop-down's face as the text field's (art.field_face, sunk into its card) and its arrow a chevron on it, as
+    ttk image elements with a state each; made once for each scale (Tk keeps an element by its name)."""
+    from PIL import ImageTk
+    name = "Odq%d" % int(round(ui.scale * 100))
+    if name + ".Combobox.field" not in style.element_names():
+        px = ui.px
+        # The face is stretched between its edges: drawn a little larger than its corners, cut into nine by `border`.
+        size, edge = (px(40), px(Button.HEIGHT)), px(6)
+        faces = {state: ImageTk.PhotoImage(art.field_face(size[0], size[1], state, ui.scale), master=ui.root)
+                 for state in ("normal", "hover", "focus", "disabled")}
+        arrows = {state: ImageTk.PhotoImage(art.chevron(px(26), px(20), colour, ui.scale), master=ui.root)
+                  for state, colour in (("normal", theme.MUTED), ("hover", theme.TEXT), ("disabled", theme.FAINT))}
+        # Kept on the root: Tk drops a picture the moment Python forgets it.
+        ui.root.odq_combobox_faces = getattr(ui.root, "odq_combobox_faces", []) + [faces, arrows]
+        # Its padding the edge alone: the words' own room is the style's padding, and the face's height a button's.
+        style.element_create(name + ".Combobox.field", "image", faces["normal"], ("focus", faces["focus"]),
+                             ("disabled", faces["disabled"]), ("hover", faces["hover"]), border=edge,
+                             padding=max(1, px(1)), sticky="nsew")
+        style.element_create(name + ".Combobox.downarrow", "image", arrows["normal"], ("disabled", arrows["disabled"]),
+                             ("hover", arrows["hover"]), sticky="")
+    style.layout("Dark.TCombobox", [(name + ".Combobox.field", {"sticky": "nswe", "children": [
+        (name + ".Combobox.downarrow", {"side": "right", "sticky": "ns"}),
+        ("Combobox.padding", {"expand": "1", "sticky": "nswe", "children": [
+            ("Combobox.textarea", {"sticky": "nswe"})]})]})])
 
 
 # The wheel's events, as Windows (MouseWheel) and X11 (buttons 4 and 5) send them.
@@ -176,7 +209,7 @@ class Header(tk.Canvas):
         for i, name in enumerate(self.steps):
             done, now = i < self.step, i == self.step
             x = left + i * (cell + px(8))
-            colour = theme.OK if (done or now) else theme.LINE
+            colour = theme.OK if (done or now) else theme.STEP_TO_COME
             picture = art.numeral(str(i + 1), colour, scale, bg=None)
             image = ImageTk.PhotoImage(picture, master=self)
             self._numerals.append(image)
@@ -289,12 +322,12 @@ class ScrollArea(tk.Frame):
         # The part of the wheel's turning that has not made a whole step yet (a touchpad sends it a little at a time).
         self._wheel_rest = 0.0
         self.canvas.configure(yscrollcommand=self._bar_set)
-        # The bar's room is kept when there is no bar, by a plain strip as wide as it: the page then has one width
-        # whether it scrolls or not. Without it, a page about as tall as the area loops for ever: the bar narrows the
-        # page, the narrower page fits, the bar goes, the wider page no longer fits, the bar comes back.
-        self.spacer = tk.Frame(self, bg=bg, width=self.bar.winfo_reqwidth())
-        self.spacer.pack(side="right", fill="y")
-        self.canvas.pack(side="left", fill="both", expand=True)
+        # The canvas spans the whole width, its picture behind with it, so the page's backdrop goes on from the header's
+        # to the window's edge; the scroll bar lies over its right edge when the page scrolls. The column keeps the bar's
+        # room either way: the page then has one width whether it scrolls or not (without it, a page about as tall as
+        # the area loops for ever: the bar narrows the page, the narrower page fits, the bar goes, and back).
+        self.bar_room = self.bar.winfo_reqwidth()
+        self.canvas.pack(fill="both", expand=True)
         # The content's height decides how far it scrolls, and how tall the picture behind it is.
         self.inner.bind("<Configure>", lambda e: self._relayout())
         # The column is as wide as the area less its margins, so text wraps instead of running off.
@@ -323,15 +356,12 @@ class ScrollArea(tk.Frame):
         if self.on_moved is not None and moved != self._moved:
             self._moved = moved
             self.on_moved(moved)
-        # The strip as wide as the bar, so swapping one for the other never moves the page.
-        self.spacer.configure(width=self.bar.winfo_reqwidth())
         if float(first) <= 0.0 and float(last) >= 1.0:
             if self.bar.winfo_manager():
-                self.spacer.pack(side="right", fill="y", before=self.canvas)
-                self.bar.pack_forget()
+                self.bar.place_forget()
         elif not self.bar.winfo_manager():
-            self.bar.pack(side="right", fill="y", before=self.canvas)
-            self.spacer.pack_forget()
+            # Over the canvas's right edge, in the room the column keeps for it.
+            self.bar.place(relx=1.0, y=0, relheight=1.0, anchor="ne")
         self.bar.set(first, last)
 
     def set_heading(self, title, description=""):
@@ -353,7 +383,7 @@ class ScrollArea(tk.Frame):
         if description:
             self._heading.append(c.create_text(px(self.MARGIN), y + px(2), text=description, anchor="nw",
                                                font=self.ui.fonts.body, fill=theme.MUTED,
-                                               width=max(px(200), c.winfo_width() - 2 * px(self.MARGIN))))
+                                               width=max(px(200), self._column(c.winfo_width()))))
         self._place_content()
 
     def _place_content(self):
@@ -367,13 +397,17 @@ class ScrollArea(tk.Frame):
         c.coords(self._window, px(self.MARGIN), self._content_top)
         self._relayout()
 
+    def _column(self, width):
+        """The column's width in an area `width` wide: between the margins, less the scroll bar's room."""
+        return width - 2 * self.ui.px(self.MARGIN) - self.bar_room
+
     def _on_resize(self, event):
         px = self.ui.px
         # The column between the margins; labels wrap to their own box (follow_width).
-        self.canvas.itemconfigure(self._window, width=max(1, event.width - 2 * px(self.MARGIN)))
+        self.canvas.itemconfigure(self._window, width=max(1, self._column(event.width)))
         for item in self._heading:
             if self.canvas.type(item) == "text":
-                self.canvas.itemconfigure(item, width=max(px(200), event.width - 2 * px(self.MARGIN)))
+                self.canvas.itemconfigure(item, width=max(px(200), self._column(event.width)))
         self._place_content()
 
     def _relayout(self):
@@ -790,6 +824,8 @@ class Toggle(tk.Label):
         self.bind("<Button-1>", lambda e: self.set(not self.value, notify=True))
         # Tab reaches it; Enter or Space switches it.
         focus_ring(self, ui, bg)
+        # The pill shows this far in: the keyboard's ring, then the halo's room (setting_row lines controls up by it).
+        self.odq_inset = int(self.cget("highlightthickness")) + art.TOGGLE_HALO
         self.bind("<Return>", lambda e: self.set(not self.value, notify=True))
         self.bind("<space>", lambda e: self.set(not self.value, notify=True))
 
@@ -840,6 +876,8 @@ class Segmented(tk.Frame):
         self.canvas.create_rectangle(0, px(self.HEIGHT), total, height, fill=theme.OK, width=0)
         # Tab reaches the row; the arrow keys move the choice.
         focus_ring(self, ui, bg)
+        # The tabs show this far in: the keyboard's ring (setting_row lines controls up by it).
+        self.odq_inset = int(self.cget("highlightthickness"))
         self.bind("<Left>", lambda e: self._step(-1))
         self.bind("<Right>", lambda e: self._step(1))
         self.set(value)
@@ -880,15 +918,18 @@ class Segmented(tk.Frame):
 
 
 class Slider(tk.Frame):
-    """A 0-100 slider with its number beside it; command(value) runs when the drag ends."""
+    """A 0-100 slider with its number beside it; command(value) runs when the drag ends. Its track is let into the card
+    and runs from the slider's own left edge, so it starts on the same line as the controls above and under it; the knob
+    stands on the track, inside its ends."""
 
     def __init__(self, parent, ui, value, command, bg=None, width=320):
         bg = bg or parent.cget("bg")
         super().__init__(parent, bg=bg)
-        self.ui, self.command, self.value = ui, command, int(value)
+        self.ui, self.command, self.value, self.bg = ui, command, int(value), bg
         self.w, self.h = ui.px(width), ui.px(26)
         self.colour = theme.OK
-        self.knob_img = ImageTk.PhotoImage(art.knob(ui.px(18), ring=self.colour), master=parent)
+        self.knob_size = ui.px(18)
+        self.knob_img = ImageTk.PhotoImage(art.knob(self.knob_size, ring=self.colour, scale=ui.scale), master=parent)
         self.canvas = tk.Canvas(self, width=self.w, height=self.h, bg=bg, highlightthickness=0, cursor="hand2")
         self.canvas.pack(side="left")
         self.number = tk.Label(self, text="", font=ui.fonts.body_bold, fg=theme.TEXT, bg=bg, width=4, anchor="e")
@@ -898,8 +939,9 @@ class Slider(tk.Frame):
         self.canvas.bind("<ButtonRelease-1>", lambda e: self.command(self.value))
         # Tab reaches it; the arrow keys move it by 5 (Home and End to either end), each step saved as a drag's end is.
         focus_ring(self.canvas, ui, bg)
-        # A canvas's ring covers its edge: the drawing starts inside it.
+        # A canvas's ring covers its edge: the drawing starts inside it, and the track's left end that far in.
         self.inset = int(self.canvas.cget("highlightthickness"))
+        self.odq_inset = self.inset
         for key, to in (("<Left>", lambda v: v - 5), ("<Right>", lambda v: v + 5), ("<Down>", lambda v: v - 5),
                         ("<Up>", lambda v: v + 5), ("<Home>", lambda v: 0), ("<End>", lambda v: 100)):
             self.canvas.bind(key, lambda e, to=to: self._key(to))
@@ -914,24 +956,36 @@ class Slider(tk.Frame):
             self.command(self.value)
 
     def _x(self, value):
-        """Where a value sits on the track (the knob's centre stays inside the canvas, inside its ring)."""
-        pad = self.ui.px(10)
-        return getattr(self, "inset", 0) + pad + (self.w - 2 * pad) * value / 100.0
+        """Where a value's knob sits: its centre a knob's half inside either end of the track, so the knob never
+        stands past the track's ends."""
+        half = self.knob_size / 2.0
+        return getattr(self, "inset", 0) + half + (self.w - 2 * half) * value / 100.0
 
     def _drag(self, event):
-        pad = self.ui.px(10)
-        frac = (event.x - getattr(self, "inset", 0) - pad) / float(max(1, self.w - 2 * pad))
+        half = self.knob_size / 2.0
+        frac = (event.x - getattr(self, "inset", 0) - half) / float(max(1, self.w - 2 * half))
         self.value = int(round(min(1.0, max(0.0, frac)) * 100))
         self._draw()
 
     def _draw(self):
         c, mid = self.canvas, getattr(self, "inset", 0) + self.h // 2
         c.delete("all")
-        thick = max(2, self.ui.px(4))
-        # The empty track, then the filled part up to the knob.
-        c.create_line(self._x(0), mid, self._x(100), mid, fill=theme.RAIL, width=thick, capstyle="round")
-        c.create_line(self._x(0), mid, self._x(self.value), mid, fill=self.colour, width=thick, capstyle="round")
+        thick = max(4, self.ui.px(6))
+        # The track as a picture let into the card, lit up to the knob's middle, from the slider's left edge.
+        fraction = (self._x(self.value) - getattr(self, "inset", 0)) / float(self.w)
+        picture = art.slider_track(self.w, thick, fraction, self.colour, self.ui.scale, bg=self.bg)
+        self._track_img = ImageTk.PhotoImage(picture, master=c)
+        inset = getattr(self, "inset", 0)
+        c.create_image(inset, mid, image=self._track_img, anchor="w")
         c.create_image(self._x(self.value), mid, image=self.knob_img)
+        # A dialog draws the window behind it from the widgets (snapshot.py): the canvas as it looks now, the track and
+        # the knob where they are.
+        from PIL import Image
+        whole = Image.new("RGB", (self.w + 2 * inset, self.h + 2 * inset), art._rgb(self.bg))
+        whole.paste(picture, (inset, mid - thick // 2))
+        knob = art.knob(self.knob_size, ring=self.colour, scale=self.ui.scale)
+        whole.paste(knob, (int(self._x(self.value) - self.knob_size / 2.0), mid - self.knob_size // 2), knob)
+        c.odq_picture = whole
         self.number.configure(text=str(self.value))
 
 
@@ -973,7 +1027,10 @@ def setting_row(parent, ui, title, control_factory, hint=None, bg=None):
     tk.Label(row, text=title, font=ui.fonts.body_bold, fg=theme.TEXT, bg=bg, anchor="w",
              width=0).grid(row=0, column=0, sticky="w", padx=(0, ui.px(18)))
     control = control_factory(row)
-    control.grid(row=0, column=1, sticky="w")
+    # Every control's visible left edge on one line: a switch, a row of tabs and a slider keep room for the keyboard's
+    # ring (and the switch for its halo) before what shows, so the others are set in by as much.
+    align = max(1, ui.px(2)) + art.TOGGLE_HALO
+    control.grid(row=0, column=1, sticky="w", padx=(max(0, align - getattr(control, "odq_inset", 0)), 0))
     hint_label = None
     if hint:
         hint_label = label(row, ui, hint, font=ui.fonts.small, fg=theme.MUTED, bg=bg, wrap_margin=4)
@@ -1036,6 +1093,51 @@ def entry(parent, ui, width=18, secret=False):
                      relief="flat", highlightthickness=1, highlightbackground=theme.LINE, highlightcolor=theme.OK,
                      show="\u2022" if secret else "")
     return field
+
+
+class Field(tk.Canvas):
+    """A text field as the launcher's pages have it: the site's dark field sunk into its card (art.field_face: dark
+    edges along its top and left, the light along its foot), the accent round it while it is typed in, brighter edges
+    under the pointer; as tall as a button, so a field and the buttons beside it stand on one line and one middle. The
+    typing goes to `entry`, a plain Tk entry inside it; a click anywhere on the field puts the caret there."""
+
+    def __init__(self, parent, ui, width=18, secret=False):
+        self.ui, bg = ui, parent.cget("bg")
+        px = ui.px
+        super().__init__(parent, bg=bg, highlightthickness=0, bd=0, cursor="xterm", takefocus=0)
+        self.entry = tk.Entry(self, width=width, font=ui.fonts.body, bg=theme.FIELD, fg=theme.TEXT,
+                              insertbackground=theme.TEXT, relief="flat", bd=0, highlightthickness=0,
+                              show="\u2022" if secret else "")
+        # The words' room either side of them, and the button's height.
+        self.pad = px(10)
+        width_px, height_px = self.entry.winfo_reqwidth() + 2 * self.pad, px(Button.HEIGHT)
+        self.configure(width=width_px, height=height_px)
+        self.faces = {state: art.field_face(width_px, height_px, state, ui.scale, bg=bg)
+                      for state in ("normal", "hover", "focus")}
+        self.images = {state: ImageTk.PhotoImage(face, master=self) for state, face in self.faces.items()}
+        self.face = self.create_image(0, 0, image=self.images["normal"], anchor="nw")
+        # The entry in the middle of the face, between its rooms.
+        self.create_window(self.pad, height_px // 2, window=self.entry, anchor="w", width=width_px - 2 * self.pad)
+        self.focused, self.under = False, False
+        self.entry.bind("<FocusIn>", lambda e: self._paint(focused=True), add="+")
+        self.entry.bind("<FocusOut>", lambda e: self._paint(focused=False), add="+")
+        for widget in (self, self.entry):
+            widget.bind("<Enter>", lambda e: self._paint(under=True), add="+")
+            widget.bind("<Leave>", lambda e: self._paint(under=False), add="+")
+        # A click on the face beside the words: the caret at their end, as a click past the words in the entry does.
+        self.bind("<Button-1>", lambda e: (self.entry.focus_set(), self.entry.icursor("end")))
+        self._paint()
+
+    def _paint(self, focused=None, under=None):
+        """The face for the field's state: the accent while typed in, brighter edges under the pointer, else normal."""
+        if focused is not None:
+            self.focused = focused
+        if under is not None:
+            self.under = under
+        state = "focus" if self.focused else ("hover" if self.under else "normal")
+        self.itemconfigure(self.face, image=self.images[state])
+        # A dialog draws the window behind it from the widgets (snapshot.py): the face as it looks now.
+        self.odq_picture = self.faces[state]
 
 
 class Progress(tk.Frame):

@@ -101,23 +101,31 @@ def build_play(app, parent):
     ui, w = app.ui, app.words
     _server_card(app, parent)
     left, right = _columns(parent, ui)
-    # Left: the ready check, filled in when the worker thread finishes it, as tall as the column.
+    # Left: the ready check, filled in when the worker thread finishes it, as tall as the column so that the row's
+    # cards end on one line; Check again stands at its foot, so the room the column gives it lies between the rows and
+    # their button instead of under everything.
     ready = widgets.Card(left, ui, w("play.ready"))
     ready.pack(fill="both", expand=True)
+    foot = tk.Frame(ready.body, bg=theme.PANEL)
+    foot.pack(side="bottom", fill="x", pady=(ui.px(16), 0))
+    widgets.Button(foot, ui, w("help.recheck"), lambda: app.refresh_checks(force=True)).pack(anchor="w")
     app.check_box = tk.Frame(ready.body, bg=theme.PANEL)
     app.check_box.pack(fill="x")
-    # Right: how to play, and how the last game went.
+    # Right: how to play, and how the last game went, the last as tall as what is left of the column (when the ready
+    # check is the taller), its button at its foot.
     how = _card(right, ui, w("play.how"))
     for i, key in enumerate(("play.how.1", "play.how.2", "play.how.3")):
         if i:
             widgets.divider(how.body, ui, pady=8)
         widgets.label(how.body, ui, w(key), wrap_margin=0).pack(fill="x")
-    last = _card(right, ui, w("play.last"), last=True)
-    widgets.label(last.body, ui, _last_session(app), fg=theme.MUTED, wrap_margin=0).pack(fill="x")
+    last = widgets.Card(right, ui, w("play.last"))
+    last.pack(fill="both", expand=True)
     record = app.state.last_session or {}
     if record.get("crashed") or record.get("failed_start"):
         # The reason is in the player's log: one press away from where it says the game stopped.
-        widgets.Button(last.body, ui, w("status.open_log"), app.open_player_log).pack(anchor="w", pady=(ui.px(12), 0))
+        widgets.Button(last.body, ui, w("status.open_log"), app.open_player_log).pack(side="bottom", anchor="w",
+                                                                                      pady=(ui.px(12), 0))
+    widgets.label(last.body, ui, _last_session(app), fg=theme.MUTED, wrap_margin=0).pack(fill="x")
     # Made again each time the page shows: a sign-in can have ended, or an app come, since the last one. Until it
     # comes back, the box says it is being made.
     app.refresh_checks()
@@ -483,8 +491,9 @@ def connect_panel(app, parent, rerender, forget=False):
     row = tk.Frame(parent, bg=bg)
     row.pack(fill="x")
     tk.Label(row, text=w("online.address"), font=ui.fonts.small, fg=theme.MUTED, bg=bg).grid(row=0, column=0, sticky="w")
-    address = widgets.entry(row, ui, width=34)
-    address.grid(row=1, column=0, sticky="w", padx=(0, ui.px(12)), ipady=ui.px(4))
+    field = widgets.Field(row, ui, width=34)
+    field.grid(row=1, column=0, sticky="w", padx=(0, ui.px(12)))
+    address = field.entry
     server = app.state.server()
     address.insert(0, server["url"] if server else "")
     text, colour = server_line(app)
@@ -500,7 +509,9 @@ def connect_panel(app, parent, rerender, forget=False):
         answer.configure(text=w("online.connecting"), fg=theme.MUTED)
 
     address.bind("<Return>", lambda e: connect())
-    widgets.Button(row, ui, w("online.connect"), connect, kind="primary").grid(row=1, column=1, sticky="w")
+    # The page's main action is the next step: Connect while there is no server (then Sign in, then the app's download).
+    widgets.Button(row, ui, w("online.connect"), connect, kind="secondary" if server else "primary").grid(
+        row=1, column=1, sticky="w")
     if server and forget:
         # After Connect, apart from it: the next server this launcher knows becomes the one PLAY plays on.
         widgets.Button(row, ui, w("online.forget"), lambda: forget_server(app, server, rerender),
@@ -545,9 +556,9 @@ def signin_panel(app, parent, rerender):
     fields = {}
     for col, (key, secret) in enumerate((("online.id", False), ("online.password", True))):
         tk.Label(form, text=w(key), font=ui.fonts.small, fg=theme.MUTED, bg=bg).grid(row=0, column=col, sticky="w")
-        field = widgets.entry(form, ui, width=16, secret=secret)
-        field.grid(row=1, column=col, sticky="w", padx=(0, ui.px(12)), ipady=ui.px(4))
-        fields[key] = field
+        box = widgets.Field(form, ui, width=16, secret=secret)
+        box.grid(row=1, column=col, sticky="w", padx=(0, ui.px(12)))
+        fields[key] = box.entry
     if server.get("account"):
         # The account signed in before: only the password to type again.
         fields["online.id"].insert(0, server["account"])

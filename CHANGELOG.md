@@ -13,6 +13,12 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ### Changed
 
+- The launcher's buttons stand a little out of their card and sink while pressed, and its text fields and drop-downs
+  are let into it: a line of light along a button's top edge and a shade along its foot, a soft shadow inside a pressed
+  button or a field, in the game's dark plates, cut corners and lime. On every page, the first-start guide, the
+  dialogs and the installer; PLAY, the tabs, the switches and the volume's track and knob have the same depth.
+- The launcher's header and the installer's pictures show the wordmark without the lime PC after it: PC CLIENT over the
+  version beside it says what it is.
 - The player for Windows speaks the launcher's language: once one is chosen in the launcher (the first-start guide, the
   Launcher page, `--language` or `--set language=`), the game, the bar over it, the question before quitting, the
   broadcast notice and the player's own messages speak it too, instead of Windows' display language; the country stays
@@ -35,6 +41,15 @@ one that only fixes raises the patch number. Each release's section here is its 
 - The launcher's ready check asks the server: one that does not answer shows so on the Server line and the status line
   instead of a lit Server line, and Help's Check again asks it again. PLAY still starts the app this PC has; an app it
   lacks waits for the server instead of a download that cannot start. `--status` asks it the same way.
+- The launcher's text fields are as tall as the buttons beside them, on the same middle, and start where the words
+  above them start; every setting's control shows from one line, the volume's track too.
+- The launcher's backdrop runs to the window's right edge: no flat dark strip where the scroll bar keeps its room, and
+  the green shapes no longer jump where the header meets the page.
+- The PLAY page's ready check ends on the same line as the cards beside it, with Check again at its foot, instead of an
+  empty band under its rows.
+- The guide's numbers of the steps to come read at 3:1 or more, in a quiet grey, instead of all but vanishing.
+- The Online page has one main button at a time: Connect while there is no server, then Sign in, then the app's
+  download.
 - The Screen page offers no frame limit above the display's rate while VSync is on (VSync holds the game at that rate
   whatever the limit), keeps one set before in its row, and its hint names this display's rate and what the limit gives
   on it (exactly, very nearly, or held at the rate) instead of a 240 Hz display's example.
