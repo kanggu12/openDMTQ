@@ -62,6 +62,12 @@ class Guide:
         skip.pack(side="right", padx=(0, px(18)))
         # The step's page: its name as the page's title over the site's field, its question under it.
         self.body = app.make_page(root, self.header)
+        # Tab goes as the window reads: the page first, then the bar, left to right (Skip, Back, Next or PLAY). Tk's
+        # Tab follows each parent's stacking order, the order its children were made in until one is raised.
+        # (Misc's own raise: a canvas's raise moves its items instead.)
+        tk.Misc.tkraise(bottom)
+        for later in (skip, self.back_button, self.next_button, self.play_slab):
+            tk.Misc.tkraise(later)
         self.show(self.index)
 
     # ------------------------------------------------------------------------------------- steps
@@ -98,9 +104,10 @@ class Guide:
         self.body.to_top()
 
     def redraw(self):
-        """The step on show, drawn again (an answer came)."""
+        """The step on show, drawn again (an answer came, a choice changed its rows), where it was scrolled to and with
+        the keyboard on the control it was on (pages.keep_place)."""
         if self.app.guide is self:
-            self.show(self.index)
+            pages.keep_place(self.body, self.app.root, lambda: self.show(self.index))
 
     def _can_go_on(self):
         """SERVER needs a server that answered; LOG IN a sign-in; DOWNLOAD the app; the last step what PLAY needs."""

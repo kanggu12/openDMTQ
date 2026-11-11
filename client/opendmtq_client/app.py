@@ -149,6 +149,11 @@ class LauncherApp:
         self.status_link.odq_action = None
         # ---- the page: its title and its cards over the site's field (widgets.ScrollArea)
         self.body = self.make_page(self.root, self.header)
+        # Tab goes as the window reads: the menu, the page, then the bar along the foot, its link before PLAY. Tk's Tab
+        # follows each parent's stacking order, the order its children were made in until one is raised.
+        # (Misc's own raise: a canvas's raise moves its items instead.)
+        tk.Misc.tkraise(bottom)
+        tk.Misc.tkraise(self.play_button)
         self._paint_status()
 
     def make_header(self, parent, nav=(), on_nav=None, link=None, steps=()):

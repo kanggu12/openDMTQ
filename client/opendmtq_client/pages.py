@@ -281,24 +281,28 @@ def _focus_order(widget):
     return found
 
 
-def redraw_in_place(app, page):
-    """The page drawn again for a change (a choice that adds or removes rows), keeping where it was scrolled to and the
-    control the keyboard was on: choosing an anti-aliasing at the page's foot does not throw the page back to its top
-    and the keyboard out of it."""
-    area = app.body
+def keep_place(area, root, rebuild):
+    """A page area drawn again by `rebuild()` for a change (a choice that adds or removes rows, an answer that came),
+    keeping where it was scrolled to and the control the keyboard was on: choosing a buffer at the Sound page's foot,
+    or switching VSync on the guide's SOUND CHECK, does not throw the page back to its top and the keyboard out of it."""
     top = area.canvas.yview()[0]
     before = _focus_order(area.inner)
-    focused = app.root.focus_get()
+    focused = root.focus_get()
     index = before.index(focused) if focused in before else None
-    app.go(page)
+    rebuild()
     # Laid out first, so that the scroll's place is measured on the new page's height.
-    app.root.update_idletasks()
+    root.update_idletasks()
     area.canvas.yview_moveto(top)
     if index is not None:
         # The rows before the changed one are the same, so the same place in the order is the same control.
         after = _focus_order(area.inner)
         if index < len(after):
             after[index].focus_set()
+
+
+def redraw_in_place(app, page):
+    """A page of the launcher drawn again in place (keep_place)."""
+    keep_place(app.body, app.root, lambda: app.go(page))
 
 
 def build_screen(app, parent):
@@ -359,7 +363,8 @@ def sound_rows(app, parent, redraw, full=True):
 
 
 def build_sound(app, parent):
-    sound_rows(app, parent, lambda: app.page == "sound" and app.go("sound"))
+    # Drawn again in place for a choice and for the devices when they come (only while the page is still on show).
+    sound_rows(app, parent, lambda: app.page == "sound" and redraw_in_place(app, "sound"))
 
 
 # ------------------------------------------------------------------------------------------ Controls

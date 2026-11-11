@@ -307,6 +307,14 @@ class ScrollArea(tk.Frame):
         self.bind("<Enter>", lambda e: self._wheel(True))
         self.bind("<Leave>", lambda e: self._wheel(False))
         self.bind("<Destroy>", lambda e: e.widget is self and self._wheel(False), add="+")
+        # A control the keyboard reaches (Tab) below or above the part of the page in view comes into view: the window's
+        # own binding for <FocusIn> hears every widget of the window take the keyboard, and this area answers for its
+        # own. Its line goes from that binding when the area goes (a rebuild of the window), as the wheel's do.
+        self._focus_command = self.register(self._focus_came)
+        self._focus_line = "%s %%W" % self._focus_command
+        root = self._root()
+        root.tk.call("bind", root._w, "<FocusIn>", "+" + self._focus_line)
+        self.bind("<Destroy>", lambda e: e.widget is self and self._focus_gone(), add="+")
 
     def _bar_set(self, first, last):
         """Show the scroll bar only when the content is taller than the area, in the room the strip keeps for it; tell
@@ -452,6 +460,61 @@ class ScrollArea(tk.Frame):
 
     def to_top(self):
         self.canvas.yview_moveto(0)
+
+    def _focus_came(self, path):
+        """A widget of the window took the keyboard (`path`, Tk's name for it): one on this page is shown."""
+        try:
+            widget = self.nametowidget(path)
+        except KeyError:
+            # Not one of this program's widgets as Python knows them (a drop-down's own list): nothing to show.
+            return
+        # The widget that has the keyboard alone: Tk says <FocusIn> to each frame round it as well, and showing a frame
+        # as tall as the page would throw the page to its foot.
+        if widget is not self.focus_get():
+            return
+        # Only what lies on this page: the menu, the bottom bar and a dialog have places of their own.
+        if str(widget).startswith(str(self.inner) + "."):
+            self.show_widget(widget)
+
+    def _focus_gone(self):
+        """This area goes: its line leaves the window's <FocusIn> binding, and its command goes with it."""
+        root = self._root()
+        try:
+            script = root.tk.call("bind", root._w, "<FocusIn>")
+            # The binding's script is its lines joined by newlines: this area's line out, the others as they were.
+            kept = "\n".join(line for line in str(script).split("\n") if line.strip() != self._focus_line)
+            root.tk.call("bind", root._w, "<FocusIn>", kept)
+            # Deleted through this area, which made it (register): its own list of commands to delete loses it too, so
+            # Tk is not asked to delete it a second time when the area finishes going.
+            self.deletecommand(self._focus_command)
+        except tk.TclError:
+            # The window went first, its bindings and commands with it.
+            pass
+
+    def show_widget(self, widget):
+        """Scroll so that `widget`, inside this page, is in view with a little room round it; nothing when it is."""
+        c = self.canvas
+        if not (widget.winfo_exists() and c.winfo_exists()) or not widget.winfo_ismapped():
+            return
+        region = [float(v) for v in str(c.cget("scrollregion")).split()] if c.cget("scrollregion") else []
+        seen = c.winfo_height()
+        if len(region) != 4 or region[3] <= seen:
+            # The whole page is in view: nothing to scroll.
+            return
+        # The widget's top and foot on the page (the scrolled region's own pixels), from where it is on screen.
+        top = widget.winfo_rooty() - c.winfo_rooty() + c.canvasy(0)
+        bottom = top + widget.winfo_height()
+        view = c.canvasy(0)
+        room = self.ui.px(24)
+        if top - room < view:
+            target = top - room
+        elif bottom + room > view + seen:
+            target = bottom + room - seen
+        else:
+            return
+        # Never past either end of the page.
+        target = max(0.0, min(target, region[3] - seen))
+        c.yview_moveto(target / region[3])
 
 
 # A wrapping label's width before its box is laid out (follow_width).

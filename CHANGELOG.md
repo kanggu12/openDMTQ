@@ -12,6 +12,10 @@ one that only fixes raises the patch number. Each release's section here is its 
   failure or a game's end no longer stays on every page after it, so the line never claims a server PLAY no longer
   plays on, nor a failure whose cause is gone. After a switch of language, the status line and the Online page's last
   answers say themselves in the new one instead of keeping the old one's sentence.
+- The launcher with the keyboard: the Sound page and the guide's SOUND CHECK keep their place and the keyboard's control
+  when a choice draws them again (the mode, the buffer, VSync), as the Screen page does; a control Tab reaches below or
+  above the part of the page in view comes into view; Tab goes through the page before the bar along the foot, and the
+  guide's bar left to right (Skip, Back, Next).
 
 ## [0.9.1] - 2026-11-11
 
