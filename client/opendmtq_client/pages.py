@@ -232,12 +232,21 @@ def screen_rows(app, parent, redraw, full=True):
     widgets.setting_row(card.body, ui, w("screen.fps"),
                         lambda p: widgets.Select(p, ui, options, v["fps"], set_and_redraw("fps"), width=22),
                         w("screen.fps.hint." + fps_hint)).pack(fill="x")
-    # The frame counter over the game, in the corner the player picks.
-    options = [(c, w("screen.counter." + c)) for c in choices.SHOW_FPS]
+    # The frame counter over the game, on or off; while on, its corner (the top left unless another is picked). Drawn
+    # again on a change: the corner's row is there only while the counter is on.
+    counter = v["show_fps"] == "on"
     widgets.divider(card.body, ui)
     widgets.setting_row(card.body, ui, w("screen.counter"),
-                        lambda p: widgets.Select(p, ui, options, v["show_fps"], lambda c: app.changed("show_fps", c), width=22),
-                        w("screen.counter.hint")).pack(fill="x")
+                        lambda p: widgets.Toggle(p, ui, counter,
+                                                 lambda on: set_and_redraw("show_fps")("on" if on else "off")),
+                        w("screen.counter.hint." + ("on" if counter else "off"))).pack(fill="x")
+    if counter:
+        options = [(c, w("screen.counter.position." + c)) for c in choices.FPS_POSITION]
+        widgets.divider(card.body, ui)
+        widgets.setting_row(card.body, ui, w("screen.counter.position"),
+                            lambda p: widgets.Select(p, ui, options, v["fps_position"],
+                                                     lambda c: app.changed("fps_position", c), width=22),
+                            w("screen.counter.position.hint")).pack(fill="x")
     if not full:
         return
     card = _card(parent, ui, w("screen.picture"), last=True)

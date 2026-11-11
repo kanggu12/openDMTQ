@@ -23,8 +23,11 @@ UPSCALER = ("bilinear", "fsr1", "nis")
 # How the edges of the game's shapes are smoothed: not at all, by Intel's CMAA 2 or SMAA over the finished picture, or by
 # drawing each frame with 2, 4 or 8 samples a pixel.
 ANTI_ALIASING = ("off", "cmaa2", "smaa", "msaa2", "msaa4", "msaa8")
-# A counter of the frames a second in a corner of the game, or none: each corner has some of the game's own controls.
-SHOW_FPS = ("off", "top_left", "top_right", "bottom_left", "bottom_right")
+# A counter of the frames a second over the game, off or on.
+SHOW_FPS = ("off", "on")
+# The counter's corner while it is on: the top left, beside a song's pause button, or another (each corner has some of
+# the game's own controls). Kept while the counter is off, for the next time it is on.
+FPS_POSITION = ("top_left", "top_right", "bottom_left", "bottom_right")
 # The sound shared with the PC's other sound, or the device alone (less latency).
 AUDIO_MODE = ("shared", "exclusive")
 # How much sound is kept ahead of the device: less latency, or fewer breaks on a busy PC.
@@ -41,17 +44,23 @@ DEFAULTS = {
     "upscaler": "bilinear",
     "anti_aliasing": "off",
     "show_fps": "off",
+    "fps_position": "top_left",
     "audio_device": "default",
     "audio_mode": "shared",
     "audio_buffer": "normal",
     "volume": 100,
 }
-# The order the settings file lists them in, the player's own order.
+# The order the settings file lists them in, the player's own order. The counter's corner is no key of the player's:
+# show_fps carries it there (off, or the corner it is on in).
 ORDER = ("display", "window", "vsync", "fps", "render_scale", "upscaler", "anti_aliasing", "show_fps", "audio_device",
          "audio_mode", "audio_buffer", "volume")
+# Every setting the launcher keeps, in the order it lists them (--set, --status): the player's, the counter's corner
+# after the counter.
+NAMES = ORDER[:ORDER.index("show_fps") + 1] + ("fps_position",) + ORDER[ORDER.index("show_fps") + 1:]
 # The choices of each setting that has a fixed list.
 CHOICES = {"display": DISPLAY, "vsync": VSYNC, "fps": FPS, "render_scale": RENDER_SCALE, "upscaler": UPSCALER,
-           "anti_aliasing": ANTI_ALIASING, "show_fps": SHOW_FPS, "audio_mode": AUDIO_MODE, "audio_buffer": AUDIO_BUFFER}
+           "anti_aliasing": ANTI_ALIASING, "show_fps": SHOW_FPS, "fps_position": FPS_POSITION, "audio_mode": AUDIO_MODE,
+           "audio_buffer": AUDIO_BUFFER}
 # A window size the player takes (its own bounds: 320x180 to 16384 a side).
 SIZE = re.compile(r"^(\d{3,5})x(\d{3,5})$")
 
@@ -104,9 +113,15 @@ def _one(name, value):
 
 def normalize(values, strict=True):
     """Every setting filled in from `values` over the defaults. A bad value raises ChoiceError, or with strict=False
-    keeps the default (a hand-edited state file)."""
+    keeps the default (a hand-edited state file). The counter's corner as show_fps's value (as an older launcher kept it,
+    and as --set still takes it) is the counter on in that corner."""
     merged = dict(DEFAULTS)
-    for name, value in (values or {}).items():
+    values = dict(values or {})
+    corner = str(values.get("show_fps", "")).strip().lower()
+    if corner in FPS_POSITION:
+        values["show_fps"] = "on"
+        values["fps_position"] = corner
+    for name, value in values.items():
         try:
             merged[name] = _one(name, value)
         except ChoiceError:
@@ -116,8 +131,10 @@ def normalize(values, strict=True):
 
 
 def settings_text(values):
-    """The settings file the player reads, one key=value a line, in its own order."""
+    """The settings file the player reads, one key=value a line, in its own order: the counter as its corner when it is
+    on (the player's show_fps names the corner), off when it is not."""
     filled = normalize(values)
+    filled["show_fps"] = filled["fps_position"] if filled["show_fps"] == "on" else "off"
     lines = ["# The PC settings the OpenDMTQ launcher chose, written before each start."]
     lines += ["%s=%s" % (name, filled[name]) for name in ORDER]
     return "\n".join(lines) + "\n"

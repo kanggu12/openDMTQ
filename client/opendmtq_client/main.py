@@ -335,7 +335,7 @@ def _status(state):
                                                                           if server.get("account") else "")))
         have = apps.local(server["url"])
         _say("app: %s" % ("%s (%s)" % (have["file"], have.get("built_at") or "?") if have else "none on this PC"))
-    _say("settings: " + ", ".join("%s=%s" % (k, state.values[k]) for k in choices.ORDER))
+    _say("settings: " + ", ".join("%s=%s" % (k, state.values[k]) for k in choices.NAMES))
     _say("language: %s%s" % (state.language, "" if state.picked_language else " (Windows' display language)"))
     # Where the logs are, as Help's Open buttons show them.
     for name, path in _log_paths(state).items():
@@ -424,7 +424,8 @@ def parse(argv):
     p.add_argument("--sign-out", action="store_true", help="forget the sign-in")
     p.add_argument("--app", action="store_true", help="download the server's app, or a newer one")
     p.add_argument("--set", metavar="NAME=VALUE", action="append", default=[],
-                   help="change a PC setting: " + ", ".join(choices.ORDER))
+                   help="change a PC setting: " + ", ".join(choices.NAMES) + " (show_fps=on|off; fps_position=top_left|"
+                        "top_right|bottom_left|bottom_right, the counter's corner, top_left unless chosen)")
     p.add_argument("--audio-devices", action="store_true", help="list the sound devices the player can play on")
     p.add_argument("--language", choices=st.LANGUAGES + ("system",),
                    help="the launcher's language (system: Windows' display language)")
@@ -576,7 +577,9 @@ def _run(state, args, jobs):
     for item in args.set:
         name, _, value = item.partition("=")
         state.set_value(name.strip(), value.strip())
-        _say("%s=%s" % (name.strip(), state.values[name.strip()]))
+        # A corner given as show_fps's value is the counter on in that corner: both settings said.
+        said = [name.strip()] + (["fps_position"] if name.strip() == "show_fps" else [])
+        _say(", ".join("%s=%s" % (n, state.values[n]) for n in said))
     if args.language:
         # "system": no choice kept, Windows' display language from now on.
         state.language = None if args.language == "system" else args.language

@@ -4,10 +4,14 @@
 #      be), then downloaded from the server's /windows, signed in, with the server on its end
 #   2. installed through its own dialog (Enter on Install), Velopack's setup underneath, the launcher started after
 #   3. the launcher's first-start guide: the server the installer brought, the sign-in, the app's download, PLAY
-#   4. the player reaching the game's menu (a frame of it saved), the bar at its top edge switching to a window and back,
-#      its X asking (the game held still), Keep playing, then the X and Quit the game, the launcher back
+#   4. the player reaching the game's menu (a frame of it saved); the bar coming down by itself for 3 seconds when the
+#      game's picture first shows; the handle at the game's top centre (the pointer resting on it brings the bar, a
+#      click on its place reaches the game, the game's window keeps the keyboard); the bar at its top edge switching to a
+#      window and back, its X asking (the game held still), Keep playing, then the X and Quit the game, the launcher back
 #   5. Repair from the command line: a file of the player and one of the launcher put back as they were installed
-#   6. Clear game data: the id alone stays, and the game starts again with it and gets to its menu
+#   6. Clear game data: the id alone stays; the FPS counter switched on from the command line (the launcher's window
+#      closed for it, then opened again), and the game starts again with the same id and gets to its menu, the counter
+#      up at its top left, a click on its place reaching the game
 #   7. Uninstall with the data: refused while the window is open, then the program, its shortcut and its data gone
 # Every step leaves a screenshot of the virtual screen in OUT_DIR, and the logs.
 #
@@ -60,7 +64,7 @@ SETUP=$(cd "$OUT" && ls OpenDMTQ-Setup-*.exe | head -n 1)
 
 # ---- 2 to 4 under Wine, on the virtual screen
 docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -w /out \
-  -e WINEPREFIX=/tmp/wine -e WINEDEBUG=-all -e TZ=Asia/Seoul -e PLAYER_SHOTS=@50 opendmtq-client-e2e:local bash -c "
+  -e WINEPREFIX=/tmp/wine -e WINEDEBUG=-all -e TZ=Asia/Seoul -e PLAYER_SHOTS=@50 -e PLAYER_TRACE_INPUT=1 opendmtq-client-e2e:local bash -c "
   set -u
   Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp >/dev/null 2>&1 &
   export DISPLAY=:99
@@ -88,6 +92,25 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   player_running() { ps -eo args | grep -q '[O]penDMTQ-Player[.]exe'; }
   # A line of the player's log so far (it sits in the app's folder under the launcher's).
   player_said() { cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | grep -q \"\$1\"; }
+  # How many presses of the mouse reached the game's window (PLAYER_TRACE_INPUT), and the last one's place there.
+  presses() { cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | grep -c 'input: the mouse.s button down on the game at'; }
+  last_press() { cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | grep 'input: the mouse.s button down on the game at' | tail -n 1 | sed 's/.* at \\([0-9]*,[0-9]*\\) .*/\\1/'; }
+  # The bar's coming and going from the game's first picture, as the player says them, with the time each line showed
+  # (looked for every 0.2 s): the bar comes down by itself for 3 s, then goes up.
+  watch_reveal() {
+    local down='' up='' line
+    for i in \$(seq 1 1500); do
+      line=\$(cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | grep -n 'the bar comes down (the game.s first picture)\\|the bar goes up' | head -n 2)
+      if [ -z \"\$down\" ] && echo \"\$line\" | grep -q 'first picture'; then down=\$(date +%s.%N); import -window root /out/reveal-down.png; fi
+      if [ -n \"\$down\" ] && [ -z \"\$up\" ] && echo \"\$line\" | grep -q 'goes up'; then up=\$(date +%s.%N); fi
+      [ -n \"\$up\" ] && break
+      sleep 0.2
+    done
+    echo \"\$down \$up\" > /out/reveal.txt
+  }
+  # How many times the game's window lost the keyboard or stopped being the active window (PLAYER_TRACE_INPUT): the
+  # overlay must never be why.
+  focus_moves() { cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | grep -c 'input: the game.s window \\(is no longer active\\|lost the keyboard\\)'; }
   # The logs and the game's frame, whatever happens: a failure needs them most.
   collect() {
     cp \"\$LOCAL\"/OpenDMTQ/client/logs/launcher.log /out/ 2>/dev/null
@@ -125,6 +148,7 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   click_from_corner 66 31
   wait_for 60 player_running || { snap no-player; echo 'FAIL: the player did not start'; exit 1; }
   echo 'player started'
+  watch_reveal &
   sleep 20; snap game-starting
   # The frame PLAYER_SHOTS asks for comes 50 s in: then the game is at its menu.
   sleep 45; snap game-menu
@@ -150,6 +174,31 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   # The bar: the pointer from the middle of the game to its top edge, then onto a chip of the bar. The game's place and size read again first: the full screen chip changes them.
   # A length of the overlay's at 720 lines in the game's pixels now: times HEIGHT / 720, rounded half up as lround.
   opx() { echo \$(( (2 * \$1 * HEIGHT + 720) / 1440 )); }
+  # The bar came down by itself once the game's picture showed, for 3 s and its 0.3 s fade (0.2 s each way for the
+  # looks at the log), and went up.
+  read down up < /out/reveal.txt
+  [ -n \"\$down\" ] || { echo 'FAIL: the bar did not come down when the game first showed'; exit 1; }
+  [ -n \"\$up\" ] || { echo 'FAIL: the bar that came down by itself did not go up'; exit 1; }
+  held=\$(awk -v a=\"\$down\" -v b=\"\$up\" 'BEGIN { printf \"%.2f\", b - a }')
+  awk -v h=\"\$held\" 'BEGIN { exit !(h >= 2.8 && h <= 4.2) }' || { echo \"FAIL: the bar stayed \$held s by itself, not 3 and its fade\"; exit 1; }
+  echo \"the bar came down by itself for \$held s when the game first showed\"
+  # The handle at the game's top centre, 2 below its top edge and 10 high at 720 lines: the pointer resting on it
+  # brings the bar down; a click on its place, the pointer away at once, reaches the game; the game's window keeps the
+  # keyboard throughout.
+  eval \$(xdotool getwindowgeometry --shell \"\$game\")
+  moves=\$(focus_moves)
+  xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5
+  xdotool mousemove \$((X + WIDTH / 2)) \$((Y + \$(opx 7))); sleep 1.5; snap handle-rest
+  player_said 'the bar comes down (the pointer on the handle)' || { echo 'FAIL: the pointer resting on the handle did not bring the bar'; exit 1; }
+  echo 'the pointer resting on the handle brought the bar down'
+  xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 2
+  before=\$(presses)
+  xdotool mousemove \$((X + WIDTH / 2)) \$((Y + \$(opx 7))) click 1 mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 1
+  [ \"\$(presses)\" -gt \"\$before\" ] || { echo \"FAIL: a click on the handle's place did not reach the game\"; exit 1; }
+  [ \"\$(last_press)\" = \"\$((WIDTH / 2)),\$(opx 7)\" ] || { echo \"FAIL: the handle's click reached the game at \$(last_press)\"; exit 1; }
+  [ \"\$(focus_moves)\" = \"\$moves\" ] || { echo 'FAIL: the game lost the keyboard to the handle or the bar'; exit 1; }
+  echo \"a click on the handle's place reached the game at \$(last_press), and the game kept the keyboard\"
+  sleep 2
   # The bar's chip (0 the X, 1 full screen): its centre's distance from the right end and from the top.
   bar_chip() {
     eval \$(xdotool getwindowgeometry --shell \"\$game\")
@@ -231,6 +280,17 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   CMD --clear-game-data --yes | tee /out/clear.txt
   [ \"\$(cd \"\$GAME\" && find . -type f)\" = './data/android_id' ] || { echo 'FAIL: clearing left more than the id'; exit 1; }
   echo 'cleared: the id alone stayed'
+  # The FPS counter on, from the command line: refused while the launcher's window is open (it would write its own
+  # copy over it), so the window closes first and opens again after.
+  xdotool windowfocus --sync \$(window '^OpenDMTQ\$') 2>/dev/null; xdotool key alt+F4
+  wait_for 20 '[ -z \"\$(window \"^OpenDMTQ\$\")\" ]' || { snap launcher-stays-for-set; echo 'FAIL: the launcher did not close for --set'; exit 1; }
+  CMD --set show_fps=on | tee /out/set-counter.txt
+  grep -q 'show_fps=on, fps_position=top_left' /out/set-counter.txt || { echo 'FAIL: --set show_fps=on did not put the counter on at the top left'; exit 1; }
+  wine \"\$CUR/OpenDMTQ.exe\" > /out/launcher-again.log 2>&1 &
+  wait_for 60 '[ -n \"\$(xdotool search --onlyvisible --name \"^OpenDMTQ\$\" 2>/dev/null)\" ]' \\
+    || { snap launcher-not-again; echo 'FAIL: the launcher did not open again'; exit 1; }
+  sleep 6; snap launcher-again
+  echo 'the FPS counter is on (--set show_fps=on), the launcher open again'
   # PLAY again: the game makes its data anew and gets to its menu with the same id.
   click_from_corner 66 31
   wait_for 60 player_running || { snap no-player-again; echo 'FAIL: the player did not start after clearing'; exit 1; }
@@ -242,8 +302,20 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   game=\$(xdotool search --name 'TECHNIKA' 2>/dev/null | tail -n 1)
   eval \$(xdotool getwindowgeometry --shell \"\$game\")
   xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5
-  # The bar's X, then its question's Quit the game (as in step 4).
+  # The counter up at its top left (8 right of the pause button's place, which ends 73 in, and 8 down, at 720 lines);
+  # a click well inside it (101,23 at 720), the pointer away at once, reaches the game, which keeps the keyboard.
+  player_said 'the frame counter is up' || { snap no-counter; echo 'FAIL: the FPS counter did not come up'; exit 1; }
+  before=\$(presses); moves=\$(focus_moves)
+  xdotool mousemove \$((X + \$(opx 101))) \$((Y + \$(opx 23))) click 1 mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 1
+  [ \"\$(presses)\" -gt \"\$before\" ] || { snap counter-click; echo \"FAIL: a click on the counter's place did not reach the game\"; exit 1; }
+  [ \"\$(last_press)\" = \"\$(opx 101),\$(opx 23)\" ] || { echo \"FAIL: the counter's click reached the game at \$(last_press)\"; exit 1; }
+  [ \"\$(focus_moves)\" = \"\$moves\" ] || { echo 'FAIL: the game lost the keyboard to the counter'; exit 1; }
+  echo \"a click on the counter's place reached the game at \$(last_press), and the game kept the keyboard\"
+  snap counter-up
+  # The bar's X, then its question's Quit the game (as in step 4); the counter hides while the question holds the game.
   bar_chip 0; xdotool click 1; sleep 2
+  wait_for 10 'player_said \"the frame counter hides while the game is held\"' || { snap counter-under-question; echo 'FAIL: the counter did not hide while the question held the game'; exit 1; }
+  echo 'the counter hid while the question held the game'
   ask_button 1; xdotool click 1
   wait_for 60 '! player_running' || { snap player-stays-again; echo 'FAIL: the X did not end the game'; exit 1; }
   wait_for 20 '[ -n \"\$(xdotool search --onlyvisible --name \"^OpenDMTQ\$\" 2>/dev/null)\" ]' \\

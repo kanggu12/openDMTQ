@@ -13,7 +13,9 @@ SETTINGS_CPP = os.path.join(os.path.dirname(__file__), "..", "..", "arm32", "des
 class Values(unittest.TestCase):
     def test_defaults_fill_everything(self):
         filled = choices.normalize({})
-        self.assertEqual(set(filled), set(choices.ORDER))
+        # Every setting the launcher keeps: the player's, and the counter's corner, which no key of the player's names.
+        self.assertEqual(set(filled), set(choices.NAMES))
+        self.assertEqual(set(choices.NAMES) - set(choices.ORDER), {"fps_position"})
         self.assertEqual(filled["display"], "fullscreen")
         self.assertEqual(filled["volume"], 100)
 
@@ -38,12 +40,29 @@ class Values(unittest.TestCase):
                 choices.normalize({name: value})
 
     def test_the_frame_counter(self):
-        # None by default; each corner by its name; a place that is no corner refused.
-        self.assertEqual(choices.normalize({})["show_fps"], "off")
+        # Off by default, its corner the top left; on and off by name, in any case.
+        filled = choices.normalize({})
+        self.assertEqual((filled["show_fps"], filled["fps_position"]), ("off", "top_left"))
+        self.assertEqual(choices.normalize({"show_fps": "ON"})["show_fps"], "on")
+        # Its corner kept while it is off, for the next time it is on.
+        kept = choices.normalize({"show_fps": "off", "fps_position": "bottom_right"})
+        self.assertEqual((kept["show_fps"], kept["fps_position"]), ("off", "bottom_right"))
+        # A corner as show_fps's value (an older launcher's file, --set as before): on, in that corner.
         for corner in ("top_left", "top_right", "bottom_left", "bottom_right"):
-            self.assertEqual(choices.normalize({"show_fps": corner.upper()})["show_fps"], corner)
-        with self.assertRaises(choices.ChoiceError):
-            choices.normalize({"show_fps": "middle"})
+            filled = choices.normalize({"show_fps": corner.upper(), "fps_position": "top_left"})
+            self.assertEqual((filled["show_fps"], filled["fps_position"]), ("on", corner))
+        # A place that is no corner refused, for either.
+        for name, value in (("show_fps", "middle"), ("fps_position", "middle"), ("fps_position", "on")):
+            with self.assertRaises(choices.ChoiceError, msg=(name, value)):
+                choices.normalize({name: value})
+        # The player's file names the corner while it is on, off while it is not.
+        def counter_line(values):
+            return [line for line in choices.settings_text(values).splitlines() if line.startswith("show_fps=")]
+        self.assertEqual(counter_line({}), ["show_fps=off"])
+        self.assertEqual(counter_line({"show_fps": "on"}), ["show_fps=top_left"])
+        self.assertEqual(counter_line({"show_fps": "on", "fps_position": "bottom_left"}), ["show_fps=bottom_left"])
+        self.assertEqual(counter_line({"show_fps": "off", "fps_position": "bottom_left"}), ["show_fps=off"])
+        self.assertNotIn("fps_position", choices.settings_text({"show_fps": "on"}))
 
     def test_a_bad_value_keeps_the_default_when_not_strict(self):
         filled = choices.normalize({"fps": "999", "volume": 40}, strict=False)
@@ -57,7 +76,7 @@ class Values(unittest.TestCase):
 
     def test_settings_file(self):
         text = choices.settings_text({"display": "window", "window": "1600x900", "vsync": "off", "fps": "unlimited",
-                                      "render_scale": "75", "upscaler": "nis", "anti_aliasing": "smaa", "show_fps": "top_left",
+                                      "render_scale": "75", "upscaler": "nis", "anti_aliasing": "smaa", "show_fps": "on",
                                       "audio_device": "{0.0.0.00000000}.{x}",
                                       "audio_mode": "exclusive", "audio_buffer": "low", "volume": 35})
         lines = [line for line in text.splitlines() if not line.startswith("#")]

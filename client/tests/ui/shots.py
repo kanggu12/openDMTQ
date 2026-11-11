@@ -393,6 +393,49 @@ def redraw_check(app, problems, tag):
             problems.append("%s: render scale %s: the keyboard left the drop-down (now on %r)" % (tag, value, focused))
 
 
+def counter_check(app, problems, tag):
+    """The FPS counter switched from the keyboard on the Screen page: Space on its toggle turns it on, its Position row
+    comes under it; Space again turns it off, the row goes; the keyboard stays on the toggle each time, and the corner
+    chosen before stays chosen."""
+    import tkinter as tk
+
+    from opendmtq_client import widgets as wd
+    w = app.words
+    area = app.body
+
+    def counter_toggle():
+        # The toggle in the row named FPS counter.
+        for widget in widgets_of(area.inner):
+            if isinstance(widget, wd.Toggle) and getattr(widget.master, "control", None) is widget:
+                names = [c.cget("text") for c in widget.master.winfo_children() if isinstance(c, tk.Label)]
+                if w("screen.counter") in names:
+                    return widget
+        return None
+
+    def position_shown():
+        return any(isinstance(c, tk.Label) and c.cget("text") == w("screen.counter.position") for c in widgets_of(area.inner))
+
+    corner = app.state.values["fps_position"]
+    for on in (not (app.state.values["show_fps"] == "on"), app.state.values["show_fps"] == "on"):
+        toggle = counter_toggle()
+        if toggle is None:
+            problems.append("%s: no FPS counter toggle on the Screen page" % tag)
+            return
+        toggle.focus_set()
+        settle(app)
+        # Pressed as the keyboard presses it.
+        toggle.event_generate("<space>")
+        settle(app)
+        if (app.state.values["show_fps"] == "on") != on:
+            problems.append("%s: Space on the FPS counter did not turn it %s" % (tag, "on" if on else "off"))
+        if position_shown() != on:
+            problems.append("%s: FPS counter %s: the Position row %s" % (tag, "on" if on else "off", "missing" if on else "still shown"))
+        if app.root.focus_get() is not counter_toggle():
+            problems.append("%s: FPS counter %s: the keyboard left the toggle (now on %r)" % (tag, "on" if on else "off", app.root.focus_get()))
+    if app.state.values["fps_position"] != corner:
+        problems.append("%s: switching the FPS counter changed its corner (%s, was %s)" % (tag, app.state.values["fps_position"], corner))
+
+
 def variants_check(app, site, out, tag, problems):
     """Pages in their other states: a window's size row, a download under way, signed out, other servers, a crash."""
     w = app.words
@@ -410,7 +453,9 @@ def variants_check(app, site, out, tag, problems):
     app.changed("render_scale", "50")
     app.changed("upscaler", "fsr1")
     app.changed("anti_aliasing", "msaa4")
-    app.changed("show_fps", "bottom_right")
+    # The FPS counter on, with its corner's row under it (the longest corner's name).
+    app.changed("show_fps", "on")
+    app.changed("fps_position", "bottom_right")
     app.go("screen")
     settle(app)
     # Scrolled to its end, where the Quality card is.
@@ -421,6 +466,7 @@ def variants_check(app, site, out, tag, problems):
     shot(app.root, out, tag + "_screen-upscaler")
     measure(app, tag + "_screen-upscaler", problems)
     redraw_check(app, problems, tag)
+    counter_check(app, problems, tag)
     # A download under way, drawn from its numbers (the real one is in the guide).
     import threading
     app.download = {"done": 47 << 20, "total": 103 << 20, "cancel": threading.Event()}

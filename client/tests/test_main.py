@@ -15,6 +15,7 @@ from unittest import mock
 
 from opendmtq_client import apps, main, playing, preset, removal
 from opendmtq_client import state as st
+from opendmtq_client import values as choices
 from tests import stub
 from tests.base import Folder
 from tests.test_removal import GAME, listing, write
@@ -57,6 +58,8 @@ class CommandLine(Folder):
                                     "--status"])
         self.assertEqual(code, 0, said)
         self.assertIn("fps=144", said)
+        # A corner as show_fps's value, as before: the counter on, in that corner.
+        self.assertIn("show_fps=on, fps_position=bottom_left", said)
         self.assertNotIn(self.site.cookie, said)
         code, said = self.run_main(["--play"])
         self.assertEqual(code, 0, said)
@@ -78,6 +81,23 @@ class CommandLine(Folder):
         code, said = self.run_main(["--set", "upscaler=dlss"])
         self.assertEqual(code, 2)
         self.assertEqual(st.LauncherState.load().values["upscaler"], "bilinear")
+
+    def test_the_frame_counter(self):
+        # On by its own name at the top left; its corner by fps_position; off keeps the corner for the next time; a
+        # place that is no corner refused.
+        code, said = self.run_main(["--set", "show_fps=on"])
+        self.assertEqual(code, 0, said)
+        self.assertIn("show_fps=on, fps_position=top_left", said)
+        code, said = self.run_main(["--set", "fps_position=top_right"])
+        self.assertEqual(code, 0, said)
+        self.assertEqual(choices.settings_text(st.LauncherState.load().values).count("show_fps=top_right"), 1)
+        code, said = self.run_main(["--set", "show_fps=off"])
+        self.assertEqual(code, 0, said)
+        values = st.LauncherState.load().values
+        self.assertEqual((values["show_fps"], values["fps_position"]), ("off", "top_right"))
+        code, said = self.run_main(["--set", "fps_position=middle"])
+        self.assertEqual(code, 2)
+        self.assertEqual(st.LauncherState.load().values["fps_position"], "top_right")
 
     def test_audio_devices(self):
         code, said = self.run_main(["--audio-devices"])
@@ -227,7 +247,7 @@ class CommandLine(Folder):
         out = io.StringIO()
         with contextlib.redirect_stdout(out), self.assertRaises(SystemExit):
             main.parse(["--help"])
-        for name in ("vsync", "fps", "render_scale", "upscaler", "anti_aliasing", "show_fps", "audio_device"):
+        for name in ("vsync", "fps", "render_scale", "upscaler", "anti_aliasing", "show_fps", "fps_position", "audio_device"):
             self.assertIn(name, out.getvalue())
 
     def test_a_worker_threads_error_goes_to_the_log(self):
