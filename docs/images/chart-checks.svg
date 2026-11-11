@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 418" width="956" height="418" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="2072 automated checks: Tools and admin pages (unit) 658; The server on the real game files 330; Command line and repository (unit) 227; All pages in a real browser 189; An upgrade from the last release 178; The PC client (unit) 160; Host install on a clean system 130; Windows bundle under Wine 115; The game server's contract 85">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 418" width="956" height="418" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="2085 automated checks: Tools and admin pages (unit) 658; The server on the real game files 330; Command line and repository (unit) 227; All pages in a real browser 189; An upgrade from the last release 178; The PC client (unit) 173; Host install on a clean system 130; Windows bundle under Wine 115; The game server's contract 85">
 <rect x="-28" y="-28" width="956" height="418" rx="16" fill="#11151a"/>
-<text x="0" y="18" font-size="19" font-weight="700" fill="#eef2f6" text-anchor="start" data-box="0,900">2,072 automated checks before a change reaches a server</text>
+<text x="0" y="18" font-size="19" font-weight="700" fill="#eef2f6" text-anchor="start" data-box="0,900">2,085 automated checks before a change reaches a server</text>
 <text x="0" y="42" font-size="13" fill="#aeb8c3" text-anchor="start" data-box="0,900">Run on every change: most on stand-in files, so that nobody needs the game's files to work on the code.</text>
 <text x="0" y="85" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">Tools and admin pages (unit)</text>
 <path d="M330.0,70.0 H836.0 Q840.0,70.0 840.0,74.0 V86.0 Q840.0,90.0 836.0,90.0 H330.0 Z" fill="#8cf23d"/>
@@ -18,8 +18,8 @@
 <path d="M330.0,206.0 H464.0 Q468.0,206.0 468.0,210.0 V222.0 Q468.0,226.0 464.0,226.0 H330.0 Z" fill="#8cf23d"/>
 <text x="475.964" y="221" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">178</text>
 <text x="0" y="255" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">The PC client (unit)</text>
-<path d="M330.0,240.0 H450.0 Q454.0,240.0 454.0,244.0 V256.0 Q454.0,260.0 450.0,260.0 H330.0 Z" fill="#8cf23d"/>
-<text x="462.012" y="255" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">160</text>
+<path d="M330.0,240.0 H460.1 Q464.1,240.0 464.1,244.0 V256.0 Q464.1,260.0 460.1,260.0 H330.0 Z" fill="#8cf23d"/>
+<text x="472.088" y="255" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">173</text>
 <text x="0" y="289" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">Host install on a clean system</text>
 <path d="M330.0,274.0 H426.8 Q430.8,274.0 430.8,278.0 V290.0 Q430.8,294.0 426.8,294.0 H330.0 Z" fill="#8cf23d"/>
 <text x="438.76" y="289" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">130</text>
