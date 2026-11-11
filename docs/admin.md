@@ -61,7 +61,7 @@ same everywhere.
 
 ## The admin pages
 
-![The App page: the app on offer, a build for another address, and the other builds](images/admin-app.jpg)
+![The App page: the app on offer and the installer for Windows beside it, a build for another address, and the other builds](images/admin-app.jpg)
 
 What each page works on:
 
