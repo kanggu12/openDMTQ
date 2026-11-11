@@ -54,9 +54,15 @@ namespace {
 // What the settings asked for (post_configure), read at every frame.
 std::atomic<int> g_upscaler{0};      // 0 the plain stretch, 1 AMD FSR 1, 2 NVIDIA NIS
 std::atomic<int> g_anti_aliasing{0};  // Settings::AntiAliasing's order
-// RCAS's sharpness in stops (AMD's sample's default) and NIS's sharpness (the SDK's samples' default, 50 %).
+// RCAS's sharpness in stops (AMD's sample's default).
 constexpr float kRcasStops = 0.25f;
-constexpr float kNisSharpness = 0.5f;
+// NIS's sharpness: 0, its scaler with no sharpening added (NIS_Config.h maps 0 to none). The SDK's samples' 50 % drew
+// rims around the game's text and lines: at a render scale of 50 %, 6.9 to 9.5 % of the pixels by the edges were more
+// than 12 levels past the full-size picture's own range around them, against 0.5 to 2.8 % at 0 (FSR 1: 0.3 to 0.8 %);
+// and at 0 the picture is as close to the full-size one as FSR 1's (PSNR 31.8 to 34.6 dB on three screens, FSR 1 31.4
+// to 34.4), its edges nearly as strong (0.94 to 0.97 of the full-size picture's, FSR 1 0.98, the plain stretch 0.81 to
+// 0.86).
+constexpr float kNisSharpness = 0.0f;
 
 // The monotonic clock in nanoseconds, for the costs.
 std::int64_t now_ns() {

@@ -160,7 +160,8 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 - **The upscaler**, below 100 %: how the smaller picture reaches the window's size. **Bilinear** (the default) is the
   plain stretch of the window's surface. **AMD FSR 1** (FidelityFX Super Resolution 1) enlarges it with its
   edge-adaptive filter (EASU) and sharpens the result (RCAS, at AMD's sample's 0.25 stops). **NVIDIA NIS** (Image
-  Scaling) enlarges and sharpens in one pass, at the SDK's default sharpness of 50 %. Both are spatial: they need only the
+  Scaling) enlarges in one pass with its edge-adaptive filter, with no sharpening added: the SDK's default of 50 % drew
+  rims around the game's text and lines. Both are spatial: they need only the
   finished picture. At 100 % no upscaler is used, and the row is not shown.
 - **Anti-aliasing** smooths the jagged edges of the game's shapes. **CMAA 2** (Intel's Conservative Morphological
   Anti-Aliasing 2) smooths them over the finished picture and keeps text and thin lines sharp; it runs on compute shaders

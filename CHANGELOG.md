@@ -47,6 +47,10 @@ one that only fixes raises the patch number. Each release's section here is its 
   5 seconds after a step down (it was 15), goes straight back when the try falls short, and waits twice as long for the
   next one, a minute at most (it was four). On a 240 Hz display a song now holds 240 frames a second from the page
   before it to its end, where it went down to 120 and 80 on that page and to 60 later, below 240 for most of the song.
+- The player for Windows: NVIDIA NIS enlarges with no sharpening added, where it had the SDK's default of 50 %, which
+  drew rims around the game's text and lines. The pixels by the edges that stand out of the full-size picture's range
+  are 0.5 to 2.8 % at a render scale of 50 % and 0.1 to 0.9 % at 75 % (they were 6.9 to 9.5 % and 4.6 to 5.2 %); the
+  picture is as close to the full-size one as AMD FSR 1's at 50 %, and the closest of the three upscalers at 75 %.
 
 ### Removed
 
