@@ -33,8 +33,7 @@ Later
 
 - Songs: on the admin pages, Songs, then "Choose the folder": the client data and the song data together, or the DMQ
   folder alone. An import replaces the songs imported before; single songs can be added on the same page and stay.
-- The admin pages: the window shows their address (usually http://localhost:8791/opendmtq/admin/), the user (admin) and
-  the password.
+- The admin pages: the window shows their address, the user (admin) and the password.
 - Commands: open a terminal in this folder (type cmd in Explorer's address bar, then Enter), then for example
   OpenDMTQ.exe status, OpenDMTQ.exe apk or OpenDMTQ.exe --help. OpenDMTQ.exe import --check <folder> says what each file
   in a folder is, and imports nothing.
