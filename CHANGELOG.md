@@ -33,6 +33,9 @@ one that only fixes raises the patch number. Each release's section here is its 
   the full screen chip keeps the green.
 - The launcher's Screen page: the upscaler's hints no longer say what 100 % does (the row is shown only below it), and
   the page's line under its title names the picture's quality too.
+- The guides: the PC client's guide lists every setting `--set` takes with its values, installing has updates,
+  backups and moving a server to another computer, troubleshooting leads to the PC client's, the notice names the
+  picture's passes and their licenses, and CONTRIBUTING lists what a release publishes.
 
 ## [0.9.0] - 2026-11-11
 

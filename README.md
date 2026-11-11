@@ -140,7 +140,7 @@ scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#pr
 
 | Guide | What it covers |
 |---|---|
-| [Installing](docs/install.md) | Each system step by step, the phones, everyday use, what it runs on |
+| [Installing](docs/install.md) | Each system step by step, the phones and PCs, everyday use, updates and backups, what it runs on |
 | [The game's files](docs/game-files.md) | What the app, the client data and the song data have to be |
 | [Questions and answers](docs/faq.md) | What it needs, which phones, playing with friends, privacy |
 | [The site and the admin pages](docs/admin.md) | The setup, the app, songs, players, backups |

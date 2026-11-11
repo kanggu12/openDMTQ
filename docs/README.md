@@ -11,6 +11,7 @@ to run a server, and [Questions and answers](faq.md) covers what people ask firs
 
 | Guide | For |
 | :--- | :--- |
+| [Installing](install.md) | Each system step by step, the phones and PCs, everyday use, updates, backups and moving to another computer, the `.env` settings |
 | [Questions and answers](faq.md) | What it needs, which phones, playing with friends, what leaves your computer |
 | [The game's files](game-files.md) | What your APK, client data and song data have to be, the forms they come in, how to check them |
 | [The site and the admin pages](admin.md) | The setup in the browser, the players' site, building the app, players, accounts, recordings, backups, the maintenance notice |
@@ -21,7 +22,7 @@ to run a server, and [Questions and answers](faq.md) covers what people ask firs
 | [Live broadcasts](live.md) | Watching players in a song, recordings, their limits |
 | [Kubernetes](kubernetes.md) | The Helm chart, failover, the database replica |
 | [Without internet](closed-network.md) | A server and phones on a network with no way out: what to carry in for each way of running it |
-| [Troubleshooting](troubleshooting.md) | When a phone cannot connect, the app does not install, or the server does not start |
+| [Troubleshooting](troubleshooting.md) | When a phone cannot connect, the app does not install, a PC does not play, or the server does not start |
 | [License and notice](notice.md) | What the project is, its license, the third-party parts |
 
 ## Working on the code

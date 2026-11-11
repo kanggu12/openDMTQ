@@ -263,4 +263,4 @@ server's app, `--settings` the file).
 - **The videos are black and silent:** see the Media Feature Pack above.
 - **It cannot reach the server:** the PC has to reach the server's address, as a phone does: on the same network, or
   over the internet when the server is set up for it ([playing from outside your home](internet.md)).
-- **The sound breaks up:** choose a safer buffer on the **Sound** page, or shared instead of the device alone.
+- **The sound breaks up:** choose the **Safe** buffer on the **Sound** page, or shared instead of the device alone.

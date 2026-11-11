@@ -23,7 +23,7 @@ When the game does not start or shows no songs, this chart leads to the right se
 - The Windows bundle: Windows Defender Firewall keeps phones out until Apache is allowed. If its question was answered
   No, allow it in Windows Security, Firewall and network protection, Allow an app through firewall, on private
   networks.
-- Windows with WSL and Docker: `./opendmtq firewall`, then `./opendmtq doctor` should show the rule.
+- Windows with WSL and Docker: `./opendmtq firewall`, then `./opendmtq doctor` then shows the rule.
 - WSL in NAT mode (WSL then has a private address of its own, behind the PC) gives the server a `172.x` address that
   phones cannot reach. Set `networkingMode=mirrored` under `[wsl2]` in `%UserProfile%\.wslconfig`, run
   `wsl --shutdown`, then `./opendmtq setup`. With Docker Desktop, which publishes ports on Windows itself, you can
@@ -88,6 +88,13 @@ Android says "App not installed" for several reasons. Check them in this order.
 
 To see which phone a player used, find their requests on the Logs page of the admin pages: browsers inside apps
 (KakaoTalk, for example) send the model name, such as `SM-S948N`.
+
+## A PC does not play
+
+The PC client says why on its bottom line and on its **Help** page, with the player's log. [The PC client's
+troubleshooting](windows-player.md#when-something-goes-wrong) covers a game that does not start, a refused sign-in,
+Windows blocking the installer, black videos and broken sound. A PC reaches the server the same way a phone does, so
+the sections above on reaching the server apply to it too.
 
 ## The game downloads data when it starts
 

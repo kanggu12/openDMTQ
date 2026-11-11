@@ -36,7 +36,7 @@ Yes, with a host name and one forwarded port: [Playing from outside your home](i
 
 **How do I make backups?**
 The server makes one a day by itself and keeps the last seven. The **Backups** page makes one at any time, downloads
-them and restores them.
+them and restores them ([backups and a new computer](install.md#backups-and-a-new-computer)).
 
 **What happens to the data if I update OpenDMTQ?**
 Everything of yours is in the `data` folder and the `.env` file, and an update leaves those alone. On Windows, close the
