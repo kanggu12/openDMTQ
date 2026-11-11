@@ -137,6 +137,9 @@ void glow(Canvas& c, Gdiplus::RectF bounds, float sigma, float dx, float dy, con
           const std::function<void(Gdiplus::Graphics&)>& draw);
 // A rounded rectangle as a path.
 void rounded(Gdiplus::GraphicsPath& path, Gdiplus::RectF r, float radius);
+// What `draw` fills (with GDI+, smooth, pixels at their centres) on a picture of w by h, as each pixel's coverage from 0
+// to 1, top row first: a shape's soft-edged mask, for pixels worked out by hand.
+std::vector<float> coverage(int w, int h, const std::function<void(Gdiplus::Graphics&)>& draw);
 // GDI+'s smooth shapes and grey smoothed text, pixels at their centres.
 void smooth(Gdiplus::Graphics& g);
 

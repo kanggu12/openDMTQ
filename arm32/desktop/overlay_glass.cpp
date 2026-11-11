@@ -707,6 +707,8 @@ void backdrop_fill(Canvas& out, const Backdrop* b, float bare) {
 
 // ---- drawing on a piece
 
+std::vector<float> coverage(int w, int h, const std::function<void(Graphics&)>& draw) { return coverage_of(w, h, draw); }
+
 void glow(Canvas& c, RectF bounds, float sigma, float dx, float dy, const Color& colour, const std::function<void(Graphics&)>& draw) {
     if (!c.bits) return;
     // The part of the canvas worked on: the bounds, the blur's reach and the move around them, within the canvas.

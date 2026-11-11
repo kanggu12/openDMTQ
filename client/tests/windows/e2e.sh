@@ -182,9 +182,9 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   held=\$(awk -v a=\"\$down\" -v b=\"\$up\" 'BEGIN { printf \"%.2f\", b - a }')
   awk -v h=\"\$held\" 'BEGIN { exit !(h >= 2.8 && h <= 4.2) }' || { echo \"FAIL: the bar stayed \$held s by itself, not 3 and its fade\"; exit 1; }
   echo \"the bar came down by itself for \$held s when the game first showed\"
-  # The handle at the game's top centre, 2 below its top edge and 10 high at 720 lines: the pointer resting on it
-  # brings the bar down; a click on its place, the pointer away at once, reaches the game; the game's window keeps the
-  # keyboard throughout.
+  # The handle's place at the game's top centre, a box 44 by 10 2 below its top edge at 720 lines and 10 around it (the
+  # tab drawn there is smaller): the pointer resting on it brings the bar down; a click on its place, the pointer away
+  # at once, reaches the game; the game's window keeps the keyboard throughout.
   eval \$(xdotool getwindowgeometry --shell \"\$game\")
   moves=\$(focus_moves)
   xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5

@@ -24,9 +24,11 @@
 //   Under the pointer the full screen chip lights with a lime edge and the X turns red, as Windows' own close does; held,
 //   a chip is pressed in. It stays while the pointer is on it and goes up soon after it leaves, so it never sits on the
 //   game's own controls at the top while they are used. No key brings it.
-// - The handle: a short pill with a down arrow at the top centre of the game, faint and small, which says where the bar
-//   is. Clicks go through it to the game; the pointer resting on it brings the bar down. Hidden while the bar is down,
-//   while the question or a notice is up, while the game is held, and before the game's first picture.
+// - The handle: a small tab hanging from the game's top edge at its centre, in the shape of the game's own tabs, its
+//   charcoal faint and the game's green line along its foot, which says where the bar is; with the pointer on it, a
+//   little taller and its line lime. Clicks go through it to the game; the pointer resting on it brings the bar down.
+//   Hidden while the bar is down, while the question or a notice is up, while the game is held, and before the game's
+//   first picture.
 // - The question before quitting: the bar's X and the window's own close ask it. The game dims and blurs behind a card of
 //   glass with the question, the game's green line under it, a thin X, Keep playing as the game's green button and Quit
 //   the game in the grey of its tabs, red under the pointer; the keys' choice marked as the game marks a chosen card. The
@@ -628,18 +630,22 @@ int chip_at(int x, int y) {
 
 // ---- the handle's size and place (both threads)
 
-// The handle's pill at 720 lines: 44 by 10, 2 below the game's top edge, centred; its window 3 more on every side for
-// its edge's soft pixels; the pointer rests on it within 10 more on either side and below it (a small target, easy to
-// reach).
+// The handle's place at 720 lines: a box 44 by 10, 2 below the game's top edge, centred, which the pointer rests on
+// within 10 more on either side and below it (a small target, easy to reach; the handle as drawn is smaller, inside it);
+// its window that box and 3 more on every side.
 constexpr float kHandleW = 44, kHandleH = 10, kHandleTop = 2, kHandleRoom = 3, kHandleReach = 10;
+// The handle as drawn, at 720 lines: a tab 28 wide at its foot, 5 high (7 with the pointer on it), hanging from the
+// game's top edge, its sides leaning out 0.268 a pixel down as the game's own tabs' do (15 degrees: measured on its 2
+// LINE and 3 LINE tabs at 1080 lines); a line a pixel high along its foot.
+constexpr float kTabFoot = 28, kTabTall = 5, kTabTallLit = 7, kTabLean = 0.268f, kTabLine = 1;
 
-// The pill in the game's area.
+// The handle's box in the game's area.
 RectF handle_pill() {
     const float w = fpx(kHandleW), h = fpx(kHandleH);
     return RectF(std::floor((static_cast<float>(area_w()) - w) / 2), fpx(kHandleTop), std::round(w), std::round(h));
 }
 
-// The handle's window in the game's area: the pill and its room.
+// The handle's window in the game's area: its box and the room around it.
 RECT handle_window() {
     const RectF pill = handle_pill();
     const int room = px(kHandleRoom);
@@ -647,7 +653,7 @@ RECT handle_window() {
                 static_cast<LONG>(pill.Y + pill.Height) + room};
 }
 
-// Whether (x, y) of the game's area is on the handle, as the pointer rests there: the pill and its reach, from the top.
+// Whether (x, y) of the game's area is on the handle, as the pointer rests there: its box and its reach, from the top.
 bool on_handle(int x, int y) {
     const RectF pill = handle_pill();
     const float reach = fpx(kHandleReach);
@@ -1115,44 +1121,50 @@ void notice_look(Paint& p, const std::string& text, bool live, int corner) {
 
 // ---- the handle's look (the painter's)
 
-// The handle: a pill with round ends, white at 22 % over the game (it lightens a dark frame a little and is nearly gone
-// on a light one), inside a pixel of black at 50 % that outlines it on a light frame; a down chevron in its middle,
-// white at 90 % over a pixel of black at 60 % on either side of it (white on a dark frame, outlined dark on a light
-// one). No glass: nothing of the frame is read for it. Its picture is the handle's window, at the place it goes to.
-std::shared_ptr<Canvas> handle_picture(int& x, int& y) {
+// The handle, as picked from three drawn over the game's frames: a small tab in the shape of the game's own tabs hanging
+// from its top edge at the centre (kTabFoot and the rest), the game's charcoal at 40 %, a line of the game's green along
+// its foot at 70 %; with the pointer on it (`lit`) 7 high and its line the lime, whole. The line takes the foot's place
+// rather than lying over the charcoal, so that it is the same green on any frame. No glass: nothing of the frame is read
+// for it. Its picture is the handle's window, at the place it goes to.
+std::shared_ptr<Canvas> handle_picture(int& x, int& y, bool lit) {
     const RECT win = handle_window();
     x = win.left;
     y = win.top;
     auto c = std::make_shared<Canvas>(std::max(1L, win.right - win.left), std::max(1L, win.bottom - win.top));
     if (!c->bits) return c;
     std::memset(c->bits, 0, static_cast<std::size_t>(c->w) * static_cast<std::size_t>(c->h) * 4);
-    auto surface = c->surface();
-    Graphics g(surface.get());
-    smooth(g);
-    const RectF pill = handle_pill();
-    // The pill in its window, half a pixel in for the dark line's whole width.
-    const float line = std::max(1.0f, fpx(1));
-    const RectF r(pill.X - static_cast<float>(win.left) + line / 2, pill.Y - static_cast<float>(win.top) + line / 2, pill.Width - line, pill.Height - line);
-    GraphicsPath path;
-    rounded(path, r, r.Height / 2);
-    SolidBrush fill(Color(56, 255, 255, 255));
-    g.FillPath(&fill, &path);
-    Pen dark(Color(128, 0, 0, 0), line);
-    g.DrawPath(&dark, &path);
-    // The chevron: 10 wide and 4 high at 720, centred, its stroke 1.5, round at its ends and its point.
-    const float cx = r.X + r.Width / 2, cy = r.Y + r.Height / 2;
-    const float half = fpx(5), drop = fpx(2);
-    const PointF chevron[] = {PointF(cx - half, cy - drop), PointF(cx, cy + drop), PointF(cx + half, cy - drop)};
-    Pen under(Color(153, 0, 0, 0), fpx(1.5f) + 2 * line);
-    under.SetLineJoin(LineJoinRound);
-    under.SetStartCap(LineCapRound);
-    under.SetEndCap(LineCapRound);
-    g.DrawLines(&under, chevron, 3);
-    Pen over(Color(230, 255, 255, 255), fpx(1.5f));
-    over.SetLineJoin(LineJoinRound);
-    over.SetStartCap(LineCapRound);
-    over.SetEndCap(LineCapRound);
-    g.DrawLines(&over, chevron, 3);
+    // The tab in its window: centred on the handle's box, its top on the game's top edge.
+    const RectF box = handle_pill();
+    const float cx = box.X + box.Width / 2 - static_cast<float>(win.left), top = -static_cast<float>(win.top);
+    const float foot = fpx(kTabFoot), tall = fpx(lit ? kTabTallLit : kTabTall), line = std::max(1.0f, fpx(kTabLine));
+    // Its width at a depth below its top: the foot's, less the lean on either side for the height above the foot.
+    auto across = [&](float depth) { return foot - 2.0f * (tall - depth) * kTabLean; };
+    // The whole tab and its foot's line, each as a shape's coverage of the window's pixels.
+    const std::vector<float> tab = coverage(c->w, c->h, [&](Graphics& g) {
+        const PointF shape[] = {PointF(cx - across(0) / 2, top), PointF(cx + across(0) / 2, top), PointF(cx + foot / 2, top + tall),
+                                PointF(cx - foot / 2, top + tall)};
+        SolidBrush white(Color(255, 255, 255, 255));
+        g.FillPolygon(&white, shape, 4);
+    });
+    const std::vector<float> foot_line = coverage(c->w, c->h, [&](Graphics& g) {
+        const PointF shape[] = {PointF(cx - across(tall - line) / 2, top + tall - line), PointF(cx + across(tall - line) / 2, top + tall - line),
+                                PointF(cx + foot / 2, top + tall), PointF(cx - foot / 2, top + tall)};
+        SolidBrush white(Color(255, 255, 255, 255));
+        g.FillPolygon(&white, shape, 4);
+    });
+    // The line's colour and strength, and the charcoal's: at rest the game's green at 70 %, lit its lime whole.
+    const Color& green = lit ? tone::kLime : game::kLine;
+    const float line_alpha = lit ? 1.0f : 0.70f, body_alpha = 0.40f;
+    auto* px = static_cast<std::uint32_t*>(c->bits);
+    for (std::size_t i = 0; i < tab.size(); ++i) {
+        // The line where it lies, the charcoal over the rest of the tab; premultiplied, as the window takes them.
+        const float l = std::min(foot_line[i], tab[i]) * line_alpha, b = std::max(0.0f, tab[i] - foot_line[i]) * body_alpha;
+        const float a = l + b;
+        if (a <= 0.0f) continue;
+        const auto ch = [&](float line_c, float body_c) { return static_cast<std::uint32_t>(std::lround(std::min(255.0f, line_c * l + body_c * b))); };
+        px[i] = static_cast<std::uint32_t>(std::lround(std::min(255.0f, a * 255.0f))) << 24 | ch(green.GetR(), kTintR) << 16 |
+                ch(green.GetG(), kTintG) << 8 | ch(green.GetB(), kTintB);
+    }
     return c;
 }
 
@@ -1169,9 +1181,9 @@ struct Order {
     std::shared_ptr<const std::vector<glass::Shot>> shots;
     // The bar's chip under the pointer and the one held; the question's choice, what is under its pointer and held.
     int hover = kNone, pressed = kNone, choice = kKeep;
-    // The notice's words and whether it is live; the counter's corner and its numbers.
+    // The notice's words and whether it is live; the counter's corner and its numbers; whether the handle is lit.
     std::string text;
-    bool live = false;
+    bool live = false, lit = false;
     int corner = 0, fps = -1;
     float ms = 0;
     // The notice's picture where it lies under the question's dim (null: none up), and its place in the game's area.
@@ -1256,11 +1268,11 @@ Painted paint_counter(const Order& o, Paint& p) {
     return Painted{true, p.picture, p.x, p.y, p.have_backdrop, p.made, o.key};
 }
 
-// The handle's picture for an order: made again only for another view.
+// The handle's picture for an order: made again only for another view, or with the pointer come on it or gone.
 Painted paint_handle(const Order& o, Paint& p) {
     const Drawing d(o.view);
     if (p.made_for != o.key || !p.picture) {
-        p.picture = handle_picture(p.x, p.y);
+        p.picture = handle_picture(p.x, p.y, o.lit);
         p.made = ++g_made;
         p.made_for = o.key;
     }
@@ -2166,31 +2178,62 @@ LRESULT CALLBACK notice_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
 Shown g_handle;
 // Whether the game's picture has shown yet: the handle and the bar's reveal wait for it.
 bool g_first_picture = false;
+// Whether the handle is drawn lit (the pointer on its reach), and the view its picture was last asked for: a new view
+// takes it off the screen until its picture comes, a change of light alone keeps the one shown meanwhile.
+bool g_handle_lit = false;
+std::string g_handle_view;
+// While it is lit, the handle's window looks again every 100 ms whether the pointer is still on it: a pointer that leaves
+// over the window's title bar tells the game's window nothing.
+constexpr UINT_PTR kHandleTimer = 1;
+constexpr UINT kHandleCheckMs = 100;
 
 // Whether the handle belongs on the screen now: once the game's picture has shown, while nothing else of the overlay
 // is at the top (the bar, a notice), no question is up and the game runs.
 bool handle_wanted() { return g_first_picture && !g_bar.up && !g_bar_wanted && !g_asking && !g_held && !g_minimised_hold && !g_notice_up; }
 
-// The handle on the screen or off it, as it belongs now; its picture asked of the painter for a new view.
+// Whether the pointer is on the handle's reach now, over the game's window (the handle lets it through), with no
+// button down and the game not pressed.
+bool pointer_on_handle() {
+    if (g_pointer_down || g_game_down) return false;
+    POINT p{};
+    GetCursorPos(&p);
+    const RECT a = area();
+    return on_handle(p.x - a.left, p.y - a.top) && WindowFromPoint(p) == g_game;
+}
+
+// The handle on the screen or off it, as it belongs now, lit while the pointer is on it; its picture asked of the
+// painter for a new view or a change of light.
 void handle_update() {
     if (!g_handle.window) return;
     if (!handle_wanted()) {
+        g_handle_lit = false;
+        KillTimer(g_handle.window, kHandleTimer);
         hide(g_handle);
         return;
+    }
+    g_handle_lit = pointer_on_handle();
+    // Looked at again while lit, for a pointer that leaves without a word to the game's window.
+    if (g_handle_lit) {
+        SetTimer(g_handle.window, kHandleTimer, kHandleCheckMs, nullptr);
+    } else {
+        KillTimer(g_handle.window, kHandleTimer);
     }
     View v = view_now();
     v.top_room = 0;
     v.full = false;
-    char key[64];
-    std::snprintf(key, sizeof key, "handle %dx%d %.4f", v.w, v.h, static_cast<double>(v.dpi));
+    char view[64], key[80];
+    std::snprintf(view, sizeof view, "handle %dx%d %.4f", v.w, v.h, static_cast<double>(v.dpi));
+    std::snprintf(key, sizeof key, "%s %s", view, g_handle_lit ? "lit" : "rest");
     if (g_handle.key != key) {
         Order o;
         o.view = v;
         o.key = key;
+        o.lit = g_handle_lit;
         order(kHandlePiece, std::move(o));
-        // Its picture for another view comes in a moment: off the screen until then.
-        if (g_handle.up) hide(g_handle);
-        return;
+        // Its picture for another view comes in a moment: off the screen until then. Lit or not, the one shown stays.
+        if (g_handle_view != view && g_handle.up) hide(g_handle);
+        g_handle_view = view;
+        if (!g_handle.up) return;
     }
     g_handle.alpha = 255;
     show(g_handle);
@@ -2199,6 +2242,11 @@ void handle_update() {
 LRESULT CALLBACK handle_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     // Clicks go through it to the game; the game's window hears the pointer resting on it.
     if (msg == WM_NCHITTEST) return HTTRANSPARENT;
+    // Lit: whether the pointer is still on it.
+    if (msg == WM_TIMER && w == kHandleTimer) {
+        handle_update();
+        return 0;
+    }
     return DefWindowProcW(h, msg, w, l);
 }
 
@@ -2598,6 +2646,8 @@ void notice(const std::string& text, bool live) {
 
 void pointer_moved(int x, int y, bool pressed) {
     g_pointer_down = pressed;
+    // The handle lights while the pointer is on its reach with no button down, and goes back as it leaves.
+    if (g_handle.up && (on_handle(x, y) && !pressed) != g_handle_lit) handle_update();
     // A move message to where the pointer already was (Windows sends some after a click) is no move: a rest only counts
     // when the pointer came to it by moving.
     const bool moved = x != g_moved_x || y != g_moved_y;
@@ -3034,20 +3084,21 @@ void test_save(const std::wstring& prefix, const std::wstring& frame_png, bool w
         layout_line(layout, n.name, got.x, got.y, got.picture.get());
         words_lines(layout, n.name, got.x, got.y);
     }
-    // The handle, at its place.
-    {
+    // The handle, at its place: at rest, and lit (the pointer on it).
+    for (const bool lit : {false, true}) {
         Order o;
         o.view = base;
         o.shots = shots;
-        o.key = "probe handle";
+        o.key = lit ? "probe handle lit" : "probe handle";
+        o.lit = lit;
         Paint p;
         Painted got = paint_handle(o, p);
-        if (got.picture) {
-            save_png(*got.picture, prefix + L"handle.png");
-            layout_line(layout, "handle", got.x, got.y, got.picture.get());
-            const RectF pill = handle_pill();
-            if (layout) std::fprintf(layout, "handle-pill %.0f %.0f %.0f %.0f\n", pill.X, pill.Y, pill.Width, pill.Height);
-        }
+        if (!got.picture) continue;
+        save_png(*got.picture, prefix + (lit ? L"handle-lit.png" : L"handle.png"));
+        if (lit) continue;
+        layout_line(layout, "handle", got.x, got.y, got.picture.get());
+        const RectF pill = handle_pill();
+        if (layout) std::fprintf(layout, "handle-pill %.0f %.0f %.0f %.0f\n", pill.X, pill.Y, pill.Width, pill.Height);
     }
     // The question: each choice of the keys, the pointer on each button and on the thin X, each button held; over the
     // dimmed game (the dim saved once, the card's window over it for each look).

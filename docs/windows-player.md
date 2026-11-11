@@ -94,9 +94,11 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   pointer is on it and goes up soon after the pointer leaves, so it never sits on the game's own controls at the top
   while they are used; no key brings it. While it is down, the broadcast notice and an FPS counter in a top corner move
   down under it. It is tall enough to cover the game's own X at the top right of its song and music screens whole.
-- **The handle**: a short faint pill with a down arrow at the top centre of the game says where the bar is: the pointer
-  resting on it brings the bar down. Clicks go through it to the game. It shows once the game's picture is up, and goes
-  while the bar is down, while a notice or the question is up and while the game holds still.
+- **The handle**: a small tab hanging from the game's top edge at its centre, in the shape of the game's own tabs, the
+  game's charcoal with its green line along the foot, says where the bar is; with the pointer on it, it grows a little
+  and its line turns lime. The pointer resting on it, or just around it, brings the bar down. Clicks go through it to
+  the game. It shows once the game's picture is up, and goes while the bar is down, while a notice or the question is
+  up and while the game holds still.
   On its left, the OpenDMTQ wordmark as the launcher's header draws it; on its right two chips like the game's OFF chips: **full
   screen** (or back to a window), lit with a lime edge under the pointer, and an **X** that quits, red under the pointer
   as Windows' own close button turns; held, a chip is pressed in, and it acts only when let go where it was pressed (the
