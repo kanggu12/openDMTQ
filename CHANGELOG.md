@@ -23,6 +23,9 @@ one that only fixes raises the patch number. Each release's section here is its 
   upscaler, anti-aliasing, VSync, the mode), instead of going back to its top.
 - The player for Windows: the bar covers the game's own X at the top right of its song and music screens whole (74
   instead of 52 at 720 lines), with no tip of it showing under the bar.
+- A restore of another PC's backup on a host install or in the Windows bundle told the owner to run `./opendmtq restore
+  --with-key`, which only Docker Compose's command line has. There the Backups page now says to put the backup's
+  `keystore` folder in place of `data/apk/keystore` with the server stopped, so that phones keep updating their app.
 
 ### Changed
 

@@ -812,6 +812,7 @@ STRINGS = {
         "bak.not_saved": "Not restored: the current state could not be saved first ({detail}).",
         "bak.restored": "Restored <code>{name}</code>. The previous state was saved as <code>{saved}</code>.",
         "bak.other_key": "<code>{name}</code> has another signing key. Moving from another PC? On the server PC run <code>./opendmtq restore {name} --with-key</code>.",
+        "bak.other_key_host": "<code>{name}</code> has another signing key. Moving from another PC? So that phones update their app, stop the server, put the <code>keystore</code> folder from inside <code>data/backups/{name}</code> in place of <code>data/apk/keystore</code>, and start the server: it builds the app again with that key.",
         # Maintenance.
         "maint.title": "Maintenance",
         "maint.heading": "Maintenance notice",
@@ -1617,6 +1618,7 @@ STRINGS = {
         "bak.not_saved": "복원하지 않았습니다: 현재 상태를 먼저 저장하지 못했습니다({detail}).",
         "bak.restored": "<code>{name}</code>에서 복원했습니다. 이전 상태는 <code>{saved}</code>에 저장했습니다.",
         "bak.other_key": "<code>{name}</code>은 서명 키가 다른 서버의 백업입니다. 다른 PC에서 옮겨 왔다면 서버 PC에서 <code>./opendmtq restore {name} --with-key</code>를 실행하세요.",
+        "bak.other_key_host": "<code>{name}</code>은 서명 키가 다른 서버의 백업입니다. 다른 PC에서 옮겨 왔다면 휴대폰이 앱을 업데이트할 수 있도록 서버를 멈추고, <code>data/backups/{name}</code> 안의 <code>keystore</code> 폴더로 <code>data/apk/keystore</code>를 바꾼 뒤 서버를 시작하세요. 서버가 그 키로 앱을 다시 만듭니다.",
         "maint.title": "점검",
         "maint.heading": "점검 안내",
         "maint.lead": "켜 두면 게임에 메시지가 나오고 플레이어는 들어올 수 없습니다. 사이트와 관리 페이지는 그대로 작동합니다.",

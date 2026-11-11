@@ -504,7 +504,10 @@ def restore_backup(name, path):
     # needs its key, or its players' phones cannot update; only the CLI puts a key back.
     theirs = key_digest_in(path)
     if theirs and theirs != current_key_digest():
-        said.append(("bad", t("bak.other_key", name=name)))
+        # Where the key comes back from: Docker Compose's command line has restore --with-key; a host install and the
+        # Windows bundle have no such command, so they are told of the key's folder in the archive instead.
+        from . import setup
+        said.append(("bad", t("bak.other_key_host" if setup.HOST_INSTALL else "bak.other_key", name=name)))
     return said, True
 
 # A backup a day, by itself, while the owner has that on: only when something changed since the last one, and at most the

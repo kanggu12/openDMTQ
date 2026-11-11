@@ -1702,6 +1702,41 @@ class RestoreRefusesAndRescuesTest(unittest.TestCase):
                 inst.client.post(f"/opendmtq/admin/backups/{name}", data={"csrf": csrf, "action": "restore"})
             self.assertFalse(os.path.exists(inst.path("custom/hidden.json")))
 
+    def _another_pcs_backup(self, inst):
+        """A backup whose signing key is not this server's, and this server's own key."""
+        os.makedirs(inst.path("apk/keystore"))
+        with open(inst.path("apk/keystore/opendmtq.jks"), "wb") as f:
+            f.write(b"this server's key")
+        snap, theirs = inst.path("snap.db3"), inst.path("theirs.jks")
+        old_game_database(snap, [])
+        with open(theirs, "wb") as f:
+            f.write(b"the other PC's key")
+        with tarfile.open(inst.path(f"backups/{self.NAME}"), "w:gz") as tar:
+            tar.add(snap, arcname="dmtq.db3")
+            tar.add(theirs, arcname="keystore/opendmtq.jks")
+        old_game_database(admin.core.DB, [])
+
+    def test_another_pcs_key_is_told_with_what_this_install_has(self):
+        # A host install and the Windows bundle were told to run ./opendmtq restore --with-key, a command only Docker
+        # Compose's command line has: there the page names the key's folder in the backup instead.
+        host_commands = {"setup", "run", "start", "stop", "restart", "status", "import", "apk", "runtime", "host", "check",
+                         "service"}
+        for host_install in (True, False):
+            with self.subTest(host_install=host_install), Install() as inst, \
+                    mock.patch.object(admin.setup, "HOST_INSTALL", host_install):
+                self._another_pcs_backup(inst)
+                csrf = page_token(inst)
+                self.post(inst, csrf)
+                page = inst.client.get("/opendmtq/admin/backups").get_data(as_text=True)
+                self.assertIn("has another signing key", page)
+                named = set(re.findall(r"\./opendmtq (\w+)", page)) | set(re.findall(r"OpenDMTQ\.exe (\w+)", page))
+                if host_install:
+                    self.assertEqual(named - host_commands, set(), "a command this install lacks")
+                    self.assertNotIn("--with-key", page)
+                    self.assertIn("data/apk/keystore", page)
+                else:
+                    self.assertIn(f"./opendmtq restore {self.NAME} --with-key", page)
+
     def test_two_backups_in_one_second_keep_both(self):
         with Install():
             old_game_database(admin.core.DB, [])

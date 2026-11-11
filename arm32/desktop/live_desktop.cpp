@@ -37,7 +37,8 @@ namespace arm32 {
 // The desktop's own entry points, which frames.cpp calls: at each swap, and when the game destroys a context.
 void desktop_live_frame(EGLDisplay display, EGLSurface surface);
 void desktop_live_context_destroyed(EGLContext context);
-// The game held still behind the player's menu (true) or going on (false), which window_win32.cpp tells.
+// The game held still (true: the question before quitting is up, or the window is minimised) or going on (false),
+// which window_win32.cpp tells.
 void desktop_live_paused(bool paused);
 }  // namespace arm32
 

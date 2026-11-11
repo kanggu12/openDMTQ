@@ -184,7 +184,8 @@ checks the archive and that its database can be read and is a game database, sav
 server, puts the database and added songs back and starts it again. The signing key is restored only when this
 install has none, or with `--with-key` (use that on a new machine so phones keep their app); the app is then rebuilt
 with it, so phones install it over theirs. The `.env` in a backup is for reference and is not restored. On a host
-install and on Windows, restore on the Backups page of the admin pages.
+install and on Windows, restore on the Backups page of the admin pages. It keeps this install's signing key; for a
+backup from another PC, the page says how to put that PC's key in place.
 
 If `./opendmtq doctor` says the signing key is missing, restore it from a backup with `--with-key`. Builds stop until
 then: an app signed with a new key is a different app to a phone. It would install next to the old one instead of
