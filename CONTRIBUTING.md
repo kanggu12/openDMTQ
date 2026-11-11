@@ -24,7 +24,7 @@ stand-in files of their own.
 ## Where the code is
 
 <p align="center">
-  <img src="docs/images/code-map.svg" alt="The map of the code. A phone's app sends the game's requests to server/edge, the one public port, then server/apache's site.conf sends each path on: the game's requests to server/game (index.php, then src/rpc.php, and src/platform.php for the platform's login), the live view's uploads to server/game/live, the site's pages to server/portal. Players, scores and accounts are in data/state/dmtq.db3. tools/opendmtq_tools holds the admin pages with the setup, the import, the app builder and the song list; opendmtq with cli/ runs them with Docker, host/ without containers" width="100%">
+  <img src="docs/images/code-map.svg" alt="The map of the code. A phone's app sends the game's requests to server/edge, the one public port, then server/apache's site.conf sends each path on: the game's requests to server/game (index.php, then src/rpc.php, and src/platform.php for the platform's login), the live view's uploads to server/game/live, the site's pages to server/portal. On a Windows PC, the launcher in client/ gets the server's app from server/portal (client.php, /apk) and starts the player in arm32/desktop, which sends the game's requests as a phone's app does. Players, scores and accounts are in data/state/dmtq.db3. tools/opendmtq_tools holds the admin pages with the setup, the import, the app builder and the song list; opendmtq with cli/ runs them with Docker, host/ without containers" width="100%">
 </p>
 
 | Path | What it is | Start reading at |

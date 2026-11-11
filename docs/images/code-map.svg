@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 676" width="956" height="676" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="The map of the code. A phone's app sends the game's requests to server/edge, the one public port, then server/apache's site.conf sends each path on: the game's requests to server/game (index.php, then src/rpc.php, and src/platform.php for the platform's login), the live view's uploads to server/game/live, the site's pages to server/portal. Players, scores and accounts are in data/state/dmtq.db3. tools/opendmtq_tools holds the admin pages with the setup, the import, the app builder and the song list; opendmtq with cli/ runs them with Docker, host/ without containers">
-<rect x="-28" y="-28" width="956" height="676" rx="16" fill="#11151a"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 866" width="956" height="866" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="The map of the code. A phone's app sends the game's requests to server/edge, the one public port, then server/apache's site.conf sends each path on: the game's requests to server/game (index.php, then src/rpc.php, and src/platform.php for the platform's login), the live view's uploads to server/game/live, the site's pages to server/portal. On a Windows PC, the launcher in client/ gets the server's app from server/portal (client.php, /apk) and starts the player in arm32/desktop, which sends the game's requests as a phone's app does. Players, scores and accounts are in data/state/dmtq.db3. tools/opendmtq_tools holds the admin pages with the setup, the import, the app builder and the song list; opendmtq with cli/ runs them with Docker, host/ without containers">
+<rect x="-28" y="-28" width="956" height="866" rx="16" fill="#11151a"/>
 <rect x="0" y="0" width="200" height="300" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
 <text x="14" y="22" font-size="13" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,186">On a phone</text>
 <path d="M14,36 H174 L186,48 V136 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
@@ -48,30 +48,50 @@
 <path d="M470.5,268 L572,268" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
 <path d="M579,268 L570.0,272.5 L570.0,263.5 Z" fill="#7b8794" data-tip="579,268"/>
 <text x="530" y="260" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="476,576">/opendmtq</text>
-<path d="M580,340 H888 L900,352 V432 H580 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="594" y="363.75" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="594,886">data/state/dmtq.db3</text>
-<text x="594" y="382.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="594,886">SQLite: players, scores, accounts,</text>
-<text x="594" y="400.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="594,886">written by server/game and the</text>
-<text x="594" y="417.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="594,886">admin pages</text>
-<rect x="0" y="340" width="520" height="202" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
-<text x="14" y="362" font-size="13" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,506">tools/opendmtq_tools: Python</text>
-<path d="M14,374 H242 L254,386 V446 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="28" y="405.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,240">importer.py</text>
-<text x="28" y="424.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,240">your files into data/content</text>
-<path d="M266,374 H494 L506,386 V446 H266 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="280" y="396.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="280,492">admin/</text>
-<text x="280" y="415.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="280,492">the admin pages, a module</text>
-<text x="280" y="433" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="280,492">per page, and the setup</text>
-<path d="M14,456 H242 L254,468 V528 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="28" y="487.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,240">songs.py</text>
-<text x="28" y="506.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,240">the song list, the tables</text>
-<path d="M266,456 H494 L506,468 V528 H266 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="280" y="478.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="280,492">builder.py</text>
-<text x="280" y="497.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="280,492">and patch_apk.py:</text>
-<text x="280" y="515" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="280,492">the phone app</text>
-<path d="M506.5,410 L572,410" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
-<path d="M579,410 L570.0,414.5 L570.0,405.5 Z" fill="#7b8794" data-tip="579,410"/>
-<path d="M0,562 H888 L900,574 V620 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="14" y="586.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,886">opendmtq, cli/ and host/</text>
-<text x="14" y="605.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,886">the command line runs these tools, with Docker (cli/) or without containers (host/, and OpenDMTQ.exe on Windows)</text>
+<rect x="0" y="340" width="900" height="150" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="14" y="362" font-size="13" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,886">On a Windows PC</text>
+<path d="M14,376 H202 L214,388 V476 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="28" y="403.75" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,200">arm32/desktop/</text>
+<text x="28" y="422.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,200">the player for Windows:</text>
+<text x="28" y="440.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,200">the server's app, run by</text>
+<text x="28" y="457.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,200">the runtime</text>
+<path d="M594,376 H874 L886,388 V476 H594 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="608" y="412.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="608,872">client/</text>
+<text x="608" y="431.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="608,872">the PC client: the launcher</text>
+<text x="608" y="449" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="608,872">(Python and Tk), its installer</text>
+<path d="M214.5,400 L235,400 L235,116 L262,116" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M269,116 L260.0,120.5 L260.0,111.5 Z" fill="#7b8794" data-tip="269,116"/>
+<text x="243" y="326" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="241,576">the game's requests, as a phone's</text>
+<path d="M740,375.5 L740,307.5" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M740,300.5 L744.5,309.5 L735.5,309.5 Z" fill="#7b8794" data-tip="740,300.5"/>
+<text x="748" y="330" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="746,900">client.php, /apk</text>
+<path d="M593.5,446 L221.5,446" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M214.5,446 L223.5,441.5 L223.5,450.5 Z" fill="#7b8794" data-tip="214.5,446"/>
+<text x="404" y="438" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="250,588">starts it, with the server's app</text>
+<path d="M580,530 H888 L900,542 V622 H580 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="594" y="553.75" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="594,886">data/state/dmtq.db3</text>
+<text x="594" y="572.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="594,886">SQLite: players, scores, accounts,</text>
+<text x="594" y="590.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="594,886">written by server/game and the</text>
+<text x="594" y="607.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="594,886">admin pages</text>
+<rect x="0" y="530" width="520" height="202" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="14" y="552" font-size="13" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,506">tools/opendmtq_tools: Python</text>
+<path d="M14,564 H242 L254,576 V636 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="28" y="595.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,240">importer.py</text>
+<text x="28" y="614.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,240">your files into data/content</text>
+<path d="M266,564 H494 L506,576 V636 H266 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="280" y="586.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="280,492">admin/</text>
+<text x="280" y="605.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="280,492">the admin pages, a module</text>
+<text x="280" y="623" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="280,492">per page, and the setup</text>
+<path d="M14,646 H242 L254,658 V718 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="28" y="677.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,240">songs.py</text>
+<text x="28" y="696.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,240">the song list, the tables</text>
+<path d="M266,646 H494 L506,658 V718 H266 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="280" y="668.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="280,492">builder.py</text>
+<text x="280" y="687.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="280,492">and patch_apk.py:</text>
+<text x="280" y="705" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="280,492">the phone app</text>
+<path d="M506.5,600 L572,600" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M579,600 L570.0,604.5 L570.0,595.5 Z" fill="#7b8794" data-tip="579,600"/>
+<path d="M0,752 H888 L900,764 V810 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="776.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,886">opendmtq, cli/ and host/</text>
+<text x="14" y="795.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,886">the command line runs these tools, with Docker (cli/) or without containers (host/, and OpenDMTQ.exe on Windows)</text>
 </svg>
