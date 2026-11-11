@@ -2,7 +2,7 @@
 
 How the game finds a tile's image (Technika Q 1.3.4, libil2cpp):
 
-    product_item.img_url_1            the sprite name, for example e33_uad (ItemInfo.ImageSelectedName)
+    product_item.img_url_1            the sprite name, for example e33_paperplanes (ItemInfo.ImageSelectedName)
     text before the first "_"         e33
     UI3DlcSprite.AtlasPrefix + that   the atlas name, d3_e33 (UI3DlcSprite.SpriteNameToAtlasName)
     "dlc/" + atlas + ".unity3d"       a file in the phone's patch folder, opened with WWW("file://...")
