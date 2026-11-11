@@ -15,13 +15,13 @@
 <text x="253" y="58" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="220,286">import</text>
 <rect x="290" y="120" width="330" height="240" rx="8" fill="#11151a" stroke="#3a434d" stroke-width="1" stroke-dasharray="5 4"/>
 <text x="304" y="142" font-size="13" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="304,606">data/content, read only</text>
-<path d="M304,156 H594 L606,168 V226 H304 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="318" y="186.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="318,592">Client data</text>
-<text x="318" y="205.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="318,592">tables, screen images, fonts</text>
-<path d="M304,242 H594 L606,254 V346 H304 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
-<text x="318" y="280.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="318,592">Songs</text>
-<text x="318" y="299.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="318,592">music, charts, previews,</text>
-<text x="318" y="317" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="318,592">tiles, jackets, songs.json</text>
+<path d="M304,156 H594 L606,168 V244 H304 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="318" y="186.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="318,592">Client data</text>
+<text x="318" y="205.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="318,592">tables, screen images, fonts,</text>
+<text x="318" y="223" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="318,592">every song's preview and tiles</text>
+<path d="M304,260 H594 L606,272 V346 H304 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="318" y="298.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="318,592">Song data</text>
+<text x="318" y="317.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="318,592">music, charts, jackets, songs.json</text>
 <path d="M216.5,166 L296.275,189.056" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
 <path d="M303,191 L293.1,192.8 L295.6,184.2 Z" fill="#7b8794" data-tip="303,191"/>
 <text x="258" y="166" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="220,286">import</text>
