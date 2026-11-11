@@ -189,6 +189,23 @@ void frame_counter_checks() {
     check(r.fps == 60, "60 before the hitch");
     r = look(counted, hitch, ms(30605));
     check(r.fps > 40 && r.fps < 52, "a quarter second without frames in the last second reads its mean (about 45)");
+    // A stall of 2.5 s, then frames again: a look whose last second holds a frame never reads 0, though the mean over the
+    // stall is under half a frame a second (0 is only for a whole second without a frame).
+    Frames stall;
+    stall.from = ms(1000);
+    stall.period = 16666667;
+    stall.gaps[stall.gap_count++] = Frames::Gap{ms(5000), ms(7500)};
+    FrameRate after;
+    bool zero_with_a_frame = false, zero_without = false;
+    for (long long t = ms(1005); t < ms(9000); t += ms(500)) {
+        const Reading x = look(after, stall, t);
+        // Whether the second before this look held a frame.
+        const bool frame_in_second = stall.at(t).count > stall.at(t - ms(1000)).count;
+        if (x.shown && frame_in_second && x.fps == 0) zero_with_a_frame = true;
+        if (x.shown && !frame_in_second && x.fps == 0) zero_without = true;
+    }
+    check(!zero_with_a_frame, "after a 2.5 s stall, a look with a frame in its second reads at least 1, never 0");
+    check(zero_without, "and the stall's whole seconds without a frame read 0");
 }
 
 }  // namespace

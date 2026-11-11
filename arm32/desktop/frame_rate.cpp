@@ -76,8 +76,9 @@ Reading FrameRate::look(const FrameCount& now, long long at, bool held) {
     const long long span = to - from;
     if (span <= 0) return shown_;
     const double mean = static_cast<double>(span) / 1e6 / static_cast<double>(frames);
-    // Three digits at most: the counter's room.
-    shown_ = Reading{true, std::min(999, static_cast<int>(std::lround(1000.0 / mean))), static_cast<float>(mean)};
+    // Three digits at most: the counter's room. At least 1: a frame came in the second (a long stall before it can make
+    // the mean under half a frame a second, which would round to 0), and 0 is for a whole second without one.
+    shown_ = Reading{true, std::clamp(static_cast<int>(std::lround(1000.0 / mean)), 1, 999), static_cast<float>(mean)};
     return shown_;
 }
 
