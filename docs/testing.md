@@ -49,9 +49,9 @@ both.
 
 On a busy machine the closed game test can stall at a song's loading screen, with client 1.3.4 and 1.3.5 alike: the
 game's own audio output (FMOD, writing to an `AudioTrack`) waits on the emulator's audio, and the game's threads wait on
-it. On 11-07 it stalled in 7 of 17 song starts while the machine also built, tested or ran a second copy of the game, and
-in none of 12 on an otherwise idle machine. No stall was in OpenDMTQ's own code, which never waits there. A run that
-stalls fails at "the song's score reaches the server".
+it. On 2026-11-07 it stalled in 7 of 17 song starts while the machine also built, tested or ran a second copy of the
+game, and in none of 12 on an otherwise idle machine. No stall was in OpenDMTQ's own code, which never waits there. A
+run that stalls fails at "the song's score reaches the server".
 
 ## Tests without the game's files
 
