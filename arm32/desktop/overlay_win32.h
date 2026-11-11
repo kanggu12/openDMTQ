@@ -40,10 +40,18 @@ void minimised(bool now);
 bool ask_key(UINT vk);
 // The game's area moved or changed size: everything shown follows it.
 void place();
+// The frames shown so far and when the last of them was shown (nanoseconds on a steady clock; 0 before the first).
+struct FrameCount {
+    unsigned long long count = 0;
+    long long ns = 0;
+};
 // The frame counter in a corner of the game (Settings::ShowFps's order: 0 none, 1 top left, 2 top right, 3 bottom left,
-// 4 bottom right): the frames a second and the mean frame time over the last half second, from `frames` (the count of
-// frames shown so far, player::frames_shown), drawn twice a second in a window of its own. Once, after start().
-void show_fps(int corner, unsigned long long (*frames)());
+// 4 bottom right): the frames a second and the mean frame time over the last half second, from `frames`
+// (player::frames_shown), drawn twice a second in a window of its own. Once, after start().
+void show_fps(int corner, FrameCount (*frames)());
+// The counter's numbers from two looks at the count (overlay_win32.cpp says how); no window needed, so a check can
+// call it.
+void rate(const FrameCount& before, const FrameCount& now, int& fps, float& ms);
 // The cursor over the game, pressed or not, at the display's scale.
 HCURSOR cursor(bool pressed);
 #ifdef OVERLAY_TEST_HOOKS
@@ -52,6 +60,8 @@ HCURSOR cursor(bool pressed);
 void test_save(const std::wstring& prefix);
 // The frame counter's picture alone, at the game area's scale now, showing these numbers.
 void test_save_fps(const std::wstring& path, int fps, float ms);
+// Windows' scale as the probe wants it drawn (1.5 for 150 %), in place of the display's.
+void test_set_dpi(float scale);
 #endif
 
 }  // namespace player::overlay

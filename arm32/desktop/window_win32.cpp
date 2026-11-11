@@ -815,6 +815,11 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         // mid-song never ends the game.
         overlay::ask_quit();
         return 0;
+    case WM_SYSCOMMAND:
+        // Windows' menu mode from the keyboard (Alt pressed and let go alone, F10, Alt+Space): nothing. It would hold the
+        // next keys for the window's menu, so that a note's key after a lone Alt did nothing, or opened the menu.
+        if ((w & 0xFFF0) == SC_KEYMENU) return 0;
+        break;
     case kQuitMessage:
         // The question's Quit the game.
         g_closed = true;
@@ -1147,7 +1152,17 @@ bool open_window(const std::string& title) {
     };
     overlay::start(g_frame, g_window, hooks, host_locale().first == "ko");
     // The frame counter in the corner the PC's settings name, from the count of frames shown (none: no counter).
-    overlay::show_fps(static_cast<int>(settings().show_fps), [] { return static_cast<unsigned long long>(frames_shown()); });
+    overlay::show_fps(static_cast<int>(settings().show_fps), [] {
+        // The count, the last frame's time, the count again: a frame shown between the two reads is read again, so that
+        // the time is the counted frame's.
+        overlay::FrameCount c;
+        for (int tries = 0; tries < 4; ++tries) {
+            c.count = frames_shown();
+            c.ns = frame_shown_ns();
+            if (frames_shown() == c.count) break;
+        }
+        return c;
+    });
     // A check's planned keys (PLAYER_KEYS), from now on.
     plan_keys();
     // This thread waits for window messages and its looper's jobs together: a job posted wakes it.

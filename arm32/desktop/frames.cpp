@@ -11,6 +11,7 @@
 #include <EGL/egl.h>
 #include <GLES3/gl3.h>
 #include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
@@ -27,6 +28,8 @@ namespace {
 // Frames shown so far, counted here. Named apart from arm32::g_frames, the runtime's own count (note_frame), which
 // a lookup from inside namespace arm32 would find first.
 std::atomic<std::uint64_t> g_shown{0};
+// When the last frame was shown (steady clock, nanoseconds; 0 before the first), for the frame counter.
+std::atomic<std::int64_t> g_shown_ns{0};
 
 // The frames to save, from PLAYER_SHOTS: by number, and by seconds from the first frame (the times still to come, in
 // order).
@@ -176,7 +179,10 @@ void live_load(JavaVM*, JNIEnv*, const std::string&) {}
 void live_frame(EGLDisplay display, EGLSurface surface) {
     // The broadcast first, while the frame is the one that goes to the screen.
     desktop_live_frame(display, surface);
-    std::uint64_t n = g_shown.fetch_add(1, std::memory_order_relaxed) + 1;
+    // The frame's moment first, then the count: a reader that sees the count sees this frame's time or a later one.
+    g_shown_ns.store(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(),
+                     std::memory_order_relaxed);
+    std::uint64_t n = g_shown.fetch_add(1, std::memory_order_release) + 1;
     if (n == 1) log("player: the game's first frame");
     if (g_stats) present_stats(display, surface);
     Shots& s = shots();
@@ -203,4 +209,6 @@ void live_audio(const void*, const void*, std::size_t) {}
 }  // namespace arm32
 
 // The count live_frame keeps, for the overlay's frame counter (player.h).
-std::uint64_t player::frames_shown() { return g_shown.load(std::memory_order_relaxed); }
+std::uint64_t player::frames_shown() { return g_shown.load(std::memory_order_acquire); }
+// And when the last of them was shown, for the counter's frames a second between two frames' own moments.
+std::int64_t player::frame_shown_ns() { return g_shown_ns.load(std::memory_order_relaxed); }

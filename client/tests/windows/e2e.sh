@@ -133,7 +133,7 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   # and the X again with Quit the game ends the game, and the launcher comes back. The overlay's sizes are the game's at
   # 720 lines, times the game's height over 720 (Wine is at 96 dpi): 1.5 in full screen here (1920x1080), 1.125 in the
   # window (1440x810), each length rounded as the player rounds it (opx below). The bar is 52 high and shows for a
-  # pointer within 4 of the top (y 0 here); its chips are 36 square, 14 in from the right end and 10 apart, centred in
+  # pointer that rests 150 ms within 4 of the top (y 0 here, for a second); its chips are 36 square, 14 in from the right end and 10 apart, centred in
   # its height. The question's card is 600 wide and 62 + 2 + 74 + 56 + 24 high, centred, its two buttons 220 by 56 with
   # 16 between, centred, their top 62 + 2 + 74 below the card's. In full screen: the X's centre 21 + 27 = 48 in from
   # the right and 12 + 27 = 39 down, the full screen chip's 21 + 54 + 15 + 27 = 117 in; the card 900 by 327 at y 376, its

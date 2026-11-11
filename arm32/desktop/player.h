@@ -254,6 +254,8 @@ void frame_shown(std::uint64_t n);
 // The frames shown so far (frames.cpp's count at each swap), for the frame counter in the game's corner: read from any
 // thread, one atomic load.
 std::uint64_t frames_shown();
+// When the last of them was shown, in nanoseconds on the steady clock (0 before the first).
+std::int64_t frame_shown_ns();
 // The mouse wheel at window pixels x,y, turned by notches (positive: away from the user; sideways: to the right), as a
 // finger's drag that scrolls what is under it; on the UI thread.
 void wheel(float x, float y, float notches_x, float notches_y);

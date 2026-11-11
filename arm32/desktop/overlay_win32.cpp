@@ -28,6 +28,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cwchar>
 #include <map>
 #include <memory>
@@ -58,9 +59,12 @@ const Color kChipEdge(255, 78, 80, 86);
 // The game's green button (its OK): light at the top, deep at the bottom, a darker edge; lighter under the pointer.
 const Color kGreenTop(255, 69, 163, 8), kGreenBottom(255, 36, 97, 0), kGreenEdge(255, 22, 64, 0);
 const Color kGreenTopHover(255, 88, 188, 22), kGreenBottomHover(255, 48, 120, 6);
+// Held down: deeper, darker at the top than at the bottom, as a button pressed in.
+const Color kGreenPressedTop(255, 28, 78, 0), kGreenPressedBottom(255, 44, 116, 4);
 // The grey button beside it, for the choice that is not the game's way on; lighter under the pointer.
 const Color kGreyTop(255, 85, 88, 94), kGreyBottom(255, 58, 60, 65), kGreyEdge(255, 34, 36, 40);
 const Color kGreyTopHover(255, 104, 108, 115), kGreyBottomHover(255, 72, 75, 81);
+const Color kGreyPressedTop(255, 46, 48, 52), kGreyPressedBottom(255, 66, 69, 74);
 // The ring of the button the keys chose: the logo's lime, plain to see on the grey body.
 const Color kChosen(255, 140, 242, 61);
 // The dialogs' white text, and the quiet grey of a line that only explains.
@@ -73,8 +77,19 @@ const Color kOutline(170, 8, 8, 8);
 const Color kLive(255, 209, 58, 64);
 const Color kEnded(255, 108, 116, 128);
 
+#ifdef OVERLAY_TEST_HOOKS
+// The probe's stand-in for Windows' scale (0: Windows' own), so that 150 % can be drawn on a PC at 100 %.
+float g_test_dpi = 0;
+// The probe's places as with the bar up (top_room).
+bool g_test_bar_up = false;
+#endif
+
 // The scale of the game's display (Windows' own, 1 at 96 dpi).
 float dpi_scale() {
+#ifdef OVERLAY_TEST_HOOKS
+    // The probe's scale, when it set one.
+    if (g_test_dpi > 0) return g_test_dpi;
+#endif
     using DpiOf = UINT(WINAPI*)(HWND);
     // Windows 10 1607 has the call; an older one is taken as 96 dpi.
     static auto dpi_of = reinterpret_cast<DpiOf>(GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetDpiForWindow"));
@@ -207,6 +222,17 @@ constexpr UINT_PTR kNoticeTimer = 1;
 // Sliding in, staying, fading out.
 constexpr UINT64 kSlideMs = 220, kStayMs = 6000, kFadeMs = 350;
 
+// The room the bar takes at the top of the game's area while it is up (0 while it is not): what sits at the top moves
+// under it rather than being covered (bar_frame and hide_bar move them).
+int top_room();
+
+// The notice's place once it has slid in: centred at the top of the game's area, a little down from its edge, and
+// under the bar while that is up.
+POINT notice_place(const Canvas& c) {
+    const RECT a = area();
+    return POINT{(a.left + a.right - c.w) / 2, a.top + px(14) + top_room()};
+}
+
 void notice_frame() {
     if (!g_notice_canvas) return;
     const UINT64 t = GetTickCount64() - g_notice_shown;
@@ -227,11 +253,8 @@ void notice_frame() {
         g_notice_canvas.reset();
         return;
     }
-    // Centred at the top of the game's area, a little down from its edge.
-    const RECT a = area();
-    const int x = (a.left + a.right - g_notice_canvas->w) / 2;
-    const int y = a.top + px(14) - static_cast<int>(drop);
-    g_notice_canvas->show(g_notice, x, y, static_cast<BYTE>(alpha * 255));
+    const POINT at = notice_place(*g_notice_canvas);
+    g_notice_canvas->show(g_notice, at.x, at.y - static_cast<int>(drop), static_cast<BYTE>(alpha * 255));
     // The next step: every 15 ms while it slides or fades; while it stays, once, when the fade begins.
     const bool staying = t >= kSlideMs && t < kSlideMs + kStayMs;
     SetTimer(g_notice, kNoticeTimer, staying ? static_cast<UINT>(kSlideMs + kStayMs - t) : 15, nullptr);
@@ -249,21 +272,47 @@ LRESULT CALLBACK notice_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
 
 // ---- the frame counter
 
+}  // namespace
+
+// The frames a second and the mean frame time from two looks at the count: the frames between the two looks' last
+// frames over the time between those frames, which are the display's own moments (a look's own time would add the
+// timer's lateness, and a frame either side of a look would make a steady 60 read 58 or 62). No frame since the last
+// look (the game held still): 0 frames a second, no time. Before a first look (`before`'s time 0): `fps` and `ms` stay.
+void rate(const FrameCount& before, const FrameCount& now, int& fps, float& ms) {
+    if (!before.ns) return;
+    const unsigned long long frames = now.count - before.count;
+    const long long span = now.ns - before.ns;
+    if (!frames || span <= 0) {
+        fps = 0;
+        ms = 0;
+        return;
+    }
+    const double mean = static_cast<double>(span) / 1e6 / static_cast<double>(frames);
+    // Three digits at most: the counter's room.
+    fps = std::min(999, static_cast<int>(std::lround(1000.0 / mean)));
+    ms = static_cast<float>(mean);
+}
+
+namespace {
+
 HWND g_fps = nullptr;
-// Its corner (Settings::ShowFps's order, 0 none) and the count of frames shown it reads.
+// Its corner (Settings::ShowFps's order, 0 none) and the count of frames shown it reads, with the last one's time.
 int g_fps_corner = 0;
-unsigned long long (*g_fps_frames)() = nullptr;
+FrameCount (*g_fps_frames)() = nullptr;
 constexpr UINT_PTR kFpsTimer = 3;
 // Twice a second.
 constexpr UINT kFpsMs = 500;
-// The count and the time (the performance counter's) at the last look, and what it showed (-1: nothing yet).
-unsigned long long g_fps_count = 0;
-LONGLONG g_fps_at = 0;
+// The count and its last frame's time at the last look (none yet: count 0 and time 0), and what it showed (-1: nothing
+// yet).
+FrameCount g_fps_last{};
 int g_fps_shown = -1;
 float g_fps_shown_ms = 0;
 std::unique_ptr<Canvas> g_fps_canvas;
-// The look: the header's dark at about 80 %, its thin edge, the game's lime for the number.
-const Color kCounter(204, 28, 28, 28);
+// The scale its picture was drawn at: a new one (a resize, another display) draws it again.
+float g_fps_canvas_scale = 0;
+// The look: the header's dark at about 92 % (the time's quiet grey keeps 4.5:1 even over the game's white), its thin
+// edge, the game's lime for the number.
+const Color kCounter(235, 28, 28, 28);
 const Color kCounterEdge(150, 90, 92, 98);
 
 // The counter's picture showing `fps` frames a second and `ms` a frame (fps below 0: not known yet, dashes). Its size
@@ -276,14 +325,17 @@ std::unique_ptr<Canvas> make_fps(int fps, float ms) {
     Font time_font(family.get(), static_cast<REAL>(px(11)), FontStyleRegular, UnitPixel);
     const float pad = static_cast<float>(px(8)), gap = static_cast<float>(px(4));
     RectF number_box, unit_box, time_box;
+    // The words set tight, without GDI+'s own room either side (a sixth of the size, more for the large number than for
+    // the small time under it): their left edges line up at the chip's padding.
+    std::unique_ptr<StringFormat> tight(StringFormat::GenericTypographic()->Clone());
     {
         // A one-pixel picture to measure the widest numbers on.
         Bitmap probe(1, 1, PixelFormat32bppPARGB);
         Graphics g(&probe);
         text_setup(g);
-        g.MeasureString(L"888", -1, &number_font, PointF(0, 0), &number_box);
-        g.MeasureString(L"FPS", -1, &unit_font, PointF(0, 0), &unit_box);
-        g.MeasureString(L"88.8 ms", -1, &time_font, PointF(0, 0), &time_box);
+        g.MeasureString(L"888", -1, &number_font, PointF(0, 0), tight.get(), &number_box);
+        g.MeasureString(L"FPS", -1, &unit_font, PointF(0, 0), tight.get(), &unit_box);
+        g.MeasureString(L"88.8 ms", -1, &time_font, PointF(0, 0), tight.get(), &time_box);
     }
     // The number's line a little tighter than the face's own height: the time sits close under it.
     const float number_h = number_box.Height * 0.86f;
@@ -309,56 +361,59 @@ std::unique_ptr<Canvas> make_fps(int fps, float ms) {
     else std::swprintf(time, 32, L"%.1f ms", static_cast<double>(ms));
     SolidBrush lime(kChosen), quiet(kQuiet);
     RectF drawn;
-    g.MeasureString(number.c_str(), -1, &number_font, PointF(0, 0), &drawn);
+    g.MeasureString(number.c_str(), -1, &number_font, PointF(0, 0), tight.get(), &drawn);
     const float top = pad * 0.6f;
-    g.DrawString(number.c_str(), -1, &number_font, PointF(pad - px(2), top), &lime);
+    g.DrawString(number.c_str(), -1, &number_font, PointF(pad, top), tight.get(), &lime);
     // "FPS" at the number's foot: the bottom of its box less the face's own room below the digits.
     const float foot = top + number_box.Height * 0.78f;
-    g.DrawString(L"FPS", -1, &unit_font, PointF(pad - px(2) + drawn.Width, foot - unit_box.Height * 0.78f), &quiet);
-    g.DrawString(time, -1, &time_font, PointF(pad - px(2), top + number_h), &quiet);
+    g.DrawString(L"FPS", -1, &unit_font, PointF(pad + drawn.Width + gap, foot - unit_box.Height * 0.78f), tight.get(), &quiet);
+    g.DrawString(time, -1, &time_font, PointF(pad, top + number_h), tight.get(), &quiet);
     return canvas;
 }
 
-// The counter's place: its corner of the game's area, 8 pixels in at 720 lines.
+// The counter's place: its corner of the game's area, 8 pixels in at 720 lines; in a top corner, under the bar while
+// that is up.
 POINT fps_place(const Canvas& c) {
     const RECT a = area();
     const int in = px(8);
     const bool right = g_fps_corner == 2 || g_fps_corner == 4, bottom = g_fps_corner == 3 || g_fps_corner == 4;
-    return POINT{right ? a.right - in - c.w : a.left + in, bottom ? a.bottom - in - c.h : a.top + in};
+    return POINT{right ? a.right - in - c.w : a.left + in, bottom ? a.bottom - in - c.h : a.top + in + top_room()};
 }
 
-// A look at the count: the frames since the last look over the time since it, and the counter drawn again when what it
-// shows changed (or its scale did, after a resize), and placed where its corner is now.
-void fps_frame(bool redraw) {
-    if (!g_fps || !g_fps_frames) return;
-    LARGE_INTEGER now{}, rate{};
-    QueryPerformanceCounter(&now);
-    QueryPerformanceFrequency(&rate);
-    const unsigned long long count = g_fps_frames();
-    int fps = g_fps_shown;
-    float ms = g_fps_shown_ms;
-    if (g_fps_at) {
-        const double seconds = static_cast<double>(now.QuadPart - g_fps_at) / static_cast<double>(rate.QuadPart);
-        const unsigned long long frames = count - g_fps_count;
-        // The frames a second over this half second, and the mean time between them; none shown: none a second.
-        fps = seconds > 0 ? static_cast<int>(std::lround(static_cast<double>(frames) / seconds)) : fps;
-        ms = frames ? static_cast<float>(seconds * 1000.0 / static_cast<double>(frames)) : 0.0f;
-        fps = std::min(fps, 999);
-    }
-    g_fps_count = count;
-    g_fps_at = now.QuadPart;
-    if (redraw || !g_fps_canvas || fps != g_fps_shown || std::fabs(ms - g_fps_shown_ms) >= 0.05f) {
-        g_fps_canvas = make_fps(fps, ms);
-        g_fps_shown = fps;
-        g_fps_shown_ms = ms;
+// The counter where its corner is now, drawn again only when its scale changed: a move of the window counts nothing.
+void fps_place_now() {
+    if (!g_fps || !g_fps_corner) return;
+    if (!g_fps_canvas || g_fps_canvas_scale != scale()) {
+        g_fps_canvas = make_fps(g_fps_shown, g_fps_shown_ms);
+        g_fps_canvas_scale = scale();
     }
     const POINT at = fps_place(*g_fps_canvas);
     g_fps_canvas->show(g_fps, at.x, at.y, 255);
 }
 
+// A look at the count, twice a second: the frames since the last look over the time between their own last frames,
+// drawn again when what it shows changed.
+void fps_frame() {
+    if (!g_fps || !g_fps_frames) return;
+    const FrameCount now = g_fps_frames();
+    int fps = g_fps_shown;
+    float ms = g_fps_shown_ms;
+    rate(g_fps_last, now, fps, ms);
+    // Held still (no frame since the last look): the next look starts afresh from its own count, so that the time the
+    // game stood still is not taken for one long frame once it goes on.
+    g_fps_last = fps == 0 ? FrameCount{} : now;
+    if (!g_fps_canvas || fps != g_fps_shown || std::fabs(ms - g_fps_shown_ms) >= 0.05f) {
+        g_fps_shown = fps;
+        g_fps_shown_ms = ms;
+        // Drawn afresh by fps_place_now.
+        g_fps_canvas.reset();
+    }
+    fps_place_now();
+}
+
 LRESULT CALLBACK fps_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     if (msg == WM_TIMER && w == kFpsTimer) {
-        fps_frame(false);
+        fps_frame();
         return 0;
     }
     // Clicks go through it to the game: it only tells.
@@ -381,10 +436,19 @@ constexpr UINT_PTR kBarTimer = 2;
 constexpr UINT64 kBarStayMs = 600, kBarFadeMs = 300, kBarTouchStayMs = 4000, kBarStepMs = 30, kBarLookMs = 100;
 // Shown by a finger: the pointer Windows parks where the finger was is no mouse on the bar, until the mouse moves.
 bool g_bar_by_touch = false;
+// The chip the mouse's button (or a finger) went down on: it acts only when let go on the same chip, and looks pressed
+// while it is held there.
+int g_bar_pressed = kNone;
+// The pointer at the top edge waits this long before the bar shows, and shows it only if it is still there: a pointer
+// on its way to the window's title bar above, or flicked past the edge mid-song, shows nothing.
+constexpr UINT_PTR kBarEdgeTimer = 4;
+constexpr UINT kBarEdgeMs = 150;
+// Whether the mouse's button was down at its last move over the game (it plays then: no bar).
+bool g_pointer_down = false;
 // The bar's picture, kept while it looks the same (its width, the overlay's scale, the chip under the pointer, full
 // screen or not): its fade and its moves with the game show the same picture at another opacity or place.
 std::unique_ptr<Canvas> g_bar_canvas;
-int g_bar_canvas_w = 0, g_bar_canvas_hover = kNone;
+int g_bar_canvas_w = 0, g_bar_canvas_hover = kNone, g_bar_canvas_pressed = kNone;
 float g_bar_canvas_scale = 0;
 bool g_bar_canvas_full = false;
 // What was shown last (the picture's version, the opacity, the place): the same again is not sent to Windows again.
@@ -397,6 +461,14 @@ int bar_height() { return px(52); }
 int chip_size() { return px(36); }
 int chip_gap() { return px(10); }
 int chip_margin() { return px(14); }
+
+int top_room() {
+#ifdef OVERLAY_TEST_HOOKS
+    // The probe's places with the bar up, its windows being hidden.
+    if (g_test_bar_up) return bar_height();
+#endif
+    return g_bar && IsWindowVisible(g_bar) ? bar_height() : 0;
+}
 
 // A chip's square on a bar `w` pixels wide: the X at the right end, the full screen chip left of it; both centred in
 // the bar's height.
@@ -448,13 +520,15 @@ Canvas& bar_canvas() {
     const int w = std::max(1, static_cast<int>(a.right - a.left));
     const float now_scale = scale();
     const bool full = full_screen();
-    if (g_bar_canvas && g_bar_canvas_w == w && g_bar_canvas_hover == g_bar_hover && g_bar_canvas_scale == now_scale && g_bar_canvas_full == full) {
+    if (g_bar_canvas && g_bar_canvas_w == w && g_bar_canvas_hover == g_bar_hover && g_bar_canvas_pressed == g_bar_pressed &&
+        g_bar_canvas_scale == now_scale && g_bar_canvas_full == full) {
         return *g_bar_canvas;
     }
     const int h = bar_height();
     g_bar_canvas = std::make_unique<Canvas>(w, h);
     g_bar_canvas_w = w;
     g_bar_canvas_hover = g_bar_hover;
+    g_bar_canvas_pressed = g_bar_pressed;
     g_bar_canvas_scale = now_scale;
     g_bar_canvas_full = full;
     ++g_bar_version;
@@ -476,11 +550,14 @@ Canvas& bar_canvas() {
         middle.SetFormatFlags(StringFormatFlagsNoWrap);
         SolidBrush white(kText);
         g.DrawString(L"OpenDMTQ", -1, &name, RectF(static_cast<REAL>(px(18)), 0, static_cast<REAL>(px(240)), static_cast<REAL>(h) - line), &middle, &white);
-        // The two chips: at rest as the game's OFF chips, under the pointer as its green button; a white glyph on both.
+        // The two chips: at rest as the game's OFF chips, under the pointer as its green button, held down as that
+        // button pressed in (deeper, its light at the bottom); a white glyph on all.
         const float radius = static_cast<float>(px(5));
         for (int which : {kQuitChip, kScreenChip}) {
             const RectF r = chip_rect(which, w);
-            if (which == g_bar_hover) {
+            if (which == g_bar_hover && which == g_bar_pressed) {
+                button(g, r, radius, kGreenPressedTop, kGreenPressedBottom, kGreenEdge);
+            } else if (which == g_bar_hover) {
                 button(g, r, radius, kGreenTop, kGreenBottom, kGreenEdge);
             } else {
                 GraphicsPath path;
@@ -506,13 +583,26 @@ Canvas& bar_canvas() {
     return *g_bar_canvas;
 }
 
-// The bar gone: hidden, its timer stopped, nothing under the pointer.
+// The notice and a counter in a top corner, placed again for the bar's coming or going (under it, or back up).
+void move_for_bar() {
+    fps_place_now();
+    if (g_notice_canvas) notice_frame();
+}
+
+// The bar gone: hidden, its timer stopped, nothing under the pointer or held on it.
 void hide_bar() {
     if (!g_bar) return;
+    const bool was = IsWindowVisible(g_bar) != FALSE;
     ShowWindow(g_bar, SW_HIDE);
     KillTimer(g_bar, kBarTimer);
     g_bar_hover = kNone;
+    // A chip held as it goes is let go of without acting: forgotten before the capture goes, so that the bar's
+    // WM_CAPTURECHANGED finds nothing held and does not draw the bar again.
+    const bool held = g_bar_pressed != kNone;
+    g_bar_pressed = kNone;
+    if (held && GetCapture() == g_bar) ReleaseCapture();
     g_bar_shown_version = -1;
+    if (was) move_for_bar();
 }
 
 // Whether the mouse's pointer is on the bar's strip at the top of the game's area (shown by a finger, it is not until
@@ -557,10 +647,26 @@ void bar_frame() {
         g_bar_shown_alpha = byte;
         g_bar_shown_at = POINT{a.left, a.top};
     }
-    if (!IsWindowVisible(g_bar)) ShowWindow(g_bar, SW_SHOWNOACTIVATE);
+    if (!IsWindowVisible(g_bar)) {
+        ShowWindow(g_bar, SW_SHOWNOACTIVATE);
+        // The notice and a counter at the top move under it.
+        move_for_bar();
+    }
     // Fading: the next step. Whole: the next look at the pointer, or the fade's start if that comes first.
     const UINT64 next = alpha < 1 ? kBarStepMs : std::min(kBarLookMs, g_bar_stay - idle + 1);
     SetTimer(g_bar, kBarTimer, static_cast<UINT>(std::max<UINT64>(1, next)), nullptr);
+}
+
+// Whether the mouse's pointer rests at the very top edge of the game's area now (within the bar's height, over the
+// game's own window, its button up): the edge's wait is over and the bar shows.
+bool pointer_at_edge() {
+    if (asking() || g_pointer_down) return false;
+    POINT p{};
+    GetCursorPos(&p);
+    const RECT a = area();
+    if (p.x < a.left || p.x >= a.right || p.y < a.top || p.y >= a.top + bar_height()) return false;
+    // Another window over the game there (another program's, the title bar of none): not the game's edge.
+    return WindowFromPoint(p) == g_game;
 }
 
 // The bar shown whole, staying `stay` ms (more while the pointer is on it).
@@ -574,6 +680,10 @@ LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     switch (msg) {
     case WM_TIMER:
         if (w == kBarTimer) bar_frame();
+        if (w == kBarEdgeTimer) {
+            KillTimer(h, kBarEdgeTimer);
+            if (pointer_at_edge()) reveal(kBarStayMs);
+        }
         return 0;
     case WM_MOUSEMOVE: {
         // A mouse's own move: the pointer is the mouse's again (a finger's moves are Windows' copies, marked).
@@ -586,8 +696,27 @@ LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         }
         return 0;
     }
+    case WM_LBUTTONDOWN:
+        // Held on a chip: it looks pressed, and the bar keeps the mouse until it is let go.
+        g_bar_pressed = chip_at(static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l)));
+        g_bar_hover = g_bar_pressed;
+        SetCapture(h);
+        bar_frame();
+        return 0;
+    case WM_CAPTURECHANGED:
+        // The mouse taken away while held (another window, a system dialog): nothing acts.
+        if (g_bar_pressed != kNone) {
+            g_bar_pressed = kNone;
+            bar_frame();
+        }
+        return 0;
     case WM_LBUTTONUP: {
         const int chip = chip_at(static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l)));
+        // Only a chip let go of where it was pressed acts: a press slid off it, or onto it from elsewhere, does nothing.
+        const int pressed = g_bar_pressed;
+        g_bar_pressed = kNone;
+        if (GetCapture() == h) ReleaseCapture();
+        bar_frame();
         // A finger's tap: the bar stays for the finger's time after it, not while Windows' parked pointer sits there.
         if (from_touch()) {
             g_bar_by_touch = true;
@@ -597,6 +726,7 @@ LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         // The keyboard back to the game's window: the bar never takes it, another program may have.
         SetForegroundWindow(g_frame);
         // The X asks before quitting; the full screen chip switches at once (the window redraws the bar for it).
+        if (chip != pressed) return 0;
         if (chip == kQuitChip) ask_quit();
         else if (chip == kScreenChip && g_hooks.toggle_fullscreen) g_hooks.toggle_fullscreen();
         return 0;
@@ -622,10 +752,18 @@ bool g_asking = false;
 constexpr int kKeep = 0, kQuit = 1, kClose = 2;
 int g_choice = kKeep;
 int g_ask_hover = kNone;
+// What the mouse's button (or a finger) went down on: a button, the thin X, beside the card (kBeside), or kNone (the
+// card's own body); only a release on the same acts, and a button held looks pressed in.
+constexpr int kBeside = 3;
+int g_ask_pressed = kNone;
 // Whether the window is minimised with the game held for it, and whether the game is held now (for either).
 bool g_minimised_hold = false, g_held = false;
 // The question's picture, kept while the game's area keeps its size: at 4K it is 33 MB, made again only for a new size.
 std::unique_ptr<Canvas> g_ask_canvas;
+// What it was last drawn with (its choice, the pointer's place, the press, the scale): a move of the window with the
+// same look only moves it.
+int g_ask_drawn_choice = -1, g_ask_drawn_hover = -1, g_ask_drawn_pressed = -1;
+float g_ask_drawn_scale = 0;
 
 // The game held still while the question is up or the window is minimised, and let go on when neither is: the window
 // is told only of a change.
@@ -670,6 +808,16 @@ void draw_ask() {
     const RECT a = area();
     const int w = a.right - a.left, h = a.bottom - a.top;
     if (w <= 0 || h <= 0) return;
+    // The same look at the same size: only its place on the screen changes.
+    if (g_ask_canvas && g_ask_canvas->w == w && g_ask_canvas->h == h && g_ask_drawn_choice == g_choice && g_ask_drawn_hover == g_ask_hover &&
+        g_ask_drawn_pressed == g_ask_pressed && g_ask_drawn_scale == scale()) {
+        g_ask_canvas->show(g_ask, a.left, a.top, 255);
+        return;
+    }
+    g_ask_drawn_choice = g_choice;
+    g_ask_drawn_hover = g_ask_hover;
+    g_ask_drawn_pressed = g_ask_pressed;
+    g_ask_drawn_scale = scale();
     if (!g_ask_canvas || g_ask_canvas->w != w || g_ask_canvas->h != h) g_ask_canvas = std::make_unique<Canvas>(w, h);
     Canvas& c = *g_ask_canvas;
     {
@@ -723,10 +871,14 @@ void draw_ask() {
         cross(g, thin, l.close.X + l.close.Width / 2, l.close.Y + l.close.Height / 2, static_cast<float>(px(9)));
         // The one quiet line that says what quitting loses.
         centred(g, ask_text(), static_cast<float>(px(18)), false, kQuiet, l.text);
-        // Keep playing as the game's green button, Quit the game as a grey one; lighter under the pointer.
+        // Keep playing as the game's green button, Quit the game as a grey one; lighter under the pointer, pressed in
+        // (deeper, darker at the top) while held there.
         const bool keep_lit = g_ask_hover == kKeep, quit_lit = g_ask_hover == kQuit;
-        button(g, l.keep, button_radius, keep_lit ? kGreenTopHover : kGreenTop, keep_lit ? kGreenBottomHover : kGreenBottom, kGreenEdge);
-        button(g, l.quit, button_radius, quit_lit ? kGreyTopHover : kGreyTop, quit_lit ? kGreyBottomHover : kGreyBottom, kGreyEdge);
+        const bool keep_in = keep_lit && g_ask_pressed == kKeep, quit_in = quit_lit && g_ask_pressed == kQuit;
+        button(g, l.keep, button_radius, keep_in ? kGreenPressedTop : keep_lit ? kGreenTopHover : kGreenTop,
+               keep_in ? kGreenPressedBottom : keep_lit ? kGreenBottomHover : kGreenBottom, kGreenEdge);
+        button(g, l.quit, button_radius, quit_in ? kGreyPressedTop : quit_lit ? kGreyTopHover : kGreyTop,
+               quit_in ? kGreyPressedBottom : quit_lit ? kGreyBottomHover : kGreyBottom, kGreyEdge);
         centred(g, keep_label(), static_cast<float>(px(21)), true, kText, l.keep);
         centred(g, quit_label(), static_cast<float>(px(21)), true, kText, l.quit);
         // The keys' choice: a lime ring a little outside its button, plain to see for a person without a mouse.
@@ -785,13 +937,36 @@ LRESULT CALLBACK ask_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             draw_ask();
         }
         return 0;
+    case WM_LBUTTONDOWN:
+        // Held: on a button, the thin X, beside the card or on its body; the question keeps the mouse until let go.
+        g_ask_pressed = in_card(x, y) ? ask_at(x, y) : kBeside;
+        g_ask_hover = ask_at(x, y);
+        SetCapture(h);
+        draw_ask();
+        return 0;
+    case WM_CAPTURECHANGED:
+        // The mouse taken away while held: nothing acts.
+        if (g_ask_pressed != kNone) {
+            g_ask_pressed = kNone;
+            if (asking()) draw_ask();
+        }
+        return 0;
     case WM_LBUTTONUP: {
+        const int pressed = g_ask_pressed;
+        g_ask_pressed = kNone;
+        if (GetCapture() == h) ReleaseCapture();
         // The keyboard back to the game's window: the question never takes it, another program may have.
         SetForegroundWindow(g_frame);
-        const int at = ask_at(x, y);
-        // Quit the game quits; Keep playing, the thin X and a click beside the card all keep playing.
+        const int at = in_card(x, y) ? ask_at(x, y) : kBeside;
+        // Only a release where the press was acts: a press slid from Keep playing onto Quit the game (or from the game
+        // beside the card) does nothing. Quit the game quits; Keep playing, the thin X and a click beside the card keep
+        // playing.
+        if (at != pressed || at == kNone) {
+            draw_ask();
+            return 0;
+        }
         if (at == kQuit) answer(true);
-        else if (at == kKeep || at == kClose || !in_card(x, y)) answer(false);
+        else answer(false);
         return 0;
     }
     case WM_SETCURSOR:
@@ -897,6 +1072,21 @@ std::vector<std::wstring> wrap_words(Graphics& g, const std::wstring& text, cons
     return lines;
 }
 
+// The same, its lines made as even as they can be in as few lines: the narrowest room that still takes no more lines
+// than the full room does, so that a long line never leaves one word alone under it ("볼 수" / "있어요").
+std::vector<std::wstring> wrap_even(Graphics& g, const std::wstring& text, const Font& font, float room) {
+    auto lines = wrap_words(g, text, font, room);
+    if (lines.size() < 2) return lines;
+    // Halving the room between what fits in that many lines and the full room, to within a pixel.
+    float low = 0, high = room;
+    while (high - low > 1) {
+        const float mid = (low + high) / 2;
+        if (wrap_words(g, text, font, mid).size() <= lines.size()) high = mid;
+        else low = mid;
+    }
+    return wrap_words(g, text, font, high);
+}
+
 // The lines one under the other, as one text with line breaks.
 std::wstring joined(const std::vector<std::wstring>& lines) {
     std::wstring out;
@@ -935,11 +1125,13 @@ std::unique_ptr<Canvas> make_notice(const std::string& text, bool live) {
         // The words' room: at most 680 pixels at 720 lines, and within the game's area however small its window; a long
         // server name wraps there.
         const RECT a = area();
-        const float beside = pad * 2 + mark_w + gap + margin * 2 + px(16);
+        float beside = pad * 2 + mark_w + gap + margin * 2 + px(16);
+        // A frame counter in a top corner keeps its corner: the card, centred, stays clear of it on both sides.
+        if (g_fps_corner == 1 || g_fps_corner == 2) beside += 2.0f * static_cast<float>(make_fps(-1, 0)->w + px(8));
         room = std::max(static_cast<float>(px(160)), std::min(static_cast<float>(px(680)), static_cast<float>(a.right - a.left) - beside));
         // Each line broken at its spaces within the room, then measured as the lines it became.
-        title = joined(wrap_words(g, title, title_font, room));
-        if (!detail.empty()) detail = joined(wrap_words(g, detail, detail_font, room));
+        title = joined(wrap_even(g, title, title_font, room));
+        if (!detail.empty()) detail = joined(wrap_even(g, detail, detail_font, room));
         g.MeasureString(title.c_str(), -1, &title_font, PointF(0, 0), &title_box);
         if (!detail.empty()) g.MeasureString(detail.c_str(), -1, &detail_font, PointF(0, 0), &detail_box);
     }
@@ -1023,15 +1215,18 @@ void notice(const std::string& text, bool live) {
 }
 
 void pointer_moved(int y, bool pressed) {
+    g_pointer_down = pressed;
     // Not while the mouse plays (its button down), not over the question, and only at the very top edge of the game
-    // (within 4 pixels at 720 lines):
-    // the game's own controls under the bar's place stay the game's while they are used.
+    // (within 4 pixels at 720 lines): the game's own controls under the bar's place stay the game's while they are used.
     if (!g_bar || asking() || pressed) return;
     // A mouse's move: the pointer is the mouse's again.
     g_bar_by_touch = false;
     if (y >= std::max(1, px(4))) return;
-    reveal(kBarStayMs);
+    // Up already: it stays. Else the edge waits a moment, and the bar shows only if the pointer is still there then.
+    if (IsWindowVisible(g_bar)) reveal(kBarStayMs);
+    else SetTimer(g_bar, kBarEdgeTimer, kBarEdgeMs, nullptr);
 }
+
 
 void show_bar() {
     if (!g_bar || asking()) return;
@@ -1048,6 +1243,7 @@ void ask_quit() {
     // Keep playing chosen first, so that Enter at once goes on; nothing lit until the pointer moves over it.
     g_choice = kKeep;
     g_ask_hover = kNone;
+    g_ask_pressed = kNone;
     hide_bar();
     // The game held before anything else happens to it (minimised, it is held already).
     update_hold();
@@ -1093,16 +1289,16 @@ void place() {
     // The bar across the game's top at its new width, if it is up.
     if (g_bar && IsWindowVisible(g_bar)) bar_frame();
     if (g_notice_canvas) notice_frame();
-    // The frame counter in its corner, at the new scale.
-    if (g_fps_corner) fps_frame(true);
+    // The frame counter in its corner, at the new scale (a move counts nothing: its numbers stay its timer's).
+    fps_place_now();
 }
 
-void show_fps(int corner, unsigned long long (*frames)()) {
+void show_fps(int corner, FrameCount (*frames)()) {
     if (!g_fps || corner <= 0 || corner > 4 || !frames) return;
     g_fps_corner = corner;
     g_fps_frames = frames;
     // Shown at once, with dashes until the first half second has been counted.
-    fps_frame(true);
+    fps_frame();
     ShowWindow(g_fps, SW_SHOWNOACTIVATE);
     SetTimer(g_fps, kFpsTimer, kFpsMs, nullptr);
 }
@@ -1133,6 +1329,12 @@ void test_save(const std::wstring& prefix) {
             const wchar_t* lit = which == kNone ? L"" : which == kScreenChip ? L"-screen" : L"-quit";
             save(bar_canvas(), L"bar-" + state + lit + L".png");
         }
+        // Each chip held down under the pointer.
+        for (int which : {kScreenChip, kQuitChip}) {
+            g_bar_hover = g_bar_pressed = which;
+            save(bar_canvas(), L"bar-" + state + (which == kScreenChip ? L"-screen" : L"-quit") + L"-pressed.png");
+        }
+        g_bar_pressed = kNone;
     }
     g_hooks = kept;
     g_bar_hover = kNone;
@@ -1149,6 +1351,13 @@ void test_save(const std::wstring& prefix) {
         draw_ask();
         save(*g_ask_canvas, look.name);
     }
+    // Each button held down under the pointer.
+    for (int which : {kKeep, kQuit}) {
+        g_ask_hover = g_ask_pressed = which;
+        draw_ask();
+        save(*g_ask_canvas, which == kKeep ? L"ask-pressed-keep.png" : L"ask-pressed-quit.png");
+    }
+    g_ask_pressed = kNone;
     g_choice = kKeep;
     g_ask_hover = kNone;
     // The notice while live and once ended, in the server's own words (server/game/live/state.php), a server's name in
@@ -1159,7 +1368,79 @@ void test_save(const std::wstring& prefix) {
                                             : "Your broadcast has ended\nWatch the replay under LIVE on My Server";
     save(*make_notice(live_text, true), L"notice-live.png");
     save(*make_notice(ended_text, false), L"notice-ended.png");
+    // A server whose name is long, which the card wraps within the game's width.
+    const std::string long_text = g_korean ? "지금 이 플레이를 라이브로 방송하고 있어요\nOpenDMTQ Community Server Seoul Central 사이트의 LIVE에서 지금도, 끝난 뒤에도 볼 수 있어요"
+                                           : "Your play is live now\nWatch it live or later under LIVE on OpenDMTQ Community Server Seoul Central";
+    save(*make_notice(long_text, true), L"notice-long.png");
+    // The same with a counter in a top corner, which the card keeps clear of.
+    const int corner_before = g_fps_corner;
+    g_fps_corner = 2;
+    save(*make_notice(long_text, true), L"notice-long-fps.png");
+    g_fps_corner = corner_before;
+    // The frame counter before its first half second, with the game held, at 60, at 240 and at its most.
+    struct Count {
+        int fps;
+        float ms;
+        const wchar_t* name;
+    };
+    for (const Count& n : {Count{-1, 0, L"fps-dash.png"}, Count{0, 0, L"fps-0.png"}, Count{60, 16.7f, L"fps-60.png"}, Count{240, 4.2f, L"fps-240.png"},
+                           Count{999, 1.0f, L"fps-999.png"}}) {
+        save(*make_fps(n.fps, n.ms), n.name);
+    }
+    // Where each is placed in the game's area, from the same code that places their windows: "name x y w h" a line.
+    FILE* out = _wfopen((prefix + L"layout.txt").c_str(), L"w");
+    if (!out) return;
+    const RECT a = area();
+    std::fprintf(out, "area 0 0 %ld %ld\nscale %.4f\n", a.right - a.left, a.bottom - a.top, static_cast<double>(scale()));
+    std::fprintf(out, "bar 0 0 %ld %d\n", a.right - a.left, bar_height());
+    for (const auto& [name, live] : {std::pair<const char*, bool>{"notice-live", true}, {"notice-ended", false}, {"notice-long", true}}) {
+        auto c = make_notice(std::string(name) == "notice-long" ? long_text : live ? live_text : ended_text, live);
+        const POINT at = notice_place(*c);
+        std::fprintf(out, "%s %ld %ld %d %d\n", name, at.x - a.left, at.y - a.top, c->w, c->h);
+    }
+    {
+        g_fps_corner = 2;
+        auto c = make_notice(long_text, true);
+        g_fps_corner = corner_before;
+        const POINT at = notice_place(*c);
+        std::fprintf(out, "notice-long-fps %ld %ld %d %d\n", at.x - a.left, at.y - a.top, c->w, c->h);
+    }
+    const int kept_corner = g_fps_corner;
+    for (int corner = 1; corner <= 4; ++corner) {
+        g_fps_corner = corner;
+        auto c = make_fps(240, 4.2f);
+        const POINT at = fps_place(*c);
+        std::fprintf(out, "fps%d %ld %ld %d %d\n", corner, at.x - a.left, at.y - a.top, c->w, c->h);
+    }
+    // The same with the bar up: the notice and a counter in a top corner under it.
+    g_test_bar_up = true;
+    for (int corner = 1; corner <= 2; ++corner) {
+        g_fps_corner = corner;
+        auto c = make_fps(240, 4.2f);
+        const POINT at = fps_place(*c);
+        std::fprintf(out, "fps%d-bar %ld %ld %d %d\n", corner, at.x - a.left, at.y - a.top, c->w, c->h);
+    }
+    // The notices as without a counter.
+    g_fps_corner = kept_corner;
+    for (const auto& [name, live] : {std::pair<const char*, bool>{"notice-live", true}, {"notice-long", true}}) {
+        auto c = make_notice(std::string(name) == "notice-long" ? long_text : live_text, live);
+        const POINT at = notice_place(*c);
+        std::fprintf(out, "%s-bar %ld %ld %d %d\n", name, at.x - a.left, at.y - a.top, c->w, c->h);
+    }
+    g_test_bar_up = false;
+    g_fps_corner = kept_corner;
+    const AskLayout l = ask_layout(a.right - a.left, a.bottom - a.top);
+    std::fprintf(out, "card %.0f %.0f %.0f %.0f\n", l.card.X, l.card.Y, l.card.Width, l.card.Height);
+    std::fprintf(out, "keep %.0f %.0f %.0f %.0f\nquit %.0f %.0f %.0f %.0f\n", l.keep.X, l.keep.Y, l.keep.Width, l.keep.Height, l.quit.X, l.quit.Y,
+                 l.quit.Width, l.quit.Height);
+    for (int which : {kScreenChip, kQuitChip}) {
+        const RectF r = chip_rect(which, a.right - a.left);
+        std::fprintf(out, "%s %.0f %.0f %.0f %.0f\n", which == kQuitChip ? "chip-quit" : "chip-screen", r.X, r.Y, r.Width, r.Height);
+    }
+    std::fclose(out);
 }
+
+void test_set_dpi(float scale) { g_test_dpi = scale; }
 #endif
 
 #ifdef OVERLAY_TEST_HOOKS

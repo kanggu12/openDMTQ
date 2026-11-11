@@ -65,12 +65,15 @@ offer. While the launcher's window is open, the flags that change what it keeps 
 | F11, or Alt+Enter | Full screen, and back |
 | The pointer at the game's top edge | The bar: full screen, and the X that quits after asking |
 | Alt+F4 | Nothing: the bar's X quits |
+| Alt alone, F10 | Nothing (no menu mode that would hold the next key) |
 
 - **The bar and quitting**: a PC has no phone's buttons around the game, so a bar in the look of the game's own dialog
-  header shows across the top of the game when the pointer touches the game's very top edge with its button up, or
-  when a finger is drawn down from that edge on a touch screen. It stays while the pointer is on it and fades soon
-  after the pointer leaves, so it never sits on the game's own controls at the top while they are used; no key opens
-  it. On its right: **full screen** (or back to a window) and an **X** that quits. The X asks first, **Keep playing** or
+  header shows across the top of the game when the pointer rests a moment at the game's very top edge with its button
+  up, or when a finger is drawn down from that edge on a touch screen; a pointer on its way to the window's title bar
+  shows nothing. It stays while the pointer is on it and fades soon after the pointer leaves, so it never sits on the
+  game's own controls at the top while they are used; no key opens it. While it is up, the broadcast notice and an FPS
+  counter in a top corner move down under it. On its right: **full screen** (or back to a window) and an **X** that
+  quits; a chip, or a button of the question, acts only when let go where it was pressed. The X asks first, **Keep playing** or
   **Quit the game**, so a click by mistake does not end a song; the window's own close button asks the same, and
   Alt+F4 does nothing. The game holds still while it asks, as a phone's game does when its owner leaves it: a song
   stops where it was, with the game's own pause screen after. In the question, Left, Right and Tab move the choice,
@@ -97,8 +100,9 @@ offer. While the launcher's window is open, the flags that change what it keeps 
 - **VSync off:** frames go out as soon as they are drawn, evenly at the limit, which may be above the display's rate, or
   as fast as the PC draws without one. A little less delay, and the picture may tear.
 - **The FPS counter**, off by default: a small chip in the corner chosen (each corner has some of the game's own
-  controls), with the frames a second in the game's lime and the mean frame time under them, over the last half second,
-  twice a second. It counts the frames the player shows, sits over the game as the bar does and lets clicks through, and
+  controls; top left sits over a song's pause button), with the frames a second in the game's lime and the mean frame
+  time under them, over the last half second, twice a second. It counts the frames the player shows between their own
+  moments, so a steady 60 reads 60; held still under the question, it reads 0. It sits over the game as the bar does and lets clicks through, and
   stays under the dim of the question before quitting. It is drawn apart from the game's picture: it costs the game
   nothing, and the broadcast does not show it.
 - **The render scale** draws the game at a share of the window's pixels (100 % down to 50 %), stretched to fill it:
