@@ -597,10 +597,10 @@ class BroadcastsTest(unittest.TestCase):
                                  follow_redirects=True)
             self.assertIn("No such quality.", r.get_data(as_text=True))
             self.assertEqual(admin.recordings.live_settings(), {"on": False, "new_players": True, "quality": "sharp"})
-            # The change in the log of changes, in words, with what it set.
+            # The change in the log of changes, in words, with what it set, in the page's words for it.
             page = inst.client.get("/opendmtq/admin/logs?tab=changes").get_data(as_text=True)
             self.assertIn("Changed the broadcast settings", page)
-            self.assertIn("on, sharp", page)
+            self.assertIn("New players: Start on; quality: Sharp", page)
 
     def test_the_players_page_and_the_status_page_say_when_broadcasts_are_off(self):
         with Install() as inst:
