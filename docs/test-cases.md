@@ -301,6 +301,9 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 | SRV-28 | A sign-in or sign-out form posted from another site | The empty sign-in page; nobody signed in or out | `tests/live/smoke.py#a sign-in form on another site leads to the empty sign-in page` | qa |
 | SRV-29 | Wrong passwords at an account with admin rights, from many addresses | Thirty in ten minutes for the whole server, and no more | `tests/live/smoke.py#thirty wrong guesses at an account with admin rights from anywhere, and no more` | qa |
 | SRV-30 | The live page's script | Comes compressed, and is checked again | `tests/live/smoke.py#the live page's script comes compressed, and revalidates` | qa |
+| SRV-31 | Players play on two cores while one address saves as fast as it can over every connection the edge lets it hold | Every save of the players is stored | `tests/load/load.py#the players' saves:` | qa |
+| SRV-32 | Players play while two others broadcast and thirty browsers watch them on the site | Every segment taken, every viewer signed in, every look at who is on answered, every save stored | `tests/load/load.py#the viewers' looks at who is on` | qa |
+| SRV-33 | Players play while the server makes a backup and builds the app on the same two cores | Both end well, and every save is stored | `tests/load/load.py#ended well` | qa |
 
 ## TS-CLI: the command line
 

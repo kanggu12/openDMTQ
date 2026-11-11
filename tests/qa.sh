@@ -110,6 +110,9 @@ step client client_tests
 step game tests/game/protocol.sh
 # The server on the real game files: the game's own requests, broadcasts, recordings, and a real video in Chromium.
 step live env BROWSER=1 tests/live/run.sh
+# Players sharing one server on two cores, on the real game files: one address saving as fast as it can, broadcasts with
+# thirty viewers, a backup and a build of the app; not one player's save may fail.
+step load tests/load/run.sh "$REPORT/load"
 # The pages in a real browser. In CI too; here also for what the screenshots show.
 step ui tests/ui/run.sh "$REPORT/ui"
 # An upgrade: the last release's images used as people use them, then this tree's on the same data. In CI too.
