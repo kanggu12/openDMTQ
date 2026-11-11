@@ -1150,6 +1150,7 @@ bool open_window(const std::string& title) {
         // The broadcast holds too: what viewers see stops with the game, and starts again with it.
         arm32::desktop_live_paused(held);
     };
+    hooks.log = [](const char* line) { jvm::log("%s", line); };
     overlay::start(g_frame, g_window, hooks, host_locale().first == "ko");
     // The frame counter in the corner the PC's settings name, from the count of frames shown (none: no counter).
     overlay::show_fps(static_cast<int>(settings().show_fps), [] {

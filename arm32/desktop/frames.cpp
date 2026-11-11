@@ -1,8 +1,9 @@
 // What the runtime's EGL bridge hands live view on a phone (live.h), on the desktop: each frame just before it is
-// shown. The computer's broadcast takes it first (live_capture.cpp, on Windows); then the frames are counted, the first
-// one logged, what the display showed noted every five seconds with stats on, the taps a check planned by frame given
-// (input.cpp), and the ones asked for (PLAYER_SHOTS="60,600,@12.5": frame numbers, and seconds from the first frame,
-// which hold whatever the frame rate) saved as PNG files in the data folder's shots/, for checks to look at.
+// shown. The computer's broadcast takes it first (live_capture.cpp, on Windows), then the overlay's glass what it wants
+// of it (glass_capture.cpp); then the frames are counted, the first one logged, what the display showed noted every
+// five seconds with stats on, the taps a check planned by frame given (input.cpp), and the ones asked for
+// (PLAYER_SHOTS="60,600,@12.5": frame numbers, and seconds from the first frame, which hold whatever the frame rate)
+// saved as PNG files in the data folder's shots/, for checks to look at.
 #include "live.h"
 #include "player.h"
 
@@ -172,6 +173,11 @@ namespace arm32 {
 // The broadcast of a computer's player: its capture on the render thread (live_capture.cpp; live_desktop.cpp on Linux).
 void desktop_live_frame(EGLDisplay display, EGLSurface surface);
 void desktop_live_context_destroyed(EGLContext context);
+// The overlay's glass: the frame behind its pieces read for its thread (glass_capture.cpp), a context gone, and what the
+// reads cost, in the stats.
+void glass_frame(EGLDisplay display, EGLSurface surface);
+void glass_context_destroyed(EGLContext context);
+void glass_stats();
 
 // The phone's start of live view: the computer's starts at its first swap, from the player's own files.
 void live_load(JavaVM*, JNIEnv*, const std::string&) {}
@@ -179,12 +185,16 @@ void live_load(JavaVM*, JNIEnv*, const std::string&) {}
 void live_frame(EGLDisplay display, EGLSurface surface) {
     // The broadcast first, while the frame is the one that goes to the screen.
     desktop_live_frame(display, surface);
+    // Then what the overlay's glass wants of it, read without the overlay over it (one atomic load while none is up).
+    glass_frame(display, surface);
     // The frame's moment first, then the count: a reader that sees the count sees this frame's time or a later one.
     g_shown_ns.store(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(),
                      std::memory_order_relaxed);
     std::uint64_t n = g_shown.fetch_add(1, std::memory_order_release) + 1;
     if (n == 1) log("player: the game's first frame");
     if (g_stats) present_stats(display, surface);
+    // What the glass's reads cost this thread, every five seconds while any glass was up.
+    if (g_stats) glass_stats();
     Shots& s = shots();
     if (s.frames.count(n)) save_frame(display, surface, n, "frame-" + std::to_string(n));
     if (!s.times.empty()) {
@@ -201,7 +211,11 @@ void live_frame(EGLDisplay display, EGLSurface surface) {
     player::frame_shown(n);
 }
 
-void live_context_destroyed(EGLContext context) { desktop_live_context_destroyed(context); }
+void live_context_destroyed(EGLContext context) {
+    desktop_live_context_destroyed(context);
+    // The glass's objects went with it too.
+    glass_context_destroyed(context);
+}
 // The phone's sound for live view: a computer's broadcast takes the player's whole mix instead (mixer.h's tap).
 void live_audio_source(const void*, int, int, int) {}
 void live_audio(const void*, const void*, std::size_t) {}

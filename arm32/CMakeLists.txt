@@ -89,7 +89,7 @@ if(NOT ANDROID)
   # libraries those need.
   if(WIN32)
     set(WIN_DEPS "" CACHE PATH "Folder with ANGLE's DLLs, the EGL and GLES headers and zlib (arm32/build_windows.sh)")
-    set(PLAYER_WINDOW desktop/window_win32.cpp desktop/overlay_win32.cpp desktop/error_box_win32.cpp desktop/player.rc)
+    set(PLAYER_WINDOW desktop/window_win32.cpp desktop/overlay_win32.cpp desktop/overlay_glass.cpp desktop/error_box_win32.cpp desktop/player.rc)
     set(PLAYER_OUTPUT desktop/output_wasapi.cpp)
     set(PLAYER_DECODER desktop/decoder_mf.cpp)
     # The broadcast's encoder and its capture of the game's frames (desktop/live_desktop.cpp says what runs where).
@@ -149,7 +149,7 @@ if(NOT ANDROID)
   add_executable(player desktop/main.cpp desktop/logd.cpp desktop/java_lang.cpp desktop/threads.cpp desktop/android_os.cpp desktop/unity.cpp
                  desktop/android_app.cpp desktop/audio.cpp desktop/mixer.cpp ${PLAYER_OUTPUT} desktop/media.cpp desktop/mp4.cpp desktop/decoder.cpp
                  ${PLAYER_DECODER} desktop/sdk.cpp desktop/web.cpp desktop/http.cpp desktop/pmangplus.cpp desktop/input.cpp desktop/ndk.cpp ${PLAYER_WINDOW} desktop/frames.cpp
-                 desktop/own_folder.cpp desktop/settings.cpp desktop/live_desktop.cpp ${PLAYER_LIVE} src/live_net.cpp src/live_ts.cpp src/live_sps.cpp
+                 desktop/own_folder.cpp desktop/settings.cpp desktop/live_desktop.cpp ${PLAYER_LIVE} desktop/glass_capture.cpp src/live_net.cpp src/live_ts.cpp src/live_sps.cpp
                  src/jni_bridge.cpp ${ARM32_JNI_ENTRY} src/android_bridge.cpp src/egl_bridge.cpp src/gl_special.cpp src/offscreen.cpp ${ARM32_GEN_DIR}/gl_thunks.cpp
                  desktop/post_pass.cpp desktop/cmaa2.cpp src/opensl_bridge.cpp src/pacing.cpp src/follow.cpp src/window_rate.cpp src/tweaks.cpp)
   # SMAA's reference shader (desktop/third_party/smaa/SMAA.hlsl) as the bytes of a C array, ending in a 0, for
@@ -179,6 +179,12 @@ if(NOT ANDROID)
     add_custom_command(TARGET player POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different ${WIN_DEPS}/bin/libEGL.dll
                        ${WIN_DEPS}/bin/libGLESv2.dll ${WIN_DEPS}/bin/zlib1.dll ${WIN_DEPS}/bin/libgcc_s_seh-1.dll
                        ${WIN_DEPS}/bin/libstdc++-6.dll ${WIN_DEPS}/bin/libwinpthread-1.dll $<TARGET_FILE_DIR:player>)
+    # The overlay's faces in fonts\ beside it, where it loads them from (desktop/overlay_glass.cpp): the launcher's own
+    # files (client/opendmtq_client/assets/fonts), as the bundle carries them (bundle_windows.sh).
+    set(PLAYER_FONTS ${CMAKE_CURRENT_SOURCE_DIR}/../client/opendmtq_client/assets/fonts)
+    add_custom_command(TARGET player POST_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:player>/fonts
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PLAYER_FONTS}/Pretendard-Regular.ttf ${PLAYER_FONTS}/Pretendard-SemiBold.ttf
+                       ${PLAYER_FONTS}/Pretendard-Bold.ttf ${PLAYER_FONTS}/DMTQWide-ExtraBold.ttf $<TARGET_FILE_DIR:player>/fonts)
   endif()
   return()
 endif()

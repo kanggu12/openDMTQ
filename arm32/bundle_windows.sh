@@ -32,6 +32,12 @@ done
 mkdir -p "$dest/runtime/sysroot"
 cp -R "$work/sysroot/bin" "$work/sysroot/lib" "$work/sysroot/usr" "$dest/runtime/sysroot/"
 cp "$work/guest/arm32-agent" "$dest/runtime/"
+# The overlay's faces, which it loads from fonts\ beside the player (desktop/overlay_glass.cpp): Pretendard and the
+# launcher's DMTQ Wide, the launcher's own files, with their licence (the SIL Open Font License, also in NOTICES.txt).
+fonts=$root/client/opendmtq_client/assets/fonts
+mkdir -p "$dest/fonts"
+for face in Pretendard-Regular Pretendard-SemiBold Pretendard-Bold DMTQWide-ExtraBold; do cp "$fonts/$face.ttf" "$dest/fonts/"; done
+cp "$fonts/Pretendard-OFL.txt" "$fonts/Saira-OFL.txt" "$dest/fonts/"
 cp "$here/desktop/README-windows.txt" "$dest/README.txt"
 # The licenses of every part, one file, in the order NOTICES-windows.txt names them; Android's notices beside it.
 notice() {
@@ -50,6 +56,9 @@ notice() {
   notice "NVIDIA Image Scaling SDK" "$here/desktop/third_party/nis/licence.txt"
   notice "SMAA" "$here/desktop/third_party/smaa/LICENSE.txt"
   notice "CMAA 2" "$here/desktop/third_party/cmaa2/license.txt"
+  # The overlay's faces (fonts\): Pretendard as it is, and DMTQ Wide, a cut of Saira under Saira's licence.
+  notice "Pretendard" "$fonts/Pretendard-OFL.txt"
+  notice "DMTQ Wide (from Saira)" "$fonts/Saira-OFL.txt"
 } > "$dest/licenses/NOTICES.txt"
 # The toolchain's licenses come out of its image.
 docker run --rm -v "$here:/a:ro" opendmtq-arm32-windows sh -ec '

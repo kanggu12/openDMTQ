@@ -29,6 +29,20 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ### Changed
 
+- The player for Windows: the bar, the question before quitting, the broadcast notice and the FPS counter are frosted
+  glass over the game, as Windows' acrylic is made: the game's own picture behind each, blurred and a little more
+  saturated, under a charcoal tint, with a light edge, a faint light at the top and a soft shadow. Their words keep
+  4.5:1 or more over the lightest picture behind them (the tint deepens under them where it is light). The picture is
+  read from the game's frames at a quarter of its size, at most 20 times a second while a piece is up, without waiting
+  for the graphics card, and not at all while none is.
+- The player for Windows: the overlay's pieces take the game's own shapes on their glass: its small corners and its
+  bevel, its green line along the bar's and the notice's foot and under the question's title, its OFF chips for the
+  bar's (full screen lit with a lime edge under the pointer, the X red), its green button for Keep playing and the grey
+  of its tabs for Quit the game (red under the pointer), both with white bold words, its lime border and glow for the
+  keys' choice, a tag with a slanted end for the notice's LIVE (grey ENDED), and its Q and MAX box for the FPS counter.
+  The words are set in Pretendard, titles and buttons bold, and the bar's name, OPEN DMTQ, in the launcher's wordmark
+  face (both under the SIL Open Font License, in the player's `fonts` folder). The question's card sits over the game
+  dimmed and blurred; the notice slides down as it fades in.
 - The broadcast notices, on phones and PCs alike, no longer repeat the LIVE mark in their title and say where to watch
   more briefly: "Your play is live" / "Watch it now or later under LIVE on" the server's site; the end of broadcasts for
   the whole server says "Broadcasts are off on this server".
@@ -37,8 +51,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 - The player for Windows: an FPS counter at the top left sits just right of a song's pause button instead of over it.
 - The player for Windows: the question before quitting keeps within three quarters of the game's width, its contents
   scaled with it, so a small window on a display at 150 % or 200 % gets a card in proportion to the game.
-- The player for Windows: the bar's X lights grey under the pointer instead of the game's green, which reads as go on;
-  the full screen chip keeps the green.
+- The player for Windows: the bar's X turns red under the pointer, as Windows' own close does, instead of the game's
+  green, which reads as go on.
 - The launcher's Screen page: the upscaler's hints no longer say what 100 % does (the row is shown only below it), and
   the page's line under its title names the picture's quality too.
 - The guides: the PC client's guide lists every setting `--set` takes with its values, installing has updates,

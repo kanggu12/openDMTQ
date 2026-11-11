@@ -20,6 +20,9 @@ Beside it:
 - The GCC runtime ANGLE's DLLs were built with (libgcc_s_seh-1.dll, libstdc++-6.dll): the GNU GPL 3 with the GCC Runtime
   Library Exception, below.
 - winpthreads (libwinpthread-1.dll): its license is below.
+- Pretendard (fonts\Pretendard-*.ttf), the face of the overlay's words, unchanged, and DMTQ Wide
+  (fonts\DMTQWide-ExtraBold.ttf), the launcher's wordmark face, a cut of Saira: the SIL Open Font License 1.1, below
+  and beside them.
 
 In runtime/sysroot: Android's 32-bit linker and system libraries (libc, libm, libdl, libstdc++, libc++, libz, liblog),
 from the Android Open Source Project, unchanged, by way of Google's Android 6.0 ARM system image. They are under the

@@ -1,5 +1,6 @@
 // What the player for Windows draws over the game: the bar at the top edge with full screen and the X, the question
-// before quitting, the server's notice, the cursor (see overlay_win32.cpp). All of it on the UI thread.
+// before quitting, the server's notice, the frame counter, the cursor, the pieces as frosted glass over the game's own
+// frame (see overlay_win32.cpp). All of it on the UI thread.
 #pragma once
 
 #include <windows.h>
@@ -18,6 +19,8 @@ struct Hooks {
     bool (*fullscreen)() = nullptr;
     // The game held still (true: a question is up, or the window is minimised) or let go on (false).
     void (*hold)(bool) = nullptr;
+    // A line for the player's log.
+    void (*log)(const char* line) = nullptr;
 };
 
 // Once the frame and the game's window are made; `korean` for the words.
@@ -55,11 +58,11 @@ void rate(const FrameCount& before, const FrameCount& now, int& fps, float& ms);
 // The cursor over the game, pressed or not, at the display's scale.
 HCURSOR cursor(bool pressed);
 #ifdef OVERLAY_TEST_HOOKS
-// The probe's look at the bar, the question and the notice: their pictures as PNGs named after `prefix`, with no window
-// shown.
-void test_save(const std::wstring& prefix);
-// The frame counter's picture alone, at the game area's scale now, showing these numbers.
-void test_save_fps(const std::wstring& path, int fps, float ms);
+// The probe's look at every piece in each of its states over a frame of the game (`frame`, a PNG of the game's area's
+// size): their pictures as PNGs named after `prefix` with their own transparency, the frame behind read from it as the
+// render thread reads it and blurred and tinted by the player's own code, and where each goes (layout.txt). No window
+// is shown. Without `words`, the same pictures without their words (the glass under them, for their contrast).
+void test_save(const std::wstring& prefix, const std::wstring& frame, bool words);
 // Windows' scale as the probe wants it drawn (1.5 for 150 %), in place of the display's.
 void test_set_dpi(float scale);
 #endif

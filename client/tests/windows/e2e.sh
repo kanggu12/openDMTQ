@@ -133,12 +133,13 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   # and the X again with Quit the game ends the game, and the launcher comes back. The overlay's sizes are the game's at
   # 720 lines, times the game's height over 720 (Wine is at 96 dpi): 1.5 in full screen here (1920x1080), 1.125 in the
   # window (1440x810), each length rounded as the player rounds it (opx below). The bar is 74 high and shows for a
-  # pointer that rests 150 ms within 4 of the top (y 0 here, for a second); its chips are 36 square, 14 in from the right end and 10 apart, centred in
-  # its height (the card within three quarters of the game's width, which neither size reaches). The question's card is 600 wide and 62 + 2 + 74 + 56 + 24 high, centred, its two buttons 220 by 56 with
-  # 16 between, centred, their top 62 + 2 + 74 below the card's. In full screen: the X's centre 21 + 27 = 48 in from
-  # the right and 28 + 27 = 55 down, the full screen chip's 21 + 54 + 15 + 27 = 117 in; the card 900 by 327 at y 376, its
-  # buttons centred at y 376 + 207 + 42 = 625, Keep playing at x 618 + 165 = 783 (the middle less 177) and Quit the game
-  # at 1137 (the middle and 177). Wine's window for the game is its client area (no window manager draws a frame), so
+  # pointer that rests 150 ms within 4 of the top (y 0 here, for a second); its chips are 40 square, 16 in from the
+  # right end and 10 apart, centred in its height (the card within three quarters of the game's width, which neither size
+  # reaches). The question's card is 520 wide and 228 high, centred, its two buttons 210 by 48 with 16 between, centred,
+  # their top 36 + 28 + 10 + 12 + 20 + 34 = 140 below the card's. In full screen: the X's centre 24 + 30 = 54 in from the
+  # right and 25 + 30 = 55 down, the full screen chip's 24 + 60 + 15 + 30 = 129 in; the card 780 by 342 at y 369, its
+  # buttons centred at y 369 + 210 + 36 = 615, Keep playing at x 633 + 157 = 790 (the middle less 170) and Quit the game
+  # at 1129 (the middle and 169). Wine's window for the game is its client area (no window manager draws a frame), so
   # its geometry is the game's area, in a window as in full screen.
   game=\$(xdotool search --name 'TECHNIKA' 2>/dev/null | tail -n 1)
   [ -n \"\$game\" ] && xdotool windowfocus --sync \"\$game\" 2>/dev/null; xdotool key alt+F4
@@ -152,17 +153,17 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   # The bar's chip (0 the X, 1 full screen): its centre's distance from the right end and from the top.
   bar_chip() {
     eval \$(xdotool getwindowgeometry --shell \"\$game\")
-    local size=\$(opx 36) gap=\$(opx 10) margin=\$(opx 14) bar=\$(opx 74)
+    local size=\$(opx 40) gap=\$(opx 10) margin=\$(opx 16) bar=\$(opx 74)
     xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5
     xdotool mousemove \$((X + WIDTH / 2)) \$Y; sleep 1
     xdotool mousemove \$((X + WIDTH - margin - size / 2 - \$1 * (size + gap))) \$((Y + (bar - size) / 2 + size / 2)); sleep 1
   }
   # The pointer on the question's button (0 Keep playing, 1 Quit the game), the game's place and size as last read.
   ask_button() {
-    local width=\$(opx 600) high=\$((\$(opx 62) + \$(opx 2) + \$(opx 74) + \$(opx 56) + \$(opx 24))) each=\$(opx 220) gap=\$(opx 16)
+    local width=\$(opx 520) high=\$(opx 228) each=\$(opx 210) gap=\$(opx 16)
     local left=\$(( (WIDTH - width) / 2 )) top=\$(( (HEIGHT - high) / 2 ))
     local keep=\$((left + (width - 2 * each - gap) / 2))
-    xdotool mousemove \$((X + keep + \$1 * (each + gap) + each / 2)) \$((Y + top + \$(opx 62) + \$(opx 2) + \$(opx 74) + \$(opx 56) / 2)); sleep 1
+    xdotool mousemove \$((X + keep + \$1 * (each + gap) + each / 2)) \$((Y + top + \$(opx 140) + \$(opx 48) / 2)); sleep 1
   }
   # How many times the player has said it switched between full screen and a window.
   switches() { cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | grep -cE 'player: (full screen|in a window)'; }
