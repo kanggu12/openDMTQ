@@ -645,11 +645,13 @@ def _run(state, args, jobs):
         state.guide_done = True
         _say("The window opens on its pages next time, without the first-start guide.")
     if args.server:
+        # No address at all: refused by the window's own check, in its words, before the server is asked anything.
+        url = srv.normalize(args.server)
         try:
-            found = actions.connect(state, args.server)
+            found = actions.connect(state, url)
             _say("Connected to %s (%s)." % (found["name"], state.current))
         except srv.ServerError:
-            known = state.server(srv.normalize(args.server))
+            known = state.server(url)
             if known is None:
                 raise
             # A server this launcher knows plays without asking it, as Online's "Play here" does.

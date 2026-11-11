@@ -73,6 +73,19 @@ class CommandLine(Folder):
         self.assertEqual(code, 2)
         self.assertIn("wrong", said)
 
+    def test_an_address_that_is_none(self):
+        # The window's check and words: refused before anything is asked, exit 2, no traceback, nothing kept.
+        from opendmtq_client import i18n
+        from opendmtq_client import server as srv
+        for bad in ("not an address", "example .com:8080"):
+            code, said = self.run_main(["--server", bad])
+            self.assertEqual(code, 2, said)
+            self.assertNotIn("Traceback", said)
+            words = i18n.Words("en")("error.server.address", address=bad)
+            self.assertEqual(said.strip(), words)
+        self.assertEqual(st.LauncherState.load().servers, [])
+        self.assertEqual(srv.normalize(self.site.url), self.site.url)
+
     def test_a_bad_setting(self):
         code, said = self.run_main(["--set", "fps=12"])
         self.assertEqual(code, 2)

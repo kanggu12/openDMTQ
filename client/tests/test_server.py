@@ -20,6 +20,46 @@ class Addresses(Folder):
             with self.assertRaises(srv.ServerError, msg=bad):
                 srv.normalize(bad)
 
+    def test_an_address_with_a_blank_is_none(self):
+        # Refused here, the one check the window and the command line share, never later as HTTP's own raw words; the
+        # error's English sentence is the window's English words, and Korean has its own.
+        from opendmtq_client import i18n
+        for bad in ("not an address", "example .com:8080", "http://exa\x0bmple.com", "club.test: 8790", "a<b>.test"):
+            with self.assertRaises(srv.ServerError, msg=bad) as caught:
+                srv.normalize(bad)
+            self.assertEqual(caught.exception.key, "error.server.address", bad)
+            self.assertEqual(str(caught.exception), i18n.Words("en").error(caught.exception), bad)
+            self.assertNotIn("control characters", i18n.Words("ko").error(caught.exception), bad)
+        self.assertEqual(str(caught.exception), "a<b>.test is not an address.")
+
+    def test_an_address_http_refuses_is_said_as_none(self):
+        # A server kept before the check above (a blank in its host) asked all the same: the address is said to be none,
+        # not Python's "URL can't contain control characters".
+        with self.assertRaises(srv.ServerError) as caught:
+            srv.about("http://not an address")
+        self.assertEqual(caught.exception.key, "error.server.address")
+
+    def test_a_service_that_is_no_http_is_no_server(self):
+        # Something on the port that answers in its own way (here a line and the end, as an SSH server greets): HTTP's
+        # own BadStatusLine becomes "not an OpenDMTQ server", never an error the window would print raw.
+        listener = socket.socket()
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+
+        def greet():
+            connection, _ = listener.accept()
+            connection.recv(1024)
+            connection.sendall(b"SSH-2.0-stand-in\r\n")
+            connection.close()
+
+        threading.Thread(target=greet, daemon=True).start()
+        try:
+            with self.assertRaises(srv.ServerError) as caught:
+                srv._call("http://127.0.0.1:%d" % listener.getsockname()[1], "/opendmtq/client.php?about")
+        finally:
+            listener.close()
+        self.assertEqual(caught.exception.key, "error.server.not_opendmtq")
+
     def test_host_and_port(self):
         self.assertEqual(srv.host_port("http://example.test"), ("example.test", 80))
         self.assertEqual(srv.host_port("https://example.test"), ("example.test", 443))

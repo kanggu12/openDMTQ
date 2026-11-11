@@ -17,6 +17,7 @@ installer downloaded from its site over HTTPS carries it, preset.py) against tha
 """
 
 import hashlib
+import http.client
 import http.cookies
 import json
 import os
@@ -56,12 +57,18 @@ class Cancelled(Exception):
     """The download was stopped by the player."""
 
 
+# What no host's name or address holds: blanks and control characters, which HTTP refuses in an address (http.client's
+# InvalidURL, raised only once a request is made), and the marks no name or address uses.
+NOT_IN_A_HOST = re.compile(r'[\x00-\x20\x7f<>"{}|\\^`]')
+
+
 def normalize(address):
     """What the player typed as the site's address: 'example.com:8080' -> 'http://example.com:8080'. Keeps https, and a
-    port that is given; drops a path (the site's address is its root)."""
+    port that is given; drops a path (the site's address is its root). The window's Connect, the guide's SERVER step and
+    --server all come through here, so an address that is none is refused the same way and in the same words."""
     text = (address or "").strip()
     if not text:
-        raise ServerError("type the server's address", "error.server.empty")
+        raise ServerError("Type the server's address.", "error.server.empty")
     if "://" not in text:
         text = "http://" + text
     try:
@@ -69,11 +76,20 @@ def normalize(address):
         # .port raises ValueError for a port that is not a number or out of range.
         port = parts.port
     except ValueError:
-        raise ServerError("%r is not an address" % address, "error.server.address", address=address) from None
-    if parts.scheme not in ("http", "https") or not parts.hostname:
-        raise ServerError("%r is not an address" % address, "error.server.address", address=address)
+        raise _not_an_address(address) from None
+    # A host with a blank or a mark no host has in it ("not an address", "example .com") is no address either.
+    if parts.scheme not in ("http", "https") or not parts.hostname or NOT_IN_A_HOST.search(parts.hostname):
+        raise _not_an_address(address)
     host = "[%s]" % parts.hostname if ":" in parts.hostname else parts.hostname.lower()
     return "%s://%s%s" % (parts.scheme, host, ":%d" % port if port else "")
+
+
+def _not_an_address(address):
+    """The error for what is no site's address. Its English sentence is the window's English words (i18n
+    error.server.address), so the command line says what the window says."""
+    # The address as the player typed it, without the blanks round it that typing leaves.
+    shown = (address or "").strip()
+    return ServerError("%s is not an address." % shown, "error.server.address", address=shown)
 
 
 def host_port(url):
@@ -185,6 +201,14 @@ def _call(base, path, data=None, cookie=None, timeout=TIMEOUT):
             body, status, headers = response.read(), response.status, response.headers
     except urllib.error.HTTPError as e:
         body, status, headers = e.read(), e.code, e.headers
+    except http.client.InvalidURL:
+        # An address HTTP refuses (one a launcher kept before normalize() looked at hosts): no address, said as such.
+        raise _not_an_address(base) from None
+    except http.client.HTTPException as e:
+        # Something at that address answered, but not in HTTP (another kind of service on that port): no OpenDMTQ server.
+        # Neither an OSError nor a ValueError, so it is caught here on its own, its own words kept for the log.
+        raise ServerError("%s answered in something other than HTTP (%r)" % (base, e), "error.server.not_opendmtq",
+                          base=base) from None
     except (urllib.error.URLError, OSError, ValueError) as e:
         raise _unreachable(base, e) from None
     try:
@@ -324,6 +348,10 @@ def download_app(base, cookie, info, folder, progress=None, cancel=None):
     except (Cancelled, ServerError):
         _remove(part)
         raise
+    except http.client.HTTPException as e:
+        # The answer broke off or came in something other than HTTP: the app did not come whole, and nothing is kept.
+        _remove(part)
+        raise ServerError("the app arrived damaged (%r); try again" % e, "error.app.damaged") from None
     except (urllib.error.URLError, OSError, ValueError) as e:
         _remove(part)
         raise _unreachable(base, e) from None
