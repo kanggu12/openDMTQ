@@ -709,6 +709,159 @@ void backdrop_fill(Canvas& out, const Backdrop* b, float bare) {
 
 std::vector<float> coverage(int w, int h, const std::function<void(Graphics&)>& draw) { return coverage_of(w, h, draw); }
 
+// ---- the launcher's buttons
+
+namespace {
+
+// A byte of a 0xRRGGBB colour as a float.
+float byte_of(std::uint32_t rgb, int shift) { return static_cast<float>((rgb >> shift) & 0xFFu); }
+
+// Whether a fill is a bright one (the lime, a lit red) rather than the metal, as the launcher tells them (art._bright):
+// its luma over 110.
+bool bright_fill(std::uint32_t rgb) { return 0.2126f * byte_of(rgb, 16) + 0.7152f * byte_of(rgb, 8) + 0.0722f * byte_of(rgb, 0) > 110.0f; }
+
+// The launcher's pressable outline (art.cut_outline) grown by `grow` on every side (its sides moved out, its cuts moved
+// out along their own normals): a box at (x, y), w by h, its top-left and bottom-right corners cut at 45 degrees by
+// `cut`. Six points, clockwise from the top-left cut's top end.
+void cut_outline(PointF out[6], float x, float y, float w, float h, float cut, float grow) {
+    const float x0 = x - grow, y0 = y - grow, x1 = x + w + grow, y1 = y + h + grow;
+    // A cut moved out by `grow` along its normal lies (2 - sqrt 2) * grow further along the grown box's sides.
+    const float c = cut + grow * (2.0f - std::sqrt(2.0f));
+    out[0] = PointF(x0 + c, y0);
+    out[1] = PointF(x1, y0);
+    out[2] = PointF(x1, y1 - c);
+    out[3] = PointF(x1 - c, y1);
+    out[4] = PointF(x0, y1);
+    out[5] = PointF(x0, y0 + c);
+}
+
+// A face's colour at row `row` of `rows`, as the launcher fills it (art._fill, art._vertical): one colour, or three at
+// its top, at 55 % and at its foot, each row the colour at its middle, rounded to a byte.
+std::array<float, 3> fill_row(const Fill& f, int row, int rows) {
+    if (f.n < 3) return {byte_of(f.c[0], 16), byte_of(f.c[0], 8), byte_of(f.c[0], 0)};
+    const float t = std::clamp((static_cast<float>(row) + 0.5f) / static_cast<float>(std::max(1, rows)), 0.0f, 1.0f);
+    // Between the top and the middle stop, or the middle and the foot.
+    const bool upper = t <= 0.55f;
+    const std::uint32_t a = upper ? f.c[0] : f.c[1], b = upper ? f.c[1] : f.c[2];
+    const float k = upper ? t / 0.55f : (t - 0.55f) / 0.45f;
+    std::array<float, 3> out{};
+    for (int i = 0; i < 3; ++i) {
+        const int shift = 16 - 8 * i;
+        out[static_cast<std::size_t>(i)] = std::round(byte_of(a, shift) + (byte_of(b, shift) - byte_of(a, shift)) * k);
+    }
+    return out;
+}
+
+}  // namespace
+
+void launcher_face(Canvas& c, int x, int y, int w, int h, const Fill& fill, bool pressed, float scale) {
+    if (!c.bits || w <= 0 || h <= 0) return;
+    // The launcher's sizes at its scale: the cut (8 at 100 %, 4 at least), the edges' lines (a pixel at 100 %, two at
+    // 200 %), a pressed face's shadow (3 deep) and its blur.
+    const float cut = std::max(4.0f, std::round(8.0f * scale));
+    const int k = std::max(1, static_cast<int>(std::lround(scale)));
+    const int deep = std::max(1, static_cast<int>(std::lround(3.0f * scale)));
+    const float sigma = std::max(1.0f, static_cast<float>(deep) * 0.6f);
+    // The face worked on with room around it for the lines' moves and the shadow's blur.
+    const int pad = (pressed ? deep + static_cast<int>(std::ceil(3.0f * sigma)) : k) + 1;
+    const int W = w + 2 * pad, H = h + 2 * pad;
+    const std::vector<float> shape = coverage(W, H, [&](Graphics& g) {
+        PointF outline[6];
+        cut_outline(outline, static_cast<float>(pad), static_cast<float>(pad), static_cast<float>(w), static_cast<float>(h), cut, 0.0f);
+        SolidBrush white(Color(255, 255, 255, 255));
+        g.FillPolygon(&white, outline, 6);
+    });
+    auto at = [&](const std::vector<float>& m, int i, int j) {
+        // Nothing of the face beyond the work's edges.
+        if (i < 0 || j < 0 || i >= W || j >= H) return 0.0f;
+        return m[static_cast<std::size_t>(j) * static_cast<std::size_t>(W) + static_cast<std::size_t>(i)];
+    };
+    // Its depth's strengths, by the fill in its middle (art: colours[len // 2]): a lit fill takes more light and less
+    // shade raised, and less shadow and more light at its foot sunk.
+    const bool lit = bright_fill(fill.c[fill.n / 2]);
+    const float light = lit ? 0.42f : 0.17f, shade = lit ? 0.22f : 0.45f;
+    const float shadow = lit ? 0.34f : 0.55f, foot_light = lit ? 0.18f : 0.10f;
+    // Sunk: the outside moved `deep` down and right into the face (what comes in from beyond the work is outside),
+    // blurred: inside the face's top and left edges, a soft shadow.
+    std::vector<float> outside;
+    if (pressed) {
+        outside.resize(static_cast<std::size_t>(W) * static_cast<std::size_t>(H));
+        for (int j = 0; j < H; ++j) {
+            for (int i = 0; i < W; ++i) outside[static_cast<std::size_t>(j) * static_cast<std::size_t>(W) + static_cast<std::size_t>(i)] = 1.0f - at(shape, i - deep, j - deep);
+        }
+        blur(outside, W, H, 1, sigma);
+    }
+    auto* px = static_cast<std::uint32_t*>(c.bits);
+    for (int j = 0; j < H; ++j) {
+        const int cy = y - pad + j;
+        if (cy < 0 || cy >= c.h) continue;
+        // The fill's colour on this row of the face (rows above or below it take the ends').
+        const std::array<float, 3> row = fill_row(fill, std::clamp(j - pad, 0, h - 1), h);
+        for (int i = 0; i < W; ++i) {
+            const int cx = x - pad + i;
+            const float a = at(shape, i, j);
+            if (cx < 0 || cx >= c.w || a <= 0.0f) continue;
+            float r = row[0], g = row[1], b = row[2];
+            // Its edges, each as the launcher's: the face less itself moved (art.raised, art.sunk), as a share of what
+            // of the pixel the face covers.
+            const float top = std::max(0.0f, a - at(shape, i - k, j - k)) / a;
+            const float foot = std::max(0.0f, a - at(shape, i + k, j + k)) / a;
+            if (!pressed) {
+                // Raised: light along its top and left, then shade along its foot and right.
+                const float l = top * light, s = foot * shade;
+                r = (r * (1 - l) + 255.0f * l) * (1 - s);
+                g = (g * (1 - l) + 255.0f * l) * (1 - s);
+                b = (b * (1 - l) + 255.0f * l) * (1 - s);
+            } else {
+                // Sunk: the shadow inside its top and left, then a faint light inside its foot.
+                const float d = outside[static_cast<std::size_t>(j) * static_cast<std::size_t>(W) + static_cast<std::size_t>(i)] * shadow;
+                const float l = foot * foot_light;
+                r = r * (1 - d) * (1 - l) + 255.0f * l;
+                g = g * (1 - d) * (1 - l) + 255.0f * l;
+                b = b * (1 - d) * (1 - l) + 255.0f * l;
+            }
+            // Premultiplied by what of the pixel the face covers, over what the canvas holds.
+            auto byte = [&](float v) { return static_cast<std::uint32_t>(std::lround(std::clamp(v * a, 0.0f, 255.0f))); };
+            const std::uint32_t src = static_cast<std::uint32_t>(std::lround(std::clamp(a, 0.0f, 1.0f) * 255.0f)) << 24 | byte(r) << 16 | byte(g) << 8 | byte(b);
+            std::uint32_t& d = px[static_cast<std::size_t>(cy) * static_cast<std::size_t>(c.w) + static_cast<std::size_t>(cx)];
+            d = over(src, d);
+        }
+    }
+}
+
+void launcher_ring(Canvas& c, int x, int y, int w, int h, float scale) {
+    if (!c.bits || w <= 0 || h <= 0) return;
+    // As the launcher's dialogs draw it (art.button_face with a margin): its cut the face's, 3 out at 100 % (2 at least),
+    // 2 wide (2 at least); its middle half a pixel nearer the face, as the launcher's lands.
+    const float cut = std::max(4.0f, std::round(8.0f * scale));
+    const float gap = std::max(2.0f, std::round(3.0f * scale)), width = std::max(2.0f, std::round(2.0f * scale));
+    const float middle = gap - 0.5f;
+    const int pad = static_cast<int>(std::ceil(middle + width)) + 1;
+    const int W = w + 2 * pad, H = h + 2 * pad;
+    const std::vector<float> ring = coverage(W, H, [&](Graphics& g) {
+        PointF outline[6];
+        cut_outline(outline, static_cast<float>(pad), static_cast<float>(pad), static_cast<float>(w), static_cast<float>(h), cut, middle);
+        Pen pen(Color(255, 255, 255, 255), width);
+        pen.SetLineJoin(LineJoinMiter);
+        g.DrawPolygon(&pen, outline, 6);
+    });
+    auto* px = static_cast<std::uint32_t*>(c.bits);
+    for (int j = 0; j < H; ++j) {
+        const int cy = y - pad + j;
+        if (cy < 0 || cy >= c.h) continue;
+        for (int i = 0; i < W; ++i) {
+            const int cx = x - pad + i;
+            const float a = ring[static_cast<std::size_t>(j) * static_cast<std::size_t>(W) + static_cast<std::size_t>(i)];
+            if (cx < 0 || cx >= c.w || a <= 0.0f) continue;
+            // The keyboard's cyan (#6FD6FF), premultiplied, over what the canvas holds.
+            const auto alpha = static_cast<std::uint32_t>(std::lround(a * 255.0f));
+            const std::uint32_t src = alpha << 24 | (0x6Fu * alpha / 255) << 16 | (0xD6u * alpha / 255) << 8 | (0xFFu * alpha / 255);
+            std::uint32_t& d = px[static_cast<std::size_t>(cy) * static_cast<std::size_t>(c.w) + static_cast<std::size_t>(cx)];
+            d = over(src, d);
+        }
+    }
+}
+
 void glow(Canvas& c, RectF bounds, float sigma, float dx, float dy, const Color& colour, const std::function<void(Graphics&)>& draw) {
     if (!c.bits) return;
     // The part of the canvas worked on: the bounds, the blur's reach and the move around them, within the canvas.

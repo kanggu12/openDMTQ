@@ -29,8 +29,7 @@ namespace tone {
 // the worst frame by the tint under them).
 inline const Gdiplus::Color kPrimary(255, 0xF4, 0xF6, 0xF8);
 inline const Gdiplus::Color kSecondary(255, 0xB8, 0xC0, 0xC8);
-// The game's lime: the full screen chip's edge and glyph under the pointer, the counter's label and border, the keys'
-// choice.
+// The game's lime: the counter's label and border, the handle's line with the pointer on it.
 inline const Gdiplus::Color kLime(255, 0x8C, 0xF2, 0x3D);
 }  // namespace tone
 
@@ -41,8 +40,8 @@ constexpr std::uint8_t kTintR = 0x15, kTintG = 0x18, kTintB = 0x1B;
 constexpr float kTintPiece = 0.60f, kTintCard = 0.72f, kTintBare = 0.88f;
 
 // The most a background may light the words on it (relative luminance), for each kind of words to keep 4.6:1 (4.5 and a
-// little for the noise): white, the primary words, the secondary words.
-constexpr float kUnderWhite = 0.178f, kUnderPrimary = 0.160f, kUnderSecondary = 0.074f;
+// little for the noise): the primary words, the secondary words.
+constexpr float kUnderPrimary = 0.160f, kUnderSecondary = 0.074f;
 
 // ---- the faces
 
@@ -140,6 +139,37 @@ void rounded(Gdiplus::GraphicsPath& path, Gdiplus::RectF r, float radius);
 // What `draw` fills (with GDI+, smooth, pixels at their centres) on a picture of w by h, as each pixel's coverage from 0
 // to 1, top row first: a shape's soft-edged mask, for pixels worked out by hand.
 std::vector<float> coverage(int w, int h, const std::function<void(Gdiplus::Graphics&)>& draw);
+
+// ---- the launcher's buttons (client/opendmtq_client/art.py: cut_outline, BUTTON_LOOKS, raised, sunk, button_face)
+
+// A face's fill: one colour, or three (at its top, at 55 % of its height, at its foot), each 0xRRGGBB.
+struct Fill {
+    int n;
+    std::uint32_t c[3];
+};
+namespace launcher {
+// The launcher's main button (its lime, "home"): at rest, under the pointer, pressed; the dark ink of its words.
+inline constexpr Fill kMain{3, {0xACF673, 0x8CF23D, 0x76CB33}}, kMainHover{3, {0xBCF98C, 0x9DF55A, 0x82D83C}},
+                      kMainPressed{3, {0x9EE665, 0x7FE234, 0x6BB92E}};
+inline const Gdiplus::Color kMainInk(255, 0x0D, 0x1C, 0x04);
+// Its secondary button (quiet metal, "neutral"): at rest, under the pointer (a lighter plate), pressed; its words' chalk.
+inline constexpr Fill kMetal{1, {0x323A44, 0, 0}}, kMetalHover{1, {0x414B57, 0, 0}}, kMetalPressed{1, {0x272E36, 0, 0}};
+inline const Gdiplus::Color kMetalInk(255, 0xEE, 0xF2, 0xF6);
+// The red its buttons that remove fill with under the pointer and pressed ("danger_quiet"); their words' dark ink.
+inline constexpr Fill kRed{1, {0xFF5F72, 0, 0}}, kRedPressed{1, {0xE04558, 0, 0}};
+inline const Gdiplus::Color kRedInk(255, 0x2B, 0x04, 0x09);
+}  // namespace launcher
+
+// A launcher button's face (art.button_face) in the canvas's pixels, w by h at (x, y), over what the canvas holds: its
+// outline with the top-left and bottom-right corners cut at 45 degrees (8 at 100 %), `fill` down it; raised (a line of
+// light along its top and left edges and one of shade along its foot and right, a pixel wide at 100 %, the light
+// stronger on the metal's shade and the lime's light) or, `pressed`, sunk (a soft shadow inside its top and left edges,
+// 3 deep at 100 %, and a faint light inside its foot). `scale` is the launcher's (1 at 100 %), the overlay's own (1 at
+// 720 lines). What GDI+ drew on the canvas before must be flushed first.
+void launcher_face(Canvas& c, int x, int y, int w, int h, const Fill& fill, bool pressed, float scale);
+// The launcher's keyboard ring around such a face, as its dialogs draw it: the face's outline 2.5 outside it (at 100 %),
+// 2 wide, in the keyboard's cyan (theme.CYAN).
+void launcher_ring(Canvas& c, int x, int y, int w, int h, float scale);
 // GDI+'s smooth shapes and grey smoothed text, pixels at their centres.
 void smooth(Gdiplus::Graphics& g);
 

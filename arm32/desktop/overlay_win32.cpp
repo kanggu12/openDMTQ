@@ -2,7 +2,7 @@
 // game's own shapes and colours: the game shows through each piece, blurred, under a charcoal tint, with a light edge
 // and the game's bevel (a line of light along the top, of shade along the foot) and a soft shadow under it
 // (overlay_glass.h makes the glass); its corners small as the game's, its green line along the bar's and the notice's
-// foot. The game's lime marks what is lit or chosen, its green button the way on, red what ends or what is live. Each
+// foot. The game's lime marks what is lit, red what is live; the buttons are the launcher's own (overlay_glass.h). Each
 // piece is a layered window of its own above the game's window, shown with UpdateLayeredWindow from a premultiplied
 // 32-bit picture, so its edges are smooth and its fades cost the game nothing. The game's frame behind a piece comes from
 // the render thread (glass_capture.h), read at a quarter of its size while a piece is up, at most 20 times a second; a
@@ -20,9 +20,9 @@
 //   is drawn down from the top edge, either only with the game quiet (no click, touch or held note) for 1.5 s; by
 //   itself for 3 seconds when the game's picture first shows and after each switch between a window and full screen,
 //   so that a player sees where it is. The OpenDMTQ wordmark on its left, as the launcher's header draws it;
-//   on its right two chips like the game's OFF chips, full screen (or back to a window) and an X that quits after asking.
-//   Under the pointer the full screen chip lights with a lime edge and the X turns red, as Windows' own close does; held,
-//   a chip is pressed in. It stays while the pointer is on it and goes up soon after it leaves, so it never sits on the
+//   on its right two of the launcher's buttons, full screen (or back to a window) as its quiet metal secondary button,
+//   a lighter plate under the pointer, and an X that quits after asking as its lime main button from the start; held,
+//   a button is sunk. It stays while the pointer is on it and goes up soon after it leaves, so it never sits on the
 //   game's own controls at the top while they are used. No key brings it.
 // - The handle: a small tab hanging from the game's top edge at its centre, in the shape of the game's own tabs, its
 //   charcoal faint and the game's green line along its foot, which says where the bar is; with the pointer on it, a
@@ -30,8 +30,8 @@
 //   Hidden while the bar is down, while the question or a notice is up, while the game is held, and before the game's
 //   first picture.
 // - The question before quitting: the bar's X and the window's own close ask it. The game dims and blurs behind a card of
-//   glass with the question, the game's green line under it, a thin X, Keep playing as the game's green button and Quit
-//   the game in the grey of its tabs, red under the pointer; the keys' choice marked as the game marks a chosen card. The
+//   glass with the question, the game's green line under it, a thin X, Keep playing as the launcher's lime main button and
+//   Quit the game as its secondary, red under the pointer; the keys' choice in the launcher's cyan keyboard ring. The
 //   game holds still meanwhile, so a click by mistake mid-song loses nothing. Alt+F4 does nothing.
 // - The notice: the server's two-line notice about a broadcast (a title, then where to watch), as a glass card that
 //   slides down at the top of the game, stays for a few seconds and fades. A red LIVE tag with a slanted end, as the
@@ -440,15 +440,8 @@ Graphics* fresh_fore(Look& look, std::unique_ptr<Bitmap>& surface) {
 // ---- the game's own look, as its frames show it (measured at 1080 lines; sizes here at 720)
 
 namespace game {
-// Its green buttons (RANKINGS, PLAY AGAIN): a light top edge, a gradient through a darker middle, a dark foot edge,
-// corners of about 4, white bold words.
-const Color kGreenEdgeTop(255, 0x6E, 0xC1, 0x30), kGreenEdgeFoot(255, 0x0C, 0x4A, 0x01);
-// Its inactive tabs: a light top edge over a grey gradient.
-const Color kTabEdgeTop(255, 0x8D, 0x8D, 0x8D), kTabTop(255, 0x5F, 0x60, 0x60), kTabFoot(255, 0x38, 0x3A, 0x3C);
-// Its OFF chips: a dark grey the picture behind tints.
-const Color kChip(220, 0x2B, 0x2B, 0x2B);
-// The red of a close, as Windows' own turns, light to deep; its light top edge.
-const Color kRedTop(255, 0xC4, 0x2B, 0x1C), kRedFoot(255, 0x9E, 0x1F, 0x14), kRedEdgeTop(255, 0xE0, 0x5A, 0x4C);
+// The red of its LIVE tags, light to deep (the notice's tag while a broadcast is live).
+const Color kRedTop(255, 0xC4, 0x2B, 0x1C), kRedFoot(255, 0x9E, 0x1F, 0x14);
 // The line under its tab row and along its notice band.
 const Color kLine(255, 0x64, 0xBB, 0x3E);
 // Its Q and MAX box: a green-black fill under a lime border.
@@ -480,115 +473,9 @@ void game_line(Graphics& g, float x0, float x1, float y, const Color& colour) {
     g.FillRectangle(&brush, x0, y, x1 - x0, std::max(1.0f, fpx(1)));
 }
 
-// The keys' choice on a button, as the game marks its chosen card: a lime border on the button's edge and a soft lime
-// glow around it (the glow goes under what the canvas holds: call it before drawing the button).
-void chosen_glow(Canvas& c, Graphics& g, RectF r, float radius) {
-    GraphicsPath path;
-    rounded(path, r, radius);
-    // What GDI+ has drawn so far is in the picture before the glow goes under it.
-    g.Flush(FlushIntentionSync);
-    glow(c, r, fpx(5), 0, 0, Color(150, tone::kLime.GetR(), tone::kLime.GetG(), tone::kLime.GetB()), [&](Graphics& m) {
-        Pen ring(Color(255, 255, 255, 255), fpx(3));
-        m.DrawPath(&ring, &path);
-    });
-}
-void chosen_border(Graphics& g, RectF r, float radius) {
-    const float line = std::max(2.0f, fpx(2));
-    GraphicsPath path;
-    // On the button's outermost pixels: half the border's width in.
-    rounded(path, RectF(r.X + line / 2, r.Y + line / 2, r.Width - line, r.Height - line), std::max(0.0f, radius - line / 2));
-    Pen lime(tone::kLime, line);
-    g.DrawPath(&lime, &path);
-}
-
-// A button's face: a vertical gradient through the stops given (top to foot), its light top edge (none pressed in)
-// and its dark foot edge, as the game's buttons are made.
-void button_face(Graphics& g, RectF r, float radius, const Color* colours, const REAL* at, int n, const Color* edge_top, const Color& edge_foot) {
-    GraphicsPath path;
-    rounded(path, r, radius);
-    // A pixel beyond both ends, so that the gradient's ends do not wrap over the first and last rows.
-    LinearGradientBrush fill(PointF(0, r.Y - 1), PointF(0, r.Y + r.Height + 1), colours[0], colours[n - 1]);
-    fill.SetInterpolationColors(colours, at, n);
-    g.FillPath(&fill, &path);
-    const float line = std::max(1.0f, fpx(1));
-    const float x0 = r.X + std::max(radius * 0.6f, line), x1 = r.X + r.Width - std::max(radius * 0.6f, line);
-    if (edge_top) {
-        Pen top(*edge_top, line);
-        g.DrawLine(&top, x0, r.Y + line / 2, x1, r.Y + line / 2);
-    }
-    Pen foot(edge_foot, line);
-    g.DrawLine(&foot, x0, r.Y + r.Height - line / 2, x1, r.Y + r.Height - line / 2);
-}
-
-// The game's green button (Keep playing): its light top edge, its gradient (#44A205 at the top, then darker than the
-// game's #3B8C04 where the white words sit, so that they keep 4.5:1: #348104 is 4.9:1), its dark foot edge, white
-// bold words. A touch lighter under the pointer (4.6:1); pressed in, darker, without its top edge, the words a pixel
-// lower (the caller's).
-void green_button(Canvas& c, Graphics& g, RectF r, bool lit, bool in, bool chosen) {
-    const float radius = fpx(4);
-    if (chosen) chosen_glow(c, g, r, radius);
-    const REAL at[] = {0.0f, 0.3f, 0.7f, 1.0f};
-    if (in) {
-        const Color colours[] = {Color(255, 0x27, 0x66, 0x03), Color(255, 0x2A, 0x6D, 0x03), Color(255, 0x25, 0x62, 0x02), Color(255, 0x1F, 0x56, 0x00)};
-        button_face(g, r, radius, colours, at, 4, nullptr, game::kGreenEdgeFoot);
-    } else if (lit) {
-        const Color colours[] = {Color(255, 0x4D, 0xB0, 0x0A), Color(255, 0x36, 0x85, 0x05), Color(255, 0x30, 0x78, 0x05), Color(255, 0x27, 0x66, 0x03)};
-        button_face(g, r, radius, colours, at, 4, &game::kGreenEdgeTop, game::kGreenEdgeFoot);
-    } else {
-        const Color colours[] = {Color(255, 0x44, 0xA2, 0x05), Color(255, 0x34, 0x81, 0x04), Color(255, 0x2E, 0x74, 0x04), Color(255, 0x24, 0x60, 0x00)};
-        button_face(g, r, radius, colours, at, 4, &game::kGreenEdgeTop, game::kGreenEdgeFoot);
-    }
-    if (chosen) chosen_border(g, r, radius);
-}
-
-// The game's inactive tab as a button (Quit the game): its light top edge over its grey gradient at 85 %, the glass
-// showing faintly through; under the pointer red, as a close turns; pressed in, darker, without its top edge.
-void tab_button(Canvas& c, Graphics& g, RectF r, bool lit, bool in, bool chosen) {
-    const float radius = fpx(4);
-    if (chosen) chosen_glow(c, g, r, radius);
-    const REAL at[] = {0.0f, 1.0f};
-    if (lit) {
-        const Color colours[] = {in ? Color(255, 0xA8, 0x24, 0x18) : game::kRedTop, in ? Color(255, 0x86, 0x1A, 0x11) : game::kRedFoot};
-        button_face(g, r, radius, colours, at, 2, in ? nullptr : &game::kRedEdgeTop, Color(200, 0x5A, 0x10, 0x0A));
-    } else {
-        const Color colours[] = {in ? Color(217, 0x48, 0x49, 0x4A) : Color(217, game::kTabTop.GetR(), game::kTabTop.GetG(), game::kTabTop.GetB()),
-                                 in ? Color(217, 0x2C, 0x2E, 0x30) : Color(217, game::kTabFoot.GetR(), game::kTabFoot.GetG(), game::kTabFoot.GetB())};
-        button_face(g, r, radius, colours, at, 2, in ? nullptr : &game::kTabEdgeTop, Color(160, 0x08, 0x08, 0x08));
-    }
-    if (chosen) chosen_border(g, r, radius);
-}
-
-// The game's OFF chip as the bar's chip: a dark grey the glass behind tints, corners of 4, the game's bevel; red under
-// the pointer for the X; a pixel lime border for the full screen chip under the pointer; pressed in, darker, its bevel
-// the other way round.
-void off_chip(Graphics& g, RectF r, bool in, bool red, bool lit) {
-    const float radius = fpx(4);
-    GraphicsPath path;
-    rounded(path, r, radius);
-    if (red) {
-        const Color colours[] = {in ? Color(255, 0xA8, 0x24, 0x18) : game::kRedTop, in ? Color(255, 0x86, 0x1A, 0x11) : game::kRedFoot};
-        const REAL at[] = {0.0f, 1.0f};
-        LinearGradientBrush fill(PointF(0, r.Y - 1), PointF(0, r.Y + r.Height + 1), colours[0], colours[1]);
-        fill.SetInterpolationColors(colours, at, 2);
-        g.FillPath(&fill, &path);
-    } else {
-        SolidBrush fill(in ? Color(235, 0x1E, 0x1F, 0x20) : game::kChip);
-        g.FillPath(&fill, &path);
-    }
-    // Raised: light along the top, shade along the foot; pressed in, the other way round.
-    const float line = std::max(1.0f, fpx(1));
-    const float x0 = r.X + std::max(radius, line), x1 = r.X + r.Width - std::max(radius, line);
-    Pen light(Color(in ? 20 : 56, 255, 255, 255), line), dark(Color(in ? 110 : 90, 0, 0, 0), line);
-    g.DrawLine(in ? &dark : &light, x0, r.Y + line / 2, x1, r.Y + line / 2);
-    g.DrawLine(in ? &light : &dark, x0, r.Y + r.Height - line / 2, x1, r.Y + r.Height - line / 2);
-    if (lit) {
-        // The full screen chip under the pointer: a pixel of the game's lime around it.
-        GraphicsPath ring;
-        rounded(ring, RectF(r.X + line / 2, r.Y + line / 2, r.Width - line, r.Height - line), std::max(0.0f, radius - line / 2));
-        Pen lime(tone::kLime, line);
-        g.DrawPath(&lime, &ring);
-    }
-}
+// A line's middle where a line `width` wide (a whole number of pixels) has both its edges on whole pixels: crisp, and at
+// most half a pixel from where it was asked.
+float crisp(float at, float width) { return std::floor(at - width / 2 + 0.5f) + width / 2; }
 
 // ---- the bar's sizes and the room it takes (both threads: the UI thread's clicks, the painter's pictures)
 
@@ -785,18 +672,19 @@ void fps_look(Paint& p, int fps, float ms, int corner) {
 // ---- the bar's look (the painter's)
 
 // The full screen chip's icon centred at (cx, cy): four corner brackets, their corners out (to full screen) or in (back
-// to a window, when `full`).
+// to a window, when `full`), each arm on whole pixels for the pen's width (crisp).
 void screen_icon(Graphics& g, Pen& line, float cx, float cy, bool full) {
-    // The brackets' reach from the centre and the length of each arm.
-    const float outer = fpx(8), inner = fpx(3), arm = fpx(4.5f);
+    // The brackets' reach from the centre and the length of each arm, in whole pixels.
+    const float outer = std::round(fpx(8)), inner = std::round(fpx(3)), arm = std::round(fpx(4.5f));
+    const float width = line.GetWidth();
     for (int sx : {-1, 1}) {
         for (int sy : {-1, 1}) {
             // Out: the corner at the outer point, the arms going back in; in: the corner near the centre, the arms
             // going out, as the corners of a smaller square pushed in.
             const float corner = full ? inner : outer;
             const float back = full ? arm : -arm;
-            const PointF bracket[] = {PointF(cx + sx * corner, cy + sy * (corner + back)), PointF(cx + sx * corner, cy + sy * corner),
-                                      PointF(cx + sx * (corner + back), cy + sy * corner)};
+            const float x = crisp(cx + static_cast<float>(sx) * corner, width), y = crisp(cy + static_cast<float>(sy) * corner, width);
+            const PointF bracket[] = {PointF(x, y + static_cast<float>(sy) * back), PointF(x, y), PointF(x + static_cast<float>(sx) * back, y)};
             g.DrawLines(&line, bracket, 3);
         }
     }
@@ -879,17 +767,26 @@ void bar_look(Paint& p, int hover, int pressed, bool full) {
     }
     // The name on the left, in the wordmark's face.
     const RectF name = bar_name(*g, static_cast<float>(h));
-    // The two chips as the game's OFF chips: the full screen chip with a lime edge under the pointer, the X red; pressed
-    // in while held there; a white glyph of 2 pixels (lime on the lit full screen chip), a pixel lower pressed in.
+    // The chips as the launcher's buttons (cut at two corners, raised, sunk while held): the X its main button, in the
+    // lime from the start with a dark X, so that it stands out the moment the bar shows, a little brighter under the
+    // pointer; full screen its secondary button, quiet metal, a lighter plate under the pointer, no lime. Their glyphs
+    // bolder than the words' lines (2.5 at 720 lines, in whole pixels so that they stay crisp).
+    g->Flush(FlushIntentionSync);
     for (int which : {kQuitChip, kScreenChip}) {
         const RectF r = chip_rect(which, w);
         const bool quit = which == kQuitChip;
         const bool lit = which == hover, in = lit && which == pressed;
-        off_chip(*g, r, in, quit && lit, !quit && lit);
-        const float down = in ? std::max(1.0f, fpx(1)) : 0.0f;
-        Pen line_pen(!quit && lit ? tone::kLime : Color(255, 255, 255, 255), fpx(2));
+        const Fill& fill = quit ? (in ? launcher::kMainPressed : lit ? launcher::kMainHover : launcher::kMain)
+                                : (in ? launcher::kMetalPressed : lit ? launcher::kMetalHover : launcher::kMetal);
+        launcher_face(*look.fore, static_cast<int>(r.X), static_cast<int>(r.Y), static_cast<int>(r.Width), static_cast<int>(r.Height), fill, in, scale());
+    }
+    const float stroke = std::max(2.0f, std::round(fpx(2.5f)));
+    for (int which : {kQuitChip, kScreenChip}) {
+        const RectF r = chip_rect(which, w);
+        const bool quit = which == kQuitChip;
+        Pen line_pen(quit ? launcher::kMainInk : launcher::kMetalInk, stroke);
         line_pen.SetLineJoin(LineJoinMiter);
-        const float cx = r.X + r.Width / 2, cy = r.Y + r.Height / 2 + down;
+        const float cx = r.X + r.Width / 2, cy = r.Y + r.Height / 2;
         if (quit) {
             line_pen.SetStartCap(LineCapRound);
             line_pen.SetEndCap(LineCapRound);
@@ -950,8 +847,10 @@ const wchar_t* quit_label() { return g_korean ? L"게임 끝내기" : L"Quit the
 
 // The card's look for the keys' choice, what is under the pointer and what is held, in a window around the card: glass
 // with the game's corners (6) and bevel, its title bold and centred with the game's green line under it, its line
-// regular, Keep playing as the game's green button and Quit the game as its grey tab, both with white bold words, the
-// keys' choice as the game marks a chosen card (a lime border and glow).
+// regular; its buttons the launcher's, as its dialogs draw them: Keep playing its main button (the lime, dark words),
+// Quit the game its secondary (quiet metal, chalk words) that fills red under the pointer as its buttons that remove do
+// (dark words then), each sunk while held, the keys' choice in its keyboard ring; the thin X a plain glyph, ash and white
+// under the pointer, as the launcher's menu names.
 void card_look(Look& card_look_out, const AskLayout& l, int choice, int hover, int pressed) {
     const AskScale cap;
     // The card's window: the card with its shadow's room, within the game's area.
@@ -975,31 +874,30 @@ void card_look(Look& card_look_out, const AskLayout& l, int choice, int hover, i
     auto text_font = font(Weight::kRegular, fpx(15), g_korean);
     say_centred(*g, ask_title(), *title_font, tone::kPrimary, at(l.title));
     say_centred(*g, ask_text(), *text_font, tone::kSecondary, at(l.text));
-    // The thin X: a faint round light behind it under the pointer, brighter itself then.
+    // The thin X: the launcher's ash (#AEB8C3), white under the pointer.
     const RectF close = at(l.close);
-    if (hover == kClose) {
-        SolidBrush lit(Color(pressed == kClose ? 20 : 30, 255, 255, 255));
-        g->FillEllipse(&lit, close);
-    }
-    Pen thin(hover == kClose ? tone::kPrimary : Color(200, 0xF4, 0xF6, 0xF8), fpx(1.5f));
+    Pen thin(hover == kClose ? Color(255, 255, 255, 255) : Color(255, 0xAE, 0xB8, 0xC3), fpx(1.5f));
     thin.SetStartCap(LineCapRound);
     thin.SetEndCap(LineCapRound);
     cross(*g, thin, close.X + close.Width / 2, close.Y + close.Height / 2, fpx(7));
-    // The two buttons; under the pointer each lights, held each is pressed in.
+    // The two buttons; under the pointer each lights (Quit the game red), held each is sunk; the keys' choice ringed.
     const bool keep_lit = hover == kKeep, quit_lit = hover == kQuit;
     const bool keep_in = keep_lit && pressed == kKeep, quit_in = quit_lit && pressed == kQuit;
     const RectF keep = at(l.keep), quit = at(l.quit);
-    green_button(*look.fore, *g, keep, keep_lit, keep_in, choice == kKeep);
-    tab_button(*look.fore, *g, quit, quit_lit, quit_in, choice == kQuit);
+    g->Flush(FlushIntentionSync);
+    auto face_at = [&](const RectF& r, const Fill& fill, bool in) {
+        launcher_face(*look.fore, static_cast<int>(r.X), static_cast<int>(r.Y), static_cast<int>(r.Width), static_cast<int>(r.Height), fill, in, scale());
+    };
+    face_at(keep, keep_in ? launcher::kMainPressed : keep_lit ? launcher::kMainHover : launcher::kMain, keep_in);
+    face_at(quit, quit_in ? launcher::kRedPressed : quit_lit ? launcher::kRed : launcher::kMetal, quit_in);
+    const RectF& ringed = choice == kQuit ? quit : keep;
+    launcher_ring(*look.fore, static_cast<int>(ringed.X), static_cast<int>(ringed.Y), static_cast<int>(ringed.Width), static_cast<int>(ringed.Height), scale());
     auto label = font(Weight::kBold, fpx(16), g_korean);
-    const float down = std::max(1.0f, fpx(1));
-    say_centred(*g, keep_label(), *label, Color(255, 255, 255, 255), RectF(keep.X, keep.Y + (keep_in ? down : 0), keep.Width, keep.Height));
-    say_centred(*g, quit_label(), *label, Color(255, 255, 255, 255), RectF(quit.X, quit.Y + (quit_in ? down : 0), quit.Width, quit.Height));
-    // The words' zones: the title and the line, as dark as the quiet line needs; Quit the game's grey, which lets a
-    // little of the glass through, as dark as white words need.
+    say_centred(*g, keep_label(), *label, launcher::kMainInk, keep);
+    say_centred(*g, quit_label(), *label, quit_lit ? launcher::kRedInk : launcher::kMetalInk, quit);
+    // The words' zone: the title and the line, as dark as the quiet line needs (the buttons are solid).
     const RectF title = at(l.title), text = at(l.text);
-    look.zones = {Look::Zone{text.X - fpx(4), title.Y - fpx(4), text.X + text.Width + fpx(4), text.Y + text.Height + fpx(4), kUnderSecondary},
-                  Look::Zone{quit.X, quit.Y, quit.X + quit.Width, quit.Y + quit.Height, kUnderWhite}};
+    look.zones = {Look::Zone{text.X - fpx(4), title.Y - fpx(4), text.X + text.Width + fpx(4), text.Y + text.Height + fpx(4), kUnderSecondary}};
     look.feather = fpx(20);
 }
 
