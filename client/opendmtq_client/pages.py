@@ -198,9 +198,9 @@ def screen_rows(app, parent, redraw, full=True):
                                                     set_and_redraw("display")),
                         w("screen.mode.hint." + mode)).pack(fill="x")
     if mode == "window" and full:
-        # Sizes that fit the display with room for the title bar and the taskbar; fitted always stays.
-        sizes = [s for s in choices.WINDOW_SIZES if s == "auto" or (choices.size_of(s)[0] <= display["width"] and
-                                                                  choices.size_of(s)[1] + 80 <= display["height"])]
+        # Sizes that fit the display with room for the title bar and the taskbar (values.fits, which --set window= uses
+        # too); fitted always stays.
+        sizes = [s for s in choices.WINDOW_SIZES if choices.fits(s, display)]
         if v["window"] not in sizes:
             # A size set on the command line keeps its row.
             sizes.append(v["window"])

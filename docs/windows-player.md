@@ -44,7 +44,8 @@ game ends.
 
 `OpenDMTQ-cmd.exe`, in `%LOCALAPPDATA%\OpenDMTQ.Client\current`, does the same from the command line: `--status`
 (exit 0 when PLAY can go), `--server URL`, `--sign-in ID` (the password from standard input), `--sign-out`, `--app`,
-`--set NAME=VALUE`, `--audio-devices`, `--language en|ko|system`, `--guide`, `--open-log player|launcher`, `--play`,
+`--set NAME=VALUE`, `--audio-devices`, `--language en|ko|system`, `--guide`, `--skip-guide` (the guide's **Skip**: the
+window opens on its pages), `--servers` (the servers it knows, as **Online** lists them), `--open-log player|launcher`, `--play`,
 `--update`, `--forget URL`, `--reset`, `--repair`, `--clear-game-data` and `--uninstall [--delete-data]`, with `--yes`
 to answer their questions (`--help` lists them all). While the launcher's window is open, the flags that change what
 it keeps are refused. `--set` takes the settings of the **Screen** and **Sound** pages:
@@ -52,7 +53,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | Setting | Values (the default first) | On the page |
 | :--- | :--- | :--- |
 | `display` | `fullscreen`, `window` | Mode |
-| `window` | `auto` (fitted to the display), `1280x720`, `1600x900`, `1920x1080`, `2560x1440`, `3840x2160`, or any `WIDTHxHEIGHT` from 320x180 | Window size |
+| `window` | `auto` (fitted to the display), `1280x720`, `1600x900`, `1920x1080`, `2560x1440`, `3840x2160`, or any `WIDTHxHEIGHT` from 320x180 that fits the main display with room for the window's title bar and the taskbar, as the page offers them | Window size |
 | `vsync` | `on`, `off` | VSync |
 | `fps` | `auto` (the display's rate), `30`, `60`, `120`, `144`, `165`, `180`, `240`, `360`, `unlimited` | Frame limit |
 | `show_fps` | `off`, `top_left`, `top_right`, `bottom_left`, `bottom_right` | FPS counter |

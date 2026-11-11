@@ -6,6 +6,11 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+### Added
+
+- The launcher's command line: `--servers` lists the servers it knows, as the Online page does, the one PLAY plays on
+  marked; `--skip-guide` is the first-start guide's Skip, so a PC set up from the command line opens on its pages.
+
 ### Changed
 
 - The player for Windows speaks the launcher's language: once one is chosen in the launcher (the first-start guide, the
@@ -13,6 +18,9 @@ one that only fixes raises the patch number. Each release's section here is its 
   broadcast notice and the player's own messages speak it too, instead of Windows' display language; the country stays
   Windows'. "Same as Windows" leaves both following Windows. The launcher hands it over in the settings file it writes
   before each start (`language=en|ko`).
+- `--set window=` refuses a size larger than the main display with room for the window's title bar and the taskbar,
+  the sizes the Screen page leaves out, with the page's own check; the display's size is read in its own pixels, also
+  by the command line, which Windows' scaling would otherwise shrink.
 
 ### Fixed
 

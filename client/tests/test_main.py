@@ -223,6 +223,46 @@ class CommandLine(Folder):
         self.assertIsNone(st.LauncherState.load().picked_language)
         self.assertIn("language=system", said)
 
+    def test_the_servers_it_knows_and_the_guide_skipped(self):
+        # Online's list of servers and the guide's "Skip: I set it up myself", from the command line: a PC set up with
+        # --server, --sign-in and --app opens on PLAY with --skip-guide.
+        code, said = self.run_main(["--servers"])
+        self.assertEqual(code, 0, said)
+        self.assertIn("No servers yet", said)
+        self.run_main(["--server", self.site.url])
+        state = st.LauncherState.load()
+        state.add_server("http://192.0.2.10:8080", "Other")
+        state.current = self.site.url
+        state.save()
+        code, said = self.run_main(["--servers"])
+        lines = [line for line in said.splitlines() if "(" in line]
+        self.assertEqual(lines, ["* Stand-in (%s)" % self.site.url, "  Other (http://192.0.2.10:8080)"])
+        self.assertFalse(st.LauncherState.load().guide_done)
+        code, said = self.run_main(["--skip-guide"])
+        self.assertEqual(code, 0, said)
+        self.assertTrue(st.LauncherState.load().guide_done)
+        # --guide and --skip-guide undo each other, as Launcher's "Show it again" and the guide's Skip do.
+        self.run_main(["--guide"])
+        self.assertFalse(st.LauncherState.load().guide_done)
+
+    def test_a_window_size_must_fit_the_display(self):
+        # --set window= takes what the Screen page offers: a size that fits the main display with room for the title
+        # bar and the taskbar, refused otherwise with nothing changed; auto always; any while the display is unknown.
+        from opendmtq_client import displays
+        with mock.patch.object(displays, "main_display", return_value={"width": 1920, "height": 1080, "hz": 60}):
+            code, said = self.run_main(["--set", "window=1920x1080", "--set", "volume=40"])
+            self.assertEqual(code, 2)
+            self.assertIn("does not fit this 1920 x 1080 display", said)
+            self.assertEqual(st.LauncherState.load().values["volume"], 100)
+            code, said = self.run_main(["--set", "window=1600x900"])
+            self.assertEqual(code, 0, said)
+            self.assertEqual(st.LauncherState.load().values["window"], "1600x900")
+            code, said = self.run_main(["--set", "window=auto"])
+            self.assertEqual(code, 0, said)
+        with mock.patch.object(displays, "main_display", return_value={"width": 0, "height": 0, "hz": None}):
+            code, said = self.run_main(["--set", "window=3840x2160"])
+            self.assertEqual(code, 0, said)
+
     def test_language_as_a_setting(self):
         # --set language=... is --language's other spelling, as the settings' table lists it: the same three values,
         # anything else refused with nothing changed.

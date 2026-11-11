@@ -462,6 +462,8 @@ TEXT = {
     # ------------------------------------------------------------------------------------------- errors
     "error.choice": ("{name} cannot be {value}", "{name}: 쓸 수 없는 값입니다({value})."),
     "error.no_setting": ("there is no setting {name}", "없는 설정입니다: {name}"),
+    "error.window.too_big": ("{size} does not fit this {w} × {h} display with the window's title bar and the taskbar.",
+                             "제목 표시줄과 작업 표시줄까지 이 모니터({w} × {h})에 들어가지 않는 크기입니다: {size}"),
     "error.server.empty": ("Type the server's address.", "서버 주소를 입력하세요."),
     "error.server.address": ("{address} is not an address.", "주소로 읽을 수 없습니다: {address}"),
     "error.server.unreachable": ("Cannot reach {base}.", "{base}에 연결할 수 없습니다."),

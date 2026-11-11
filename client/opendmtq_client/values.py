@@ -127,3 +127,17 @@ def size_of(text):
     """'1920x1080' -> (1920, 1080); None for auto."""
     found = SIZE.match(text or "")
     return (int(found.group(1)), int(found.group(2))) if found else None
+
+
+# The room a window needs on its display beyond the game's area: its title bar and Windows' taskbar (pixels).
+WINDOW_ROOM = 80
+
+
+def fits(size, display):
+    """Whether a window size ("1920x1080", or "auto") fits `display` ({"width", "height"}, displays.main_display) with
+    room for the window's title bar and the taskbar: the Screen page leaves out the sizes that do not, and --set window=
+    refuses them. True for auto, and for any size while the display's size is not known."""
+    found = size_of(size)
+    if found is None or not display.get("width") or not display.get("height"):
+        return True
+    return found[0] <= display["width"] and found[1] + WINDOW_ROOM <= display["height"]
