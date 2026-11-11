@@ -179,9 +179,10 @@ from a fixed path, and print one line per step: the admin pages show those lines
 
 ## Releases
 
-Versions follow [Semantic Versioning](https://semver.org/): a release that adds something raises the minor number, one
-that only fixes raises the patch number. A change notes itself under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md)
-([Keep a Changelog](https://keepachangelog.com/en/1.1.0/): Added, Changed, Fixed, Removed).
+Versions follow [Semantic Versioning](https://semver.org/): a release with a new feature raises the minor number, one
+of fixes, changes and smaller additions raises the patch number. A change notes itself under `## [Unreleased]` in
+[CHANGELOG.md](CHANGELOG.md) ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/): Added, Changed, Fixed,
+Removed).
 
 A release, by a maintainer:
 

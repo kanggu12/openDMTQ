@@ -1,8 +1,8 @@
 # Changelog
 
 What changed in each release of OpenDMTQ. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and versions follow [Semantic Versioning](https://semver.org/): a release that adds something raises the minor number,
-one that only fixes raises the patch number. Each release's section here is its release notes.
+and versions follow [Semantic Versioning](https://semver.org/): a release with a new feature raises the minor number,
+one of fixes, changes and smaller additions raises the patch number. Each release's section here is its release notes.
 
 ## [Unreleased]
 
