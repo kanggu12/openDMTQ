@@ -274,8 +274,8 @@ server's app, `--settings` the file).
 
 ## When something goes wrong
 
-- **The game does not start:** the launcher says why on its bottom line, with a link to the player's log; **Help**
-  opens it too. The log is `player.log` in the game's folder in `%LOCALAPPDATA%\OpenDMTQ`; the launcher's own is in
+- **The game does not start:** the launcher says why on its bottom line, with a link to the player's log (**Open the
+  game log**); **Help** opens it too. The log is `player.log` in the game's folder in `%LOCALAPPDATA%\OpenDMTQ`; the launcher's own is in
   `%LOCALAPPDATA%\OpenDMTQ\client\logs`.
 - **The launcher says the server runs an older OpenDMTQ:** the PC client needs a server of 0.8 or newer.
 - **The player is missing or a file of the program is damaged:** **Help**, **Repair** puts the program's files back

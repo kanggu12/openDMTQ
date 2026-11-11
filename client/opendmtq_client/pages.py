@@ -413,9 +413,11 @@ def build_sound(app, parent):
 
 def build_controls(app, parent):
     ui, w = app.ui, app.words
-    groups = (("controls.mouse", ("controls.click", "controls.drag", "controls.wheel", "controls.menu")),
-              ("controls.touch", ("controls.fingers", "controls.edges")),
-              ("controls.keyboard", ("controls.esc", "controls.f11", "controls.typing")))
+    # The game's bar over it in each group by the way it comes: the pointer, a finger, and the keys it does not take.
+    groups = (("controls.mouse", ("controls.click", "controls.drag", "controls.wheel", "controls.menu",
+                                  "controls.minimise")),
+              ("controls.touch", ("controls.fingers", "controls.edges", "controls.bar")),
+              ("controls.keyboard", ("controls.esc", "controls.f11", "controls.alt_f4", "controls.typing")))
     for n, (title, keys) in enumerate(groups):
         card = _card(parent, ui, w(title), last=n == len(groups) - 1)
         for i, key in enumerate(keys):
@@ -528,7 +530,8 @@ def signin_panel(app, parent, rerender):
     server = app.state.server()
     if server is None:
         return
-    card = _card(parent, ui, w("online.account"))
+    # The card's title says the state: signed in, or the sign-in to make.
+    card = _card(parent, ui, w("online.account.signed" if app.state.signed_in(server) else "online.account"))
     parent, bg = card.body, theme.PANEL
     if app.state.signed_in(server):
         signed = tk.Frame(parent, bg=bg)
@@ -805,24 +808,24 @@ def build_help(app, parent):
     if root:
         # Only the installed launcher has a package to put its files back from.
         widgets.divider(card.body, ui)
-        widgets.setting_row(card.body, ui, w("help.repair"),
+        widgets.setting_row(card.body, ui, w("help.repair.row"),
                             lambda p: widgets.Button(p, ui, w("help.repair"), lambda: maintenance.repair_program(app)),
                             w("help.repair.hint")).pack(fill="x")
     # From the least to the most: the game's data, the launcher's, the program.
     card = _card(parent, ui, w("help.remove"), last=True)
-    widgets.setting_row(card.body, ui, w("help.clear"),
+    widgets.setting_row(card.body, ui, w("help.clear.row"),
                         lambda p: widgets.Button(p, ui, w("help.clear.confirm"), lambda: maintenance.clear_game_data(app),
                                                  kind="danger"),
                         w("help.clear.hint")).pack(fill="x")
     widgets.divider(card.body, ui)
 
-    widgets.setting_row(card.body, ui, w("help.reset"),
+    widgets.setting_row(card.body, ui, w("help.reset.row"),
                         lambda p: widgets.Button(p, ui, w("help.reset"), lambda: maintenance.start_over(app), kind="danger"),
                         w("help.reset.hint")).pack(fill="x")
     if root and installed.updater(root):
         # Velopack's uninstaller is what takes the program; a copied folder is deleted as any folder.
         widgets.divider(card.body, ui)
-        widgets.setting_row(card.body, ui, w("help.uninstall"),
+        widgets.setting_row(card.body, ui, w("help.uninstall.row"),
                             lambda p: widgets.Button(p, ui, w("help.uninstall"), lambda: maintenance.uninstall_program(app),
                                                      kind="danger"),
                             w("help.uninstall.hint")).pack(fill="x")

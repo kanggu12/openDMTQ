@@ -41,6 +41,13 @@ one that only fixes raises the patch number. Each release's section here is its 
 - The launcher's ready check asks the server: one that does not answer shows so on the Server line and the status line
   instead of a lit Server line, and Help's Check again asks it again. PLAY still starts the app this PC has; an app it
   lacks waits for the server instead of a download that cannot start. `--status` asks it the same way.
+- The launcher's words: the Controls page says the bar over the game in one short line each for the pointer, a finger
+  and the keyboard, without reasons; no line about the page itself or advice it is not the launcher's to give (sizes
+  left out, everything changeable later, updating the graphics driver, a code to note before uninstalling); the Online
+  page's sign-in card says when it is signed in; "player" is the one who plays, and the program it plays in the game
+  program; a row of Help is named for what it acts on, not for its button; pages by the menu's names (SCREEN, SOUND,
+  ONLINE); in Korean, the bar's line, the touch line, the Online page's line and the uninstall's question read as
+  plain Korean.
 - The launcher's text fields are as tall as the buttons beside them, on the same middle, and start where the words
   above them start; every setting's control shows from one line, the volume's track too.
 - The launcher's backdrop runs to the window's right edge: no flat dark strip where the scroll bar keeps its room, and
