@@ -6,6 +6,27 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+### Fixed
+
+- The player for Windows: the bar's chips and the question's buttons act only when let go where they were pressed, and
+  look pressed while held; a press that slid from Keep playing onto Quit the game no longer quits.
+- The player for Windows: while the bar is up, the broadcast notice and an FPS counter in a top corner move down under
+  it instead of being covered by it.
+- The player for Windows: the FPS counter reads a steady rate as it is (60, not 58 and 62 in turn), takes nothing from
+  moving the window, reads 0 while the game holds still, and its small grey text keeps 4.5:1 over the game's white.
+- The player for Windows: Alt pressed and let go alone, F10 and Alt+Space no longer put the window in Windows' menu mode,
+  which held the next key.
+- The player for Windows: the bar no longer flashes when the pointer crosses the game's top edge on its way to the
+  window's title bar; it shows when the pointer rests a moment at the edge.
+- The player for Windows: the broadcast notice breaks a long line into even lines, with no word left alone under it.
+- The launcher's Screen page keeps its place and the keyboard's control when a choice redraws it (the render scale, the
+  upscaler, anti-aliasing, VSync, the mode), instead of going back to its top.
+
+### Changed
+
+- The launcher's Screen page: the upscaler's hints no longer say what 100 % does (the row is shown only below it), and
+  the page's line under its title names the picture's quality too.
+
 ## [0.9.0] - 2026-11-11
 
 ### Added

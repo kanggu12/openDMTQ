@@ -264,8 +264,45 @@ def screen_rows(app, parent, redraw, full=True):
                         w("screen.aa.hint." + kind)).pack(fill="x")
 
 
+def _focus_order(widget):
+    """The widgets under `widget` that take the keyboard, in the order Tab visits them (the page's packing order)."""
+    found = []
+    for child in widget.winfo_children():
+        # A widget that takes the keyboard (a drop-down, a toggle, a segment) is one stop; what is inside it is not.
+        # Asked of Tk itself: a widget may have a `keys` of its own, and one without the option takes no keyboard.
+        try:
+            takes = str(child.cget("takefocus"))
+        except tk.TclError:
+            takes = ""
+        if takes not in ("", "0"):
+            found.append(child)
+        else:
+            found.extend(_focus_order(child))
+    return found
+
+
+def redraw_in_place(app, page):
+    """The page drawn again for a change (a choice that adds or removes rows), keeping where it was scrolled to and the
+    control the keyboard was on: choosing an anti-aliasing at the page's foot does not throw the page back to its top
+    and the keyboard out of it."""
+    area = app.body
+    top = area.canvas.yview()[0]
+    before = _focus_order(area.inner)
+    focused = app.root.focus_get()
+    index = before.index(focused) if focused in before else None
+    app.go(page)
+    # Laid out first, so that the scroll's place is measured on the new page's height.
+    app.root.update_idletasks()
+    area.canvas.yview_moveto(top)
+    if index is not None:
+        # The rows before the changed one are the same, so the same place in the order is the same control.
+        after = _focus_order(area.inner)
+        if index < len(after):
+            after[index].focus_set()
+
+
 def build_screen(app, parent):
-    screen_rows(app, parent, lambda: app.go("screen"))
+    screen_rows(app, parent, lambda: redraw_in_place(app, "screen"))
 
 
 # --------------------------------------------------------------------------------------------- Sound

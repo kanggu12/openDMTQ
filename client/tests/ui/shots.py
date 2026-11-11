@@ -349,6 +349,50 @@ def pages_check(app, out, tag, problems):
             wheel_check(app, problems)
 
 
+def redraw_check(app, problems, tag):
+    """The Screen page drawn again for a choice keeps its place: scrolled to the Quality card, the render scale chosen
+    from the keyboard to 100 % takes the upscaler's row away and back below it, and neither throws the page back to its
+    top nor the keyboard off the render scale's drop-down."""
+    import tkinter as tk
+
+    from opendmtq_client import widgets as wd
+    w = app.words
+    area = app.body
+
+    def scale_select():
+        # The drop-down in the row named Render scale.
+        for widget in widgets_of(area.inner):
+            if isinstance(widget, wd.Select) and getattr(widget.master, "control", None) is widget:
+                names = [c.cget("text") for c in widget.master.winfo_children() if isinstance(c, tk.Label)]
+                if w("screen.scale") in names:
+                    return widget
+        return None
+
+    def upscaler_shown():
+        return any(isinstance(c, tk.Label) and c.cget("text") == w("screen.upscaler") for c in widgets_of(area.inner))
+
+    for value, shown in (("100", False), ("75", True)):
+        select = scale_select()
+        if select is None:
+            problems.append("%s: no render scale drop-down on the Screen page" % tag)
+            return
+        select.focus_set()
+        settle(app)
+        before = area.canvas.yview()[0]
+        # Chosen as the keyboard chooses: the value set, then the drop-down's own event.
+        select.set_value(value)
+        select.event_generate("<<ComboboxSelected>>")
+        settle(app)
+        after = area.canvas.yview()[0]
+        focused = app.root.focus_get()
+        if upscaler_shown() != shown:
+            problems.append("%s: render scale %s: the upscaler's row %s" % (tag, value, "missing" if shown else "still shown"))
+        if before > 0 and after == 0:
+            problems.append("%s: render scale %s: the page went back to its top (was at %.2f)" % (tag, value, before))
+        if focused is not scale_select():
+            problems.append("%s: render scale %s: the keyboard left the drop-down (now on %r)" % (tag, value, focused))
+
+
 def variants_check(app, site, out, tag, problems):
     """Pages in their other states: a window's size row, a download under way, signed out, other servers, a crash."""
     w = app.words
@@ -376,6 +420,7 @@ def variants_check(app, site, out, tag, problems):
     settle(app)
     shot(app.root, out, tag + "_screen-upscaler")
     measure(app, tag + "_screen-upscaler", problems)
+    redraw_check(app, problems, tag)
     # A download under way, drawn from its numbers (the real one is in the guide).
     import threading
     app.download = {"done": 47 << 20, "total": 103 << 20, "cancel": threading.Event()}
