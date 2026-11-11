@@ -29,7 +29,7 @@ closed); while a game runs it installs nothing and ends with 3.
 | Page | What it has |
 | :--- | :--- |
 | **Play** | The server and the account, the checks before a start (the player, the server, the sign-in, the app), how to play, the last play, and **PLAY** |
-| **Screen** | Full screen or a window, the window's size, VSync, the frame limit, the FPS counter, the render scale and its upscaler, anti-aliasing |
+| **Screen** | Full screen or a window, the window's size, VSync, the frame limit, the FPS counter and its position, the render scale and its upscaler, anti-aliasing |
 | **Sound** | The volume, the device, shared or the device alone, the buffer |
 | **Controls** | What the touch screen, the mouse and the keyboard do |
 | **Online** | The servers, the sign-in, the app on this PC and a check for a newer one |
@@ -55,7 +55,8 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | `window` | `auto` (fitted to the display), `1280x720`, `1600x900`, `1920x1080`, `2560x1440`, `3840x2160`, or any `WIDTHxHEIGHT` from 320x180 | Window size |
 | `vsync` | `on`, `off` | VSync |
 | `fps` | `auto` (the display's rate), `30`, `60`, `120`, `144`, `165`, `180`, `240`, `360`, `unlimited` | Frame limit |
-| `show_fps` | `off`, `top_left`, `top_right`, `bottom_left`, `bottom_right` | FPS counter |
+| `show_fps` | `off`, `on` (a corner's name, as `fps_position` takes it, is on in that corner) | FPS counter |
+| `fps_position` | `top_left` (beside a song's pause button), `top_right`, `bottom_left`, `bottom_right`; kept while the counter is off | Position, while the counter is on |
 | `render_scale` | `100`, `85`, `75`, `67`, `50` | Render scale |
 | `upscaler` | `bilinear`, `fsr1`, `nis` | Upscaler, below 100 % |
 | `anti_aliasing` | `off`, `cmaa2`, `smaa`, `msaa2`, `msaa4`, `msaa8` | Anti-aliasing |
@@ -76,16 +77,21 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | The keyboard | Text where the game asks for it (Enter ends it, Esc cancels it), Hangul too |
 | The touch keyboard | Comes up when a touch opens the game's text, and types into it |
 | F11, or Alt+Enter | Full screen, and back |
-| The pointer at the game's top edge | The bar: full screen, and the X that quits after asking |
+| The pointer resting at the game's top edge, or on the handle at its top centre | The bar: full screen, and the X that quits after asking |
 | Alt+F4 | Nothing: the bar's X quits |
 | Alt alone, F10 | Nothing (no menu mode that would hold the next key) |
 
-- **The bar and quitting**: a PC has no phone's buttons around the game, so a bar of frosted glass shows across the
-  top of the game when the pointer rests a moment at the game's very top edge with its button up, or when a finger is
-  drawn down from that edge on a touch screen; a pointer on its way to the window's title bar shows nothing. It stays
-  while the pointer is on it and fades soon after the pointer leaves, so it never sits on the game's own controls at the
-  top while they are used; no key opens it. While it is up, the broadcast notice and an FPS counter in a top corner move
+- **The bar and quitting**: a PC has no phone's buttons around the game, so a bar of frosted glass comes down across
+  the top of the game when the pointer rests a moment at the game's very top edge or on the handle with its button up,
+  or when a finger is drawn down from that edge on a touch screen; a pointer on its way to the window's title bar
+  brings nothing. It also comes down by itself for 3 seconds when the game's picture first shows (not during its black
+  start) and after each switch between a window and full screen, so that a player sees where it is. It stays while the
+  pointer is on it and goes up soon after the pointer leaves, so it never sits on the game's own controls at the top
+  while they are used; no key brings it. While it is down, the broadcast notice and an FPS counter in a top corner move
   down under it. It is tall enough to cover the game's own X at the top right of its song and music screens whole.
+- **The handle**: a short faint pill with a down arrow at the top centre of the game says where the bar is: the pointer
+  resting on it brings the bar down. Clicks go through it to the game. It shows once the game's picture is up, and goes
+  while the bar is down, while a notice or the question is up and while the game holds still.
   On its left, OPEN DMTQ in the launcher's wordmark face; on its right two chips like the game's OFF chips: **full
   screen** (or back to a window), lit with a lime edge under the pointer, and an **X** that quits, red under the pointer
   as Windows' own close button turns; held, a chip is pressed in, and it acts only when let go where it was pressed (the
@@ -97,15 +103,20 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   it was, with the game's own pause screen after. In the question, Left, Right and Tab move the choice (marked as the
   game marks a chosen card, with a lime border and glow), Enter takes it and Esc keeps playing. Minimised, the game holds
   still the same way, and goes on when it comes back.
+- **Nothing of it is in the game's way**: the notice, the FPS counter and the handle let every click through to the game,
+  and no piece takes the keyboard from the game's window (each is a window that never takes the focus; a click on the
+  bar or the question gives the keyboard back to the game). Their pictures are made on a thread of their own, so the
+  thread that stamps each key and click for the game never waits for them.
 - **The glass**: the bar, the question, the broadcast notice and the FPS counter are frosted glass over the game, as
   Windows' own acrylic is made: the game's picture behind each, blurred and a little more saturated, under a charcoal
   tint, with a faint light at its top, a light edge and a soft shadow; in the game's own shapes, with its small corners,
   its bevel (a line of light along the top, of shade along the foot) and its green line along the bar's and the
   notice's foot. Their words keep 4.5:1 against the light behind them: where the game is light under the words, the
-  tint deepens there. The picture behind is read from the game's frames at a quarter of its size, at most 20 times a
-  second while a piece is up and once while the game holds still; with none up, it costs the game nothing. Until the
-  first read (a moment), a piece is its plain tint, nearly solid. The words are set in Pretendard, titles and buttons
-  bold, which the player carries in its `fonts` folder with the wordmark's face.
+  tint deepens there. The picture behind is read from the game's frames at a quarter of its size (each of its pixels
+  the mean of 4 by 4 of the frame's), at most 20 times a second while a piece is up and once while the game holds still;
+  with none up, it costs the game nothing. A piece waits a moment for its first read; where none comes, it is its plain
+  tint, nearly solid. The words are set in Pretendard, titles and buttons bold, which the player carries in its `fonts`
+  folder with the wordmark's face.
 - **The pointer** over the game is a dart in the logo's look: a chrome left face and a lime right face with a dark rim.
   While the button is down it is all lime and a little smaller. It is sized for the display's scaling.
 - **A touch screen** is the player's first input, as a phone's screen is the game's. Windows' own touch feedback stays
@@ -115,7 +126,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 
 ### The picture
 
-![The launcher's Screen page: VSync, the frame limit, the FPS counter, then the render scale at 50 % with AMD FSR 1 as its upscaler, and MSAA 4x](images/client-screen.png)
+![The launcher's Screen page: the frame limit, the FPS counter switched on with its position under it, then the render scale at 50 % with AMD FSR 1 as its upscaler, and MSAA 4x](images/client-screen.png)
 
 - **Full screen or a window.** Full screen is a borderless window over the whole display, at the display's own pixels
   whatever its scaling. A window opens at three quarters of the display's height at 16:9, or at the size chosen. The
@@ -129,12 +140,15 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   display); another limit is held by the clock, with each frame still on a refresh (144 on a 240 Hz display).
 - **VSync off:** frames go out as soon as they are drawn, evenly at the limit, which may be above the display's rate, or
   as fast as the PC draws without one. A little less delay, and the picture may tear.
-- **The FPS counter**, off by default: a small glass box like the game's Q and MAX box, in the corner chosen (each
-  corner has some of the game's own controls; top left sits just right of a song's pause button): FPS in the game's
-  lime, the frames a second in white and the mean frame time under them, over the last half second, twice a second. It counts the frames the player shows between their own
-  moments, so a steady 60 reads 60; held still under the question, it reads 0. It sits over the game as the bar does and lets clicks through, and
-  stays under the dim of the question before quitting. It is drawn apart from the game's picture: it costs the game
-  nothing, and the broadcast does not show it.
+- **The FPS counter** is off by default. On, it shows at the top left, just right of a song's pause button; its
+  **Position** can be changed to another corner (each corner has some of the game's own controls), and stays chosen
+  while the counter is off. A small glass box like the game's Q and MAX box, faint as a whole so the game shows through
+  it: FPS in the game's lime, the frames a second in white and the mean frame time under them, over the last half
+  second, twice a second. It counts the frames the player shows between their own moments, so a steady 60 reads 60;
+  while the game shows no new frame (a loading screen) it reads 0, and the true rate again within a second of frames
+  coming back. It shows from the game's first frame, and hides while the game holds still (the question before
+  quitting, a minimised window) instead of counting the stillness. It lets clicks through, and is drawn apart from the
+  game's picture: it costs the game nothing, and the broadcast does not show it.
 - **The render scale** draws the game at a share of the window's pixels (100 % down to 50 %), stretched to fill it:
   lighter for the graphics card, and softer.
 - **The upscaler**, below 100 %: how the smaller picture reaches the window's size. **Bilinear** (the default) is the
@@ -256,12 +270,14 @@ The player runs the game's own 32-bit Android code, as the app does on phones th
 calls on Windows. In place of Android's Java side, the player has its own stand-in for the classes the game calls. The
 game draws with OpenGL ES, which ANGLE runs on Direct3D 11; its sound goes out through WASAPI, and its videos are
 decoded by Media Foundation. Its requests to the server go out as a phone's do, asking for the server's answers
-compressed, which makes its lists of songs and scores many times smaller on the way. The bar, the question before
-quitting, the notice, the FPS counter and the pointer are drawn by the player over the game's window, each a window of
-its own drawn on the CPU; for their glass, the render thread reads the rectangles of the frame behind them as it goes to
-the window (after the passes), a quarter of their size, into a pixel buffer that a later frame copies out once the
-graphics card is done, so nothing waits for it. With the stats on, a `stats: glass` line every 5 seconds says what that
-took the render thread a frame.
+compressed, which makes its lists of songs and scores many times smaller on the way. The bar, its handle, the question
+before quitting, the notice, the FPS counter and the pointer are drawn by the player over the game's window, each a
+window of its own whose picture a thread of the overlay's makes on the CPU; the UI thread, which stamps the game's keys
+and clicks, only hands the finished pictures to Windows. For their glass, the render thread reads the rectangles of the
+frame behind them as it goes to the window (after the passes), at half and then a quarter of their size, into a pixel
+buffer that a later frame copies out once the graphics card is done, so nothing waits for it. With the stats on, a
+`stats: glass` line every 5 seconds says what that took the render thread a frame, and a `stats: overlay` line what
+the pictures took their thread and the UI thread.
 
 The launcher is Python with Tk, made into a Windows program with PyInstaller; Velopack installs it and updates it. The
 launcher writes the player's settings into a file and starts the player with it (`--app` names the folder of the

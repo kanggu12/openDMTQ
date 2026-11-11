@@ -6,6 +6,41 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+### Fixed
+
+- The player for Windows: the FPS counter stayed at 0 and "-- ms" for the whole game once a half second had passed with
+  no frame (the loading at the start does it). It reads the true rate again by its second look after frames come back,
+  hides until the game's first frame and while the game holds still (the question before quitting, a minimised window)
+  instead of reading 0 for the overlay's own hold, and comes back with the true rate once frames come again.
+- The player for Windows: in a game area whose size is not a multiple of 4 (1366x768, 1376x774, 1386x780, 1680x1050),
+  the bar, the question and a piece at the right or bottom edge were their plain tint instead of glass, and the question
+  waited for a read that never held it.
+- The player for Windows: the glass's read of the frame no longer stays stuck when the driver cannot wait on it, and
+  where the frame cannot be read the question no longer waits for a read; the read never reuses what a destroyed game
+  context held; the question's two pictures of the whole game area (66 MB at 4K) go when it closes.
+- The player for Windows: the frame behind the glass is read at half and then a quarter of its size, each of its pixels
+  the mean of 4 by 4 of the frame's, so thin lines in it no longer shimmer in the blur as they move.
+
+### Changed
+
+- The player for Windows: the overlay's pictures (the blur, the tint, the words) are made on a thread of their own; the
+  UI thread, which stamps each key and click for the game, only hands them to Windows, and never waits for them.
+- The player for Windows: the FPS counter is faint as a whole (its window at 62 %), so the game shows through it.
+- The launcher: the FPS counter is On or Off on the Screen page, at the top left beside a song's pause button when on; a
+  Position row under it, shown while it is on, moves it to another corner, kept while it is off. `--set show_fps=on|off`
+  and `--set fps_position=top_left|top_right|bottom_left|bottom_right` do the same; `show_fps` with a corner's name, as
+  before, is on in that corner, and an older launcher's choice of a corner is kept.
+
+### Added
+
+- The player for Windows: a small handle at the top centre of the game, a faint pill with a down arrow, says where the
+  bar is: the pointer resting on it brings the bar down, and clicks go through it to the game. The bar also comes down
+  by itself for 3 seconds when the game's picture first shows and after each switch between a window and full screen.
+- For contributors: the player says in its log when the bar comes down (and why) and goes up, when the FPS counter comes
+  up or hides, and how long each planned key (`PLAYER_KEYS`) waited for the UI thread; with `PLAYER_TRACE_INPUT=1`, each
+  press of the mouse that reaches the game's window and each time the game's window stops being active or loses the
+  keyboard, and to which window.
+
 ## [0.9.1] - 2026-11-11
 
 ### Fixed
