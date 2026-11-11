@@ -62,6 +62,8 @@ def start_over(app):
     actions.reset(app.state)
     app.state.save()
     app.devices = None
+    # No server is known any more: the guide's address field starts empty, whatever was typed before.
+    app.address_draft = None
     app.page = "play"
     app.show()
 

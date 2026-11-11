@@ -482,6 +482,8 @@ def check_server(app, address, then=None):
     def answered(check):
         app.server_check = check
         if check["state"] == "ok":
+            # Connected: the field shows the server in use again, as the launcher writes its address.
+            app.address_draft = None
             # Another server, or the same one again: what the last download said is not about it.
             app.download_error, app.app_note = None, None
             app.user_acted()
@@ -506,7 +508,19 @@ def connect_panel(app, parent, rerender, forget=False):
     field.grid(row=1, column=0, sticky="w", padx=(0, ui.px(12)))
     address = field.entry
     server = app.state.server()
-    address.insert(0, server["url"] if server else "")
+    in_use = server["url"] if server else ""
+    # The field holds what the player typed until it connects or the server in use changes (app.address_draft): a
+    # failed Connect keeps it, as the line under it names it, instead of the server in use or nothing coming back.
+    address.insert(0, in_use if app.address_draft is None else app.address_draft)
+
+    def remember(event=None):
+        # What the field holds, kept for the page's next drawing; the address in use again is no draft.
+        text = address.get()
+        app.address_draft = None if text.strip() == in_use else text
+
+    # Each key the player types (a paste with Ctrl+V too) is in the field by the time the key comes up. A binding of the
+    # field's own goes with the field, where a variable traced for it would outlive every page that drew one.
+    address.bind("<KeyRelease>", remember, add="+")
     text, colour = server_line(app)
     answer = widgets.label(parent, ui, text, font=ui.fonts.small, fg=colour, bg=bg, wrap_margin=0)
     answer.pack(fill="x", pady=(ui.px(8), 0))
@@ -515,6 +529,8 @@ def connect_panel(app, parent, rerender, forget=False):
         if app.busy_now():
             answer.configure(text=w("online.busy"), fg=theme.WARN)
             return
+        # What is asked is what the field holds: kept for the page drawn again with the answer.
+        remember()
         check_server(app, address.get(), then=rerender)
         # Said at once, before the server answers.
         answer.configure(text=w("online.connecting"), fg=theme.MUTED)
@@ -722,6 +738,8 @@ def known_servers(app, parent, rerender):
             # gives way to where PLAY stands on this one once the ready check below answers.
             app.user_acted()
             app.state.current = url
+            # The server in use changed: the address field shows it, whatever was typed there before.
+            app.address_draft = None
             # What the last server's download said is not this one's.
             app.download_error, app.app_note = None, None
             app.state.save()
@@ -753,8 +771,9 @@ def forget_server(app, server, rerender):
     app.user_acted()
     actions.forget(app.state, server["url"])
     if in_use:
-        # What the last download and the last look said was about the server that is gone.
-        app.download_error, app.app_note = None, None
+        # What the last download and the last look said was about the server that is gone; the address field shows
+        # the server in use now.
+        app.download_error, app.app_note, app.address_draft = None, None, None
     app.state.save()
     app.refresh_checks()
     rerender()

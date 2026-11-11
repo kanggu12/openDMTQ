@@ -70,6 +70,8 @@ class LauncherApp:
         #                                 repair, a count or a deletion): the window stays until it ends
         self.play_offline = False       # PLAY went on with this PC's app because the server did not answer
         self.server_check = None        # the last time a server was asked in this run: {"url", "state", "error"}
+        self.address_draft = None       # what the player typed in a server's address field and has not connected to
+        #                                 yet (None: the field shows the server in use); kept over the page's redraws
         self.server_reached = None      # the ready check's last answer from the server: {"url", "reached", "at"}
         self.pumps = 0                  # turns of the task pump, for the slower look for an installer's server
         self._setup_fonts()

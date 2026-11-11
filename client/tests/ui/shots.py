@@ -175,6 +175,51 @@ def click_button(dialog, i):
     c.event_generate("<ButtonRelease-1>", x=x, y=y)
 
 
+def typed_address_check(app, out, name, problems, site_url):
+    """A Connect that fails keeps what was typed in the address field, and the line under it names that address in the
+    window's words, never Python's: an address with a blank (refused before anything is asked), then one nobody
+    answers at. A Connect that works shows the server's address again, written as the launcher writes it. Works on the
+    page on show (the guide's SERVER step or Online), whose first field is the address."""
+    import tkinter as tk
+    w = app.words
+    for typed in ("not an address", "127.0.0.1:1"):
+        field = entries(app)[0]
+        field.delete(0, "end")
+        field.insert(0, typed)
+        # Connect, as a person presses it.
+        button(app, w("online.connect")).press()
+        settle(app, 12, until=lambda: not (app.server_check and app.server_check["state"] == "checking"))
+        settle(app)
+        field = entries(app)[0]
+        if field.get() != typed:
+            problems.append("%s: a failed Connect left %r in the address field, not %r" % (name, field.get(), typed))
+        check = app.server_check or {}
+        said = w.error(check["error"]) if check.get("state") == "failed" else None
+        if typed == "not an address" and said != w("error.server.address", address=typed):
+            problems.append("%s: an address with a blank was answered %r" % (name, said))
+        if said is not None and typed != "not an address" and "http://127.0.0.1:1" not in said:
+            problems.append("%s: the failure does not name the address typed: %r" % (name, said))
+        shown = [x.cget("text") for x in widgets_of(app.root) if isinstance(x, tk.Label) and x.winfo_ismapped()]
+        if said not in shown:
+            problems.append("%s: the line under the address does not say %r" % (name, said))
+        if any("control characters" in text or "Traceback" in text for text in shown):
+            problems.append("%s: Python's own words on the page" % name)
+        if typed == "not an address":
+            shot(app.root, out, name + "-typed")
+            measure(app, name + "-typed", problems)
+    # Back to the server it was on: the field shows its address again, nothing typed kept.
+    field = entries(app)[0]
+    field.delete(0, "end")
+    field.insert(0, site_url)
+    button(app, w("online.connect")).press()
+    settle(app, 12, until=lambda: not (app.server_check and app.server_check["state"] == "checking"))
+    settle(app)
+    kept = getattr(app, "address_draft", None)
+    if kept is not None or entries(app)[0].get() != app.state.current:
+        problems.append("%s: after a Connect that worked the field shows %r (kept %r)" % (name, entries(app)[0].get(),
+                                                                                        kept))
+
+
 def guide_check(app, site, out, tag, problems):
     """The first-start guide, step by step, as a person goes through it: the server the installer brought answers,
     the sign-in form is filled in, the download runs, then the screen and sound and the ready check."""
@@ -186,6 +231,9 @@ def guide_check(app, site, out, tag, problems):
             guide.next()
         settle(app)
         name = "%s_guide%d-%s" % (tag, i + 1, key)
+        if key == "server":
+            # A failed Connect keeps what was typed, said in plain words; then the server the installer brought again.
+            typed_address_check(app, out, name, problems, site.url)
         if key == "login":
             shot(app.root, out, name + "-form")
             measure(app, name + "-form", problems)
@@ -909,6 +957,10 @@ def main():
     guide.finish(play=False)
     settle(app)
     pages_check(app, args.out, tag, problems)
+    # Online's address field after a failed Connect, as the guide's SERVER step above.
+    app.go("online")
+    settle(app)
+    typed_address_check(app, args.out, "%s_online" % tag, problems, site.url)
     wheel_bindings_check(app, problems)
     variants_check(app, site, args.out, tag, problems)
     app.root.geometry("%dx%d+0+0" % (w, h))
