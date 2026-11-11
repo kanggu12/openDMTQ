@@ -202,7 +202,8 @@ def play(state, report=lambda step, done=None, total=None: None, cancel=None, ch
                 # Played all the same, from this PC's app, which may be older than the server's: said so.
                 report("offline")
     report("starting")
-    settings = player.write_settings(state.values)
+    # The launcher's language goes to the player too when the player chose one (none: both follow Windows).
+    settings = player.write_settings(state.values, state.picked_language)
     have = apps.local(server["url"])
     # The player makes the game's data folder of the app's package name, its log in it: one that is no package name
     # stops the start here with its own words (player.NotAPackage), before anything is made of it.

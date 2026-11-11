@@ -63,6 +63,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | `audio_mode` | `shared`, `exclusive` (the device alone) | Mode |
 | `audio_buffer` | `normal`, `low`, `safe` | Buffer |
 | `volume` | `100`, or any number from 0 | Volume |
+| `language` | `system` (Windows' display language), `en`, `ko`: the same as `--language` | Language, on the **Launcher** page; the game and what the player draws over it speak it too |
 
 ### In the game
 
@@ -195,8 +196,10 @@ where it can be watched.
   Media Feature Pack, under Settings, Optional features (in Apps or in System, by the version of Windows). Without it
   the videos are black and silent, and the game goes on.
 - **The language:** the launcher speaks Windows' display language, Korean or English, until one is chosen on the
-  first-start guide's first step or the **Launcher** page, and the installer speaks the launcher's. What the player draws
-  over the game follows Windows' display language, and so does the game, among the languages it has.
+  first-start guide's first step or the **Launcher** page, and the installer speaks the launcher's. The game and what
+  the player draws over it (the bar, the question before quitting, the broadcast notice, its messages) speak the
+  launcher's language once one is chosen, among the languages the game has, and Windows' display language until then;
+  the country stays Windows'. The launcher hands it over in the settings file it writes before each start (`language=`).
 - **What it keeps on the PC,** per Windows user:
   - the program, in `%LOCALAPPDATA%\OpenDMTQ.Client`;
   - the launcher's settings and logs, and each server's app, in `%LOCALAPPDATA%\OpenDMTQ\client`;

@@ -541,10 +541,28 @@ def main(argv=None):
             state.save()
 
 
+def _language_set(args):
+    """--set language=VALUE is --language's other spelling, as the settings' table lists it with the pages' settings:
+    taken out of --set into --language, checked as --language checks it."""
+    rest = []
+    for item in args.set:
+        name, _, value = item.partition("=")
+        if name.strip() != "language":
+            rest.append(item)
+            continue
+        value = value.strip().lower()
+        if value not in st.LANGUAGES + ("system",):
+            raise choices.ChoiceError("language cannot be %r: it is en, ko or system" % value, "error.choice",
+                                      name="language", value=value)
+        args.language = value
+    args.set = rest
+
+
 def _run(state, args, jobs):
     """The jobs the command line asked for, in order; else the window."""
     if args.update:
         return _update(args.yes)
+    _language_set(args)
     if args.reset:
         # Every server's app goes: refused while a game plays from one, as the window's Start over is.
         if _started_meanwhile():

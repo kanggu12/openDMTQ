@@ -6,6 +6,14 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+### Changed
+
+- The player for Windows speaks the launcher's language: once one is chosen in the launcher (the first-start guide, the
+  Launcher page, `--language` or `--set language=`), the game, the bar over it, the question before quitting, the
+  broadcast notice and the player's own messages speak it too, instead of Windows' display language; the country stays
+  Windows'. "Same as Windows" leaves both following Windows. The launcher hands it over in the settings file it writes
+  before each start (`language=en|ko`).
+
 ### Fixed
 
 - The launcher's status line gives way to where PLAY stands once the player does something: an installer's server, a

@@ -223,6 +223,20 @@ class CommandLine(Folder):
         self.assertIsNone(st.LauncherState.load().picked_language)
         self.assertIn("language=system", said)
 
+    def test_language_as_a_setting(self):
+        # --set language=... is --language's other spelling, as the settings' table lists it: the same three values,
+        # anything else refused with nothing changed.
+        code, said = self.run_main(["--set", "language=ko", "--set", "volume=40"])
+        self.assertEqual(code, 0, said)
+        saved = st.LauncherState.load()
+        self.assertEqual((saved.picked_language, saved.values["volume"]), ("ko", 40))
+        code, said = self.run_main(["--set", "language=system"])
+        self.assertIsNone(st.LauncherState.load().picked_language)
+        code, said = self.run_main(["--set", "language=fr"])
+        self.assertEqual(code, 2)
+        self.assertIn("language cannot be 'fr'", said)
+        self.assertIsNone(st.LauncherState.load().picked_language)
+
     def test_the_setting_names_are_in_the_help(self):
         out = io.StringIO()
         with contextlib.redirect_stdout(out), self.assertRaises(SystemExit):

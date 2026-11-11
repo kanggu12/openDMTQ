@@ -23,6 +23,8 @@
 //   audio_mode    shared | exclusive         with the computer's other sound, or the device alone (less latency)
 //   audio_buffer  low | normal | safe        how much sound is kept ahead of the device: less latency, or fewer breaks
 //   volume        0..100                     the game's sound, in percent
+//   language      en | ko                    the language the launcher chose for the game and the player's own words, in
+//                                            place of the computer's (host_locale); none: the computer's
 //
 // On Linux, a developer's player, the window takes only its size (it reads no display timing and has no full screen),
 // and the sound server picks the device and shares it: the buffer and the volume apply.
@@ -136,6 +138,10 @@ bool load_settings(const std::string& path) {
             if (ok) s.audio_buffer = value == "low" ? 0 : value == "normal" ? 1 : 2;
         } else if (key == "volume") {
             if ((ok = number(value, 0, 100, n))) s.volume = n;
+        } else if (key == "language") {
+            // The launcher's languages; another keeps the computer's (host_locale).
+            ok = value == "en" || value == "ko";
+            if (ok) s.language = value;
         } else {
             jvm::log("player: settings: %s is no setting of this player's: left out", key.c_str());
             continue;
@@ -155,7 +161,26 @@ bool load_settings(const std::string& path) {
              kCorners[static_cast<int>(s.show_fps)],
              s.audio_device.empty() ? "the default device" : "a chosen device", s.audio_exclusive ? "exclusive" : "shared",
              s.audio_buffer == 0 ? "a low" : s.audio_buffer == 1 ? "a normal" : "a safe", s.volume);
+    // The language on a line of its own: the launcher's when it chose one, else the computer's.
+    jvm::log("player: settings: language %s", s.language.empty() ? "the computer's" : s.language.c_str());
     return true;
+}
+
+std::string settings_language(const std::string& path) {
+    std::ifstream f(utf8_path(path));
+    std::string line, found;
+    // The last language= line, as load_settings reads them (a later line wins), and nothing said: the log is not yet
+    // in its place.
+    while (f && std::getline(f, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '#') continue;
+        const auto eq = line.find('=');
+        if (eq == std::string::npos || trim(line.substr(0, eq)) != "language") continue;
+        const std::string value = trim(line.substr(eq + 1));
+        // Only a language the player speaks; another leaves the computer's.
+        if (value == "en" || value == "ko") found = value;
+    }
+    return found;
 }
 
 }  // namespace player
