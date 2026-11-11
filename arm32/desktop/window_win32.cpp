@@ -23,6 +23,7 @@
 // launcher's Screen page before a start), quitting the bar's X, which asks first; F11, Alt+Enter and Alt+F4 do nothing.
 #include "player.h"
 
+#include "overlay_scale.h"
 #include "overlay_win32.h"
 #include "post_pass.h"
 #include "offscreen.h"
@@ -134,8 +135,6 @@ std::int64_t g_edge_time = 0;
 // The shapes the game lays itself out for: a tablet's 4:3 to a long phone's 21:9. Beyond them its screens fall apart
 // (a portrait shape squeezes its whole layout into the middle).
 constexpr double kNarrowest = 4.0 / 3.0, kWidest = 21.0 / 9.0;
-// The smallest game area the frame can be made to hold.
-constexpr int kMinWidth = 480, kMinHeight = 270;
 
 // The display the frame is on, for its refresh rate and refreshes, and a display's mode change for the refresh thread.
 std::atomic<HMONITOR> g_monitor{nullptr};
@@ -168,17 +167,25 @@ std::string narrow(const wchar_t* s) {
 float game_x(int x) { return g_area_w > 0 ? static_cast<float>(x) * static_cast<float>(app().width) / static_cast<float>(g_area_w) : static_cast<float>(x); }
 float game_y(int y) { return g_area_h > 0 ? static_cast<float>(y) * static_cast<float>(app().height) / static_cast<float>(g_area_h) : static_cast<float>(y); }
 
+// The dpi of the display a window is on, as Windows scales it there (96 at 100 %); 0 where Windows cannot say (before
+// Windows 10 1607, which has the call).
+UINT window_dpi(HWND h) {
+    using DpiOf = UINT(WINAPI*)(HWND);
+    static HMODULE user = GetModuleHandleW(L"user32.dll");
+    static auto dpi_of = reinterpret_cast<DpiOf>(user ? GetProcAddress(user, "GetDpiForWindow") : nullptr);
+    return dpi_of && h ? dpi_of(h) : 0;
+}
+
 // The frame's outer size for a client area of w by h at the frame's own scaling (Windows 10 1607 has the call that
 // takes it; an older Windows sizes by the system's).
 SIZE frame_size(int w, int h) {
     RECT r{0, 0, w, h};
     using ForDpi = BOOL(WINAPI*)(LPRECT, DWORD, BOOL, DWORD, UINT);
-    using DpiOf = UINT(WINAPI*)(HWND);
     static HMODULE user = GetModuleHandleW(L"user32.dll");
     static auto for_dpi = reinterpret_cast<ForDpi>(user ? GetProcAddress(user, "AdjustWindowRectExForDpi") : nullptr);
-    static auto dpi_of = reinterpret_cast<DpiOf>(user ? GetProcAddress(user, "GetDpiForWindow") : nullptr);
     const DWORD style = static_cast<DWORD>(GetWindowLongW(g_frame, GWL_STYLE));
-    if (for_dpi && dpi_of && g_frame) for_dpi(&r, style, FALSE, 0, dpi_of(g_frame));
+    const UINT dpi = window_dpi(g_frame);
+    if (for_dpi && dpi) for_dpi(&r, style, FALSE, 0, dpi);
     else AdjustWindowRectEx(&r, style, FALSE, 0);
     return SIZE{r.right - r.left, r.bottom - r.top};
 }
@@ -942,8 +949,13 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         return 0;
     }
     case WM_GETMINMAXINFO: {
-        // The frame never so small that the game's area falls below its smallest.
-        const SIZE least = frame_size(kMinWidth, kMinHeight);
+        // The frame never so small that the game's area falls below its smallest: 480x270 of Windows' own pixels, as
+        // many of the display's as its scale makes them (720x405 at 150 %), where the overlay's bar keeps its wordmark
+        // and its buttons apart at any scale (overlay_scale.h). Windows' scale of the display it is on now: moved to
+        // another, the smallest follows.
+        const UINT dpi = window_dpi(h);
+        const float scale = dpi ? static_cast<float>(dpi) / 96.0f : 1.0f;
+        const SIZE least = frame_size(overlay::at_scale(overlay::kLeastAreaW, scale), overlay::at_scale(overlay::kLeastAreaH, scale));
         auto* mm = reinterpret_cast<MINMAXINFO*>(l);
         mm->ptMinTrackSize.x = least.cx;
         mm->ptMinTrackSize.y = least.cy;

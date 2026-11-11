@@ -28,8 +28,9 @@ from opendmtq_client import art  # noqa: E402
 # The launcher header's mark (art.brand's) and the two bars' heights at 100 %: the header's 64, the bar's 74 at 720.
 HEADER_MARK, HEADER_HEIGHT, BAR_HEIGHT = 26, 64, 74
 MARK = round(HEADER_MARK * BAR_HEIGHT / HEADER_HEIGHT)
-# The overlay's scales a bar is drawn at (its height over 720 lines, or Windows' scale when larger): each picture is
-# drawn for its own, and a scale between two takes the larger drawn down.
+# The overlay's scales a bar is drawn at (the game's own, its height over 720 lines, never below half of Windows' scale):
+# each picture is drawn for its own, a scale between two takes the larger drawn down, and a scale below 100 % (a small
+# window: down to 50 %) the 100 % picture drawn down.
 PERCENTS = (100, 125, 150, 175, 200, 250, 300, 400)
 
 

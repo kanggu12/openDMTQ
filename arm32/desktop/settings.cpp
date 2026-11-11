@@ -7,7 +7,8 @@
 //   display       window | fullscreen        the window, or the whole display it is on (the bar's full screen button
 //                                            over the game switches either way)
 //   window        auto | WxH                 the game's area in a window: fitted to the display, or this size (480x270
-//                                            at least, the smallest area the window holds)
+//                                            at least; the window holds no area smaller than 480x270 at Windows'
+//                                            scale, 720x405 at 150 %, and opens at that for a size below it)
 //   vsync         on | off                   frames on the display's refreshes, or as soon as they are drawn
 //   fps           auto | N | unlimited       the most frames a second: the display's own rate, N (30 to 1000; with vsync
 //                                            on, a whole fraction of the display's rate when one is within 10 % below

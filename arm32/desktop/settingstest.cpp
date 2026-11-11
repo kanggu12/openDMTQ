@@ -2,9 +2,11 @@
 // key it does not know leaving the default, a volume out of range held to 0 to 100, MSAA of earlier launchers read as
 // CMAA 2, notes, Windows' line ends, a byte order mark and capitals taken in their stride, no file at all the
 // defaults. Then the numbers of the frame counter that one of the settings shows (frame_rate.cpp): its looks at the
-// count of frames through the game's start, a stretch with no frame, frames again and a hold. Prints ALL CHECKS PASSED
-// when every check held.
+// count of frames through the game's start, a stretch with no frame, frames again and a hold. Then the size the overlay
+// over the game is drawn at and the smallest game area the window holds (overlay_scale.h), over Windows' scales and the
+// game's sizes. Prints ALL CHECKS PASSED when every check held.
 #include "frame_rate.h"
+#include "overlay_scale.h"
 #include "player.h"
 
 #include <cstdio>
@@ -208,6 +210,51 @@ void frame_counter_checks() {
     check(zero_without, "and the stall's whole seconds without a frame read 0");
 }
 
+// The overlay's scale and the smallest game area the window holds (overlay_scale.h), at Windows' scales from 100 % to
+// 300 % and the game's sizes from the smallest to 4K.
+void overlay_scale_checks() {
+    using player::overlay::at_scale;
+    using player::overlay::kLeastAreaH;
+    using player::overlay::kLeastAreaW;
+    using player::overlay::scale_for;
+    // The game's own scale wherever it is above the floor (exact: these are whole binary fractions).
+    check(scale_for(720, 1.0f) == 1.0f && scale_for(1080, 1.0f) == 1.5f && scale_for(1440, 1.0f) == 2.0f && scale_for(2160, 1.0f) == 3.0f,
+          "at 100 %: the game's own scale, 1 at 720 lines, 1.5 at 1080, 2 at 1440, 3 at 2160");
+    check(scale_for(720, 1.5f) == 1.0f, "1280x720 at 150 %: 1 as at 100 %, not Windows' 1.5, so the counter covers no more of the game");
+    check(scale_for(720, 2.0f) == 1.0f && scale_for(1080, 3.0f) == 1.5f, "a display's scale does not grow the overlay over a game it fits");
+    check(scale_for(2160, 1.5f) == 3.0f && scale_for(2160, 3.0f) == 3.0f, "4K at 150 % and at 300 %: the game's own 3");
+    // The floor: half of Windows' scale, in the smallest windows.
+    check(scale_for(270, 1.0f) == 0.5f && scale_for(405, 1.5f) == 0.75f && scale_for(540, 2.0f) == 1.0f && scale_for(810, 3.0f) == 1.5f,
+          "the smallest area at 100, 150, 200 and 300 %: half of Windows' scale, the bar's buttons 20 of Windows' own pixels");
+    check(scale_for(359, 1.0f) == 0.5f && scale_for(361, 1.0f) > 0.5f, "at 100 % the floor ends at 360 lines");
+    // The smallest area in the display's pixels: whole, and never less than 480x270 of Windows' own.
+    check(at_scale(kLeastAreaW, 1.0f) == 480 && at_scale(kLeastAreaH, 1.0f) == 270, "the smallest area: 480x270 at 100 %");
+    check(at_scale(kLeastAreaW, 1.25f) == 600 && at_scale(kLeastAreaH, 1.25f) == 338, "600x338 at 125 % (337.5 rounded up)");
+    check(at_scale(kLeastAreaW, 1.5f) == 720 && at_scale(kLeastAreaH, 1.5f) == 405, "720x405 at 150 %");
+    check(at_scale(kLeastAreaW, 168.0f / 96.0f) == 840 && at_scale(kLeastAreaH, 168.0f / 96.0f) == 473, "840x473 at 175 % (168 dpi)");
+    check(at_scale(kLeastAreaW, 2.0f) == 960 && at_scale(kLeastAreaH, 2.0f) == 540, "960x540 at 200 %");
+    check(at_scale(kLeastAreaW, 3.0f) == 1440 && at_scale(kLeastAreaH, 3.0f) == 810, "1440x810 at 300 %");
+    // Every area the window can hold, at each of Windows' scales: from the smallest up to 4K's height, at the narrowest
+    // the window lets it be (4:3, its height rounded as place_game rounds it, so a little narrower; and never below the
+    // smallest width). The overlay's 720-line layout has 960 by 540 of room in all of them (as over a 960x540 game at
+    // 100 %), less two across for that rounding, so the bar's wordmark keeps clear of its buttons.
+    bool roomy = true, own = true;
+    for (int dpi : {96, 120, 144, 168, 192, 240, 288}) {
+        const float s = static_cast<float>(dpi) / 96.0f;
+        for (int h = at_scale(kLeastAreaH, s); h <= 2160; ++h) {
+            // The narrowest area of this height: the least width whose three quarters round to it, or the smallest width.
+            const int w = std::max(at_scale(kLeastAreaW, s), static_cast<int>(std::ceil((4.0 * h - 2.0) / 3.0)));
+            const float k = scale_for(h, s);
+            // Its room at 720 lines.
+            roomy = roomy && static_cast<float>(w) / k >= 958.0f && static_cast<float>(h) / k >= 539.99f;
+            // Above the floor's reach, the game's own scale exactly.
+            if (static_cast<float>(h) >= 360.0f * s) own = own && k == static_cast<float>(h) / 720.0f;
+        }
+    }
+    check(roomy, "every area at 100 % to 300 %: the overlay's 720-line layout has 960x540 of room (958 across at the narrowest)");
+    check(own, "every area above the floor's reach: the game's own scale, its height over 720");
+}
+
 }  // namespace
 
 int main() {
@@ -330,6 +377,8 @@ int main() {
     std::remove(path.c_str());
     // The frame counter's numbers.
     frame_counter_checks();
+    // The overlay's scale and the smallest game area.
+    overlay_scale_checks();
     if (g_failed) {
         std::printf("%d of %d checks FAILED\n", g_failed, g_checks);
         return 1;

@@ -51,6 +51,8 @@
 // The game's frame behind the glass, read on the render thread; the glass and the faces.
 #include "glass_capture.h"
 #include "overlay_glass.h"
+// The overlay's scale, the game's own with a floor at Windows' scale.
+#include "overlay_scale.h"
 
 #include <algorithm>
 #include <atomic>
@@ -106,12 +108,16 @@ float g_test_dpi = 0;
 bool g_test_no_words = false;
 // The probe draws only: no window is ever shown or moved.
 bool g_test_quiet = false;
-// Where the words of the piece being drawn went and in what colour, for the probe's measure of their contrast.
+// Where the words of the piece being drawn went and in what colour, for the probe's measure of their contrast, and
+// whether they were cut to fit their box (an ellipsis in their place), which no look may do.
 struct TestText {
     Gdiplus::RectF box;
     Gdiplus::Color colour;
+    bool cut = false;
 };
 std::vector<TestText>* g_test_texts = nullptr;
+// Where the bar's last look put its name (the wordmark), for the probe's check that the chips keep clear of it.
+Gdiplus::RectF g_test_bar_name;
 #endif
 
 // Whether a window may be shown: never while the probe draws.
@@ -167,16 +173,19 @@ int area_h() {
     return std::max(1, static_cast<int>(a.bottom - a.top));
 }
 
-// The overlay's scale: the game's, which lays itself out for 720 lines and grows with its area (1.5 at 1080 lines, 3 at
-// 4K), or Windows' own when that is larger (a small window on a display at 200 %), so that the bar, the question and the
-// notice keep their size beside the game's own dialogs and buttons.
 // A cap on the scale while one piece is laid out and drawn (0: none): the question's card, which keeps within the
 // game's area (AskScale below). Each thread its own: the UI thread lays the card out for its clicks while the painter
 // draws it.
 thread_local float t_scale_cap = 0;
 
+// The overlay's scale: the game's own, which lays itself out for 720 lines and grows with its area (1.5 at 1080 lines, 3
+// at 4K), so that the bar, the question, the notice and the counter keep the size of the game's own words and buttons in
+// a small window as in a large one, and cover no more of the game on a display at 150 % than at 100 %; never below half
+// its 720-line size at Windows' scale, where the bar's buttons are still large enough to hit (overlay_scale.h). The
+// painter's view and the UI thread's clicks both come here, so a chip is hit where it is drawn.
 float scale() {
-    const float s = std::max(dpi_scale(), static_cast<float>(area_h()) / 720.0f);
+    const float s = scale_for(area_h(), dpi_scale());
+    // The question's card within its cap while it is laid out or drawn.
     return t_scale_cap > 0 ? std::min(s, t_scale_cap) : s;
 }
 
@@ -184,8 +193,9 @@ float scale() {
 constexpr float kCardWidth = 520, kCardHeight = 228;
 
 // The question's card at most three quarters of the game's area wide and nine tenths of it high, everything in it scaled
-// with it: a small window on a display at 150 % or 200 % gets a card in proportion to the game instead of one across its
-// whole width. Held while the card is laid out or drawn.
+// with it. The overlay's own scale keeps it well within that (at most 54 % of the area's width, in a 4:3 one, and 42 % of
+// its height, in the smallest the window holds): a guard, so that no scale can ever set the card past the game's edges.
+// Held while the card is laid out or drawn.
 struct AskScale {
     float before;
     AskScale() : before(t_scale_cap) {
@@ -260,13 +270,15 @@ RectF measure(const std::wstring& text, const Font& f) {
     return box;
 }
 
-// The probe's note of words drawn (or that would be), opaque ones only: a faint one under them is no words of its own.
-void note_words(RectF box, const Color& colour) {
+// The probe's note of words drawn (or that would be), opaque ones only: a faint one under them is no words of its own;
+// `cut` when they did not fit their box.
+void note_words(RectF box, const Color& colour, bool cut = false) {
 #ifdef OVERLAY_TEST_HOOKS
-    if (g_test_texts && colour.GetA() == 255) g_test_texts->push_back(TestText{box, colour});
+    if (g_test_texts && colour.GetA() == 255) g_test_texts->push_back(TestText{box, colour, cut});
 #else
     (void)box;
     (void)colour;
+    (void)cut;
 #endif
 }
 
@@ -283,7 +295,8 @@ void say(Graphics& g, const std::wstring& text, const Font& f, const Color& colo
 void say_centred(Graphics& g, const std::wstring& text, const Font& f, const Color& colour, RectF box) {
     const RectF size = measure(text, f);
     const float tw = std::min(size.Width, box.Width);
-    note_words(RectF(box.X + (box.Width - tw) / 2, box.Y + (box.Height - size.Height) / 2, tw, size.Height), colour);
+    // Wider than the box by more than rounding: GDI+ cuts them with an ellipsis, which the probe reports.
+    note_words(RectF(box.X + (box.Width - tw) / 2, box.Y + (box.Height - size.Height) / 2, tw, size.Height), colour, size.Width > box.Width + 0.5f);
     if (!words()) return;
     std::unique_ptr<StringFormat> centre(tight().Clone());
     centre->SetAlignment(StringAlignmentCenter);
@@ -779,6 +792,10 @@ void bar_look(Paint& p, int hover, int pressed, bool full) {
     }
     // The name on the left, in the wordmark's face.
     const RectF name = bar_name(*g, static_cast<float>(h));
+#ifdef OVERLAY_TEST_HOOKS
+    // Where it went, for the probe.
+    g_test_bar_name = name;
+#endif
     // The chips as the launcher's buttons (cut at two corners, raised, sunk while held): the X its main button, in the
     // lime from the start with a dark X, so that it stands out the moment the bar shows, a little brighter under the
     // pointer; full screen and minimise its secondary buttons, quiet metal, a lighter plate under the pointer, no lime.
@@ -828,7 +845,7 @@ struct AskLayout {
     float line_x0 = 0, line_x1 = 0, line_y = 0;
 };
 AskLayout ask_layout() {
-    // Within the game's area, however large Windows' scale.
+    // Within the game's area whatever the scale (AskScale's cap, a guard).
     const AskScale cap;
     AskLayout l;
     const float w = static_cast<float>(area_w()), h = static_cast<float>(area_h());
@@ -2824,8 +2841,9 @@ std::vector<TestText> g_test_words;
 void words_lines(FILE* out, const std::string& name, int x, int y) {
     for (const TestText& t : g_test_words) {
         if (out) {
-            std::fprintf(out, "text %s %.1f %.1f %.1f %.1f %02x%02x%02x\n", name.c_str(), t.box.X + static_cast<float>(x), t.box.Y + static_cast<float>(y), t.box.Width,
-                         t.box.Height, t.colour.GetR(), t.colour.GetG(), t.colour.GetB());
+            // " cut" after the colour when the words did not fit their box.
+            std::fprintf(out, "text %s %.1f %.1f %.1f %.1f %02x%02x%02x%s\n", name.c_str(), t.box.X + static_cast<float>(x), t.box.Y + static_cast<float>(y),
+                         t.box.Width, t.box.Height, t.colour.GetR(), t.colour.GetG(), t.colour.GetB(), t.cut ? " cut" : "");
         }
     }
     g_test_words.clear();
@@ -2897,6 +2915,8 @@ void test_save(const std::wstring& prefix, const std::wstring& frame_png, bool w
             save_png(*got.picture, prefix + L"bar-" + state + b.suffix + L".png");
             if (!full && b.hover == kNone) {
                 layout_line(layout, "bar", got.x, got.y, got.picture.get());
+                // Where its name (the wordmark) went, which the chips keep clear of.
+                if (layout) std::fprintf(layout, "bar-name %.1f %.1f %.1f %.1f\n", g_test_bar_name.X, g_test_bar_name.Y, g_test_bar_name.Width, g_test_bar_name.Height);
                 // Whether the frame was behind it (else its bare tint): a read must hold it at every size.
                 if (layout) std::fprintf(layout, "glass bar %d\n", got.glass ? 1 : 0);
                 const Drawing d(o.view);
