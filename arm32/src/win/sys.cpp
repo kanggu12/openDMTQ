@@ -377,6 +377,9 @@ std::unordered_multimap<const void*, Waiter*>& futex_waiters() {
     return *m;
 }
 
+// How long a futex wait goes on before it returns without a wake, for the caller to look again.
+constexpr long long kSpuriousWakeNs = 100000000LL;
+
 long futex_wait(const std::uint32_t* word, std::uint32_t expected, long long deadline, std::uint32_t bitset) {
     if (!bitset) return -EINVAL;
     Waiter w{word, bitset, thread_event()};
@@ -388,11 +391,21 @@ long futex_wait(const std::uint32_t* word, std::uint32_t expected, long long dea
         futex_waiters().emplace(word, &w);
     }
     for (;;) {
-        int r = wait_any(&w.event, 1, deadline);
+        // A wait without a timeout ends on its own every so often, as a spurious wake-up (-EINTR, which every caller of a
+        // futex wait has to take): a condition variable's wait may return without a signal, and the game's video decoder
+        // counts on it. Its seek signals the worker's queue between the worker's look at a flag and its wait; that signal
+        // finds nobody and is gone, as on a phone, but here the worker's first run of that code is slow enough for the seek
+        // to come in between about one start of a song in twenty-five. The worker then waits for ever, the seek waits for
+        // its answer, and the picture stops.
+        const long long now = monotonic_ns();
+        const bool capped = deadline < 0;
+        int r = wait_any(&w.event, 1, capped ? now + kSpuriousWakeNs : deadline);
         std::lock_guard<std::mutex> l(g_futex_lock);
         if (w.woken) return 0;
         // The thread's event is shared with its polls: a set that was not a wake waits on.
         if (r == 0) continue;
+        // The cap's own end, not the caller's deadline: out of the table, back to the caller as a spurious wake-up.
+        if (r == -ETIMEDOUT && capped) r = -EINTR;
         // Timed out or interrupted: out of the table, unless a wake took it out just now.
         auto range = futex_waiters().equal_range(w.address);
         for (auto it = range.first; it != range.second; ++it) {

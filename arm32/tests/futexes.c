@@ -10,6 +10,9 @@
 //   wakeop    FUTEX_WAKE_OP waking two words at once
 //   churn     batches of threads made, started with one wake and joined (the join is a futex wait too)
 //   pthread   semaphores in a ring, a mutex and condition variables with and without timeouts
+//   lostsignal  the handshake of a game's video decoder (seek and its worker): a signal that comes before the wait it was
+//             meant for is lost, as a condition variable's is, and the worker's wait has to end on its own (a spurious
+//             wake-up, which the standard allows a condition variable) for the worker to look at its flag again
 #include <errno.h>
 #include <limits.h>
 #include <linux/futex.h>
@@ -408,6 +411,70 @@ static void* producer(void* arg) {
     return NULL;
 }
 
+// ----------------------------------------------------------------------------------------------------- lostsignal
+
+// The video decoder of the game (libgpuv2) keeps a request flag that its worker reads before it takes the queue's mutex,
+// and waits on the queue's condition variable when the queue says so, without reading the flag again. A seek that sets the
+// flag and signals the queue in between finds nobody waiting: its signal is gone, the worker then waits for a wake that
+// never comes, and the seek waits for the worker's answer. On a phone the window is a few instructions; here it is as
+// long as the first run of the worker's code takes. The worker's wait must come back by itself for the loop to see the flag.
+enum { kLostRounds = 20 };
+static pthread_mutex_t lq_m = PTHREAD_MUTEX_INITIALIZER, lr_m = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t lq_c = PTHREAD_COND_INITIALIZER, lr_c = PTHREAD_COND_INITIALIZER;
+static atomic_int lost_flag, lost_in_window, lost_acked, lost_stop, lost_done;
+static void* lost_worker(void* arg) {
+    (void)arg;
+    for (;;) {
+        if (atomic_load(&lost_stop)) {
+            atomic_store(&lost_done, 1);
+            return NULL;
+        }
+        if (atomic_load(&lost_flag)) {
+            // The answer to the request.
+            pthread_mutex_lock(&lr_m);
+            atomic_store(&lost_flag, 0);
+            atomic_store(&lost_acked, 1);
+            pthread_cond_signal(&lr_c);
+            pthread_mutex_unlock(&lr_m);
+            continue;
+        }
+        // The window between reading the flag and taking the mutex.
+        atomic_store(&lost_in_window, 1);
+        usleep(5000);
+        pthread_mutex_lock(&lq_m);
+        pthread_cond_wait(&lq_c, &lq_m);  // the queue is empty: wait, as the decoder does, without looking at the flag
+        pthread_mutex_unlock(&lq_m);
+        tick();
+    }
+}
+static void run_lostsignal(void) {
+    pthread_t w;
+    pthread_create(&w, NULL, lost_worker, NULL);
+    for (int i = 0; i < kLostRounds; i++) {
+        while (!atomic_load(&lost_in_window)) sched_yield();
+        atomic_store(&lost_in_window, 0);
+        // The seek: the flag, the signal to the queue (nobody waits yet), then the wait for the answer.
+        atomic_store(&lost_flag, 1);
+        pthread_mutex_lock(&lq_m);
+        pthread_cond_signal(&lq_c);
+        pthread_mutex_unlock(&lq_m);
+        pthread_mutex_lock(&lr_m);
+        while (!atomic_load(&lost_acked)) pthread_cond_wait(&lr_c, &lr_m);
+        atomic_store(&lost_acked, 0);
+        pthread_mutex_unlock(&lr_m);
+        tick();
+    }
+    atomic_store(&lost_stop, 1);
+    // The worker may be asleep in its wait: signals until it has seen the stop.
+    while (!atomic_load(&lost_done)) {
+        pthread_mutex_lock(&lq_m);
+        pthread_cond_signal(&lq_c);
+        pthread_mutex_unlock(&lq_m);
+        usleep(2000);
+    }
+    pthread_join(w, NULL);
+}
+
 // ----------------------------------------------------------------------------------------------------- driver
 
 // The watchdog: every thread of a phase ticks as it goes; four seconds without one is a lost wake.
@@ -524,6 +591,13 @@ skip_requeue:;
     }
     report("wakeop", t0);
 skip_wakeop:;
+
+    phase_name = "lostsignal";
+    if (only && !strstr("lostsignal", only)) goto skip_lostsignal;
+    t0 = now_ns(CLOCK_MONOTONIC);
+    run_lostsignal();
+    report("lostsignal", t0);
+skip_lostsignal:;
 
     phase_name = "churn";
     if (only && !strstr("churn", only)) goto skip_churn;
