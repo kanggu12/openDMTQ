@@ -45,9 +45,19 @@ one that only fixes raises the patch number. Each release's section here is its 
 ### Fixed
 
 - The player for Windows: the FPS counter stayed at 0 and "-- ms" for the whole game once a half second had passed with
-  no frame (the loading at the start does it). It reads the true rate again by its second look after frames come back,
-  hides until the game's first frame and while the game holds still (the question before quitting, a minimised window)
-  instead of reading 0 for the overlay's own hold, and comes back with the true rate once frames come again.
+  no frame (the loading at the start does it). It reads the frames a second over the last second, twice a second: a
+  loading screen that shows a frame now and then reads its few frames a second instead of turning between 0 and small
+  numbers, and only a whole second without a frame reads 0. It hides until the game's first frame and while the game
+  holds still (the question before quitting, a minimised window) instead of reading 0 for the overlay's own hold, and
+  comes back with the true rate once frames come again.
+- The player for Windows: a click on the bar's handle, or a held note there, with the pointer still after it brought the
+  bar down a moment later, and the bar then took the next clicks of the song. The top edge and the handle bring the bar
+  only when the pointer moves there and rests, the game having had no click, touch or held note for a second and a
+  half; a finger drawn down from the top edge likewise, and only alone on the screen.
+- The player for Windows: after a switch between a window and full screen with the bar's chip, the bar went up within a
+  second once the pointer left it; it stays down its 3 seconds whatever the pointer does.
+- The broadcast notice no longer says it twice: the English title while live is "Broadcasting your play" beside the red
+  LIVE tag, and once the broadcast has ended (or broadcasts are off) the card has no tag, its title saying so.
 - The player for Windows: in a game area whose size is not a multiple of 4 (1366x768, 1376x774, 1386x780, 1680x1050),
   the bar, the question and a piece at the right or bottom edge were their plain tint instead of glass, and the question
   waited for a read that never held it.

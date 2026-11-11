@@ -85,10 +85,12 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | Alt alone, F10 | Nothing (no menu mode that would hold the next key) |
 
 - **The bar and quitting**: a PC has no phone's buttons around the game, so a bar of frosted glass comes down across
-  the top of the game when the pointer rests a moment at the game's very top edge or on the handle with its button up,
-  or when a finger is drawn down from that edge on a touch screen; a pointer on its way to the window's title bar
-  brings nothing. It also comes down by itself for 3 seconds when the game's picture first shows (not during its black
-  start) and after each switch between a window and full screen, so that a player sees where it is. It stays while the
+  the top of the game when the pointer moves to the game's very top edge or onto the handle and rests there a moment
+  with its button up, or when a finger is drawn down from that edge on a touch screen, in either case only once the
+  game has had no click, touch or held note for a second and a half: a click or a held note at the top of a song plays
+  the song and never brings the bar, nor does a pointer on its way to the window's title bar. It also comes down by
+  itself for 3 seconds when the game's picture first shows (not during its black start) and for 3 seconds after each
+  switch between a window and full screen, whatever the pointer does, so that a player sees where it is. It stays while the
   pointer is on it and goes up soon after the pointer leaves, so it never sits on the game's own controls at the top
   while they are used; no key brings it. While it is down, the broadcast notice and an FPS counter in a top corner move
   down under it. It is tall enough to cover the game's own X at the top right of its song and music screens whole.
@@ -146,10 +148,10 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 - **The FPS counter** is off by default. On, it shows at the top left, just right of a song's pause button; its
   **Position** can be changed to another corner (each corner has some of the game's own controls), and stays chosen
   while the counter is off. A small glass box like the game's Q and MAX box, faint as a whole so the game shows through
-  it: FPS in the game's lime, the frames a second in white and the mean frame time under them, over the last half
-  second, twice a second. It counts the frames the player shows between their own moments, so a steady 60 reads 60;
-  while the game shows no new frame (a loading screen) it reads 0, and the true rate again within a second of frames
-  coming back. It shows from the game's first frame, and hides while the game holds still (the question before
+  it: FPS in the game's lime, the frames a second in white and the mean frame time under them, over the last second,
+  twice a second. It counts the frames the player shows between their own moments, so a steady 60 reads 60; a loading
+  screen that shows a frame now and then reads its few frames a second, and only a whole second without a frame reads
+  0. It shows from the game's first frame, and hides while the game holds still (the question before
   quitting, a minimised window) instead of counting the stillness. It lets clicks through, and is drawn apart from the
   game's picture: it costs the game nothing, and the broadcast does not show it.
 - **The render scale** draws the game at a share of the window's pixels (100 % down to 50 %), stretched to fill it:
@@ -198,8 +200,8 @@ within 4.5 ms of their time; no limit, 733 to 965.
 
 While broadcasts are on for the server and its owner shows a player live, the player broadcasts from the PC as a phone
 does, with Windows' own video and sound encoders, at the quality the owner chose ([live broadcasts](live.md#from-a-pc)). A glass card slides down at the top of the game
-when a broadcast starts and ends, with a red LIVE tag (a grey ENDED once it is over) like the game's own tags, and says
-where it can be watched.
+when a broadcast starts and ends, with a red LIVE tag like the game's own tags while it is on (once it is over, its
+title says so alone), and says where it can be watched.
 
 ### What it needs, and what it keeps
 

@@ -199,6 +199,26 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   [ \"\$(focus_moves)\" = \"\$moves\" ] || { echo 'FAIL: the game lost the keyboard to the handle or the bar'; exit 1; }
   echo \"a click on the handle's place reached the game at \$(last_press), and the game kept the keyboard\"
   sleep 2
+  # The bar comes from the handle only after a rest the pointer came to by moving, the game quiet (no press) for 1.5 s:
+  # a click there with the pointer still after it brings nothing, nor a press held there; clicks there, then a move
+  # away and back and a rest, bring it once the game has been quiet, not before. Counted in the player's log.
+  bar_downs() { cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | grep -c 'the bar comes down (the pointer on the handle)'; }
+  downs=\$(bar_downs)
+  xdotool mousemove \$((X + WIDTH / 2)) \$((Y + \$(opx 7))) click 1; sleep 2.5
+  [ \"\$(bar_downs)\" = \"\$downs\" ] || { snap click-still; echo 'FAIL: a click on the handle, the pointer still after it, brought the bar'; exit 1; }
+  echo 'a click on the handle with the pointer still after it brought no bar'
+  xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5
+  xdotool mousemove \$((X + WIDTH / 2)) \$((Y + \$(opx 7))) mousedown 1; sleep 1; xdotool mouseup 1; sleep 2.5
+  [ \"\$(bar_downs)\" = \"\$downs\" ] || { snap press-held; echo 'FAIL: a press held on the handle brought the bar'; exit 1; }
+  echo 'a press held on the handle brought no bar'
+  xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5
+  xdotool mousemove \$((X + WIDTH / 2)) \$((Y + \$(opx 7))) click 1 sleep 0.2 click 1 sleep 0.2 click 1 \
+    mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)) sleep 0.1 mousemove \$((X + WIDTH / 2)) \$((Y + \$(opx 7)))
+  sleep 1
+  [ \"\$(bar_downs)\" = \"\$downs\" ] || { snap clicks-then-rest; echo 'FAIL: the bar came within a second of clicks on the game'; exit 1; }
+  wait_for 4 '[ \"\$(bar_downs)\" -gt \"\$downs\" ]' || { snap clicks-then-rest; echo 'FAIL: a rest on the handle after clicks did not bring the bar once the game was quiet'; exit 1; }
+  echo 'clicks, then a move to the handle and a rest, brought the bar once the game had been quiet for 1.5 s'
+  xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 2
   # The bar's chip (0 the X, 1 full screen): its centre's distance from the right end and from the top.
   bar_chip() {
     eval \$(xdotool getwindowgeometry --shell \"\$game\")
@@ -216,10 +236,17 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   }
   # How many times the player has said it switched between full screen and a window.
   switches() { cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | grep -cE 'player: (full screen|in a window)'; }
-  # The full screen chip, twice: to a window, then back, each said in the player's log.
+  # How many times the bar went up.
+  bar_ups() { cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | grep -c 'player: the bar goes up'; }
+  # The full screen chip, twice: to a window, then back, each said in the player's log. The bar stays down for 3 s
+  # after each switch, the pointer taken off it at once.
   for way in window full-screen; do
     before=\$(switches); size_before=\$(xdotool getwindowgeometry \"\$game\" | grep Geometry)
-    bar_chip 1; snap \"bar-to-\$way\"; xdotool click 1; sleep 3
+    bar_chip 1; snap \"bar-to-\$way\"; ups=\$(bar_ups)
+    xdotool click 1 mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 2.2
+    [ \"\$(bar_ups)\" = \"\$ups\" ] || { snap bar-left; echo \"FAIL: the bar went up within 2 s of switching to \$way\"; exit 1; }
+    echo \"the bar stayed down after switching to \$way, the pointer off it\"
+    sleep 1
     wait_for 10 '[ \"\$(switches)\" -gt \"\$before\" ]' || { snap no-switch; echo \"FAIL: the bar's full screen chip did not switch to \$way\"; exit 1; }
     echo \"the bar switched to \$way: \$size_before, now \$(xdotool getwindowgeometry \"\$game\" | grep Geometry)\"
     sleep 2; snap \"in-\$way\"

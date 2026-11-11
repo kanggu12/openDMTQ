@@ -113,7 +113,7 @@ up after a minute with time to spare: a 1080p60 stream encoded 20 ms slower than
 1440 by 808 at 30 frames a second, and kept up there.
 
 The notice that a broadcast started or ended shows as a card at the top of the game's window, with the LIVE mark while
-it is on, and leaves after six seconds. While the question before quitting holds the game still, or the window is minimised, the broadcast stops too; it goes
+it is on (its English title "Broadcasting your play"; once ended, the title alone), and leaves after six seconds. While the question before quitting holds the game still, or the window is minimised, the broadcast stops too; it goes
 on with the game, as it does when a phone's game comes back to the screen.
 
 Measured on a 240 Hz display (Ryzen 9 9950X, RTX 4090), the game in a 1280 by 720 window, through a whole song of two
