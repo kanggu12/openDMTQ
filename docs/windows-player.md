@@ -112,22 +112,19 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 - **The window**: the game has a title bar to move it by and a frame to size it by, dark as the launcher's header (on
   Windows 11 in its very colours; Windows 10 dark where it can), and no buttons of its own: it is minimised, put in
   full screen and quit from the bar. A double click on the title bar does nothing.
-- **Nothing of it is in the game's way**: the notice, the FPS counter and the handle let every click through to the game,
-  and no piece takes the keyboard from the game's window (each is a window that never takes the focus; a click on the
-  bar or the question gives the keyboard back to the game). Their pictures are made on a thread of their own, so the
-  thread that stamps each key and click for the game never waits for them.
+- **Nothing of it is in the game's way**: the notice, the FPS counter and the handle let every click through to the
+  game, and no piece takes the keyboard from the game's window (each is a window that never takes the focus; a click on
+  the bar or the question gives the keyboard back to the game).
 - **The glass**: the bar, the question, the broadcast notice and the FPS counter are frosted glass over the game, as
   Windows' own acrylic is made: the game's picture behind each, blurred and a little more saturated, under a charcoal
   tint, with a faint light at its top, a light edge and a soft shadow; in the game's own shapes, with its small corners,
   its bevel (a line of light along the top, of shade along the foot) and its green line along the bar's and the
   notice's foot. Their words keep 4.5:1 against the light behind them: where the game is light under the words, the
-  tint deepens there. The picture behind is read from the game's frames at a quarter of its size (each of its pixels
-  the mean of 4 by 4 of the frame's), at most 20 times a second while a piece is up and once while the game holds still;
-  with none up, it costs the game nothing. A piece waits a moment for its first read; where none comes, it is its plain
-  tint, nearly solid. The words are set in Pretendard, titles and buttons bold, which the player carries in its `fonts`
-  folder with the launcher's wide face. The wordmark is a picture for each scale from 100 % to 400 %, drawn by the
-  launcher's own code (`arm32/desktop/assets/make_wordmark.py`) and carried in the player's `images` folder: at those
-  scales it is drawn pixel for pixel, between them the next larger is drawn down.
+  tint deepens there. With none of them up, the glass costs the game nothing. The words are set in Pretendard, titles
+  and buttons bold, which the player carries in its `fonts` folder with the launcher's wide face. The wordmark is a
+  picture for each scale from 100 % to 400 %, drawn by the launcher's own code (`arm32/desktop/assets/make_wordmark.py`)
+  and carried in the player's `images` folder: at those scales it is drawn pixel for pixel, between them the next
+  larger is drawn down.
 - **The pointer** over the game is a dart in the logo's look: a chrome left face and a lime right face with a dark rim.
   While the button is down it is all lime and a little smaller. It is sized for the display's scaling.
 - **A touch screen** is the player's first input, as a phone's screen is the game's. Windows' own touch feedback stays
@@ -295,8 +292,10 @@ compressed, which makes its lists of songs and scores many times smaller on the 
 before quitting, the notice, the FPS counter and the pointer are drawn by the player over the game's window, each a
 window of its own whose picture a thread of the overlay's makes on the CPU; the UI thread, which stamps the game's keys
 and clicks, only hands the finished pictures to Windows. For their glass, the render thread reads the rectangles of the
-frame behind them as it goes to the window (after the passes), at half and then a quarter of their size, into a pixel
-buffer that a later frame copies out once the graphics card is done, so nothing waits for it. With the stats on, a
+frame behind them as it goes to the window (after the passes), at half and then a quarter of their size (each pixel
+the mean of 4 by 4 of the frame's), into a pixel buffer that a later frame copies out once the graphics card is done,
+so nothing waits for it. It reads at most 20 times a second while a piece is up, and once while the game holds still;
+a piece waits a moment for its first read, and where none comes it is its plain tint, nearly solid. With the stats on, a
 `stats: glass` line every 5 seconds says what that took the render thread a frame, and a `stats: overlay` line what
 the pictures took their thread and the UI thread.
 
