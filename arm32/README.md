@@ -157,10 +157,10 @@ and the game's cap follows it (Tweaks), so each frame gets one refresh. Above 60
 every two seconds while the game aims that high (an edit to the game keeps untouched menus from stepping down to 18 fps
 for its old battery saving, `SetTargetFrameRate`; its target still changes between scenes), so the runtime reads
 `Application.targetFrameRate` every tenth frame through the il2cpp API and drops a window in which it changed. The check goes by what the screen showed (the
-frames' present times): a window falls short when more than 3 % of the frames stayed on screen for more
+frames' present times): a phone's window falls short when more than 3 % of the frames stayed on screen for more
 than one refresh. With each frame stretched by 6 ms a Galaxy S26 Ultra made 110 fps and 7 % of its frames
 did; at full speed 0.1 %. The gaps between swaps are no guide: there a fifth of them were half a refresh
-off while every frame still got its own refresh. A device without present times is judged by the rate
+off while every frame still got its own refresh. A phone without present times is judged by the rate
 frames came at (under 97 % falls short). Three short windows without a good one between take one step
 down the list for the rest of the run: the window asks for that rate, and the frame rate is the panel's
 refresh rate or the highest whole fraction of it not above that (72 fps on a panel that stays at 144 Hz, and
@@ -176,11 +176,12 @@ system (the display configuration and DXGI on Windows) and hands them to the run
 and the steps down are every second refresh, every third, while that stays at 57 fps or more. Each frame
 goes out on its refresh: the swap interval holds it for its share, and after the swap the thread waits for
 the refresh the frame goes on screen at, so that no frame waits in the swap queue. The pace check counts the
-frames that missed their refresh. 15 s after a step down the faster rate is tried again (a song's load holds
-the frames up for some seconds, after which every refresh holds again), and each try that falls short doubles
-the wait, up to four minutes: a step on a computer's display shows nothing, where a phone's panel switch can.
-A computer gives up its resolution only at 60 fps: a frame that misses 240 Hz there is the processor's, which
-fewer pixels do not help.
+frames that missed their refresh, and a computer's window falls short when more than a quarter of its frames did
+(a phone's at 3 %, above): three short windows of 2 s in a row take a step down. 5 s after a step down the faster
+rate is tried again (a song's load holds the frames up for some seconds, after which every refresh holds again); a
+try that falls short in its first two windows goes back down at once and doubles the wait, up to a minute: a step
+on a computer's display shows nothing, where a phone's panel switch can. A computer keeps its resolution, which the
+render scale of the PC client's settings chooses.
 
 The PC client's settings can set a frame limit and turn VSync off: the player reads them from the file the client
 writes (`desktop/settings.cpp`) and hands them to the runtime (`g_host_fps_cap`, `g_host_vsync`). With VSync on, a limit
