@@ -47,8 +47,8 @@ bool g_korean = false;
 ULONG_PTR g_gdiplus = 0;
 
 // The look, taken from the game's own screens at 1280x720 (its "Select Game Screen Type!" dialog, its OFF chips).
-// The header of its dialogs, a little see-through over the game as the bar.
-const Color kHeader(250, 28, 28, 28);
+// The header of its dialogs, opaque: as the bar it covers the game's own top controls, which would otherwise show through.
+const Color kHeader(255, 28, 28, 28);
 // The body of its dialogs, under the header.
 const Color kBody(255, 48, 50, 55);
 // The lime of the glow under a dialog's header, at its brightest.
