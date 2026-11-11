@@ -6,12 +6,16 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-11-12
+
 ### Added
 
-- The player for Windows: a small handle at the top centre of the game shows where the bar is. Resting the pointer on
-  it, or on the top edge, brings the bar down once the game has had no click, touch or held note for 1.5 seconds, so a
-  song is never interrupted; clicks pass through the handle to the game. The bar also shows for 3 seconds when the
-  game's picture first appears and after each switch between a window and full screen.
+- The player for Windows: a small tab at the top centre of the game, in the shape of the game's own tabs with its green
+  line, shows where the bar is. Resting the pointer on it, or on the top edge, brings the bar down once the game has had
+  no click, touch or held note for 1.5 seconds, so a song is never interrupted; clicks pass through it to the game. The
+  bar also shows for 3 seconds when the game's picture first appears and after each switch between a window and full
+  screen.
+- The player for Windows: a minimise button on the bar, left of full screen; the taskbar brings the game back.
 - The launcher's command line: `--servers` lists the servers it knows, and `--skip-guide` skips the first-start guide.
 - For contributors: the player logs when the bar comes and goes and why, when the FPS counter shows or hides, and how
   long each planned key (`PLAYER_KEYS`) waited; `PLAYER_TRACE_INPUT=1` also logs each mouse press reaching the game and
@@ -19,6 +23,12 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ### Changed
 
+- The player for Windows: the bar over the game carries the OpenDMTQ wordmark as the launcher's header draws it, and
+  every button over the game is the launcher's own, its shape and depth: on the bar the X is the lime main button from
+  the start, so it is seen at once, and minimise and full screen are quiet secondary buttons; in the question before
+  quitting, Keep playing is the lime main button and Quit the game the secondary one, red under the pointer. The window
+  has no buttons of its own, only its title bar and frame, and its title bar is dark as the launcher's header; the game
+  is minimised, put in full screen and quit from its bar, and the taskbar's Close window still asks before quitting.
 - The player for Windows speaks the launcher's language: the game, the bar, the question before quitting, the broadcast
   notice and its own messages. "Same as Windows" keeps Windows' display language. The launcher passes it in the settings
   file as `language=en|ko`.
@@ -45,6 +55,10 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ### Fixed
 
+- The player for Windows: a song's start could freeze the picture for good while the sound went on, 8 of 142 starts on
+  one PC: the game's own video decoder missed a signal its player sent a moment too early, a race its slower first run
+  here made likely. A wait without a time limit now wakes by itself every 100 ms, as the system may, so the decoder
+  looks again: 0 of 80 starts froze.
 - The FPS counter read 0 for the whole game once the first loading had passed. It now shows the frames over the last
   second, hides before the game's first frame and while the game is held, and reads 0 only after a whole second without
   a frame.
@@ -66,6 +80,8 @@ one that only fixes raises the patch number. Each release's section here is its 
   guide's numbers of the steps to come are readable.
 - The launcher's words: shorter Controls lines, no lines about the page itself or advice, "player" only for the one who
   plays, pages by the menu's names, and plainer Korean.
+- The player for Windows: a timed wait in the game could end early when its timer had fired during an earlier wait that
+  ended for another reason; the player's tests now include a stress test of the game's waits.
 
 ## [0.9.1] - 2026-11-11
 
@@ -591,7 +607,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 - Four ways to run it: the Windows bundle, one command on Linux or macOS, Docker Compose, and a Helm chart for
   Kubernetes.
 
-[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/kanggu12/openDMTQ/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/kanggu12/openDMTQ/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/kanggu12/openDMTQ/compare/v0.8.2...v0.9.0
 [0.8.2]: https://github.com/kanggu12/openDMTQ/compare/v0.8.1...v0.8.2
