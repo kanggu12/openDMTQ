@@ -11,10 +11,10 @@ Beside the admin pages, at `/opendmtq/api/v1/`, and only where they are:
 
 | Install | Address |
 |:---|:---|
-| Docker Compose, on the server PC | `http://localhost:8791/opendmtq/api/v1/` (`ADMIN_PORT` and `ADMIN_BIND` in `.env` change it) |
+| Docker Compose, on the server PC | The admin pages' address `./opendmtq setup` gives at its end, with `/opendmtq/api/v1/` in place of `/opendmtq/admin/` (`ADMIN_PORT` and `ADMIN_BIND` in `.env` change it) |
 | Docker Compose, from the local network | `https://<server>:<port>/opendmtq/api/v1/`, with port 80 `https://<server>:80/opendmtq/api/v1/`. A request over plain HTTP is refused while HTTPS works (`403 use_https`, with that address) |
 | Docker Compose, exposed to the internet | Only on the server PC, unless `./opendmtq expose --admin-public`: then over HTTPS from anywhere |
-| Host install and Windows | `http://localhost:8791/opendmtq/api/v1/` on the server PC (another port when 8791 was taken: `./opendmtq status` shows it, and on Windows the window), and `http://<server>:<port>/opendmtq/api/v1/` from the local network (without `:<port>` when it is 80) |
+| Host install and Windows | On the server PC, the admin pages' address `./opendmtq status` shows, and on Windows the server's window, with `/opendmtq/api/v1/` in place of `/opendmtq/admin/`; from the local network, `http://<server>:<port>/opendmtq/api/v1/` (without `:<port>` when it is 80) |
 | Kubernetes | Through the router when `admin.onPublicPort` allows it, else `kubectl port-forward` to port 8000 of the api pod ([kubernetes.md](kubernetes.md)) |
 
 The same settings open it or keep it closed as for the admin pages ([admin.md](admin.md), [internet.md](internet.md)):
@@ -62,7 +62,7 @@ The token is looked at first, and a token that works is never held back. A wrong
 admin pages: after five in ten minutes from one address, wrong tokens from there are answered `429` (with
 `Retry-After`), and the sign-in page makes that address wait too. Requests through the server also count together:
 after thirty in ten minutes, every wrong token through the server is answered `429` ([admin.md](admin.md)). On the
-admin service's own port (`http://localhost:8791/`) only each address's own count applies.
+admin service's own port, on the server PC, only each address's own count applies.
 
 What a token changes goes into the log of changes (Logs, Changes, or `GET /logs/changes`), under the admin's ID with the
 token's name: `sena (nightly backup)`. A refused token goes there as a failed sign-in does, by `API` with the address it
@@ -156,11 +156,11 @@ otherwise); a part that begins past the end is `416`, with `Content-Range: bytes
 
 ## Examples
 
-These run on the server PC, where the admin service answers on its own port. From another computer, use the address
-[Where it is](#where-it-is) gives.
+`API` is the address [Where it is](#where-it-is) gives: on the server PC the admin service's own port, from another
+computer the one for that computer.
 
 ```sh
-API=http://localhost:8791/opendmtq/api/v1
+API=http://<server>:<port>/opendmtq/api/v1    # the address Where it is gives
 TOKEN=odq_...    # made on the Accounts page
 ```
 
@@ -213,7 +213,7 @@ On Windows, in PowerShell on the server PC of the Windows bundle or a host insta
 here.
 
 ```powershell
-$Api = "http://localhost:8791/opendmtq/api/v1"
+$Api = "http://<server>:<port>/opendmtq/api/v1"    # the address Where it is gives
 $Auth = @{ Authorization = "Bearer odq_..." }    # made on the Accounts page
 Invoke-RestMethod -Headers $Auth "$Api/status"
 $backup = (Invoke-RestMethod -Method Post -Headers $Auth "$Api/backups").backup
