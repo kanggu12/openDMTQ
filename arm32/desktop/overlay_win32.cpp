@@ -33,7 +33,9 @@
 // - The question before quitting: the bar's X and the taskbar's Close window ask it. The game dims and blurs behind a
 //   card of glass with the question, the game's green line under it, a thin X, Keep playing as the launcher's lime main
 //   button and Quit the game as its secondary, red under the pointer; the keys' choice in the launcher's cyan keyboard
-//   ring. The game holds still meanwhile, so a click by mistake mid-song loses nothing. Alt+F4 does nothing.
+//   ring. The game holds still meanwhile, so a click by mistake mid-song loses nothing. Asked over a minimised window,
+//   the window comes back and the game draws its picture again before it holds, so the question shows over the game,
+//   not over black. Alt+F4, F11 and Alt+Enter do nothing.
 // - The notice: the server's two-line notice about a broadcast (a title, then where to watch), as a glass card that
 //   slides down at the top of the game, stays for a few seconds and fades. A red LIVE tag with a slanted end, as the
 //   game's tags, while broadcasting; once the broadcast has ended its title says so alone, with no tag.
@@ -1772,6 +1774,15 @@ bool g_ask_ahead = false;
 unsigned g_ask_after = 0;
 UINT64 g_ask_asked = 0;
 constexpr UINT64 kAskWaitMs = 150;
+// Asked over a minimised window (the taskbar's Close on it): the game drew nothing while it was held there, so the window
+// comes back and the game goes on until it has drawn its picture again, and only then holds for the question, which shows
+// over the game's own picture rather than over a black window. The count of frames shown when it was asked (the log says
+// how many the game showed before the question came).
+bool g_ask_restoring = false;
+unsigned long long g_ask_frames = 0;
+// How long that waits for the game's picture at most: the game's resume takes a few frames (a slow computer's more), and
+// a game that shows nothing but black meanwhile gets its question all the same.
+constexpr UINT64 kAskRestoreWaitMs = 1500;
 // A read of the whole frame younger than this is taken as it is: the X under the pointer had it read ahead.
 constexpr UINT64 kAskFreshMs = 250;
 
@@ -1831,10 +1842,19 @@ void show_ask() {
     if (!first || !g_ask.up) return;
     // Said once a question: whether the frame behind it was read (ahead, while the X was under the pointer, or once
     // asked), and how long after it was asked it showed, its picture's making included.
-    char line[200];
-    std::snprintf(line, sizeof line, "player: glass: the question over %s, shown %llu ms after it was asked",
-                  !g_ask.glass ? "the bare dim (no read of the frame came)" : g_ask_ahead ? "the frame read ahead" : "the frame read for it",
-                  static_cast<unsigned long long>(GetTickCount64() - g_ask_asked));
+    const char* over = !g_ask.glass       ? "the bare dim (no read of the frame came)"
+                       : g_ask_restoring ? "the game's picture drawn again after the window came back"
+                       : g_ask_ahead     ? "the frame read ahead"
+                                         : "the frame read for it";
+    // Over a window that came back from minimised: how many frames the game showed meanwhile (its picture again, held
+    // once the question was made).
+    char frames[80] = "";
+    if (g_ask_restoring && g_hooks.frames) {
+        std::snprintf(frames, sizeof frames, ", %llu frames shown since it was asked", g_hooks.frames().count - g_ask_frames);
+    }
+    char line[260];
+    std::snprintf(line, sizeof line, "player: glass: the question over %s, shown %llu ms after it was asked%s", over,
+                  static_cast<unsigned long long>(GetTickCount64() - g_ask_asked), frames);
     note(line);
     if (showing()) {
         // Above everything else of the overlay: the notice stays under its dim.
@@ -1855,6 +1875,7 @@ void answer(bool quit) {
     if (!g_asking) return;
     g_asking = false;
     g_ask_waiting = false;
+    g_ask_restoring = false;
     hide(g_ask);
     g_ask.picture.reset();
     g_ask.key.clear();
@@ -2336,10 +2357,21 @@ void glass_tick() {
         if (!g_asking) glass_redraw();
     }
     if (g_ask_waiting) {
-        // The question is made once a read of the whole frame has come (one in flight as it was asked holds less), or
-        // bare after the wait.
+        const UINT64 waited = GetTickCount64() - g_ask_asked;
+        // A read of the whole frame since it was asked (one in flight as it was asked holds less).
         const bool read = glass::generation() != g_ask_after && holds(*g_shots, glass::Rect{0, 0, area_w(), area_h()});
-        if (read || GetTickCount64() - g_ask_asked >= kAskWaitMs || glass::refused()) {
+        bool done = false;
+        if (g_ask_restoring) {
+            // After a minimised window: once the game has drawn its picture again, a read of it that shows more than black
+            // (where the frame cannot be read, once it has shown a frame); at most kAskRestoreWaitMs, and not while the
+            // window is minimised again, where the question would show nowhere.
+            const bool drawn = glass::refused() ? g_hooks.frames && g_hooks.frames().count > g_ask_frames : read && picture_in(*g_shots);
+            done = drawn || (waited >= kAskRestoreWaitMs && !IsIconic(g_frame));
+        } else {
+            // The question is made once a read of the whole frame has come, or bare after the wait.
+            done = read || waited >= kAskWaitMs || glass::refused();
+        }
+        if (done) {
             paint_ask();
             // The clock back to its pace.
             glass_wish();
@@ -2644,18 +2676,24 @@ void ask_quit() {
     g_choice = kKeep;
     g_ask_hover = kNone;
     g_ask_pressed = kNone;
+    // Over a minimised window it would show nowhere, and the game drew nothing while it was held there: the window
+    // comes back first, and the game goes on until it has drawn its picture again (a frame or a few; mid-song on its own
+    // pause screen, where the song waits), then holds, and the question shows over that picture.
+    g_ask_restoring = IsIconic(g_frame) || g_minimised_hold;
+    g_ask_frames = g_hooks.frames ? g_hooks.frames().count : 0;
     // A read of the whole frame the X had made ahead (under the pointer a moment ago) is taken at once; else one is
     // asked for now, and the question is made when it comes (a few frames) or bare after kAskWaitMs. The game goes on
-    // meanwhile, so that the read has a frame to read; minimised, it is held already, and the question is made at once.
+    // meanwhile, so that the read has a frame to read. After a minimised window no read is fresh: the game drew nothing.
     if (glass::take(g_shots_seen, g_shots)) g_shots_at = GetTickCount64();
-    const bool fresh = holds(*g_shots, glass::Rect{0, 0, area_w(), area_h()}) && GetTickCount64() - g_shots_at < kAskFreshMs;
-    g_ask_waiting = !fresh && !g_minimised_hold && !glass::refused();
+    const bool fresh = !g_ask_restoring && holds(*g_shots, glass::Rect{0, 0, area_w(), area_h()}) && GetTickCount64() - g_shots_at < kAskFreshMs;
+    // Where the frame cannot be read there is no read to wait for, but after a minimised window still a frame.
+    g_ask_waiting = !fresh && (g_ask_restoring || !glass::refused());
     g_ask_ahead = fresh;
     g_ask_after = glass::generation();
     g_ask_asked = GetTickCount64();
     hide_bar();
     handle_update();
-    // Over a minimised game it would show nowhere: the game comes back first, still held for the question.
+    // Back from minimised: the window lets the game go on as it comes back (minimised(false)), the question waiting.
     if (IsIconic(g_frame)) ShowWindow(g_frame, SW_RESTORE);
     glass_wish();
     if (!g_ask_waiting) paint_ask();
@@ -2669,6 +2707,13 @@ void minimised(bool now) {
     } else {
         // Back: the game goes on (to its own pause screen mid-song), unless the question is up.
         g_minimised_hold = false;
+        // Back while the question waits for the game's picture (asked over the minimised window, or minimised again
+        // meanwhile): its wait, and the frames it waits for, from now.
+        if (g_asking && g_ask_waiting && g_ask_restoring) {
+            g_ask_asked = GetTickCount64();
+            g_ask_after = glass::generation();
+            g_ask_frames = g_hooks.frames ? g_hooks.frames().count : 0;
+        }
     }
     update_hold();
     glass_wish();
