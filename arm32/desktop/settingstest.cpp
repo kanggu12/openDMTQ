@@ -218,6 +218,14 @@ int main() {
     // Spaces around the parts, notes, empty lines and Windows' line ends.
     const player::Settings& loose = read(path, "\r\n# a note\r\n  vsync = off \r\n\r\nvolume\t=\t55\r\nno equals sign here\r\n");
     check(!loose.vsync && loose.volume == 55, "spaces, tabs, notes and CR LF line ends");
+    // The launcher's language: each it has, none by default (the computer's), another left out; read early on its own.
+    check(player::Settings{}.language.empty(), "no language is the default: the computer's");
+    check(read(path, "language=ko\n").language == "ko", "language=ko is Korean");
+    check(read(path, "language=en\n").language == "en", "language=en is English");
+    check(read(path, "language=fr\n").language.empty(), "a language the player does not speak keeps the computer's");
+    read(path, "volume=40\nlanguage = ko\r\nlanguage=xx\n");
+    check(player::settings_language(path) == "ko", "the language read early: spaces and CR LF, another after it left out");
+    check(player::settings_language("no-such-settings-file.txt").empty(), "no file names no language");
     // No file: the defaults, and false.
     player::settings() = player::Settings{};
     check(!player::load_settings("no-such-settings-file.txt"), "a missing file says so");

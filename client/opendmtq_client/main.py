@@ -10,6 +10,8 @@
   OpenDMTQ.exe --audio-devices          list the sound devices the player can play on
   OpenDMTQ.exe --language en|ko|system  the launcher's language (system: Windows' display language)
   OpenDMTQ.exe --guide                  open the first-start guide again at the next start of the window
+  OpenDMTQ.exe --skip-guide             the window opens on its pages, the first-start guide done (the guide's Skip)
+  OpenDMTQ.exe --servers                list the servers this launcher knows, the one PLAY plays on marked *
   OpenDMTQ.exe --open-log player|launcher   show the player's or the launcher's log in Explorer
   OpenDMTQ.exe --play                   get ready and start the game, no window; returns when the game ends
   OpenDMTQ.exe --forget URL [--yes]     forget a server, its sign-in and its app on this PC
@@ -340,9 +342,10 @@ def _status(state):
     # Where the logs are, as Help's Open buttons show them.
     for name, path in _log_paths(state).items():
         _say("%s log: %s" % (name, path or "none yet (no app on this PC)"))
-    checks = actions.readiness(state)
+    # The server asked as the window's ready check asks it: one that does not answer is said, and does not stop PLAY.
+    checks = actions.readiness(state, reached=actions.reach(state))
     for c in checks:
-        mark = "ok  " if c.ok else ("play" if c.play_fixes else "todo")
+        mark = "ok  " if c.ok else ("play" if c.play_fixes else "todo" if c.blocks else "warn")
         _say("  [%s] %s: %s" % (mark, c.key, c.detail))
     return 0 if actions.can_play(checks) else 1
 
@@ -430,6 +433,10 @@ def parse(argv):
     p.add_argument("--language", choices=st.LANGUAGES + ("system",),
                    help="the launcher's language (system: Windows' display language)")
     p.add_argument("--guide", action="store_true", help="open the first-start guide again at the next start")
+    p.add_argument("--skip-guide", action="store_true",
+                   help="open the window on its pages next time, the first-start guide done (as the guide's Skip)")
+    p.add_argument("--servers", action="store_true",
+                   help="list the servers this launcher knows, the one PLAY plays on marked *")
     p.add_argument("--open-log", choices=("player", "launcher"), help="show the player's or the launcher's log")
     p.add_argument("--play", action="store_true", help="get ready and start the game")
     p.add_argument("--forget", metavar="URL", help="forget a server, its sign-in and its app")
@@ -470,7 +477,7 @@ def parse(argv):
 def _writes(args):
     """Whether the command line changes what the launcher keeps (refused while its window is open)."""
     return any((args.set, args.reset, args.forget, args.language, args.guide, args.server, args.sign_in,
-                args.sign_out, args.uninstall))
+                args.sign_out, args.uninstall, args.skip_guide))
 
 
 def window_open():
@@ -483,7 +490,8 @@ def _jobs(args, maintenance=True):
     """Whether the command line asks for any job (none: the window); with `maintenance` False, any but --repair,
     --clear-game-data and --uninstall."""
     return any((args.status, args.server, args.sign_in, args.sign_out, args.app, args.set, args.audio_devices,
-                args.language, args.guide, args.open_log, args.play, args.forget, args.reset, args.update)) or (
+                args.language, args.guide, args.open_log, args.play, args.forget, args.reset, args.update,
+                args.skip_guide, args.servers)) or (
         maintenance and any((args.repair, args.clear_game_data, args.uninstall)))
 
 
@@ -542,10 +550,54 @@ def main(argv=None):
             state.save()
 
 
+def _language_set(args):
+    """--set language=VALUE is --language's other spelling, as the settings' table lists it with the pages' settings:
+    taken out of --set into --language, checked as --language checks it."""
+    rest = []
+    for item in args.set:
+        name, _, value = item.partition("=")
+        if name.strip() != "language":
+            rest.append(item)
+            continue
+        value = value.strip().lower()
+        if value not in st.LANGUAGES + ("system",):
+            raise choices.ChoiceError("language cannot be %r: it is en, ko or system" % value, "error.choice",
+                                      name="language", value=value)
+        args.language = value
+    args.set = rest
+
+
+def _window_fits(args):
+    """--set window=WxH refused for a size the Screen page leaves out: larger than the main display with room for the
+    window's title bar and the taskbar (values.fits, the page's own check). Checked before anything is changed."""
+    from opendmtq_client import displays
+    for item in args.set:
+        name, _, value = item.partition("=")
+        if name.strip() != "window":
+            continue
+        display = displays.main_display()
+        if not choices.fits(value.strip().lower(), display):
+            raise choices.ChoiceError("window cannot be %s: it does not fit this %d x %d display with the window's title "
+                                      "bar and the taskbar" % (value.strip(), display["width"], display["height"]),
+                                      "error.window.too_big", size=value.strip(), w=display["width"],
+                                      h=display["height"])
+
+
+def _servers(state):
+    """--servers: every server this launcher knows, as Online lists them, the one PLAY plays on first and marked *."""
+    if not state.servers:
+        _say("No servers yet (connect with --server URL).")
+        return
+    for server in sorted(state.servers, key=lambda s: s["url"] != state.current):
+        _say("%s %s (%s)" % ("*" if server["url"] == state.current else " ", server["name"], server["url"]))
+
+
 def _run(state, args, jobs):
     """The jobs the command line asked for, in order; else the window."""
     if args.update:
         return _update(args.yes)
+    _language_set(args)
+    _window_fits(args)
     if args.reset:
         # Every server's app goes: refused while a game plays from one, as the window's Start over is.
         if _started_meanwhile():
@@ -588,6 +640,10 @@ def _run(state, args, jobs):
         # The window opens on the guide next time, as Launcher's "Show it again" does.
         state.guide_done = False
         _say("The window opens the first-start guide next time.")
+    if args.skip_guide:
+        # The guide done, as its "Skip: I set it up myself" leaves it: a PC set up from the command line opens on PLAY.
+        state.guide_done = True
+        _say("The window opens on its pages next time, without the first-start guide.")
     if args.server:
         try:
             found = actions.connect(state, args.server)
@@ -624,6 +680,8 @@ def _run(state, args, jobs):
             return 2
         _say(path)
         actions.show_file(path)
+    if args.servers:
+        _servers(state)
     if args.status:
         return _status(state)
     if args.play:

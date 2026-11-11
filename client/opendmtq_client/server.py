@@ -178,10 +178,10 @@ def _unreachable(base, e):
     return ServerError("cannot reach %s (%s)" % (base, reason), key, base=base)
 
 
-def _call(base, path, data=None, cookie=None):
+def _call(base, path, data=None, cookie=None, timeout=TIMEOUT):
     """One request to the site; (status, its JSON answer, its headers). A status of 400 or more comes back as well."""
     try:
-        with _opener(base).open(_request(base + path, data, cookie), timeout=TIMEOUT) as response:
+        with _opener(base).open(_request(base + path, data, cookie), timeout=timeout) as response:
             body, status, headers = response.read(), response.status, response.headers
     except urllib.error.HTTPError as e:
         body, status, headers = e.read(), e.code, e.headers
@@ -194,9 +194,10 @@ def _call(base, path, data=None, cookie=None):
     return status, answer, headers
 
 
-def about(base):
-    """The server's word on itself: {"opendmtq", "name", "address", "app"}; ServerError unless it is an OpenDMTQ server."""
-    status, answer, _ = _call(base, "/opendmtq/client.php?about")
+def about(base, timeout=TIMEOUT):
+    """The server's word on itself: {"opendmtq", "name", "address", "app"}; ServerError unless it is an OpenDMTQ server.
+    `timeout`: how long to wait for its answer (the ready check waits less than a connect)."""
+    status, answer, _ = _call(base, "/opendmtq/client.php?about", timeout=timeout)
     if status != 200 or not isinstance(answer, dict) or "opendmtq" not in answer:
         # A page that is not the client's answer: an OpenDMTQ from before the PC client (every one since 0.1 answers its
         # health page with its game's patch), or another site.

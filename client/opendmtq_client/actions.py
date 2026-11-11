@@ -18,14 +18,18 @@ log = logging.getLogger("opendmtq_client")
 
 
 class Check:
-    """One line of the ready check: whether it is fine, what it says, which page fixes it, and whether PLAY does."""
+    """One line of the ready check: whether it is fine, what it says, which page fixes it, whether PLAY does, and
+    whether it stops PLAY until it is fixed."""
 
-    def __init__(self, key, ok, detail, page=None, play_fixes=False):
+    def __init__(self, key, ok, detail, page=None, play_fixes=False, blocks=None):
         self.key = key                  # a stable name for the line (the words, the tests and the Help page use it)
         self.ok = ok                    # True: nothing to do
         self.detail = detail            # what it is about, in plain words (a name, an address, a file)
         self.page = page                # the page that fixes it, or None
         self.play_fixes = play_fixes    # PLAY does it by itself (downloads the app it lacks)
+        # Not fine, it stops PLAY: by its kind (BLOCKING) unless told (a server that does not answer does not: PLAY
+        # plays this PC's app then).
+        self.blocks = key in BLOCKING if blocks is None else blocks
 
 
 # Ready-check lines that stop PLAY until the player fixes them, unless PLAY fixes them by itself.
@@ -54,11 +58,30 @@ def can_play(checks):
 
 def stopping(checks):
     """The lines that stop PLAY."""
-    return [c for c in checks if not c.ok and c.key in BLOCKING and not c.play_fixes]
+    return [c for c in checks if not c.ok and c.blocks and not c.play_fixes]
 
 
-def readiness(state):
-    """The ready check on the PLAY page and of --status, in the order a player would fix things."""
+# How long the ready check waits for the server's answer (seconds): a server that is up answers at once, one on a slow
+# line or starting its pages within this, and the page shows the last check meanwhile.
+REACH_TIMEOUT = 5
+
+
+def reach(state, timeout=REACH_TIMEOUT):
+    """Whether the server PLAY plays on answers as an OpenDMTQ server now: True, or the ServerError it gave; None with
+    no server. The ready check's Server line follows it (readiness)."""
+    server = state.server()
+    if server is None:
+        return None
+    try:
+        srv.about(server["url"], timeout=timeout)
+        return True
+    except srv.ServerError as e:
+        return e
+
+
+def readiness(state, reached=None):
+    """The ready check on the PLAY page and of --status, in the order a player would fix things. `reached` is how the
+    server answered just now (reach): True, the error it gave, or None when it was not asked (PLAY asks it itself)."""
     lines = []
     path = player.player_path()
     # The player comes with the launcher: without it, installing again is the fix.
@@ -66,7 +89,12 @@ def readiness(state):
     server = state.server()
     if server is None:
         return lines + [Check("server", False, "no server chosen", page="online")]
-    lines.append(Check("server", True, "%s (%s)" % (server["name"], server["url"]), page="online"))
+    answered = not isinstance(reached, BaseException)
+    if answered:
+        lines.append(Check("server", True, "%s (%s)" % (server["name"], server["url"]), page="online"))
+    else:
+        # Not answering: nothing on this PC to fix, and PLAY still plays the app this PC has (it says so).
+        lines.append(Check("server", False, str(reached), page="online", blocks=False))
     signed = state.signed_in(server)
     lines.append(Check("account", signed, server.get("account") or "not signed in", page="online"))
     have = apps.local(server["url"])
@@ -75,10 +103,11 @@ def readiness(state):
         newer = bool(offered.get("sha256")) and offered["sha256"].lower() != have["sha256"]
         # A newer app the server offered at the last look: PLAY gets it first when the sign-in still holds.
         lines.append(Check("app", True, when(have), page="online") if not newer else
-                     Check("app_update", False, when(offered), page="online", play_fixes=signed))
+                     Check("app_update", False, when(offered), page="online", play_fixes=signed and answered))
     else:
-        # No app yet: PLAY downloads it when signed in, else the sign-in comes first (Online).
-        lines.append(Check("app", False, "not downloaded", page="online", play_fixes=signed))
+        # No app yet: PLAY downloads it when signed in and the server answers, else the sign-in comes first (Online),
+        # or the server.
+        lines.append(Check("app", False, "not downloaded", page="online", play_fixes=signed and answered))
     if playing.running():
         # One game at a time: the player's data is the same folder.
         lines.append(Check("running", False, "a game is running"))
@@ -202,7 +231,8 @@ def play(state, report=lambda step, done=None, total=None: None, cancel=None, ch
                 # Played all the same, from this PC's app, which may be older than the server's: said so.
                 report("offline")
     report("starting")
-    settings = player.write_settings(state.values)
+    # The launcher's language goes to the player too when the player chose one (none: both follow Windows).
+    settings = player.write_settings(state.values, state.picked_language)
     have = apps.local(server["url"])
     # The player makes the game's data folder of the app's package name, its log in it: one that is no package name
     # stops the start here with its own words (player.NotAPackage), before anything is made of it.

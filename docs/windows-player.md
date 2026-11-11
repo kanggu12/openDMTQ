@@ -37,14 +37,16 @@ closed); while a game runs it installs nothing and ends with 3.
 | **Launcher** | The language, updates of the launcher, the first-start guide again |
 
 **PLAY** asks the server for a newer app first and downloads it when there is one; when the server cannot be asked, the
-game starts with the app this PC has. The launcher updates itself from the project's releases: **Launcher**, **Check for
+game starts with the app this PC has. The checks ask the server too: one that does not answer is said on the **Play** and
+**Help** pages and does not stop **PLAY**. The launcher updates itself from the project's releases: **Launcher**, **Check for
 updates**. Without internet, the installer from the server's **Download** page updates it instead, once the server has
 a newer one; the servers and the settings stay. While the game runs the launcher steps aside, and comes back when the
 game ends.
 
 `OpenDMTQ-cmd.exe`, in `%LOCALAPPDATA%\OpenDMTQ.Client\current`, does the same from the command line: `--status`
 (exit 0 when PLAY can go), `--server URL`, `--sign-in ID` (the password from standard input), `--sign-out`, `--app`,
-`--set NAME=VALUE`, `--audio-devices`, `--language en|ko|system`, `--guide`, `--open-log player|launcher`, `--play`,
+`--set NAME=VALUE`, `--audio-devices`, `--language en|ko|system`, `--guide`, `--skip-guide` (the guide's **Skip**: the
+window opens on its pages), `--servers` (the servers it knows, as **Online** lists them), `--open-log player|launcher`, `--play`,
 `--update`, `--forget URL`, `--reset`, `--repair`, `--clear-game-data` and `--uninstall [--delete-data]`, with `--yes`
 to answer their questions (`--help` lists them all). While the launcher's window is open, the flags that change what
 it keeps are refused. `--set` takes the settings of the **Screen** and **Sound** pages:
@@ -52,7 +54,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | Setting | Values (the default first) | On the page |
 | :--- | :--- | :--- |
 | `display` | `fullscreen`, `window` | Mode |
-| `window` | `auto` (fitted to the display), `1280x720`, `1600x900`, `1920x1080`, `2560x1440`, `3840x2160`, or any `WIDTHxHEIGHT` from 320x180 | Window size |
+| `window` | `auto` (fitted to the display), `1280x720`, `1600x900`, `1920x1080`, `2560x1440`, `3840x2160`, or any `WIDTHxHEIGHT` from 320x180 that fits the main display with room for the window's title bar and the taskbar, as the page offers them | Window size |
 | `vsync` | `on`, `off` | VSync |
 | `fps` | `auto` (the display's rate), `30`, `60`, `120`, `144`, `165`, `180`, `240`, `360`, `unlimited` | Frame limit |
 | `show_fps` | `off`, `on` (a corner's name, as `fps_position` takes it, is on in that corner) | FPS counter |
@@ -64,6 +66,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | `audio_mode` | `shared`, `exclusive` (the device alone) | Mode |
 | `audio_buffer` | `normal`, `low`, `safe` | Buffer |
 | `volume` | `100`, or any number from 0 | Volume |
+| `language` | `system` (Windows' display language), `en`, `ko`: the same as `--language` | Language, on the **Launcher** page; the game and what the player draws over it speak it too |
 
 ### In the game
 
@@ -209,8 +212,10 @@ where it can be watched.
   Media Feature Pack, under Settings, Optional features (in Apps or in System, by the version of Windows). Without it
   the videos are black and silent, and the game goes on.
 - **The language:** the launcher speaks Windows' display language, Korean or English, until one is chosen on the
-  first-start guide's first step or the **Launcher** page, and the installer speaks the launcher's. What the player draws
-  over the game follows Windows' display language, and so does the game, among the languages it has.
+  first-start guide's first step or the **Launcher** page, and the installer speaks the launcher's. The game and what
+  the player draws over it (the bar, the question before quitting, the broadcast notice, its messages) speak the
+  launcher's language once one is chosen, among the languages the game has, and Windows' display language until then;
+  the country stays Windows'. The launcher hands it over in the settings file it writes before each start (`language=`).
 - **What it keeps on the PC,** per Windows user:
   - the program, in `%LOCALAPPDATA%\OpenDMTQ.Client`;
   - the launcher's settings and logs, and each server's app, in `%LOCALAPPDATA%\OpenDMTQ\client`;
@@ -285,8 +290,8 @@ server's app, `--settings` the file).
 
 ## When something goes wrong
 
-- **The game does not start:** the launcher says why on its bottom line, with a link to the player's log; **Help**
-  opens it too. The log is `player.log` in the game's folder in `%LOCALAPPDATA%\OpenDMTQ`; the launcher's own is in
+- **The game does not start:** the launcher says why on its bottom line, with a link to the player's log (**Open the
+  game log**); **Help** opens it too. The log is `player.log` in the game's folder in `%LOCALAPPDATA%\OpenDMTQ`; the launcher's own is in
   `%LOCALAPPDATA%\OpenDMTQ\client\logs`.
 - **The launcher says the server runs an older OpenDMTQ:** the PC client needs a server of 0.8 or newer.
 - **The player is missing or a file of the program is damaged:** **Help**, **Repair** puts the program's files back

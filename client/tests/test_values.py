@@ -74,6 +74,41 @@ class Values(unittest.TestCase):
         self.assertEqual(choices.size_of("1280x720"), (1280, 720))
         self.assertIsNone(choices.size_of("auto"))
 
+    def test_vsync_pacing_is_the_players(self):
+        # The refreshes a frame stays for with VSync, as the player's pacing_math.h has them (its own test's cases):
+        # every refresh without a limit or at the rate and above, a whole fraction near the limit, else by the clock.
+        cases = [(60.0, "60", 1), (59.94, "60", 1), (60.0, "120", 1), (144.0, "144", 1), (180.0, "240", 1),
+                 (240.084, "240", 1), (240.084, "120", 2), (240.084, "60", 4), (144.0, "72", 2), (180.0, "60", 3),
+                 (165.0, "60", 3), (360.0, "120", 3), (360.0, "180", 2), (120.0, "60", 2), (240.084, "130", 2),
+                 (240.084, "144", 0), (144.0, "120", 0), (144.0, "60", 0), (165.0, "144", 0), (180.0, "144", 0),
+                 (360.0, "240", 0), (144, "auto", 1), (144, "unlimited", 1)]
+        for hz, fps, want in cases:
+            self.assertEqual(choices.vsync_refreshes(hz, fps), want, (hz, fps))
+        # Above the rate (the same 3 % margin): no limit, a number past it; not auto, not a rate a little under 144.
+        self.assertTrue(choices.above_rate(144, "165"))
+        self.assertTrue(choices.above_rate(60, "unlimited"))
+        self.assertFalse(choices.above_rate(143, "144"))
+        self.assertFalse(choices.above_rate(144, "auto"))
+        self.assertFalse(choices.above_rate(None, "360"))
+
+    def test_the_frame_limits_offered_and_their_words(self):
+        # With VSync on a 144 Hz display: nothing above 144 offered, a limit kept from before keeps its row; the hint
+        # names this display's rate and what the limit gives on it, never another display's.
+        from opendmtq_client import i18n, pages
+        offered = pages.fps_choices(True, 144, "auto")
+        self.assertEqual(offered, ["auto", "30", "60", "120", "144"])
+        self.assertEqual(pages.fps_choices(True, 144, "240")[-1], "240")
+        self.assertEqual(pages.fps_choices(False, 144, "auto"), list(choices.FPS))
+        self.assertEqual(pages.fps_choices(True, None, "auto"), list(choices.FPS))
+        w = i18n.Words("en")
+        self.assertEqual(pages.fps_hint(w, True, "72", 144), "On this 144 Hz display: 72 fps exactly.")
+        self.assertEqual(pages.fps_hint(w, True, "60", 144), "On this 144 Hz display: very nearly 60 fps.")
+        self.assertEqual(pages.fps_hint(w, True, "130", 240), "On this 240 Hz display: 120 fps exactly.")
+        self.assertEqual(pages.fps_hint(w, True, "240", 144), w("screen.fps.hint.vsync.above", hz=144))
+        self.assertEqual(pages.fps_hint(w, True, "auto", 144), w("screen.fps.hint.vsync_rate"))
+        self.assertEqual(pages.fps_hint(w, False, "240", 144), w("screen.fps.hint.free"))
+        self.assertNotIn("240", pages.fps_hint(w, True, "120", None))
+
     def test_settings_file(self):
         text = choices.settings_text({"display": "window", "window": "1600x900", "vsync": "off", "fps": "unlimited",
                                       "render_scale": "75", "upscaler": "nis", "anti_aliasing": "smaa", "show_fps": "on",

@@ -10,7 +10,7 @@ import os
 import threading
 import tkinter as tk
 
-from opendmtq_client import actions, apps, dialogs, displays, maintenance, player, theme, updates, widgets
+from opendmtq_client import actions, apps, dialogs, displays, i18n, maintenance, player, theme, updates, widgets
 from opendmtq_client import server as srv
 from opendmtq_client import state as st
 from opendmtq_client import values as choices
@@ -101,23 +101,31 @@ def build_play(app, parent):
     ui, w = app.ui, app.words
     _server_card(app, parent)
     left, right = _columns(parent, ui)
-    # Left: the ready check, filled in when the worker thread finishes it, as tall as the column.
+    # Left: the ready check, filled in when the worker thread finishes it, as tall as the column so that the row's
+    # cards end on one line; Check again stands at its foot, so the room the column gives it lies between the rows and
+    # their button instead of under everything.
     ready = widgets.Card(left, ui, w("play.ready"))
     ready.pack(fill="both", expand=True)
+    foot = tk.Frame(ready.body, bg=theme.PANEL)
+    foot.pack(side="bottom", fill="x", pady=(ui.px(16), 0))
+    widgets.Button(foot, ui, w("help.recheck"), lambda: app.refresh_checks(force=True)).pack(anchor="w")
     app.check_box = tk.Frame(ready.body, bg=theme.PANEL)
     app.check_box.pack(fill="x")
-    # Right: how to play, and how the last game went.
+    # Right: how to play, and how the last game went, the last as tall as what is left of the column (when the ready
+    # check is the taller), its button at its foot.
     how = _card(right, ui, w("play.how"))
     for i, key in enumerate(("play.how.1", "play.how.2", "play.how.3")):
         if i:
             widgets.divider(how.body, ui, pady=8)
         widgets.label(how.body, ui, w(key), wrap_margin=0).pack(fill="x")
-    last = _card(right, ui, w("play.last"), last=True)
-    widgets.label(last.body, ui, _last_session(app), fg=theme.MUTED, wrap_margin=0).pack(fill="x")
+    last = widgets.Card(right, ui, w("play.last"))
+    last.pack(fill="both", expand=True)
     record = app.state.last_session or {}
     if record.get("crashed") or record.get("failed_start"):
         # The reason is in the player's log: one press away from where it says the game stopped.
-        widgets.Button(last.body, ui, w("status.open_log"), app.open_player_log).pack(anchor="w", pady=(ui.px(12), 0))
+        widgets.Button(last.body, ui, w("status.open_log"), app.open_player_log).pack(side="bottom", anchor="w",
+                                                                                      pady=(ui.px(12), 0))
+    widgets.label(last.body, ui, _last_session(app), fg=theme.MUTED, wrap_margin=0).pack(fill="x")
     # Made again each time the page shows: a sign-in can have ended, or an app come, since the last one. Until it
     # comes back, the box says it is being made.
     app.refresh_checks()
@@ -144,11 +152,14 @@ def refresh_checks(app):
     for child in box.winfo_children():
         child.destroy()
     ui, w = app.ui, app.words
-    if app.checks is None:
+    # While a check is made (it may ask the server for a few seconds), the last one that came back stays on show: the
+    # rows do not blink to "..." and back each time a page asks for one.
+    checks = app.checks if app.checks is not None else getattr(app, "shown_checks", None)
+    if checks is None:
         widgets.label(box, ui, "...", fg=theme.MUTED).pack(anchor="w")
         return
     from opendmtq_client import installed
-    for i, check in enumerate(app.checks):
+    for i, check in enumerate(checks):
         if i:
             widgets.divider(box, ui, pady=9)
         name, value, action, fix = w("check." + check.key), None, None, w("play.fix")
@@ -168,6 +179,9 @@ def refresh_checks(app):
         elif check.play_fixes:
             # PLAY does these by itself; the row only says it will.
             state, value = "change", w("play.will_get")
+        elif not check.blocks and check.key == "server":
+            # The server does not answer: nothing to fix on this PC, and PLAY still plays this PC's app.
+            state, value = "change", w("check.server.down")
         else:
             state = "bad" if check.key in actions.BLOCKING else "change"
             action = (lambda p=check.page: app.nav_go(p)) if check.page and app.guide is None else None
@@ -198,9 +212,9 @@ def screen_rows(app, parent, redraw, full=True):
                                                     set_and_redraw("display")),
                         w("screen.mode.hint." + mode)).pack(fill="x")
     if mode == "window" and full:
-        # Sizes that fit the display with room for the title bar and the taskbar; fitted always stays.
-        sizes = [s for s in choices.WINDOW_SIZES if s == "auto" or (choices.size_of(s)[0] <= display["width"] and
-                                                                  choices.size_of(s)[1] + 80 <= display["height"])]
+        # Sizes that fit the display with room for the title bar and the taskbar (values.fits, which --set window= uses
+        # too); fitted always stays.
+        sizes = [s for s in choices.WINDOW_SIZES if choices.fits(s, display)]
         if v["window"] not in sizes:
             # A size set on the command line keeps its row.
             sizes.append(v["window"])
@@ -223,15 +237,15 @@ def screen_rows(app, parent, redraw, full=True):
                                                  lambda on: set_and_redraw("vsync")("on" if on else "off")),
                         w("screen.vsync.hint." + ("on" if vsync else "off"))).pack(fill="x")
     rate = w("screen.fps.auto.hz", hz=hz) if hz else w("screen.fps.auto")
-    # The VSync hint about fractions of the rate only means something for a number of frames.
-    numbered = v["fps"] not in ("auto", "unlimited")
-    fps_hint = ("vsync" if numbered else "vsync_rate") if vsync else "free"
+    # With VSync on a display whose rate is known, the limits above that rate are left out: VSync holds the game at the
+    # display's rate whatever the limit (values.vsync_refreshes, the player's own arithmetic). A limit set before (with
+    # VSync off, or on the command line) keeps its row, and its hint says so.
     options = [(f, rate if f == "auto" else w("screen.fps.unlimited") if f == "unlimited" else w("screen.fps.n", n=f))
-               for f in choices.FPS]
+               for f in fps_choices(vsync, hz, v["fps"])]
     widgets.divider(card.body, ui)
     widgets.setting_row(card.body, ui, w("screen.fps"),
                         lambda p: widgets.Select(p, ui, options, v["fps"], set_and_redraw("fps"), width=22),
-                        w("screen.fps.hint." + fps_hint)).pack(fill="x")
+                        fps_hint(w, vsync, v["fps"], hz)).pack(fill="x")
     # The frame counter over the game, on or off; while on, its corner (the top left unless another is picked). Drawn
     # again on a change: the corner's row is there only while the counter is on.
     counter = v["show_fps"] == "on"
@@ -273,6 +287,33 @@ def screen_rows(app, parent, redraw, full=True):
                         w("screen.aa.hint." + kind)).pack(fill="x")
 
 
+def fps_choices(vsync, hz, current):
+    """The frame limits the Screen page offers: all of them, but with VSync on a display whose rate is known none above
+    that rate (VSync holds the game at it whatever the limit); the `current` one keeps its row all the same."""
+    offered = [f for f in choices.FPS if not (vsync and hz) or not choices.above_rate(hz, f)]
+    return offered + ([current] if current not in offered else [])
+
+
+def fps_hint(w, vsync, fps, hz):
+    """The frame limit's hint for its value: without VSync, the game holds it itself; with VSync, the display's own
+    rate, or on a display whose rate is known, what this limit gives there (exactly, very nearly, or held at the rate:
+    values.vsync_refreshes, as the player paces the frames)."""
+    if not vsync:
+        return w("screen.fps.hint.free")
+    if fps == "auto":
+        return w("screen.fps.hint.vsync_rate")
+    if not hz:
+        return w("screen.fps.hint.vsync")
+    if choices.above_rate(hz, fps):
+        # Above the display's rate: every refresh, no more.
+        return w("screen.fps.hint.vsync.above", hz=hz)
+    refreshes = choices.vsync_refreshes(hz, fps)
+    if refreshes:
+        # Each frame the same number of refreshes: the rate a whole fraction of the display's.
+        return w("screen.fps.hint.vsync.exact", hz=hz, fps=int(round(hz / float(refreshes))))
+    return w("screen.fps.hint.vsync.near", hz=hz, n=fps)
+
+
 def _focus_order(widget):
     """The widgets under `widget` that take the keyboard, in the order Tab visits them (the page's packing order)."""
     found = []
@@ -290,24 +331,28 @@ def _focus_order(widget):
     return found
 
 
-def redraw_in_place(app, page):
-    """The page drawn again for a change (a choice that adds or removes rows), keeping where it was scrolled to and the
-    control the keyboard was on: choosing an anti-aliasing at the page's foot does not throw the page back to its top
-    and the keyboard out of it."""
-    area = app.body
+def keep_place(area, root, rebuild):
+    """A page area drawn again by `rebuild()` for a change (a choice that adds or removes rows, an answer that came),
+    keeping where it was scrolled to and the control the keyboard was on: choosing a buffer at the Sound page's foot,
+    or switching VSync on the guide's SOUND CHECK, does not throw the page back to its top and the keyboard out of it."""
     top = area.canvas.yview()[0]
     before = _focus_order(area.inner)
-    focused = app.root.focus_get()
+    focused = root.focus_get()
     index = before.index(focused) if focused in before else None
-    app.go(page)
+    rebuild()
     # Laid out first, so that the scroll's place is measured on the new page's height.
-    app.root.update_idletasks()
+    root.update_idletasks()
     area.canvas.yview_moveto(top)
     if index is not None:
         # The rows before the changed one are the same, so the same place in the order is the same control.
         after = _focus_order(area.inner)
         if index < len(after):
             after[index].focus_set()
+
+
+def redraw_in_place(app, page):
+    """A page of the launcher drawn again in place (keep_place)."""
+    keep_place(app.body, app.root, lambda: app.go(page))
 
 
 def build_screen(app, parent):
@@ -368,7 +413,8 @@ def sound_rows(app, parent, redraw, full=True):
 
 
 def build_sound(app, parent):
-    sound_rows(app, parent, lambda: app.page == "sound" and app.go("sound"))
+    # Drawn again in place for a choice and for the devices when they come (only while the page is still on show).
+    sound_rows(app, parent, lambda: app.page == "sound" and redraw_in_place(app, "sound"))
 
 
 # ------------------------------------------------------------------------------------------ Controls
@@ -376,9 +422,11 @@ def build_sound(app, parent):
 
 def build_controls(app, parent):
     ui, w = app.ui, app.words
-    groups = (("controls.mouse", ("controls.click", "controls.drag", "controls.wheel", "controls.menu")),
-              ("controls.touch", ("controls.fingers", "controls.edges")),
-              ("controls.keyboard", ("controls.esc", "controls.f11", "controls.typing")))
+    # The game's bar over it in each group by the way it comes: the pointer, a finger, and the keys it does not take.
+    groups = (("controls.mouse", ("controls.click", "controls.drag", "controls.wheel", "controls.menu",
+                                  "controls.minimise")),
+              ("controls.touch", ("controls.fingers", "controls.edges", "controls.bar")),
+              ("controls.keyboard", ("controls.esc", "controls.f11", "controls.alt_f4", "controls.typing")))
     for n, (title, keys) in enumerate(groups):
         card = _card(parent, ui, w(title), last=n == len(groups) - 1)
         for i, key in enumerate(keys):
@@ -401,7 +449,7 @@ def server_line(app):
         if not server or check["url"] != server["url"]:
             # An address the player typed, not the server in use: said this once, then the line is the server's again.
             check["seen"] = True
-        return check["text"], theme.BAD
+        return w.error(check["error"]), theme.BAD
     if server and check and check["state"] == "ok" and check["url"] == server["url"]:
         return w("online.connected", name=server["name"]), theme.OK
     if server:
@@ -429,7 +477,7 @@ def check_server(app, address, then=None):
         except Exception as e:  # noqa: BLE001  (ServerError, or anything else: shown, never a silent stop)
             # The system's own words for it go to the log; the window says it plainly.
             log.info("could not connect to %s: %s", address, e)
-            app.post(lambda text=w.error(e): answered({"url": address, "state": "failed", "text": text}))
+            app.post(lambda error=e: answered({"url": address, "state": "failed", "error": error}))
 
     def answered(check):
         app.server_check = check
@@ -454,8 +502,9 @@ def connect_panel(app, parent, rerender, forget=False):
     row = tk.Frame(parent, bg=bg)
     row.pack(fill="x")
     tk.Label(row, text=w("online.address"), font=ui.fonts.small, fg=theme.MUTED, bg=bg).grid(row=0, column=0, sticky="w")
-    address = widgets.entry(row, ui, width=34)
-    address.grid(row=1, column=0, sticky="w", padx=(0, ui.px(12)), ipady=ui.px(4))
+    field = widgets.Field(row, ui, width=34)
+    field.grid(row=1, column=0, sticky="w", padx=(0, ui.px(12)))
+    address = field.entry
     server = app.state.server()
     address.insert(0, server["url"] if server else "")
     text, colour = server_line(app)
@@ -471,7 +520,9 @@ def connect_panel(app, parent, rerender, forget=False):
         answer.configure(text=w("online.connecting"), fg=theme.MUTED)
 
     address.bind("<Return>", lambda e: connect())
-    widgets.Button(row, ui, w("online.connect"), connect, kind="primary").grid(row=1, column=1, sticky="w")
+    # The page's main action is the next step: Connect while there is no server (then Sign in, then the app's download).
+    widgets.Button(row, ui, w("online.connect"), connect, kind="secondary" if server else "primary").grid(
+        row=1, column=1, sticky="w")
     if server and forget:
         # After Connect, apart from it: the next server this launcher knows becomes the one PLAY plays on.
         widgets.Button(row, ui, w("online.forget"), lambda: forget_server(app, server, rerender),
@@ -488,7 +539,8 @@ def signin_panel(app, parent, rerender):
     server = app.state.server()
     if server is None:
         return
-    card = _card(parent, ui, w("online.account"))
+    # The card's title says the state: signed in, or the sign-in to make.
+    card = _card(parent, ui, w("online.account.signed" if app.state.signed_in(server) else "online.account"))
     parent, bg = card.body, theme.PANEL
     if app.state.signed_in(server):
         signed = tk.Frame(parent, bg=bg)
@@ -498,8 +550,9 @@ def signin_panel(app, parent, rerender):
         def sign_out():
             if app.busy_now():
                 # The download or the game uses the sign-in now: it stays until they are over.
-                app.set_status(w("online.busy"), "warn")
+                app.set_status(i18n.Said("online.busy"), "warn")
                 return
+            app.user_acted()
             actions.sign_out(app.state)
             app.state.save()
             app.refresh_checks()
@@ -515,9 +568,9 @@ def signin_panel(app, parent, rerender):
     fields = {}
     for col, (key, secret) in enumerate((("online.id", False), ("online.password", True))):
         tk.Label(form, text=w(key), font=ui.fonts.small, fg=theme.MUTED, bg=bg).grid(row=0, column=col, sticky="w")
-        field = widgets.entry(form, ui, width=16, secret=secret)
-        field.grid(row=1, column=col, sticky="w", padx=(0, ui.px(12)), ipady=ui.px(4))
-        fields[key] = field
+        box = widgets.Field(form, ui, width=16, secret=secret)
+        box.grid(row=1, column=col, sticky="w", padx=(0, ui.px(12)))
+        fields[key] = box.entry
     if server.get("account"):
         # The account signed in before: only the password to type again.
         fields["online.id"].insert(0, server["account"])
@@ -558,6 +611,8 @@ def signin_panel(app, parent, rerender):
 
     def signed_in():
         asking["now"] = False
+        # A sign-in is the player's doing: a message kept until then gives way (a sign-in that had ended, say).
+        app.user_acted()
         app.state.save()
         app.refresh_checks()
         rerender()
@@ -591,21 +646,21 @@ def app_panel(app, parent, rerender):
     widgets.label(parent, ui, text, fg=colour, bg=bg, wrap_margin=0).pack(fill="x", pady=(0, ui.px(10)))
     if app.download is None and app.app_note and not newer:
         # The last look for a newer app found none: said here, where its button is.
-        widgets.label(parent, ui, app.app_note, font=ui.fonts.small, fg=theme.MUTED, bg=bg, wrap_margin=0).pack(
+        widgets.label(parent, ui, w.say(app.app_note), font=ui.fonts.small, fg=theme.MUTED, bg=bg, wrap_margin=0).pack(
             fill="x", pady=(0, ui.px(10)))
     if app.download is None and app.download_error:
         # What the last try said (a stop, a sign-in that ended, a line that broke), in the same colour as the status
         # line says it: the guide has no status line to say it.
         said, tone = app.download_error
-        widgets.label(parent, ui, said, font=ui.fonts.small, fg=theme.WARN if tone == "warn" else theme.BAD, bg=bg,
-                      wrap_margin=0).pack(fill="x", pady=(0, ui.px(10)))
+        widgets.label(parent, ui, w.say(said), font=ui.fonts.small, fg=theme.WARN if tone == "warn" else theme.BAD,
+                      bg=bg, wrap_margin=0).pack(fill="x", pady=(0, ui.px(10)))
     if app.download is not None:
         # The download under way: its bar, kept moving by the app (app._download_moved), and Cancel.
         bar = widgets.Progress(parent, ui, bg=bg)
         bar.pack(anchor="w", pady=(0, ui.px(10)))
         done, total = app.download["done"], app.download["total"]
         # The status line's words (app.download_words): how far it is, the server asked first, or stopping.
-        bar.set(done / float(total) if total else None, app.download_words())
+        bar.set(done / float(total) if total else None, w.say(app.download_words()))
         app.download_bar = bar
         stopping = app.download.get("stopping")
         stop = widgets.Button(parent, ui, w("online.stopping") if stopping else w("common.cancel"), lambda: halt())
@@ -639,7 +694,7 @@ def _date(details):
 def _get(app, rerender):
     """Ask the server for its app and download it when this PC lacks it; the page shows the progress."""
     if app.busy_now():
-        app.set_status(app.words("online.busy"), "warn")
+        app.set_status(i18n.Said("online.busy"), "warn")
         return
     app.get_app(done_then=lambda error: rerender())
     rerender()
@@ -661,8 +716,11 @@ def known_servers(app, parent, rerender):
 
         def pick(url=s["url"]):
             if app.busy_now():
-                app.set_status(w("online.busy"), "warn")
+                app.set_status(i18n.Said("online.busy"), "warn")
                 return
+            # Another server to play on: what the line said about the one before (an installer's server, a failure)
+            # gives way to where PLAY stands on this one once the ready check below answers.
+            app.user_acted()
             app.state.current = url
             # What the last server's download said is not this one's.
             app.download_error, app.app_note = None, None
@@ -685,12 +743,14 @@ def forget_server(app, server, rerender):
     in_use = server["url"] == app.state.current
     if in_use and app.files_in_use():
         # Its app is downloading or playing, from this window or the command line.
-        app.set_status(w("online.busy"), "warn")
+        app.set_status(i18n.Said("online.busy"), "warn")
         return
     # The question short, the server it is about named in the line under it.
     if not dialogs.ask(app, "danger", w("online.forget.title"), w("online.forget.ask"),
                        w("online.forget.detail", name=server["name"]), w("online.forget")):
         return
+    # The player's doing: a line kept about the server that goes gives way.
+    app.user_acted()
     actions.forget(app.state, server["url"])
     if in_use:
         # What the last download and the last look said was about the server that is gone.
@@ -714,8 +774,8 @@ def build_online(app, parent):
 def build_help(app, parent):
     ui, w = app.ui, app.words
     card = _card(parent, ui, w("help.checks"))
-    # Check again at the title's right end.
-    widgets.Button(card.head, ui, w("help.recheck"), app.refresh_checks).pack(side="right")
+    # Check again at the title's right end: the server asked again too, whatever its last answer.
+    widgets.Button(card.head, ui, w("help.recheck"), lambda: app.refresh_checks(force=True)).pack(side="right")
     app.check_box = tk.Frame(card.body, bg=theme.PANEL)
     app.check_box.pack(fill="x")
     app.refresh_checks()
@@ -757,24 +817,24 @@ def build_help(app, parent):
     if root:
         # Only the installed launcher has a package to put its files back from.
         widgets.divider(card.body, ui)
-        widgets.setting_row(card.body, ui, w("help.repair"),
+        widgets.setting_row(card.body, ui, w("help.repair.row"),
                             lambda p: widgets.Button(p, ui, w("help.repair"), lambda: maintenance.repair_program(app)),
                             w("help.repair.hint")).pack(fill="x")
     # From the least to the most: the game's data, the launcher's, the program.
     card = _card(parent, ui, w("help.remove"), last=True)
-    widgets.setting_row(card.body, ui, w("help.clear"),
+    widgets.setting_row(card.body, ui, w("help.clear.row"),
                         lambda p: widgets.Button(p, ui, w("help.clear.confirm"), lambda: maintenance.clear_game_data(app),
                                                  kind="danger"),
                         w("help.clear.hint")).pack(fill="x")
     widgets.divider(card.body, ui)
 
-    widgets.setting_row(card.body, ui, w("help.reset"),
+    widgets.setting_row(card.body, ui, w("help.reset.row"),
                         lambda p: widgets.Button(p, ui, w("help.reset"), lambda: maintenance.start_over(app), kind="danger"),
                         w("help.reset.hint")).pack(fill="x")
     if root and installed.updater(root):
         # Velopack's uninstaller is what takes the program; a copied folder is deleted as any folder.
         widgets.divider(card.body, ui)
-        widgets.setting_row(card.body, ui, w("help.uninstall"),
+        widgets.setting_row(card.body, ui, w("help.uninstall.row"),
                             lambda p: widgets.Button(p, ui, w("help.uninstall"), lambda: maintenance.uninstall_program(app),
                                                      kind="danger"),
                             w("help.uninstall.hint")).pack(fill="x")

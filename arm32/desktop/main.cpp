@@ -283,6 +283,8 @@ int main(int argc, char** argv) {
     // No arguments: a double click, the app from the player's own folder as the server's download lays it out; --app:
     // the PC client's start, the app from the folder it keeps for a server. Its log goes to the user's folder from here.
     const bool from_folder = argc == 1 || !app_folder.empty();
+    // The language the launcher chose, before anything is said: a folder the player cannot use is said in it too.
+    if (!settings_path.empty()) player::settings().language = player::settings_language(settings_path);
     if (from_folder) {
         std::string why;
         if (!player::use_own_folder(app_folder, why)) {

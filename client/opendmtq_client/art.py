@@ -7,7 +7,7 @@ down, because Tk's own canvas does not smooth diagonal edges.
 import collections
 import math
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 from opendmtq_client import theme
 
@@ -157,9 +157,10 @@ def version_block(label, version, scale=1.0, accent=theme.OK):
 
 
 def brand(scale=1.0, version="", mark=26, label="PC CLIENT"):
-    """The header's left end: the wordmark with PC after it, and the version block beside it standing on the same
-    line, as the site's front page sets its version. Returns an RGBA picture."""
-    logo = wordmark(mark, scale, suffix="PC")
+    """The header's left end: the wordmark, and the version block beside it standing on the same line, as the site's
+    front page sets its version; the block's label says what this is (PC CLIENT), so the wordmark carries no suffix.
+    Returns an RGBA picture."""
+    logo = wordmark(mark, scale)
     block = version_block(label, version, scale) if version else None
     if block is None:
         return logo
@@ -412,14 +413,21 @@ def tab_face(width, height, state, scale=1.0, bg=theme.PANEL):
     shape = Image.new("L", (w, h), 0)
     ImageDraw.Draw(shape).polygon([(slant, 0), (w - slant, 0), (w, h), (0, h)], fill=255)
     img.paste(_rgb(fill), (0, 0), shape)
+    # Its depth, drawn at the picture's own scale: the choices raised, the chosen one sunk (pressed in).
+    if state == "on":
+        sunk(img, shape, scale * k, fill, depth=2)
+    else:
+        raised(img, shape, scale * k, fill)
     return img.resize((width, height), Image.LANCZOS)
 
 
-def play_button(width, height, state="normal"):
-    """The PLAY button: a lime slab with its corners cut at 45 degrees, the site's main button in the game's shape."""
+def play_button(width, height, state="normal", scale=None):
+    """The PLAY button: a lime slab with its corners cut at 45 degrees, the site's main button in the game's shape;
+    raised while it can be pressed, sunk while it is held, flat while it waits or the game plays. `scale`: the screen's
+    (its 50 logical pixels of height by default)."""
+    scale = scale or height / 50.0
     w, h = width * SS, height * SS
     cut = int(h * 0.28)
-    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     top, bottom = {
         "normal": ("#b2f777", theme.OK),
         "hover": ("#c6fa98", "#9df55a"),
@@ -427,19 +435,26 @@ def play_button(width, height, state="normal"):
         "disabled": ("#262d37", "#1d232b"),
         "playing": ("#2c3646", "#222a36"),
     }[state]
-    # A vertical gradient, then the cut-corner outline as its mask.
+    # A vertical gradient, then the cut-corner outline as its mask (the picture's own transparency).
     grad = Image.linear_gradient("L").resize((w, h))
-    body = Image.composite(Image.new("RGBA", (w, h), _rgb(bottom) + (255,)),
-                           Image.new("RGBA", (w, h), _rgb(top) + (255,)), grad)
+    body = Image.composite(Image.new("RGB", (w, h), _rgb(bottom)), Image.new("RGB", (w, h), _rgb(top)), grad)
     mask = Image.new("L", (w, h), 0)
     ImageDraw.Draw(mask).polygon(cut_outline(0, 0, w, h, cut), fill=255)
-    img.paste(body, (0, 0), mask)
     if state in ("normal", "hover"):
-        # A thin bright edge along the top, the chrome highlight.
+        # A thin bright edge along the top, the chrome highlight, and the slab raised.
         edge = Image.new("L", (w, h), 0)
         ImageDraw.Draw(edge).line([(cut, SS), (w - SS, SS)], fill=150, width=SS)
-        img.paste(Image.new("RGBA", (w, h), (255, 255, 255, 255)), (0, 0), edge)
+        body.paste((255, 255, 255), (0, 0), edge)
+        raised(body, mask, scale * SS, bottom)
+    elif state == "pressed":
+        sunk(body, mask, scale * SS, bottom, depth=4)
+    img = body.convert("RGBA")
+    img.putalpha(mask)
     return img.resize((width, height), Image.LANCZOS)
+
+
+# The room round a switch's pill for the accent's faint ring when it is on (pixels, whatever the scale).
+TOGGLE_HALO = 3
 
 
 def toggle(on, width, height, enabled=True, colour=None, knob=None, bg=theme.BG):
@@ -447,7 +462,7 @@ def toggle(on, width, height, enabled=True, colour=None, knob=None, bg=theme.BG)
     at its right end; off, rail metal with a light knob at its left end. The picture is the ring's 3 px wider on every
     side, on `bg`."""
     k = SS
-    ring = 3
+    ring = TOGGLE_HALO
     w, h = (width + 2 * ring) * k, (height + 2 * ring) * k
     colour = colour or theme.OK
     img = Image.new("RGB", (w, h), _rgb(bg))
@@ -459,26 +474,98 @@ def toggle(on, width, height, enabled=True, colour=None, knob=None, bg=theme.BG)
         img.paste(_rgb(colour), (0, 0), halo)
     track = Image.new("L", (w, h), 0)
     ImageDraw.Draw(track).rounded_rectangle([x0, y0, x1 - 1, y1 - 1], radius=r, fill=255)
-    img.paste(_rgb(colour if on and enabled else theme.RAIL_UP), (0, 0), track)
-    # The knob: 16 of 22, 3 from the end.
+    fill = colour if on and enabled else theme.RAIL_UP
+    img.paste(_rgb(fill), (0, 0), track)
+    # The track sunk into the card (the switch's scale: 22 logical pixels of height).
+    scale = height / 22.0
+    sunk(img, track, scale * k, fill, depth=2, across=False)
+    # The knob: 16 of 22, 3 from the end, standing on the track: a soft shadow under it, then the knob raised.
     kd = (height - 6) * k
     kx = x1 - 3 * k - kd if on else x0 + 3 * k
     ky = y0 + 3 * k
     dot = Image.new("L", (w, h), 0)
     ImageDraw.Draw(dot).ellipse([kx, ky, kx + kd, ky + kd], fill=255)
-    img.paste(_rgb(knob or ("#0c0f13" if on and enabled else theme.MUTED)), (0, 0), dot)
+    under = _moved(dot, 0, max(1, int(round(scale * k)))).filter(ImageFilter.GaussianBlur(scale * k))
+    img.paste((0, 0, 0), (0, 0), _at(ImageChops.multiply(under, track), 0.5))
+    knob_fill = knob or ("#0c0f13" if on and enabled else theme.MUTED)
+    img.paste(_rgb(knob_fill), (0, 0), dot)
+    raised(img, dot, scale * k, knob_fill)
     return img.resize((width + 2 * ring, height + 2 * ring), Image.LANCZOS)
 
 
-def knob(size, colour=theme.TEXT, ring=theme.OK):
-    """A slider knob: a light disc with a ring in the accent (the site's lime)."""
+def knob(size, colour=theme.TEXT, ring=theme.OK, scale=None):
+    """A slider knob: a light disc with a ring in the accent (the site's lime), raised off the track. `scale`: the
+    screen's (its 18 logical pixels by default)."""
+    scale = scale or size / 18.0
     s = size * SS
-    img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    draw.ellipse([0, 0, s - 1, s - 1], fill=_rgb(ring) + (255,))
+    disc = Image.new("L", (s, s), 0)
+    ImageDraw.Draw(disc).ellipse([0, 0, s - 1, s - 1], fill=255)
+    body = Image.new("RGB", (s, s), _rgb(ring))
     inset = int(s * 0.22)
-    draw.ellipse([inset, inset, s - 1 - inset, s - 1 - inset], fill=_rgb(colour) + (255,))
+    ImageDraw.Draw(body).ellipse([inset, inset, s - 1 - inset, s - 1 - inset], fill=_rgb(colour))
+    raised(body, disc, scale * SS, ring)
+    img = body.convert("RGBA")
+    img.putalpha(disc)
     return img.resize((size, size), Image.LANCZOS)
+
+
+def slider_track(width, height, fraction, colour, scale=1.0, bg=theme.PANEL):
+    """A slider's track, let into the card it lies on: a rounded groove in rail metal, its part up to `fraction` in
+    `colour`, a soft shadow inside its top. On `bg`."""
+    k = SS
+    w, h = width * k, height * k
+    img = Image.new("RGB", (w, h), _rgb(bg))
+    groove = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(groove).rounded_rectangle([0, 0, w - 1, h - 1], radius=h // 2, fill=255)
+    img.paste(_rgb(theme.RAIL), (0, 0), groove)
+    done = int(round(max(0.0, min(1.0, fraction)) * (w - 1)))
+    if done >= h:
+        lit = Image.new("L", (w, h), 0)
+        ImageDraw.Draw(lit).rounded_rectangle([0, 0, done, h - 1], radius=h // 2, fill=255)
+        img.paste(_rgb(colour), (0, 0), lit)
+    sunk(img, groove, scale * k, theme.RAIL, depth=2, across=False)
+    return img.resize((width, height), Image.LANCZOS)
+
+
+# A field's edges, as a recess in the card: dark along its top and left, catching the light along its foot and right;
+# brighter edges under the pointer, the accent all round while it is typed in (the site's .input:focus).
+FIELD_EDGES = {"normal": ("#06080b", "#3d4651"), "hover": ("#06080b", "#55606c"), "focus": (theme.OK, theme.OK),
+               "disabled": ("#0b0e12", "#272e36")}
+
+
+def field_face(width, height, state="normal", scale=1.0, bg=theme.PANEL):
+    """A text field's (or a drop-down's) face: the site's dark field let into its card, one pixel of edge round it
+    (FIELD_EDGES), darker at its top, with a soft shadow inside its top and left edges. `state`: normal, hover, focus or
+    disabled."""
+    k = SS
+    w, h = width * k, height * k
+    # The well in the field's own colour (the entry's words sit on the same colour in its middle), its shadow inside
+    # its top and left edges.
+    img = Image.new("RGB", (w, h), _rgb(theme.FIELD))
+    box = Image.new("L", (w, h), 255)
+    sunk(img, box, scale * k, theme.FIELD, depth=3)
+    # The edge: one pixel (two at 200 %), its top and left in one colour, its foot and right in the other.
+    e = max(1, int(round(scale))) * k
+    dark, light = FIELD_EDGES[state]
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([0, h - e, w - 1, h - 1], fill=_rgb(light))
+    draw.rectangle([w - e, 0, w - 1, h - 1], fill=_rgb(light))
+    draw.rectangle([0, 0, w - 1, e - 1], fill=_rgb(dark))
+    draw.rectangle([0, 0, e - 1, h - 1], fill=_rgb(dark))
+    return img.resize((width, height), Image.LANCZOS)
+
+
+def chevron(width, height, colour, scale=1.0):
+    """A drop-down's arrow: a small chevron pointing down, in `colour`, on nothing (a picture with transparency)."""
+    k = SS
+    w, h = width * k, height * k
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    # 8 by 4.5 logical pixels round the middle, 1.6 thick.
+    half, drop = 4 * scale * k, 2.25 * scale * k
+    cx, cy = w / 2.0, h / 2.0
+    ImageDraw.Draw(img).line([(cx - half, cy - drop), (cx, cy + drop), (cx + half, cy - drop)],
+                             fill=_rgb(colour) + (255,), width=max(k, int(round(1.6 * scale * k))), joint="curve")
+    return img.resize((width, height), Image.LANCZOS)
 
 
 def bar(width, height, fraction, colour, track=theme.RAIL):
@@ -593,6 +680,61 @@ BUTTON_LOOKS = {
 }
 
 
+# ------------------------------------------------------------------------------------------------ depth
+#
+# What can be pressed stands a little out of its surface and sinks when pressed, and what takes typing is sunk into it
+# (the owner's neumorphism, kept to the game's dark plates and cut corners): a raised face has a line of light along
+# its top and left edges and a shade along its foot and right; a sunk one a soft shadow inside its top and left edges and
+# a faint light inside its foot. Both are drawn inside the face's own outline, so a pressable keeps its size and its
+# place, and its words their colour on its fill.
+
+
+def _moved(mask, dx, dy, edge=0):
+    """The mask moved by (dx, dy) pixels; what comes in from beyond the picture's edge is `edge` (255: the outside)."""
+    out = Image.new("L", mask.size, edge)
+    out.paste(mask, (dx, dy))
+    return out
+
+
+def _at(mask, strength):
+    """The mask at `strength` (0 to 1) of its own."""
+    return mask.point(lambda v: int(v * strength))
+
+
+def _bright(colour):
+    """Whether a fill is a bright one (the lime, the yellow, the red of a lit button) rather than the metal."""
+    r, g, b = _rgb(colour)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 110
+
+
+def raised(img, shape, scale, fill):
+    """`img` with the face in `shape` (a mask) raised: light along its top and left edges, shade along its foot and
+    right, each a pixel wide at 100 % (two at 200 %), stronger light on the metal than on a lit fill."""
+    k = max(1, int(round(scale)))
+    top = ImageChops.subtract(shape, _moved(shape, k, k))
+    foot = ImageChops.subtract(shape, _moved(shape, -k, -k))
+    light, shade = (0.42, 0.22) if _bright(fill) else (0.17, 0.45)
+    img.paste((255, 255, 255), (0, 0), _at(top, light))
+    img.paste((0, 0, 0), (0, 0), _at(foot, shade))
+    return img
+
+
+def sunk(img, shape, scale, fill, depth=3, across=True):
+    """`img` with the face in `shape` sunk: a soft shadow inside its top and left edges, `depth` pixels at 100 %, and a
+    faint light inside its foot, as a pressed button or a field let into its surface. `across` False keeps the shadow
+    to the top (a groove or a switch's pill, whose round ends would otherwise start a little later than they are)."""
+    d = max(1, int(round(depth * scale)))
+    k = max(1, int(round(scale)))
+    # The outside, moved down (and right) into the face: what of it lies inside along the top (and left), softened.
+    outside = ImageChops.invert(shape)
+    shadow = _moved(outside, d if across else 0, d, edge=255).filter(ImageFilter.GaussianBlur(max(1.0, d * 0.6)))
+    shadow = ImageChops.multiply(shadow, shape)
+    img.paste((0, 0, 0), (0, 0), _at(shadow, 0.34 if _bright(fill) else 0.55))
+    foot = ImageChops.subtract(shape, _moved(shape, -k, -k))
+    img.paste((255, 255, 255), (0, 0), _at(foot, 0.10 if not _bright(fill) else 0.18))
+    return img
+
+
 def _fill(size, colours):
     """A button's fill: one colour, or a gradient through two or three (top, middle at 55 %, foot) as the site's."""
     if len(colours) == 1:
@@ -621,6 +763,12 @@ def button_face(size, margin, look, state, focused, scale, under=None, bg=None):
     filled = Image.new("RGB", (w, h))
     filled.paste(_fill((bw, bh), colours[state]), (margin, margin))
     img.paste(filled, (0, 0), shape)
+    # Its depth: raised to be pressed, sunk while pressed, flat while it cannot be.
+    middle = colours[state][len(colours[state]) // 2]
+    if state in ("normal", "hover"):
+        raised(img, shape, scale, middle)
+    elif state == "pressed":
+        sunk(img, shape, scale, middle)
     if focused and not margin:
         # Inside the outline, parallel to it: the cut corners move in by about 0.4 of the inset (45 degrees).
         inset = max(2, int(round(3 * scale)))

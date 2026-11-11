@@ -25,6 +25,9 @@ EDGE = 28
 BAR_HEIGHT = 54
 # How often the window looks for a server an installer left while it is open, in turns of the 50 ms task pump (2 s).
 PRESET_EVERY = 40
+# How long the server's last answer to the ready check stands (seconds): the PLAY and Help pages ask for a check each
+# time they show, and the server is asked again only after this, or when the player presses Check again.
+REACH_FOR = 30
 
 
 class LauncherApp:
@@ -45,10 +48,13 @@ class LauncherApp:
         self.tasks = queue.Queue()      # functions from worker threads, run on the Tk thread
         self.session = None             # the running game, while it runs
         self.checks = None              # the last ready check (None: being made)
+        self.shown_checks = None        # the last ready check that came back, shown while the next one is made
         self.checks_asked = 0           # ready checks started in this run (show() looks whether a page started one)
         self.page = "play"              # the page on show
         self.busy = False               # PLAY is getting ready (asking the server, downloading its app)
-        self.status_text, self.status_tone = "", "normal"
+        # What the status line says: the message (i18n.Said, said again in the window's language each time it is
+        # drawn, or plain text) and its tone.
+        self.status_message, self.status_tone = None, "normal"
         self.status_sticky = False      # a message that stays until the player does something (an update's outcome, a
         #                                 sign-in that ended, a stopped download): the ready check does not replace it
         self.quit_after_game = False    # the window was closed while the game ran
@@ -56,14 +62,15 @@ class LauncherApp:
         self.devices = None             # the sound devices the player lists (None: not asked yet)
         self.download = None            # the app's download under way: {"done", "total", "cancel"}
         self.download_bar = None        # the page's progress bar for it, while one is on show
-        self.download_error = None      # (words, tone) of the last download that did not end well (the page shows it)
-        self.app_note = None            # what the last look for a newer app found when it found none (the page shows it)
+        self.download_error = None      # (i18n.Said, tone): how the last download ended badly (the page shows it)
+        self.app_note = None            # what the last look for a newer app found when it found none (an i18n.Said)
         self.status_transient = False   # the status line says something passing, which the ready check may replace
-        self.status_action = None       # (words, function): a link after the status line, or None
+        self.status_action = None       # (i18n.Said, function): a link after the status line, or None
         self.keep_open = False          # work that closing would cut short is under way (the launcher's update, a
         #                                 repair, a count or a deletion): the window stays until it ends
         self.play_offline = False       # PLAY went on with this PC's app because the server did not answer
-        self.server_check = None        # the last time a server was asked in this run: {"url", "state", "text"}
+        self.server_check = None        # the last time a server was asked in this run: {"url", "state", "error"}
+        self.server_reached = None      # the ready check's last answer from the server: {"url", "reached", "at"}
         self.pumps = 0                  # turns of the task pump, for the slower look for an installer's server
         self._setup_fonts()
         self._size_window()
@@ -147,6 +154,11 @@ class LauncherApp:
         self.status_link.odq_action = None
         # ---- the page: its title and its cards over the site's field (widgets.ScrollArea)
         self.body = self.make_page(self.root, self.header)
+        # Tab goes as the window reads: the menu, the page, then the bar along the foot, its link before PLAY. Tk's Tab
+        # follows each parent's stacking order, the order its children were made in until one is raised.
+        # (Misc's own raise: a canvas's raise moves its items instead.)
+        tk.Misc.tkraise(bottom)
+        tk.Misc.tkraise(self.play_button)
         self._paint_status()
 
     def make_header(self, parent, nav=(), on_nav=None, link=None, steps=()):
@@ -167,8 +179,31 @@ class LauncherApp:
         return page
 
     def user_acted(self):
-        """The player did something: a message kept until then (status_sticky) may give way now."""
-        self.status_sticky = False
+        """The player did something: a message kept until then (status_sticky) gives way now to where PLAY stands, as
+        the last ready check says it. An outcome (a game that ended, an installer's server, a failure) is about the
+        moment it came; once the player has moved on, the line says the state again instead of an outcome that may no
+        longer hold (another server chosen since, a cause gone). What the player does next says its own words after
+        this, as each action sets the line."""
+        if self.status_sticky:
+            self.status_sticky = False
+            self._say_state()
+
+    def _say_state(self):
+        """The status line says where PLAY stands, from the last ready check: no server, something to fix, or ready.
+        Not while a message is kept (status_sticky), work is under way (busy_now) or no check has come back yet (the
+        one on its way says it)."""
+        if self.status_sticky or self.busy_now() or self.checks is None:
+            return
+        if self.state.server() is None:
+            self.set_status(i18n.Said("status.no_server"), "warn")
+        elif not self.ready():
+            self.set_status(i18n.Said("status.fix_first"), "warn")
+        elif not self.server_answers():
+            # Ready all the same: PLAY starts the app this PC has, which may be older than the server's.
+            self.set_status(i18n.Said("status.server_down"), "warn")
+        else:
+            # Ready: nothing more to say, whatever the line said before (a passing note, an outcome given way).
+            self.set_status(i18n.Said("status.ready"), "normal")
 
     def nav_go(self, page):
         """A page chosen from the menu (a click, or Enter or Space)."""
@@ -218,13 +253,13 @@ class LauncherApp:
             return
         self.user_acted()
         if not self.ready():
-            self.set_status(self.words("status.fix_first"), "warn")
+            self.set_status(i18n.Said("status.fix_first"), "warn")
             self._paint_play()
             return
         self.busy = True
         self.play_offline = False
         self._paint_play()
-        self.set_status(self.words("status.app_check"), "normal")
+        self.set_status(i18n.Said("status.app_check"), "normal")
         # PLAY's own download is the app's download like any other: its bar and Cancel on the Online page.
         cancel = threading.Event()
 
@@ -258,10 +293,10 @@ class LauncherApp:
     def _play_step(self, step):
         """What PLAY is doing now, on the status line."""
         if step == "app":
-            self.set_status(self.words("status.app_check"), "normal")
+            self.set_status(i18n.Said("status.app_check"), "normal")
         else:
             # Starting: with this PC's app, said so, when the server did not answer.
-            self.set_status(self.words("status.offline" if self.play_offline else "status.starting"),
+            self.set_status(i18n.Said("status.offline" if self.play_offline else "status.starting"),
                             "warn" if self.play_offline else "normal")
 
     def _play_downloading(self, done, total, cancel):
@@ -280,7 +315,7 @@ class LauncherApp:
         """PLAY's download was stopped: nothing started, and the page and the status line say so alike."""
         self.busy = False
         self.download = None
-        self.download_error = (self.words("status.download_cancelled"), "warn")
+        self.download_error = (i18n.Said("status.download_cancelled"), "warn")
         self.set_status(self.download_error[0], "warn", sticky=True)
         self._paint_play()
         self.refresh_checks()
@@ -298,9 +333,9 @@ class LauncherApp:
         playing.hold()
         if self.play_offline:
             # Said until the game ends: the app may be older than the server's.
-            self.set_status(self.words("status.offline"), "warn", sticky=True)
+            self.set_status(i18n.Said("status.offline"), "warn", sticky=True)
         else:
-            self.set_status(self.words("status.playing"), "ok")
+            self.set_status(i18n.Said("status.playing"), "ok")
         self._paint_play()
         # Out of the way while the game has the screen; it comes back when the game closes.
         self.root.iconify()
@@ -320,15 +355,14 @@ class LauncherApp:
             self.root.destroy()
             return
         self.root.deiconify()
-        minutes = record["seconds"] // 60
-        span = self.words("common.minutes", m=minutes) if minutes else self.words("common.seconds", s=record["seconds"])
         crashed, failed = record["crashed"], record.get("failed_start")
         if crashed or failed:
             # What went wrong is in the player's log: the status line opens it.
-            self.set_status(self.words("status.failed_start" if failed else "status.crashed"), "bad",
-                            action=(self.words("status.open_log"), self.open_player_log), sticky=True)
+            self.set_status(i18n.Said("status.failed_start" if failed else "status.crashed"), "bad",
+                            action=(i18n.Said("status.open_log"), self.open_player_log), sticky=True)
         else:
-            self.set_status(self.words("status.ended", time=span), "ok")
+            # Kept until the player does something: the ready check that follows does not take its place at once.
+            self.set_status(i18n.Said("status.ended", time=i18n.span(record["seconds"])), "ok", sticky=True)
         self.refresh_checks()
         if self.page == "play":
             self.go("play")
@@ -350,7 +384,7 @@ class LauncherApp:
     def _failed(self, error):
         self.busy = False
         self.download = None
-        self.set_status(self.words("status.error", error=self.words.error(error)), "bad", sticky=True)
+        self.set_status(i18n.Said("status.error", error=error), "bad", sticky=True)
         self._paint_play()
         self.refresh_checks()
 
@@ -360,7 +394,7 @@ class LauncherApp:
         self.download = None
         self.state.save()
         # Kept until the player does something: the ready check that follows does not replace it.
-        self.set_status(self.words("status.signed_out"), "warn", sticky=True)
+        self.set_status(i18n.Said("status.signed_out"), "warn", sticky=True)
         self.refresh_checks()
         self._paint_play()
 
@@ -375,10 +409,10 @@ class LauncherApp:
         if outcome is None:
             return
         if outcome[0] == "updated":
-            self.set_status(self.words("status.updated", v=outcome[1]), "ok", sticky=True)
+            self.set_status(i18n.Said("status.updated", v=outcome[1]), "ok", sticky=True)
         else:
             log.warning("the update to %s was not installed (this is %s)", outcome[1], outcome[2])
-            self.set_status(self.words("status.not_updated", v=outcome[1], now=outcome[2]), "warn", sticky=True)
+            self.set_status(i18n.Said("status.not_updated", v=outcome[1], now=outcome[2]), "warn", sticky=True)
 
     # ----------------------------------------------------------------------------------- pages
 
@@ -445,15 +479,16 @@ class LauncherApp:
         self.state.save()
         log.info("took the server %s an installer left", url)
         key = "status.preset.later" if busy and before else "status.preset"
-        self.set_status(self.words(key, name=brought["name"]), "ok", sticky=True)
+        self.set_status(i18n.Said(key, name=brought["name"]), "ok", sticky=True)
         self.refresh_checks()
         if self.guide is not None:
             self.guide.redraw()
         elif self.page in ("play", "online"):
             self.go(self.page)
 
-    def refresh_checks(self):
-        """Make the ready check again on a worker thread; the PLAY page and button follow it."""
+    def refresh_checks(self, force=False):
+        """Make the ready check again on a worker thread, the server asked whether it answers (its last answer used for
+        REACH_FOR seconds, unless `force`: Check again); the PLAY page and button follow it."""
         self.checks = None
         self.checks_asked += 1
         # Which check this is: only the last one asked is taken when it answers.
@@ -461,7 +496,7 @@ class LauncherApp:
 
         def work():
             try:
-                checks = actions.readiness(self.state)
+                checks = actions.readiness(self.state, reached=self._reach(force))
             except Exception as e:  # noqa: BLE001
                 log.exception("ready check failed")
                 checks = [actions.Check("server", False, str(e), page="online")]
@@ -469,22 +504,33 @@ class LauncherApp:
 
         threading.Thread(target=work, daemon=True, name="check").start()
 
+    def _reach(self, force):
+        """Whether the server PLAY plays on answers (actions.reach), on the ready check's worker thread: asked again
+        when its last answer is older than REACH_FOR seconds, is about another server, or `force` says so."""
+        import time
+        server = self.state.server()
+        if server is None:
+            return None
+        seen = self.server_reached
+        if not force and seen and seen["url"] == server["url"] and time.time() - seen["at"] < REACH_FOR:
+            return seen["reached"]
+        reached = actions.reach(self.state)
+        # Kept for the next checks (one dict swapped in whole: a check on another thread reads either one or the other).
+        self.server_reached = {"url": server["url"], "reached": reached, "at": time.time()}
+        return reached
+
+    def server_answers(self):
+        """False when the last ready check found the server PLAY plays on not answering."""
+        return not any(c.key == "server" and not c.ok and not c.blocks for c in (self.checks or ()))
+
     def _checked(self, checks, asked):
         if asked != self.checks_asked:
             # A check asked before the last one, answering after it: about the state before, so the last one's answer,
             # on its way, is the one to show.
             return
         self.checks = checks
-        # A message kept until the player does something (a sign-in that ended, a stopped download) stays.
-        quiet = self.status_sticky
-        if not quiet and not self.busy_now():
-            if self.state.server() is None:
-                self.set_status(self.words("status.no_server"), "warn")
-            elif not self.ready():
-                self.set_status(self.words("status.fix_first"), "warn")
-            elif self.status_transient or self.status_tone not in ("ok", "bad"):
-                # Nothing to say beyond being ready (a passing "the app is here" included).
-                self.set_status(self.words("status.ready"), "normal")
+        self.shown_checks = checks
+        self._say_state()
         self._paint_play()
         # The PLAY page, the Help page and the guide's last step each show the check when they are on screen.
         from opendmtq_client import pages
@@ -526,7 +572,7 @@ class LauncherApp:
         self.download = {"done": 0, "total": None, "cancel": cancel, "before": before}
         self.download_error = None
         self.app_note = None
-        self.set_status(self.words("status.app_check"), "normal")
+        self.set_status(i18n.Said("status.app_check"), "normal")
         self._paint_play()
 
         def progress(done, total):
@@ -549,20 +595,20 @@ class LauncherApp:
         """What the download under way is doing, for the status line and the page's bar alike: stopping (said until it
         has stopped, whatever pieces still come in), asking the server while the size is not known yet, or how far."""
         if self.download.get("stopping"):
-            return self.words("status.stopping")
+            return i18n.Said("status.stopping")
         done, total = self.download["done"], self.download["total"]
         if not total:
-            return self.words("status.app_check")
-        return self.words("status.downloading", done=i18n.mb(done), total=i18n.mb(total))
+            return i18n.Said("status.app_check")
+        return i18n.Said("status.downloading", done=i18n.mb(done), total=i18n.mb(total))
 
     def _download_moved(self, done, total):
         if self.download is None:
             return
         self.download.update(done=done, total=total)
-        text = self.download_words()
-        self.set_status(text, "normal")
+        message = self.download_words()
+        self.set_status(message, "normal")
         if self.download_bar is not None and self.download_bar.winfo_exists():
-            self.download_bar.set(done / float(total) if total else None, text)
+            self.download_bar.set(done / float(total) if total else None, self.words.say(message))
 
     def _download_ended(self, error, done_then):
         from opendmtq_client import apps
@@ -575,19 +621,19 @@ class LauncherApp:
             after = apps.local(server["url"]) if server else None
             if before and after and before.get("sha256") == after.get("sha256"):
                 # Nothing newer: the page says so where the button was pressed (the guide has no status line).
-                self.app_note = self.words("online.app.newest")
-                self.set_status(self.words("status.newest"), "normal", transient=True)
+                self.app_note = i18n.Said("online.app.newest")
+                self.set_status(i18n.Said("status.newest"), "normal", transient=True)
             else:
-                self.set_status(self.words("status.app_ready"), "ok", transient=True)
+                self.set_status(i18n.Said("status.app_ready"), "ok", transient=True)
         else:
             # The page and the status line say it alike, in the same tone: a stop or a sign-in that ended in the
             # warning colour, a failure in the error colour. Kept until the player does something.
             if error == "cancelled":
-                self.download_error = (self.words("status.download_cancelled"), "warn")
+                self.download_error = (i18n.Said("status.download_cancelled"), "warn")
             elif isinstance(error, srv.SignedOut):
-                self.download_error = (self.words("status.signed_out"), "warn")
+                self.download_error = (i18n.Said("status.signed_out"), "warn")
             else:
-                self.download_error = (self.words("status.error", error=self.words.error(error)), "bad")
+                self.download_error = (i18n.Said("status.error", error=error), "bad")
             self.set_status(self.download_error[0], self.download_error[1], sticky=True)
         self.refresh_checks()
         if done_then:
@@ -600,16 +646,23 @@ class LauncherApp:
         if self.download is not None and not self.download.get("stopping"):
             self.download["cancel"].set()
             self.download["stopping"] = True
-            self.set_status(self.words("status.stopping"), "normal")
+            self.set_status(i18n.Said("status.stopping"), "normal")
 
     # ---------------------------------------------------------------------------------- status
 
-    def set_status(self, text, tone="normal", action=None, transient=False, sticky=False):
-        """The bottom line: words in a tone, an optional link after them (words, function). A transient line gives way
-        to the ready check's own words when it comes back; a sticky one stays until the player does something."""
-        self.status_text, self.status_tone = text, tone
+    def set_status(self, message, tone="normal", action=None, transient=False, sticky=False):
+        """The bottom line: a message in a tone (i18n.Said, said in the window's language each time the line is drawn,
+        so a switch of language says it again; or plain text), an optional link after it (message, function). A
+        transient line gives way to the ready check's own words when it comes back; a sticky one stays until the
+        player does something (user_acted)."""
+        self.status_message, self.status_tone = message, tone
         self.status_action, self.status_transient, self.status_sticky = action, transient, sticky
         self._paint_status()
+
+    @property
+    def status_text(self):
+        """What the status line says now, in the window's language."""
+        return self.words.say(self.status_message)
 
     def _paint_status(self):
         if not hasattr(self, "status_label") or not self.status_label.winfo_exists():
@@ -620,8 +673,8 @@ class LauncherApp:
         self.status_label.configure(text=self.status_text, fg=theme.TEXT if self.status_tone != "normal" else theme.MUTED)
         # The link after the words: shown with an action, gone without one.
         if self.status_action:
-            words, function = self.status_action
-            self.status_link.configure(text=words + "  " + theme.ICON["chevron"])
+            message, function = self.status_action
+            self.status_link.configure(text=self.words.say(message) + "  " + theme.ICON["chevron"])
             self.status_link.odq_action = function
             if not self.status_link.winfo_manager():
                 self.status_link.pack(side="left", after=self.status_label, padx=(0, self.ui.px(12)))
@@ -635,7 +688,7 @@ class LauncherApp:
         self.state.set_value(name, value)
         self.state.save()
         self.user_acted()
-        self.set_status(self.words("status.saved"), "normal")
+        self.set_status(i18n.Said("status.saved"), "normal")
 
     def set_language(self, language):
         """Switch the words and fonts: the whole window is rebuilt in the other language. "system" follows Windows'

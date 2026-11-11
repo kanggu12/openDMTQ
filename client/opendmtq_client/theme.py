@@ -31,6 +31,8 @@ DIVIDER = "#2b3035"     # the faint line between rows in a card (white at 7.5 % 
 TEXT = "#eef2f6"        # body text (--chalk)
 MUTED = "#aeb8c3"       # hints under a setting (--ash: 7:1 and more on the deck)
 FAINT = "#8d98a4"       # disabled text and small labels (4.5:1 and more on every surface they sit on)
+STEP_TO_COME = "#707985"  # the guide's big numbers of the steps to come: 3:1 and more on the header's lit field (large
+#                           text), dimmer than their names, so that only the lime ones read as done or on show
 INK = "#0b0e12"         # words on a bright colour
 OK_INK = "#0d1c04"      # words on the lime: PLAY, a chosen tab (and the lime buttons' words, art.BUTTON_LOOKS)
 

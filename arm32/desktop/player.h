@@ -70,10 +70,16 @@ struct Settings {
     bool audio_exclusive = false;
     int audio_buffer = 1;
     int volume = 100;
+    // The language the game and the player's own words speak, as the launcher chose it ("en", "ko"); "" for the
+    // computer's (host_locale), as when the launcher follows Windows' display language.
+    std::string language;
 };
 Settings& settings();
 // Reads a settings file into settings(); false when there is none (the defaults stay).
 bool load_settings(const std::string& path);
+// The language a settings file names (language=), "" for none or one the player does not speak: read before the app's
+// folder is in place, so that the player's first words (a folder it cannot use) speak it too.
+std::string settings_language(const std::string& path);
 
 // The host path of a guest path (the runtime's path_hook), and the guest name of a host file (guest_paths.h: on Windows
 // nothing the guest names reaches past the player's folders and the app's data folder).
@@ -96,8 +102,10 @@ bool use_own_folder(const std::string& folder, std::string& error);
 void show_error(const std::string& what);
 // A name for the calling thread, which the stats and a debugger show (threads.cpp).
 void name_thread(const char* name);
-// The computer's language and country ("ko", "KR"), for the game's locale (java_lang.cpp): the environment's locale on
-// Linux (LC_ALL, LC_MESSAGES, LANG), the user's language on Windows unless the environment names one; en, US otherwise.
+// The language and country the game and the player speak ("ko", "KR"), for the game's locale and the player's own words
+// (java_lang.cpp): the language the launcher chose (settings' language=) when it chose one, else the computer's; the
+// country always the computer's. The computer's: the environment's locale on Linux (LC_ALL, LC_MESSAGES, LANG), the
+// user's display language on Windows unless the environment names one; en, US otherwise.
 std::pair<std::string, std::string> host_locale();
 
 // Loads a 32-bit library in the guest as System.load does on a phone with the runtime: dlopen, the natives it exports

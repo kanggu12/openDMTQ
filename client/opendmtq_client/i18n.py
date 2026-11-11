@@ -14,7 +14,9 @@ TEXT = {
     "bottom.play": ("PLAY", "PLAY"),
     "bottom.playing": ("PLAYING", "PLAYING"),
     "status.ready": ("Ready to play.", "플레이할 준비가 됐습니다."),
-    "status.no_server": ("Connect to a server on the Online page.", "온라인 페이지에서 서버에 연결하세요."),
+    "status.server_down": ("The server does not answer. PLAY starts the app on this PC.",
+                           "서버가 응답하지 않습니다. PLAY를 누르면 이 PC의 앱으로 시작합니다."),
+    "status.no_server": ("Connect to a server on the ONLINE page.", "ONLINE 페이지에서 서버에 연결하세요."),
     "status.fix_first": ("Something needs fixing first: see the ready check.", "먼저 고칠 것이 있습니다. 준비 점검을 보세요."),
     "status.app_check": ("Asking the server for its app...", "서버의 앱을 확인하는 중..."),
     "status.downloading": ("Downloading the app: {done} of {total} MB", "앱을 내려받는 중: {total}MB 중 {done}MB"),
@@ -29,18 +31,18 @@ TEXT = {
     "status.ended": ("The game closed after {time}.", "{time} 동안 플레이하고 게임이 닫혔습니다."),
     "status.crashed": ("The game closed by itself.", "게임이 저절로 닫혔습니다."),
     "status.failed_start": ("The game could not start.", "게임을 시작하지 못했습니다."),
-    "status.open_log": ("Open the player's log", "플레이어 기록 열기"),
+    "status.open_log": ("Open the game log", "게임 기록 열기"),
     "status.saved": ("Saved. It applies at the next PLAY.", "저장했습니다. 다음 PLAY부터 적용됩니다."),
-    "status.preset.later": ("The installer added a server: {name}. Choose it on the Online page.",
-                            "설치 파일이 서버를 추가했습니다: {name}. 온라인 페이지에서 고를 수 있습니다."),
+    "status.preset.later": ("The installer added a server: {name}. Choose it on the ONLINE page.",
+                            "설치 파일이 서버를 추가했습니다: {name}. ONLINE 페이지에서 고를 수 있습니다."),
     "status.preset": ("The installer added a server: {name}. You play on it from now on.",
                       "설치 파일이 서버를 추가했습니다: {name}. 이제 이 서버에서 플레이합니다."),
     "status.updated": ("Updated to {v}.", "{v} 버전으로 업데이트했습니다."),
     "status.not_updated": ("The update to {v} was not installed. This is still {now}.",
                            "{v} 버전으로 업데이트하지 못했습니다. 지금 버전은 {now}입니다."),
     "status.error": ("{error}", "{error}"),
-    "status.signed_out": ("Your sign-in ended (it ran out, or the password changed). Sign in again on the Online page.",
-                          "로그인이 끝났습니다(기간이 지났거나 비밀번호가 바뀌었습니다). 온라인 페이지에서 다시 로그인하세요."),
+    "status.signed_out": ("Your sign-in ended (it ran out, or the password changed). Sign in again on the ONLINE page.",
+                          "로그인이 끝났습니다(기간이 지났거나 비밀번호가 바뀌었습니다). ONLINE 페이지에서 다시 로그인하세요."),
 
     # ------------------------------------------------------------------------------------------- common
     "common.cancel": ("Cancel", "취소"),
@@ -65,8 +67,8 @@ TEXT = {
     "play.how": ("How to play", "플레이 방법"),
     "play.how.1": ("A touch screen plays as a phone does, several fingers at once.", "터치스크린은 휴대폰처럼 여러 손가락으로 플레이합니다."),
     "play.how.2": ("With a mouse, a click is a tap and a drag is a slide.", "마우스는 클릭이 터치, 끌기가 슬라이드입니다."),
-    "play.how.3": ("Esc goes back. Touch the top edge of the game for the bar: full screen, and the X that quits.",
-                   "Esc는 뒤로입니다. 게임 맨 위 가장자리에 마우스를 대면 막대가 나와 전체 화면과 끝내기(X)를 고릅니다."),
+    "play.how.3": ("Esc goes back. The pointer on the game's top edge brings the bar: full screen, and X to quit.",
+                   "Esc는 뒤로 가기입니다. 게임 맨 위 가장자리에 포인터를 두면 전체 화면과 끝내기(X)가 있는 막대가 나옵니다."),
     "play.last": ("Last game", "지난 플레이"),
     "play.last.none": ("No game yet.", "아직 플레이 기록이 없습니다."),
     "play.last.ok": ("{time} of play, closed normally.", "{time} 플레이, 정상 종료."),
@@ -74,13 +76,14 @@ TEXT = {
     "play.last.failed": ("The game could not start. Its log says why.", "게임을 시작하지 못했습니다. 기록에 이유가 있습니다."),
 
     # ----------------------------------------------------------------------------------- ready-check lines
-    "check.player": ("The player for Windows", "Windows용 플레이어"),
+    "check.player": ("Game program for Windows", "Windows용 게임 프로그램"),
     "check.server": ("Server", "서버"),
     "check.account": ("Sign-in", "로그인"),
     "check.app": ("The server's app", "서버의 앱"),
     "check.app_update": ("A newer app on the server", "서버에 새 앱이 있음"),
     "check.player.missing": ("not found: run OpenDMTQ-Setup again", "없음. OpenDMTQ-Setup을 다시 실행하세요"),
     "check.player.repair": ("Repair", "복구"),
+    "check.server.down": ("not answering", "응답 없음"),
     "check.running": ("A game is open: close it first", "게임이 열려 있습니다. 먼저 닫으세요"),
 
     # ------------------------------------------------------------------------------------------- screen
@@ -95,8 +98,7 @@ TEXT = {
                                 "옮기고 크기를 바꿀 수 있는 창입니다. 게임은 4:3부터 21:9까지 창을 채웁니다."),
     "screen.size": ("Window size", "창 크기"),
     "screen.size.auto": ("Fitted to the display", "모니터에 맞춤"),
-    "screen.size.hint": ("The game's area in the window. Sizes larger than this display are left out.",
-                         "창 안 게임 영역의 크기입니다. 이 모니터보다 큰 크기는 빠집니다."),
+    "screen.size.hint": ("The game's area in the window.", "창 안 게임 영역의 크기입니다."),
     "screen.main": ("Main display: {w} × {h}", "주 모니터: {w} × {h}"),
     "screen.main.hz": (" at {hz} Hz", ", {hz}Hz"),
     "screen.frames": ("Frames", "프레임"),
@@ -110,8 +112,14 @@ TEXT = {
     "screen.fps.auto.hz": ("The display's rate ({hz} Hz)", "모니터 주사율({hz}Hz)"),
     "screen.fps.unlimited": ("No limit", "제한 없음"),
     "screen.fps.n": ("{n} fps", "{n} fps"),
-    "screen.fps.hint.vsync": ("On a 240 Hz display, limits that divide it, such as 120 or 60, are kept exactly; others, such as 144, very nearly.",
-                              "240Hz 모니터라면 120, 60처럼 나누어떨어지는 값은 정확히, 144 같은 값은 거의 그대로 맞춥니다."),
+    "screen.fps.hint.vsync": ("With VSync, a limit the display's rate divides by is kept exactly, others very nearly.",
+                              "VSync를 켜면 주사율이 나누어떨어지는 값은 정확히, 다른 값은 거의 그대로 지킵니다."),
+    "screen.fps.hint.vsync.exact": ("On this {hz} Hz display: {fps} fps exactly.",
+                                    "이 {hz}Hz 모니터에서 정확히 {fps} fps로 보입니다."),
+    "screen.fps.hint.vsync.near": ("On this {hz} Hz display: very nearly {n} fps.",
+                                   "이 {hz}Hz 모니터에서 {n} fps에 아주 가깝게 보입니다."),
+    "screen.fps.hint.vsync.above": ("Above this display's {hz} Hz: with VSync the game shows {hz} fps.",
+                                    "이 모니터의 주사율({hz}Hz)보다 높습니다. VSync를 켜면 {hz} fps로 보입니다."),
     "screen.fps.hint.vsync_rate": ("With VSync, frames follow the display's refreshes.",
                                    "VSync를 켜면 모니터 주사율에 맞춰 프레임을 냅니다."),
     "screen.fps.hint.free": ("Without VSync, the game holds this limit itself. No limit uses the processor in full.",
@@ -172,8 +180,8 @@ TEXT = {
     "sound.device.gone": ("The device chosen before (not connected)", "전에 고른 장치(연결되지 않음)"),
     "sound.device.hint": ("Windows' default follows the output Windows plays through, also when it changes mid-game.",
                           "Windows 기본은 Windows가 쓰는 출력을 따르며, 플레이 중에 바뀌어도 따라갑니다."),
-    "sound.device.none": ("The player listed no devices. The game plays through Windows' default output.",
-                          "플레이어가 장치를 찾지 못했습니다. 게임은 Windows 기본 출력으로 소리를 냅니다."),
+    "sound.device.none": ("No sound devices were found. The game plays through Windows' default output.",
+                          "소리 장치를 찾지 못했습니다. 게임은 Windows 기본 출력으로 소리를 냅니다."),
     "sound.mode": ("Mode", "방식"),
     "sound.mode.shared": ("Shared", "공유"),
     "sound.mode.exclusive": ("Exclusive", "독점"),
@@ -191,27 +199,30 @@ TEXT = {
                                "소리를 더 앞서 준비해 바쁜 PC에서도 끊기지 않습니다. 지연이 조금 늘어납니다."),
 
     # ----------------------------------------------------------------------------------------- controls
-    "controls.sub": ("On a PC, the game plays like this.", "PC에서는 아래처럼 조작합니다."),
+    "controls.sub": ("Mouse, touch screen and keyboard.", "마우스, 터치스크린, 키보드."),
     "controls.mouse": ("Mouse", "마우스"),
     "controls.click": ("Click: a tap, on a note or a button.", "클릭: 노트나 버튼을 터치합니다."),
     "controls.drag": ("Drag: a slide, and the song list moves with it.", "끌기: 슬라이드이며, 곡 목록도 따라 움직입니다."),
     "controls.wheel": ("Wheel: scrolls lists. With Shift, sideways.", "휠: 목록을 넘깁니다. Shift를 누르면 옆으로 넘깁니다."),
     "controls.touch": ("Touch screen", "터치스크린"),
-    "controls.fingers": ("Fingers play as on a phone, several at once, each touch reaching the game the moment it happens.",
-                         "손가락은 휴대폰처럼 여러 개를 함께 쓰고, 터치한 순간이 그대로 게임에 전달됩니다."),
+    "controls.fingers": ("Fingers play as on a phone, several at once.", "손가락은 휴대폰처럼 여러 개를 함께 씁니다."),
     "controls.edges": ("Windows' touch circles and edge swipes stay out of the game in full screen.",
                        "전체 화면에서는 Windows의 터치 표시와 가장자리 밀기가 게임을 방해하지 않습니다."),
+    "controls.bar": ("A finger drawn down from the game's top edge: the same bar.",
+                     "게임 맨 위 가장자리에서 손가락을 아래로 쓸면 같은 막대가 나옵니다."),
     "controls.keyboard": ("Keyboard", "키보드"),
     "controls.esc": ("Esc: back. It pauses a song and closes what is open.", "Esc: 뒤로. 곡을 멈추고 열린 것을 닫습니다."),
-    "controls.menu": ("The bar: touch the very top edge of the game with the pointer, or draw a finger down from it, and a bar shows there with full screen (or back to a window) and an X. The X asks before quitting, so a stray click does not end a song; the game holds still while it asks. Alt+F4 does nothing. Minimising holds the game still.",
-                      "막대: 마우스를 게임 맨 위 가장자리에 대거나 손가락으로 그 가장자리에서 아래로 쓸면 막대가 나오고, 전체 화면(또는 창으로)과 X가 있습니다. X는 끝내기 전에 한 번 물어서 실수로 눌러도 곡이 끝나지 않고, 묻는 동안 게임은 멈춰 있습니다. Alt+F4는 아무 일도 하지 않습니다. 창을 내리면 게임이 멈춥니다."),
+    "controls.menu": ("Pointer on the game's top edge: the bar, with full screen and X.",
+                      "게임 맨 위 가장자리에 포인터를 두면 전체 화면과 X가 있는 막대가 나옵니다."),
+    "controls.minimise": ("Minimised, the game holds still.", "창을 내리면 게임이 멈춥니다."),
     "controls.f11": ("F11 or Alt+Enter: full screen and back.", "F11 또는 Alt+Enter: 전체 화면과 창을 오갑니다."),
+    "controls.alt_f4": ("Alt+F4 does nothing. The bar's X asks before quitting.",
+                        "Alt+F4는 아무 일도 하지 않습니다. 막대의 X는 끝내기 전에 한 번 묻습니다."),
     "controls.typing": ("When the game asks for text, the keyboard types it, Korean too. Without a keyboard, Windows' touch keyboard comes up.",
                         "게임이 글자를 받을 때 키보드로 입력합니다. 한글도 됩니다. 키보드가 없으면 Windows 터치 키보드가 뜹니다."),
 
     # ------------------------------------------------------------------------------------------- online
-    "online.sub": ("The OpenDMTQ server you play on, your sign-in there, and its app on this PC.",
-                   "플레이하는 OpenDMTQ 서버, 그 서버의 로그인, 이 PC에 받은 그 서버의 앱입니다."),
+    "online.sub": ("The server you play on, your sign-in and its app on this PC.", "플레이하는 서버와 로그인, 이 PC에 받은 앱입니다."),
     "online.server": ("Server", "서버"),
     "online.address": ("The site's address", "사이트 주소"),
     "online.connect": ("Connect", "연결"),
@@ -220,13 +231,14 @@ TEXT = {
     "online.to_play": ("Server to play on: {name}", "플레이할 서버: {name}"),
     "online.busy": ("Wait until the game or the download is over.", "게임이나 내려받기가 끝날 때까지 기다리세요."),
     "online.account": ("Sign in", "로그인"),
+    "online.account.signed": ("Signed in", "로그인됨"),
     "online.id": ("ID", "아이디"),
     "online.password": ("Password", "비밀번호"),
     "online.signin": ("Sign in", "로그인"),
     "online.signing": ("Signing in...", "로그인하는 중..."),
     "online.signin.hint": ("With the ID and password the server's admin made for you. The launcher keeps the sign-in, never the password.",
                            "서버 관리자가 만들어 준 아이디와 비밀번호로 로그인합니다. 런처는 로그인 상태만 기억하고 비밀번호는 저장하지 않습니다."),
-    "online.signed": ("Signed in as {account}.", "로그인: {account}"),
+    "online.signed": ("{account}", "{account}"),
     "online.signout": ("Sign out", "로그아웃"),
     "online.app": ("The server's app", "서버의 앱"),
     "online.app.have": ("The app on this PC: {date}.", "이 PC의 앱: {date}"),
@@ -252,20 +264,21 @@ TEXT = {
     "help.checks": ("Checks", "점검"),
     "help.recheck": ("Check again", "다시 점검"),
     "help.trouble": ("If the game does not start, or closes by itself", "게임이 시작되지 않거나 저절로 닫히면"),
-    "help.trouble.1": ("Open the player's log below: its last lines say why.", "아래에서 플레이어 기록을 여세요. 마지막 줄에 이유가 있습니다."),
-    "help.trouble.1.none": ("The player's log appears below once the game has run.", "게임을 한 번 실행하면 아래에 플레이어 기록이 생깁니다."),
-    "help.trouble.2": ("Play in a window at 100% render scale once (Screen). If that works, update the graphics driver.",
-                       "화면에서 창 모드, 렌더 배율 100%로 한 번 플레이해 보세요. 잘 되면 그래픽 드라이버를 업데이트하세요."),
-    "help.trouble.3": ("If the sound breaks, choose a safe buffer and shared mode (Sound).", "소리가 끊기면 소리에서 버퍼를 안정, 방식을 공유로 고르세요."),
+    "help.trouble.1": ("Open the game log below: its last lines say why.", "아래에서 게임 기록을 여세요. 마지막 줄에 이유가 있습니다."),
+    "help.trouble.1.none": ("The game log appears below once the game has run.", "게임을 한 번 실행하면 아래에 게임 기록이 생깁니다."),
+    "help.trouble.2": ("Try a window at 100% render scale (SCREEN).", "SCREEN 페이지에서 창 모드, 렌더 배율 100%로 해 보세요."),
+    "help.trouble.3": ("If the sound breaks, choose the safe buffer and shared mode (SOUND).",
+                       "소리가 끊기면 SOUND 페이지에서 버퍼는 안정, 방식은 공유로 고르세요."),
     "help.trouble.4": ("If the server cannot be reached, ask the server's admin whether it is on.",
                        "서버에 연결되지 않으면 서버가 켜져 있는지 서버 관리자에게 물어보세요."),
     "help.tools": ("Tools", "도구"),
-    "help.player_log": ("The player's log", "플레이어 기록"),
-    "help.player_log.hint": ("What the game and the player wrote while it ran, with the reason when it stopped.",
-                             "게임이 실행되는 동안 게임과 플레이어가 남긴 기록입니다. 멈췄다면 그 이유도 있습니다."),
+    "help.player_log": ("Game log", "게임 기록"),
+    "help.player_log.hint": ("What the game wrote while it ran, with the reason when it stopped.",
+                             "게임이 실행되는 동안 남긴 기록입니다. 멈췄다면 그 이유도 있습니다."),
     "help.logs": ("The launcher's log", "런처 기록"),
     "help.logs.hint": ("What the launcher did: connecting, signing in, downloads, updates.", "런처가 한 일입니다. 연결, 로그인, 내려받기, 업데이트."),
     "help.reset": ("Start over", "처음부터"),
+    "help.reset.row": ("Servers and settings", "서버와 설정"),
     "help.reset.hint": ("Forgets the servers, the sign-ins, the downloaded apps and the settings, and opens the first-start guide. The game's own data stays.",
                         "서버, 로그인, 받은 앱, 설정을 지우고 처음 안내를 엽니다. 게임 자체의 데이터는 그대로 둡니다."),
     "help.reset.title": ("Start over", "처음부터"),
@@ -275,6 +288,7 @@ TEXT = {
     "help.reset.confirm": ("Start over", "처음부터"),
     "help.reset.busy": ("Wait until the game or the download is over.", "게임이나 내려받기가 끝날 때까지 기다리세요."),
     "help.repair": ("Repair", "복구"),
+    "help.repair.row": ("Program files", "프로그램 파일"),
     "help.repair.hint": ("Compares the program's files with the installed package and puts back what is missing or changed. Settings and the game's data are not touched.",
                          "프로그램 파일을 설치된 패키지와 대조해 없거나 바뀐 파일을 되돌립니다. 설정과 게임 데이터는 건드리지 않습니다."),
     "help.repair.working": ("Checking the program's files...", "프로그램 파일을 확인하는 중..."),
@@ -291,6 +305,7 @@ TEXT = {
     "help.remove": ("Reset and remove", "초기화와 제거"),
     "help.counting": ("Measuring the data on this PC...", "이 PC의 데이터 크기를 확인하는 중..."),
     "help.clear": ("Clear game data", "게임 데이터 지우기"),
+    "help.clear.row": ("Game data", "게임 데이터"),
     "help.clear.hint": ("Deletes what the game keeps on this PC: its downloads and its own settings. The game downloads its data again at the next start, and this PC stays the same player.",
                         "게임이 이 PC에 둔 것(받은 데이터와 게임 안 설정)을 지웁니다. 다음에 시작할 때 다시 받고, 이 PC의 플레이어는 그대로입니다."),
     "help.clear.ask": ("Delete the game's data on this PC?", "이 PC의 게임 데이터를 지울까요?"),
@@ -304,17 +319,12 @@ TEXT = {
     "help.clear.partly.detail": ("In use and left in place: {n}. The first is {path}. Close what uses them and clear again.",
                                  "사용 중이라 남은 항목: {n}개. 첫 항목: {path}. 쓰고 있는 프로그램을 닫고 다시 지우세요."),
     "help.uninstall": ("Uninstall", "제거"),
+    "help.uninstall.row": ("OpenDMTQ", "OpenDMTQ"),
     "help.uninstall.hint": ("Removes OpenDMTQ from this PC. You choose then whether the settings and the game's data stay.",
                             "이 PC에서 OpenDMTQ를 제거합니다. 설정과 게임 데이터를 남길지는 그때 고릅니다."),
     "help.uninstall.ask": ("Uninstall OpenDMTQ from this PC?", "이 PC에서 OpenDMTQ를 제거할까요?"),
-    "help.uninstall.detail": ("The launcher closes and the program is gone a few seconds later. Your records stay on the server.\n\n"
-                              "Keep data: the settings, sign-ins and game data stay for a later install.\n"
-                              "Delete all: they go too ({size}), with the id this PC plays by. A later install is then a new player. "
-                              "To come back as this one, note the code under OPTION, CONNECT ACCOUNT in the game first: RESTORE DATA takes it.",
-                              "런처가 닫히고 몇 초 뒤 프로그램이 지워집니다. 기록은 서버에 그대로 있습니다.\n\n"
-                              "데이터 남기기: 설정, 로그인, 게임 데이터를 남겨 다시 설치할 때 그대로 씁니다.\n"
-                              "모두 삭제: 그것까지 지웁니다({size}). 이 PC의 기기 ID도 지워져 다시 설치하면 새 플레이어가 됩니다. "
-                              "지금 플레이어로 돌아오려면 먼저 게임의 OPTION, CONNECT ACCOUNT에서 코드를 적어 두세요. RESTORE DATA에 입력합니다."),
+    "help.uninstall.detail": ("The launcher closes and the program is gone a few seconds later. Your records stay on the server.\n\nKeep data: the settings, sign-ins and game data stay for a later install.\nDelete all: they go too ({size}), with the id this PC plays by, and a later install starts as a new player.",
+                              "런처가 닫히고 몇 초 뒤 프로그램이 지워집니다. 기록은 서버에 그대로 있습니다.\n\n데이터 남기기: 설정, 로그인, 게임 데이터를 남겨 다시 설치할 때 그대로 씁니다.\n모두 삭제: 이 PC의 기기 ID까지 모두 지웁니다({size}). 다시 설치하면 새 플레이어로 시작합니다."),
     "help.uninstall.keep": ("Keep data", "데이터 남기기"),
     "help.uninstall.all": ("Delete all", "모두 삭제"),
     "help.uninstall.working": ("Deleting OpenDMTQ's data on this PC...", "이 PC의 OpenDMTQ 데이터를 지우는 중..."),
@@ -347,7 +357,8 @@ TEXT = {
     "about.updating.detail": ("The launcher closes and starts again in a few seconds. Your servers and settings stay.",
                               "런처가 닫혔다가 몇 초 뒤 다시 열립니다. 서버와 설정은 그대로입니다."),
     "about.update_failed.title": ("Update failed", "업데이트 실패"),
-    "about.update_busy": ("Close the game first: the update replaces the player's files.", "먼저 게임을 닫으세요. 업데이트가 플레이어 파일을 바꿉니다."),
+    "about.update_busy": ("Close the game first: the update replaces the game program.",
+                          "먼저 게임을 닫으세요. 업데이트가 게임 프로그램을 바꿉니다."),
     "about.guide": ("First-start guide", "처음 안내"),
     "about.guide.run": ("Show it again", "다시 보기"),
     "about.legal": ("About", "정보"),
@@ -363,8 +374,7 @@ TEXT = {
     "guide.step": ("Step {n} of {total}", "{total}단계 중 {n}단계"),
     "guide.power.name": ("POWER ON", "POWER ON"),
     "guide.power.title": ("Welcome to OpenDMTQ", "OpenDMTQ에 오신 것을 환영합니다"),
-    "guide.power.text": ("A few steps to your first song. Everything here can be changed later in the launcher.",
-                         "첫 곡까지 몇 단계면 됩니다. 여기서 고른 것은 나중에 런처에서 모두 바꿀 수 있습니다."),
+    "guide.power.text": ("A few steps to your first song.", "첫 곡까지 몇 단계면 됩니다."),
     "guide.power.notice.title": ("The app comes from your server", "앱은 플레이할 서버에서"),
     "guide.power.notice": ("The launcher brings no game files. It downloads the app from the OpenDMTQ server you play on, once you sign in there.",
                            "런처에는 게임 파일이 없습니다. 플레이할 OpenDMTQ 서버에 로그인하면 그 서버에서 앱을 받습니다."),
@@ -382,8 +392,8 @@ TEXT = {
                          "서버 사이트에 계정으로 로그인합니다. 플레이 기록은 게임이 서버에 남깁니다."),
     "guide.download.name": ("DOWNLOAD", "DOWNLOAD"),
     "guide.download.title": ("Get the app", "앱 받기"),
-    "guide.download.text": ("The app the server made for itself, the same one its phones install. It comes once, and again only when the server has a newer one.",
-                            "서버가 자기 주소로 만든 앱으로, 휴대폰이 설치하는 것과 같습니다. 한 번 받으면 서버에 새 앱이 생겼을 때만 다시 받습니다."),
+    "guide.download.text": ("The server builds it for its own address, the same one its phones install. It comes once, and again only when the server has a newer one.",
+                            "서버가 자기 주소로 만든 것으로, 휴대폰이 설치하는 것과 같습니다. 한 번 받고, 서버에 새 버전이 있을 때만 다시 받습니다."),
     "guide.sound.name": ("SOUND CHECK", "SOUND CHECK"),
     "guide.sound.title": ("Screen and sound", "화면과 소리"),
     "guide.stage.name": ("STAGE START", "STAGE START"),
@@ -420,8 +430,8 @@ TEXT = {
     "setup.again": ("Try again", "다시 시도"),
     "setup.retry": ("Try again", "다시 시도"),
     "setup.game": ("A game is running.", "게임이 진행 중입니다."),
-    "setup.game.detail": ("Finish it and close the game first: installing replaces the player it plays in.",
-                          "게임을 마치고 닫은 뒤 다시 시도하세요. 설치하면 게임이 쓰는 플레이어가 바뀝니다."),
+    "setup.game.detail": ("Finish it and close the game first: installing replaces the game program.",
+                          "게임을 마치고 닫은 뒤 다시 시도하세요. 설치하면 게임 프로그램이 바뀝니다."),
     "setup.work.install": ("Installing", "설치 중"),
     "setup.work.install.line": ("Installing OpenDMTQ {v}...", "OpenDMTQ {v} 버전을 설치하는 중..."),
     "setup.work.update": ("Updating", "업데이트 중"),
@@ -466,6 +476,8 @@ TEXT = {
     # ------------------------------------------------------------------------------------------- errors
     "error.choice": ("{name} cannot be {value}", "{name}: 쓸 수 없는 값입니다({value})."),
     "error.no_setting": ("there is no setting {name}", "없는 설정입니다: {name}"),
+    "error.window.too_big": ("{size} does not fit this {w} × {h} display with the window's title bar and the taskbar.",
+                             "제목 표시줄과 작업 표시줄까지 이 모니터({w} × {h})에 들어가지 않는 크기입니다: {size}"),
     "error.server.empty": ("Type the server's address.", "서버 주소를 입력하세요."),
     "error.server.address": ("{address} is not an address.", "주소로 읽을 수 없습니다: {address}"),
     "error.server.unreachable": ("Cannot reach {base}.", "{base}에 연결할 수 없습니다."),
@@ -495,8 +507,8 @@ TEXT = {
     "error.app.damaged": ("The app arrived damaged. Try again.", "앱이 손상된 채로 왔습니다. 다시 해 보세요."),
     "error.app.named": ("The server offered an app without a proper name. Tell the server's admin.",
                         "서버가 이름이 올바르지 않은 앱을 내놓았습니다. 서버 관리자에게 알려 주세요."),
-    "error.app.package": ("The app on this PC has no proper package name, so the game does not start. Get the app again on the Online page.",
-                          "이 PC의 앱에 올바른 패키지 이름이 없어 게임을 시작하지 않습니다. 온라인 페이지에서 앱을 다시 받으세요."),
+    "error.app.package": ("The app on this PC has no proper package name, so the game does not start. Get the app again on the ONLINE page.",
+                          "이 PC의 앱에 올바른 패키지 이름이 없어 게임을 시작하지 않습니다. ONLINE 페이지에서 앱을 다시 받으세요."),
     "error.repair.not_installed": ("Repair works in the launcher installed by OpenDMTQ-Setup.exe.",
                                    "복구는 OpenDMTQ-Setup.exe로 설치한 런처에서 됩니다."),
     "error.repair.no_package": ("The installed package is not on this PC. Run OpenDMTQ-Setup.exe again and choose Repair.",
@@ -506,6 +518,41 @@ TEXT = {
     "error.uninstall.not_installed": ("Uninstalling works in the launcher installed by OpenDMTQ-Setup.exe.",
                                       "제거는 OpenDMTQ-Setup.exe로 설치한 런처에서 됩니다."),
 }
+
+
+class Said:
+    """Words to show now and again later, in whatever language the window speaks then: a key of TEXT and its gaps. The
+    window keeps what it said this way (the status line, a page's last answer), so that a switch of language says it
+    again in the new one instead of keeping the old one's sentence. A gap that is words itself (another Said, or an
+    error, which Words.error says) is said in that language too; anything else (an address, a number) goes in as it
+    is."""
+
+    def __init__(self, key, **params):
+        # The key of the words, and the values of their gaps.
+        self.key, self.params = key, params
+
+    def __call__(self, words):
+        """The words in `words`' language, each gap that is words itself said in it too."""
+        filled = {}
+        for name, value in self.params.items():
+            if isinstance(value, Said):
+                # Words inside words: a span of time, a reason.
+                filled[name] = value(words)
+            elif isinstance(value, BaseException):
+                # An error: its own words in this language when it has them (Words.error).
+                filled[name] = words.error(value)
+            else:
+                filled[name] = value
+        return words(self.key, **filled)
+
+    def __repr__(self):
+        return "Said(%r, %r)" % (self.key, self.params)
+
+
+def span(seconds):
+    """How long something lasted, as words to say later: whole minutes, or seconds under one."""
+    minutes = int(seconds) // 60
+    return Said("common.minutes", m=minutes) if minutes else Said("common.seconds", s=int(seconds))
 
 
 class Words:
@@ -522,6 +569,13 @@ class Words:
         en, ko = TEXT.get(key, (key, key))
         text = ko if self.language == "ko" and ko else en
         return text.format(**kw) if kw else text
+
+    def say(self, message):
+        """A message kept to show (a Said, said in this language now), or plain text as it is; "" for none."""
+        if message is None:
+            return ""
+        # A Said is said in this language; anything else is text already (a test's own words, a path).
+        return message(self) if isinstance(message, Said) else str(message)
 
     def error(self, error):
         """What a raised error says, in this language: its words when it has them, else its own sentence."""

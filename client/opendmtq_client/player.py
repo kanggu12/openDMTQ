@@ -85,13 +85,19 @@ def settings_path():
     return os.path.join(st.config_dir(), SETTINGS)
 
 
-def write_settings(values):
-    """The PC settings as the player reads them; returns the file's path."""
+def write_settings(values, language=None):
+    """The PC settings as the player reads them; returns the file's path. `language` is the launcher's language when the
+    player chose one ("en", "ko"): the game and the player's own words (the bar, the question before quitting) then
+    speak it instead of Windows' display language. None, the launcher following Windows, leaves it out: the player
+    follows Windows too."""
     path = settings_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + ".part"
     with open(tmp, "w", encoding="utf-8", newline="\n") as f:
         f.write(choices.settings_text(values))
+        if language:
+            # On a line of its own after the PC settings: the player reads it as one of them (settings.cpp).
+            f.write("language=%s\n" % language)
     os.replace(tmp, path)
     return path
 

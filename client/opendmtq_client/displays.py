@@ -22,8 +22,10 @@ def main_display(root=None):
             gdi32.GetDeviceCaps.argtypes = (wintypes.HDC, ctypes.c_int)
             dc = user32.GetDC(None)
             try:
-                # HORZRES, VERTRES and VREFRESH: the main display's pixels and its rate in whole hertz.
-                width, height, hz = gdi32.GetDeviceCaps(dc, 8), gdi32.GetDeviceCaps(dc, 10), gdi32.GetDeviceCaps(dc, 116)
+                # DESKTOPHORZRES, DESKTOPVERTRES and VREFRESH: the main display's own pixels, whatever the program's
+                # DPI awareness (the command line has none, and HORZRES would give it the display shrunk by Windows'
+                # scaling), and its rate in whole hertz.
+                width, height, hz = gdi32.GetDeviceCaps(dc, 118), gdi32.GetDeviceCaps(dc, 117), gdi32.GetDeviceCaps(dc, 116)
             finally:
                 user32.ReleaseDC(None, dc)
             # 0 and 1 mean the hardware's default rate, which says nothing.

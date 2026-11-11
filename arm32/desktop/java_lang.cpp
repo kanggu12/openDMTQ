@@ -328,7 +328,7 @@ void define_uri() {
     c.method("toString", "()Ljava/lang/String;", [](Call& c) { return Value(jvm::string(c.self_as<Uri>().text)); });
 }
 
-// java.util.Locale: the computer's (host_locale).
+// java.util.Locale: the launcher's language when it chose one, the computer's country (host_locale).
 void define_locale() {
     Class& c = jvm::define("java/util/Locale");
     const auto [lang, country] = host_locale();
@@ -343,9 +343,8 @@ void define_locale() {
     c.method("toString", "()Ljava/lang/String;", [lang, country](Call&) { return Value(jvm::string(lang + "_" + country)); });
 }
 
-}  // namespace
-
-std::pair<std::string, std::string> host_locale() {
+// The computer's own language and country, before the launcher's choice (host_locale).
+std::pair<std::string, std::string> computer_locale() {
     // A Linux locale's name, as the environment gives it ("ko_KR.UTF-8"): the first of these that says one.
     for (const char* name : {"LC_ALL", "LC_MESSAGES", "LANG"}) {
         const char* l = std::getenv(name);
@@ -375,6 +374,17 @@ std::pair<std::string, std::string> host_locale() {
     }
 #endif
     return {"en", "US"};
+}
+
+}  // namespace
+
+std::pair<std::string, std::string> host_locale() {
+    std::pair<std::string, std::string> found = computer_locale();
+    // The language the launcher chose (settings' language=) in place of the computer's: the game, the bar over it, the
+    // question before quitting and the player's own messages speak it. The country stays the computer's, so the game's
+    // idea of where it is does not move with the words.
+    if (!settings().language.empty()) found.first = settings().language;
+    return found;
 }
 
 std::vector<std::pair<std::string, std::string>> string_pairs(Object* map) {

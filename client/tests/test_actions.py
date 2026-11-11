@@ -55,6 +55,8 @@ class Actions(Folder):
         folder = apps.folder(self.state.current)
         self.assertEqual(started["args"][:2], ["--app", folder])
         self.assertIn("display=fullscreen", started["settings"])
+        # The launcher following Windows' display language: none for the player either, which follows Windows too.
+        self.assertNotIn("language=", started["settings"])
         # The server's folder: the app and player.conf naming it, as the player reads it.
         with open(os.path.join(folder, "player.conf"), encoding="utf-8") as f:
             conf = f.read()
@@ -65,6 +67,40 @@ class Actions(Folder):
         # The player's standard output went to its own log for the app.
         with open(player.log_path(info["package"]), encoding="utf-8") as f:
             self.assertIn("stand-in player: started", f.read())
+
+    def test_a_server_that_does_not_answer_is_said_and_does_not_stop_play(self):
+        # The ready check asks the server (reach): one that answers is fine; one that does not is said, and PLAY still
+        # plays the app this PC has; without an app it cannot be got from a server that does not answer.
+        actions.connect(self.state, self.site.url)
+        actions.sign_in(self.state, stub.ACCOUNT, stub.PASSWORD)
+        self.assertIs(actions.reach(self.state), True)
+        down = srv.ServerError("Cannot reach it.", "error.server.unreachable", base=self.site.url)
+        checks = self.keys(actions.readiness(self.state, reached=down))
+        self.assertFalse(checks["server"].ok)
+        self.assertFalse(checks["server"].blocks)
+        self.assertFalse(checks["app"].play_fixes)
+        self.assertFalse(actions.can_play(list(checks.values())))
+        actions.get_app(self.state)
+        checks = actions.readiness(self.state, reached=down)
+        self.assertTrue(actions.can_play(checks))
+        # A server that stopped answering, asked for real.
+        self.site.stop()
+        reached = actions.reach(self.state, timeout=2)
+        self.assertIsInstance(reached, srv.ServerError)
+        self.site.start()
+
+    def test_the_players_language_is_the_launchers(self):
+        # A language chosen in the launcher (Launcher page, the guide, --language) goes to the player's settings, so the
+        # game and the bar over it speak it; "Same as Windows" (none kept) leaves the player to follow Windows.
+        actions.connect(self.state, self.site.url)
+        actions.sign_in(self.state, stub.ACCOUNT, stub.PASSWORD)
+        for picked, line in (("ko", "language=ko\n"), ("en", "language=en\n")):
+            self.state.language = picked
+            actions.finish(self.state, actions.play(self.state))
+            self.assertIn(line, self.started()["settings"])
+        self.state.language = None
+        actions.finish(self.state, actions.play(self.state))
+        self.assertNotIn("language=", self.started()["settings"])
 
     def test_a_newer_app_replaces_the_old_one(self):
         actions.connect(self.state, self.site.url)

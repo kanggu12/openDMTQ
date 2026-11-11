@@ -6,6 +6,42 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+### Added
+
+- The player for Windows: a small handle at the top centre of the game, a faint pill with a down arrow, says where the
+  bar is: the pointer resting on it brings the bar down, and clicks go through it to the game. The bar also comes down
+  by itself for 3 seconds when the game's picture first shows and after each switch between a window and full screen.
+- For contributors: the player says in its log when the bar comes down (and why) and goes up, when the FPS counter comes
+  up or hides, and how long each planned key (`PLAYER_KEYS`) waited for the UI thread; with `PLAYER_TRACE_INPUT=1`, each
+  press of the mouse that reaches the game's window and each time the game's window stops being active or loses the
+  keyboard, and to which window.
+- The launcher's command line: `--servers` lists the servers it knows, as the Online page does, the one PLAY plays on
+  marked; `--skip-guide` is the first-start guide's Skip, so a PC set up from the command line opens on its pages.
+
+### Changed
+
+- The player for Windows: the overlay's pictures (the blur, the tint, the words) are made on a thread of their own; the
+  UI thread, which stamps each key and click for the game, only hands them to Windows, and never waits for them.
+- The player for Windows: the FPS counter is faint as a whole (its window at 62 %), so the game shows through it.
+- The launcher: the FPS counter is On or Off on the Screen page, at the top left beside a song's pause button when on; a
+  Position row under it, shown while it is on, moves it to another corner, kept while it is off. `--set show_fps=on|off`
+  and `--set fps_position=top_left|top_right|bottom_left|bottom_right` do the same; `show_fps` with a corner's name, as
+  before, is on in that corner, and an older launcher's choice of a corner is kept.
+- The launcher's buttons stand a little out of their card and sink while pressed, and its text fields and drop-downs
+  are let into it: a line of light along a button's top edge and a shade along its foot, a soft shadow inside a pressed
+  button or a field, in the game's dark plates, cut corners and lime. On every page, the first-start guide, the
+  dialogs and the installer; PLAY, the tabs, the switches and the volume's track and knob have the same depth.
+- The launcher's header and the installer's pictures show the wordmark without the lime PC after it: PC CLIENT over the
+  version beside it says what it is.
+- The player for Windows speaks the launcher's language: once one is chosen in the launcher (the first-start guide, the
+  Launcher page, `--language` or `--set language=`), the game, the bar over it, the question before quitting, the
+  broadcast notice and the player's own messages speak it too, instead of Windows' display language; the country stays
+  Windows'. "Same as Windows" leaves both following Windows. The launcher hands it over in the settings file it writes
+  before each start (`language=en|ko`).
+- `--set window=` refuses a size larger than the main display with room for the window's title bar and the taskbar,
+  the sizes the Screen page leaves out, with the page's own check; the display's size is read in its own pixels, also
+  by the command line, which Windows' scaling would otherwise shrink.
+
 ### Fixed
 
 - The player for Windows: the FPS counter stayed at 0 and "-- ms" for the whole game once a half second had passed with
@@ -20,26 +56,36 @@ one that only fixes raises the patch number. Each release's section here is its 
   context held; the question's two pictures of the whole game area (66 MB at 4K) go when it closes.
 - The player for Windows: the frame behind the glass is read at half and then a quarter of its size, each of its pixels
   the mean of 4 by 4 of the frame's, so thin lines in it no longer shimmer in the blur as they move.
-
-### Changed
-
-- The player for Windows: the overlay's pictures (the blur, the tint, the words) are made on a thread of their own; the
-  UI thread, which stamps each key and click for the game, only hands them to Windows, and never waits for them.
-- The player for Windows: the FPS counter is faint as a whole (its window at 62 %), so the game shows through it.
-- The launcher: the FPS counter is On or Off on the Screen page, at the top left beside a song's pause button when on; a
-  Position row under it, shown while it is on, moves it to another corner, kept while it is off. `--set show_fps=on|off`
-  and `--set fps_position=top_left|top_right|bottom_left|bottom_right` do the same; `show_fps` with a corner's name, as
-  before, is on in that corner, and an older launcher's choice of a corner is kept.
-
-### Added
-
-- The player for Windows: a small handle at the top centre of the game, a faint pill with a down arrow, says where the
-  bar is: the pointer resting on it brings the bar down, and clicks go through it to the game. The bar also comes down
-  by itself for 3 seconds when the game's picture first shows and after each switch between a window and full screen.
-- For contributors: the player says in its log when the bar comes down (and why) and goes up, when the FPS counter comes
-  up or hides, and how long each planned key (`PLAYER_KEYS`) waited for the UI thread; with `PLAYER_TRACE_INPUT=1`, each
-  press of the mouse that reaches the game's window and each time the game's window stops being active or loses the
-  keyboard, and to which window.
+- The launcher's status line gives way to where PLAY stands once the player does something: an installer's server, a
+  failure or a game's end no longer stays on every page after it, so the line never claims a server PLAY no longer
+  plays on, nor a failure whose cause is gone. After a switch of language, the status line and the Online page's last
+  answers say themselves in the new one instead of keeping the old one's sentence.
+- The launcher with the keyboard: the Sound page and the guide's SOUND CHECK keep their place and the keyboard's control
+  when a choice draws them again (the mode, the buffer, VSync), as the Screen page does; a control Tab reaches below or
+  above the part of the page in view comes into view; Tab goes through the page before the bar along the foot, and the
+  guide's bar left to right (Skip, Back, Next).
+- The launcher's ready check asks the server: one that does not answer shows so on the Server line and the status line
+  instead of a lit Server line, and Help's Check again asks it again. PLAY still starts the app this PC has; an app it
+  lacks waits for the server instead of a download that cannot start. `--status` asks it the same way.
+- The launcher's words: the Controls page says the bar over the game in one short line each for the pointer, a finger
+  and the keyboard, without reasons; no line about the page itself or advice it is not the launcher's to give (sizes
+  left out, everything changeable later, updating the graphics driver, a code to note before uninstalling); the Online
+  page's sign-in card says when it is signed in; "player" is the one who plays, and the program it plays in the game
+  program; a row of Help is named for what it acts on, not for its button; pages by the menu's names (SCREEN, SOUND,
+  ONLINE); in Korean, the bar's line, the touch line, the Online page's line and the uninstall's question read as
+  plain Korean.
+- The launcher's text fields are as tall as the buttons beside them, on the same middle, and start where the words
+  above them start; every setting's control shows from one line, the volume's track too.
+- The launcher's backdrop runs to the window's right edge: no flat dark strip where the scroll bar keeps its room, and
+  the green shapes no longer jump where the header meets the page.
+- The PLAY page's ready check ends on the same line as the cards beside it, with Check again at its foot, instead of an
+  empty band under its rows.
+- The guide's numbers of the steps to come read at 3:1 or more, in a quiet grey, instead of all but vanishing.
+- The Online page has one main button at a time: Connect while there is no server, then Sign in, then the app's
+  download.
+- The Screen page offers no frame limit above the display's rate while VSync is on (VSync holds the game at that rate
+  whatever the limit), keeps one set before in its row, and its hint names this display's rate and what the limit gives
+  on it (exactly, very nearly, or held at the rate) instead of a 240 Hz display's example.
 
 ## [0.9.1] - 2026-11-11
 

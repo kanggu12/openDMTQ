@@ -28,7 +28,7 @@ def splash(path, version, width=720, height=400, scale=1.75, label="PC CLIENT"):
     """The picture shown while OpenDMTQ installs or updates, as the launcher's own header: the site's page behind, and
     the wordmark with the version block beside it, in the middle."""
     img = art.backdrop(width, height, scale=scale / 1.75).convert("RGBA")
-    # The header's brand at a larger size: the wordmark with PC after it, the label over the version.
+    # The header's brand at a larger size: the wordmark, and the label over the version beside it.
     brand = art.brand(scale, "v" + version, label=label)
     img.alpha_composite(brand, ((width - brand.width) // 2, (height - brand.height) // 2))
     img.convert("RGB").save(path)
