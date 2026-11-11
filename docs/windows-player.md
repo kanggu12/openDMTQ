@@ -92,11 +92,11 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   that a player sees where it is. It stays while the pointer is on it and goes up soon after the pointer leaves, so it
   never sits on the game's own controls at the top while they are used. On its left is the OpenDMTQ wordmark as the
   launcher's header draws it; on its right are three buttons in the launcher's own shape and depth (two corners cut,
-  raised, sunk while held): **minimise** and **full screen** (or back to a window), quiet metal with a lighter plate
-  under the pointer, and the **X** that quits, in the launcher's lime from the start so that it is seen at once. A
-  button acts only when let go where it was pressed. Minimise holds the game still, and the taskbar brings it back.
-  While the bar is down, the broadcast notice and an FPS counter in a top corner move down under it. It is tall enough
-  to cover the game's own X at the top right of its song and music screens whole.
+  raised, sunk while held): **minimise** and **full screen** (or back to a window) as secondary buttons, quiet metal
+  with a lighter plate under the pointer, and the **X** that quits as the main button, in the launcher's lime from the
+  start so that it is seen at once. A button acts only when let go where it was pressed. Minimise holds the game still,
+  and the taskbar brings it back. While the bar is down, the broadcast notice and an FPS counter in a top corner move
+  down under it. It is tall enough to cover the game's own X at the top right of its song and music screens whole.
 - **The handle**: a small tab hanging from the game's top edge at its centre, in the shape of the game's own tabs, the
   game's charcoal with its green line along the foot, says where the bar is; with the pointer on it, it grows a little
   and its line turns lime. The pointer resting on it, or just around it, brings the bar down. It shows once the game's
