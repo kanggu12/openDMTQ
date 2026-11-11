@@ -27,9 +27,13 @@ ANTI_ALIASING = ("off", "cmaa2", "smaa")
 OLD_ANTI_ALIASING = {"msaa2": "cmaa2", "msaa4": "cmaa2", "msaa8": "cmaa2"}
 # A counter of the frames a second over the game, off or on.
 SHOW_FPS = ("off", "on")
-# The counter's corner while it is on: the top left, beside a song's pause button, or another (each corner has some of
-# the game's own controls). Kept while the counter is off, for the next time it is on.
+# The counter's corner while it is on: the bottom right unless another is chosen (measured on the game's screens, it
+# covers the fewest of the game's own labels and buttons there; every corner covers some on some screen). Kept while the
+# counter is off, for the next time it is on.
 FPS_POSITION = ("top_left", "top_right", "bottom_left", "bottom_right")
+# The corner every launcher before 0.9.3 wrote into its settings file whether or not the player chose it: read as no
+# choice (the default above) unless the file says the player chose it.
+OLD_FPS_POSITION = "top_left"
 # The sound shared with the PC's other sound, or the device alone (less latency).
 AUDIO_MODE = ("shared", "exclusive")
 # How much sound is kept ahead of the device: less latency, or fewer breaks on a busy PC.
@@ -46,7 +50,7 @@ DEFAULTS = {
     "upscaler": "bilinear",
     "anti_aliasing": "off",
     "show_fps": "off",
-    "fps_position": "top_left",
+    "fps_position": "bottom_right",
     "audio_device": "default",
     "audio_mode": "shared",
     "audio_buffer": "normal",

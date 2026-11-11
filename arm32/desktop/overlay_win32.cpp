@@ -582,8 +582,11 @@ FpsMetrics fps_metrics() {
 constexpr float kPauseRight = 73;
 
 // The counter's glass's top left in its corner (Settings::ShowFps's order: 1 top left, 2 top right, 3 bottom left, 4
-// bottom right), 8 pixels in at 720 lines; top left, 8 pixels right of the game's pause button, so that it covers
-// nothing a song uses; in a top corner, under the bar while that is down.
+// bottom right, its own place), 8 pixels in at 720 lines; top left, 8 pixels right of the game's pause button, so that
+// it covers nothing a song uses; in a top corner, under the bar while that is down. At the bottom right, 8 in from the
+// right and the foot, it covers the fewest of the game's labels and buttons: none on most of its screens, the end of
+// the result's SELECT MUSIC and of the download list's DOWNLOAD, and the loading screen's version (measured on the
+// game's frames at 720 and 1080 lines: 9 of 37; the bottom left 13, its music list's grid button whole).
 POINT fps_place(int corner, int chip_w, int chip_h) {
     const int in = px(8);
     const bool right = corner == 2 || corner == 4, bottom = corner == 3 || corner == 4;

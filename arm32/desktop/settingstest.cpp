@@ -239,7 +239,7 @@ int main() {
         check(read(path, text).show_fps == static_cast<player::Settings::ShowFps>(i), corners[i]);
     }
     check(read(path, "show_fps=middle\n").show_fps == player::Settings::ShowFps::kOff, "a corner it does not know shows no frame counter");
-    check(read(path, "show_fps=on\n").show_fps == player::Settings::ShowFps::kTopLeft, "show_fps=on is the top left, beside the pause button");
+    check(read(path, "show_fps=on\n").show_fps == player::Settings::ShowFps::kBottomRight, "show_fps=on is the bottom right, its own place");
     // The other words each key takes.
     const player::Settings& words = read(path, "display=window\nwindow=auto\nvsync=on\nfps=unlimited\naudio_device=default\n"
                                                "audio_mode=shared\naudio_buffer=safe\n");

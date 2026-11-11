@@ -113,6 +113,7 @@ class LauncherState:
         self.picked_language = None             # the language the player chose; None: Windows' display language
         self.guide_done = False                 # the first-start guide was finished or skipped
         self.values = choices.normalize({})     # the PC settings for the picture and the sound, all filled in
+        self.chosen = set()                     # the settings the player chose (from 0.9.3 on), by name
         self.servers = []                       # the servers this launcher knows (see _server)
         self.current = None                     # the address of the one PLAY plays on, or None
         self.last_session = None                # {"seconds", "exit_code", "crashed"} of the last game
@@ -169,6 +170,12 @@ class LauncherState:
         state.guide_done = bool(data.get("guide_done", False))
         # A hand-edited value the launcher does not offer keeps that setting's default, the others stay.
         state.values = choices.normalize(data.get("values") or {}, strict=False)
+        chosen = data.get("chosen")
+        state.chosen = {name for name in chosen if name in choices.NAMES} if isinstance(chosen, list) else set()
+        # The counter's corner as a launcher before 0.9.3 wrote it, its default then, with no word that the player chose
+        # it: the default now (another corner was the player's choice, and stays).
+        if "fps_position" not in state.chosen and state.values["fps_position"] == choices.OLD_FPS_POSITION:
+            state.values["fps_position"] = choices.DEFAULTS["fps_position"]
         state.servers = [_server(entry) for entry in (data.get("servers") or [])]
         current = data.get("current")
         state.current = current if any(s["url"] == current for s in state.servers) else None
@@ -189,6 +196,7 @@ class LauncherState:
             "language": self.picked_language,
             "guide_done": self.guide_done,
             "values": self.values,
+            "chosen": sorted(self.chosen),
             "servers": self.servers,
             "current": self.current,
             "last_session": self.last_session,
@@ -238,7 +246,11 @@ class LauncherState:
             server["expires"] = 0
 
     def set_value(self, name, value):
-        """Change one PC setting; a value the launcher does not offer raises ChoiceError and changes nothing."""
+        """Change one PC setting; a value the launcher does not offer raises ChoiceError and changes nothing. The setting
+        is the player's choice from then on (a corner given as show_fps's value chooses the counter's corner too)."""
         merged = dict(self.values)
         merged[name] = value
         self.values = choices.normalize(merged)
+        self.chosen.add(name)
+        if name == "show_fps" and str(value).strip().lower() in choices.FPS_POSITION:
+            self.chosen.add("fps_position")

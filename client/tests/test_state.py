@@ -37,6 +37,33 @@ class State(Folder):
         self.assertEqual(again.server()["name"], "A server")
         self.assertTrue(again.signed_in())
 
+    def test_the_counters_corner_from_before_0_9_3(self):
+        # A launcher before 0.9.3 wrote its default corner, the top left, whether or not the player chose it: read as no
+        # choice, the bottom right now. Another corner was the player's choice and stays.
+        os.makedirs(os.path.dirname(st.LauncherState.path()), exist_ok=True)
+        for written, read in (("top_left", "bottom_right"), ("top_right", "top_right"), ("bottom_left", "bottom_left"),
+                              ("bottom_right", "bottom_right")):
+            with open(st.LauncherState.path(), "w", encoding="utf-8") as f:
+                json.dump({"version": 1, "values": {"show_fps": "on", "fps_position": written}}, f)
+            self.assertEqual(st.LauncherState.load().values["fps_position"], read, written)
+        # The top left chosen from now on stays: the file says the player chose it.
+        s = st.LauncherState()
+        s.set_value("fps_position", "top_left")
+        s.save()
+        self.assertEqual(st.LauncherState.load().values["fps_position"], "top_left")
+        # So does one chosen as show_fps's value (as --set takes it).
+        s = st.LauncherState()
+        s.set_value("show_fps", "top_left")
+        s.save()
+        again = st.LauncherState.load()
+        self.assertEqual((again.values["show_fps"], again.values["fps_position"]), ("on", "top_left"))
+        # The counter turned on alone chooses no corner: the default's.
+        s = st.LauncherState()
+        s.set_value("show_fps", "on")
+        s.save()
+        self.assertEqual(st.LauncherState.load().values["fps_position"], "bottom_right")
+        self.assertEqual(sorted(st.LauncherState.load().chosen), ["show_fps"])
+
     def test_the_language_follows_windows_until_one_is_picked(self):
         # Windows' display language stands in through system_language: no test depends on this computer's.
         saved = st.system_language

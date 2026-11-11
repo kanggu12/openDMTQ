@@ -47,13 +47,13 @@ class Values(unittest.TestCase):
         self.assertIn("anti_aliasing=cmaa2", choices.settings_text({"anti_aliasing": "msaa4"}).splitlines())
 
     def test_the_frame_counter(self):
-        # Off by default, its corner the top left; on and off by name, in any case.
+        # Off by default, its corner the bottom right; on and off by name, in any case.
         filled = choices.normalize({})
-        self.assertEqual((filled["show_fps"], filled["fps_position"]), ("off", "top_left"))
+        self.assertEqual((filled["show_fps"], filled["fps_position"]), ("off", "bottom_right"))
         self.assertEqual(choices.normalize({"show_fps": "ON"})["show_fps"], "on")
         # Its corner kept while it is off, for the next time it is on.
-        kept = choices.normalize({"show_fps": "off", "fps_position": "bottom_right"})
-        self.assertEqual((kept["show_fps"], kept["fps_position"]), ("off", "bottom_right"))
+        kept = choices.normalize({"show_fps": "off", "fps_position": "top_right"})
+        self.assertEqual((kept["show_fps"], kept["fps_position"]), ("off", "top_right"))
         # A corner as show_fps's value (an older launcher's file, --set as before): on, in that corner.
         for corner in ("top_left", "top_right", "bottom_left", "bottom_right"):
             filled = choices.normalize({"show_fps": corner.upper(), "fps_position": "top_left"})
@@ -66,7 +66,7 @@ class Values(unittest.TestCase):
         def counter_line(values):
             return [line for line in choices.settings_text(values).splitlines() if line.startswith("show_fps=")]
         self.assertEqual(counter_line({}), ["show_fps=off"])
-        self.assertEqual(counter_line({"show_fps": "on"}), ["show_fps=top_left"])
+        self.assertEqual(counter_line({"show_fps": "on"}), ["show_fps=bottom_right"])
         self.assertEqual(counter_line({"show_fps": "on", "fps_position": "bottom_left"}), ["show_fps=bottom_left"])
         self.assertEqual(counter_line({"show_fps": "off", "fps_position": "bottom_left"}), ["show_fps=off"])
         self.assertNotIn("fps_position", choices.settings_text({"show_fps": "on"}))
@@ -131,7 +131,7 @@ class Values(unittest.TestCase):
                                       "audio_mode": "exclusive", "audio_buffer": "low", "volume": 35})
         lines = [line for line in text.splitlines() if not line.startswith("#")]
         self.assertEqual(lines, ["display=window", "window=1600x900", "vsync=off", "fps=unlimited", "render_scale=75",
-                                 "upscaler=nis", "anti_aliasing=smaa", "show_fps=top_left", "audio_device={0.0.0.00000000}.{x}",
+                                 "upscaler=nis", "anti_aliasing=smaa", "show_fps=bottom_right", "audio_device={0.0.0.00000000}.{x}",
                                  "audio_mode=exclusive", "audio_buffer=low", "volume=35"])
 
     def test_the_player_reads_every_key_and_value(self):

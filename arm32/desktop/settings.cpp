@@ -20,8 +20,9 @@
 //                                            SMAA 1x over the finished picture (msaa2, msaa4 and msaa8, which earlier
 //                                            launchers wrote, read as cmaa2: MSAA left the game's picture as it was)
 //   show_fps      off | on | top_left |      the frames a second and the frame time in that corner of the game; on is
-//                 top_right | bottom_left |  the top left, beside a song's pause button (where the launcher puts it
-//                 bottom_right               unless its position is chosen)
+//                 top_right | bottom_left |  the bottom right, where it covers the fewest of the game's own labels and
+//                 bottom_right               buttons (measured on its screens; the launcher puts it there unless its
+//                                            position is chosen)
 //   audio_device  default | <endpoint id>    the sound's device: Windows' default output, or one by its id
 //                                            (player --audio-devices lists them)
 //   audio_mode    shared | exclusive         with the computer's other sound, or the device alone (less latency)
@@ -157,11 +158,11 @@ bool load_settings(const std::string& path) {
                 ok = true;
             }
         } else if (key == "show_fps") {
-            // Each corner's name to its kind, in the order of the enum, and on for the top left, the counter's own
+            // Each corner's name to its kind, in the order of the enum, and on for the bottom right, the counter's own
             // place; a name it does not know shows none.
             static const char* const kCorners[] = {"off", "top_left", "top_right", "bottom_left", "bottom_right"};
             ok = value == "on";
-            if (ok) s.show_fps = Settings::ShowFps::kTopLeft;
+            if (ok) s.show_fps = Settings::ShowFps::kBottomRight;
             for (int i = 0; i < 5; ++i) {
                 if (value != kCorners[i]) continue;
                 s.show_fps = static_cast<Settings::ShowFps>(i);

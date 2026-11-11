@@ -63,8 +63,9 @@ struct Settings {
     // (CMAA 2, SMAA 1x).
     enum class AntiAliasing { kOff, kCmaa2, kSmaa };
     AntiAliasing anti_aliasing = AntiAliasing::kOff;
-    // A counter of the frames a second in a corner of the game (overlay_win32.cpp): none, or on in its corner, the top
-    // left beside a song's pause button unless another is chosen (each corner has some of the game's own controls).
+    // A counter of the frames a second in a corner of the game (overlay_win32.cpp): none, or on in its corner, the bottom
+    // right unless another is chosen (measured on the game's screens, it covers the fewest of the game's own labels and
+    // buttons there; every corner covers some on some screen).
     enum class ShowFps { kOff, kTopLeft, kTopRight, kBottomLeft, kBottomRight };
     ShowFps show_fps = ShowFps::kOff;
     // The sound's device ("" Windows' default output), the device alone, how much is kept ahead (0 low, 1 normal,

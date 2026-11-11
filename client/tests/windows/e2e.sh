@@ -13,7 +13,7 @@
 #   5. Repair from the command line: a file of the player and one of the launcher put back as they were installed
 #   6. Clear game data: the id alone stays; the FPS counter switched on from the command line (the launcher's window
 #      closed for it, then opened again), and the game starts again with the same id and gets to its menu, the counter
-#      up at its top left, a click on its place reaching the game
+#      up at its bottom right, a click on its place reaching the game
 #   7. Uninstall with the data: refused while the window is open, then the program, its shortcut and its data gone
 # Every step leaves a screenshot of the virtual screen in OUT_DIR, and the logs.
 #
@@ -343,7 +343,7 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   xdotool windowfocus --sync \$(window '^OpenDMTQ\$') 2>/dev/null; xdotool key alt+F4
   wait_for 20 '[ -z \"\$(window \"^OpenDMTQ\$\")\" ]' || { snap launcher-stays-for-set; echo 'FAIL: the launcher did not close for --set'; exit 1; }
   CMD --set show_fps=on | tee /out/set-counter.txt
-  grep -q 'show_fps=on, fps_position=top_left' /out/set-counter.txt || { echo 'FAIL: --set show_fps=on did not put the counter on at the top left'; exit 1; }
+  grep -q 'show_fps=on, fps_position=bottom_right' /out/set-counter.txt || { echo 'FAIL: --set show_fps=on did not put the counter on at the bottom right'; exit 1; }
   wine \"\$CUR/OpenDMTQ.exe\" > /out/launcher-again.log 2>&1 &
   wait_for 60 '[ -n \"\$(xdotool search --onlyvisible --name \"^OpenDMTQ\$\" 2>/dev/null)\" ]' \\
     || { snap launcher-not-again; echo 'FAIL: the launcher did not open again'; exit 1; }
@@ -360,13 +360,15 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   game=\$(xdotool search --name 'TECHNIKA' 2>/dev/null | tail -n 1)
   eval \$(xdotool getwindowgeometry --shell \"\$game\")
   xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5
-  # The counter up at its top left (8 right of the pause button's place, which ends 73 in, and 8 down, at 720 lines);
-  # a click well inside it (101,23 at 720), the pointer away at once, reaches the game, which keeps the keyboard.
+  # The counter up at its bottom right (88 by 44, 8 in from the right and the foot, at 720 lines); a click well inside
+  # it (52 in from the right and 30 up from the foot at 720), the pointer away at once, reaches the game, which keeps
+  # the keyboard.
   player_said 'the frame counter is up' || { snap no-counter; echo 'FAIL: the FPS counter did not come up'; exit 1; }
   before=\$(presses); moves=\$(focus_moves)
-  xdotool mousemove \$((X + \$(opx 101))) \$((Y + \$(opx 23))) click 1 mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 1
+  cx=\$((WIDTH - \$(opx 52))) cy=\$((HEIGHT - \$(opx 30)))
+  xdotool mousemove \$((X + cx)) \$((Y + cy)) click 1 mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 1
   [ \"\$(presses)\" -gt \"\$before\" ] || { snap counter-click; echo \"FAIL: a click on the counter's place did not reach the game\"; exit 1; }
-  [ \"\$(last_press)\" = \"\$(opx 101),\$(opx 23)\" ] || { echo \"FAIL: the counter's click reached the game at \$(last_press)\"; exit 1; }
+  [ \"\$(last_press)\" = \"\$cx,\$cy\" ] || { echo \"FAIL: the counter's click reached the game at \$(last_press)\"; exit 1; }
   [ \"\$(focus_moves)\" = \"\$moves\" ] || { echo 'FAIL: the game lost the keyboard to the counter'; exit 1; }
   echo \"a click on the counter's place reached the game at \$(last_press), and the game kept the keyboard\"
   snap counter-up

@@ -246,7 +246,7 @@ def screen_rows(app, parent, redraw, full=True):
     widgets.setting_row(card.body, ui, w("screen.fps"),
                         lambda p: widgets.Select(p, ui, options, v["fps"], set_and_redraw("fps"), width=22),
                         fps_hint(w, vsync, v["fps"], hz)).pack(fill="x")
-    # The frame counter over the game, on or off; while on, its corner (the top left unless another is picked). Drawn
+    # The frame counter over the game, on or off; while on, its corner (the bottom right unless another is picked). Drawn
     # again on a change: the corner's row is there only while the counter is on.
     counter = v["show_fps"] == "on"
     widgets.divider(card.body, ui)

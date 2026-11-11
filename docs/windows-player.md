@@ -58,7 +58,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | `vsync` | `on`, `off` | VSync |
 | `fps` | `auto` (the display's rate), `30`, `60`, `120`, `144`, `165`, `180`, `240`, `360`, `unlimited` | Frame limit |
 | `show_fps` | `off`, `on` (a corner's name, as `fps_position` takes it, is on in that corner) | FPS counter |
-| `fps_position` | `top_left` (beside a song's pause button), `top_right`, `bottom_left`, `bottom_right`; kept while the counter is off | Position, while the counter is on |
+| `fps_position` | `bottom_right` (where it covers the least of the game), `top_left` (beside a song's pause button), `top_right`, `bottom_left`; kept while the counter is off | Position, while the counter is on |
 | `render_scale` | `100`, `85`, `75`, `67`, `50` | Render scale |
 | `upscaler` | `bilinear`, `fsr1`, `nis` | Upscaler, below 100 % |
 | `anti_aliasing` | `off`, `cmaa2`, `smaa` | Anti-aliasing |
@@ -156,15 +156,19 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   display); another limit is held by the clock, with each frame still on a refresh (144 on a 240 Hz display).
 - **VSync off:** frames go out as soon as they are drawn, evenly at the limit, which may be above the display's rate, or
   as fast as the PC draws without one. A little less delay, and the picture may tear.
-- **The FPS counter** is off by default. On, it shows at the top left, just right of a song's pause button; its
-  **Position** can be changed to another corner (each corner has some of the game's own controls), and stays chosen
-  while the counter is off. A small glass box like the game's Q and MAX box, faint as a whole so the game shows through
-  it: FPS in the game's lime, the frames a second in white and the mean frame time under them, over the last second,
-  twice a second. It counts the frames the player shows between their own moments, so a steady 60 reads 60; a loading
-  screen that shows a frame now and then reads its few frames a second, and only a whole second without a frame reads
-  0. It shows from the game's first frame, and hides while the game holds still (the question before
-  quitting, a minimised window) instead of counting the stillness. It lets clicks through, and is drawn apart from the
-  game's picture: it costs the game nothing, and the broadcast does not show it.
+- **The FPS counter** is off by default. On, it shows at the bottom right, 8 pixels in at 720 lines, where it covers the
+  least of the game: on its screens, none of its labels and buttons but the end of the result's SELECT MUSIC and of the
+  download list's DOWNLOAD and the loading screen's version (the bottom left would cover more, the music list's grid
+  button whole; the top is the bar's). In a song it sits over the play field's corner, faint, so a note there shows
+  through. Its **Position** can be changed to another corner, and stays chosen while the counter is off; a corner chosen
+  before stays (the top left that launchers before 0.9.3 wrote whether chosen or not reads as the default). A small
+  glass box like the game's Q and MAX box, faint as a whole so the game shows through it: FPS in the game's lime, the
+  frames a second in white and the mean frame time under them, over the last second, twice a second. It counts the
+  frames the player shows between their own moments, so a steady 60 reads 60; a loading screen that shows a frame now
+  and then reads its few frames a second, and only a whole second without a frame reads 0. It shows from the game's
+  first frame, and hides while the game holds still (the question before quitting, a minimised window) instead of
+  counting the stillness. It lets clicks through, and is drawn apart from the game's picture: it costs the game nothing,
+  and the broadcast does not show it.
 - **The render scale** draws the game at a share of the window's pixels (100 % down to 50 %), stretched to fill it:
   lighter for the graphics card, and softer. The share keeps the window's shape exactly where its size has fine enough
   steps (1920x1080 is 120 steps of 16x9): 67 % of 1920x1080 is 1280x720, so the game lays itself out as it does at full

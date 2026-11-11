@@ -428,7 +428,7 @@ def parse(argv):
     p.add_argument("--app", action="store_true", help="download the server's app, or a newer one")
     p.add_argument("--set", metavar="NAME=VALUE", action="append", default=[],
                    help="change a PC setting: " + ", ".join(choices.NAMES) + " (show_fps=on|off; fps_position=top_left|"
-                        "top_right|bottom_left|bottom_right, the counter's corner, top_left unless chosen)")
+                        "top_right|bottom_left|bottom_right, the counter's corner, bottom_right unless chosen)")
     p.add_argument("--audio-devices", action="store_true", help="list the sound devices the player can play on")
     p.add_argument("--language", choices=st.LANGUAGES + ("system",),
                    help="the launcher's language (system: Windows' display language)")

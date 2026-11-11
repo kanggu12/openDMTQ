@@ -6,6 +6,14 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+### Changed
+
+- The player for Windows: the FPS counter's place is the bottom right unless another corner is chosen, as the top is
+  the bar's: measured on the game's screens, it covers the least of the game's own labels and buttons there (none on
+  28 of 37 screens, the end of a button on two kinds of screen). The launcher's Position row says it is the default. A
+  corner chosen before stays; the top left that every launcher before this one wrote whether chosen or not reads as
+  the new default.
+
 ## [0.9.2] - 2026-11-12
 
 ### Added

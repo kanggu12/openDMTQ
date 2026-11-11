@@ -83,11 +83,11 @@ class CommandLine(Folder):
         self.assertEqual(st.LauncherState.load().values["upscaler"], "bilinear")
 
     def test_the_frame_counter(self):
-        # On by its own name at the top left; its corner by fps_position; off keeps the corner for the next time; a
+        # On by its own name at the bottom right; its corner by fps_position; off keeps the corner for the next time; a
         # place that is no corner refused.
         code, said = self.run_main(["--set", "show_fps=on"])
         self.assertEqual(code, 0, said)
-        self.assertIn("show_fps=on, fps_position=top_left", said)
+        self.assertIn("show_fps=on, fps_position=bottom_right", said)
         code, said = self.run_main(["--set", "fps_position=top_right"])
         self.assertEqual(code, 0, said)
         self.assertEqual(choices.settings_text(st.LauncherState.load().values).count("show_fps=top_right"), 1)
