@@ -297,8 +297,10 @@ class WindowFlow(Folder):
         state.add_server("http://127.0.0.1:1", "Somewhere")
         os.makedirs(apps.folder("http://127.0.0.1:1"))
         said = []
-        app = types.SimpleNamespace(words=i18n.Words("en"), state=state, busy=False, download=None, session=None,
-                                    set_status=lambda text, tone="normal", **kw: said.append(text))
+        words = i18n.Words("en")
+        # What the status line would say, in English (the line keeps a message to say in the window's language).
+        app = types.SimpleNamespace(words=words, state=state, busy=False, download=None, session=None,
+                                    set_status=lambda message, tone="normal", **kw: said.append(words.say(message)))
         for name in ("_game_open", "busy_now", "files_in_use"):
             setattr(app, name, getattr(launcher.LauncherApp, name).__get__(app))
         with mock.patch.object(playing, "running", return_value=True), \

@@ -198,7 +198,7 @@ class WindowThread(Folder):
 
         app = types.SimpleNamespace(state=state, checks=None, checks_asked=0, post=tasks.append, status_sticky=True,
                                     guide=None, check_box=None, _paint_play=lambda: None)
-        for name in ("refresh_checks", "_checked"):
+        for name in ("refresh_checks", "_checked", "_say_state"):
             setattr(app, name, getattr(launcher.LauncherApp, name).__get__(app))
 
         def answers(count):
@@ -221,3 +221,72 @@ class WindowThread(Folder):
             task()
         self.assertEqual(asked, ["http://first.test", "http://second.test"])
         self.assertEqual([c.detail for c in app.checks], ["http://second.test"])
+
+
+class StatusLine(Folder):
+    """The window's status line: what it keeps gives way once the player does something, and says itself again in the
+    language the window switches to."""
+
+    def window(self, state, checks):
+        """A stand-in for the window with the status line's own methods, the last ready check `checks`, no work under
+        way and nothing drawn."""
+        from opendmtq_client import app as launcher, i18n
+        app = types.SimpleNamespace(state=state, checks=checks, busy=False, download=None, session=None,
+                                    words=i18n.Words("en"), status_message=None, status_tone="normal",
+                                    status_action=None, status_transient=False, status_sticky=False,
+                                    _paint_status=lambda: None)
+        for name in ("set_status", "user_acted", "_say_state", "ready", "busy_now", "_game_open"):
+            setattr(app, name, getattr(launcher.LauncherApp, name).__get__(app))
+        # The line's words as the window draws them (a property of the window's class).
+        app.text = lambda: launcher.LauncherApp.status_text.fget(app)
+        return app
+
+    def test_an_outcome_gives_way_once_the_player_acts(self):
+        # An installer's server taken while the window was open says "you play on it from now on"; the player then
+        # picks another server (Online's Play here, which is acting): the line no longer claims the first.
+        from opendmtq_client import actions, i18n
+        state = st.LauncherState()
+        state.add_server("http://stand.in", "Stand-in")
+        state.add_server("http://club.test", "Club")
+        app = self.window(state, [actions.Check("server", True, "Club")])
+        app.set_status(i18n.Said("status.preset", name="Club"), "ok", sticky=True)
+        self.assertIn("Club", app.text())
+        state.current = "http://stand.in"
+        app.user_acted()
+        self.assertEqual((app.status_message.key, app.status_tone), ("status.ready", "normal"))
+        # A red outcome gives way the same way: a failure is about its moment, not about every page after it.
+        app.set_status(i18n.Said("status.error", error=srv.ServerError("x", "error.app.failed")), "bad", sticky=True)
+        app.user_acted()
+        self.assertEqual(app.status_message.key, "status.ready")
+
+    def test_what_is_kept_waits_for_the_player(self):
+        # The ready check that comes right after an outcome (a game that ended) does not take its place: only the
+        # player doing something does.
+        from opendmtq_client import actions, i18n
+        state = st.LauncherState()
+        state.add_server("http://stand.in", "Stand-in")
+        app = self.window(state, [actions.Check("server", True, "Stand-in")])
+        app.set_status(i18n.Said("status.ended", time=i18n.span(130)), "ok", sticky=True)
+        app._say_state()
+        self.assertEqual(app.text(), "The game closed after 2 min.")
+        # Work under way says its own words: the state is not said over them.
+        app.user_acted()
+        app.busy = True
+        app.set_status(i18n.Said("status.app_check"), "normal")
+        app._say_state()
+        self.assertEqual(app.status_message.key, "status.app_check")
+
+    def test_a_kept_line_says_itself_again_in_the_new_language(self):
+        # The window switched to Korean redraws its line from what it kept, not from the English sentence it showed.
+        from opendmtq_client import actions, i18n
+        state = st.LauncherState()
+        state.add_server("http://stand.in", "Stand-in")
+        app = self.window(state, [actions.Check("server", True, "Stand-in")])
+        app.set_status(i18n.Said("status.error", error=srv.ServerError("x", "error.app.failed")), "bad", sticky=True)
+        english = app.text()
+        app.words = i18n.Words("ko")
+        self.assertNotEqual(app.text(), english)
+        self.assertEqual(app.text(), i18n.Words("ko")("error.app.failed"))
+        # A span of time inside the words is said in the new language too.
+        app.set_status(i18n.Said("status.ended", time=i18n.span(130)), "ok", sticky=True)
+        self.assertEqual(app.text(), i18n.Words("ko")("status.ended", time=i18n.Words("ko")("common.minutes", m=2)))

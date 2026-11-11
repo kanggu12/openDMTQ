@@ -10,7 +10,7 @@ is removal.py's and actions.py's.
 import logging
 import threading
 
-from opendmtq_client import actions, dialogs, updates
+from opendmtq_client import actions, dialogs, i18n, updates
 
 log = logging.getLogger("opendmtq_client")
 
@@ -45,7 +45,7 @@ def _not_now(app):
     """True, said on the status line, while the files these tools change are in use (app.files_in_use): the game runs,
     from this window or the command line, or PLAY or a download is under way."""
     if app.files_in_use():
-        app.set_status(app.words("help.reset.busy"), "warn")
+        app.set_status(i18n.Said("help.reset.busy"), "warn")
         return True
     return False
 
@@ -105,7 +105,7 @@ def clear_game_data(app):
             dialogs.tell(app, "error", w("help.clear"), w("failed.message"), w.error(error))
             return
         if not size:
-            app.set_status(w("help.clear.none"), "normal", transient=True)
+            app.set_status(i18n.Said("help.clear.none"), "normal", transient=True)
             return
         said = removal.megabytes(size)
         if not dialogs.ask(app, "danger", w("help.clear"), w("help.clear.ask"), w("help.clear.detail", size=said),
@@ -123,7 +123,7 @@ def clear_game_data(app):
                 app.go("help")
             if error is None and not failed:
                 # Said after the page is drawn again, whose ready check would otherwise take the line at once.
-                app.set_status(w("help.clear.done", size=said), "ok", sticky=True)
+                app.set_status(i18n.Said("help.clear.done", size=said), "ok", sticky=True)
 
         _in_background(app, w("help.clear.working"), removal.clear_game_data, done)
 

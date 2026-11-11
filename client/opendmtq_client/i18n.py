@@ -504,6 +504,41 @@ TEXT = {
 }
 
 
+class Said:
+    """Words to show now and again later, in whatever language the window speaks then: a key of TEXT and its gaps. The
+    window keeps what it said this way (the status line, a page's last answer), so that a switch of language says it
+    again in the new one instead of keeping the old one's sentence. A gap that is words itself (another Said, or an
+    error, which Words.error says) is said in that language too; anything else (an address, a number) goes in as it
+    is."""
+
+    def __init__(self, key, **params):
+        # The key of the words, and the values of their gaps.
+        self.key, self.params = key, params
+
+    def __call__(self, words):
+        """The words in `words`' language, each gap that is words itself said in it too."""
+        filled = {}
+        for name, value in self.params.items():
+            if isinstance(value, Said):
+                # Words inside words: a span of time, a reason.
+                filled[name] = value(words)
+            elif isinstance(value, BaseException):
+                # An error: its own words in this language when it has them (Words.error).
+                filled[name] = words.error(value)
+            else:
+                filled[name] = value
+        return words(self.key, **filled)
+
+    def __repr__(self):
+        return "Said(%r, %r)" % (self.key, self.params)
+
+
+def span(seconds):
+    """How long something lasted, as words to say later: whole minutes, or seconds under one."""
+    minutes = int(seconds) // 60
+    return Said("common.minutes", m=minutes) if minutes else Said("common.seconds", s=int(seconds))
+
+
 class Words:
     """Looks words up in the chosen language; a missing Korean entry falls back to English. A key with no words shows as
     itself, except in a test run or the UI tests' container, where it is an error: the tests reach every page, dialog
@@ -518,6 +553,13 @@ class Words:
         en, ko = TEXT.get(key, (key, key))
         text = ko if self.language == "ko" and ko else en
         return text.format(**kw) if kw else text
+
+    def say(self, message):
+        """A message kept to show (a Said, said in this language now), or plain text as it is; "" for none."""
+        if message is None:
+            return ""
+        # A Said is said in this language; anything else is text already (a test's own words, a path).
+        return message(self) if isinstance(message, Said) else str(message)
 
     def error(self, error):
         """What a raised error says, in this language: its words when it has them, else its own sentence."""

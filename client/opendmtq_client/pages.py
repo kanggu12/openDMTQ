@@ -10,7 +10,7 @@ import os
 import threading
 import tkinter as tk
 
-from opendmtq_client import actions, apps, dialogs, displays, maintenance, player, theme, updates, widgets
+from opendmtq_client import actions, apps, dialogs, displays, i18n, maintenance, player, theme, updates, widgets
 from opendmtq_client import server as srv
 from opendmtq_client import state as st
 from opendmtq_client import values as choices
@@ -392,7 +392,7 @@ def server_line(app):
         if not server or check["url"] != server["url"]:
             # An address the player typed, not the server in use: said this once, then the line is the server's again.
             check["seen"] = True
-        return check["text"], theme.BAD
+        return w.error(check["error"]), theme.BAD
     if server and check and check["state"] == "ok" and check["url"] == server["url"]:
         return w("online.connected", name=server["name"]), theme.OK
     if server:
@@ -420,7 +420,7 @@ def check_server(app, address, then=None):
         except Exception as e:  # noqa: BLE001  (ServerError, or anything else: shown, never a silent stop)
             # The system's own words for it go to the log; the window says it plainly.
             log.info("could not connect to %s: %s", address, e)
-            app.post(lambda text=w.error(e): answered({"url": address, "state": "failed", "text": text}))
+            app.post(lambda error=e: answered({"url": address, "state": "failed", "error": error}))
 
     def answered(check):
         app.server_check = check
@@ -489,8 +489,9 @@ def signin_panel(app, parent, rerender):
         def sign_out():
             if app.busy_now():
                 # The download or the game uses the sign-in now: it stays until they are over.
-                app.set_status(w("online.busy"), "warn")
+                app.set_status(i18n.Said("online.busy"), "warn")
                 return
+            app.user_acted()
             actions.sign_out(app.state)
             app.state.save()
             app.refresh_checks()
@@ -549,6 +550,8 @@ def signin_panel(app, parent, rerender):
 
     def signed_in():
         asking["now"] = False
+        # A sign-in is the player's doing: a message kept until then gives way (a sign-in that had ended, say).
+        app.user_acted()
         app.state.save()
         app.refresh_checks()
         rerender()
@@ -582,21 +585,21 @@ def app_panel(app, parent, rerender):
     widgets.label(parent, ui, text, fg=colour, bg=bg, wrap_margin=0).pack(fill="x", pady=(0, ui.px(10)))
     if app.download is None and app.app_note and not newer:
         # The last look for a newer app found none: said here, where its button is.
-        widgets.label(parent, ui, app.app_note, font=ui.fonts.small, fg=theme.MUTED, bg=bg, wrap_margin=0).pack(
+        widgets.label(parent, ui, w.say(app.app_note), font=ui.fonts.small, fg=theme.MUTED, bg=bg, wrap_margin=0).pack(
             fill="x", pady=(0, ui.px(10)))
     if app.download is None and app.download_error:
         # What the last try said (a stop, a sign-in that ended, a line that broke), in the same colour as the status
         # line says it: the guide has no status line to say it.
         said, tone = app.download_error
-        widgets.label(parent, ui, said, font=ui.fonts.small, fg=theme.WARN if tone == "warn" else theme.BAD, bg=bg,
-                      wrap_margin=0).pack(fill="x", pady=(0, ui.px(10)))
+        widgets.label(parent, ui, w.say(said), font=ui.fonts.small, fg=theme.WARN if tone == "warn" else theme.BAD,
+                      bg=bg, wrap_margin=0).pack(fill="x", pady=(0, ui.px(10)))
     if app.download is not None:
         # The download under way: its bar, kept moving by the app (app._download_moved), and Cancel.
         bar = widgets.Progress(parent, ui, bg=bg)
         bar.pack(anchor="w", pady=(0, ui.px(10)))
         done, total = app.download["done"], app.download["total"]
         # The status line's words (app.download_words): how far it is, the server asked first, or stopping.
-        bar.set(done / float(total) if total else None, app.download_words())
+        bar.set(done / float(total) if total else None, w.say(app.download_words()))
         app.download_bar = bar
         stopping = app.download.get("stopping")
         stop = widgets.Button(parent, ui, w("online.stopping") if stopping else w("common.cancel"), lambda: halt())
@@ -630,7 +633,7 @@ def _date(details):
 def _get(app, rerender):
     """Ask the server for its app and download it when this PC lacks it; the page shows the progress."""
     if app.busy_now():
-        app.set_status(app.words("online.busy"), "warn")
+        app.set_status(i18n.Said("online.busy"), "warn")
         return
     app.get_app(done_then=lambda error: rerender())
     rerender()
@@ -652,8 +655,11 @@ def known_servers(app, parent, rerender):
 
         def pick(url=s["url"]):
             if app.busy_now():
-                app.set_status(w("online.busy"), "warn")
+                app.set_status(i18n.Said("online.busy"), "warn")
                 return
+            # Another server to play on: what the line said about the one before (an installer's server, a failure)
+            # gives way to where PLAY stands on this one once the ready check below answers.
+            app.user_acted()
             app.state.current = url
             # What the last server's download said is not this one's.
             app.download_error, app.app_note = None, None
@@ -676,12 +682,14 @@ def forget_server(app, server, rerender):
     in_use = server["url"] == app.state.current
     if in_use and app.files_in_use():
         # Its app is downloading or playing, from this window or the command line.
-        app.set_status(w("online.busy"), "warn")
+        app.set_status(i18n.Said("online.busy"), "warn")
         return
     # The question short, the server it is about named in the line under it.
     if not dialogs.ask(app, "danger", w("online.forget.title"), w("online.forget.ask"),
                        w("online.forget.detail", name=server["name"]), w("online.forget")):
         return
+    # The player's doing: a line kept about the server that goes gives way.
+    app.user_acted()
     actions.forget(app.state, server["url"])
     if in_use:
         # What the last download and the last look said was about the server that is gone.
