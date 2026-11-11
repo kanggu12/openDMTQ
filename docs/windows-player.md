@@ -46,10 +46,23 @@ game ends.
 (exit 0 when PLAY can go), `--server URL`, `--sign-in ID` (the password from standard input), `--sign-out`, `--app`,
 `--set NAME=VALUE`, `--audio-devices`, `--language en|ko|system`, `--guide`, `--open-log player|launcher`, `--play`,
 `--update`, `--forget URL`, `--reset`, `--repair`, `--clear-game-data` and `--uninstall [--delete-data]`, with `--yes`
-to answer their questions (`--help` lists them all). `--set` takes `display`, `window`, `vsync`, `fps`,
-`render_scale`, `upscaler` (`bilinear`, `fsr1`, `nis`), `anti_aliasing` (`off`, `cmaa2`, `smaa`, `msaa2`, `msaa4`,
-`msaa8`), `show_fps` (`off`, `top_left`, `top_right`, `bottom_left`, `bottom_right`), `audio_device`, `audio_mode`, `audio_buffer` and `volume`, with the values the **Screen** and **Sound** pages
-offer. While the launcher's window is open, the flags that change what it keeps are refused.
+to answer their questions (`--help` lists them all). While the launcher's window is open, the flags that change what
+it keeps are refused. `--set` takes the settings of the **Screen** and **Sound** pages:
+
+| Setting | Values (the default first) | On the page |
+| :--- | :--- | :--- |
+| `display` | `fullscreen`, `window` | Mode |
+| `window` | `auto` (fitted to the display), `1280x720`, `1600x900`, `1920x1080`, `2560x1440`, `3840x2160`, or any `WIDTHxHEIGHT` from 320x180 | Window size |
+| `vsync` | `on`, `off` | VSync |
+| `fps` | `auto` (the display's rate), `30`, `60`, `120`, `144`, `165`, `180`, `240`, `360`, `unlimited` | Frame limit |
+| `show_fps` | `off`, `top_left`, `top_right`, `bottom_left`, `bottom_right` | FPS counter |
+| `render_scale` | `100`, `85`, `75`, `67`, `50` | Render scale |
+| `upscaler` | `bilinear`, `fsr1`, `nis` | Upscaler, below 100 % |
+| `anti_aliasing` | `off`, `cmaa2`, `smaa`, `msaa2`, `msaa4`, `msaa8` | Anti-aliasing |
+| `audio_device` | `default` (Windows' default output), or a device's id from `--audio-devices` | Device |
+| `audio_mode` | `shared`, `exclusive` (the device alone) | Mode |
+| `audio_buffer` | `normal`, `low`, `safe` | Buffer |
+| `volume` | `100`, or any number from 0 | Volume |
 
 ### In the game
 

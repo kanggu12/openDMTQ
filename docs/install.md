@@ -127,12 +127,30 @@ The same accounts play on a PC ([the PC client](windows-player.md)).
 | Start | `OpenDMTQ.exe` | `./opendmtq start` | `./opendmtq up` |
 | Stop | close the window | `./opendmtq stop` | `./opendmtq down` |
 | See the address | the window shows it | `./opendmtq status` | `./opendmtq status` |
+| Update | close the window, then run the [four lines](#windows) again | run the `curl` line again | `git pull`, then `./opendmtq up` |
 | Start with the computer | a shortcut in `shell:startup` | `./opendmtq service` | `RESTART=unless-stopped` in `.env`, or `cli/install.sh --service` |
 | Import songs | admin pages, **Songs**, or a folder dropped on `OpenDMTQ.exe` (the game's files in it too) | admin pages, **Songs** | `./opendmtq import --songs <folder>` |
 | Name the app (`TECHNIKA Q (<name>)`) | `SERVER_NAME=<name>` in `.env`, restart, then build the app (admin pages, **App**) | the same | `./opendmtq name <name>` |
 | Remove it | close the window, then delete the folder | `./opendmtq stop`, `./opendmtq service --remove`, `host/install.sh --uninstall`, then delete the folder | `./opendmtq down`, `./opendmtq firewall --remove` under WSL, then delete the folder |
 
 Everything else is on the admin pages: the app, songs, players, accounts, recordings and backups.
+
+An update keeps `data` and `.env`. Phones get a newer app on the site when the update brings one, and PCs update the
+launcher on its **Launcher** page ([the PC client](windows-player.md#the-launcher)).
+
+## Backups and a new computer
+
+The server makes a backup a day while something changed, and keeps the latest seven, in `data/backups`. A backup holds
+the database (accounts, scores, players, settings), the app's signing key and the added songs; recordings and live
+video stay out of it. The admin pages' **Backups** page makes one at any time, downloads, uploads and restores them
+([the admin pages](admin.md#the-admin-pages)). With Docker Compose the command line does the same: `./opendmtq backup`,
+`./opendmtq backups` and `./opendmtq restore <name>`, and `./opendmtq down` backs up as it stops
+([restoring](troubleshooting.md#restoring)).
+
+To move a server to another computer, stop it, copy its `data` folder and `.env` into a new install of the same kind,
+and start it there. The signing key comes along in `data/apk/keystore`, so phones update their app over the old one.
+Give the new computer's address with `./opendmtq host <address>` (`OpenDMTQ.exe host <address>` on Windows) when it
+differs, and phones install the app it builds.
 
 ## Settings
 
@@ -162,7 +180,7 @@ then restart.
 | **Server** | 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker; 2 GB of memory | 2 cores, 4 GB |
 | **Disk** | 1 GB without the songs | 7 GB with every song |
 | **Phones** | Android 5.0 | Android 8 or newer to broadcast |
-| **PCs** | 64-bit Windows 10 or 11 on an x64 processor, Direct3D 11, 350 MB of disk | A touch screen |
+| **PCs** | 64-bit Windows 10 or 11 on an x64 processor, Direct3D 11, 390 MB of disk | A touch screen |
 
 At rest the server takes about 170 MB of memory, and up to 1.6 GB for half a minute while it builds the app. The client
 data takes about 120 MB and the song data 4.5 GB; each app build about 110 MB, the last ten kept. Broadcast recordings

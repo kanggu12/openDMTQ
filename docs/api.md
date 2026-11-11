@@ -126,7 +126,7 @@ in words. A backup made, or a change to the songs, on the admin pages is a job t
 `GET /jobs` lists; through the API the same is done when it answers.
 
 ```json
-{"job": {"id": "6b0c3e1a9f24", "kind": "build", "state": "running", "started": 1794200000, "log": ["patching ..."], "why": null, "host": "192.168.0.10"}}
+{"job": {"id": "6b0c3e1a9f24", "kind": "build", "state": "running", "started": 1794200000, "log": ["patching ..."], "why": null, "host": "192.168.1.10"}}
 ```
 
 Jobs live in the admin service's memory: it keeps its last twenty, and a restart of it forgets them.

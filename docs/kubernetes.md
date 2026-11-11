@@ -146,8 +146,8 @@ kubectl -n opendmtq create secret generic opendmtq-s3 \
   --from-literal=LITESTREAM_ACCESS_KEY_ID=... --from-literal=LITESTREAM_SECRET_ACCESS_KEY=...
 
 helm install opendmtq oci://ghcr.io/kanggu12/charts/opendmtq -n opendmtq \
-  --set publicHost=192.168.0.50 \
-  --set router.service.loadBalancerIP=192.168.0.50 \
+  --set publicHost=192.168.1.50 \
+  --set router.service.loadBalancerIP=192.168.1.50 \
   --set data.existingClaim=opendmtq-data \
   --set litestream.s3.endpoint=https://s3.example.com \
   --set litestream.s3.bucket=opendmtq \
@@ -156,7 +156,7 @@ helm install opendmtq oci://ghcr.io/kanggu12/charts/opendmtq -n opendmtq \
 helm test opendmtq -n opendmtq
 ```
 
-Phones then open `http://192.168.0.50/` exactly as with Docker Compose. On a network with no way out, the images and the chart
+Phones then open `http://192.168.1.50/` exactly as with Docker Compose. On a network with no way out, the images and the chart
 are carried in: [Without internet](closed-network.md#kubernetes).
 
 The chart and its own two images (`ghcr.io/kanggu12/opendmtq-server`, `opendmtq-tools`) are published with each

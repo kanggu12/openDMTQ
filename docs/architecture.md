@@ -70,6 +70,10 @@ live broadcasts' three endpoints (`/live/state`, `/live/upload`, `/live/end`) ha
 their own size limits. `/opendmtq/` is the site (`server/portal`). Apache denies notes, backups and databases
 wherever one is left in a served folder (`*.txt`, `*.bak`, `*.db3`, `*.log`, `*.md`).
 
+Text answers go out gzip-compressed to a client that asks for it: the game's JSON and HTML, and the site's pages,
+stylesheets and scripts. Phones ask for it, and so does the player for Windows, whose song list comes in 17 KB instead
+of 145 KB. The game's files (songs, charts, pictures) go as they are, and keep in clients' caches.
+
 ## The game server
 
 OpenDMTQ's own code, written from the requests client 1.3.4 makes and the replies it reads. Client 1.3.5 asks for one

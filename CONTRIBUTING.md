@@ -139,7 +139,7 @@ The site and the admin pages come in English and Korean. The site's text is in t
 of its table, and `tools/tests/test_strings.py` checks them (and the spacing of Korean particles). The PC client's words
 are in the `TEXT` table of `client/opendmtq_client/i18n.py`, both languages side by side, and `client/tests/test_words.py`
 checks them. A few Korean texts live elsewhere: the in-game notices in `server/game/live/state.php`, the help page in
-`server/game/pages/help.php`, the menu and notice card of the player for Windows in `arm32/desktop/overlay_win32.cpp`,
+`server/game/pages/help.php`, the bar, the question before quitting and the notice card of the player for Windows in `arm32/desktop/overlay_win32.cpp`,
 its error box in `arm32/desktop/error_box_win32.cpp` and its error messages in `arm32/desktop/own_folder.cpp`, the
 error messages of the Windows bundle's `host/windows/launcher.c`, the dates and the language switch in
 `server/portal/lib.php`, and one word each in `server/portal/player.php`, `tools/opendmtq_tools/admin/static/admin.css`,
@@ -191,10 +191,20 @@ A release, by a maintainer:
    `CLIENTS=<folder>` checks the patcher against every APK in that folder too: the game's other version, a copy
    changed for another server.
 3. Push the tag `v1.2.3`. `.github/workflows/release.yml` checks that the tag, the chart and the changelog name one
-   version (`.github/release_notes.py`), runs CI again, checks the mark, and publishes the images, the Helm chart, the
-   runtime for newer phones, the player for Windows, the Windows bundle, the PC client (its installer, `OpenDMTQ-Setup.exe`, and the packages installed clients update
-   themselves from) and a GitHub release whose notes are that version's section of the changelog. Without the mark it
-   stops: run `tests/qa.sh`, then run the release again (`gh run rerun`).
+   version (`.github/release_notes.py`), runs CI again, checks the mark, and publishes a GitHub release whose notes are
+   that version's section of the changelog. Without the mark it stops: run `tests/qa.sh`, then run the release again
+   (`gh run rerun`).
+
+What a release publishes:
+
+| What | Where |
+| :--- | :--- |
+| The server and tools images | `ghcr.io/kanggu12/opendmtq-server` and `opendmtq-tools`, tagged `1.2.3` and `latest` |
+| The Helm chart | `oci://ghcr.io/kanggu12/charts/opendmtq`, and `opendmtq-1.2.3.tgz` on the release |
+| The Windows bundle | `OpenDMTQ-windows.zip` and `OpenDMTQ-windows.zip.sha256` |
+| The PC client | `OpenDMTQ-Setup.exe` with `OpenDMTQ-Setup.exe.version`, and Velopack's packages that installed clients update from (`OpenDMTQ.Client-1.2.3-full.nupkg`, `RELEASES`, `releases.win.json`, `assets.win.json`) |
+| The runtime for newer phones | `opendmtq-arm32-runtime.zip` |
+| The player for Windows alone | `opendmtq-player-windows.zip` |
 
 A release names itself by its number (`0.2.0`): the Windows bundle, the one-command install and the Helm chart. A copy
 from a clone names itself by the date and commit of its code (`2026.11.07-62ce933`). The site shows it beside its logo,

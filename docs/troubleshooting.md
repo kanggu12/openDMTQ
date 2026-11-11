@@ -37,7 +37,7 @@ When the game does not start or shows no songs, this chart leads to the right se
   is not Docker's: there the system's firewall applies as usual.
 - The port already used by something else. With Docker Compose, `./opendmtq up` then fails to start the edge proxy,
   the small program that holds the server's public port. Stop the other program, or use another port, for example
-  `./opendmtq host 192.168.0.10:8080` (the app is rebuilt for it). Not 8791, which the admin pages use on this PC
+  `./opendmtq host 192.168.1.10:8080` (the app is rebuilt for it). Not 8791, which the admin pages use on this PC
   (`ADMIN_PORT`). A host install and the Windows bundle pick a free port at their setup: 80, else 8080, else 8790,
   else 8792 to 8795. `./opendmtq host <address>:<port>` (`OpenDMTQ.exe host <address>:<port>`) changes it.
 - `./opendmtq doctor` fails when the port in the address and `LISTEN_PORT` differ: phones would call one port while
