@@ -5,7 +5,7 @@ picks one on the guide's first page, under Launcher or with --language. The inst
 launcher's choice when there is one, else Windows'. Each entry is (English, Korean). Placeholders use str.format names.
 """
 
-from opendmtq_client import safety
+from opendmtq_client import errors, safety
 from opendmtq_client.errors import Worded
 
 TEXT = {
@@ -347,8 +347,8 @@ TEXT = {
     "about.not_installed": ("Updates work in the launcher installed by OpenDMTQ-Setup.exe.",
                             "업데이트는 OpenDMTQ-Setup.exe로 설치한 런처에서 됩니다."),
     "about.no_source": ("No update address is set for this build.", "이 빌드에는 업데이트 주소가 없습니다."),
-    "about.update_failed": ("Could not check for updates: {error}", "업데이트를 확인하지 못했습니다: {error}"),
-    "about.apply_failed": ("The update failed: {error}", "업데이트하지 못했습니다: {error}"),
+    "about.update_failed": ("Could not check for updates.", "업데이트를 확인하지 못했습니다."),
+    "about.apply_failed": ("The update was not installed.", "업데이트를 설치하지 못했습니다."),
     "about.updating.title": ("Update", "업데이트"),
     "about.updating.message": ("Updating OpenDMTQ to {v}...", "OpenDMTQ를 {v} 버전으로 업데이트하는 중..."),
     "about.updating.detail": ("The launcher closes and starts again in a few seconds. Your servers and settings stay.",
@@ -441,15 +441,12 @@ TEXT = {
     "setup.starting": ("Starting the launcher...", "런처를 여는 중..."),
     "setup.done": ("OpenDMTQ {v} is installed.", "OpenDMTQ {v} 버전을 설치했습니다."),
     "setup.failed": ("OpenDMTQ could not be installed.", "OpenDMTQ를 설치하지 못했습니다."),
-    "setup.failed.log": ("{why}\nThe log is {path}", "{why}\n기록 파일: {path}"),
+    "setup.failed.log": ("The log is {path}", "기록 파일: {path}"),
     "setup.open_log": ("Open the log", "기록 열기"),
     "setup.not_started": ("OpenDMTQ did not start.", "OpenDMTQ가 열리지 않았습니다."),
-    "setup.not_started.detail": ("OpenDMTQ is installed, but it did not start: {error}",
-                                 "OpenDMTQ는 설치됐지만 열리지 않았습니다: {error}"),
-    "setup.no_setup": ("The setup inside this installer did not start: {error}",
-                       "설치 파일 안의 설치 프로그램이 시작되지 않았습니다: {error}"),
+    "setup.not_started.detail": ("OpenDMTQ is installed, but it did not start.", "OpenDMTQ는 설치됐지만 열리지 않았습니다."),
+    "setup.no_setup": ("The setup inside this installer did not start.", "설치 파일 안의 설치 프로그램이 시작되지 않았습니다."),
     "setup.too_long": ("The setup did not finish in {m} minutes.", "설치가 {m}분 안에 끝나지 않았습니다."),
-    "setup.code": ("The setup ended with code {code}.", "설치 프로그램 종료 코드: {code}"),
     "setup.wrong_version": ("The setup finished, but the installed version is {found} (this installer has {here}).",
                             "설치는 끝났지만 설치된 버전이 {found}입니다(이 설치 파일은 {here})."),
 
@@ -471,6 +468,13 @@ TEXT = {
     "start.over": ("Start over", "처음부터"),
 
     # ------------------------------------------------------------------------------------------- errors
+    # Why another program's work failed, by its kind (errors.fault), after the words that say what failed; anything
+    # else says no more, its own words in the log.
+    "fault.network": ("This PC cannot reach the internet.", "이 PC에서 인터넷에 연결할 수 없습니다."),
+    "fault.no_answer": ("The update server did not answer.", "업데이트 서버가 응답하지 않았습니다."),
+    "fault.disk_full": ("There is not enough space on the disk.", "디스크 공간이 부족합니다."),
+    "fault.in_use": ("A file is in use by another program.", "다른 프로그램이 사용 중인 파일이 있습니다."),
+    "fault.denied": ("Windows refused access to a file.", "Windows가 파일 접근을 거부했습니다."),
     "error.choice": ("{name} cannot be {value}", "{name}: 쓸 수 없는 값입니다({value})."),
     "error.no_setting": ("there is no setting {name}", "없는 설정입니다: {name}"),
     "error.window.too_big": ("{size} does not fit this {w} × {h} display with the window's title bar and the taskbar.",
@@ -588,6 +592,22 @@ class Words:
             # backslash doubled.
             return "%s: %s" % (error.strerror, error.filename) if error.filename else error.strerror
         return str(error)
+
+    def fault(self, failure, network=True):
+        """Why another program's work failed (Velopack's, the system's), in plain words of this language by its kind
+        (errors.fault): one sentence, or "" for anything else, whose own words stay in the log. `network` False for
+        work that asks nothing over the network."""
+        kind = errors.fault(failure, network)
+        return self("fault." + kind) if kind else ""
+
+    def failed(self, key, failure, network=True, **kw):
+        """What failed (the words of `key`) and, when its kind is known, why (fault), as one or two sentences."""
+        return sentences(self(key, **kw), self.fault(failure, network))
+
+
+def sentences(*parts):
+    """Sentences joined by a space, the empty ones left out."""
+    return " ".join(p for p in parts if p)
 
 
 def mb(size):

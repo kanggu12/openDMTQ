@@ -7,7 +7,10 @@ next to this module. A build made without one has no update address and says so.
 its place, for trying a feed out. Every call here may be slow (network), so the window runs them on a worker thread.
 """
 
+import logging
 import os
+
+log = logging.getLogger("opendmtq_client")
 
 SOURCE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "update-source.txt")
 
@@ -27,7 +30,8 @@ UPDATE_SOURCE = _update_source()
 
 
 class Result:
-    """What a check found: kind is 'none', 'not_installed', 'no_source', 'uptodate', 'available' or 'failed'."""
+    """What a check found: kind is 'none', 'not_installed', 'no_source', 'uptodate', 'available' or 'failed'. A failed
+    check's `error` is Velopack's own words for it, for the log: a person reads it by its kind (i18n Words.failed)."""
 
     def __init__(self, kind, version=None, info=None, error=None):
         self.kind, self.version, self.info, self.error = kind, version, info, error
@@ -75,6 +79,9 @@ def check():
         # Velopack refuses outside an installation: a state of this copy, which the page says as such.
         if "not installed" in text.lower() or "locator" in text.lower():
             return Result("not_installed")
+        # Velopack's own words ("Network error: Http error: io: ...") are for the log; the page and --update say the
+        # failure by its kind.
+        log.warning("could not check for updates: %s", text)
         return Result("failed", error=text)
 
 

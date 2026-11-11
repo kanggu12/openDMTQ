@@ -653,6 +653,78 @@ def dialogs_check(app, out, tag, problems):
     if dialog.closed:
         problems.append("%s: Esc closed the update under way" % tag)
     dialog.close(None)
+    update_failures_check(app, out, tag, problems)
+
+
+def update_failures_check(app, out, tag, problems):
+    """The Launcher page's update when Velopack fails, said by its kind in the page's language, Velopack's own words in
+    the log only: a check with no network (as Wine says it), then an update whose download finds the disk full. A
+    stand-in for Velopack's module answers (the test machine has none)."""
+    import tkinter as tk
+    import types
+    from unittest import mock
+
+    from opendmtq_client import __version__, updates
+    w = app.words
+    said = {"check": "Network error: Http error: io: Nonauthoritative host not found. (os error 11002)"}
+
+    class Manager:
+        """Velopack's UpdateManager as far as the launcher uses it."""
+
+        def __init__(self, source):
+            self.source = source
+
+        def get_current_version(self):
+            return __version__
+
+        def check_for_updates(self):
+            if said["check"]:
+                raise RuntimeError(said["check"])
+            return types.SimpleNamespace(TargetFullRelease=types.SimpleNamespace(Version="9.9.9"))
+
+        def download_updates(self, info):
+            raise RuntimeError("IO error: There is not enough space on the disk. (os error 112)")
+
+    velopack = types.SimpleNamespace(UpdateManager=Manager, GithubSource=lambda *a: a[0])
+    with mock.patch.dict(sys.modules, {"velopack": velopack}), \
+            mock.patch.object(updates, "UPDATE_SOURCE", "http://updates.test/"):
+        app.go("about")
+        settle(app)
+        button(app, w("about.check")).press()
+        expected = w("about.update_failed") + " " + w("fault.network")
+        end = time.time() + 5
+        while time.time() < end and not any(isinstance(x, tk.Label) and x.cget("text") == expected
+                                            for x in widgets_of(app.root)):
+            app.root.update()
+            time.sleep(0.02)
+        shot(app.root, out, "%s_about-update-offline" % tag)
+        measure(app, "%s_about-update-offline" % tag, problems)
+        texts = [x.cget("text") for x in widgets_of(app.root) if isinstance(x, tk.Label)]
+        if expected not in texts or any("os error" in t for t in texts):
+            problems.append("%s: a check with no network said %r" % (tag, [t for t in texts if "update" in t.lower()
+                                                                          or "업데이트" in t]))
+        # Then one on offer, whose download finds the disk full: the dialog says so in plain words.
+        said["check"] = None
+        button(app, w("about.check")).press()
+        end = time.time() + 5
+        while time.time() < end:
+            try:
+                update = button(app, w("about.update_now", v="9.9.9"))
+                break
+            except AssertionError:
+                app.root.update()
+                time.sleep(0.02)
+        else:
+            problems.append("%s: the update on offer showed no button" % tag)
+            return
+        failed = next_dialog(app, out, "%s_dialog-update-failed" % tag, problems,
+                             lambda d: not d.progress and d.message == w("about.apply_failed"),
+                             lambda d: d.canvas.event_generate("<Return>"))
+        update.press()
+        wait_out(app.root, 2.0)
+        dialog = failed.get("dialog")
+        if dialog is None or dialog.detail != w("fault.disk_full"):
+            problems.append("%s: a full disk during the update said %r" % (tag, dialog and dialog.detail))
 
 
 def fake_install(home):
@@ -837,7 +909,9 @@ def installer_check(out, tag, lang, problems):
             if code == 0:
                 f.write("printf '<version>%s</version>' > '%s/current/sq.version'\n" % (version, app))
             else:
-                f.write("echo '[12:00:01] [ERROR] Not enough space on the disk.' >> \"$3\"\n")
+                # Velopack's way of writing a full disk in its log, in its own words.
+                f.write("echo '[setup:500] [12:00:01] [ERROR] Error: IO error: There is not enough space on the disk. "
+                        "(os error 112)' >> \"$3\"\n")
             f.write("exit %d\n" % code)
         os.chmod(path, 0o755)
         os.environ["OPENDMTQ_VELOPACK_SETUP"] = path
@@ -909,8 +983,9 @@ def installer_check(out, tag, lang, problems):
     run_until(inst, 0.6)
     shot(inst.root, out, "%s_setup-failed" % tag)
     problems.extend("%s_setup-failed: %s" % (tag, p) for p in inst.dialog.layout_problems())
-    if "Not enough space" not in (inst.dialog.detail or ""):
-        problems.append("%s: the failure did not show Velopack's error: %r" % (tag, inst.dialog.detail))
+    # The full disk said in the installer's language, then where the log is; Velopack's own words only in the logs.
+    if not (inst.dialog.detail or "").startswith(w("fault.disk_full") + "\n") or "os error" in inst.dialog.detail:
+        problems.append("%s: the failure did not say the full disk plainly: %r" % (tag, inst.dialog.detail))
     inst.root.destroy()
     # A game running: the installer waits instead of replacing the player under it.
     installed(older)

@@ -912,7 +912,8 @@ def build_about(app, parent):
             "not_installed": w("about.not_installed"),
             "no_source": w("about.no_source"),
             "uptodate": w("about.uptodate"),
-            "failed": w("about.update_failed", error=result.error),
+            # What failed and, by its kind, why: Velopack's own words are in the launcher's log (updates.check).
+            "failed": w.failed("about.update_failed", result.error),
             "available": w("about.available", v=result.version),
         }[result.kind]
         answer.configure(text=text, fg=theme.BAD if result.kind == "failed" else theme.MUTED)

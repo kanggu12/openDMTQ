@@ -84,6 +84,41 @@ class Words(unittest.TestCase):
         self.assertIn("http://x", i18n.Words("ko").error(error))
         self.assertEqual(i18n.Words("en").error(ValueError("plain")), "plain")
 
+    def test_another_programs_failure_is_said_by_its_kind(self):
+        # Velopack's and the system's own words, as they come on Windows (and under Wine), on Linux, and from Python:
+        # each read as the kind a person can do something about, the rest as none (only the log has those words).
+        from opendmtq_client import errors
+        cases = (
+            ("Network error: Http error: io: Nonauthoritative host not found. (os error 11002)", "network"),
+            ("Network error: Http error: io: No such host is known. (os error 11001)", "network"),
+            ("Network error: Http error: io: failed to lookup address information: Temporary failure in name "
+             "resolution", "network"),
+            ("Network error: Http error: io: A connection attempt failed because the connected party did not properly "
+             "respond after a period of time (os error 10060)", "no_answer"),
+            ("Network error: Http error: timeout: global", "no_answer"),
+            ("Error: IO error: There is not enough space on the disk. (os error 112)", "disk_full"),
+            ("[Errno 28] No space left on device: '/tmp/x'", "disk_full"),
+            ("IO error: The process cannot access the file because it is being used by another process. (os error 32)",
+             "in_use"),
+            ("IO error: Access is denied. (os error 5)", "denied"),
+            (PermissionError(13, "Permission denied"), "denied"),
+            ("Checksum did not match for OpenDMTQ.Client-0.9.4-full.nupkg", None),
+            ("Extracting files in user folders", None),
+            ("", None),
+        )
+        for failure, kind in cases:
+            self.assertEqual(errors.fault(failure), kind, failure)
+        # Work that asks nothing over the network (Velopack's setup) is never said to have failed for the network.
+        self.assertIsNone(errors.fault("timed out waiting for the lock", network=False))
+        self.assertEqual(errors.fault("timed out (os error 112)", network=False), "disk_full")
+        # In each language, what failed, then why; Velopack's words in neither.
+        for language in ("en", "ko"):
+            w = i18n.Words(language)
+            said = w.failed("about.update_failed", cases[0][0])
+            self.assertEqual(said, w("about.update_failed") + " " + w("fault.network"))
+            self.assertNotIn("11002", said)
+            self.assertEqual(w.failed("about.update_failed", "Checksum did not match"), w("about.update_failed"))
+
     def test_no_dashes_in_the_words(self):
         for key, pair in i18n.TEXT.items():
             for text in pair:

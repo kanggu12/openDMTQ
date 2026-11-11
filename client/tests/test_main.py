@@ -365,6 +365,24 @@ class CommandLine(Folder):
         self.assertEqual(code, 2)
         self.assertIn("Could not check for updates", said)
 
+    def test_an_update_check_that_fails_is_said_by_its_kind(self):
+        # Velopack's own words (here as Wine gave them with no network) stay in the log; the console says what the
+        # Launcher page says in English: what failed, and why by its kind.
+        from opendmtq_client import updates
+
+        def offline():
+            raise RuntimeError("Network error: Http error: io: Nonauthoritative host not found. (os error 11002)")
+
+        velopack = types.SimpleNamespace(UpdateManager=lambda source: types.SimpleNamespace(
+            check_for_updates=offline, get_current_version=lambda: "0.8.0"))
+        with mock.patch.dict(sys.modules, {"velopack": velopack}), \
+                mock.patch.object(updates, "UPDATE_SOURCE", "http://updates.test/"):
+            code, said = self.run_main(["--update"])
+        self.assertEqual(code, 2)
+        self.assertEqual(said.strip(), "Could not check for updates. This PC cannot reach the internet.")
+        with open(st.launcher_log(), encoding="utf-8") as f:
+            self.assertIn("Nonauthoritative host not found. (os error 11002)", f.read())
+
     def test_version(self):
         out = io.StringIO()
         with contextlib.redirect_stdout(out), self.assertRaises(SystemExit):

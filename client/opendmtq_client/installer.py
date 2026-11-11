@@ -96,7 +96,8 @@ def brought():
 
 
 def failure_line(log_path):
-    """The last error Velopack wrote in its log, for the dialog (None when there is none)."""
+    """The last error Velopack wrote in its log, in its own words (None when there is none): for the installer's log,
+    and for the dialog to say by its kind (i18n Words.fault), never as it is."""
     try:
         with open(log_path, encoding="utf-8", errors="replace") as f:
             lines = [line.strip() for line in f if "[ERROR]" in line]
@@ -257,8 +258,10 @@ class Installer:
         try:
             start_launcher()
         except OSError as e:
+            # The system's own words in the log; the dialog says why by its kind, when it is one.
             log.exception("could not start the launcher")
-            self.failed(self.words("setup.not_started.detail", error=e), title=self.words("setup.not_started"))
+            self.failed(self.words.failed("setup.not_started.detail", e, network=False),
+                        title=self.words("setup.not_started"))
             return
         self.root.after(wait, self.root.destroy)
 
@@ -272,8 +275,9 @@ class Installer:
         try:
             self.process = run_setup(self.log_path)
         except OSError as e:
+            # The system's own words in the log; the dialog says why by its kind, when it is one.
             log.exception("could not start Velopack's setup")
-            self.failed(self.words("setup.no_setup", error=e))
+            self.failed(self.words.failed("setup.no_setup", e, network=False))
             return
         self.started_at = time.time()
         self.root.after(100, self._wait)
@@ -292,8 +296,12 @@ class Installer:
         log.info("Velopack's setup ended with %s", code)
         found = installed_version()
         if code != 0:
-            # Velopack's own last error line, as it wrote it, else the code it ended with.
-            self.failed(failure_line(self.log_path) or self.words("setup.code", code=code))
+            # Velopack's last error line, in its own (English) words, goes to this log; the dialog says it by its kind
+            # in the installer's language (a full disk, a file in use, no permission), else only that it failed and
+            # where Velopack's log is. Its setup asks nothing over the network: no network kind is read into it.
+            line = failure_line(self.log_path)
+            log.error("Velopack's setup failed: %s", line or "no error line in its log")
+            self.failed(self.words.fault(line, network=False))
             return
         if found != __version__:
             self.failed(self.words("setup.wrong_version", found=found, here=__version__))
@@ -303,16 +311,19 @@ class Installer:
         self._start_or_say()
 
     def failed(self, why, title=None):
-        """What went wrong, with Try again as the main answer and the way to Velopack's log when there is one."""
+        """What went wrong (`why`: plain words, or "" when there is no more to say than the title), with Try again as
+        the main answer and the way to Velopack's log when there is one."""
         w = self.words
         title = title or w("setup.failed")
         self.failure = (why, title)
         if os.path.isfile(self.log_path):
-            self.show("error", w("setup.tab"), title, w("setup.failed.log", why=why, path=self.log_path),
+            # Why, then where the log is, each on its own line.
+            detail = "\n".join(part for part in (why, w("setup.failed.log", path=self.log_path)) if part)
+            self.show("error", w("setup.tab"), title, detail,
                       [(w("setup.close"), "close", "neutral"), (w("setup.open_log"), "log", "neutral"),
                        (w("setup.retry"), "again", "home")], default=2, cancel="close")
         else:
-            self.show("error", w("setup.tab"), title, why,
+            self.show("error", w("setup.tab"), title, why or None,
                       [(w("setup.close"), "close", "neutral"), (w("setup.retry"), "again", "home")], default=1,
                       cancel="close")
 

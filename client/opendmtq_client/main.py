@@ -189,12 +189,14 @@ def _ask(question, yes):
 def _update(yes):
     """--update: the same check as the Launcher page, then the same update (the launcher restarts into it)."""
     from opendmtq_client import updates
+    # The window's English words for a failure: what failed and, by its kind, why (Velopack's own are in the log).
+    w = i18n.Words("en")
     result = updates.check()
     if result.kind != "available":
         said = {"not_installed": "Updates work in the launcher installed by OpenDMTQ-Setup.exe.",
                 "no_source": "No update address is set for this build.",
                 "uptodate": "This is the newest version (%s)." % (updates.current_version() or __version__),
-                "failed": "Could not check for updates: %s" % result.error}
+                "failed": w.failed("about.update_failed", result.error)}
         _say(said.get(result.kind, result.kind), error=result.kind == "failed")
         return 0 if result.kind == "uptodate" else 2
     _say("OpenDMTQ %s is available (this is %s)." % (result.version, updates.current_version() or __version__))
@@ -211,8 +213,9 @@ def _update(yes):
         # the new launcher.
         updates.apply(result)
     except Exception as e:  # noqa: BLE001  (shown and logged, never swallowed)
+        # Velopack's own words, with where they came from, in the log; on the console the window's words.
         log.exception("--update failed")
-        _say("The update failed: %s" % e, error=True)
+        _say(w.failed("about.apply_failed", e), error=True)
         return 2
     _say("Updating: the launcher starts again in a few seconds.")
     return 0
