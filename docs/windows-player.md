@@ -72,8 +72,11 @@ offer. While the launcher's window is open, the flags that change what it keeps 
   up, or when a finger is drawn down from that edge on a touch screen; a pointer on its way to the window's title bar
   shows nothing. It stays while the pointer is on it and fades soon after the pointer leaves, so it never sits on the
   game's own controls at the top while they are used; no key opens it. While it is up, the broadcast notice and an FPS
-  counter in a top corner move down under it. On its right: **full screen** (or back to a window) and an **X** that
-  quits; a chip, or a button of the question, acts only when let go where it was pressed. The X asks first, **Keep playing** or
+  counter in a top corner move down under it. It is tall enough to cover the game's own X at the top right of its song
+  and music screens whole. On its right: **full screen** (or back to a window), lit green under the pointer, and an
+  **X** that quits, lit grey; a chip, or a button of the question, acts only when let go where it was pressed. The
+  question's card keeps within three quarters of the game's width, so a small window on a display at 150 % or 200 %
+  gets a card in proportion to the game. The X asks first, **Keep playing** or
   **Quit the game**, so a click by mistake does not end a song; the window's own close button asks the same, and
   Alt+F4 does nothing. The game holds still while it asks, as a phone's game does when its owner leaves it: a song
   stops where it was, with the game's own pause screen after. In the question, Left, Right and Tab move the choice,
@@ -100,7 +103,7 @@ offer. While the launcher's window is open, the flags that change what it keeps 
 - **VSync off:** frames go out as soon as they are drawn, evenly at the limit, which may be above the display's rate, or
   as fast as the PC draws without one. A little less delay, and the picture may tear.
 - **The FPS counter**, off by default: a small chip in the corner chosen (each corner has some of the game's own
-  controls; top left sits over a song's pause button), with the frames a second in the game's lime and the mean frame
+  controls; top left sits just right of a song's pause button), with the frames a second in the game's lime and the mean frame
   time under them, over the last half second, twice a second. It counts the frames the player shows between their own
   moments, so a steady 60 reads 60; held still under the question, it reads 0. It sits over the game as the bar does and lets clicks through, and
   stays under the dim of the question before quitting. It is drawn apart from the game's picture: it costs the game

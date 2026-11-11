@@ -107,10 +107,30 @@ RECT area() {
 // The overlay's scale: the game's, which lays itself out for 720 lines and grows with its area (1.5 at 1080 lines, 3 at
 // 4K), or Windows' own when that is larger (a small window on a display at 200 %), so that the bar, the question and the
 // notice keep their size beside the game's own dialogs and buttons.
+// A cap on the scale while one piece is laid out and drawn (0: none): the question's card, which keeps within the
+// game's area (AskScale below).
+float g_scale_cap = 0;
+
 float scale() {
     const RECT a = area();
-    return std::max(dpi_scale(), static_cast<float>(a.bottom - a.top) / 720.0f);
+    const float s = std::max(dpi_scale(), static_cast<float>(a.bottom - a.top) / 720.0f);
+    return g_scale_cap > 0 ? std::min(s, g_scale_cap) : s;
 }
+
+// The question's card at most three quarters of the game's area wide (600 at 720 lines) and nine tenths of it high
+// (218 at 720 lines), everything in it scaled with it: a small window on a display at 150 % or 200 % gets a card in
+// proportion to the game instead of one across its whole width. Held while the card is laid out or drawn.
+struct AskScale {
+    float before;
+    AskScale() : before(g_scale_cap) {
+        const RECT a = area();
+        const float w = static_cast<float>(a.right - a.left), h = static_cast<float>(a.bottom - a.top);
+        g_scale_cap = std::min(0.75f * w / 600.0f, 0.9f * h / 218.0f);
+    }
+    ~AskScale() { g_scale_cap = before; }
+    AskScale(const AskScale&) = delete;
+    AskScale& operator=(const AskScale&) = delete;
+};
 // A length of the game's at 720 lines as pixels at the overlay's scale, whole (edges on whole pixels stay sharp). Every
 // size of the overlay goes through here.
 int px(float at720) { return static_cast<int>(std::lround(at720 * scale())); }
@@ -371,13 +391,19 @@ std::unique_ptr<Canvas> make_fps(int fps, float ms) {
     return canvas;
 }
 
-// The counter's place: its corner of the game's area, 8 pixels in at 720 lines; in a top corner, under the bar while
-// that is up.
+// The right edge of the game's pause button in a song, at 720 lines: the button spans 13 to 72 from the left (measured
+// on the game's frames), at the game's own scale (its height over 720), whatever Windows' scale.
+constexpr float kPauseRight = 73;
+
+// The counter's place: its corner of the game's area, 8 pixels in at 720 lines; top left, 8 pixels right of the
+// game's pause button, so that it covers nothing a song uses; in a top corner, under the bar while that is up.
 POINT fps_place(const Canvas& c) {
     const RECT a = area();
     const int in = px(8);
     const bool right = g_fps_corner == 2 || g_fps_corner == 4, bottom = g_fps_corner == 3 || g_fps_corner == 4;
-    return POINT{right ? a.right - in - c.w : a.left + in, bottom ? a.bottom - in - c.h : a.top + in + top_room()};
+    const float game = static_cast<float>(a.bottom - a.top) / 720.0f;
+    const int left = g_fps_corner == 1 ? static_cast<int>(std::lround(kPauseRight * game)) + in : in;
+    return POINT{right ? a.right - in - c.w : a.left + left, bottom ? a.bottom - in - c.h : a.top + in + top_room()};
 }
 
 // The counter where its corner is now, drawn again only when its scale changed: a move of the window counts nothing.
@@ -456,8 +482,10 @@ int g_bar_version = 0, g_bar_shown_version = -1;
 BYTE g_bar_shown_alpha = 0;
 POINT g_bar_shown_at{};
 
-// The bar's height, the chips' size, the gap between them and their room from the bar's right end, at this scale.
-int bar_height() { return px(52); }
+// The bar's height, the chips' size, the gap between them and their room from the bar's right end, at this scale. 74
+// at 720 lines: the game's own X at the top right of its song and music screens reaches row 70 (its soft edge, measured
+// on the game's frames), and the bar covers it whole with 4 to spare, no tip of it showing under the glow.
+int bar_height() { return px(74); }
 int chip_size() { return px(36); }
 int chip_gap() { return px(10); }
 int chip_margin() { return px(14); }
@@ -550,15 +578,21 @@ Canvas& bar_canvas() {
         middle.SetFormatFlags(StringFormatFlagsNoWrap);
         SolidBrush white(kText);
         g.DrawString(L"OpenDMTQ", -1, &name, RectF(static_cast<REAL>(px(18)), 0, static_cast<REAL>(px(240)), static_cast<REAL>(h) - line), &middle, &white);
-        // The two chips: at rest as the game's OFF chips, under the pointer as its green button, held down as that
-        // button pressed in (deeper, its light at the bottom); a white glyph on all.
+        // The two chips: at rest as the game's OFF chips; under the pointer, the full screen chip as the game's green
+        // button and the X as its grey one; held down, that button pressed in (deeper, its light at the bottom); a
+        // white glyph on all.
         const float radius = static_cast<float>(px(5));
         for (int which : {kQuitChip, kScreenChip}) {
             const RectF r = chip_rect(which, w);
+            // The X lights grey, not the game's green, which says go on; the full screen chip lights green.
+            const bool quit = which == kQuitChip;
             if (which == g_bar_hover && which == g_bar_pressed) {
-                button(g, r, radius, kGreenPressedTop, kGreenPressedBottom, kGreenEdge);
+                if (quit) button(g, r, radius, kGreyPressedTop, kGreyPressedBottom, kGreyEdge);
+                else button(g, r, radius, kGreenPressedTop, kGreenPressedBottom, kGreenEdge);
             } else if (which == g_bar_hover) {
-                button(g, r, radius, kGreenTop, kGreenBottom, kGreenEdge);
+                // White on its lightest grey (104, 108, 115) is 5.3:1.
+                if (quit) button(g, r, radius, kGreyTopHover, kGreyBottomHover, kGreyEdge);
+                else button(g, r, radius, kGreenTop, kGreenBottom, kGreenEdge);
             } else {
                 GraphicsPath path;
                 rounded(path, RectF(r.X + 0.5f, r.Y + 0.5f, r.Width - 1, r.Height - 1), radius);
@@ -779,6 +813,8 @@ struct AskLayout {
     RectF card, header, close, text, keep, quit;
 };
 AskLayout ask_layout(int w, int h) {
+    // Within the game's area, however large Windows' scale.
+    const AskScale cap;
     AskLayout l;
     // At 720 lines, as the game's own dialog there: 600 wide; the header 62 high, the glow's two pixels under it; the
     // line of text with 24 above and below it (26 for the line), then the buttons 220 by 56 side by side with 16
@@ -808,6 +844,8 @@ void draw_ask() {
     const RECT a = area();
     const int w = a.right - a.left, h = a.bottom - a.top;
     if (w <= 0 || h <= 0) return;
+    // Within the game's area, however large Windows' scale: the card and all in it.
+    const AskScale cap;
     // The same look at the same size: only its place on the screen changes.
     if (g_ask_canvas && g_ask_canvas->w == w && g_ask_canvas->h == h && g_ask_drawn_choice == g_choice && g_ask_drawn_hover == g_ask_hover &&
         g_ask_drawn_pressed == g_ask_pressed && g_ask_drawn_scale == scale()) {
@@ -1127,7 +1165,13 @@ std::unique_ptr<Canvas> make_notice(const std::string& text, bool live) {
         const RECT a = area();
         float beside = pad * 2 + mark_w + gap + margin * 2 + px(16);
         // A frame counter in a top corner keeps its corner: the card, centred, stays clear of it on both sides.
-        if (g_fps_corner == 1 || g_fps_corner == 2) beside += 2.0f * static_cast<float>(make_fps(-1, 0)->w + px(8));
+        if (g_fps_corner == 1 || g_fps_corner == 2) {
+            // How far in from its side the counter reaches (top left, beside the pause button), on both sides.
+            auto counter = make_fps(-1, 0);
+            const POINT at = fps_place(*counter);
+            const float reach = g_fps_corner == 1 ? static_cast<float>(at.x - a.left + counter->w) : static_cast<float>(a.right - at.x);
+            beside += 2.0f * (reach + static_cast<float>(px(8)));
+        }
         room = std::max(static_cast<float>(px(160)), std::min(static_cast<float>(px(680)), static_cast<float>(a.right - a.left) - beside));
         // Each line broken at its spaces within the room, then measured as the lines it became.
         title = joined(wrap_even(g, title, title_font, room));
@@ -1374,8 +1418,10 @@ void test_save(const std::wstring& prefix) {
     save(*make_notice(long_text, true), L"notice-long.png");
     // The same with a counter in a top corner, which the card keeps clear of.
     const int corner_before = g_fps_corner;
-    g_fps_corner = 2;
-    save(*make_notice(long_text, true), L"notice-long-fps.png");
+    for (int corner : {1, 2}) {
+        g_fps_corner = corner;
+        save(*make_notice(long_text, true), corner == 1 ? L"notice-long-fps1.png" : L"notice-long-fps2.png");
+    }
     g_fps_corner = corner_before;
     // The frame counter before its first half second, with the game held, at 60, at 240 and at its most.
     struct Count {
@@ -1398,12 +1444,12 @@ void test_save(const std::wstring& prefix) {
         const POINT at = notice_place(*c);
         std::fprintf(out, "%s %ld %ld %d %d\n", name, at.x - a.left, at.y - a.top, c->w, c->h);
     }
-    {
-        g_fps_corner = 2;
+    for (int corner : {1, 2}) {
+        g_fps_corner = corner;
         auto c = make_notice(long_text, true);
         g_fps_corner = corner_before;
         const POINT at = notice_place(*c);
-        std::fprintf(out, "notice-long-fps %ld %ld %d %d\n", at.x - a.left, at.y - a.top, c->w, c->h);
+        std::fprintf(out, "notice-long-fps%d %ld %ld %d %d\n", corner, at.x - a.left, at.y - a.top, c->w, c->h);
     }
     const int kept_corner = g_fps_corner;
     for (int corner = 1; corner <= 4; ++corner) {

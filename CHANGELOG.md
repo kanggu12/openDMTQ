@@ -21,9 +21,16 @@ one that only fixes raises the patch number. Each release's section here is its 
 - The player for Windows: the broadcast notice breaks a long line into even lines, with no word left alone under it.
 - The launcher's Screen page keeps its place and the keyboard's control when a choice redraws it (the render scale, the
   upscaler, anti-aliasing, VSync, the mode), instead of going back to its top.
+- The player for Windows: the bar covers the game's own X at the top right of its song and music screens whole (74
+  instead of 52 at 720 lines), with no tip of it showing under the bar.
 
 ### Changed
 
+- The player for Windows: an FPS counter at the top left sits just right of a song's pause button instead of over it.
+- The player for Windows: the question before quitting keeps within three quarters of the game's width, its contents
+  scaled with it, so a small window on a display at 150 % or 200 % gets a card in proportion to the game.
+- The player for Windows: the bar's X lights grey under the pointer instead of the game's green, which reads as go on;
+  the full screen chip keeps the green.
 - The launcher's Screen page: the upscaler's hints no longer say what 100 % does (the row is shown only below it), and
   the page's line under its title names the picture's quality too.
 

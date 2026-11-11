@@ -132,11 +132,11 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   # screen chip switches to a window and back; its X asks first and holds the game still, Keep playing lets it go on,
   # and the X again with Quit the game ends the game, and the launcher comes back. The overlay's sizes are the game's at
   # 720 lines, times the game's height over 720 (Wine is at 96 dpi): 1.5 in full screen here (1920x1080), 1.125 in the
-  # window (1440x810), each length rounded as the player rounds it (opx below). The bar is 52 high and shows for a
+  # window (1440x810), each length rounded as the player rounds it (opx below). The bar is 74 high and shows for a
   # pointer that rests 150 ms within 4 of the top (y 0 here, for a second); its chips are 36 square, 14 in from the right end and 10 apart, centred in
-  # its height. The question's card is 600 wide and 62 + 2 + 74 + 56 + 24 high, centred, its two buttons 220 by 56 with
+  # its height (the card within three quarters of the game's width, which neither size reaches). The question's card is 600 wide and 62 + 2 + 74 + 56 + 24 high, centred, its two buttons 220 by 56 with
   # 16 between, centred, their top 62 + 2 + 74 below the card's. In full screen: the X's centre 21 + 27 = 48 in from
-  # the right and 12 + 27 = 39 down, the full screen chip's 21 + 54 + 15 + 27 = 117 in; the card 900 by 327 at y 376, its
+  # the right and 28 + 27 = 55 down, the full screen chip's 21 + 54 + 15 + 27 = 117 in; the card 900 by 327 at y 376, its
   # buttons centred at y 376 + 207 + 42 = 625, Keep playing at x 618 + 165 = 783 (the middle less 177) and Quit the game
   # at 1137 (the middle and 177). Wine's window for the game is its client area (no window manager draws a frame), so
   # its geometry is the game's area, in a window as in full screen.
@@ -152,7 +152,7 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   # The bar's chip (0 the X, 1 full screen): its centre's distance from the right end and from the top.
   bar_chip() {
     eval \$(xdotool getwindowgeometry --shell \"\$game\")
-    local size=\$(opx 36) gap=\$(opx 10) margin=\$(opx 14) bar=\$(opx 52)
+    local size=\$(opx 36) gap=\$(opx 10) margin=\$(opx 14) bar=\$(opx 74)
     xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5
     xdotool mousemove \$((X + WIDTH / 2)) \$Y; sleep 1
     xdotool mousemove \$((X + WIDTH - margin - size / 2 - \$1 * (size + gap))) \$((Y + (bar - size) / 2 + size / 2)); sleep 1
