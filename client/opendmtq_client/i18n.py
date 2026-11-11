@@ -315,7 +315,7 @@ TEXT = {
     "help.clear.partly.detail": ("In use and left in place: {n}. The first is {path}. Close what uses them and clear again.",
                                  "사용 중이라 남은 항목: {n}개. 첫 항목: {path}. 쓰고 있는 프로그램을 닫고 다시 지우세요."),
     "help.uninstall": ("Uninstall", "제거"),
-    "help.uninstall.row": ("OpenDMTQ on this PC", "이 PC의 OpenDMTQ"),
+    "help.uninstall.row": ("OpenDMTQ", "OpenDMTQ"),
     "help.uninstall.hint": ("Removes OpenDMTQ from this PC. You choose then whether the settings and the game's data stay.",
                             "이 PC에서 OpenDMTQ를 제거합니다. 설정과 게임 데이터를 남길지는 그때 고릅니다."),
     "help.uninstall.ask": ("Uninstall OpenDMTQ from this PC?", "이 PC에서 OpenDMTQ를 제거할까요?"),

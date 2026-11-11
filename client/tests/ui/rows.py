@@ -44,8 +44,11 @@ def main():
     os.makedirs(out, exist_ok=True)
     if not safety.on_virtual_display():
         sys.exit("refusing: this opens windows; run it through client/tests/ui/run.sh")
+    import tempfile
     import tkinter as tk
     site, state = keyboard.setup(args.lang)
+    # Help as an installed launcher has it: Repair and Uninstall among its rows.
+    os.environ["OPENDMTQ_INSTALL_ROOT"] = shots.fake_install(tempfile.mkdtemp())
     from opendmtq_client.app import LauncherApp
     problems = []
     app = LauncherApp(state)
@@ -82,13 +85,14 @@ def main():
             problems.append("Online: a field starts at %d, its words %r at %d" % (field.winfo_rootx(),
                                                                                  words.cget("text"), start))
 
-    # ---- The settings' controls of the Screen page (below 100 %, with every row) and of the Sound page: what shows of
-    # each starts on one line (a switch's and a row of tabs' rooms for the keyboard's ring left out).
+    # ---- The settings' controls of the Screen page (below 100 %, with every row), of the Sound page and of Help's
+    # tools: what shows of each starts on one line (a row name longer than the names' column would push its control
+    # out of it).
     # Below 100 % for every row; VSync off, as a switch that is on has a faint halo of the accent round its pill, which
     # reaches past where the pill starts.
     app.changed("render_scale", "75")
     app.changed("vsync", "off")
-    for page in ("screen", "sound"):
+    for page in ("screen", "sound", "help"):
         app.nav_go(page)
         shots.settle(app, 6, until=lambda: app.devices is not None)
         shots.settle(app)
