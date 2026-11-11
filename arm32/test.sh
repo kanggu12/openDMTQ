@@ -20,7 +20,7 @@ $adb push -q "$work/guest/." "$dir/"
 $adb shell "chmod 755 $dir/arm32run"
 failed=0
 # The signal tests run several times: thread handshakes are where timing bugs show.
-for test in basic signals signals signals signals signals interrupt interrupt interrupt wakes wakes wakes futexes restart restart \
+for test in basic signals signals signals signals signals interrupt interrupt interrupt wakes wakes wakes futexes atomics restart restart \
     coherence cxx neon memory calls descriptors zones "dl $dir/libplugin.so"; do
     out=$($adb shell "cd $dir && ./arm32run --sysroot $dir/sysroot $dir/$test 2>&1" | tr -d '\r' || true)
     if echo "$out" | grep -q "ALL CHECKS PASSED"; then
