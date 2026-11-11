@@ -103,6 +103,8 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 
 ### The picture
 
+![The launcher's Screen page: VSync, the frame limit, the FPS counter, then the render scale at 50 % with AMD FSR 1 as its upscaler, and MSAA 4x](images/client-screen.png)
+
 - **Full screen or a window.** Full screen is a borderless window over the whole display, at the display's own pixels
   whatever its scaling. A window opens at three quarters of the display's height at 16:9, or at the size chosen. The
   game fills the window while its shape is between 4:3 and 21:9; a window of another shape, such as a display turned
