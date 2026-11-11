@@ -20,9 +20,11 @@ RENDER_SCALE = ("100", "85", "75", "67", "50")
 # Below 100 %, how the picture reaches the area's size: the plain stretch, AMD FidelityFX Super Resolution 1, or NVIDIA
 # Image Scaling (arm32/desktop/post_pass.cpp).
 UPSCALER = ("bilinear", "fsr1", "nis")
-# How the edges of the game's shapes are smoothed: not at all, by Intel's CMAA 2 or SMAA over the finished picture, or by
-# drawing each frame with 2, 4 or 8 samples a pixel.
-ANTI_ALIASING = ("off", "cmaa2", "smaa", "msaa2", "msaa4", "msaa8")
+# How the edges of the game's shapes are smoothed: not at all, or by Intel's CMAA 2 or SMAA over the finished picture.
+ANTI_ALIASING = ("off", "cmaa2", "smaa")
+# MSAA, which earlier launchers offered, left the game's picture as it was: what they kept reads as CMAA 2, the smoothing
+# it was chosen for, as the player reads it.
+OLD_ANTI_ALIASING = {"msaa2": "cmaa2", "msaa4": "cmaa2", "msaa8": "cmaa2"}
 # A counter of the frames a second over the game, off or on.
 SHOW_FPS = ("off", "on")
 # The counter's corner while it is on: the top left, beside a song's pause button, or another (each corner has some of
@@ -61,8 +63,9 @@ NAMES = ORDER[:ORDER.index("show_fps") + 1] + ("fps_position",) + ORDER[ORDER.in
 CHOICES = {"display": DISPLAY, "vsync": VSYNC, "fps": FPS, "render_scale": RENDER_SCALE, "upscaler": UPSCALER,
            "anti_aliasing": ANTI_ALIASING, "show_fps": SHOW_FPS, "fps_position": FPS_POSITION, "audio_mode": AUDIO_MODE,
            "audio_buffer": AUDIO_BUFFER}
-# A window size the player takes (its own bounds: 320x180 to 16384 a side).
+# A window size the player takes (its own bounds: 480x270, the smallest area its window holds, to 16384 a side).
 SIZE = re.compile(r"^(\d{3,5})x(\d{3,5})$")
+SMALLEST = (480, 270)
 
 
 class ChoiceError(ValueError):
@@ -78,6 +81,8 @@ def _one(name, value):
     """The value as the launcher keeps it, or ChoiceError."""
     if name in CHOICES:
         text = str(value).strip().lower()
+        if name == "anti_aliasing":
+            text = OLD_ANTI_ALIASING.get(text, text)
         if text not in CHOICES[name]:
             raise ChoiceError("%s cannot be %r: it is one of %s" % (name, value, ", ".join(CHOICES[name])), "error.choice",
                               name=name, value=value)
@@ -87,8 +92,8 @@ def _one(name, value):
         found = SIZE.match(text)
         if text == "auto":
             return text
-        if not found or not (320 <= int(found.group(1)) <= 16384 and 180 <= int(found.group(2)) <= 16384):
-            raise ChoiceError("window cannot be %r: it is auto or WIDTHxHEIGHT (320x180 or more)" % (value,), "error.choice",
+        if not found or not (SMALLEST[0] <= int(found.group(1)) <= 16384 and SMALLEST[1] <= int(found.group(2)) <= 16384):
+            raise ChoiceError("window cannot be %r: it is auto or WIDTHxHEIGHT (%dx%d or more)" % ((value,) + SMALLEST), "error.choice",
                               name=name, value=value)
         return "%dx%d" % (int(found.group(1)), int(found.group(2)))
     if name == "volume":

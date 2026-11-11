@@ -23,12 +23,23 @@ float ms(Nanos n) { return static_cast<float>(static_cast<double>(n) / 1e6); }
 // A computer's display: the longest swap interval it is paced with (Direct3D's longest, four refreshes).
 constexpr int kMaxHostInterval = kHostIntervalMost;
 // A computer's display: after a step down, the wait before a step back up is tried (a song's load can hold the frames
-// up for some seconds, after which the display's best holds again), doubled after each try that falls short, up to
-// four minutes; and how long a frame rate has to hold for the wait to start again from the first.
-constexpr Nanos kHostFirstRetry = 15LL * 1000000000, kHostLongestRetry = 240LL * 1000000000;
+// up for some seconds, after which the display's best holds again), doubled after each try that falls short, up to a
+// minute; and how long a frame rate has to hold for the wait to start again from the first. A try costs little: one
+// window short of the two it is checked over takes it back down at once.
+constexpr Nanos kHostFirstRetry = 5LL * 1000000000, kHostLongestRetry = 60LL * 1000000000;
 // Check windows (2 s each) that a rate stepped back up to has to pass, checked, for the wait to start from the first again:
-// a minute of frames that kept up, not a minute of a menu left alone with the check off.
-constexpr int kHostSettledWindows = 30;
+// half a minute of frames that kept up, not half a minute of a menu left alone with the check off.
+constexpr int kHostSettledWindows = 15;
+// The check windows right after a step back up that decide the try: a short one among them steps down at once.
+constexpr int kHostTryWindows = 2;
+// A computer's check window falls short when more than a quarter of its frames were shown late: what a computer that is
+// really behind shows (a frame a refresh late on every second refresh and worse, 49 % to 100 % of the frames, in the
+// runs logged with the broadcast's encoder or a pass too slow for the card), and none of what a song that played well
+// showed: at most 14 % in 99 windows of 100 at 240 Hz in the 4,451 windows of 76 runs on a 240 Hz display, the page
+// before a song included (its loading, up to 10 %), and other programs busy on the computer meanwhile. A phone's panel
+// keeps its 3 %: its steps down are to rates the panel itself switches to, and they also choose the resolution.
+constexpr int kHostLatePercent = 25;
+constexpr int kPhoneLatePercent = 3;
 
 // Following the display (see pacing.cpp's top).
 constexpr float kRates[] = {144, 120, 90, 72, 60};
@@ -215,8 +226,11 @@ bool pace_check(const FollowHooks& h, Nanos now, Nanos gap, double hz, bool host
     f.gaps.clear();
     f.window_start = 0;
     f.shown = f.shown_late = 0;
-    // (A pause never gets here: it starts the window over.)
-    const bool fell_short = seen ? late * 100 > shown * 3 : fps < rate * 0.97;
+    // (A pause never gets here: it starts the window over, as a frame that stayed longer than kFollowPause does: a scene
+    // being loaded is not judged.) Without present times, the rate the same share of late frames leaves: a quarter late
+    // is four frames for every five refreshes.
+    const int late_percent = host ? kHostLatePercent : kPhoneLatePercent;
+    const bool fell_short = seen ? late * 100 > shown * late_percent : fps < rate * (host ? 0.8 : 0.97);
     f.short_windows = fell_short ? f.short_windows + 1 : 0;
     // For the resolution, which stays changed from then on: windows in which the game was drawing all along and did not keep up. A
     // scene being loaded holds everything up for some seconds, far below this, and says nothing about drawing.
@@ -233,6 +247,13 @@ bool pace_check(const FollowHooks& h, Nanos now, Nanos gap, double hz, bool host
         log("arm32: frame rate: %.0f fps not kept while drawing (last 2 s: %.1f fps, %d of %d frames shown late)",
             static_cast<double>(rate), fps, late, shown);
         h.note_low_resolution();
+    }
+    // A try of a rate stepped back up to that falls short in its first windows: back down at once, the next try after the
+    // doubled wait (step_down_host).
+    if (host && f.host_held >= 0 && f.host_held < kHostTryWindows && fell_short && !floor) {
+        log("arm32: frame rate: %.0f fps not kept after the step back up (last 2 s: %.1f fps, %d of %d frames shown late); back down",
+            static_cast<double>(rate), fps, late, shown);
+        return step_down_host(h, now);
     }
     // A rate stepped back up to that has kept up for a while: the next step down waits the first wait again.
     if (host && f.host_held >= 0 && !fell_short && ++f.host_held >= kHostSettledWindows) {

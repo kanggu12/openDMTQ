@@ -126,6 +126,14 @@ private:
     std::atomic<int> state_{kStopped};
     // Whether anything was written since play or flush: before that an empty buffer is not the game falling behind.
     bool fed_ = false;
+    // Whether the stream has begun to play since it was fed: its first frames wait until a period of the output's worth is
+    // there with what the resampler's filter reaches past it, while the game's buffer has room for more, or for one
+    // period at most (a sound shorter than a period still plays), as Android's mixer waits for a track's first buffer;
+    // what the first period lacks is silence before the stream's first frames, not a gap after them (the device alone
+    // with the safe buffer's 20 ms periods, a game's buffer of 20 ms and the filter's 36 frames gave each stream a gap
+    // of 1.6 ms). The periods waited so far.
+    bool primed_ = false;
+    int waits_ = 0;
     float gain_[kChannels] = {1.0f, 1.0f};
     Resampler resampler_;
     // The mixer's scratch for this stream's frames.

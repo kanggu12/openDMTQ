@@ -199,8 +199,8 @@ void place_game() {
     // What the game draws at: the area, or its share by the render scale, of the same shape; the surface is made at
     // that size and stretched over the area (egl_bridge.cpp).
     const int scale = settings().render_scale;
-    const int dw = scale < 100 ? std::max(1, static_cast<int>(std::lround(w * scale / 100.0))) : w;
-    const int dh = scale < 100 ? std::max(1, static_cast<int>(std::lround(h * scale / 100.0))) : h;
+    const DrawSize drawn = draw_size(w, h, scale);
+    const int dw = drawn.w, dh = drawn.h;
     g_area_w = w;
     g_area_h = h;
     arm32::g_window_fixed_size.store(scale < 100 ? (static_cast<std::int64_t>(dw) << 32) | dh : 0);

@@ -498,10 +498,18 @@ private:
             return fail("no render client");
         }
         buffer_ms_ = 1000.0 * frames_ / rate_;
-        // What Windows adds after the buffer: its engine's latency for the stream.
-        REFERENCE_TIME latency = 0;
+        // What Windows adds after the buffer: the stream's latency where the driver gives it; where it gives none (0), the
+        // period the audio engine mixes in, which is what it adds then.
+        REFERENCE_TIME latency = 0, engine = 0, shortest = 0;
         client_->GetStreamLatency(&latency);
-        jvm::log("player: WASAPI: %s, %u frames buffered (%.1f ms), stream latency %.1f ms", mode_, frames_, buffer_ms_, static_cast<double>(latency) / 1e4);
+        if (latency > 0) {
+            jvm::log("player: WASAPI: %s, %u frames buffered (%.1f ms), stream latency %.1f ms", mode_, frames_, buffer_ms_, static_cast<double>(latency) / 1e4);
+        } else if (SUCCEEDED(client_->GetDevicePeriod(&engine, &shortest)) && engine > 0) {
+            jvm::log("player: WASAPI: %s, %u frames buffered (%.1f ms), the audio engine's period %.1f ms (Windows gives no stream latency)", mode_,
+                     frames_, buffer_ms_, static_cast<double>(engine) / 1e4);
+        } else {
+            jvm::log("player: WASAPI: %s, %u frames buffered (%.1f ms)", mode_, frames_, buffer_ms_);
+        }
         started_ = false;
         pending_.clear();
         return true;

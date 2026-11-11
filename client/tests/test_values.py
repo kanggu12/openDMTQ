@@ -33,11 +33,18 @@ class Values(unittest.TestCase):
         self.assertEqual((filled["upscaler"], filled["anti_aliasing"]), ("bilinear", "off"))
         # Each offered value is kept, in any case; the temporal ones and FXAA are not offered.
         self.assertEqual(choices.normalize({"upscaler": "FSR1"})["upscaler"], "fsr1")
-        self.assertEqual(choices.normalize({"anti_aliasing": "MSAA8"})["anti_aliasing"], "msaa8")
+        self.assertEqual(choices.normalize({"anti_aliasing": "SMAA"})["anti_aliasing"], "smaa")
         for name, value in (("upscaler", "dlss"), ("upscaler", "fsr2"), ("anti_aliasing", "taa"), ("anti_aliasing", "fxaa"),
                             ("anti_aliasing", "msaa16")):
             with self.assertRaises(choices.ChoiceError, msg=(name, value)):
                 choices.normalize({name: value})
+        # MSAA is no choice any more (it left the game's picture as it was): what an earlier launcher kept, and --set as
+        # before, read as CMAA 2, kept or not strict, and the player's file says cmaa2.
+        self.assertEqual(choices.ANTI_ALIASING, ("off", "cmaa2", "smaa"))
+        for old in ("msaa2", "msaa4", "MSAA8"):
+            self.assertEqual(choices.normalize({"anti_aliasing": old})["anti_aliasing"], "cmaa2", old)
+            self.assertEqual(choices.normalize({"anti_aliasing": old}, strict=False)["anti_aliasing"], "cmaa2", old)
+        self.assertIn("anti_aliasing=cmaa2", choices.settings_text({"anti_aliasing": "msaa4"}).splitlines())
 
     def test_the_frame_counter(self):
         # Off by default, its corner the top left; on and off by name, in any case.
@@ -71,6 +78,14 @@ class Values(unittest.TestCase):
 
     def test_window_sizes(self):
         self.assertEqual(choices.normalize({"window": "1920X1080"})["window"], "1920x1080")
+        # The smallest area the player's window holds, 480x270: smaller is refused (the player would not take it).
+        self.assertEqual(choices.normalize({"window": "480x270"})["window"], "480x270")
+        for small in ("320x180", "479x270", "480x269"):
+            with self.assertRaises(choices.ChoiceError, msg=small):
+                choices.normalize({"window": small})
+        with self.assertRaises(choices.ChoiceError) as refused:
+            choices.normalize({"window": "320x180"})
+        self.assertIn("480x270 or more", str(refused.exception))
         self.assertEqual(choices.size_of("1280x720"), (1280, 720))
         self.assertIsNone(choices.size_of("auto"))
 

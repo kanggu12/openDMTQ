@@ -203,7 +203,9 @@ int main() {
     }
 
     // Underruns: a playing stream that had frames and runs out counts the period and the frames it was short; one
-    // that never had any does not.
+    // that never had any does not. A stream's start waits one period for a period's worth (as Android's mixer waits for
+    // a track's first buffer), and what its first period lacks is silence before its first frames: a first write
+    // shorter than a period is a later start, not a gap.
     {
         Stream fed(48000, 2, Encoding::F32, 1000, "fed", 48000), empty(48000, 2, Encoding::F32, 1000, "never fed", 48000);
         std::vector<float> data(100 * kChannels, 0.25f);
@@ -212,11 +214,82 @@ int main() {
         fed.play();
         empty.play();
         fed.mix_into(out.data(), 240);
+        check(fed.underruns() == 0 && fed.played() == 0, "a start with less than a period waits a period, no underrun");
+        fed.mix_into(out.data(), 240);
+        check(fed.underruns() == 0 && fed.played() == 100 && out[0] == 0.0f && out[139 * kChannels] == 0.0f && out[140 * kChannels] == 0.25f &&
+                  out[239 * kChannels] == 0.25f,
+              "the start's period: 140 frames of silence, then the 100 written, to the period's end");
+        fed.mix_into(out.data(), 240);
         empty.mix_into(out.data(), 240);
-        std::snprintf(what, sizeof what, "a stream 140 frames short: %llu underrun, %llu frames short", static_cast<unsigned long long>(fed.underruns()),
+        std::snprintf(what, sizeof what, "then a period with nothing: %llu underrun, %llu frames short", static_cast<unsigned long long>(fed.underruns()),
                       static_cast<unsigned long long>(fed.short_frames()));
-        check(fed.underruns() == 1 && fed.short_frames() == 140 && fed.played() == 100, what);
+        check(fed.underruns() == 1 && fed.short_frames() == 240 && fed.played() == 100, what);
         check(empty.underruns() == 0, "a stream nothing was written to is not short");
+        // The game's second write coming while the start waited: the whole period from it, no gap at all.
+        Stream later(48000, 2, Encoding::F32, 1000, "later", 48000);
+        later.write(data.data(), 100);
+        later.play();
+        later.mix_into(out.data(), 240);
+        std::vector<float> more(300 * kChannels, 0.25f);
+        later.write(more.data(), 300);
+        later.mix_into(out.data(), 240);
+        std::snprintf(what, sizeof what, "a first write shorter than the period, the next one before it is needed: %llu underruns, %llu played",
+                      static_cast<unsigned long long>(later.underruns()), static_cast<unsigned long long>(later.played()));
+        check(later.underruns() == 0 && later.played() == 240, what);
+        // A stream at a rate of its own (22050 Hz into 192 kHz, as the game's AudioTrack on a 192 kHz device with 20 ms
+        // periods): its start waits for 20 ms of its own frames, then plays without a gap.
+        Stream song(22050, 2, Encoding::F32, 4096, "song", 192000);
+        std::vector<float> song_data(400 * kChannels, 0.25f);
+        song.write(song_data.data(), 400);
+        song.play();
+        std::vector<float> period(3840 * kChannels, 0.0f);
+        song.mix_into(period.data(), 3840);
+        check(song.played() == 0 && song.underruns() == 0, "22050 Hz into 20 ms periods at 192 kHz: 400 frames wait for the 441 a period takes");
+        song.write(song_data.data(), 400);
+        song.mix_into(period.data(), 3840);
+        std::snprintf(what, sizeof what, "then a whole period from the next write: %llu underruns, %llu played", static_cast<unsigned long long>(song.underruns()),
+                      static_cast<unsigned long long>(song.played()));
+        check(song.underruns() == 0 && song.played() > 400, what);
+        // The game's AudioTrack at 22050 Hz with the smallest buffer it is given (20 ms, 441 frames: getMinBufferSize)
+        // on a 192 kHz device alone with 20 ms periods, the game filling the buffer again as soon as there is room: the
+        // buffer can never hold a period's worth with the filter's reach beside it. The stream starts the filter's
+        // reach into its first period, with silence before it, and no period after it is short.
+        Stream track(22050, 2, Encoding::F32, 441, "track", 192000);
+        std::vector<float> fill(441 * kChannels, 0.25f);
+        track.write(fill.data(), 441);
+        track.play();
+        std::vector<float> first(3840 * kChannels, 0.0f);
+        track.mix_into(first.data(), 3840);
+        std::size_t silent = 0;
+        while (silent < 3840 && first[silent * kChannels] == 0.0f) ++silent;
+        bool ends_in_sound = std::abs(first[3839 * kChannels] - 0.25f) < 1e-3f;
+        bool gapless = track.underruns() == 0;
+        for (int p = 0; p < 50; ++p) {
+            // What the mix took, written again (the game's write waits for room, then fills it).
+            const std::size_t room = 441 - static_cast<std::size_t>(track.written() - track.played());
+            track.write(fill.data(), room);
+            std::vector<float> next(3840 * kChannels, 0.0f);
+            track.mix_into(next.data(), 3840);
+            for (std::size_t k = 0; k < 3840; ++k) gapless = gapless && std::abs(next[k * kChannels] - 0.25f) < 1e-3f;
+        }
+        std::snprintf(what, sizeof what,
+                      "a 22050 Hz track with a 441-frame buffer into 20 ms periods at 192 kHz: %zu frames of silence first (want 300 to 330), "
+                      "%llu underruns in 51 periods, every frame after the start sound",
+                      silent, static_cast<unsigned long long>(track.underruns()));
+        check(silent >= 300 && silent <= 330 && ends_in_sound && gapless && track.underruns() == 0, what);
+        // A sound shorter than a period, and nothing after it: it waits one period, then plays (short, as it is).
+        Stream click(48000, 2, Encoding::F32, 1000, "click", 48000);
+        click.write(data.data(), 100);
+        click.play();
+        click.mix_into(out.data(), 240);
+        click.mix_into(out.data(), 240);
+        check(click.played() == 100, "a sound shorter than a period still plays, one period later");
+        // After a stop the next start waits again.
+        click.stop();
+        click.write(data.data(), 100);
+        click.play();
+        click.mix_into(out.data(), 240);
+        check(click.played() == 100, "after a stop, the next start waits a period again");
     }
 
     // The mix: two streams add up, and a sum beyond full scale is held at it.

@@ -1,5 +1,6 @@
 // The player's PC settings file (settings.cpp), as the PC client writes it: each key read, a value it cannot read or a
-// key it does not know leaving the default, notes and Windows' line ends taken in their stride, no file at all the
+// key it does not know leaving the default, a volume out of range held to 0 to 100, MSAA of earlier launchers read as
+// CMAA 2, notes, Windows' line ends, a byte order mark and capitals taken in their stride, no file at all the
 // defaults. Then the numbers of the frame counter that one of the settings shows (frame_rate.cpp): its looks at the
 // count of frames through the game's start, a stretch with no frame, frames again and a hold. Prints ALL CHECKS PASSED
 // when every check held.
@@ -233,26 +234,55 @@ int main() {
     check(read(path, "upscaler=bilinear\n").upscaler == player::Settings::Upscaler::kBilinear, "upscaler=bilinear is the plain stretch");
     check(player::Settings{}.upscaler == player::Settings::Upscaler::kBilinear, "the plain stretch is the default upscaler");
     check(player::Settings{}.anti_aliasing == player::Settings::AntiAliasing::kOff, "no anti-aliasing is the default");
-    const char* const aa_names[] = {"off", "cmaa2", "smaa", "msaa2", "msaa4", "msaa8"};
-    for (int i = 0; i < 6; ++i) {
+    const char* const aa_names[] = {"off", "cmaa2", "smaa"};
+    for (int i = 0; i < 3; ++i) {
         // Each name gives its own kind, in the enum's order.
         const std::string text = std::string("anti_aliasing=") + aa_names[i] + "\n";
         check(read(path, text).anti_aliasing == static_cast<player::Settings::AntiAliasing>(i), aa_names[i]);
     }
+    // MSAA, which earlier launchers wrote, is CMAA 2 now.
+    for (const char* msaa : {"msaa2", "msaa4", "msaa8"}) {
+        const std::string text = std::string("anti_aliasing=") + msaa + "\n";
+        check(read(path, text).anti_aliasing == player::Settings::AntiAliasing::kCmaa2, (std::string(msaa) + " is read as CMAA 2").c_str());
+    }
     check(read(path, "audio_buffer=normal\n").audio_buffer == 1, "audio_buffer=normal is 1");
     // Values it cannot read keep the default, each on its own: the keys around them are still read.
     const player::Settings& bad = read(path, "display=huge\nwindow=200x100\nvsync=maybe\nfps=20\nrender_scale=40\naudio_mode=loud\nupscaler=dlss\n"
-                                             "anti_aliasing=fxaa\nanti_aliasing=MSAA4\n"
-                                             "audio_buffer=tiny\nvolume=101\nvolume2=5\nfps=120\n");
+                                             "anti_aliasing=fxaa\n"
+                                             "audio_buffer=tiny\nvolume=loud\nvolume2=5\nfps=120\n");
     check(!bad.fullscreen && bad.window_w == 0 && bad.vsync, "a display, window or vsync it cannot read keeps the default");
     check(bad.render_scale == 100 && !bad.audio_exclusive && bad.audio_buffer == 1 && bad.volume == 100,
-          "a render scale below 50, a mode, a buffer or a volume it cannot read keeps the default");
+          "a render scale below 50, a mode, a buffer or a volume that is no number keeps the default");
     check(bad.fps == 120, "a frame limit below 30 is left out, and a later good one read");
     check(bad.upscaler == player::Settings::Upscaler::kBilinear, "an upscaler it does not know keeps the plain stretch");
-    check(bad.anti_aliasing == player::Settings::AntiAliasing::kOff, "an anti-aliasing it does not know, or in capitals, keeps it off");
+    check(bad.anti_aliasing == player::Settings::AntiAliasing::kOff, "an anti-aliasing it does not know keeps it off");
     check(read(path, "window=1280x720x2\n").window_w == 0, "a size with more after it is not read");
     check(read(path, "fps=1001\n").fps == 0, "a frame limit above 1000 is left out");
     check(read(path, "volume=0\n").volume == 0, "volume=0 is silence, a value of its own");
+    // A volume out of 0 to 100 is held to it: a hand-made -5 is silence, not the default's full sound.
+    check(read(path, "volume=-5\n").volume == 0, "volume=-5 is held to 0");
+    check(read(path, "volume=150\n").volume == 100, "volume=150 is held to 100");
+    check(read(path, "volume=101\n").volume == 100, "volume=101 is held to 100");
+    // The window's smallest area, 480x270: smaller is not read (the window could not hold it).
+    check(read(path, "window=320x180\n").window_w == 0, "a window smaller than 480x270 is not read");
+    check(read(path, "window=479x270\n").window_w == 0 && read(path, "window=480x269\n").window_w == 0, "one pixel short of 480x270 is not read");
+    const player::Settings& least = read(path, "window=480x270\n");
+    check(least.window_w == 480 && least.window_h == 270, "window=480x270, the smallest, is that size");
+    // Capitals in keys and names, as a hand-made file may have them; a device's id kept as written.
+    const player::Settings& caps = read(path, "Display=FullScreen\nVSYNC=Off\nUpscaler=FSR1\nAnti_Aliasing=SMAA\nShow_FPS=Top_Right\n"
+                                              "Audio_Mode=Exclusive\nAUDIO_DEVICE={0.0.0.00000000}.{ABC-def}\nLanguage=KO\n");
+    check(caps.fullscreen && !caps.vsync && caps.upscaler == player::Settings::Upscaler::kFsr1, "keys and names in capitals are read");
+    check(caps.anti_aliasing == player::Settings::AntiAliasing::kSmaa && caps.show_fps == player::Settings::ShowFps::kTopRight &&
+              caps.audio_exclusive,
+          "SMAA, Top_Right and Exclusive in capitals");
+    check(caps.audio_device == "{0.0.0.00000000}.{ABC-def}", "a device's id keeps its own capitals");
+    check(caps.language == "ko", "Language=KO is Korean");
+    check(read(path, "anti_aliasing=MSAA4\n").anti_aliasing == player::Settings::AntiAliasing::kCmaa2, "MSAA4 in capitals is CMAA 2 too");
+    // A byte order mark at the file's start, as Notepad saves one: the first key still read.
+    const player::Settings& marked = read(path, "\xEF\xBB\xBF" "display=fullscreen\r\nvolume=30\r\n");
+    check(marked.fullscreen && marked.volume == 30, "a byte order mark before the first key");
+    read(path, "\xEF\xBB\xBF" "language=ko\n");
+    check(player::settings_language(path) == "ko", "the language read early past a byte order mark");
     // Spaces around the parts, notes, empty lines and Windows' line ends.
     const player::Settings& loose = read(path, "\r\n# a note\r\n  vsync = off \r\n\r\nvolume\t=\t55\r\nno equals sign here\r\n");
     check(!loose.vsync && loose.volume == 55, "spaces, tabs, notes and CR LF line ends");
@@ -264,6 +294,19 @@ int main() {
     read(path, "volume=40\nlanguage = ko\r\nlanguage=xx\n");
     check(player::settings_language(path) == "ko", "the language read early: spaces and CR LF, another after it left out");
     check(player::settings_language("no-such-settings-file.txt").empty(), "no file names no language");
+    // The size the game draws at for a render scale: the area's shape kept in whole steps where it has them.
+    auto drawn = [](int w, int h, int scale, int ew, int eh) {
+        const player::DrawSize d = player::draw_size(w, h, scale);
+        return d.w == ew && d.h == eh;
+    };
+    check(drawn(1920, 1080, 100, 1920, 1080), "100 %: the area itself");
+    check(drawn(1920, 1080, 85, 1632, 918) && drawn(1920, 1080, 75, 1440, 810) && drawn(1920, 1080, 50, 960, 540),
+          "85, 75 and 50 % of 1920x1080: 1632x918, 1440x810, 960x540");
+    check(drawn(1920, 1080, 67, 1280, 720), "67 % of 1920x1080 is 1280x720, 16:9 exactly (not 1286x724)");
+    check(drawn(1280, 720, 67, 864, 486) && drawn(2560, 1440, 67, 1712, 963) && drawn(3840, 2160, 67, 2576, 1449),
+          "67 % of 1280x720, 2560x1440 and 3840x2160: whole steps of 16x9");
+    check(drawn(2880, 1620, 67, 1936, 1089), "67 % of a fitted 2880x1620: 1936x1089");
+    check(drawn(1366, 768, 67, 915, 514), "67 % of 1366x768, which has no fine steps: 915 wide, the height from it");
     // No file: the defaults, and false.
     player::settings() = player::Settings{};
     check(!player::load_settings("no-such-settings-file.txt"), "a missing file says so");

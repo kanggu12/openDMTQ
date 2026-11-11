@@ -5,13 +5,16 @@
 #include "guest_paths.h"
 #include "jvm.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
 #include <functional>
 #include <mutex>
+#include <numeric>
 #include <string>
 #include <filesystem>
 #include <utility>
@@ -56,9 +59,9 @@ struct Settings {
     // gives a surface of a fixed size, or a pass of our own over the game's frame drawn at the scaled size.
     enum class Upscaler { kBilinear, kFsr1, kNis };
     Upscaler upscaler = Upscaler::kBilinear;
-    // How the edges of the game's shapes are smoothed (post_pass.cpp): not at all, by a pass over the finished picture
-    // (CMAA 2, SMAA 1x), or by drawing the frame with that many samples a pixel (MSAA).
-    enum class AntiAliasing { kOff, kCmaa2, kSmaa, kMsaa2, kMsaa4, kMsaa8 };
+    // How the edges of the game's shapes are smoothed (post_pass.cpp): not at all, or by a pass over the finished picture
+    // (CMAA 2, SMAA 1x).
+    enum class AntiAliasing { kOff, kCmaa2, kSmaa };
     AntiAliasing anti_aliasing = AntiAliasing::kOff;
     // A counter of the frames a second in a corner of the game (overlay_win32.cpp): none, or on in its corner, the top
     // left beside a song's pause button unless another is chosen (each corner has some of the game's own controls).
@@ -75,6 +78,27 @@ struct Settings {
     std::string language;
 };
 Settings& settings();
+
+// The size the game draws at for an area of `w` x `h` at a render scale in percent (window_win32.cpp's place_game). Where
+// the area's shape has fine enough whole steps (1920x1080 is 120 steps of 16x9) the size is a whole number of them, the
+// nearest to the share asked: the shape kept exactly, so the game's layout scales alike both ways and lands where it
+// does at full size (67 % of 1920x1080 is 1280x720, not the 1286x724 that rounding each side gave: a little wider than
+// 16:9, stretched to the area 0.09 % more across than down). An area without such steps (1366x768) by its width, the
+// height from it.
+struct DrawSize {
+    int w, h;
+};
+inline DrawSize draw_size(int w, int h, int scale) {
+    if (scale >= 100 || w <= 0 || h <= 0) return {w, h};
+    const int steps = std::gcd(w, h);
+    // At 25 steps or more the nearest is within 2 % of the share asked.
+    if (steps >= 25) {
+        const int k = std::max(1, static_cast<int>(std::lround(steps * scale / 100.0)));
+        return {w / steps * k, h / steps * k};
+    }
+    const int dw = std::max(1, static_cast<int>(std::lround(w * scale / 100.0)));
+    return {dw, std::max(1, static_cast<int>(std::lround(static_cast<double>(dw) * h / w)))};
+}
 // Reads a settings file into settings(); false when there is none (the defaults stay).
 bool load_settings(const std::string& path);
 // The language a settings file names (language=), "" for none or one the player does not speak: read before the app's

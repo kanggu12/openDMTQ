@@ -5,8 +5,8 @@
 //   glBindFramebuffer (every target)              0 binds the offscreen framebuffer
 //   glGetIntegerv / Integer64v / Floatv / Booleanv the bindings answer 0 for it, its read and draw buffer GL_BACK, and
 //                                                 its samples the window config's
-//   glReadPixels, glReadnPixels(EXT/KHR),         read the frame (resolved first when it is multisampled, which GL
-//   glCopyTex(Sub)Image2D/3D, glBlitFramebuffer   cannot read from directly where the window's could be read)
+//   glReadPixels, glReadnPixels(EXT/KHR),         read the frame through the read binding, which stands for the
+//   glCopyTex(Sub)Image2D/3D, glBlitFramebuffer   offscreen framebuffer already: passed on as they are
 //   glInvalidate(Sub)Framebuffer,                 GL_COLOR, GL_DEPTH and GL_STENCIL become the framebuffer's
 //   glDiscardFramebufferEXT                       attachments, which a framebuffer object names instead
 //   glDrawBuffers(EXT), glReadBuffer              GL_BACK becomes its colour attachment
@@ -41,10 +41,9 @@ namespace arm32 {
 
 std::atomic<bool> g_offscreen{false};
 std::atomic<bool> g_offscreen_window_size{false};
-std::atomic<int> g_offscreen_samples{0};
 std::atomic<bool> g_offscreen_es31{false};
 std::atomic<std::int64_t> g_offscreen_size{0};
-std::atomic<std::uint64_t> g_offscreen_swaps{0}, g_offscreen_swap_ns{0}, g_offscreen_make_currents{0}, g_offscreen_read_resolves{0};
+std::atomic<std::uint64_t> g_offscreen_swaps{0}, g_offscreen_swap_ns{0}, g_offscreen_make_currents{0};
 std::atomic<OffscreenPresent> g_offscreen_present{nullptr};
 
 namespace {
@@ -72,8 +71,7 @@ struct Gl {
     PFNGLGENRENDERBUFFERSPROC gen_renderbuffers;
     PFNGLDELETERENDERBUFFERSPROC delete_renderbuffers;
     PFNGLBINDRENDERBUFFERPROC bind_renderbuffer;
-    PFNGLRENDERBUFFERSTORAGEMULTISAMPLEPROC renderbuffer_storage;
-    PFNGLGETINTERNALFORMATIVPROC internalformat;
+    PFNGLRENDERBUFFERSTORAGEPROC renderbuffer_storage;
     PFNGLBLITFRAMEBUFFERPROC blit;
     PFNGLISENABLEDPROC is_enabled;
     PFNGLENABLEPROC enable;
@@ -113,8 +111,7 @@ const Gl& gl() {
         look_up(x.gen_renderbuffers, "glGenRenderbuffers", ok);
         look_up(x.delete_renderbuffers, "glDeleteRenderbuffers", ok);
         look_up(x.bind_renderbuffer, "glBindRenderbuffer", ok);
-        look_up(x.renderbuffer_storage, "glRenderbufferStorageMultisample", ok);
-        look_up(x.internalformat, "glGetInternalformativ", ok);
+        look_up(x.renderbuffer_storage, "glRenderbufferStorage", ok);
         look_up(x.blit, "glBlitFramebuffer", ok);
         look_up(x.is_enabled, "glIsEnabled", ok);
         look_up(x.enable, "glEnable", ok);
@@ -143,12 +140,9 @@ struct Target {
     EGLContext context = EGL_NO_CONTEXT;
     EGLSurface surface = EGL_NO_SURFACE;  // the redirected surface it draws for now
     GLuint fbo = 0;          // the framebuffer that stands for 0
-    GLuint color = 0;        // its colour as a texture, or, with MSAA, the resolved frame's
-    GLuint ms_color = 0;     // with MSAA: the multisampled colour renderbuffer the game draws into
+    GLuint color = 0;        // its colour as a texture, which the game draws into and the passes sample
     GLuint depth = 0;        // the depth and stencil renderbuffer, when the window config has either
-    GLuint resolve_fbo = 0;  // with MSAA: the framebuffer of `color`, the resolve's target
-    int width = 0, height = 0, samples = 0;
-    int asked_samples = 0;  // the samples asked when its objects were made: a change makes them again
+    int width = 0, height = 0;
     GLenum color_format = GL_RGBA8;  // the window config's colour: RGB8 without alpha, RGBA8 with it
     GLenum depth_format = 0;         // its depth and stencil (0: none)
     EGLint config_samples = 0, config_sample_buffers = 0;  // the window config's own, which the game is told
@@ -194,36 +188,12 @@ void wanted_size(EGLDisplay d, EGLSurface s, int* w, int* h) {
     *h = qh;
 }
 
-// The most samples at most `asked` that the host draws both of the target's formats with (0: none, or none asked).
-int usable_samples(const Gl& g, const Target& t, int asked) {
-    if (asked <= 1) return 0;
-    int best = 0;
-    // The counts a format takes, highest first, as glGetInternalformativ lists them.
-    auto counts = [&g](GLenum format) {
-        GLint n = 0;
-        g.internalformat(GL_RENDERBUFFER, format, GL_NUM_SAMPLE_COUNTS, 1, &n);
-        std::vector<GLint> list(static_cast<std::size_t>(n > 0 ? n : 0));
-        if (n > 0) g.internalformat(GL_RENDERBUFFER, format, GL_SAMPLES, n, list.data());
-        return list;
-    };
-    const std::vector<GLint> color = counts(t.color_format);
-    const std::vector<GLint> depth = t.depth_format ? counts(t.depth_format) : color;
-    for (GLint c : color) {
-        // Taken when the depth format has the same count too, and it is no more than asked.
-        if (c > asked || c <= best) continue;
-        for (GLint d : depth) if (d == c) best = c;
-    }
-    return best;
-}
-
 // The target's objects gone (its context current), its names cleared.
 void free_objects(const Gl& g, Target& t) {
-    GLuint fbos[2] = {t.fbo, t.resolve_fbo};
-    g.delete_framebuffers(2, fbos);
+    g.delete_framebuffers(1, &t.fbo);
     g.delete_textures(1, &t.color);
-    GLuint rbs[2] = {t.ms_color, t.depth};
-    g.delete_renderbuffers(2, rbs);
-    t.fbo = t.color = t.ms_color = t.depth = t.resolve_fbo = 0;
+    g.delete_renderbuffers(1, &t.depth);
+    t.fbo = t.color = t.depth = 0;
 }
 
 // The target's objects for `w` x `h`, made in its context (current), with the game's texture, renderbuffer and
@@ -233,17 +203,7 @@ bool make_objects(const Gl& g, Target& t, int w, int h) {
     g.get_integer(GL_TEXTURE_BINDING_2D, &was_texture);
     g.get_integer(GL_RENDERBUFFER_BINDING, &was_renderbuffer);
     const GLuint was_draw = bound(GL_DRAW_FRAMEBUFFER);
-    // The samples asked for, as the host can draw them; said once each time it changes.
-    const int asked = g_offscreen_samples.load(std::memory_order_relaxed);
-    const int samples = usable_samples(g, t, asked);
-    static int said = -1;
-    if (asked > 1 && said != samples) {
-        if (samples == asked) log("arm32: anti-aliasing: MSAA %dx", samples);
-        else if (samples) log("arm32: anti-aliasing: MSAA %dx asked, %dx is the most this graphics card draws: MSAA %dx", asked, samples, samples);
-        else log("arm32: anti-aliasing: MSAA %dx asked, none here (no multisampled renderbuffers): off", asked);
-        said = samples;
-    }
-    // The frame's colour as a texture, which the passes sample: the game's frame itself, or the resolve's target.
+    // The frame's colour as a texture, which the game draws into and the passes sample.
     g.gen_textures(1, &t.color);
     g.bind_texture(GL_TEXTURE_2D, t.color);
     g.tex_storage(GL_TEXTURE_2D, 1, t.color_format, w, h);
@@ -254,32 +214,16 @@ bool make_objects(const Gl& g, Target& t, int w, int h) {
     g.tex_parameter(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     g.gen_framebuffers(1, &t.fbo);
     g.bind_framebuffer(GL_DRAW_FRAMEBUFFER, t.fbo);
-    if (samples) {
-        // MSAA: the game draws into multisampled colour, resolved into the texture through a framebuffer of its own.
-        g.gen_renderbuffers(1, &t.ms_color);
-        g.bind_renderbuffer(GL_RENDERBUFFER, t.ms_color);
-        g.renderbuffer_storage(GL_RENDERBUFFER, samples, t.color_format, w, h);
-        g.framebuffer_renderbuffer(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, t.ms_color);
-    } else {
-        // One sample: the game draws into the texture itself.
-        g.framebuffer_texture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, t.color, 0);
-    }
+    g.framebuffer_texture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, t.color, 0);
     if (t.depth_format) {
-        // Depth and stencil as the window config has them, with the colour's samples.
+        // Depth and stencil as the window config has them.
         g.gen_renderbuffers(1, &t.depth);
         g.bind_renderbuffer(GL_RENDERBUFFER, t.depth);
-        g.renderbuffer_storage(GL_RENDERBUFFER, samples, t.depth_format, w, h);
+        g.renderbuffer_storage(GL_RENDERBUFFER, t.depth_format, w, h);
         const bool stencil = t.depth_format == GL_DEPTH24_STENCIL8;
         g.framebuffer_renderbuffer(GL_DRAW_FRAMEBUFFER, stencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, t.depth);
     }
-    bool ok = g.check_framebuffer(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
-    if (ok && samples) {
-        // The resolve's target: the texture in a framebuffer of its own.
-        g.gen_framebuffers(1, &t.resolve_fbo);
-        g.bind_framebuffer(GL_DRAW_FRAMEBUFFER, t.resolve_fbo);
-        g.framebuffer_texture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, t.color, 0);
-        ok = g.check_framebuffer(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
-    }
+    const bool ok = g.check_framebuffer(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
     if (ok) {
         // A new frame starts black, as a new window surface's does, not with whatever the memory held.
         g.bind_framebuffer(GL_DRAW_FRAMEBUFFER, t.fbo);
@@ -309,8 +253,6 @@ bool make_objects(const Gl& g, Target& t, int w, int h) {
     }
     t.width = w;
     t.height = h;
-    t.samples = samples;
-    t.asked_samples = asked;
     return true;
 }
 
@@ -330,42 +272,6 @@ void read_config(EGLDisplay d, EGLConfig config, Target& t) {
     // Depth and stencil together when there is stencil; depth alone at the config's precision; else none.
     t.depth_format = stencil > 0 ? GL_DEPTH24_STENCIL8 : depth > 16 ? GL_DEPTH_COMPONENT24 : depth > 0 ? GL_DEPTH_COMPONENT16 : 0;
 }
-
-// The frame resolved into the target's texture (with MSAA), with the scissor off for the blit and back after.
-void resolve(const Gl& g, const Target& t) {
-    if (!t.samples) return;
-    const GLuint was_read = bound(GL_READ_FRAMEBUFFER), was_draw = bound(GL_DRAW_FRAMEBUFFER);
-    const GLboolean scissor = g.is_enabled(GL_SCISSOR_TEST);
-    if (scissor) g.disable(GL_SCISSOR_TEST);
-    g.bind_framebuffer(GL_READ_FRAMEBUFFER, t.fbo);
-    g.bind_framebuffer(GL_DRAW_FRAMEBUFFER, t.resolve_fbo);
-    g.blit(0, 0, t.width, t.height, 0, 0, t.width, t.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-    g.bind_framebuffer(GL_READ_FRAMEBUFFER, was_read);
-    g.bind_framebuffer(GL_DRAW_FRAMEBUFFER, was_draw);
-    if (scissor) g.enable(GL_SCISSOR_TEST);
-}
-
-// While a game's call reads the frame: with MSAA, which GL cannot read from directly, the frame resolved and its texture's
-// framebuffer bound for reading, the multisampled one back after. Nothing to do without MSAA or another read binding.
-class ReadResolved {
-public:
-    ReadResolved() {
-        Target* t = t_target;
-        if (!t || !t->samples || bound(GL_READ_FRAMEBUFFER) != t->fbo) return;
-        resolve(gl(), *t);
-        g_offscreen_read_resolves.fetch_add(1, std::memory_order_relaxed);
-        gl().bind_framebuffer(GL_READ_FRAMEBUFFER, t->resolve_fbo);
-        fbo_ = t->fbo;
-    }
-    ~ReadResolved() {
-        if (fbo_) gl().bind_framebuffer(GL_READ_FRAMEBUFFER, fbo_);
-    }
-    ReadResolved(const ReadResolved&) = delete;
-    ReadResolved& operator=(const ReadResolved&) = delete;
-
-private:
-    GLuint fbo_ = 0;  // the stand-in to bind back, 0 when nothing was changed
-};
 
 // While a game's call is asked of framebuffer 0 itself (attaching, its parameters): the real 0 bound to `target` when the
 // stand-in is bound there, the stand-in back after.
@@ -425,7 +331,7 @@ bool fix_value(GLenum pname, std::int64_t& v) {
         v = GL_BACK;
         return true;
     case GL_SAMPLES:
-        // MSAA of our own is no sample buffer of the window's: the game hears its config's.
+        // The offscreen framebuffer has one sample a pixel: the game hears its window config's, as from the window's own.
         if (bound(GL_DRAW_FRAMEBUFFER) != t->fbo) return false;
         v = t->config_samples;
         return true;
@@ -586,21 +492,19 @@ void offscreen_swap(EGLDisplay d, EGLSurface s) {
     } count{began};
     const Gl& g = gl();
     const GLuint was_read = bound(GL_READ_FRAMEBUFFER), was_draw = bound(GL_DRAW_FRAMEBUFFER);
-    // The frame as a single-sampled texture.
-    resolve(g, *t);
     static auto query = reinterpret_cast<EGLBoolean (*)(EGLDisplay, EGLSurface, EGLint, EGLint*)>(egl_fn("eglQuerySurface"));
     EGLint ow = 0, oh = 0;
     if (query) {
         query(d, s, EGL_WIDTH, &ow);
         query(d, s, EGL_HEIGHT, &oh);
     }
-    const OffscreenFrame frame{d, s, t->context, t->color, t->width, t->height, ow, oh, t->samples};
+    const OffscreenFrame frame{d, s, t->context, t->color, t->width, t->height, ow, oh};
     OffscreenPresent present = g_offscreen_present.load(std::memory_order_relaxed);
     if (!present || !present(frame)) {
         // No passes here: the frame stretched to the window by a plain blit, the scissor and mask out of its way.
         const GLboolean scissor = g.is_enabled(GL_SCISSOR_TEST);
         if (scissor) g.disable(GL_SCISSOR_TEST);
-        g.bind_framebuffer(GL_READ_FRAMEBUFFER, t->samples ? t->resolve_fbo : t->fbo);
+        g.bind_framebuffer(GL_READ_FRAMEBUFFER, t->fbo);
         g.bind_framebuffer(GL_DRAW_FRAMEBUFFER, 0);
         const bool same = ow == t->width && oh == t->height;
         g.blit(0, 0, t->width, t->height, 0, 0, ow, oh, GL_COLOR_BUFFER_BIT, same ? GL_NEAREST : GL_LINEAR);
@@ -613,9 +517,7 @@ void offscreen_swap(EGLDisplay d, EGLSurface s) {
     // the stand-in was bound.
     int w = 0, h = 0;
     wanted_size(d, s, &w, &h);
-    // The samples asked compared with those asked before, not with what the driver offers: asking the driver at every
-    // frame is a round of format queries.
-    if (w > 0 && h > 0 && (w != t->width || h != t->height || t->asked_samples != g_offscreen_samples.load(std::memory_order_relaxed))) {
+    if (w > 0 && h > 0 && (w != t->width || h != t->height)) {
         const GLuint old = t->fbo;
         free_objects(g, *t);
         if (!make_objects(g, *t, w, h)) {
@@ -703,7 +605,8 @@ std::uint64_t gl_special_glGetBooleanv(Thread& t) {
     return 0;
 }
 
-// Reads of the frame: resolved first with MSAA (ReadResolved).
+// Reads of the frame: the read binding already stands for the offscreen framebuffer (glBindFramebuffer above), so they
+// pass on as they are.
 std::uint64_t gl_special_glReadPixels(Thread& t) {
     ARM32_FN(void (*)(GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, void*), glReadPixels);
     Words w{t};
@@ -715,7 +618,6 @@ std::uint64_t gl_special_glReadPixels(Thread& t) {
     auto type = static_cast<GLenum>(w.u32());
     void* pixels = gl_ptr(w.u32());
     if (!fn) return gl_missing("glReadPixels");
-    ReadResolved read;
     fn(x, y, width, height, format, type, pixels);
     return 0;
 }
@@ -732,7 +634,6 @@ static std::uint64_t read_n_pixels(Thread& t, void (*fn)(GLint, GLint, GLsizei, 
     auto size = static_cast<GLsizei>(w.u32());
     void* pixels = gl_ptr(w.u32());
     if (!fn) return gl_missing(name);
-    ReadResolved read;
     fn(x, y, width, height, format, type, size, pixels);
     return 0;
 }
@@ -764,7 +665,6 @@ std::uint64_t gl_special_glCopyTexImage2D(Thread& t) {
     auto height = static_cast<GLsizei>(w.u32());
     auto border = static_cast<GLint>(w.u32());
     if (!fn) return gl_missing("glCopyTexImage2D");
-    ReadResolved read;
     fn(target, level, format, x, y, width, height, border);
     return 0;
 }
@@ -781,7 +681,6 @@ std::uint64_t gl_special_glCopyTexSubImage2D(Thread& t) {
     auto width = static_cast<GLsizei>(w.u32());
     auto height = static_cast<GLsizei>(w.u32());
     if (!fn) return gl_missing("glCopyTexSubImage2D");
-    ReadResolved read;
     fn(target, level, xoffset, yoffset, x, y, width, height);
     return 0;
 }
@@ -799,7 +698,6 @@ std::uint64_t gl_special_glCopyTexSubImage3D(Thread& t) {
     auto width = static_cast<GLsizei>(w.u32());
     auto height = static_cast<GLsizei>(w.u32());
     if (!fn) return gl_missing("glCopyTexSubImage3D");
-    ReadResolved read;
     fn(target, level, xoffset, yoffset, zoffset, x, y, width, height);
     return 0;
 }
@@ -812,20 +710,7 @@ std::uint64_t gl_special_glBlitFramebuffer(Thread& t) {
     auto mask = static_cast<GLbitfield>(w.u32());
     auto filter = static_cast<GLenum>(w.u32());
     if (!fn) return gl_missing("glBlitFramebuffer");
-    Target* target = t_target;
-    // A blit into the multisampled frame is GL's error, which a single-sampled window would not give: said once.
-    if (target && target->samples && bound(GL_DRAW_FRAMEBUFFER) == target->fbo) {
-        static bool said = false;
-        if (!said) log("arm32: anti-aliasing: the game blits into its frame, which MSAA's frame cannot take: choose another anti-aliasing");
-        said = true;
-    }
-    // Colour read from the frame with MSAA comes from the resolved frame; depth and stencil stay the multisampled ones'.
-    if (mask == GL_COLOR_BUFFER_BIT) {
-        ReadResolved read;
-        fn(c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], mask, filter);
-    } else {
-        fn(c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], mask, filter);
-    }
+    fn(c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], mask, filter);
     return 0;
 }
 

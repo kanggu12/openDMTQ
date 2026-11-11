@@ -185,6 +185,8 @@ void Stream::stop() {
         // What was not played goes; the next play starts from what is written then, with nothing of the old.
         head_ = size_ = 0;
         fed_ = false;
+        primed_ = false;
+        waits_ = 0;
         ++epoch_;
         resampler_.reset();
     }
@@ -198,6 +200,8 @@ void Stream::flush() {
         if (state_ == kPlaying) return;
         head_ = size_ = 0;
         fed_ = false;
+        primed_ = false;
+        waits_ = 0;
         ++epoch_;
         resampler_.reset();
     }
@@ -216,10 +220,30 @@ void Stream::mix_into(float* out, std::size_t frames) {
     {
         std::lock_guard<std::mutex> l(lock_);
         if (state_ != kPlaying) return;
+        // The stream's start: a period's worth of its own frames there first, and the frames the resampler's filter
+        // reaches past them, while more can come (the game's buffer not full yet), one period at most; nothing written
+        // yet is no start at all.
+        bool start = false;
+        if (!primed_) {
+            if (!fed_) return;
+            const std::size_t need = (frames * static_cast<std::size_t>(rate_) + static_cast<std::size_t>(out_rate_) - 1) / static_cast<std::size_t>(out_rate_);
+            const std::size_t reach = rate_ == out_rate_ ? 0 : resampler_.reach() + 1;
+            if (size_ < need + reach && size_ < capacity_ && ++waits_ < 2) return;
+            primed_ = true;
+            start = true;
+        }
         scratch_.resize(frames * kChannels);
         made = resampler_.run(scratch_.data(), frames, [this](float* dst, std::size_t max) { return take(dst, max); });
-        // Short after the game had begun writing: it fell behind, and the gap is silence.
-        if (made < frames && fed_) {
+        if (made < frames && start) {
+            // Short at the start (a game's buffer of one period holds no more than a period's worth, without the
+            // filter's reach): the frames there go at the period's end, silence before them, and the next period goes on
+            // from them. The stream begins that much later, with no gap after its first frames.
+            std::copy_backward(scratch_.begin(), scratch_.begin() + static_cast<std::ptrdiff_t>(made * kChannels),
+                               scratch_.begin() + static_cast<std::ptrdiff_t>(frames * kChannels));
+            std::fill(scratch_.begin(), scratch_.begin() + static_cast<std::ptrdiff_t>((frames - made) * kChannels), 0.0f);
+            made = frames;
+        } else if (made < frames && fed_) {
+            // Short after the game had begun writing: it fell behind, and the gap is silence.
             ++underruns_;
             short_frames_ += frames - made;
         }
