@@ -462,7 +462,9 @@ class LauncherApp:
 
     def _take_preset(self):
         """A server an installer left while this window is open (its "Open OpenDMTQ" with a launcher already open):
-        taken now, as a start would take it, and said on the status line."""
+        taken now, as a start would take it, and said on the status line only when it changed something: a server
+        added, or another one played on. The server already known and in use (the usual case: an installer from the
+        site this launcher plays on) changes nothing, and says nothing."""
         from opendmtq_client import preset
         brought = preset.take()
         if brought is None:
@@ -474,14 +476,30 @@ class LauncherApp:
             return
         busy = self.busy_now()
         before = self.state.current
+        known = self.state.server(url)
+        # Its name as the launcher knows it, to tell whether the installer's changes it.
+        named = known["name"] if known else None
         self.state.add_server(url, brought["name"])
         if busy and before:
-            # The game or a download uses the current server: the new one waits on the Online page.
+            # The game or a download uses the current server: the installer's waits on the Online page.
             self.state.current = before
+        switched = self.state.current != before
+        if known is not None and not switched and named == self.state.server(url)["name"]:
+            # Known, and the one in use already (or kept from being, while busy): nothing to save or to say.
+            log.info("the installer left the server %s, known already", url)
+            return
         self.state.save()
         log.info("took the server %s an installer left", url)
-        key = "status.preset.later" if busy and before else "status.preset"
-        self.set_status(i18n.Said(key, name=brought["name"]), "ok", sticky=True)
+        if switched:
+            # Another server in use: the address field shows it, whatever was typed there before.
+            self.address_draft = None
+        if known is None:
+            # Added: played on from now on, or, while the game or a download uses the current one, waiting on Online.
+            key = "status.preset" if switched else "status.preset.later"
+            self.set_status(i18n.Said(key, name=brought["name"]), "ok", sticky=True)
+        elif switched:
+            # Known before, another one in use: the installer's is the one played on from now on.
+            self.set_status(i18n.Said("status.preset.switched", name=brought["name"]), "ok", sticky=True)
         self.refresh_checks()
         if self.guide is not None:
             self.guide.redraw()

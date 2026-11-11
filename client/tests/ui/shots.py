@@ -563,6 +563,20 @@ def variants_check(app, site, out, tag, problems):
     measure(app, tag + "_play-preset", problems)
     if app.state.server("http://192.0.2.20:8790") is None or w("status.preset", name="Club") != app.status_text:
         problems.append("%s: the window did not take the installer's server (%r)" % (tag, app.status_text))
+    # The same server again (an installer from the site of the server in use, "Open OpenDMTQ"): taken, and as nothing
+    # changed, nothing said; then the stand-in, known but not in use: played on, and said as a switch, not an addition.
+    from opendmtq_client import state as st
+    handed = os.path.join(st.config_dir(), preset.FILE_NAME)
+    for url, name, said in (("http://192.0.2.20:8790", "Club", None), (before, "Stand-in", "status.preset.switched")):
+        # Kept until something says otherwise (a ready check coming back meanwhile does not replace it).
+        app.set_status("(the line before)", "normal", sticky=True)
+        preset.hand_over({"url": url, "name": name})
+        settle(app, 6, until=lambda: not os.path.exists(handed))
+        settle(app)
+        expected = "(the line before)" if said is None else w(said, name=name)
+        if os.path.exists(handed) or app.status_text != expected or app.state.current != url:
+            problems.append("%s: the installer's %s, known, made the line say %r (playing on %s)"
+                            % (tag, name, app.status_text, app.state.current))
     # Back to the stand-in server for the dialogs that follow.
     app.state.remove_server("http://192.0.2.20:8790")
     app.state.current = before

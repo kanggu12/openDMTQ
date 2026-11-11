@@ -37,6 +37,8 @@ TEXT = {
                             "설치 파일이 서버를 추가했습니다: {name}. ONLINE 페이지에서 고를 수 있습니다."),
     "status.preset": ("The installer added a server: {name}. You play on it from now on.",
                       "설치 파일이 서버를 추가했습니다: {name}. 이제 이 서버에서 플레이합니다."),
+    "status.preset.switched": ("Switched to the installer's server: {name}. You play on it from now on.",
+                               "설치 파일의 서버로 바꿨습니다: {name}. 이제 이 서버에서 플레이합니다."),
     "status.updated": ("Updated to {v}.", "{v} 버전으로 업데이트했습니다."),
     "status.not_updated": ("The update to {v} was not installed. This is still {now}.",
                            "{v} 버전으로 업데이트하지 못했습니다. 지금 버전은 {now}입니다."),
