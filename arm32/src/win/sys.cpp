@@ -236,7 +236,12 @@ int wait_any(const HANDLE* handles, int n, long long deadline_ns) {
         all[count++] = e.timer;
     }
     DWORD r = WaitForMultipleObjects(static_cast<DWORD>(count), all, FALSE, INFINITE);
-    if (timer_at >= 0) CancelWaitableTimer(e.timer);
+    if (timer_at >= 0) {
+        CancelWaitableTimer(e.timer);
+        // A timer that fired while another object ended the wait is still signaled, and cancelling does not clear it:
+        // taken here, so that it cannot end a later wait before its time.
+        WaitForSingleObject(e.timer, 0);
+    }
     if (r < WAIT_OBJECT_0 || r >= WAIT_OBJECT_0 + static_cast<DWORD>(count)) return -EINVAL;
     int k = static_cast<int>(r - WAIT_OBJECT_0);
     if (k == interrupt_at) return -EINTR;

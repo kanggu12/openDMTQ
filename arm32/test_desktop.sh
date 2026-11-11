@@ -21,7 +21,7 @@ run=$w/build-desktop-x86_64/arm32run
 failed=0
 # Each program prints ALL CHECKS PASSED when every check held. The signal, interrupt and wake tests run several times:
 # thread handshakes are where timing bugs show.
-for test in basic signals signals signals signals signals interrupt interrupt interrupt wakes wakes wakes restart restart \
+for test in basic signals signals signals signals signals interrupt interrupt interrupt wakes wakes wakes futexes restart restart \
     coherence cxx neon memory calls descriptors zones "dl $w/guest/libplugin.so"; do
   set -- $test
   out=$($run --sysroot $w/sysroot $w/guest/$1 ${2:-} 2>&1 || true)
