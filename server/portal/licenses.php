@@ -13,9 +13,10 @@ $parts = [
     ['fmt, mcl, oaknut, robin-map', t('lic.use.cpu_libs'), 'MIT'],
     ['xbyak, Zydis, Zycore', t('lic.use.cpu_x86'), 'BSD 3-Clause (xbyak), MIT (Zydis, Zycore)'],
     ['Android linker, libc, libm, libdl, libstdc++, libc++, libz, liblog', t('lic.use.android'), t('lic.android')],
-    // The installer for Windows the download page hands out: the PC client, with the player for Windows in it.
-    ['Python, Tcl/Tk, OpenSSL, libffi, zlib, Pillow, Velopack, PyInstaller', t('lic.use.pc'), t('lic.pc')],
-    ['ANGLE, zlib, GCC runtime, winpthreads, LLVM runtime libraries', t('lic.use.pc_player'), t('lic.pc_player')],
+    // The installer for Windows the download page hands out: the PC client with its fonts, and the player for Windows in
+    // it with the picture's passes and the faces it draws over the game (arm32/bundle_windows.sh, NOTICES-windows.txt).
+    ['Python, Tcl/Tk, OpenSSL, libffi, zlib, Pillow, Velopack, PyInstaller, DMTQ Wide, Pretendard, Material Icons', t('lic.use.pc'), t('lic.pc')],
+    ['ANGLE, zlib, GCC runtime, winpthreads, LLVM runtime libraries, FSR 1, NIS, SMAA, CMAA 2, Pretendard, DMTQ Wide', t('lic.use.pc_player'), t('lic.pc_player')],
 ];
 ?>
   <?= masthead('LICENSE') ?>
