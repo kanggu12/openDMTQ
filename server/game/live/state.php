@@ -12,12 +12,12 @@ require __DIR__ . '/../../portal/live_lib.php';
 // site then shows nothing of them. Phones show both lines in their toast; the PC player draws the first as the title of
 // its card and the second under it.
 const TOASTS = [
-    'ko' => ['on' => "지금 이 플레이를 라이브로 방송하고 있어요\n%s 사이트의 LIVE에서 지금도, 끝난 뒤에도 볼 수 있어요",
-             'off' => "방송을 마쳤어요\n지난 방송은 %s 사이트의 LIVE에서 다시 볼 수 있어요",
-             'end' => "방송을 마쳤어요\n이 서버의 방송이 지금은 꺼져 있어요"],
-    'en' => ['on' => "Your play is live now\nWatch it live or later under LIVE on %s",
+    'ko' => ['on' => "이 플레이를 방송하고 있어요\n%s 사이트 LIVE에서 지금도, 끝난 뒤에도 볼 수 있어요",
+             'off' => "방송을 마쳤어요\n%s 사이트 LIVE에서 다시 볼 수 있어요",
+             'end' => "방송을 마쳤어요\n이 서버의 방송이 꺼졌어요"],
+    'en' => ['on' => "Your play is live\nWatch it now or later under LIVE on %s",
              'off' => "Your broadcast has ended\nWatch the replay under LIVE on %s",
-             'end' => "Your broadcast has ended\nBroadcasts are off on this server for now"],
+             'end' => "Your broadcast has ended\nBroadcasts are off on this server"],
 ];
 
 // What the stream should be, for the phone's encoder, by the owner's quality; the same whether on or off.

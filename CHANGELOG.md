@@ -29,6 +29,11 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ### Changed
 
+- The broadcast notices, on phones and PCs alike, no longer repeat the LIVE mark in their title and say where to watch
+  more briefly: "Your play is live" / "Watch it now or later under LIVE on" the server's site; the end of broadcasts for
+  the whole server says "Broadcasts are off on this server".
+- The player for Windows: the question before quitting says what quitting mid-song loses ("Quitting mid-song loses
+  that song's record"), which holds on any screen; it spoke of a song in progress where there was none.
 - The player for Windows: an FPS counter at the top left sits just right of a song's pause button instead of over it.
 - The player for Windows: the question before quitting keeps within three quarters of the game's width, its contents
   scaled with it, so a small window on a display at 150 % or 200 % gets a card in proportion to the game.

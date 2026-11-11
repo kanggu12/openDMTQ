@@ -185,7 +185,7 @@ switch("live-on")
 s = state("ko")
 token = s.get("token", "")
 check("on: a token", s["on"] is True and re.fullmatch(r"[0-9a-f]{32}", token) is not None, s)
-check("the notice in Korean", s["toast"].startswith("지금 이 플레이를 라이브로 방송하고 있어요\n") and "사이트의 LIVE에서" in s["toast"], s)
+check("the notice in Korean", s["toast"].startswith("이 플레이를 방송하고 있어요\n") and "사이트 LIVE에서" in s["toast"], s)
 check("the notice only once", state("ko")["toast"] == "")
 check("the admin says it waits for the phone", "live-state wait" in admin_page("/opendmtq/admin/players"))
 
@@ -215,7 +215,7 @@ call("game.getUserAsset", [guid])
 check("a menu request in the start's batch does not end the song", state()["toast"] == "")
 time.sleep(11)
 call("game.getUserAsset", [guid])
-check("a later menu request does", state()["toast"].startswith("Your play is live now\nWatch it live or later under LIVE on "))
+check("a later menu request does", state()["toast"].startswith("Your play is live\nWatch it now or later under LIVE on "))
 
 # Flipping back before the phone read the notice leaves nothing to say.
 switch("live-off")
@@ -791,7 +791,7 @@ check("on air as the owner turns broadcasts off", upload(token, 0) == 204)
 broadcasts_post(action="broadcasts-off")
 s = state()
 check("the player on air is told it ended, and that broadcasts are off for now",
-      s["on"] is False and s["toast"] == "Your broadcast has ended\nBroadcasts are off on this server for now", s)
+      s["on"] is False and s["toast"] == "Your broadcast has ended\nBroadcasts are off on this server", s)
 check("that notice only once", state()["toast"] == "")
 switch("live-off")
 broadcasts_post(action="broadcasts-on")
@@ -818,7 +818,7 @@ s = poll(newcomer_udid)
 site_name = json.loads(request(plain, SITE + "/opendmtq/client.php?about")[2])["name"]
 check("a new device's first poll: on, its key, and the notice naming the server as the site does",
       s["on"] is True and re.fullmatch(r"[0-9a-f]{32}", s.get("token", "")) is not None
-      and s["toast"] == f"Your play is live now\nWatch it live or later under LIVE on {site_name}", s)
+      and s["toast"] == f"Your play is live\nWatch it now or later under LIVE on {site_name}", s)
 switch("live-off", newcomer)
 s = poll(newcomer_udid)
 check("a new player the owner turns off stays off at the next poll, and the one after",

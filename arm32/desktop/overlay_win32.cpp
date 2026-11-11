@@ -836,7 +836,8 @@ AskLayout ask_layout(int w, int h) {
 
 // The question's words in the language of the PC.
 const wchar_t* ask_title() { return g_korean ? L"게임을 끝낼까요?" : L"Quit the game?"; }
-const wchar_t* ask_text() { return g_korean ? L"하던 곡의 기록은 남지 않아요." : L"A song in progress is not kept."; }
+// What quitting loses, true on any screen: the player cannot tell whether a song is going on.
+const wchar_t* ask_text() { return g_korean ? L"곡 도중에 끝내면 기록이 남지 않아요." : L"Quitting mid-song loses that song's record."; }
 const wchar_t* keep_label() { return g_korean ? L"계속하기" : L"Keep playing"; }
 const wchar_t* quit_label() { return g_korean ? L"게임 끝내기" : L"Quit the game"; }
 
@@ -1406,15 +1407,15 @@ void test_save(const std::wstring& prefix) {
     g_ask_hover = kNone;
     // The notice while live and once ended, in the server's own words (server/game/live/state.php), a server's name in
     // its place.
-    const std::string live_text = g_korean ? "지금 이 플레이를 라이브로 방송하고 있어요\nMy Server 사이트의 LIVE에서 지금도, 끝난 뒤에도 볼 수 있어요"
-                                           : "Your play is live now\nWatch it live or later under LIVE on My Server";
-    const std::string ended_text = g_korean ? "방송을 마쳤어요\n지난 방송은 My Server 사이트의 LIVE에서 다시 볼 수 있어요"
+    const std::string live_text = g_korean ? "이 플레이를 방송하고 있어요\nMy Server 사이트 LIVE에서 지금도, 끝난 뒤에도 볼 수 있어요"
+                                           : "Your play is live\nWatch it now or later under LIVE on My Server";
+    const std::string ended_text = g_korean ? "방송을 마쳤어요\nMy Server 사이트 LIVE에서 다시 볼 수 있어요"
                                             : "Your broadcast has ended\nWatch the replay under LIVE on My Server";
     save(*make_notice(live_text, true), L"notice-live.png");
     save(*make_notice(ended_text, false), L"notice-ended.png");
     // A server whose name is long, which the card wraps within the game's width.
-    const std::string long_text = g_korean ? "지금 이 플레이를 라이브로 방송하고 있어요\nOpenDMTQ Community Server Seoul Central 사이트의 LIVE에서 지금도, 끝난 뒤에도 볼 수 있어요"
-                                           : "Your play is live now\nWatch it live or later under LIVE on OpenDMTQ Community Server Seoul Central";
+    const std::string long_text = g_korean ? "이 플레이를 방송하고 있어요\nOpenDMTQ Community Server Seoul Central 사이트 LIVE에서 지금도, 끝난 뒤에도 볼 수 있어요"
+                                           : "Your play is live\nWatch it now or later under LIVE on OpenDMTQ Community Server Seoul Central";
     save(*make_notice(long_text, true), L"notice-long.png");
     // The same with a counter in a top corner, which the card keeps clear of.
     const int corner_before = g_fps_corner;
