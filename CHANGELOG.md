@@ -6,6 +6,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-11-12
+
 ### Changed
 
 - The player for Windows: the FPS counter's place is the bottom right unless another corner is chosen, as the top is
@@ -615,7 +617,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 - Four ways to run it: the Windows bundle, one command on Linux or macOS, Docker Compose, and a Helm chart for
   Kubernetes.
 
-[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/kanggu12/openDMTQ/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/kanggu12/openDMTQ/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/kanggu12/openDMTQ/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/kanggu12/openDMTQ/compare/v0.8.2...v0.9.0
