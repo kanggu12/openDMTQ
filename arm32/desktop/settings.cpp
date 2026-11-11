@@ -4,7 +4,8 @@
 // hand-made line, and past a byte order mark at the file's start (Windows' Notepad saves one). A key it does not know,
 // or a value it cannot read, keeps the default and is said in the log: an older player reads a newer client's file.
 //
-//   display       window | fullscreen        the window, or the whole display it is on (F11 switches either way)
+//   display       window | fullscreen        the window, or the whole display it is on (the bar's full screen button
+//                                            over the game switches either way)
 //   window        auto | WxH                 the game's area in a window: fitted to the display, or this size (480x270
 //                                            at least, the smallest area the window holds)
 //   vsync         on | off                   frames on the display's refreshes, or as soon as they are drawn

@@ -19,7 +19,8 @@
 // the UI thread takes each event as it comes. The keyboard types into the soft keyboard while the
 // game asks for text, through a text field of the window's that it focuses meanwhile (Windows' touch keyboard offers
 // itself there on a PC without a keyboard); otherwise its keys are the phone's, Escape the Back key (it pauses a song and
-// closes what is open). F11 and Alt+Enter switch full screen.
+// closes what is open). No key switches full screen or quits: full screen is the overlay's bar's button (or the
+// launcher's Screen page before a start), quitting the bar's X, which asks first; F11, Alt+Enter and Alt+F4 do nothing.
 #include "player.h"
 
 #include "overlay_win32.h"
@@ -645,7 +646,8 @@ void ime_cancel(HWND h) {
 
 // Checks press keys at seconds of their choosing (PLAYER_KEYS="@seconds:key[/hold_ms];...", the seconds from the window's
 // first showing): esc, enter, space, up, down, f11, alt+enter, alt+f4, each posted to the frame as Windows would send it,
-// down, then up after hold_ms (50 when not given); close, the window's own close (its X). Three more act as the mouse
+// down, then up after hold_ms (50 when not given); f11, alt+enter and alt+f4 are there for a check to show that they do
+// nothing. close, the window's own close (its X). Three more act as the mouse
 // and the keyboard do: click=x,y presses and lifts the mouse's first button at x,y of the game's pixels on the game's
 // area; text=... types into whichever window has the keyboard then (the text field while the game asks for text), a
 // key at a time, \uXXXX for a character cmd's own set would not carry and \b for Backspace; ime=... the same, each
@@ -681,6 +683,8 @@ void plan_keys() {
         const std::string key(name, static_cast<std::size_t>(stop - name));
         int hold = 50;
         if (*stop == '/') hold = static_cast<int>(std::strtol(stop + 1, const_cast<char**>(&stop), 10));
+        // Each name's key and whether Alt is held with it. F11, Alt+Enter and Alt+F4 do nothing in the window: they stay
+        // here so that a check can press them and see that nothing happens.
         static const std::map<std::string, std::pair<UINT, bool>> names = {
             {"esc", {VK_ESCAPE, false}}, {"enter", {VK_RETURN, false}}, {"space", {VK_SPACE, false}}, {"up", {VK_UP, false}},
             {"down", {VK_DOWN, false}}, {"f11", {VK_F11, false}}, {"alt+enter", {VK_RETURN, true}}, {"alt+f4", {VK_F4, true}}};
@@ -844,19 +848,19 @@ LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         type_composing("");
         break;
     case WM_KEYDOWN:
+        // The question before quitting takes every key first, as over the game.
         if (ask_key(w, l)) return 0;
         // Enter takes what is being composed along (finish adds it).
         if (w == VK_RETURN) type_key(kKeyEnter);
         else if (w == VK_ESCAPE) type_key(kKeyEscape);
         else if (w == VK_BACK) type_key(kKeyBackspace);
-        else if (w == VK_F11 && !(l & (1L << 30))) toggle_fullscreen(g_frame);
+        // The rest as an edit control has them (F11 among them: nothing, as over the game).
         else break;
         return 0;
     case WM_SYSKEYDOWN:
-        if (w == VK_RETURN && (HIWORD(l) & KF_ALTDOWN) && !(l & (1L << 30))) {
-            toggle_fullscreen(g_frame);
-            return 0;
-        }
+        // Alt+Enter while the game asks for text: nothing, as over the game (full screen is the bar's button); its
+        // character makes no beep (WM_SYSCHAR below).
+        if (w == VK_RETURN && (HIWORD(l) & KF_ALTDOWN)) return 0;
         // Alt+F4 while the game asks for text: nothing, as over the game (quitting is the bar's X's, which asks first).
         if (w == VK_F4 && (HIWORD(l) & KF_ALTDOWN)) return 0;
         // F10 alone would put the window in Windows' menu mode, which eats the next key: nothing.
@@ -984,22 +988,18 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         if (w == VK_F10) return 0;
         // Alt+F4: nothing. Windows would close the window with it; quitting is the bar's X's, which asks first.
         if (w == VK_F4 && (HIWORD(l) & KF_ALTDOWN)) return 0;
-        // Alt+Enter: full screen, as Windows games switch; once per press, not again while held.
-        if (w == VK_RETURN && (HIWORD(l) & KF_ALTDOWN)) {
-            if (!(l & (1L << 30))) toggle_fullscreen(h);
-            return 0;
-        }
+        // Alt+Enter: nothing either, though many Windows games switch with it: full screen is the bar's button, which
+        // nobody presses by mistake mid-song. Its character makes no beep (WM_SYSCHAR above).
+        if (w == VK_RETURN && (HIWORD(l) & KF_ALTDOWN)) return 0;
         break;
     case WM_KEYDOWN: {
         // A check's planned key: how long it waited for this thread, which stamps it for the game below.
         if (const long long posted = g_key_posted.exchange(0, std::memory_order_acquire)) {
             jvm::log("player: the key came to the window %.3f ms after it was posted", static_cast<double>(steady_ns() - posted) / 1e6);
         }
-        if (w == VK_F11) {
-            if (!(l & (1L << 30))) toggle_fullscreen(h);
-            return 0;
-        }
         g_last_touch = false;
+        // The question before quitting takes every key first: none of them changes the window while it is up. F11
+        // goes on to the phone's keys below, which have none for it: nothing.
         if (ask_key(w, l)) return 0;
         if (typing()) {
             if (w == VK_RETURN) type_key(kKeyEnter);
