@@ -41,6 +41,12 @@ one that only fixes raises the patch number. Each release's section here is its 
 - `--set window=` refuses a size larger than the main display with room for the window's title bar and the taskbar,
   the sizes the Screen page leaves out, with the page's own check; the display's size is read in its own pixels, also
   by the command line, which Windows' scaling would otherwise shrink.
+- The player for Windows with VSync on: the frame rate steps down only when the computer is really behind, more than
+  a quarter of its frames a refresh late through three checks of 2 seconds in a row (it was 3 %, which a song that
+  played well passed often: the page before a song, where it loads, shows up to a tenth). It tries the faster rate again
+  5 seconds after a step down (it was 15), goes straight back when the try falls short, and waits twice as long for the
+  next one, a minute at most (it was four). On a 240 Hz display a song now holds 240 frames a second from the page
+  before it to its end, where it went down to 120 and 80 on that page and to 60 later, below 240 for most of the song.
 
 ### Fixed
 

@@ -136,8 +136,11 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   game fills the window while its shape is between 4:3 and 21:9; a window of another shape, such as a display turned
   upright, has black around the game. Moved to a display with other scaling, the game draws at the new size.
 - **VSync on** (the default): each frame goes out on a refresh of the display the window is on, 60 Hz, 144 Hz, 240 Hz or
-  another. A PC that does not keep up takes every second refresh (120 frames a second on a 240 Hz display), then every
-  third, and tries the faster rate again after a while.
+  another. A PC that is really behind, more than a quarter of its frames a refresh late through three checks of 2
+  seconds in a row, takes every second refresh (120 frames a second on a 240 Hz display), then every third. It tries the
+  faster rate again 5 seconds later, goes straight back when the try falls short, and waits twice as long before the
+  next try, a minute at most. Some late frames, as the page before a song shows while the song loads (up to a tenth of
+  them), and a pause of a tenth of a second or more, keep the display's rate.
 - **The frame limit:** the display's rate (the default), a number, or none. With VSync on, a limit that is a whole
   fraction of the display's rate, or within 10 % above one, keeps every frame the same length (60 or 120 on a 240 Hz
   display); another limit is held by the clock, with each frame still on a refresh (144 on a 240 Hz display).

@@ -1,10 +1,12 @@
 // Checks following the display (arm32/src/follow.cpp) on the build machine, with a display and a game the test plays:
 //   c++ -std=c++20 -Iarm32/src arm32/tests/host/follow_test.cpp arm32/src/follow.cpp -o /tmp/follow_test && /tmp/follow_test
 //
-// A computer's display at 240 Hz whose frames fall short three check windows in a row goes to every second refresh,
-// tries every refresh again 15 s later, and after a try that falls short waits 30 s; vsync off keeps the limit. A phone's
-// 120 Hz panel steps down to 90, 72 and 60 as it follows what the window asks, a panel that stays at 120 Hz goes to 60
-// and is asked for it; the phone's own word that it is hot steps down every half minute.
+// A computer's display at 240 Hz keeps every refresh through what a song that played well shows (a fifth of the frames
+// late, a song's load), goes to every second refresh when more than a quarter are late three check windows in a row,
+// tries every refresh again 5 s later, goes back down at once when the try falls short and waits 10 s for the next, and
+// waits 5 s again once a rate has held for half a minute; vsync off keeps the limit. A phone's 120 Hz panel steps down
+// to 90, 72 and 60 as it follows what the window asks (3 % of frames late make a window short there), a panel that stays
+// at 120 Hz goes to 60 and is asked for it; the phone's own word that it is hot steps down every half minute.
 #include "follow.h"
 
 #include <algorithm>
@@ -78,9 +80,20 @@ struct Play {
     bool host = false;                 // a computer's display, whose rate the player reads
     bool panel_follows = false;        // a phone's panel goes to the rate the window asks for
     int late_per_100 = 0;              // frames shown late, of each hundred
+    double capacity = 0;               // the most frames a second the computer makes: above it every frame is late (0: no limit)
     long frame = 0;
     // Each change of the frame rate and of the window's ask, with when.
     std::vector<std::pair<std::int64_t, float>> rates, asks;
+
+    // Frames until the frame rate changes, or `seconds` at most; true when it changed.
+    bool run_to_change(double seconds) {
+        const float rate = followed_frame_rate();
+        for (double t = 0; t < seconds; t += 0.05) {
+            run(0.05);
+            if (followed_frame_rate() != rate) return true;
+        }
+        return false;
+    }
 
     // `seconds` of frames.
     void run(double seconds) {
@@ -94,7 +107,8 @@ struct Play {
             const float rate = followed_frame_rate(), ask = followed_window_rate();
             const bool ask_again = arm32::follow_display(kHooks, now, interval, gap, host);
             // Its time on screen came, as a phone's present time or a computer's refresh says.
-            arm32::follow_note_shown(now, frame % 100 < late_per_100);
+            const bool behind = capacity > 0 && static_cast<double>(followed_frame_rate()) > capacity;
+            arm32::follow_note_shown(now, behind || frame % 100 < late_per_100);
             ++frame;
             if (followed_frame_rate() != rate) rates.emplace_back(now, followed_frame_rate());
             if (followed_window_rate() != ask) asks.emplace_back(now, followed_window_rate());
@@ -129,46 +143,95 @@ std::string rate_text(float r) {
     return text;
 }
 
-// A computer's display at 240 Hz: three short windows, every second refresh; every refresh again 15 s later; a try that
-// falls short, back down, and the next try 30 s after that.
+// A computer's display at 240 Hz: a fifth of the frames late (a song that played well, a song's load) keeps every refresh;
+// 40 % late (more than the quarter that makes a window short) three windows in a row, every second refresh; every refresh again 5 s later; a try that falls
+// short, back down in its first window, and the next try 10 s after that; half a minute held, the first wait again.
 void computer_display() {
     Play p = fresh(240, true);
     p.run(1);
     check(std::fabs(followed_frame_rate() - 240) < 0.01f, "240 Hz: every refresh at first", rate_text(followed_frame_rate()));
-    // 2 % of the frames late: under the 3 % that makes a window short.
+    // 2 % late, then 20 % for 15 s (the page before a song while it loads showed up to 10 %): under the quarter that makes
+    // a window short.
     p.late_per_100 = 2;
     p.run(20);
     check(std::fabs(followed_frame_rate() - 240) < 0.01f, "240 Hz, 2 % of frames late: no step down", rate_text(followed_frame_rate()));
-    // 5 % late: three short windows of 2 s, a step down to every second refresh.
-    p.late_per_100 = 5;
+    p.late_per_100 = 20;
+    p.run(15);
+    check(std::fabs(followed_frame_rate() - 240) < 0.01f && p.rates.size() == 1, "240 Hz, 20 % late for 15 s: no step down",
+          rate_text(followed_frame_rate()));
+    // 40 % late: three short windows of 2 s, a step down to every second refresh; on time again from the step on.
+    p.late_per_100 = 40;
     const std::int64_t late_from = p.now;
-    p.run(10);
-    check(!p.rates.empty() && std::fabs(p.rates.back().second - 120) < 0.01f, "240 Hz, 5 % late: every second refresh",
+    p.run_to_change(10);
+    p.late_per_100 = 0;
+    check(!p.rates.empty() && std::fabs(p.rates.back().second - 120) < 0.01f, "240 Hz, 40 % late: every second refresh",
           rate_text(followed_frame_rate()));
     const std::int64_t down = p.rates.empty() ? 0 : p.rates.back().first;
     check(seconds(late_from, down) > 5.9 && seconds(late_from, down) < 8.1, "240 Hz: the step after three windows of 2 s",
           std::to_string(seconds(late_from, down)) + " s");
-    // Every frame on time from then on: every refresh again 15 s after the step down, not before.
+    // Every frame on time from then on: every refresh again 5 s after the step down, not before.
     p.late_per_100 = 0;
-    p.run(14.5 - seconds(down, p.now));
-    check(std::fabs(followed_frame_rate() - 120) < 0.01f, "120 on 240 Hz: still 14.5 s after the step down");
-    p.run(2);
-    check(std::fabs(followed_frame_rate() - 240) < 0.01f, "120 on 240 Hz: every refresh again 15 s after the step down",
+    p.run(4.5 - seconds(down, p.now));
+    check(std::fabs(followed_frame_rate() - 120) < 0.01f, "120 on 240 Hz: still 4.5 s after the step down");
+    p.run(1);
+    check(std::fabs(followed_frame_rate() - 240) < 0.01f, "120 on 240 Hz: every refresh again 5 s after the step down",
           rate_text(followed_frame_rate()));
     const std::int64_t up = p.rates.back().first;
-    check(seconds(down, up) >= 15 && seconds(down, up) < 15.1, "240 Hz: the try 15 s after the step", std::to_string(seconds(down, up)) + " s");
-    // The try falls short: back down, and the next try waits twice as long.
-    p.late_per_100 = 5;
-    p.run(10);
-    const std::int64_t down2 = p.rates.back().first;
-    check(std::fabs(followed_frame_rate() - 120) < 0.01f && down2 > up, "240 Hz: a try that falls short goes back down");
+    check(seconds(down, up) >= 5 && seconds(down, up) < 5.1, "240 Hz: the try 5 s after the step", std::to_string(seconds(down, up)) + " s");
+    // The try falls short: back down within its first window (2 s), not after three.
+    p.late_per_100 = 40;
+    p.run_to_change(3);
     p.late_per_100 = 0;
-    p.run(29 - seconds(down2, p.now));
-    check(std::fabs(followed_frame_rate() - 120) < 0.01f, "240 Hz: after a failed try, not up again within 29 s");
-    p.run(2);
-    check(std::fabs(followed_frame_rate() - 240) < 0.01f && seconds(down2, p.rates.back().first) >= 30,
-          "240 Hz: after a failed try, up again 30 s after", std::to_string(seconds(down2, p.rates.back().first)) + " s");
+    const std::int64_t down2 = p.rates.back().first;
+    check(std::fabs(followed_frame_rate() - 120) < 0.01f && down2 > up && seconds(up, down2) < 2.1,
+          "240 Hz: a try that falls short goes back down in its first window", std::to_string(seconds(up, down2)) + " s");
+    // The next try 10 s after that, not 5.
+    p.late_per_100 = 0;
+    p.run(9.5 - seconds(down2, p.now));
+    check(std::fabs(followed_frame_rate() - 120) < 0.01f, "240 Hz: after a failed try, not up again within 9.5 s");
+    p.run(1);
+    check(std::fabs(followed_frame_rate() - 240) < 0.01f && seconds(down2, p.rates.back().first) >= 10,
+          "240 Hz: after a failed try, up again 10 s after", std::to_string(seconds(down2, p.rates.back().first)) + " s");
+    // Held for half a minute: the next step down waits the first 5 s again.
+    p.run(32);
+    p.late_per_100 = 40;
+    p.run_to_change(8);
+    p.late_per_100 = 0;
+    const std::int64_t down3 = p.rates.back().first;
+    check(std::fabs(followed_frame_rate() - 120) < 0.01f, "240 Hz: down again when 40 % are late", rate_text(followed_frame_rate()));
+    p.late_per_100 = 0;
+    p.run(5.5 - seconds(down3, p.now));
+    check(std::fabs(followed_frame_rate() - 240) < 0.01f && seconds(down3, p.rates.back().first) < 5.1,
+          "240 Hz: after half a minute held, the first wait (5 s) again", std::to_string(seconds(down3, p.rates.back().first)) + " s");
     check(g_low_noted == 0, "a computer's display never marks the low resolution");
+}
+
+// A computer that is really behind: it makes 130 frames a second at most, so at 240 Hz every frame is a refresh late and
+// at every second refresh none is. It steps down, each try back up falls short in its first window, and the waits
+// between tries double to a minute and stay there; 120 holds meanwhile.
+void computer_overloaded() {
+    Play p = fresh(240, true);
+    p.capacity = 130;
+    p.run(240);
+    // Down to every second refresh, then tries at 5, 10, 20, 40, 60 and 60 s gaps: 240 for at most 2 s each time.
+    std::vector<double> ups;
+    for (std::size_t i = 1; i < p.rates.size(); ++i) {
+        if (p.rates[i].second > p.rates[i - 1].second) ups.push_back(seconds(p.rates[i - 1].first, p.rates[i].first));
+    }
+    check(ups.size() >= 5 && std::fabs(ups[0] - 5) < 0.1 && std::fabs(ups[1] - 10) < 0.1 && std::fabs(ups[2] - 20) < 0.1 &&
+              std::fabs(ups[3] - 40) < 0.1 && std::fabs(ups[4] - 60) < 0.1,
+          "overloaded: tries back up after 5, 10, 20, 40 and 60 s", std::to_string(ups.size()) + " tries");
+    double at_240 = 0;
+    for (std::size_t i = 0; i < p.rates.size(); ++i) {
+        const std::int64_t until = i + 1 < p.rates.size() ? p.rates[i + 1].first : p.now;
+        if (std::fabs(p.rates[i].second - 240) < 0.01f && i > 0) at_240 += seconds(p.rates[i].first, until);
+    }
+    check(at_240 < 2.1 * static_cast<double>(ups.size()), "overloaded: each try lasts one window at most", std::to_string(at_240) + " s at 240");
+    check(std::fabs(followed_frame_rate() - 120) < 0.01f || std::fabs(followed_frame_rate() - 240) < 0.01f,
+          "overloaded: at 120 between tries, never lower", rate_text(followed_frame_rate()));
+    bool lower = false;
+    for (const auto& r : p.rates) lower = lower || r.second < 119;
+    check(!lower, "overloaded: no step below 120, which the computer makes");
 }
 
 // A computer's display with vsync off and a limit: the limit by the clock, and no steps however late the frames.
@@ -258,6 +321,7 @@ void game_aims_lower() {
 
 int main() {
     computer_display();
+    computer_overloaded();
     computer_vsync_off();
     phone_panel_follows();
     phone_panel_stays();
