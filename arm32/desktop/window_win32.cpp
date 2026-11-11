@@ -379,6 +379,31 @@ void refresh_loop() {
 // system menu: with it the taskbar minimises the window and brings it back with a click on its button, as any window's.
 constexpr DWORD kWindowStyle = WS_OVERLAPPED | WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX;
 
+// The window's title bar and border dark, as the launcher's header (client/opendmtq_client/theme.py: SIDEBAR #11151A,
+// its words TEXT #EEF2F6), so that no white bar sits over the dark game: Windows' dark title bar (attribute 20, or 19
+// before Windows 10 20H1), and on Windows 11 the header's own colours for the bar (35), its words (36) and the border
+// (34). Best effort: an older Windows says no and keeps its own. dwmapi is looked up in System32 rather than linked, so
+// the player starts wherever it did. Said in the log: whether the bar went dark, and whether it took the colours.
+void dark_title_bar(HWND h) {
+    using SetAttribute = HRESULT(WINAPI*)(HWND, DWORD, LPCVOID, DWORD);
+    static const SetAttribute set = [] {
+        HMODULE dwm = LoadLibraryExW(L"dwmapi.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        return dwm ? reinterpret_cast<SetAttribute>(GetProcAddress(dwm, "DwmSetWindowAttribute")) : nullptr;
+    }();
+    if (!set) return;
+    const BOOL dark = TRUE;
+    const bool dark_ok = SUCCEEDED(set(h, 20, &dark, sizeof dark)) || SUCCEEDED(set(h, 19, &dark, sizeof dark));
+    const COLORREF bar = RGB(0x11, 0x15, 0x1A), words = RGB(0xEE, 0xF2, 0xF6);
+    const bool colours_ok = SUCCEEDED(set(h, 35, &bar, sizeof bar));
+    set(h, 36, &words, sizeof words);
+    set(h, 34, &bar, sizeof bar);
+    static bool said = false;
+    if (!said) {
+        said = true;
+        jvm::log("player: the title bar %s, %s", dark_ok ? "dark" : "as Windows has it", colours_ok ? "in the launcher's colours" : "in Windows' own colours");
+    }
+}
+
 // The frame over the whole display it is on, without its border, and back.
 void toggle_fullscreen(HWND h) {
     DWORD style = static_cast<DWORD>(GetWindowLongW(h, GWL_STYLE));
@@ -396,6 +421,7 @@ void toggle_fullscreen(HWND h) {
         }
     } else {
         SetWindowLongW(h, GWL_STYLE, static_cast<LONG>(style | kWindowStyle));
+        dark_title_bar(h);
         SetWindowPlacement(h, &g_placement);
         SetWindowPos(h, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
         g_fullscreen = false;
@@ -1202,6 +1228,7 @@ bool open_window(const std::string& title) {
     }
     jvm::log("player: the window has a title bar and a frame, no buttons of its own (style %08lx)",
              static_cast<unsigned long>(GetWindowLongW(g_frame, GWL_STYLE)));
+    dark_title_bar(g_frame);
     if (app().fit_screen) {
         fit_display();
     } else {

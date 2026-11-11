@@ -106,13 +106,14 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   question's buttons too). Minimise holds the game still, as a minimised window does, and the taskbar brings it back.
   The X asks first, in a glass card over the game dimmed and blurred behind it: **Keep playing** as the launcher's main
   button, or **Quit the game** as its secondary, red under the pointer; so a click by mistake does not end a song. In a
-  window the game has a title bar to move it by and a frame to size it by, and no buttons of its own: it is minimised,
-  put in full screen and quit from the bar. The taskbar's Close window asks the same, and Alt+F4 and a double click on
-  the title bar do nothing. The card keeps within three quarters of the game's width, so a small window on a display at
-  150 % or 200 % gets a card in proportion to the game. The game holds still while it asks, as a phone's game does when
-  its owner leaves it: a song stops where it was, with the game's own pause screen after. In the question, Left, Right
-  and Tab move the choice (marked with the launcher's cyan keyboard ring), Enter takes it and Esc keeps playing.
-  Minimised, the game holds still the same way, and goes on when it comes back.
+  window the game has a title bar to move it by and a frame to size it by, dark as the launcher's header (on Windows 11
+  in its very colours; Windows 10 dark where it can), and no buttons of its own: it is minimised, put in full screen and
+  quit from the bar. The taskbar's Close window asks the same, and Alt+F4 and a double click on the title bar do
+  nothing. The card keeps within three quarters of the game's width, so a small window on a display at 150 % or 200 %
+  gets a card in proportion to the game. The game holds still while it asks, as a phone's game does when its owner
+  leaves it: a song stops where it was, with the game's own pause screen after. In the question, Left, Right and Tab
+  move the choice (marked with the launcher's cyan keyboard ring), Enter takes it and Esc keeps playing. Minimised, the
+  game holds still the same way, and goes on when it comes back.
 - **Nothing of it is in the game's way**: the notice, the FPS counter and the handle let every click through to the game,
   and no piece takes the keyboard from the game's window (each is a window that never takes the focus; a click on the
   bar or the question gives the keyboard back to the game). Their pictures are made on a thread of their own, so the
