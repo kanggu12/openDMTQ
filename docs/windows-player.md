@@ -84,36 +84,34 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | Alt+F4 | Nothing: the bar's X quits |
 | Alt alone, F10 | Nothing (no menu mode that would hold the next key) |
 
-- **The bar and quitting**: a PC has no phone's buttons around the game, so a bar of frosted glass comes down across
-  the top of the game when the pointer moves to the game's very top edge or onto the handle and rests there a moment
-  with its button up, or when a finger is drawn down from that edge on a touch screen, in either case only once the
-  game has had no click, touch or held note for a second and a half: a click or a held note at the top of a song plays
-  the song and never brings the bar, nor does a pointer on its way to the window's title bar. It also comes down by
-  itself for 3 seconds when the game's picture first shows (not during its black start) and for 3 seconds after each
-  switch between a window and full screen, whatever the pointer does, so that a player sees where it is. It stays while the
-  pointer is on it and goes up soon after the pointer leaves, so it never sits on the game's own controls at the top
-  while they are used; no key brings it. While it is down, the broadcast notice and an FPS counter in a top corner move
-  down under it. It is tall enough to cover the game's own X at the top right of its song and music screens whole.
+- **The bar**: a PC has no phone's buttons around the game, so a bar of frosted glass comes down across the top of the
+  game when the pointer rests a moment at the game's very top edge or on the handle, with its button up, or when a
+  finger is drawn down from that edge on a touch screen, in either case only once the game has had no click, touch or
+  held note for a second and a half: a click or a held note at the top of a song plays the song and never brings the
+  bar, nor does a pointer on its way to the window's title bar. It also comes down by itself for 3 seconds when the
+  game's picture first shows (not during its black start) and after each switch between a window and full screen, so
+  that a player sees where it is. It stays while the pointer is on it and goes up soon after the pointer leaves, so it
+  never sits on the game's own controls at the top while they are used. On its left is the OpenDMTQ wordmark as the
+  launcher's header draws it; on its right are three buttons in the launcher's own shape and depth (two corners cut,
+  raised, sunk while held): **minimise** and **full screen** (or back to a window), quiet metal with a lighter plate
+  under the pointer, and the **X** that quits, in the launcher's lime from the start so that it is seen at once. A
+  button acts only when let go where it was pressed. Minimise holds the game still, and the taskbar brings it back.
+  While the bar is down, the broadcast notice and an FPS counter in a top corner move down under it. It is tall enough
+  to cover the game's own X at the top right of its song and music screens whole.
 - **The handle**: a small tab hanging from the game's top edge at its centre, in the shape of the game's own tabs, the
   game's charcoal with its green line along the foot, says where the bar is; with the pointer on it, it grows a little
-  and its line turns lime. The pointer resting on it, or just around it, brings the bar down. Clicks go through it to
-  the game. It shows once the game's picture is up, and goes while the bar is down, while a notice or the question is
-  up and while the game holds still.
-  On its left, the OpenDMTQ wordmark as the launcher's header draws it; on its right three buttons in the launcher's own
-  shape and depth (two corners cut, raised, sunk while held): **minimise** and **full screen** (or back to a window) as
-  its secondary buttons, quiet metal with a lighter plate under the pointer, and an **X** that quits as its main button,
-  in its lime from the start so that it is seen at once. A button acts only when let go where it was pressed (the
-  question's buttons too). Minimise holds the game still, as a minimised window does, and the taskbar brings it back.
-  The X asks first, in a glass card over the game dimmed and blurred behind it: **Keep playing** as the launcher's main
-  button, or **Quit the game** as its secondary, red under the pointer; so a click by mistake does not end a song. In a
-  window the game has a title bar to move it by and a frame to size it by, dark as the launcher's header (on Windows 11
-  in its very colours; Windows 10 dark where it can), and no buttons of its own: it is minimised, put in full screen and
-  quit from the bar. The taskbar's Close window asks the same, and Alt+F4 and a double click on the title bar do
-  nothing. The card keeps within three quarters of the game's width, so a small window on a display at 150 % or 200 %
-  gets a card in proportion to the game. The game holds still while it asks, as a phone's game does when its owner
-  leaves it: a song stops where it was, with the game's own pause screen after. In the question, Left, Right and Tab
-  move the choice (marked with the launcher's cyan keyboard ring), Enter takes it and Esc keeps playing. Minimised, the
-  game holds still the same way, and goes on when it comes back.
+  and its line turns lime. The pointer resting on it, or just around it, brings the bar down. It shows once the game's
+  picture is up, and goes while the bar is down, while a notice or the question is up and while the game holds still.
+- **Quitting**: the X asks first, in a glass card over the game dimmed and blurred behind it: **Keep playing** as the
+  launcher's main button, or **Quit the game** as its secondary, red under the pointer; so a click by mistake does not
+  end a song. Its buttons too act only when let go where they were pressed; Left, Right and Tab move the choice (marked
+  with the launcher's cyan keyboard ring), Enter takes it and Esc keeps playing. The card keeps within three quarters
+  of the game's width, so a small window on a display at 150 % or 200 % gets a card in proportion to the game. The
+  taskbar's Close window asks the same. The game holds still while it asks, as a phone's game does when its owner
+  leaves it and as it does minimised: a song stops where it was, with the game's own pause screen after.
+- **The window**: the game has a title bar to move it by and a frame to size it by, dark as the launcher's header (on
+  Windows 11 in its very colours; Windows 10 dark where it can), and no buttons of its own: it is minimised, put in
+  full screen and quit from the bar. A double click on the title bar does nothing.
 - **Nothing of it is in the game's way**: the notice, the FPS counter and the handle let every click through to the game,
   and no piece takes the keyboard from the game's window (each is a window that never takes the focus; a click on the
   bar or the question gives the keyboard back to the game). Their pictures are made on a thread of their own, so the
