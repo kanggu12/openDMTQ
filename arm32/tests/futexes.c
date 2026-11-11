@@ -413,7 +413,7 @@ static void* producer(void* arg) {
 
 // ----------------------------------------------------------------------------------------------------- lostsignal
 
-// The video decoder of the game (libgpuv2) keeps a request flag that its worker reads before it takes the queue's mutex,
+// The game's video decoder keeps a request flag that its worker reads before it takes the queue's mutex,
 // and waits on the queue's condition variable when the queue says so, without reading the flag again. A seek that sets the
 // flag and signals the queue in between finds nobody waiting: its signal is gone, the worker then waits for a wake that
 // never comes, and the seek waits for the worker's answer. On a phone the window is a few instructions; here it is as
