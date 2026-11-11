@@ -187,7 +187,7 @@ class WindowThread(Folder):
         slow = threading.Event()
         asked = []
 
-        def readiness(state):
+        def readiness(state, reached=None):
             # What the check reads when it runs: the server played on then.
             seen = state.current
             asked.append(seen)
@@ -196,8 +196,9 @@ class WindowThread(Folder):
                 slow.wait(5)
             return [actions.Check("server", True, seen)]
 
+        # The server is not asked here (actions.reach): whether it answers is not what this test is about.
         app = types.SimpleNamespace(state=state, checks=None, checks_asked=0, post=tasks.append, status_sticky=True,
-                                    guide=None, check_box=None, _paint_play=lambda: None)
+                                    guide=None, check_box=None, _paint_play=lambda: None, _reach=lambda force: None)
         for name in ("refresh_checks", "_checked", "_say_state"):
             setattr(app, name, getattr(launcher.LauncherApp, name).__get__(app))
 
@@ -235,7 +236,7 @@ class StatusLine(Folder):
                                     words=i18n.Words("en"), status_message=None, status_tone="normal",
                                     status_action=None, status_transient=False, status_sticky=False,
                                     _paint_status=lambda: None)
-        for name in ("set_status", "user_acted", "_say_state", "ready", "busy_now", "_game_open"):
+        for name in ("set_status", "user_acted", "_say_state", "ready", "busy_now", "_game_open", "server_answers"):
             setattr(app, name, getattr(launcher.LauncherApp, name).__get__(app))
         # The line's words as the window draws them (a property of the window's class).
         app.text = lambda: launcher.LauncherApp.status_text.fget(app)
@@ -290,3 +291,13 @@ class StatusLine(Folder):
         # A span of time inside the words is said in the new language too.
         app.set_status(i18n.Said("status.ended", time=i18n.span(130)), "ok", sticky=True)
         self.assertEqual(app.text(), i18n.Words("ko")("status.ended", time=i18n.Words("ko")("common.minutes", m=2)))
+
+    def test_a_server_that_does_not_answer_is_said_while_play_can_go(self):
+        # Ready with the app this PC has, the server not answering: the line says so, in the warning's tone.
+        from opendmtq_client import actions
+        state = st.LauncherState()
+        state.add_server("http://stand.in", "Stand-in")
+        down = actions.Check("server", False, "Cannot reach it.", page="online", blocks=False)
+        app = self.window(state, [down, actions.Check("app", True, "2026-11-09")])
+        app._say_state()
+        self.assertEqual((app.status_message.key, app.status_tone), ("status.server_down", "warn"))

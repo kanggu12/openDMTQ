@@ -32,6 +32,12 @@ one that only fixes raises the patch number. Each release's section here is its 
   when a choice draws them again (the mode, the buffer, VSync), as the Screen page does; a control Tab reaches below or
   above the part of the page in view comes into view; Tab goes through the page before the bar along the foot, and the
   guide's bar left to right (Skip, Back, Next).
+- The launcher's ready check asks the server: one that does not answer shows so on the Server line and the status line
+  instead of a lit Server line, and Help's Check again asks it again. PLAY still starts the app this PC has; an app it
+  lacks waits for the server instead of a download that cannot start. `--status` asks it the same way.
+- The Screen page offers no frame limit above the display's rate while VSync is on (VSync holds the game at that rate
+  whatever the limit), keeps one set before in its row, and its hint names this display's rate and what the limit gives
+  on it (exactly, very nearly, or held at the rate) instead of a 240 Hz display's example.
 
 ## [0.9.1] - 2026-11-11
 

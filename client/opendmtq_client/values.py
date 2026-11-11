@@ -141,3 +141,32 @@ def fits(size, display):
     if found is None or not display.get("width") or not display.get("height"):
         return True
     return found[0] <= display["width"] and found[1] + WINDOW_ROOM <= display["height"]
+
+
+# The most refreshes VSync holds a frame for on a computer's display (arm32/src/pacing_math.h, kHostIntervalMost).
+VSYNC_MOST = 4
+
+
+def vsync_refreshes(hz, fps):
+    """With VSync on a display of `hz`, the refreshes each frame stays for at the frame limit `fps` ("auto", a number,
+    "unlimited"), as the player paces it (arm32/src/pacing_math.h, host_top): 1 for every refresh (no limit, or one at
+    or above the display's rate), a whole number for a whole fraction of the rate near the limit, 0 when none comes
+    near it and the player keeps the limit by the clock instead (very nearly, each frame on a refresh)."""
+    if fps in ("auto", "unlimited") or not hz:
+        return 1
+    cap = float(fps)
+    for n in range(1, VSYNC_MOST + 1):
+        # Still above the limit at this many refreshes a frame (a 3 % margin): one more.
+        if hz / float(n) > cap * 1.03:
+            continue
+        # A fraction under 90 % of the limit is not what the player chose: the limit by the clock instead.
+        return n if n == 1 or hz / float(n) >= cap * 0.9 else 0
+    return 0
+
+
+def above_rate(hz, fps):
+    """Whether a frame limit is above a display's rate of `hz` (with the player's 3 % margin): with VSync, the game
+    shows no more frames than the display refreshes, so such a limit changes nothing. Never for "auto"."""
+    if fps == "auto" or not hz:
+        return False
+    return fps == "unlimited" or int(fps) > hz * 1.03

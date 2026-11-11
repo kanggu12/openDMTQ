@@ -223,6 +223,23 @@ class CommandLine(Folder):
         self.assertIsNone(st.LauncherState.load().picked_language)
         self.assertIn("language=system", said)
 
+    def test_status_asks_the_server(self):
+        # --status asks the server as the window's ready check does: one that stopped answering is said as a warning,
+        # and PLAY can still go with the app this PC has (exit 0).
+        self.run_main(["--server", self.site.url])
+        self.run_main(["--sign-in", stub.ACCOUNT], stdin=stub.PASSWORD + "\n")
+        self.run_main(["--app"])
+        code, said = self.run_main(["--status"])
+        self.assertEqual(code, 0, said)
+        self.assertIn("[ok  ] server:", said)
+        self.site.stop()
+        try:
+            code, said = self.run_main(["--status"])
+        finally:
+            self.site.start()
+        self.assertEqual(code, 0, said)
+        self.assertIn("[warn] server:", said)
+
     def test_the_servers_it_knows_and_the_guide_skipped(self):
         # Online's list of servers and the guide's "Skip: I set it up myself", from the command line: a PC set up with
         # --server, --sign-in and --app opens on PLAY with --skip-guide.

@@ -25,6 +25,9 @@ EDGE = 28
 BAR_HEIGHT = 54
 # How often the window looks for a server an installer left while it is open, in turns of the 50 ms task pump (2 s).
 PRESET_EVERY = 40
+# How long the server's last answer to the ready check stands (seconds): the PLAY and Help pages ask for a check each
+# time they show, and the server is asked again only after this, or when the player presses Check again.
+REACH_FOR = 30
 
 
 class LauncherApp:
@@ -45,6 +48,7 @@ class LauncherApp:
         self.tasks = queue.Queue()      # functions from worker threads, run on the Tk thread
         self.session = None             # the running game, while it runs
         self.checks = None              # the last ready check (None: being made)
+        self.shown_checks = None        # the last ready check that came back, shown while the next one is made
         self.checks_asked = 0           # ready checks started in this run (show() looks whether a page started one)
         self.page = "play"              # the page on show
         self.busy = False               # PLAY is getting ready (asking the server, downloading its app)
@@ -65,7 +69,8 @@ class LauncherApp:
         self.keep_open = False          # work that closing would cut short is under way (the launcher's update, a
         #                                 repair, a count or a deletion): the window stays until it ends
         self.play_offline = False       # PLAY went on with this PC's app because the server did not answer
-        self.server_check = None        # the last time a server was asked in this run: {"url", "state", "text"}
+        self.server_check = None        # the last time a server was asked in this run: {"url", "state", "error"}
+        self.server_reached = None      # the ready check's last answer from the server: {"url", "reached", "at"}
         self.pumps = 0                  # turns of the task pump, for the slower look for an installer's server
         self._setup_fonts()
         self._size_window()
@@ -193,6 +198,9 @@ class LauncherApp:
             self.set_status(i18n.Said("status.no_server"), "warn")
         elif not self.ready():
             self.set_status(i18n.Said("status.fix_first"), "warn")
+        elif not self.server_answers():
+            # Ready all the same: PLAY starts the app this PC has, which may be older than the server's.
+            self.set_status(i18n.Said("status.server_down"), "warn")
         else:
             # Ready: nothing more to say, whatever the line said before (a passing note, an outcome given way).
             self.set_status(i18n.Said("status.ready"), "normal")
@@ -478,8 +486,9 @@ class LauncherApp:
         elif self.page in ("play", "online"):
             self.go(self.page)
 
-    def refresh_checks(self):
-        """Make the ready check again on a worker thread; the PLAY page and button follow it."""
+    def refresh_checks(self, force=False):
+        """Make the ready check again on a worker thread, the server asked whether it answers (its last answer used for
+        REACH_FOR seconds, unless `force`: Check again); the PLAY page and button follow it."""
         self.checks = None
         self.checks_asked += 1
         # Which check this is: only the last one asked is taken when it answers.
@@ -487,7 +496,7 @@ class LauncherApp:
 
         def work():
             try:
-                checks = actions.readiness(self.state)
+                checks = actions.readiness(self.state, reached=self._reach(force))
             except Exception as e:  # noqa: BLE001
                 log.exception("ready check failed")
                 checks = [actions.Check("server", False, str(e), page="online")]
@@ -495,12 +504,32 @@ class LauncherApp:
 
         threading.Thread(target=work, daemon=True, name="check").start()
 
+    def _reach(self, force):
+        """Whether the server PLAY plays on answers (actions.reach), on the ready check's worker thread: asked again
+        when its last answer is older than REACH_FOR seconds, is about another server, or `force` says so."""
+        import time
+        server = self.state.server()
+        if server is None:
+            return None
+        seen = self.server_reached
+        if not force and seen and seen["url"] == server["url"] and time.time() - seen["at"] < REACH_FOR:
+            return seen["reached"]
+        reached = actions.reach(self.state)
+        # Kept for the next checks (one dict swapped in whole: a check on another thread reads either one or the other).
+        self.server_reached = {"url": server["url"], "reached": reached, "at": time.time()}
+        return reached
+
+    def server_answers(self):
+        """False when the last ready check found the server PLAY plays on not answering."""
+        return not any(c.key == "server" and not c.ok and not c.blocks for c in (self.checks or ()))
+
     def _checked(self, checks, asked):
         if asked != self.checks_asked:
             # A check asked before the last one, answering after it: about the state before, so the last one's answer,
             # on its way, is the one to show.
             return
         self.checks = checks
+        self.shown_checks = checks
         self._say_state()
         self._paint_play()
         # The PLAY page, the Help page and the guide's last step each show the check when they are on screen.

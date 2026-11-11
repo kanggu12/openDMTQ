@@ -342,9 +342,10 @@ def _status(state):
     # Where the logs are, as Help's Open buttons show them.
     for name, path in _log_paths(state).items():
         _say("%s log: %s" % (name, path or "none yet (no app on this PC)"))
-    checks = actions.readiness(state)
+    # The server asked as the window's ready check asks it: one that does not answer is said, and does not stop PLAY.
+    checks = actions.readiness(state, reached=actions.reach(state))
     for c in checks:
-        mark = "ok  " if c.ok else ("play" if c.play_fixes else "todo")
+        mark = "ok  " if c.ok else ("play" if c.play_fixes else "todo" if c.blocks else "warn")
         _say("  [%s] %s: %s" % (mark, c.key, c.detail))
     return 0 if actions.can_play(checks) else 1
 

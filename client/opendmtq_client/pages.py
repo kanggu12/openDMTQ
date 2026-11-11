@@ -144,11 +144,14 @@ def refresh_checks(app):
     for child in box.winfo_children():
         child.destroy()
     ui, w = app.ui, app.words
-    if app.checks is None:
+    # While a check is made (it may ask the server for a few seconds), the last one that came back stays on show: the
+    # rows do not blink to "..." and back each time a page asks for one.
+    checks = app.checks if app.checks is not None else getattr(app, "shown_checks", None)
+    if checks is None:
         widgets.label(box, ui, "...", fg=theme.MUTED).pack(anchor="w")
         return
     from opendmtq_client import installed
-    for i, check in enumerate(app.checks):
+    for i, check in enumerate(checks):
         if i:
             widgets.divider(box, ui, pady=9)
         name, value, action, fix = w("check." + check.key), None, None, w("play.fix")
@@ -168,6 +171,9 @@ def refresh_checks(app):
         elif check.play_fixes:
             # PLAY does these by itself; the row only says it will.
             state, value = "change", w("play.will_get")
+        elif not check.blocks and check.key == "server":
+            # The server does not answer: nothing to fix on this PC, and PLAY still plays this PC's app.
+            state, value = "change", w("check.server.down")
         else:
             state = "bad" if check.key in actions.BLOCKING else "change"
             action = (lambda p=check.page: app.nav_go(p)) if check.page and app.guide is None else None
@@ -223,15 +229,15 @@ def screen_rows(app, parent, redraw, full=True):
                                                  lambda on: set_and_redraw("vsync")("on" if on else "off")),
                         w("screen.vsync.hint." + ("on" if vsync else "off"))).pack(fill="x")
     rate = w("screen.fps.auto.hz", hz=hz) if hz else w("screen.fps.auto")
-    # The VSync hint about fractions of the rate only means something for a number of frames.
-    numbered = v["fps"] not in ("auto", "unlimited")
-    fps_hint = ("vsync" if numbered else "vsync_rate") if vsync else "free"
+    # With VSync on a display whose rate is known, the limits above that rate are left out: VSync holds the game at the
+    # display's rate whatever the limit (values.vsync_refreshes, the player's own arithmetic). A limit set before (with
+    # VSync off, or on the command line) keeps its row, and its hint says so.
     options = [(f, rate if f == "auto" else w("screen.fps.unlimited") if f == "unlimited" else w("screen.fps.n", n=f))
-               for f in choices.FPS]
+               for f in fps_choices(vsync, hz, v["fps"])]
     widgets.divider(card.body, ui)
     widgets.setting_row(card.body, ui, w("screen.fps"),
                         lambda p: widgets.Select(p, ui, options, v["fps"], set_and_redraw("fps"), width=22),
-                        w("screen.fps.hint." + fps_hint)).pack(fill="x")
+                        fps_hint(w, vsync, v["fps"], hz)).pack(fill="x")
     # The frame counter over the game, in the corner the player picks.
     options = [(c, w("screen.counter." + c)) for c in choices.SHOW_FPS]
     widgets.divider(card.body, ui)
@@ -262,6 +268,33 @@ def screen_rows(app, parent, redraw, full=True):
                         lambda p: widgets.Select(p, ui, options, v["anti_aliasing"], set_and_redraw("anti_aliasing"),
                                                  width=22),
                         w("screen.aa.hint." + kind)).pack(fill="x")
+
+
+def fps_choices(vsync, hz, current):
+    """The frame limits the Screen page offers: all of them, but with VSync on a display whose rate is known none above
+    that rate (VSync holds the game at it whatever the limit); the `current` one keeps its row all the same."""
+    offered = [f for f in choices.FPS if not (vsync and hz) or not choices.above_rate(hz, f)]
+    return offered + ([current] if current not in offered else [])
+
+
+def fps_hint(w, vsync, fps, hz):
+    """The frame limit's hint for its value: without VSync, the game holds it itself; with VSync, the display's own
+    rate, or on a display whose rate is known, what this limit gives there (exactly, very nearly, or held at the rate:
+    values.vsync_refreshes, as the player paces the frames)."""
+    if not vsync:
+        return w("screen.fps.hint.free")
+    if fps == "auto":
+        return w("screen.fps.hint.vsync_rate")
+    if not hz:
+        return w("screen.fps.hint.vsync")
+    if choices.above_rate(hz, fps):
+        # Above the display's rate: every refresh, no more.
+        return w("screen.fps.hint.vsync.above", hz=hz)
+    refreshes = choices.vsync_refreshes(hz, fps)
+    if refreshes:
+        # Each frame the same number of refreshes: the rate a whole fraction of the display's.
+        return w("screen.fps.hint.vsync.exact", hz=hz, fps=int(round(hz / float(refreshes))))
+    return w("screen.fps.hint.vsync.near", hz=hz, n=fps)
 
 
 def _focus_order(widget):
@@ -718,8 +751,8 @@ def build_online(app, parent):
 def build_help(app, parent):
     ui, w = app.ui, app.words
     card = _card(parent, ui, w("help.checks"))
-    # Check again at the title's right end.
-    widgets.Button(card.head, ui, w("help.recheck"), app.refresh_checks).pack(side="right")
+    # Check again at the title's right end: the server asked again too, whatever its last answer.
+    widgets.Button(card.head, ui, w("help.recheck"), lambda: app.refresh_checks(force=True)).pack(side="right")
     app.check_box = tk.Frame(card.body, bg=theme.PANEL)
     app.check_box.pack(fill="x")
     app.refresh_checks()

@@ -37,7 +37,8 @@ closed); while a game runs it installs nothing and ends with 3.
 | **Launcher** | The language, updates of the launcher, the first-start guide again |
 
 **PLAY** asks the server for a newer app first and downloads it when there is one; when the server cannot be asked, the
-game starts with the app this PC has. The launcher updates itself from the project's releases: **Launcher**, **Check for
+game starts with the app this PC has. The checks ask the server too: one that does not answer is said on the **Play** and
+**Help** pages and does not stop **PLAY**. The launcher updates itself from the project's releases: **Launcher**, **Check for
 updates**. Without internet, the installer from the server's **Download** page updates it instead, once the server has
 a newer one; the servers and the settings stay. While the game runs the launcher steps aside, and comes back when the
 game ends.
