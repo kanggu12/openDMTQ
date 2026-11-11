@@ -9,9 +9,8 @@ owner sets up and runs the server.
 
 - **Home:** the server's version beside the logo, the way to the download page, what is on the server, top players,
   newest records.
-- **Download:** the app (.apk) and its QR code, the three steps after it, and help, for Android, as it says before
-  anyone signs in; and the PC client's installer for Windows, set up for this server, when the server has it
-  ([the PC client](windows-player.md)).
+- **Download:** for Android, the app (.apk) with its QR code, the three steps to install it, and help; and the PC
+  client's installer for Windows, set up for this server, when the server has it ([the PC client](windows-player.md)).
 - **Rankings:** the first three on a podium, then the others who have played, by total best score (best score per
   chart, summed), this month's as the game ranks them, or by S grades, perfect plays, charts played. Players with nothing in a category are not listed in
   it. Average accuracy is the game's own figure.
