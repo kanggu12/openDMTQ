@@ -16,8 +16,9 @@
 //                                            AMD FidelityFX Super Resolution 1 (EASU then RCAS), or NVIDIA Image Scaling
 //   anti_aliasing off | cmaa2 | smaa |       the edges of the game's shapes smoothed: not at all, by Intel's CMAA 2 or by
 //                 msaa2 | msaa4 | msaa8      SMAA 1x over the finished picture, or by drawing with 2, 4 or 8 samples
-//   show_fps      off | top_left | top_right | the frames a second and the frame time in that corner of the game
-//                 bottom_left | bottom_right
+//   show_fps      off | on | top_left |      the frames a second and the frame time in that corner of the game; on is
+//                 top_right | bottom_left |  the top left, beside a song's pause button (where the launcher puts it
+//                 bottom_right               unless its position is chosen)
 //   audio_device  default | <endpoint id>    the sound's device: Windows' default output, or one by its id
 //                                            (player --audio-devices lists them)
 //   audio_mode    shared | exclusive         with the computer's other sound, or the device alone (less latency)
@@ -118,9 +119,11 @@ bool load_settings(const std::string& path) {
                 ok = true;
             }
         } else if (key == "show_fps") {
-            // Each corner's name to its kind, in the order of the enum; a name it does not know shows none.
+            // Each corner's name to its kind, in the order of the enum, and on for the top left, the counter's own
+            // place; a name it does not know shows none.
             static const char* const kCorners[] = {"off", "top_left", "top_right", "bottom_left", "bottom_right"};
-            ok = false;
+            ok = value == "on";
+            if (ok) s.show_fps = Settings::ShowFps::kTopLeft;
             for (int i = 0; i < 5; ++i) {
                 if (value != kCorners[i]) continue;
                 s.show_fps = static_cast<Settings::ShowFps>(i);

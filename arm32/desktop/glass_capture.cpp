@@ -1,7 +1,10 @@
 // The game's frame behind the overlay's glass (glass_capture.h says why): on the game's render thread, at each swap, while
 // the overlay wants rectangles of it. Each wanted rectangle of the frame as it goes to the window (after the player's
-// passes, at the window's own size or the render scale's) is scaled to a quarter of its size by one blit into a small
-// picture of ours, stacked one under another, and the whole is read into a pixel buffer with one read and a fence. A
+// passes, at the window's own size or the render scale's) is scaled to half its size by a blit into a picture of ours,
+// then to a quarter by a second blit into a smaller one, each at exactly half with a linear filter, so that each quarter
+// pixel is the mean of its 4 by 4 (one blit to a quarter would take the middle 2 by 2 alone, and a thin line would count
+// twice or not at all, shimmering in the blur as it moves); stacked one under another, the whole is read into a pixel
+// buffer with one read and a fence. A
 // later swap, once the GPU says it is done, copies it out for the overlay's thread; nothing here waits for the GPU. At
 // most 20 reads a second, one in flight at a time; with nothing wanted and nothing in flight, a swap costs one atomic
 // load. Everything of the game's GL state this touches is put back, as the broadcast's capture does (live_capture.cpp).
@@ -37,6 +40,8 @@ std::atomic<bool> g_active{false};
 std::mutex g_shot_lock;
 std::shared_ptr<const std::vector<Shot>> g_shots;
 std::atomic<unsigned> g_generation{0};
+// The render thread gave up reading the frame here: said to the overlay, which then waits for no read.
+std::atomic<bool> g_refused{false};
 
 // What the reads cost the render thread, for the stats: the reads issued and the hand-overs, their time and the
 // longest of either, and the swaps that did anything and the ones that did not.
@@ -88,8 +93,9 @@ void want(const std::vector<Rect>& rects, int area_w, int area_h) {
     g_wish_w = area_w;
     g_wish_h = area_h;
     ++g_wish_serial;
-    // Something to do from the next swap; a read in flight finishes on its own and clears it after.
-    if (!g_wish.empty()) g_active.store(true, std::memory_order_release);
+    // Something to do from the next swap (unless the render thread gave up reading here); a read in flight finishes
+    // on its own and clears it after.
+    if (!g_wish.empty() && !g_refused.load(std::memory_order_acquire)) g_active.store(true, std::memory_order_release);
 }
 
 bool take(unsigned& generation, std::shared_ptr<const std::vector<Shot>>& out) {
@@ -102,6 +108,8 @@ bool take(unsigned& generation, std::shared_ptr<const std::vector<Shot>>& out) {
 }
 
 unsigned generation() { return g_generation.load(std::memory_order_acquire); }
+
+bool refused() { return g_refused.load(std::memory_order_acquire); }
 
 }  // namespace player::glass
 
@@ -242,9 +250,12 @@ constexpr std::int64_t kEveryNs = 50000000;
 // The reads' objects in the game's context, and the read in flight.
 struct Reader {
     EGLContext context = EGL_NO_CONTEXT;
-    // The picture the rectangles are scaled into, one under another, its framebuffer, and its size.
+    // The picture the rectangles are scaled into, one under another, its framebuffer, and its size; and the one at half
+    // their size they pass through.
     GLuint picture = 0, fbo = 0;
     int picture_w = 0, picture_h = 0;
+    GLuint half = 0, half_fbo = 0;
+    int half_w = 0, half_h = 0;
     // The pixel buffer the picture is read into, and its size in bytes.
     GLuint buffer = 0;
     GLsizeiptr buffer_bytes = 0;
@@ -260,8 +271,17 @@ struct Reader {
     bool refused = false;
 } g_reader;
 
-// A context the game destroyed, until the render thread has seen it: its objects went with it.
-std::atomic<void*> g_destroyed{nullptr};
+// The contexts the game destroyed since the render thread last looked, every one of them (two may go before it looks,
+// and a new context may get the address of either): the objects of one of them went with it, and are never used again.
+std::mutex g_destroyed_lock;
+std::vector<void*> g_destroyed;
+
+// The render thread gives up reading here: no more tries, and the overlay told.
+void give_up(Reader& r) {
+    r.refused = true;
+    g_refused.store(true, std::memory_order_release);
+    g_active.store(false, std::memory_order_release);
+}
 
 // The reader's objects gone, in their own context; outside it they went with the context.
 void drop(Reader& r, bool current) {
@@ -271,32 +291,41 @@ void drop(Reader& r, bool current) {
         if (r.buffer) g.delete_buffers(1, &r.buffer);
         if (r.fbo) g.delete_framebuffers(1, &r.fbo);
         if (r.picture) g.delete_textures(1, &r.picture);
+        if (r.half_fbo) g.delete_framebuffers(1, &r.half_fbo);
+        if (r.half) g.delete_textures(1, &r.half);
     }
     const bool refused = r.refused;
     r = Reader{};
     r.refused = refused;
 }
 
-// The picture at least `w` by `h`, and the pixel buffer for all of it: made again only when a wish needs more. Made at
-// once as large as a quarter of the whole window (`area_w` by `area_h`) and a little more, which the question's read and
-// any pieces' together fit in: the first read makes them (a millisecond or two, once), and no later wish makes them
-// again. The caller has the game's state saved. False when the driver will not.
+// A picture of ours at least `w` by `h` (made again only when a wish needs more: then at once as large as `least_w` by
+// `least_h` too), with its framebuffer (a blit from it takes the blit's own filter). False when the driver will not.
+bool picture_room(const Gl& g, GLuint& texture, GLuint& fbo, int& tw, int& th, int w, int h, int least_w, int least_h) {
+    if (w <= tw && h <= th) return true;
+    if (fbo) g.delete_framebuffers(1, &fbo);
+    if (texture) g.delete_textures(1, &texture);
+    tw = std::max({w, tw, least_w});
+    th = std::max({h, th, least_h});
+    g.gen_textures(1, &texture);
+    g.bind_texture(GL_TEXTURE_2D, texture);
+    g.tex_storage(GL_TEXTURE_2D, 1, GL_RGBA8, tw, th);
+    g.tex_parameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    g.tex_parameter(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    g.gen_framebuffers(1, &fbo);
+    g.bind_framebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+    g.framebuffer_texture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+    return g.check_framebuffer(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+}
+
+// The pictures at least `w` by `h` (the half one twice that), and the pixel buffer for all of the quarter one: made
+// again only when a wish needs more. Made at once as large as a quarter (and a half) of the whole window (`area_w` by
+// `area_h`) and a little more, which the question's read and any pieces' together fit in: the first read makes them (a
+// millisecond or two, once), and no later wish makes them again. The caller has the game's state saved. False when the
+// driver will not.
 bool room(const Gl& g, Reader& r, int w, int h, int area_w, int area_h) {
-    if (w > r.picture_w || h > r.picture_h) {
-        if (r.fbo) g.delete_framebuffers(1, &r.fbo);
-        if (r.picture) g.delete_textures(1, &r.picture);
-        r.picture_w = std::max({w, r.picture_w, (area_w + 3) / 4});
-        r.picture_h = std::max({h, r.picture_h, (area_h + 3) / 4 + 64});
-        g.gen_textures(1, &r.picture);
-        g.bind_texture(GL_TEXTURE_2D, r.picture);
-        g.tex_storage(GL_TEXTURE_2D, 1, GL_RGBA8, r.picture_w, r.picture_h);
-        g.tex_parameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        g.tex_parameter(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        g.gen_framebuffers(1, &r.fbo);
-        g.bind_framebuffer(GL_DRAW_FRAMEBUFFER, r.fbo);
-        g.framebuffer_texture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, r.picture, 0);
-        if (g.check_framebuffer(GL_DRAW_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) return false;
-    }
+    if (!picture_room(g, r.half, r.half_fbo, r.half_w, r.half_h, w * 2, h * 2, (area_w + 1) / 2, (area_h + 1) / 2 + 128)) return false;
+    if (!picture_room(g, r.picture, r.fbo, r.picture_w, r.picture_h, w, h, (area_w + 3) / 4, (area_h + 3) / 4 + 64)) return false;
     // The pixel buffer as large as the picture.
     const auto bytes = static_cast<GLsizeiptr>(r.picture_w) * r.picture_h * 4;
     if (bytes > r.buffer_bytes) {
@@ -308,10 +337,16 @@ bool room(const Gl& g, Reader& r, int w, int h, int area_w, int area_h) {
     return true;
 }
 
-// The read in flight copied out for the overlay once the GPU is done with it; nothing when it is not yet.
+// The read in flight copied out for the overlay once the GPU is done with it; nothing when it is not yet. A fence the
+// driver cannot wait on (GL_WAIT_FAILED) is let go of with its read: a later read takes its place.
 void collect(const Gl& g, Reader& r) {
     if (!r.fence) return;
     const GLenum state = g.client_wait(r.fence, GL_SYNC_FLUSH_COMMANDS_BIT, 0);
+    if (state == GL_WAIT_FAILED) {
+        g.delete_sync(r.fence);
+        r.fence = nullptr;
+        return;
+    }
     if (state != GL_ALREADY_SIGNALED && state != GL_CONDITION_SATISFIED) return;
     const std::int64_t began = now_ns();
     g.delete_sync(r.fence);
@@ -356,13 +391,15 @@ void collect(const Gl& g, Reader& r) {
 // waited for. False when it cannot be read here.
 bool read(const Gl& g, Reader& r, const std::vector<Rect>& rects, int area_w, int area_h, int surface_w, int surface_h) {
     const std::int64_t began = now_ns();
-    // Where each goes in the picture: one under another, from its top.
-    std::vector<int> rows;
-    int width = 0, height = 0;
+    // Where each goes in the picture: one under another, from its top; and in the half one.
+    std::vector<int> rows, half_rows;
+    int width = 0, height = 0, half_height = 0;
     for (const Rect& rect : rects) {
         rows.push_back(height);
+        half_rows.push_back(half_height);
         width = std::max(width, rect.w / 4);
         height += rect.h / 4;
+        half_height += rect.h / 2;
     }
     if (!width || !height) return true;
     Saved saved;
@@ -375,15 +412,22 @@ bool read(const Gl& g, Reader& r, const std::vector<Rect>& rects, int area_w, in
         // The frame as it goes to the window: the window's framebuffer, whose size is the window's or, with a render
         // scale and the plain stretch, the scale's (ANGLE stretches it then).
         g.bind_framebuffer(GL_READ_FRAMEBUFFER, 0);
-        g.bind_framebuffer(GL_DRAW_FRAMEBUFFER, r.fbo);
+        g.bind_framebuffer(GL_DRAW_FRAMEBUFFER, r.half_fbo);
         const double kx = static_cast<double>(surface_w) / area_w, ky = static_cast<double>(surface_h) / area_h;
         for (std::size_t i = 0; i < rects.size(); ++i) {
             const Rect& a = rects[i];
             // The window's rows from the top, GL's from the bottom; the destination upside down, so that the picture's
-            // first row (the first one read) is the rectangle's top.
+            // first row (the first one read) is the rectangle's top. To half its size first.
             const auto sx0 = static_cast<GLint>(a.x * kx + 0.5), sx1 = static_cast<GLint>((a.x + a.w) * kx + 0.5);
             const auto sy0 = static_cast<GLint>(surface_h - (a.y + a.h) * ky + 0.5), sy1 = static_cast<GLint>(surface_h - a.y * ky + 0.5);
-            g.blit(sx0, sy0, sx1, sy1, 0, rows[i] + a.h / 4, a.w / 4, rows[i], GL_COLOR_BUFFER_BIT, GL_LINEAR);
+            g.blit(sx0, sy0, sx1, sy1, 0, half_rows[i] + a.h / 2, a.w / 2, half_rows[i], GL_COLOR_BUFFER_BIT, GL_LINEAR);
+        }
+        // Then from half to a quarter, the same way up: each quarter pixel the mean of 2 by 2 half ones.
+        g.bind_framebuffer(GL_READ_FRAMEBUFFER, r.half_fbo);
+        g.bind_framebuffer(GL_DRAW_FRAMEBUFFER, r.fbo);
+        for (std::size_t i = 0; i < rects.size(); ++i) {
+            const Rect& a = rects[i];
+            g.blit(0, half_rows[i], a.w / 2, half_rows[i] + a.h / 2, 0, rows[i], a.w / 4, rows[i] + a.h / 4, GL_COLOR_BUFFER_BIT, GL_LINEAR);
         }
         // One read of the whole, into the pixel buffer: copied out at a later swap (collect).
         g.bind_framebuffer(GL_READ_FRAMEBUFFER, r.fbo);
@@ -425,13 +469,18 @@ void glass_frame(EGLDisplay d, EGLSurface s) {
     static auto query_context = reinterpret_cast<EGLBoolean (*)(EGLDisplay, EGLContext, EGLint, EGLint*)>(egl_proc("eglQueryContext"));
     if (!g.ok || !current_context || !current_surface || !query_surface || !query_context || r.refused) {
         // Nothing can be read here: the overlay keeps its plain tint, and the swaps are spared from now on.
-        g_active.store(false, std::memory_order_release);
+        give_up(r);
         return;
     }
     const EGLContext context = current_context();
-    // A context the game destroyed took the objects along; one that is no longer current leaves them to it.
-    if (void* dead = g_destroyed.exchange(nullptr, std::memory_order_relaxed)) {
-        if (dead == r.context) drop(r, false);
+    // Every context the game destroyed since the last look: when the objects' own is among them, they went with it, and
+    // their names are never bound again (a new context at the same address has names of its own).
+    {
+        std::lock_guard<std::mutex> l(g_destroyed_lock);
+        for (void* dead : g_destroyed) {
+            if (dead == r.context) drop(r, false);
+        }
+        g_destroyed.clear();
     }
     // Only the frame going to the window, drawn on the current context.
     if (context == EGL_NO_CONTEXT || current_surface(EGL_DRAW) != s) return;
@@ -451,8 +500,7 @@ void glass_frame(EGLDisplay d, EGLSurface s) {
         if (choose_config && config_attrib && choose_config(d, by_id, &config, 1, &found) && found == 1) config_attrib(d, config, EGL_SAMPLE_BUFFERS, &samples);
         if (version < 3 || samples != 0) {
             log("player: glass: the frame cannot be read here (OpenGL ES %d, %d sample buffers): the overlay keeps its plain tint", version, samples);
-            r.refused = true;
-            g_active.store(false, std::memory_order_release);
+            give_up(r);
             return;
         }
     }
@@ -479,8 +527,7 @@ void glass_frame(EGLDisplay d, EGLSurface s) {
         if (surface_w > 0 && surface_h > 0) {
             if (!read(g, r, rects, area_w, area_h, surface_w, surface_h)) {
                 log("player: glass: the frame's read cannot be set up here: the overlay keeps its plain tint");
-                r.refused = true;
-                g_active.store(false, std::memory_order_release);
+                give_up(r);
             }
             r.serial = serial;
             r.last = start;
@@ -489,7 +536,11 @@ void glass_frame(EGLDisplay d, EGLSurface s) {
     if (g_stats) g_busy_swaps.fetch_add(1, std::memory_order_relaxed);
 }
 
-void glass_context_destroyed(EGLContext context) { g_destroyed.store(context, std::memory_order_relaxed); }
+void glass_context_destroyed(EGLContext context) {
+    // Kept until the render thread looks: every one, in case two go before it does.
+    std::lock_guard<std::mutex> l(g_destroyed_lock);
+    g_destroyed.push_back(context);
+}
 
 void glass_stats() {
     // Every 5 s with the stats on: what the reads cost this thread a frame over all frames, and a read and a hand-over

@@ -32,6 +32,9 @@ void want(const std::vector<Rect>& rects, int area_w, int area_h);
 bool take(unsigned& generation, std::shared_ptr<const std::vector<Shot>>& out);
 // How many reads the render thread has handed over so far (the overlay waits for one after asking).
 unsigned generation();
+// Whether the render thread cannot read the frame here (OpenGL ES 2, a multisampled window, a read it could not set
+// up): no read will come, and the overlay waits for none.
+bool refused();
 
 // A rectangle grown by `by` on every side, its edges on whole multiples of 4, kept within an area of `w` by `h`: what a
 // request asks for, so that a quarter's pixel is four of the window's exactly.

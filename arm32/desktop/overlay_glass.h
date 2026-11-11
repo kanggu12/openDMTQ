@@ -69,6 +69,9 @@ struct Backdrop {
 // what the render thread read: the read that holds `r` whole, its edge repeated where the margin goes past it. False
 // when no read holds it.
 bool backdrop_from(const std::vector<glass::Shot>& shots, const glass::Rect& r, int margin, Backdrop& out);
+// Whether a read holds the rectangle `r` whole, as backdrop_from takes it, without copying anything: the window's
+// thread asks it, the overlay's painter copies.
+bool holds(const std::vector<glass::Shot>& shots, const glass::Rect& r);
 // Another of the overlay's pictures (premultiplied, at (x, y) of the game's window) laid over the frame's pixels, as
 // what lies under the question's dim with the game: blurred and dimmed with it after.
 void stamp(Backdrop& b, Canvas& picture, int x, int y);

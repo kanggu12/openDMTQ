@@ -1,6 +1,9 @@
 // The player's PC settings file (settings.cpp), as the PC client writes it: each key read, a value it cannot read or a
 // key it does not know leaving the default, notes and Windows' line ends taken in their stride, no file at all the
-// defaults. Prints ALL CHECKS PASSED when every check held.
+// defaults. Then the numbers of the frame counter that one of the settings shows (frame_rate.cpp): its looks at the
+// count of frames through the game's start, a stretch with no frame, frames again and a hold. Prints ALL CHECKS PASSED
+// when every check held.
+#include "frame_rate.h"
 #include "player.h"
 
 #include <cstdio>
@@ -28,6 +31,125 @@ const player::Settings& read(const std::string& path, const std::string& text) {
     }
     player::load_settings(path);
     return player::settings();
+}
+
+// A game showing frames at a steady rate from a moment on, as the count of frames shown says it: frames at the display's
+// own moments, `period` nanoseconds apart from `from` (the first at `from`), none before `from` or within a stretch
+// left out, and a look at a moment seeing every frame up to it.
+struct Frames {
+    long long from = 0, period = 0;
+    // The stretches with no frame (start and end, nanoseconds), each within the run.
+    struct Gap {
+        long long start, end;
+    };
+    Gap gaps[4] = {};
+    int gap_count = 0;
+    // Whether a frame at `t` was shown: past the start and in no stretch left out.
+    bool shown(long long t) const {
+        if (t < from) return false;
+        for (int i = 0; i < gap_count; ++i) {
+            if (t >= gaps[i].start && t < gaps[i].end) return false;
+        }
+        return true;
+    }
+    // The count and the last frame's moment at `t`: each frame up to it, one at a time (a few thousand at most here).
+    player::overlay::FrameCount at(long long t) const {
+        player::overlay::FrameCount c;
+        for (long long f = from; f <= t; f += period) {
+            if (!shown(f)) continue;
+            ++c.count;
+            c.ns = f;
+        }
+        return c;
+    }
+};
+
+// Milliseconds as the count's nanoseconds.
+constexpr long long ms(long long n) { return n * 1000000LL; }
+
+// The frame counter through a run: what it shows at each look, against what the frames give.
+void frame_counter_checks() {
+    using player::overlay::FrameRate;
+    using player::overlay::Reading;
+    // 60 frames a second from 2 s on (the game's black start before that), with no frame from 10 s to 12 s (a
+    // loading screen), looks every 500 ms as the counter's own.
+    Frames sixty;
+    sixty.from = ms(2000);
+    sixty.period = 16666667;
+    sixty.gaps[sixty.gap_count++] = Frames::Gap{ms(10000), ms(12000)};
+    FrameRate counter;
+    Reading r = counter.look(sixty.at(ms(500)), false);
+    check(!r.shown, "the counter is hidden before the game's first frame");
+    r = counter.look(sixty.at(ms(1500)), false);
+    check(!r.shown, "and still hidden while no frame has come");
+    // The first frame: a measure starts, the counter quicker to look (it waits for its first rate), still hidden.
+    r = counter.look(sixty.at(ms(2005)), false);
+    check(!r.shown && counter.waiting(), "the first frame starts a measure, hidden until it gives a rate");
+    r = counter.look(sixty.at(ms(2105)), false);
+    check(r.shown && r.fps == 60 && r.ms > 16.6f && r.ms < 16.7f, "the second look after the first frame reads 60 and 16.7 ms");
+    check(!counter.waiting(), "measured: the counter looks at its own pace again");
+    // Steady: 60 at every look.
+    bool steady = true;
+    for (long long t = ms(2605); t < ms(10000); t += ms(500)) steady = steady && counter.look(sixty.at(t), false).fps == 60;
+    check(steady, "60 at every look while the game shows 60 frames a second");
+    // The loading screen: no frame for 2 s. A look past its start may still count the frames before it; the looks
+    // within it that see no new frame read 0, shown (the game shows nothing new).
+    r = counter.look(sixty.at(ms(10105)), false);
+    check(r.shown && r.fps > 0, "a look just into the stretch counts the frames before it");
+    r = counter.look(sixty.at(ms(10605)), false);
+    check(r.shown && r.fps == 0 && r.ms == 0, "a look that sees no new frame reads 0 with no frame time");
+    r = counter.look(sixty.at(ms(11105)), false);
+    check(r.shown && r.fps == 0, "and 0 again while the stretch goes on");
+    // Frames again from 12 s: the first look after them starts a measure afresh (dashes, never the 0 of before); the
+    // second reads the true rate again (the stuck 0 this check was written for read 0 from here on).
+    r = counter.look(sixty.at(ms(12105)), false);
+    check(r.shown && r.fps == -1, "the first look after frames come again shows dashes, not 0");
+    r = counter.look(sixty.at(ms(12605)), false);
+    check(r.shown && r.fps == 60, "the second look after frames come again reads 60 again");
+    steady = true;
+    for (long long t = ms(13105); t < ms(20000); t += ms(500)) steady = steady && counter.look(sixty.at(t), false).fps == 60;
+    check(steady, "and 60 at every look after it");
+    // Held still for the question from 20.1 s to 25.2 s: hidden at once. The game takes a moment to stop (its pause
+    // goes through its own thread: frames until 20.2 s) and to start again (from 25.3 s); the frames it shows after the
+    // hold began count for nothing. After the hold, hidden until a frame comes, then the true rate by the next look.
+    Frames held = sixty;
+    held.gaps[held.gap_count++] = Frames::Gap{ms(20200), ms(25300)};
+    r = counter.look(held.at(ms(20105)), true);
+    check(!r.shown, "the counter hides while the game is held");
+    r = counter.look(held.at(ms(25105)), true);
+    check(!r.shown, "and stays hidden through the hold");
+    r = counter.look(held.at(ms(25200)), false);
+    check(!r.shown && counter.waiting(), "let go with no frame yet: still hidden, waiting for one");
+    r = counter.look(held.at(ms(25305)), false);
+    check(!r.shown, "the first frame after the hold starts a measure");
+    r = counter.look(held.at(ms(25405)), false);
+    check(r.shown && r.fps == 60, "and the next look reads 60: the hold is no long frame");
+    // 144 frames a second, looked at every 500 ms, and a run so quick its rate is capped at three digits.
+    Frames fast;
+    fast.from = ms(1000);
+    fast.period = 6944444;
+    FrameRate quick;
+    quick.look(fast.at(ms(1001)), false);
+    quick.look(fast.at(ms(1101)), false);
+    r = quick.look(fast.at(ms(1601)), false);
+    check(r.fps == 144 && r.ms > 6.9f && r.ms < 7.0f, "144 frames a second read as 144 and 6.9 ms");
+    Frames faster;
+    faster.from = ms(1000);
+    faster.period = 500000;
+    FrameRate capped;
+    capped.look(faster.at(ms(1001)), false);
+    r = capped.look(faster.at(ms(1101)), false);
+    check(r.fps == 999, "2000 frames a second read as 999, the counter's room");
+    // A stretch with no frame shorter than a look's time: the rate over the look's time takes it in (the true mean).
+    Frames hitch = sixty;
+    hitch.gaps[hitch.gap_count++] = Frames::Gap{ms(30100), ms(30350)};
+    FrameRate counted;
+    counted.look(hitch.at(ms(29505)), false);
+    counted.look(hitch.at(ms(29605)), false);
+    r = counted.look(hitch.at(ms(30105)), false);
+    check(r.fps == 60, "60 before the hitch");
+    r = counted.look(hitch.at(ms(30605)), false);
+    check(r.fps > 20 && r.fps < 35, "a quarter second without frames in a look's half second reads its mean (about 30)");
 }
 
 }  // namespace
@@ -61,6 +183,7 @@ int main() {
         check(read(path, text).show_fps == static_cast<player::Settings::ShowFps>(i), corners[i]);
     }
     check(read(path, "show_fps=middle\n").show_fps == player::Settings::ShowFps::kOff, "a corner it does not know shows no frame counter");
+    check(read(path, "show_fps=on\n").show_fps == player::Settings::ShowFps::kTopLeft, "show_fps=on is the top left, beside the pause button");
     // The other words each key takes.
     const player::Settings& words = read(path, "display=window\nwindow=auto\nvsync=on\nfps=unlimited\naudio_device=default\n"
                                                "audio_mode=shared\naudio_buffer=safe\n");
@@ -99,6 +222,8 @@ int main() {
     player::settings() = player::Settings{};
     check(!player::load_settings("no-such-settings-file.txt"), "a missing file says so");
     std::remove(path.c_str());
+    // The frame counter's numbers.
+    frame_counter_checks();
     if (g_failed) {
         std::printf("%d of %d checks FAILED\n", g_failed, g_checks);
         return 1;

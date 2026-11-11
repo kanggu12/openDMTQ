@@ -51,6 +51,8 @@
 namespace arm32 {
 // live_desktop.cpp: the game held still (the question before quitting is up, or the window is minimised), or going on.
 void desktop_live_paused(bool paused);
+// The player's stats (ARM32_STATS; log.cpp): the overlay says what its pictures cost with them.
+extern bool g_stats;
 }  // namespace arm32
 
 namespace player {
@@ -88,6 +90,30 @@ constexpr UINT kQuitMessage = WM_APP + 1;
 // A check's character for the input method (PLAYER_KEYS ime=): composed on the text field's own thread, where the input
 // context lives. wParam the character, lParam 1 to compose it and 2 to finish it.
 constexpr UINT kImeMessage = WM_APP + 2;
+// A check's planned key (PLAYER_KEYS): when it was posted, on the steady clock in nanoseconds (0: none waits), so that
+// the window says how long it waited before the UI thread took it, which is when the key is stamped for the game.
+std::atomic<long long> g_key_posted{0};
+// A check's trace of the mouse on the game's window (PLAYER_TRACE_INPUT=1): each press and release said in the log, where
+// the game has it, so that a check sees a click reach the game through what the overlay draws over it.
+bool trace_input() {
+    static const bool on = [] {
+        const char* v = std::getenv("PLAYER_TRACE_INPUT");
+        return v && *v && *v != '0';
+    }();
+    return on;
+}
+// Which window a trace line names: its class (the overlay's are OpenDMTQBar, OpenDMTQNotice and so on), or none of
+// this program's.
+std::string window_class(HWND h) {
+    if (!h) return "to no window of this program";
+    wchar_t name[128] = {};
+    GetClassNameW(h, name, 128);
+    char out[256] = {};
+    WideCharToMultiByte(CP_UTF8, 0, name, -1, out, sizeof out, nullptr, nullptr);
+    return std::string("to ") + out;
+}
+// The steady clock in nanoseconds, as the planned keys' poster stamps them.
+long long steady_ns() { return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
 // Esc is the phone's Back key, sent when it comes up: whether it went down over the game, and whether the question took
 // it (Esc answering Keep playing is no Back key when it comes up).
 bool g_esc_down = false, g_esc_held = false;
@@ -364,8 +390,10 @@ void toggle_fullscreen(HWND h) {
     }
     // Said in the log, which a check reads (the end-to-end test clicks the bar's chip).
     jvm::log("player: %s", g_fullscreen ? "full screen" : "in a window");
-    // What is drawn over the game, again with the new state: the bar's chip shows the other way now.
+    // What is drawn over the game, again with the new state: the bar's chip shows the other way now, and the bar comes
+    // down for a moment to say where it went.
     overlay::place();
+    overlay::switched();
 }
 
 // A first size that fits the display the frame is on: three quarters of the height its taskbar leaves, at 16:9, and no
@@ -715,6 +743,8 @@ void plan_keys() {
             const LPARAM down = 1 | (static_cast<LPARAM>(MapVirtualKeyW(k.vk, MAPVK_VK_TO_VSC)) << 16) | (k.alt ? (1L << 29) : 0);
             const LPARAM up = down | (1L << 30) | static_cast<LPARAM>(1UL << 31);
             jvm::log("player: %.1f s: the key %s, held %d ms", k.at, k.name.c_str(), k.hold);
+            // When it went: the window says how long it waited for the UI thread (frame_proc).
+            g_key_posted.store(steady_ns(), std::memory_order_release);
             PostMessageW(g_frame, k.alt ? WM_SYSKEYDOWN : WM_KEYDOWN, k.vk, down);
             std::this_thread::sleep_for(std::chrono::milliseconds(k.hold));
             PostMessageW(g_frame, k.alt ? WM_SYSKEYUP : WM_KEYUP, k.vk, up);
@@ -869,7 +899,17 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         mm->ptMinTrackSize.y = least.cy;
         return 0;
     }
+    case WM_ACTIVATE:
+        // A check's trace: the frame the active window, or no longer and which window is instead (another program's, or
+        // one of the overlay's, which must never be).
+        if (trace_input()) {
+            if (LOWORD(w) == WA_INACTIVE) jvm::log("player: input: the game's window is no longer active (%s)", window_class(reinterpret_cast<HWND>(l)).c_str());
+            else jvm::log("player: input: the game's window is active");
+        }
+        break;
     case WM_KILLFOCUS:
+        // A check's trace: the keyboard gone from the frame, and to which window.
+        if (trace_input()) jvm::log("player: input: the game's window lost the keyboard (%s)", window_class(reinterpret_cast<HWND>(w)).c_str());
         lift_keys();
         // An Esc whose coming up goes elsewhere (Ctrl+Shift+Esc, Alt+Tab while held): no Back.
         g_esc_down = false;
@@ -905,6 +945,10 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         }
         break;
     case WM_KEYDOWN: {
+        // A check's planned key: how long it waited for this thread, which stamps it for the game below.
+        if (const long long posted = g_key_posted.exchange(0, std::memory_order_acquire)) {
+            jvm::log("player: the key came to the window %.3f ms after it was posted", static_cast<double>(steady_ns() - posted) / 1e6);
+        }
         if (w == VK_F11) {
             if (!(l & (1L << 30))) toggle_fullscreen(h);
             return 0;
@@ -989,12 +1033,16 @@ LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         g_pressed = true;
         SetCursor(overlay::cursor(true));
         g_last_touch = false;
+        if (trace_input()) {
+            jvm::log("player: input: the mouse's button down on the game at %d,%d (the game's %.0f,%.0f)", static_cast<short>(LOWORD(l)),
+                     static_cast<short>(HIWORD(l)), static_cast<double>(game_x(static_cast<short>(LOWORD(l)))), static_cast<double>(game_y(static_cast<short>(HIWORD(l)))));
+        }
         touch(0, game_x(static_cast<short>(LOWORD(l))), game_y(static_cast<short>(HIWORD(l))));
         return 0;
     case WM_MOUSEMOVE:
-        // The mouse moving over the game: at its very top edge the overlay's bar shows (a touch's moves are pointer
-        // messages, and their copies as mouse moves are marked).
-        if ((GetMessageExtraInfo() & 0xFFFFFF00) != 0xFF515700) overlay::pointer_moved(static_cast<short>(HIWORD(l)), g_pressed);
+        // The mouse moving over the game: resting at its very top edge or on the overlay's handle, the bar comes down (a
+        // touch's moves are pointer messages, and their copies as mouse moves are marked).
+        if ((GetMessageExtraInfo() & 0xFFFFFF00) != 0xFF515700) overlay::pointer_moved(static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l)), g_pressed);
         if (g_pressed) touch(2, game_x(static_cast<short>(LOWORD(l))), game_y(static_cast<short>(HIWORD(l))));
         return 0;
     case WM_LBUTTONUP:
@@ -1002,6 +1050,7 @@ LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             g_pressed = false;
             SetCursor(overlay::cursor(false));
             ReleaseCapture();
+            if (trace_input()) jvm::log("player: input: the mouse's button up on the game at %d,%d", static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l)));
             touch(1, game_x(static_cast<short>(LOWORD(l))), game_y(static_cast<short>(HIWORD(l))));
         }
         return 0;
@@ -1151,9 +1200,8 @@ bool open_window(const std::string& title) {
         arm32::desktop_live_paused(held);
     };
     hooks.log = [](const char* line) { jvm::log("%s", line); };
-    overlay::start(g_frame, g_window, hooks, host_locale().first == "ko");
-    // The frame counter in the corner the PC's settings name, from the count of frames shown (none: no counter).
-    overlay::show_fps(static_cast<int>(settings().show_fps), [] {
+    // The count of frames shown, for the frame counter and the game's first picture.
+    hooks.frames = [] {
         // The count, the last frame's time, the count again: a frame shown between the two reads is read again, so that
         // the time is the counted frame's.
         overlay::FrameCount c;
@@ -1163,7 +1211,12 @@ bool open_window(const std::string& title) {
             if (frames_shown() == c.count) break;
         }
         return c;
-    });
+    };
+    // What the overlay's pictures cost, with the player's stats.
+    hooks.stats = arm32::g_stats;
+    overlay::start(g_frame, g_window, hooks, host_locale().first == "ko");
+    // The frame counter in the corner the PC's settings name (none: no counter).
+    overlay::show_fps(static_cast<int>(settings().show_fps));
     // A check's planned keys (PLAYER_KEYS), from now on.
     plan_keys();
     // This thread waits for window messages and its looper's jobs together: a job posted wakes it.

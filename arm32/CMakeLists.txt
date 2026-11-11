@@ -89,7 +89,8 @@ if(NOT ANDROID)
   # libraries those need.
   if(WIN32)
     set(WIN_DEPS "" CACHE PATH "Folder with ANGLE's DLLs, the EGL and GLES headers and zlib (arm32/build_windows.sh)")
-    set(PLAYER_WINDOW desktop/window_win32.cpp desktop/overlay_win32.cpp desktop/overlay_glass.cpp desktop/error_box_win32.cpp desktop/player.rc)
+    set(PLAYER_WINDOW desktop/window_win32.cpp desktop/overlay_win32.cpp desktop/overlay_glass.cpp desktop/frame_rate.cpp desktop/error_box_win32.cpp
+                      desktop/player.rc)
     set(PLAYER_OUTPUT desktop/output_wasapi.cpp)
     set(PLAYER_DECODER desktop/decoder_mf.cpp)
     # The broadcast's encoder and its capture of the game's frames (desktop/live_desktop.cpp says what runs where).
@@ -124,8 +125,9 @@ if(NOT ANDROID)
   target_include_directories(mediatest PRIVATE desktop)
   target_compile_options(mediatest PRIVATE -Wall -Wextra -Wno-unused-parameter)
   target_link_libraries(mediatest PRIVATE jvm ${PLAYER_POSIX} ${PLAYER_DECODER_LIBS})
-  # The desktop player's PC settings file, as the PC client writes it (arm32/desktop/settings.cpp).
-  add_executable(settingstest desktop/settingstest.cpp desktop/settings.cpp)
+  # The desktop player's PC settings file, as the PC client writes it (arm32/desktop/settings.cpp), and the numbers of the
+  # frame counter one of them shows (arm32/desktop/frame_rate.cpp).
+  add_executable(settingstest desktop/settingstest.cpp desktop/settings.cpp desktop/frame_rate.cpp)
   target_include_directories(settingstest PRIVATE desktop src)
   target_compile_options(settingstest PRIVATE -Wall -Wextra -Wno-unused-parameter)
   target_link_libraries(settingstest PRIVATE jvm ${PLAYER_POSIX})

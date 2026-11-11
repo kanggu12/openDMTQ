@@ -263,15 +263,26 @@ std::unique_ptr<Font> wide_font(float px) {
 
 // ---- the frame behind a piece
 
-bool backdrop_from(const std::vector<glass::Shot>& shots, const glass::Rect& r, int margin, Backdrop& out) {
-    // The read that holds the rectangle whole.
-    const glass::Shot* from = nullptr;
+namespace {
+
+// The read that holds the rectangle whole, or null: a read ends on the window's multiples of 4 (glass::aligned), so one
+// that stops short of the rectangle's right or bottom side by less than 4 pixels holds it too (the game's area of 1366
+// by 768 has 2 pixels past its last multiple), its edge repeated over them as over the blur's margin.
+const glass::Shot* holder(const std::vector<glass::Shot>& shots, const glass::Rect& r) {
     for (const glass::Shot& s : shots) {
-        if (r.x >= s.rect.x && r.y >= s.rect.y && r.x + r.w <= s.rect.x + s.rect.w && r.y + r.h <= s.rect.y + s.rect.h && s.w > 0 && s.h > 0) {
-            from = &s;
-            break;
+        if (r.x >= s.rect.x && r.y >= s.rect.y && r.x + r.w <= s.rect.x + s.rect.w + 3 && r.y + r.h <= s.rect.y + s.rect.h + 3 && s.w > 0 && s.h > 0) {
+            return &s;
         }
     }
+    return nullptr;
+}
+
+}  // namespace
+
+bool holds(const std::vector<glass::Shot>& shots, const glass::Rect& r) { return holder(shots, r) != nullptr; }
+
+bool backdrop_from(const std::vector<glass::Shot>& shots, const glass::Rect& r, int margin, Backdrop& out) {
+    const glass::Shot* from = holder(shots, r);
     if (!from) return false;
     // The quarter pixels around it with the margin, on the window's multiples of 4 (a floor that rounds down below 0 too).
     auto down = [](int v) { return v >= 0 ? v / 4 : -((-v + 3) / 4); };
