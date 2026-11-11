@@ -75,6 +75,7 @@ class LauncherApp:
         self.server_check = None        # the last time a server was asked in this run: {"url", "state", "error"}
         self.address_draft = None       # what the player typed in a server's address field and has not connected to
         #                                 yet (None: the field shows the server in use); kept over the page's redraws
+        self.main_buttons = []          # the page's main-action buttons (pages.main_button): lime while PLAY is not
         self.server_reached = None      # the ready check's last answer from the server: {"url", "reached", "at"}
         self.pumps = 0                  # turns of the task pump, for the slower look for an installer's server
         self._setup_fonts()
@@ -142,6 +143,9 @@ class LauncherApp:
         # PLAY: the lime slab on the bar's own colour, the same as the guide's last step shows.
         self.play_button = widgets.PlaySlab(bar, ui, self.words("bottom.play"), self.play)
         self.play_button.pack(side="right")
+        # Lit or not as things stand now, before the page under it is drawn: a page's main button is lime only while
+        # PLAY is not (pages.main_button reads it).
+        self._paint_play()
         # The status's lamp in its tone's colour, then its words.
         from PIL import ImageTk
         self._status_lamps = {tone: art.lamp(colour, self.scale, bg=theme.STRIP) for tone, colour in
@@ -229,6 +233,16 @@ class LauncherApp:
             self.play_button.set("waiting", self.words("bottom.play"))
         else:
             self.play_button.set("ready", self.words("bottom.play"))
+        # One lime main action on the screen: the page's main buttons go quiet while PLAY is lit, and light up while
+        # it is not (the ones of pages drawn since are gone from the list).
+        self.main_buttons = [b for b in self.main_buttons if b.winfo_exists()]
+        for button in self.main_buttons:
+            button.set_kind("secondary" if self.play_lit() else "primary")
+
+    def play_lit(self):
+        """PLAY is lit at the window's foot, the screen's one lime main action (the guide's steps have no PLAY)."""
+        slab = getattr(self, "play_button", None)
+        return self.guide is None and slab is not None and slab.winfo_exists() and slab.state == "ready"
 
     def _game_open(self):
         """The game this window started is running."""

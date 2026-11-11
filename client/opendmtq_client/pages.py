@@ -32,6 +32,15 @@ def heading(app, page):
     return TITLES[page], app.words(page + ".sub")
 
 
+def main_button(app, parent, text, command):
+    """A page's main action (Connect, Sign in, the app's download, the launcher's update) as a button: lit in lime while
+    PLAY is not, and quiet beside a lit PLAY, so that a screen has one lime main action. It follows PLAY as PLAY
+    changes (app._paint_play); the guide's steps, which have no PLAY, light it."""
+    button = widgets.Button(parent, app.ui, text, command, kind="secondary" if app.play_lit() else "primary")
+    app.main_buttons.append(button)
+    return button
+
+
 def _card(parent, ui, title, last=False):
     """A card with its title, stacked under the ones before it with the site's gap between cards."""
     card = widgets.Card(parent, ui, title)
@@ -80,12 +89,11 @@ def _server_card(app, parent):
     if server is None:
         widgets.label(line, ui, w("play.no_server"), fg=theme.MUTED, wrap_margin=0).pack(side="left", fill="x",
                                                                                          expand=True)
-        widgets.Button(line, ui, w("play.connect"), lambda: app.nav_go("online"), kind="primary").pack(side="right")
+        main_button(app, line, w("play.connect"), lambda: app.nav_go("online")).pack(side="right")
         return
     signed = app.state.signed_in(server)
     if not signed:
-        widgets.Button(line, ui, w("online.signin"), lambda: app.nav_go("online"), kind="primary").pack(
-            side="right", anchor="n")
+        main_button(app, line, w("online.signin"), lambda: app.nav_go("online")).pack(side="right", anchor="n")
     words = tk.Frame(line, bg=theme.PANEL)
     words.pack(side="left", fill="x", expand=True)
     widgets.label(words, ui, server["name"], font=ui.fonts.body_bold, wrap_margin=0).pack(fill="x")
@@ -537,8 +545,11 @@ def connect_panel(app, parent, rerender, forget=False):
 
     address.bind("<Return>", lambda e: connect())
     # The page's main action is the next step: Connect while there is no server (then Sign in, then the app's download).
-    widgets.Button(row, ui, w("online.connect"), connect, kind="secondary" if server else "primary").grid(
-        row=1, column=1, sticky="w")
+    if server:
+        connect_button = widgets.Button(row, ui, w("online.connect"), connect)
+    else:
+        connect_button = main_button(app, row, w("online.connect"), connect)
+    connect_button.grid(row=1, column=1, sticky="w")
     if server and forget:
         # After Connect, apart from it: the next server this launcher knows becomes the one PLAY plays on.
         widgets.Button(row, ui, w("online.forget"), lambda: forget_server(app, server, rerender),
@@ -638,7 +649,7 @@ def signin_panel(app, parent, rerender):
     # Typing goes to the first empty field; Tab to the next; Enter signs in.
     first = fields["online.password"] if server.get("account") else fields["online.id"]
     first.after_idle(first.focus_set)
-    widgets.Button(form, ui, w("online.signin"), sign_in, kind="primary").grid(row=1, column=2, sticky="w")
+    main_button(app, form, w("online.signin"), sign_in).grid(row=1, column=2, sticky="w")
     message.pack(fill="x", pady=(ui.px(8), 0))
 
 
@@ -697,8 +708,12 @@ def app_panel(app, parent, rerender):
     buttons = tk.Frame(parent, bg=bg)
     buttons.pack(anchor="w")
     words = w("online.app.update") if newer else w("online.app.check") if have else w("online.app.get")
-    widgets.Button(buttons, ui, words, lambda: _get(app, rerender), kind="primary" if not have or newer else
-                   "secondary").pack(side="left")
+    # Getting an app this PC lacks, or the newer one, is the page's main action; looking for a newer one is not.
+    if not have or newer:
+        get = main_button(app, buttons, words, lambda: _get(app, rerender))
+    else:
+        get = widgets.Button(buttons, ui, words, lambda: _get(app, rerender))
+    get.pack(side="left")
 
 
 def _date(details):
@@ -918,8 +933,8 @@ def build_about(app, parent):
         }[result.kind]
         answer.configure(text=text, fg=theme.BAD if result.kind == "failed" else theme.MUTED)
         if result.kind == "available":
-            widgets.Button(slot, ui, w("about.update_now", v=result.version), lambda: update(result),
-                           kind="primary").pack(anchor="w", pady=(ui.px(10), 0))
+            main_button(app, slot, w("about.update_now", v=result.version), lambda: update(result)).pack(
+                anchor="w", pady=(ui.px(10), 0))
 
     def update(result):
         if not maintenance.update_launcher(app, result):

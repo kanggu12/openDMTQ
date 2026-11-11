@@ -72,6 +72,23 @@ def measure(app, name, problems, root=None):
             parent = w.nametowidget(w.winfo_parent())
             if w.winfo_width() > parent.winfo_width() + 2:
                 problems.append("%s: wrapped text wider than its box: %r" % (name, w.cget("text")[:60]))
+    if root is app.root:
+        lime_check(app, name, problems)
+
+
+def lime_check(app, name, problems):
+    """One lime main action on a screen: of PLAY lit at the foot and the page's lit lime buttons (the guide's Next among
+    them), never more than one."""
+    lit = []
+    for w in widgets_of(app.root):
+        if not w.winfo_ismapped():
+            continue
+        if isinstance(w, widgets.Button) and w.look == widgets.Button.LOOKS["primary"] and w.enabled:
+            lit.append(w.words)
+        elif isinstance(w, widgets.PlaySlab) and w.state == "ready":
+            lit.append("PLAY")
+    if len(lit) > 1:
+        problems.append("%s: %d lime main actions: %r" % (name, len(lit), lit))
 
 
 def shot(root, out, name):

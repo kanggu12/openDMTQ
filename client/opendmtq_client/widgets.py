@@ -666,13 +666,10 @@ class Button(tk.Canvas):
 
     def __init__(self, parent, ui, text, command, kind="secondary"):
         self.ui, self.bg = ui, parent.cget("bg")
-        self.look = self.LOOKS[kind]
         super().__init__(parent, bg=self.bg, highlightthickness=0, bd=0, cursor="hand2")
         self.command, self.enabled, self.words, self.state = command, True, None, "normal"
         self.focused = False            # the keyboard is on it: its face shows the ring
-        colours = art.BUTTON_LOOKS[self.look]
-        self.text_colour = {"normal": colours["text"], "hover": colours.get("hover_text", colours["text"]),
-                            "pressed": colours.get("hover_text", colours["text"]), "disabled": theme.FAINT}
+        self._take_look(kind)
         self.set_text(text)
         self.bind("<Enter>", lambda e: self._paint("hover" if self.enabled else "disabled"))
         self.bind("<Leave>", lambda e: self._paint("normal" if self.enabled else "disabled"))
@@ -685,6 +682,22 @@ class Button(tk.Canvas):
         self.bind("<FocusOut>", lambda e: self._focus(False))
         self.bind("<Return>", lambda e: self.press())
         self.bind("<space>", lambda e: self.press())
+
+    def _take_look(self, kind):
+        """The kind's look and its words' colour in each state."""
+        self.look = self.LOOKS[kind]
+        colours = art.BUTTON_LOOKS[self.look]
+        self.text_colour = {"normal": colours["text"], "hover": colours.get("hover_text", colours["text"]),
+                            "pressed": colours.get("hover_text", colours["text"]), "disabled": theme.FAINT}
+
+    def set_kind(self, kind):
+        """Another kind (a page's main action lit in lime, or quiet while PLAY is the lit one): its faces drawn again."""
+        if self.LOOKS[kind] == self.look:
+            return
+        self._take_look(kind)
+        # Drawn again for the same words: set_text draws only for words it does not show yet.
+        words, self.words = self.words, None
+        self.set_text(words)
 
     def set_text(self, text):
         """Show other words (the guide's last Next becomes PLAY): the button takes the width they need."""
