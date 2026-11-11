@@ -10,7 +10,7 @@
 //              textures
 //   then, below 100 %, the upscaler to the window's size:
 //     AMD FSR 1      EASU (edge-adaptive upsampling), then RCAS (sharpening) at AMD's sample's 0.25 stops
-//     NVIDIA NIS     NVScaler with its coefficient textures, at the SDK's default sharpness of 50 %
+//     NVIDIA NIS     NVScaler with its coefficient textures, with no sharpening added (kNisSharpness below says why)
 //     (the plain stretch is no pass: the window's surface keeps the render scale's fixed size, and ANGLE stretches it)
 //   or a plain copy when the picture is already the window's size.
 //

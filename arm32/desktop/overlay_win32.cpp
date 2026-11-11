@@ -40,10 +40,11 @@
 //   slides down at the top of the game, stays for a few seconds and fades. A red LIVE tag with a slanted end, as the
 //   game's tags, while broadcasting; once the broadcast has ended its title says so alone, with no tag.
 // - The cursor: a dart in the logo's chrome and lime, all lime while the mouse's finger is down on the game.
-// - The frame counter: when the PC's settings ask for it, a small glass box like the game's Q and MAX box, at the top
-//   left beside a song's pause button unless another corner is chosen, 8 pixels in at 720 lines: FPS in the game's
-//   lime, the frames a second in white and the mean frame time under them, over the last half second, from the count of
-//   frames shown that the player keeps anyway (frames.cpp; frame_rate.h says how it reads it). The whole of it faint
+// - The frame counter: when the PC's settings ask for it, a small glass box like the game's Q and MAX box, at the bottom
+//   right, where it covers the fewest of the game's own labels and buttons, unless another corner is chosen (at the top
+//   left, beside a song's pause button), 8 pixels in at 720 lines: FPS in the game's lime, the frames a second in white
+//   and the mean frame time under them, over the last second, from the count of frames shown that the player keeps
+//   anyway (frames.cpp; frame_rate.h says how it reads it). The whole of it faint
 //   (its window at 62 % opacity), so the game shows through. Hidden until the game's first frame and while the game is
 //   held still, never a 0 that the overlay itself caused. It lets clicks through.
 #include "overlay_win32.h"

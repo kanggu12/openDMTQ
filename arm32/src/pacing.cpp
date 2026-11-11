@@ -56,9 +56,10 @@
 // holds it for its share of refreshes, and after the swap the thread waits for the refresh it goes
 // on screen at, so that no frame waits in the swap queue. The pace check counts the frames that
 // missed their refresh. Unlike a phone's panel, whose switches show, a computer's display takes a
-// step back up as smoothly as a step down: 15 s after a step down the faster rate is tried again (a
-// song's load holds the frames up for some seconds, after which every refresh holds again), and
-// each try that falls short doubles the wait, up to four minutes.
+// step back up as smoothly as a step down: 5 s after a step down the faster rate is tried again (a
+// song's load holds the frames up for some seconds, after which every refresh holds again), each
+// try that falls short doubles the wait, up to a minute, and a rate that then keeps up for half a
+// minute of checked frames starts the wait from 5 s again (follow.cpp's kHostFirstRetry and the rest).
 //
 // The display-following state machine (the frame rate, what the window asks for, the steps down and back up) is
 // follow.cpp's, which the build machine tests on its own; this file feeds it each swap and each frame shown.

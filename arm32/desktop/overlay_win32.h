@@ -60,8 +60,8 @@ void place();
 // The frame switched between a window and full screen: the bar shows for a few seconds, its chip the other way.
 void switched();
 // The frame counter in a corner of the game (Settings::ShowFps's order: 0 none, 1 top left, 2 top right, 3 bottom left,
-// 4 bottom right): the frames a second and the mean frame time over the last half second, from the hooks' count of
-// frames, in a window of its own. Once, after start().
+// 4 bottom right; the PC's settings put it at the bottom right unless another is chosen): the frames a second and the
+// mean frame time over the last second, from the hooks' count of frames, in a window of its own. Once, after start().
 void show_fps(int corner);
 // The cursor over the game, pressed or not, at the display's scale.
 HCURSOR cursor(bool pressed);
