@@ -120,6 +120,7 @@ run "
   \$cc -O2 -o \$out/signals \$t/signals.c
   \$cc -O2 -o \$out/interrupt \$t/interrupt.c
   \$cc -O2 -o \$out/wakes \$t/wakes.c
+  \$cc -O2 -o \$out/futexes \$t/futexes.c
   \$cc -O2 -o \$out/restart \$t/restart.c
   \$cc -O2 -o \$out/coherence \$t/coherence.c
   \$cc -O2 -o \$out/memory \$t/memory.c

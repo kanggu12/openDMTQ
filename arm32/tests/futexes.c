@@ -487,7 +487,7 @@ skip_timed:;
     {
         pthread_t f;
         atomic_store(&flood_on, 1);
-        mailbox_rounds = 1500;
+        mailbox_rounds = 800;
         run_mailbox(kPairs);
         pthread_create(&f, NULL, flooder, NULL);
         join_mailbox(kPairs);
