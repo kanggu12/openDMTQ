@@ -2041,6 +2041,9 @@ class SongPlaysTest(unittest.TestCase):
             self.assertIn('<i style="width: 100.0%"></i>', page)
             # Never played: a dash, no bar.
             self.assertEqual(page.count('<span class="plays-none">'), 1)
+            # The search finds what a row shows (title, artist, the number in #), not the song's name inside the game.
+            self.assertIn('data-k="paper planes " data-n="1"', page)
+            self.assertNotIn("paperplanes", re.sub(r'href="[^"]*"|src="[^"]*"', "", page))
 
 
 class PlaysTabTest(unittest.TestCase):

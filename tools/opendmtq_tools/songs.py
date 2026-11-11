@@ -97,9 +97,11 @@ def _category_rows(header, song_id):
     pid = PRODUCT_ID_BASE + song_id
     return [[str({"category_id": cat, "product_id": pid, "display_order": 0, "update": 0}.get(h.lstrip("\ufeff"), ""))
              for h in header] for cat in SONG_CATEGORIES]
-# Chart types the game knows: lines and the signature (0 special, 1 normal, 2 hard, 3 maximum).
+# Chart types the game knows: its lines (3, 4 and 5 are its 2, 3 and 4 LINE) and the signature, the difficulty.
 LINES = {3, 4, 5}
 SIGNATURES = {0, 1, 2, 3}
+# The game's name for each signature, as its chart screen and the site call a chart's difficulty (admin/site.py takes it).
+DIFFICULTIES = {0: "Easy", 1: "Normal", 2: "Hard", 3: "Expert"}
 # Song "name": the key for jacket and preview file names.
 NAME_RE = re.compile(r"[a-z0-9_]{1,40}")
 # Text fields copied from song.json into the tables.
@@ -420,7 +422,8 @@ def _add_package(path):
             if line not in LINES or sig not in SIGNATURES or not isinstance(diff, int) or not 1 <= diff <= 15:
                 raise SongError("song.bad_chart", chart=number)
             if (line, sig) in seen:
-                raise SongError("song.two_charts", line=line, signature=sig)
+                # Named as the game names a chart: line 5 is its 4LINE.
+                raise SongError("song.two_charts", chart=f"{line - 1}LINE {DIFFICULTIES[sig]}")
             seen.add((line, sig))
             if f not in names or names[f].file_size == 0:
                 raise SongError("song.no_chart_file", name=repr(f))

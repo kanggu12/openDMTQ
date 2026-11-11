@@ -287,15 +287,17 @@ for (const table of document.querySelectorAll('table.sortable')) {
   });
 }
 
-// A list narrowed to a word as it is typed (the Players and Songs pages): the rows whose data-k has it, a count of those
-// shown (the count's data-of says it, with {shown} and {all}; the number alone without), and the line that says none was
-// found. The page's own search box names them: data-rows, data-count, data-none, and data-scroll for a box to hide too.
+// A list narrowed to a word as it is typed (the Players and Songs pages): the rows whose data-k has it, or whose number
+// (data-n, the songs' # column) is the one typed, a count of those shown (the count's data-of says it, with {shown} and
+// {all}; the number alone without), and the line that says none was found. The page's own search box names them:
+// data-rows, data-count, data-none, and data-scroll for a box to hide too.
 for (const search of document.querySelectorAll('input[type=search][data-rows]')) {
   search.addEventListener('input', () => {
     const q = search.value.trim().toLowerCase(), rows = document.querySelectorAll(search.dataset.rows);
     let shown = 0;
     for (const r of rows) {
-      const hit = !q || r.dataset.k.includes(q);
+      // A number typed is that row's number, whole: 12 is song 12, not 112 too.
+      const hit = !q || r.dataset.k.includes(q) || r.dataset.n === q;
       r.style.display = hit ? '' : 'none';
       shown += hit;
     }

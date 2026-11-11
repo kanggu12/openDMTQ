@@ -1,12 +1,16 @@
 {% extends "base.html" %}{% block title %}{{ t('players.title') }}{% endblock %}
 {% block body %}
 <section class="card">
+  {# Nobody yet: the heading and that one line, with nothing about switches or a file of a list there is not. #}
+  {% if not players %}
+  <h2>{{ t('players.title') }}</h2>
+  <p class="empty">{{ t('players.none') }}</p>
+  {% else %}
   <h2>{{ t('players.title') }} <span class="meta-inline" id="player-count">{{ players|length }}</span><a class="more" href="{{ url_for('players_page', csv=1) }}">{{ t('players.csv') }}</a></h2>
   {# Said once, above the switches it is about. #}
   <p class="lead">{{ t('players.devices') }}</p>
   {# Broadcasts off for the whole server: the switches below wait for them, and the way to turn them on. #}
   {% if not broadcasts_on %}<p class="flash note">{{ t('players.live_master_off', url=url_for('recordings_page') ~ '#broadcasts') }}</p>{% endif %}
-  {% if not players %}<p class="empty">{{ t('players.none') }}</p>{% else %}
   {# The list narrows to a word as it is typed (admin.js). #}
   <input class="search list-search" id="player-search" type="search" placeholder="{{ t('players.search') }}" aria-label="{{ t('players.search') }}" data-rows="table.players tbody tr" data-count="#player-count" data-none="#player-none">
   <p class="empty" id="player-none" role="status" hidden>{{ t('players.nomatch') }}</p>

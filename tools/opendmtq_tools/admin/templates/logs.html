@@ -17,7 +17,6 @@
 </div>
 <section class="card">
   <h2>{{ t('logs.heading') }} <span class="meta-inline" id="log-count">{{ t('logs.count', shown=rows|length, all=matched) }}</span><a class="more" href="{{ url_for('logs_download') }}">{{ t('logs.download') }}</a></h2>
-  <p class="meta log-help">{{ t('logs.help') }}</p>
   <form class="log-filters" id="log-form">
     <input class="input" name="q" value="{{ q }}" placeholder="{{ t('logs.placeholder') }}" type="search" aria-label="{{ t('logs.filter') }}">
     <select class="input" name="status" aria-label="{{ t('logs.th_status') }}">

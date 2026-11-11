@@ -35,8 +35,9 @@ PLAYER_TOTALS = f"""SELECT p.user_id, SUM({SCORE_SQL}) AS total FROM Play p
 # charts played.
 SORTS = ("total", "month", "s_count", "perfect", "charts")
 
-# The difficulty's name, by the song list's signature code, as the game's chart screen calls them.
-DIFFICULTIES = {0: "Easy", 1: "Normal", 2: "Hard", 3: "Expert"}
+# The difficulty's name, by the song list's signature code, as the game's chart screen calls them (songs.py's, which a
+# song package's checks name its charts by too).
+DIFFICULTIES = songs.DIFFICULTIES
 
 # The grades, best first.
 GRADES = ("S", "A", "B", "C", "D", "E", "F")

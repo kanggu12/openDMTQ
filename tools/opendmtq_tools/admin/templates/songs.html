@@ -47,7 +47,8 @@
     <thead><tr><th class="rank" data-sort="num">#</th><th data-sort="text">{{ t('songs.th_title') }}</th><th data-sort="text">{{ t('songs.th_artist') }}</th><th class="song-plays" data-sort="num">{{ t('songs.th_plays') }}</th><th class="r opt" data-sort="num">{{ t('songs.th_charts') }}</th><th></th></tr></thead>
     <tbody id="songs">
     {% for s in songs %}
-      <tr data-k="{{ (s.title ~ ' ' ~ s.artist ~ ' ' ~ s.name)|lower }}"{% if s.hidden %} class="dim"{% endif %}>
+      {# The search finds what the row shows: its title and artist (data-k), and its number in the # column whole (data-n). #}
+      <tr data-k="{{ (s.title ~ ' ' ~ s.artist)|lower }}" data-n="{{ s.song_id }}"{% if s.hidden %} class="dim"{% endif %}>
         <td data-label="#" class="rank">{{ s.song_id }}</td>
         <td class="primary"><a href="{{ public_url }}/opendmtq/song.php?id={{ s.song_id }}">{{ s.title }}</a>{% if s.added %} <span class="mark new">{{ t('songs.added') }}</span>{% endif %}{% if s.hidden %} <span class="mark off">{{ t('songs.hidden') }}</span>{% endif %}</td>
         <td class="sub">{{ s.artist }}</td>
