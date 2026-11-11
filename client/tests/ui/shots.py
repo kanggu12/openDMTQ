@@ -452,7 +452,7 @@ def variants_check(app, site, out, tag, problems):
     # Below 100 %: the upscaler's row and its hint, with an anti-aliasing chosen (the longest hint of each).
     app.changed("render_scale", "50")
     app.changed("upscaler", "fsr1")
-    app.changed("anti_aliasing", "msaa4")
+    app.changed("anti_aliasing", "smaa")
     # The FPS counter on, with its corner's row under it (the longest corner's name).
     app.changed("show_fps", "on")
     app.changed("fps_position", "bottom_right")

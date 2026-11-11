@@ -61,7 +61,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | `fps_position` | `top_left` (beside a song's pause button), `top_right`, `bottom_left`, `bottom_right`; kept while the counter is off | Position, while the counter is on |
 | `render_scale` | `100`, `85`, `75`, `67`, `50` | Render scale |
 | `upscaler` | `bilinear`, `fsr1`, `nis` | Upscaler, below 100 % |
-| `anti_aliasing` | `off`, `cmaa2`, `smaa`, `msaa2`, `msaa4`, `msaa8` | Anti-aliasing |
+| `anti_aliasing` | `off`, `cmaa2`, `smaa` | Anti-aliasing |
 | `audio_device` | `default` (Windows' default output), or a device's id from `--audio-devices` | Device |
 | `audio_mode` | `shared`, `exclusive` (the device alone) | Mode |
 | `audio_buffer` | `normal`, `low`, `safe` | Buffer |
@@ -129,7 +129,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 
 ### The picture
 
-![The launcher's Screen page: the frame limit, the FPS counter switched on with its position under it, then the render scale at 50 % with AMD FSR 1 as its upscaler, and MSAA 4x](images/client-screen.png)
+![The launcher's Screen page: the frame limit, the FPS counter switched on with its position under it, then the render scale at 50 % with AMD FSR 1 as its upscaler, and SMAA](images/client-screen.png)
 
 - **Full screen or a window.** Full screen is a borderless window over the whole display, at the display's own pixels
   whatever its scaling. A window opens at three quarters of the display's height at 16:9, or at the size chosen. The
@@ -165,10 +165,9 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 - **Anti-aliasing** smooths the jagged edges of the game's shapes. **CMAA 2** (Intel's Conservative Morphological
   Anti-Aliasing 2) smooths them over the finished picture and keeps text and thin lines sharp; it runs on compute shaders
   (OpenGL ES 3.1), and where the graphics card has none the player uses SMAA instead and says so in its log. **SMAA**
-  (SMAA 1x, High preset) smooths them with three light passes over the finished picture. **MSAA** at 2x, 4x or 8x draws
-  each frame with that many samples a pixel: smoother shapes, more work for the graphics card as the number grows; a card
-  that draws fewer samples gets the most it has, and the log says how many. With an upscaler, anti-aliasing comes first,
-  at the size the game draws at. Temporal methods (DLSS, FSR 2 and 3, TAA, DLAA) need what a closed game does not hand
+  (SMAA 1x, High preset) smooths them with three light passes over the finished picture. With an upscaler,
+  anti-aliasing comes first, at the size the game draws at. MSAA, which 0.9 offered, is gone: it left the game's picture
+  as it was, and a setting of `msaa2`, `msaa4` or `msaa8` reads as CMAA 2. Temporal methods (DLSS, FSR 2 and 3, TAA, DLAA) need what a closed game does not hand
   over (its motion vectors and depth), and frame generation adds delay: none of them is offered.
 
 How it works: with an upscaler or anti-aliasing, the game draws into a framebuffer of the player's own, of the size it
@@ -179,8 +178,7 @@ the picture after them: what players see. The log says once what is in use (`the
 FSR 1 to 1280x720`, `anti-aliasing: SMAA`), and what the passes took on the render thread over the first 600 frames.
 With the player's stats on (`ARM32_STATS=1`), every 5 seconds a `stats: picture` line gives each pass's mean time a frame
 on the render thread and on the graphics card (by `EXT_disjoint_timer_query`, which ANGLE has; with its timestamps the
-game's own time on the graphics card too), the swap's whole cost, and how often the game made its context current and
-read its multisampled frame. `PLAYER_OFFSCREEN=1` has the frames drawn offscreen with no pass at all (a plain copy), to
+game's own time on the graphics card too), the swap's whole cost, and how often the game made its context current. `PLAYER_OFFSCREEN=1` has the frames drawn offscreen with no pass at all (a plain copy), to
 measure the redirection by itself.
 
 Measured on a 240 Hz display (4K, RTX 4090): 240 frames a second with VSync, none late in 480, in full screen at 100 %

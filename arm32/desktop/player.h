@@ -56,9 +56,9 @@ struct Settings {
     // gives a surface of a fixed size, or a pass of our own over the game's frame drawn at the scaled size.
     enum class Upscaler { kBilinear, kFsr1, kNis };
     Upscaler upscaler = Upscaler::kBilinear;
-    // How the edges of the game's shapes are smoothed (post_pass.cpp): not at all, by a pass over the finished picture
-    // (CMAA 2, SMAA 1x), or by drawing the frame with that many samples a pixel (MSAA).
-    enum class AntiAliasing { kOff, kCmaa2, kSmaa, kMsaa2, kMsaa4, kMsaa8 };
+    // How the edges of the game's shapes are smoothed (post_pass.cpp): not at all, or by a pass over the finished picture
+    // (CMAA 2, SMAA 1x).
+    enum class AntiAliasing { kOff, kCmaa2, kSmaa };
     AntiAliasing anti_aliasing = AntiAliasing::kOff;
     // A counter of the frames a second in a corner of the game (overlay_win32.cpp): none, or on in its corner, the top
     // left beside a song's pause button unless another is chosen (each corner has some of the game's own controls).

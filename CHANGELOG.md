@@ -48,6 +48,14 @@ one that only fixes raises the patch number. Each release's section here is its 
   next one, a minute at most (it was four). On a 240 Hz display a song now holds 240 frames a second from the page
   before it to its end, where it went down to 120 and 80 on that page and to 60 later, below 240 for most of the song.
 
+### Removed
+
+- MSAA 2x, 4x and 8x, from the launcher's Screen page, `--set anti_aliasing=` and the player: they left the game's
+  picture as it was, at the graphics card's cost. On three of the game's screens at 1920x1080, no pixel was more than 2
+  levels of 255 from the picture without MSAA, as two runs without it differ, where CMAA 2 and SMAA change 7,000 to
+  16,000 pixels of each. A setting of `msaa2`, `msaa4` or `msaa8` an earlier launcher kept reads as CMAA 2, the
+  smoothing it was chosen for, in the launcher and in the player.
+
 ### Fixed
 
 - The player for Windows: the FPS counter stayed at 0 and "-- ms" for the whole game once a half second had passed with

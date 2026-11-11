@@ -14,8 +14,9 @@
 //                                            is stretched to the area (less for the graphics card to draw)
 //   upscaler      bilinear | fsr1 | nis      below 100 %, how the picture reaches the area's size: the plain stretch,
 //                                            AMD FidelityFX Super Resolution 1 (EASU then RCAS), or NVIDIA Image Scaling
-//   anti_aliasing off | cmaa2 | smaa |       the edges of the game's shapes smoothed: not at all, by Intel's CMAA 2 or by
-//                 msaa2 | msaa4 | msaa8      SMAA 1x over the finished picture, or by drawing with 2, 4 or 8 samples
+//   anti_aliasing off | cmaa2 | smaa         the edges of the game's shapes smoothed: not at all, or by Intel's CMAA 2 or
+//                                            SMAA 1x over the finished picture (msaa2, msaa4 and msaa8, which earlier
+//                                            launchers wrote, read as cmaa2: MSAA left the game's picture as it was)
 //   show_fps      off | on | top_left |      the frames a second and the frame time in that corner of the game; on is
 //                 top_right | bottom_left |  the top left, beside a song's pause button (where the launcher puts it
 //                 bottom_right               unless its position is chosen)
@@ -113,11 +114,19 @@ bool load_settings(const std::string& path) {
             if (ok) s.upscaler = value == "fsr1" ? Settings::Upscaler::kFsr1 : value == "nis" ? Settings::Upscaler::kNis : Settings::Upscaler::kBilinear;
         } else if (key == "anti_aliasing") {
             // Each name to its kind, in the order of the enum; a name it does not know keeps it off.
-            static const char* const kNames[] = {"off", "cmaa2", "smaa", "msaa2", "msaa4", "msaa8"};
+            static const char* const kNames[] = {"off", "cmaa2", "smaa"};
             ok = false;
-            for (int i = 0; i < 6; ++i) {
+            for (int i = 0; i < 3; ++i) {
                 if (value != kNames[i]) continue;
                 s.anti_aliasing = static_cast<Settings::AntiAliasing>(i);
+                ok = true;
+            }
+            // MSAA, which earlier launchers offered, is gone: it left the game's picture as it was (its screens' pixels no
+            // further from the picture without it than two runs without it are). The smoothing it was chosen for is CMAA 2's.
+            if (value == "msaa2" || value == "msaa4" || value == "msaa8") {
+                s.anti_aliasing = Settings::AntiAliasing::kCmaa2;
+                jvm::log("player: settings: anti_aliasing=%s is no choice any more (MSAA left the game's picture as it was): CMAA 2 in its place",
+                         value.c_str());
                 ok = true;
             }
         } else if (key == "show_fps") {
@@ -153,7 +162,7 @@ bool load_settings(const std::string& path) {
     }
     // The picture's passes by the names the file uses, for the line below.
     static const char* const kUpscalers[] = {"bilinear", "fsr1", "nis"};
-    static const char* const kAntiAliasing[] = {"off", "cmaa2", "smaa", "msaa2", "msaa4", "msaa8"};
+    static const char* const kAntiAliasing[] = {"off", "cmaa2", "smaa"};
     static const char* const kCorners[] = {"off", "top left", "top right", "bottom left", "bottom right"};
     jvm::log("player: settings: %s, %s, vsync %s, fps %s, render %d%% (upscaler %s), anti-aliasing %s, frame counter %s; sound %s, %s, %s buffer, "
              "volume %d%%",

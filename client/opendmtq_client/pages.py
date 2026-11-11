@@ -277,9 +277,9 @@ def screen_rows(app, parent, redraw, full=True):
         widgets.setting_row(card.body, ui, w("screen.upscaler"),
                             lambda p: widgets.Select(p, ui, options, v["upscaler"], set_and_redraw("upscaler"), width=22),
                             w("screen.upscaler.hint." + v["upscaler"])).pack(fill="x")
-    # The edges smoothed, at any scale; its hint says what the chosen one does (the three MSAA counts share one).
+    # The edges smoothed, at any scale; its hint says what the chosen one does.
     options = [(a, w("screen.aa." + a)) for a in choices.ANTI_ALIASING]
-    kind = "msaa" if v["anti_aliasing"].startswith("msaa") else v["anti_aliasing"]
+    kind = v["anti_aliasing"]
     widgets.divider(card.body, ui)
     widgets.setting_row(card.body, ui, w("screen.aa"),
                         lambda p: widgets.Select(p, ui, options, v["anti_aliasing"], set_and_redraw("anti_aliasing"),

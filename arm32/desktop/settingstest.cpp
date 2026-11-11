@@ -195,11 +195,16 @@ int main() {
     check(read(path, "upscaler=bilinear\n").upscaler == player::Settings::Upscaler::kBilinear, "upscaler=bilinear is the plain stretch");
     check(player::Settings{}.upscaler == player::Settings::Upscaler::kBilinear, "the plain stretch is the default upscaler");
     check(player::Settings{}.anti_aliasing == player::Settings::AntiAliasing::kOff, "no anti-aliasing is the default");
-    const char* const aa_names[] = {"off", "cmaa2", "smaa", "msaa2", "msaa4", "msaa8"};
-    for (int i = 0; i < 6; ++i) {
+    const char* const aa_names[] = {"off", "cmaa2", "smaa"};
+    for (int i = 0; i < 3; ++i) {
         // Each name gives its own kind, in the enum's order.
         const std::string text = std::string("anti_aliasing=") + aa_names[i] + "\n";
         check(read(path, text).anti_aliasing == static_cast<player::Settings::AntiAliasing>(i), aa_names[i]);
+    }
+    // MSAA, which earlier launchers wrote, is CMAA 2 now.
+    for (const char* msaa : {"msaa2", "msaa4", "msaa8"}) {
+        const std::string text = std::string("anti_aliasing=") + msaa + "\n";
+        check(read(path, text).anti_aliasing == player::Settings::AntiAliasing::kCmaa2, (std::string(msaa) + " is read as CMAA 2").c_str());
     }
     check(read(path, "audio_buffer=normal\n").audio_buffer == 1, "audio_buffer=normal is 1");
     // Values it cannot read keep the default, each on its own: the keys around them are still read.

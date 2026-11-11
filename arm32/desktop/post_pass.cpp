@@ -8,7 +8,6 @@
 //     SMAA     SMAA 1x at its High preset: edges by luma, blending weights, neighbourhood blending (three draws), the
 //              reference shader itself (third_party/smaa/SMAA.hlsl, which has a GLSL path) with its area and search
 //              textures
-//     (MSAA is no pass: the bridge draws the frame multisampled and resolves it before it comes here)
 //   then, below 100 %, the upscaler to the window's size:
 //     AMD FSR 1      EASU (edge-adaptive upsampling), then RCAS (sharpening) at AMD's sample's 0.25 stops
 //     NVIDIA NIS     NVScaler with its coefficient textures, at the SDK's default sharpness of 50 %
@@ -989,7 +988,7 @@ void bind_unit(const Gl& g, int unit, GLuint texture) {
 
 // ---- what the passes cost, for the player's stats (every 5 s, with ARM32_STATS) and once in the log
 
-// The steps of a frame's picture timed apart: the resolve and the passes, each on the CPU (this thread's time) and on
+// The steps of a frame's picture timed apart: the passes, each on the CPU (this thread's time) and on
 // the GPU (EXT_disjoint_timer_query, where the driver has it). kStepGame is the GPU's time from the end of the last frame's
 // passes to the start of this one's: the game's own drawing of the frame (timestamps only).
 enum Step { kStepGame, kStepCopy, kStepCmaa2, kStepSmaaEdges, kStepSmaaWeights, kStepSmaaBlend, kStepEasu, kStepRcas, kStepNis, kSteps };
@@ -1166,10 +1165,10 @@ void steps_done() {
 }
 
 // Every 5 s with the player's stats on: each step's mean CPU and GPU time a frame, and the bridge's own share (the swap
-// as a whole, the game's make-currents and the resolves its reads of a multisampled frame made).
+// as a whole, and the game's make-currents).
 void report_steps(const char* what) {
     static std::int64_t last = 0;
-    static std::uint64_t swaps0 = 0, swap_ns0 = 0, makes0 = 0, reads0 = 0;
+    static std::uint64_t swaps0 = 0, swap_ns0 = 0, makes0 = 0;
     const std::int64_t t = now_ns();
     if (!last) last = t;
     if (t - last < 5000000000LL || !g_cpu_frames) return;
@@ -1177,7 +1176,7 @@ void report_steps(const char* what) {
     last = t;
     gpu_times_collect();
     const std::uint64_t swaps = arm32::g_offscreen_swaps.load(), swap_ns = arm32::g_offscreen_swap_ns.load();
-    const std::uint64_t makes = arm32::g_offscreen_make_currents.load(), reads = arm32::g_offscreen_read_resolves.load();
+    const std::uint64_t makes = arm32::g_offscreen_make_currents.load();
     std::string line;
     char part[96];
     for (int k = 0; k < kSteps; ++k) {
@@ -1191,14 +1190,13 @@ void report_steps(const char* what) {
         line += part;
     }
     const std::uint64_t n = swaps - swaps0;
-    arm32::log("stats: picture (%s), ms a frame:%s the swap's whole CPU %.3f (the passes' %.3f), %.1f make-currents/s, %.1f read resolves/s%s%s",
+    arm32::log("stats: picture (%s), ms a frame:%s the swap's whole CPU %.3f (the passes' %.3f), %.1f make-currents/s%s%s",
                what, line.c_str(), n ? static_cast<double>(swap_ns - swap_ns0) / static_cast<double>(n) / 1e6 : 0.0,
                static_cast<double>(g_cpu_total_ns) / static_cast<double>(g_cpu_frames) / 1e6, static_cast<double>(makes - makes0) / seconds,
-               static_cast<double>(reads - reads0) / seconds, g_gpu.on ? "" : "; no GPU timer here", g_gpu.disjoint ? "; a GPU clock change dropped some" : "");
+               g_gpu.on ? "" : "; no GPU timer here", g_gpu.disjoint ? "; a GPU clock change dropped some" : "");
     swaps0 = swaps;
     swap_ns0 = swap_ns;
     makes0 = makes;
-    reads0 = reads;
     for (std::uint64_t& v : g_cpu_ns) v = 0;
     g_cpu_frames = g_cpu_total_ns = 0;
     for (std::uint64_t& v : g_gpu.gpu_ns) v = 0;
@@ -1207,15 +1205,13 @@ void report_steps(const char* what) {
 }
 
 // The names of the passes in use, for the log.
-std::string names(const Passes& p, bool scaled, int samples) {
+std::string names(const Passes& p, bool scaled) {
     std::string s;
     if (p.aa == 1) s = "CMAA 2";
     else if (p.aa == 2) s = "SMAA";
-    // MSAA by the samples the frame really had (a card with fewer draws fewer, one with none draws one).
-    else if (samples > 1) s = "MSAA " + std::to_string(samples) + "x";
     const char* up = !scaled ? nullptr : p.easu ? "AMD FSR 1" : p.nis ? "NVIDIA NIS" : nullptr;
     if (up) s += s.empty() ? up : std::string(" + ") + up;
-    // No pass of its own drew the picture: the copy (MSAA's frame is resolved in the bridge, before this).
+    // No pass of its own drew the picture: the copy.
     else if (p.aa != 1 && p.aa != 2) s += s.empty() ? "a plain copy" : ", a plain copy";
     return s;
 }
@@ -1267,8 +1263,7 @@ bool present(const arm32::OffscreenFrame& f) {
         const char* up = p.easu ? "AMD FSR 1" : p.nis ? "NVIDIA NIS" : "a plain stretch";
         if (scaled) arm32::log("player: the game draws at %dx%d, upscaled by %s to %dx%d", f.width, f.height, up, f.out_width, f.out_height);
         else arm32::log("player: the game draws at %dx%d, the window's own size: no upscaler", f.width, f.height);
-        const char* msaa = f.samples == 2 ? "MSAA 2x" : f.samples == 4 ? "MSAA 4x" : f.samples == 8 ? "MSAA 8x" : nullptr;
-        arm32::log("player: anti-aliasing: %s", p.aa == 1 ? "CMAA 2" : p.aa == 2 ? "SMAA" : msaa ? msaa : "off");
+        arm32::log("player: anti-aliasing: %s", p.aa == 1 ? "CMAA 2" : p.aa == 2 ? "SMAA" : "off");
     }
     Saved saved;
     save_state(g, saved);
@@ -1378,10 +1373,10 @@ bool present(const arm32::OffscreenFrame& f) {
         first_ns += static_cast<std::uint64_t>(took);
         if (++first_frames == 600) {
             arm32::log("player: picture: %s took %.3f ms a frame on the render thread on average over its first 600 frames%s",
-                       names(p, scaled, f.samples).c_str(), static_cast<double>(first_ns) / 600.0 / 1e6, finish ? ", with the GPU's work waited for" : "");
+                       names(p, scaled).c_str(), static_cast<double>(first_ns) / 600.0 / 1e6, finish ? ", with the GPU's work waited for" : "");
         }
     }
-    if (arm32::g_stats) report_steps(names(p, scaled, f.samples).c_str());
+    if (arm32::g_stats) report_steps(names(p, scaled).c_str());
     return true;
 }
 
@@ -1392,13 +1387,10 @@ void post_configure(int upscaler, int anti_aliasing, int render_scale) {
     const int up = render_scale < 100 ? upscaler : 0;
     g_upscaler.store(up);
     g_anti_aliasing.store(anti_aliasing);
-    // MSAA's samples (Settings::AntiAliasing 3 to 5), drawn by the bridge itself.
-    const int samples = anti_aliasing == 3 ? 2 : anti_aliasing == 4 ? 4 : anti_aliasing == 5 ? 8 : 0;
     // The frames go offscreen for any of these; with none, the bridge is as it was without them. A check can have them go
     // offscreen with neither (PLAYER_OFFSCREEN=1: a plain copy to the window), to measure the redirection by itself.
     const char* forced = std::getenv("PLAYER_OFFSCREEN");
     const bool offscreen = up != 0 || anti_aliasing != 0 || (forced && *forced == '1');
-    arm32::g_offscreen_samples.store(samples);
     // With an upscaler the window's surface keeps its own size, the picture drawn to it from the scaled frame.
     arm32::g_offscreen_window_size.store(up != 0);
     // CMAA 2's compute shaders want OpenGL ES 3.1.

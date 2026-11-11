@@ -155,16 +155,11 @@ TEXT = {
     "screen.aa.off": ("Off", "끔"),
     "screen.aa.cmaa2": ("CMAA 2", "CMAA 2"),
     "screen.aa.smaa": ("SMAA", "SMAA"),
-    "screen.aa.msaa2": ("MSAA 2x", "MSAA 2x"),
-    "screen.aa.msaa4": ("MSAA 4x", "MSAA 4x"),
-    "screen.aa.msaa8": ("MSAA 8x", "MSAA 8x"),
     "screen.aa.hint.off": ("The edges of shapes stay as the game draws them.", "도형의 가장자리를 게임이 그린 그대로 둡니다."),
     "screen.aa.hint.cmaa2": ("Smooths jagged edges and keeps text and thin lines sharp.",
                              "계단처럼 각진 가장자리를 매끄럽게 하면서 글자와 가는 선은 선명하게 둡니다."),
     "screen.aa.hint.smaa": ("Smooths jagged edges with a light pass over the finished picture.",
                             "완성된 화면을 한 번 더 가볍게 다듬어 각진 가장자리를 매끄럽게 합니다."),
-    "screen.aa.hint.msaa": ("Smooths the edges of shapes as they are drawn. The higher the number, the more it costs the graphics card.",
-                            "도형을 그릴 때 가장자리를 매끄럽게 합니다. 숫자가 클수록 그래픽 카드 부담이 커집니다."),
 
     # -------------------------------------------------------------------------------------------- sound
     "sound.sub": ("The game's volume, and the device it plays on.", "게임 음량과 소리를 낼 장치를 고릅니다."),
