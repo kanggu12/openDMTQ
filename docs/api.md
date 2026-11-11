@@ -2458,7 +2458,7 @@ A player of the rankings.
 - `s_count` (integer): S grades.
 - `all_combos` (integer): All combos.
 - `perfect_plays` (integer): Perfect plays.
-- `accuracy` (number): Their average accuracy (percent).
+- `accuracy` (number): Their average accuracy (percent, to the tenth, the half rounded up as the site does).
 
 #### MonthRankings
 
@@ -2499,7 +2499,7 @@ A player's page on the site.
 - `s_count` (integer): S grades.
 - `all_combos` (integer): All combos.
 - `perfect_plays` (integer): Perfect plays.
-- `accuracy` (number): Their average accuracy (percent).
+- `accuracy` (number, or null): Their average accuracy (percent, to the tenth, the half rounded up as the site does); null with no plays.
 - `grades` (object of integer): Their best records by grade, only the grades they have.
 - `records` (integer): Their best records (GET /site/players/{player}/records lists them).
 - `recent` (list of [SitePlay](#siteplay)): Their last 15 plays.

@@ -9,6 +9,7 @@ import calendar
 import datetime
 import hashlib
 import json
+import math
 import os
 import sqlite3
 import time
@@ -95,8 +96,12 @@ def jacket(song):
 
 
 def accuracy(judgement):
-    """The game's per-mille judgement as a percentage with one decimal."""
-    return round(float(judgement or 0) / 10, 1)
+    """The game's per-mille judgement (an average of them need not be whole) as a percentage to the tenth, the half
+    rounded up, as the site shows it (accuracy() in server/portal/lib.php): 967.53 is 96.8. None for none (no plays)."""
+    if judgement is None:
+        return None
+    # In whole per-mille, a tenth of a percent each: Python's round() would take a half to the even tenth, the site up.
+    return math.floor(float(judgement) + 0.5) / 10
 
 
 def song_list():
@@ -135,7 +140,9 @@ def _figures(row):
     """A player's figures as the API says them."""
     return {"id": int(row["id"]), "name": player_name(row["nickname"], row["id"]), "charts": int(row["charts"] or 0),
             "total": int(row["total"] or 0), "s_count": int(row["s_count"] or 0), "all_combos": int(row["ac"] or 0),
-            "perfect_plays": int(row["perfect"] or 0), "accuracy": accuracy(row["avg_judgement"])}
+            "perfect_plays": int(row["perfect"] or 0),
+            # None with no plays: the site shows a dash there, not 0.0%.
+            "accuracy": accuracy(row["avg_judgement"]) if int(row["charts"] or 0) else None}
 
 
 def players(con):

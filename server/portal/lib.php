@@ -497,10 +497,12 @@ function jacket(array $s): string
    image mark (an empty one-pixel image takes its place). */
 const JACKET_ONERROR = " onerror=\"this.onerror=null;this.src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'\"";
 
-/* Accuracy from the game's per-mille judgement value. */
+/* Accuracy from the game's per-mille judgement value (an average of them is no whole number), to the tenth of a percent
+   with the half rounded up, as the API gives it (accuracy() in tools/opendmtq_tools/admin/site.py): 967.53 is 96.8%. */
 function accuracy($judgement): string
 {
-    return number_format(((int)$judgement) / 10, 1) . '%';
+    // In whole per-mille, a tenth of a percent each: the half goes up, the same in every language that reads the double.
+    return number_format(floor((float)$judgement + 0.5) / 10, 1) . '%';
 }
 
 /* Player display name (blank until set in game). Plain text: escape it where it is printed. */

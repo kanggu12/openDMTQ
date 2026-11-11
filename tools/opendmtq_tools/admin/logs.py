@@ -13,7 +13,7 @@ import time
 from flask import redirect, render_template, request, url_for
 from markupsafe import Markup
 
-from . import charts, core, insights, players, recordings, song_pages, status
+from . import charts, core, insights, players, recordings, site, song_pages, status
 from .core import ago, app, BASE, db, t, tp
 
 LOG_KINDS = {"game": "logs.kind_game", "files": "logs.kind_files", "app": "logs.kind_app", "site": "logs.kind_site",
@@ -309,7 +309,8 @@ class PlaysSum:
                                for i, (d, n) in enumerate(points)], tp("sum.c_weeks" if step == 7 else "sum.c_days"))
         order = [g for g in status.GRADE_COLOURS if self.grades.get(g)]
         grades = charts.segments([(g, self.grades[g], self.grades[g]) for g in order], tp("sum.c_grades"), colours=[status.GRADE_COLOURS[g] for g in order])
-        return {"n": self.n, "records": self.records, "accuracy": f"{self.judged / self.n / 10:.1f}" if self.n else "", "people": len(self.people),
+        # The average as the site and the API round it (site.accuracy).
+        return {"n": self.n, "records": self.records, "accuracy": f"{site.accuracy(self.judged / self.n):.1f}" if self.n else "", "people": len(self.people),
                 "days": days, "weekly": step == 7, "grades": grades}
 
 

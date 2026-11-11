@@ -634,6 +634,8 @@ def CASES():
         C("site_rankings_month", "GET", "/site/rankings/month", 200),
         C("site_player", "GET", "/site/players/7", 200, check=lambda t, inst, r: t.assertEqual((r.get_json()["rank"], r.get_json()["grades"]), (1, {"S": 1, "A": 1}))),
         C("site_player", "GET", "/site/players/99", 404, "player_not_found"),
+        # A player with no plays has no average accuracy (the site shows a dash), not 0.0.
+        C("site_player", "GET", "/site/players/9", 200, check=lambda t, inst, r: t.assertIsNone(r.get_json()["accuracy"])),
         C("site_player_records", "GET", "/site/players/7/records", 200, check=lambda t, inst, r: t.assertEqual(len(r.get_json()["items"]), 2)),
         C("site_player_records", "GET", "/site/players/99/records", 404, "player_not_found"),
         C("site_plays_recent", "GET", "/site/plays/recent?records=true", 200, check=lambda t, inst, r: t.assertEqual(len(r.get_json()["items"]), 3)),
@@ -1374,6 +1376,17 @@ class AsTheSiteCountsTest(unittest.TestCase):
             inst.write("custom/songList.json", json.dumps(listed))
             after = {lv["level"]: (lv["charts"], lv["records"]) for lv in inst.ask("GET", "/site/players/7").get_json()["levels"]}
             self.assertEqual(after, {k: v for k, v in before.items() if k not in (3, 7)})
+
+    def test_the_average_accuracy_is_rounded_as_the_site_rounds_it(self):
+        # To the tenth of a percent with the half up, in whole per-mille: the site cut 967.53 to 96.7 where this said 96.8,
+        # and Python's round() takes a half to the even tenth (96.25 to 96.2) where the site's rule takes it up.
+        self.assertEqual([admin.site.accuracy(j) for j in (967.53, 967.5, 962.5, 967.4999, 1000, 0)], [96.8, 96.8, 96.3, 96.7, 100.0, 0.0])
+        self.assertIsNone(admin.site.accuracy(None))
+        # The site's own rule, for the same figures: accuracy() in lib.php, the same floor of the half added.
+        lib = os.path.join(PORTAL, "lib.php")
+        if os.path.isfile(lib):
+            with open(lib, encoding="utf-8") as f:
+                self.assertIn("number_format(floor((float)$judgement + 0.5) / 10, 1)", f.read())
 
     def test_the_months_are_named_in_utc_west_of_it(self):
         # A month's rankings begin at midnight UTC on its first day (the game counts down to it), and the site names the

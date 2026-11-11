@@ -543,7 +543,7 @@ SHAPES = {
         Field("id", "integer", "Their number."), Field("name", "string", "Their name."),
         Field("charts", "integer", "Charts played (with a record)."), Field("total", "integer", "Best scores summed."),
         Field("s_count", "integer", "S grades."), Field("all_combos", "integer", "All combos."), Field("perfect_plays", "integer", "Perfect plays."),
-        Field("accuracy", "number", "Their average accuracy (percent).")]),
+        Field("accuracy", "number", "Their average accuracy (percent, to the tenth, the half rounded up as the site does).")]),
     "MonthRankings": Shape("This month's rankings, as the game ranks them.", [
         Field("items", "[MonthPlayer]", "This month's players, best first: the sum of each one's best score per chart this month."),
         Field("starts_anew", "integer", "When the next month begins: the first of the month at midnight UTC (Unix time)."),
@@ -559,7 +559,8 @@ SHAPES = {
         Field("rank", "integer", "Their rank by total, among those who played.", nullable=True),
         Field("charts", "integer", "Charts with a record."), Field("total", "integer", "Best scores summed."),
         Field("s_count", "integer", "S grades."), Field("all_combos", "integer", "All combos."), Field("perfect_plays", "integer", "Perfect plays."),
-        Field("accuracy", "number", "Their average accuracy (percent)."),
+        Field("accuracy", "number", "Their average accuracy (percent, to the tenth, the half rounded up as the site does); null with no plays.",
+              nullable=True),
         Field("grades", "{integer}", "Their best records by grade, only the grades they have."),
         Field("records", "integer", "Their best records (GET /site/players/{player}/records lists them)."),
         Field("recent", "[SitePlay]", "Their last 15 plays."),
