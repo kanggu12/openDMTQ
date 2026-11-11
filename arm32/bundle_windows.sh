@@ -38,6 +38,10 @@ fonts=$root/client/opendmtq_client/assets/fonts
 mkdir -p "$dest/fonts"
 for face in Pretendard-Regular Pretendard-SemiBold Pretendard-Bold DMTQWide-ExtraBold; do cp "$fonts/$face.ttf" "$dest/fonts/"; done
 cp "$fonts/Pretendard-OFL.txt" "$fonts/Saira-OFL.txt" "$dest/fonts/"
+# The bar's wordmark, which the overlay loads from images\ beside the player: the pictures desktop/assets/make_wordmark.py
+# drew with the launcher's own code, one for each scale.
+mkdir -p "$dest/images"
+cp "$here"/desktop/assets/bar-wordmark-*.png "$dest/images/"
 cp "$here/desktop/README-windows.txt" "$dest/README.txt"
 # The licenses of every part, one file, in the order NOTICES-windows.txt names them; Android's notices beside it.
 notice() {

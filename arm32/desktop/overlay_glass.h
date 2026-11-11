@@ -5,9 +5,10 @@
 // frame behind needs for the words to keep 4.5:1. The frame comes from the render thread (glass_capture.h) at a quarter of
 // the window's pixels; the blur, the tint and the rest are done here, on the overlay's thread, on the CPU.
 //
-// Also the overlay's faces: Pretendard (regular, semibold, bold) for its words and DMTQ Wide for the bar's name, both
-// under the SIL Open Font License, loaded for the player alone from its own folder (fonts\ beside the program); Windows'
-// own faces where they are not there.
+// Also the overlay's faces: Pretendard (regular, semibold, bold) for its words and DMTQ Wide for the bar's name where
+// its wordmark's pictures are not there, both under the SIL Open Font License, loaded for the player alone from its own
+// folder (fonts\ beside the program); Windows' own faces where they are not there. And the wordmark's pictures
+// (images\ beside the program).
 #pragma once
 
 #include "canvas_win32.h"
@@ -53,6 +54,16 @@ std::unique_ptr<Gdiplus::Font> font(Weight weight, float px, bool korean);
 std::unique_ptr<Gdiplus::Font> wide_font(float px);
 // Loads the player's own faces from fonts\ beside the program, once, after GDI+ has started; whether they were there.
 bool load_fonts();
+
+// ---- the wordmark
+
+// Loads the OpenDMTQ wordmark's pictures from images\ beside the program (bar-wordmark-<percent>.png, drawn by the
+// launcher's own code: arm32/desktop/assets/make_wordmark.py), once, after GDI+ has started; whether any was there.
+bool load_art();
+// The wordmark's picture for the overlay's `scale` (1 at 720 lines and 96 dpi): the one drawn for that scale, or the
+// next larger one, which the caller draws down to it (the largest beyond the last); its own scale in `drawn_for`. Null
+// when none was loaded (the bar sets its name in words then).
+Gdiplus::Bitmap* wordmark(float scale, float& drawn_for);
 
 // ---- the frame behind a piece
 

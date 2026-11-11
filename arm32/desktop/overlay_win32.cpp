@@ -16,9 +16,10 @@
 // the picture comes back as a message, so a key pressed meanwhile is never stamped late for it.
 //
 // - The bar: a PC has no phone's buttons around the game, so a bar of glass across the top of the game's area comes down
-//   when the pointer rests at the very top edge or on the handle with its button up, or when a finger is drawn down
-//   from the top edge; by itself for 3 seconds when the game's picture first shows and after each switch between a
-//   window and full screen, so that a player sees where it is. "OPEN DMTQ" on its left in the launcher's wordmark face;
+//   when the pointer moves to the very top edge or onto the handle and rests there with its button up, or when a finger
+//   is drawn down from the top edge, either only with the game quiet (no click, touch or held note) for 1.5 s; by
+//   itself for 3 seconds when the game's picture first shows and after each switch between a window and full screen,
+//   so that a player sees where it is. The OpenDMTQ wordmark on its left, as the launcher's header draws it;
 //   on its right two chips like the game's OFF chips, full screen (or back to a window) and an X that quits after asking.
 //   Under the pointer the full screen chip lights with a lime edge and the X turns red, as Windows' own close does; held,
 //   a chip is pressed in. It stays while the pointer is on it and goes up soon after it leaves, so it never sits on the
@@ -801,9 +802,32 @@ void cross(Graphics& g, Pen& line, float cx, float cy, float half) {
     g.DrawLine(&line, cx - half, cy + half, cx + half, cy - half);
 }
 
-// The bar's name in the launcher's wordmark face, "OPEN DMTQ" spaced out as the launcher's header spaces its OPEN (set
-// plainly as "OpenDMTQ", the wide face's small letters read heavier and cramped); where it went, for its words' zone.
+// The bar's name: the OpenDMTQ wordmark as the launcher's header draws it (OPEN over its lime line, DMTQ in chrome with
+// the Q lit; its pictures beside the player, overlay_glass.h's wordmark), 22 in from the bar's left end at 720 lines and
+// centred in its height as the header centres its own; drawn down with GDI+'s finest filter from the picture of the
+// next larger scale when there is none of this one. Where the pictures are not there, "OPEN DMTQ" in the launcher's
+// wordmark face, spaced out as its header spaces OPEN. Where it went, for its zone.
 RectF bar_name(Graphics& g, float h) {
+    float drawn_for = 0;
+    if (Bitmap* mark = wordmark(scale(), drawn_for)) {
+        const float k = scale() / drawn_for;
+        const auto pw = static_cast<float>(mark->GetWidth()), ph = static_cast<float>(mark->GetHeight());
+        // At its own size, on whole pixels: the picture's pixels as they are, nothing filtered.
+        const bool own = std::fabs(k - 1.0f) < 0.001f;
+        float x0 = fpx(22), y = (h - ph * k) / 2;
+        if (own) {
+            x0 = std::round(x0);
+            y = std::round(y);
+        }
+        const InterpolationMode before = g.GetInterpolationMode();
+        g.SetInterpolationMode(own ? InterpolationModeNearestNeighbor : InterpolationModeHighQualityBicubic);
+        // The picture's edge repeated past it as the filter reads beyond it (no dark fringe at the mark's sides).
+        ImageAttributes edges;
+        edges.SetWrapMode(WrapModeTileFlipXY);
+        g.DrawImage(mark, RectF(x0, y, pw * k, ph * k), 0, 0, pw, ph, UnitPixel, &edges);
+        g.SetInterpolationMode(before);
+        return RectF(x0, y, pw * k, ph * k);
+    }
     const std::wstring name = L"OPEN DMTQ";
     // 0.2 em after each letter.
     const float size = fpx(15);
@@ -2527,9 +2551,10 @@ void start(HWND frame, HWND game, const Hooks& hooks, bool korean) {
     g_korean = korean;
     GdiplusStartupInput input;
     GdiplusStartup(&g_gdiplus, &input, nullptr);
-    // The player's own faces, from its folder (Windows' own where they are not there), before the painter draws with
-    // them.
+    // The player's own faces and the wordmark's pictures, from its folder (Windows' own faces, and the name in words,
+    // where they are not there), before the painter draws with them.
     load_fonts();
+    load_art();
     // The notice, the frame counter and the handle let clicks through to the game; the bar and the question take
     // theirs. The counter and the handle first, so that the windows made after them are above them.
     g_fps.window = make_window(L"OpenDMTQFrameCounter", fps_proc, true);

@@ -97,7 +97,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 - **The handle**: a short faint pill with a down arrow at the top centre of the game says where the bar is: the pointer
   resting on it brings the bar down. Clicks go through it to the game. It shows once the game's picture is up, and goes
   while the bar is down, while a notice or the question is up and while the game holds still.
-  On its left, OPEN DMTQ in the launcher's wordmark face; on its right two chips like the game's OFF chips: **full
+  On its left, the OpenDMTQ wordmark as the launcher's header draws it; on its right two chips like the game's OFF chips: **full
   screen** (or back to a window), lit with a lime edge under the pointer, and an **X** that quits, red under the pointer
   as Windows' own close button turns; held, a chip is pressed in, and it acts only when let go where it was pressed (the
   question's buttons too). The X asks first, in a glass card over the game dimmed and blurred behind it: **Keep
@@ -121,7 +121,9 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   the mean of 4 by 4 of the frame's), at most 20 times a second while a piece is up and once while the game holds still;
   with none up, it costs the game nothing. A piece waits a moment for its first read; where none comes, it is its plain
   tint, nearly solid. The words are set in Pretendard, titles and buttons bold, which the player carries in its `fonts`
-  folder with the wordmark's face.
+  folder with the launcher's wide face. The wordmark is a picture for each scale from 100 % to 400 %, drawn by the
+  launcher's own code (`arm32/desktop/assets/make_wordmark.py`) and carried in the player's `images` folder: at those
+  scales it is drawn pixel for pixel, between them the next larger is drawn down.
 - **The pointer** over the game is a dart in the logo's look: a chrome left face and a lime right face with a dark rim.
   While the button is down it is all lime and a little smaller. It is sized for the display's scaling.
 - **A touch screen** is the player's first input, as a phone's screen is the game's. Windows' own touch feedback stays

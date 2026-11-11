@@ -187,6 +187,11 @@ if(NOT ANDROID)
     add_custom_command(TARGET player POST_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:player>/fonts
                        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PLAYER_FONTS}/Pretendard-Regular.ttf ${PLAYER_FONTS}/Pretendard-SemiBold.ttf
                        ${PLAYER_FONTS}/Pretendard-Bold.ttf ${PLAYER_FONTS}/DMTQWide-ExtraBold.ttf $<TARGET_FILE_DIR:player>/fonts)
+    # The bar's wordmark in images\ beside it, where it loads them from (desktop/overlay_glass.cpp): the pictures
+    # desktop/assets/make_wordmark.py drew with the launcher's own code, as the bundle carries them (bundle_windows.sh).
+    file(GLOB PLAYER_WORDMARKS ${CMAKE_CURRENT_SOURCE_DIR}/desktop/assets/bar-wordmark-*.png)
+    add_custom_command(TARGET player POST_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:player>/images
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PLAYER_WORDMARKS} $<TARGET_FILE_DIR:player>/images)
   endif()
   return()
 endif()

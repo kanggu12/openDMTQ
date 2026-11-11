@@ -26,6 +26,16 @@ std::unique_ptr<PrivateFontCollection> g_collections[4];
 std::unique_ptr<FontFamily> g_regular, g_semibold, g_bold, g_wide;
 bool g_fonts_tried = false;
 
+// The wordmark's pictures by the scale each was drawn for, smallest first (none: the bar's name in words), loaded once:
+// each one's premultiplied pixels in memory of its own and a GDI+ bitmap over them.
+struct Art {
+    float scale = 1;
+    std::vector<std::uint32_t> pixels;
+    std::unique_ptr<Bitmap> bitmap;
+};
+std::vector<Art> g_wordmarks;
+bool g_art_tried = false;
+
 // The folder the program is in, without its last separator ("" when Windows will not say).
 std::wstring program_folder() {
     std::vector<wchar_t> buf(MAX_PATH);
@@ -240,6 +250,59 @@ bool load_fonts() {
     g_bold = family_of(L"Pretendard", g_collections[2].get());
     g_wide = family_of(L"DMTQ Wide", g_collections[3].get());
     return g_regular != nullptr;
+}
+
+// ---- the wordmark
+
+bool load_art() {
+    if (g_art_tried) return !g_wordmarks.empty();
+    g_art_tried = true;
+    // images\ beside the program, as the player's bundle lays it out (arm32/bundle_windows.sh), one picture for each
+    // scale the script drew (arm32/desktop/assets/make_wordmark.py).
+    const std::wstring folder = program_folder() + L"\\images\\";
+    for (int percent : {100, 125, 150, 175, 200, 250, 300, 400}) {
+        const std::wstring path = folder + L"bar-wordmark-" + std::to_wstring(percent) + L".png";
+        Art art;
+        art.scale = static_cast<float>(percent) / 100.0f;
+        INT w = 0, h = 0;
+        {
+            // Its pixels read into memory of its own, and the file let go: a bitmap cloned from the file's would keep
+            // the file open for the player's life (measured on Windows 11: it could not be renamed meanwhile).
+            Bitmap file(path.c_str());
+            w = static_cast<INT>(file.GetWidth());
+            h = static_cast<INT>(file.GetHeight());
+            if (file.GetLastStatus() != Ok || w <= 0 || h <= 0) continue;
+            art.pixels.resize(static_cast<std::size_t>(w) * static_cast<std::size_t>(h));
+            BitmapData data{};
+            data.Width = static_cast<UINT>(w);
+            data.Height = static_cast<UINT>(h);
+            data.Stride = w * 4;
+            data.PixelFormat = PixelFormat32bppPARGB;
+            data.Scan0 = art.pixels.data();
+            Rect all(0, 0, w, h);
+            if (file.LockBits(&all, ImageLockModeRead | ImageLockModeUserInputBuf, PixelFormat32bppPARGB, &data) != Ok) continue;
+            file.UnlockBits(&data);
+        }
+        // The bitmap over those pixels (a vector's buffer stays where it is when the vector moves).
+        art.bitmap = std::make_unique<Bitmap>(w, h, w * 4, PixelFormat32bppPARGB, reinterpret_cast<BYTE*>(art.pixels.data()));
+        if (art.bitmap->GetLastStatus() != Ok) continue;
+        g_wordmarks.push_back(std::move(art));
+    }
+    return !g_wordmarks.empty();
+}
+
+Bitmap* wordmark(float scale, float& drawn_for) {
+    if (g_wordmarks.empty()) return nullptr;
+    // The first drawn for this scale or a larger one (a hair under it counts as it: the scales come from divisions);
+    // past the largest, the largest.
+    for (const Art& art : g_wordmarks) {
+        if (art.scale >= scale - 0.001f) {
+            drawn_for = art.scale;
+            return art.bitmap.get();
+        }
+    }
+    drawn_for = g_wordmarks.back().scale;
+    return g_wordmarks.back().bitmap.get();
 }
 
 std::unique_ptr<Font> font(Weight weight, float px, bool korean) {
