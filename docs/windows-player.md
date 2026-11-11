@@ -151,19 +151,16 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   display); another limit is held by the clock, with each frame still on a refresh (144 on a 240 Hz display).
 - **VSync off:** frames go out as soon as they are drawn, evenly at the limit, which may be above the display's rate, or
   as fast as the PC draws without one. A little less delay, and the picture may tear.
-- **The FPS counter** is off by default. On, it shows at the bottom right, 8 pixels in at 720 lines, where it covers the
-  least of the game: on its screens, none of its labels and buttons but the end of the result's SELECT MUSIC and of the
-  download list's DOWNLOAD and the loading screen's version (the bottom left would cover more, the music list's grid
-  button whole; the top is the bar's). In a song it sits over the play field's corner, faint, so a note there shows
-  through. Its **Position** can be changed to another corner, and stays chosen while the counter is off; a corner chosen
-  before stays (the top left that launchers before 0.9.3 wrote whether chosen or not reads as the default). A small
-  glass box like the game's Q and MAX box, faint as a whole so the game shows through it: FPS in the game's lime, the
-  frames a second in white and the mean frame time under them, over the last second, twice a second. It counts the
-  frames the player shows between their own moments, so a steady 60 reads 60; a loading screen that shows a frame now
-  and then reads its few frames a second, and only a whole second without a frame reads 0. It shows from the game's
-  first frame, and hides while the game holds still (the question before quitting, a minimised window) instead of
-  counting the stillness. It lets clicks through, and is drawn apart from the game's picture: it costs the game nothing,
-  and the broadcast does not show it.
+- **The FPS counter**, off by default, is a small glass box like the game's Q and MAX box, faint so that the game shows
+  through it: FPS in the game's lime, the frames a second in white and the mean frame time under them, over the last
+  second, twice a second. It sits at the bottom right, 8 pixels in at 720 lines, where it covers the least of the
+  game's labels and buttons: only the end of the result's SELECT MUSIC and of the download list's DOWNLOAD, and the
+  loading screen's version (the bottom left would cover the music list's grid button whole; the top is the bar's). In
+  a song it sits over the play field's corner. **Position** moves it to another corner, kept while the counter is off.
+  A top left set by a launcher before 0.9.3, which wrote it whether chosen or not, reads as the default; another corner
+  set then stays. It counts the frames the player shows: a steady 60 reads 60, and only a whole second without a frame
+  reads 0. It shows from the game's first frame and hides while the game holds still. Drawn apart from the game's
+  picture, it costs the game nothing, and the broadcast does not show it.
 - **The render scale** draws the game at a share of the window's pixels (100 % down to 50 %), stretched to fill it:
   lighter for the graphics card, and softer. The share keeps the window's shape exactly where its size has fine enough
   steps (1920x1080 is 120 steps of 16x9): 67 % of 1920x1080 is 1280x720, so the game lays itself out as it does at full
