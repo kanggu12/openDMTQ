@@ -6,6 +6,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-11
+
 ### Fixed
 
 - The player for Windows: the bar's chips and the question's buttons act only when let go where they were pressed, and
@@ -528,7 +530,8 @@ one that only fixes raises the patch number. Each release's section here is its 
 - Four ways to run it: the Windows bundle, one command on Linux or macOS, Docker Compose, and a Helm chart for
   Kubernetes.
 
-[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/kanggu12/openDMTQ/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/kanggu12/openDMTQ/compare/v0.8.2...v0.9.0
 [0.8.2]: https://github.com/kanggu12/openDMTQ/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/kanggu12/openDMTQ/compare/v0.8.0...v0.8.1
