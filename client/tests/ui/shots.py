@@ -72,6 +72,9 @@ def measure(app, name, problems, root=None):
             parent = w.nametowidget(w.winfo_parent())
             if w.winfo_width() > parent.winfo_width() + 2:
                 problems.append("%s: wrapped text wider than its box: %r" % (name, w.cget("text")[:60]))
+        if cls == "Entry" and str(w.cget("selectbackground")) != widgets.SELECTION["selectbackground"]:
+            # Selected words in a field in the launcher's colours, never the system's blue.
+            problems.append("%s: a field selects in %s" % (name, w.cget("selectbackground")))
     if root is app.root:
         lime_check(app, name, problems)
 

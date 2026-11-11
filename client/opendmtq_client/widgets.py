@@ -1100,11 +1100,15 @@ def check_line(parent, ui, state, text, action_text=None, action=None, bg=theme.
     return row
 
 
+# Text selected in a field: the launcher's own colours, as a drop-down's chosen row has them, never Windows' blue.
+SELECTION = {"selectbackground": theme.RAIL_UP, "selectforeground": theme.TEXT, "selectborderwidth": 0}
+
+
 def entry(parent, ui, width=18, secret=False):
     """A text field as the site's: a dark field with a one-pixel seam, lime round it while typing."""
     field = tk.Entry(parent, width=width, font=ui.fonts.body, bg=theme.FIELD, fg=theme.TEXT, insertbackground=theme.TEXT,
                      relief="flat", highlightthickness=1, highlightbackground=theme.LINE, highlightcolor=theme.OK,
-                     show="\u2022" if secret else "")
+                     show="\u2022" if secret else "", **SELECTION)
     return field
 
 
@@ -1118,9 +1122,10 @@ class Field(tk.Canvas):
         self.ui, bg = ui, parent.cget("bg")
         px = ui.px
         super().__init__(parent, bg=bg, highlightthickness=0, bd=0, cursor="xterm", takefocus=0)
+        # Selected words in the launcher's colours (SELECTION), not Windows' blue.
         self.entry = tk.Entry(self, width=width, font=ui.fonts.body, bg=theme.FIELD, fg=theme.TEXT,
                               insertbackground=theme.TEXT, relief="flat", bd=0, highlightthickness=0,
-                              show="\u2022" if secret else "")
+                              show="\u2022" if secret else "", **SELECTION)
         # The words' room either side of them, and the button's height.
         self.pad = px(10)
         width_px, height_px = self.entry.winfo_reqwidth() + 2 * self.pad, px(Button.HEIGHT)
