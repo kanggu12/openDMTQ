@@ -727,6 +727,59 @@ def update_failures_check(app, out, tag, problems):
             problems.append("%s: a full disk during the update said %r" % (tag, dialog and dialog.detail))
 
 
+def game_end_check(app, out, tag, problems):
+    """A game that ends with Help on show: at once, before the ready check comes back (made slow here, as with the
+    server away), PLAY is no longer PLAYING and Help shows the game's log (its row, and the line that points at it)."""
+    import tkinter as tk
+
+    from opendmtq_client import actions
+    w = app.words
+    app.go("help")
+    settle(app)
+    seen, slow = {}, {"on": False}
+    real_readiness = actions.readiness
+
+    def readiness(*args, **kw):
+        # A check started after the game: three seconds, as a server that does not answer keeps the window waiting.
+        if slow["on"]:
+            time.sleep(3)
+        return real_readiness(*args, **kw)
+
+    real_watch = app._watch
+
+    def watch():
+        real_watch()
+        if app.session is None and "after" not in seen:
+            # The moment the game has ended: what PLAY and the page say before the slow check answers.
+            texts = [x.cget("text") for x in widgets_of(app.root) if isinstance(x, tk.Label) and x.winfo_exists()]
+            seen["after"] = (app.play_button.state, app.checks is None, texts)
+
+    actions.readiness, app._watch = readiness, watch
+    try:
+        app.play()
+        end = time.time() + 15
+        while time.time() < end and app.session is None:
+            app.root.update()
+            time.sleep(0.02)
+        slow["on"] = True
+        while time.time() < end and "after" not in seen:
+            app.root.update()
+            time.sleep(0.02)
+        wait_out(app.root, 0.4)
+        shot(app.root, out, "%s_help-after-game" % tag)
+    finally:
+        actions.readiness, app._watch = real_readiness, real_watch
+    if "after" not in seen:
+        problems.append("%s: the game did not end in the window" % tag)
+        return
+    state, waiting, texts = seen["after"]
+    if state == "playing" or not waiting:
+        problems.append("%s: when the game ended PLAY was %r (ready check back: %r)" % (tag, state, not waiting))
+    if w("help.trouble.1") not in texts or w("help.player_log") not in texts:
+        problems.append("%s: when the game ended Help did not show its log: %r" % (tag, [t for t in texts if t][:12]))
+    settle(app, 8)
+
+
 def fake_install(home):
     """A folder laid out as Velopack's install, with its package: Help shows Repair and Uninstall as in an installed
     launcher, and Repair has something to compare."""
@@ -1055,6 +1108,8 @@ def main():
     app.root.geometry("%dx%d+0+0" % (w, h))
     settle(app)
     dialogs_check(app, args.out, tag, problems)
+    # Last of the window's checks: the game it starts makes the player's log, which the clearing above would count.
+    game_end_check(app, args.out, tag, problems)
     # Jobs the window still has waiting would fire into the next window's event loop once it is gone.
     for job in app.root.tk.splitlist(app.root.tk.call("after", "info")):
         app.root.after_cancel(job)

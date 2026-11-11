@@ -19,6 +19,9 @@ log = logging.getLogger("opendmtq_client")
 
 # The menu, left to right, in English in both languages as the site's and the game's menus are.
 NAV = ("play", "screen", "sound", "controls", "online", "help", "about")
+# The pages that show what a game changes (the last game, the player's log, the app PLAY got first): drawn again when a
+# game ends while one of them is on show. The others show settings, which a game leaves as they were.
+GAME_PAGES = ("play", "help", "online")
 # The room at the window's left and right ends (logical pixels), the same in the guide.
 EDGE = 28
 # The bottom bar's height inside its padding: PLAY's slab and its keyboard ring, on every page and every guide step.
@@ -366,8 +369,14 @@ class LauncherApp:
             # Kept until the player does something: the ready check that follows does not take its place at once.
             self.set_status(i18n.Said("status.ended", time=i18n.span(record["seconds"])), "ok", sticky=True)
         self.refresh_checks()
-        if self.page == "play":
-            self.go("play")
+        # PLAY says at once that the game is over, never PLAYING until the ready check comes back (a few seconds with
+        # the server away): lit as before the game, and the check's answer says more when it comes.
+        self._paint_play()
+        if self.guide is None and self.page in GAME_PAGES:
+            # The page on show follows the game's end where it shows what a game changes, in place: the last game on
+            # PLAY, the player's log on Help, the app on Online (a newer one PLAY got first).
+            from opendmtq_client import pages
+            pages.redraw_in_place(self, self.page)
 
     def open_player_log(self):
         """Show the player's log for the current server's app (Explorer, the file selected); the Help page when there
