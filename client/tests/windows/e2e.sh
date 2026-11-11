@@ -7,7 +7,9 @@
 #   4. the player reaching the game's menu (a frame of it saved); the bar coming down by itself for 3 seconds when the
 #      game's picture first shows; the handle at the game's top centre (the pointer resting on it brings the bar, a
 #      click on its place reaches the game, the game's window keeps the keyboard); the bar at its top edge switching to a
-#      window and back, its X asking (the game held still), Keep playing, then the X and Quit the game, the launcher back
+#      window and back; in the window, no buttons of its own, and the bar's minimise (the game held still) and the
+#      taskbar's restore (the game going on, no bar by itself); the bar's X asking (the game held still), Keep playing,
+#      then the X and Quit the game, the launcher back
 #   5. Repair from the command line: a file of the player and one of the launcher put back as they were installed
 #   6. Clear game data: the id alone stays; the FPS counter switched on from the command line (the launcher's window
 #      closed for it, then opened again), and the game starts again with the same id and gets to its menu, the counter
@@ -40,6 +42,13 @@ docker image inspect opendmtq-arm32-wine >/dev/null 2>&1 \
   || docker build -q -t opendmtq-arm32-wine -f "$ROOT/arm32/wine.Dockerfile" "$ROOT/arm32" >/dev/null
 docker image inspect opendmtq-client-e2e:local >/dev/null 2>&1 \
   || docker build -q -t opendmtq-client-e2e:local "$ROOT/client/tests/windows" >/dev/null
+# The taskbar's part, which Wine has none of (taskbar.c: bringing back a minimised window, reading its title bar's
+# buttons), built with the player's toolchain into OUT_DIR.
+docker image inspect opendmtq-arm32-windows >/dev/null 2>&1 \
+  || docker build -q -t opendmtq-arm32-windows -f "$ROOT/arm32/windows.Dockerfile" "$ROOT/arm32" >/dev/null
+docker run --rm --network none -u "$(id -u):$(id -g)" -v "$ROOT/client/tests/windows:/src:ro" -v "$OUT:/out" opendmtq-arm32-windows \
+  x86_64-w64-mingw32-clang -O2 -Wall -o /out/taskbar.exe /src/taskbar.c -luser32 \
+  || { echo "FAIL: the taskbar's helper did not build" >&2; exit 1; }
 
 # ---- 1. the installer on the server, and back from its /windows as a player downloads it
 cp "$BUILD/releases/OpenDMTQ-Setup.exe" "$BUILD/releases/OpenDMTQ-Setup.exe.version" "$APK/"
@@ -219,7 +228,7 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   wait_for 4 '[ \"\$(bar_downs)\" -gt \"\$downs\" ]' || { snap clicks-then-rest; echo 'FAIL: a rest on the handle after clicks did not bring the bar once the game was quiet'; exit 1; }
   echo 'clicks, then a move to the handle and a rest, brought the bar once the game had been quiet for 1.5 s'
   xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 2
-  # The bar's chip (0 the X, 1 full screen): its centre's distance from the right end and from the top.
+  # The bar's chip (0 the X, 1 full screen, 2 minimise): its centre's distance from the right end and from the top.
   bar_chip() {
     eval \$(xdotool getwindowgeometry --shell \"\$game\")
     local size=\$(opx 40) gap=\$(opx 10) margin=\$(opx 16) bar=\$(opx 74)
@@ -238,6 +247,8 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   switches() { cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | grep -cE 'player: (full screen|in a window)'; }
   # How many times the bar went up.
   bar_ups() { cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | grep -c 'player: the bar goes up'; }
+  # How many times the player said a line.
+  said_count() { cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | grep -c \"\$1\"; }
   # The full screen chip, twice: to a window, then back, each said in the player's log. The bar stays down for 3 s
   # after each switch, the pointer taken off it at once.
   for way in window full-screen; do
@@ -250,6 +261,26 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
     wait_for 10 '[ \"\$(switches)\" -gt \"\$before\" ]' || { snap no-switch; echo \"FAIL: the bar's full screen chip did not switch to \$way\"; exit 1; }
     echo \"the bar switched to \$way: \$size_before, now \$(xdotool getwindowgeometry \"\$game\" | grep Geometry)\"
     sleep 2; snap \"in-\$way\"
+    [ \"\$way\" = window ] || continue
+    # In a window: no buttons of its own on its title bar (Windows draws none without a system menu), as its style says.
+    buttons=\$(wine /out/taskbar.exe buttons 2>/dev/null | tr -d '\\r')
+    case \"\$buttons\" in 'buttons: none'*) ;; *) echo \"FAIL: the window has buttons of its own: \$buttons\"; exit 1 ;; esac
+    echo \"the window has no buttons of its own: \$buttons\"
+    # The bar's minimise: the window minimised and the game held still. Then back as the taskbar brings it (taskbar.c
+    # sends its restore command, Wine having no taskbar): the game goes on, and the bar does not come by itself.
+    paused=\$(said_count 'player: the game is paused'); resumed=\$(said_count 'player: the game goes on')
+    bar_chip 2; snap bar-minimise
+    xdotool click 1 mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2))
+    wait_for 10 'player_said \"player: minimised\"' || { snap not-minimised; echo \"FAIL: the bar's minimise did not minimise the window\"; exit 1; }
+    wait_for 10 '[ \"\$(said_count \"player: the game is paused\")\" -gt \"\$paused\" ]' || { echo 'FAIL: minimised, the game did not hold still'; exit 1; }
+    echo \"the bar's minimise minimised the window and held the game still\"
+    sleep 2; snap minimised; downs=\$(said_count 'player: the bar comes down')
+    wine /out/taskbar.exe restore >/dev/null 2>&1
+    wait_for 10 'player_said \"player: back from minimised\"' || { snap not-restored; echo \"FAIL: the taskbar's restore did not bring the window back\"; exit 1; }
+    wait_for 10 '[ \"\$(said_count \"player: the game goes on\")\" -gt \"\$resumed\" ]' || { echo 'FAIL: back from minimised, the game did not go on'; exit 1; }
+    sleep 3.5; snap restored
+    [ \"\$(said_count 'player: the bar comes down')\" = \"\$downs\" ] || { snap bar-after-restore; echo 'FAIL: the bar came down by itself after the restore'; exit 1; }
+    echo 'back from the taskbar: the game went on, and the bar did not come by itself'
   done
   # The X asks first, and the game holds still while it asks.
   bar_chip 0; snap bar-quit

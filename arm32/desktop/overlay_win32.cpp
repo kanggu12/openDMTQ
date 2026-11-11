@@ -20,19 +20,20 @@
 //   is drawn down from the top edge, either only with the game quiet (no click, touch or held note) for 1.5 s; by
 //   itself for 3 seconds when the game's picture first shows and after each switch between a window and full screen,
 //   so that a player sees where it is. The OpenDMTQ wordmark on its left, as the launcher's header draws it;
-//   on its right two of the launcher's buttons, full screen (or back to a window) as its quiet metal secondary button,
-//   a lighter plate under the pointer, and an X that quits after asking as its lime main button from the start; held,
-//   a button is sunk. It stays while the pointer is on it and goes up soon after it leaves, so it never sits on the
+//   on its right three of the launcher's buttons, minimise and full screen (or back to a window) as its quiet metal
+//   secondary buttons, a lighter plate under the pointer, and an X that quits after asking as its lime main button from
+//   the start; held, a button is sunk. The window itself has no buttons: the game is minimised, put in full screen and
+//   quit from here. It stays while the pointer is on it and goes up soon after it leaves, so it never sits on the
 //   game's own controls at the top while they are used. No key brings it.
 // - The handle: a small tab hanging from the game's top edge at its centre, in the shape of the game's own tabs, its
 //   charcoal faint and the game's green line along its foot, which says where the bar is; with the pointer on it, a
 //   little taller and its line lime. Clicks go through it to the game; the pointer resting on it brings the bar down.
 //   Hidden while the bar is down, while the question or a notice is up, while the game is held, and before the game's
 //   first picture.
-// - The question before quitting: the bar's X and the window's own close ask it. The game dims and blurs behind a card of
-//   glass with the question, the game's green line under it, a thin X, Keep playing as the launcher's lime main button and
-//   Quit the game as its secondary, red under the pointer; the keys' choice in the launcher's cyan keyboard ring. The
-//   game holds still meanwhile, so a click by mistake mid-song loses nothing. Alt+F4 does nothing.
+// - The question before quitting: the bar's X and the taskbar's Close window ask it. The game dims and blurs behind a
+//   card of glass with the question, the game's green line under it, a thin X, Keep playing as the launcher's lime main
+//   button and Quit the game as its secondary, red under the pointer; the keys' choice in the launcher's cyan keyboard
+//   ring. The game holds still meanwhile, so a click by mistake mid-song loses nothing. Alt+F4 does nothing.
 // - The notice: the server's two-line notice about a broadcast (a title, then where to watch), as a glass card that
 //   slides down at the top of the game, stays for a few seconds and fades. A red LIVE tag with a slanted end, as the
 //   game's tags, while broadcasting; once the broadcast has ended its title says so alone, with no tag.
@@ -479,8 +480,9 @@ float crisp(float at, float width) { return std::floor(at - width / 2 + 0.5f) + 
 
 // ---- the bar's sizes and the room it takes (both threads: the UI thread's clicks, the painter's pictures)
 
-// What is under the pointer on the bar: nothing, the X (at the right end) or the full screen chip (left of it).
-constexpr int kNone = -1, kQuitChip = 0, kScreenChip = 1;
+// What is under the pointer on the bar: nothing, the X (at the right end), the full screen chip (left of it) or the
+// minimise chip (left of that).
+constexpr int kNone = -1, kQuitChip = 0, kScreenChip = 1, kMinChip = 2;
 // Whether the bar's window is on the screen (the UI thread's).
 bool g_bar_up = false;
 
@@ -499,8 +501,8 @@ int top_room() {
     return g_bar_up ? bar_height() : 0;
 }
 
-// A chip's square on a bar `w` pixels wide: the X at the right end, the full screen chip left of it; both centred in
-// the bar's height.
+// A chip's square on a bar `w` pixels wide: the X at the right end, the full screen chip left of it, minimise left of
+// that; each centred in the bar's height.
 RectF chip_rect(int which, int w) {
     const float size = static_cast<float>(chip_size());
     const float x = static_cast<float>(w - chip_margin() - chip_size() - which * (chip_size() + chip_gap()));
@@ -509,7 +511,7 @@ RectF chip_rect(int which, int w) {
 
 // The chip under a point of the bar's window, or kNone.
 int chip_at(int x, int y) {
-    for (int which : {kQuitChip, kScreenChip}) {
+    for (int which : {kQuitChip, kScreenChip, kMinChip}) {
         if (chip_rect(which, area_w()).Contains(static_cast<REAL>(x), static_cast<REAL>(y))) return which;
     }
     return kNone;
@@ -696,6 +698,13 @@ void cross(Graphics& g, Pen& line, float cx, float cy, float half) {
     g.DrawLine(&line, cx - half, cy + half, cx + half, cy - half);
 }
 
+// The minimise chip's glyph centred at (cx, cy): a short bar across, 14 long at 720 lines, on whole pixels for the pen's
+// width (crisp).
+void minimise_icon(Graphics& g, Pen& line, float cx, float cy) {
+    const float half = std::round(fpx(7)), y = crisp(cy, line.GetWidth());
+    g.DrawLine(&line, cx - half, y, cx + half, y);
+}
+
 // The bar's name: the OpenDMTQ wordmark as the launcher's header draws it (OPEN over its lime line, DMTQ in chrome with
 // the Q lit; its pictures beside the player, overlay_glass.h's wordmark), 22 in from the bar's left end at 720 lines and
 // centred in its height as the header centres its own; drawn down with GDI+'s finest filter from the picture of the
@@ -769,10 +778,10 @@ void bar_look(Paint& p, int hover, int pressed, bool full) {
     const RectF name = bar_name(*g, static_cast<float>(h));
     // The chips as the launcher's buttons (cut at two corners, raised, sunk while held): the X its main button, in the
     // lime from the start with a dark X, so that it stands out the moment the bar shows, a little brighter under the
-    // pointer; full screen its secondary button, quiet metal, a lighter plate under the pointer, no lime. Their glyphs
-    // bolder than the words' lines (2.5 at 720 lines, in whole pixels so that they stay crisp).
+    // pointer; full screen and minimise its secondary buttons, quiet metal, a lighter plate under the pointer, no lime.
+    // Their glyphs bolder than the words' lines (2.5 at 720 lines, in whole pixels so that they stay crisp).
     g->Flush(FlushIntentionSync);
-    for (int which : {kQuitChip, kScreenChip}) {
+    for (int which : {kQuitChip, kScreenChip, kMinChip}) {
         const RectF r = chip_rect(which, w);
         const bool quit = which == kQuitChip;
         const bool lit = which == hover, in = lit && which == pressed;
@@ -781,7 +790,7 @@ void bar_look(Paint& p, int hover, int pressed, bool full) {
         launcher_face(*look.fore, static_cast<int>(r.X), static_cast<int>(r.Y), static_cast<int>(r.Width), static_cast<int>(r.Height), fill, in, scale());
     }
     const float stroke = std::max(2.0f, std::round(fpx(2.5f)));
-    for (int which : {kQuitChip, kScreenChip}) {
+    for (int which : {kQuitChip, kScreenChip, kMinChip}) {
         const RectF r = chip_rect(which, w);
         const bool quit = which == kQuitChip;
         Pen line_pen(quit ? launcher::kMainInk : launcher::kMetalInk, stroke);
@@ -791,8 +800,10 @@ void bar_look(Paint& p, int hover, int pressed, bool full) {
             line_pen.SetStartCap(LineCapRound);
             line_pen.SetEndCap(LineCapRound);
             cross(*g, line_pen, cx, cy, fpx(6.5f));
-        } else {
+        } else if (which == kScreenChip) {
             screen_icon(*g, line_pen, cx, cy, full);
+        } else {
+            minimise_icon(*g, line_pen, cx, cy);
         }
     }
     // The name's zone: the tint deepens there as much as the frame behind needs for it.
@@ -1699,10 +1710,12 @@ LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         }
         // The keyboard back to the game's window: the bar never takes it, another program may have.
         SetForegroundWindow(g_frame);
-        // The X asks before quitting; the full screen chip switches at once (the window redraws the bar for it).
+        // The X asks before quitting; the full screen chip switches at once (the window redraws the bar for it);
+        // minimise minimises the game's window, as its own button did (the window holds the game and hides all this).
         if (chip_now != pressed) return 0;
         if (chip_now == kQuitChip) ask_quit();
         else if (chip_now == kScreenChip && g_hooks.toggle_fullscreen) g_hooks.toggle_fullscreen();
+        else if (chip_now == kMinChip) ShowWindow(g_frame, SW_MINIMIZE);
         return 0;
     }
     case WM_SETCURSOR:
@@ -2864,7 +2877,8 @@ void test_save(const std::wstring& prefix, const std::wstring& frame_png, bool w
             const wchar_t* suffix;
         };
         for (const BarLook& b : {BarLook{kNone, kNone, L""}, BarLook{kScreenChip, kNone, L"-screen"}, BarLook{kQuitChip, kNone, L"-quit"},
-                                 BarLook{kScreenChip, kScreenChip, L"-screen-pressed"}, BarLook{kQuitChip, kQuitChip, L"-quit-pressed"}}) {
+                                 BarLook{kMinChip, kNone, L"-min"}, BarLook{kScreenChip, kScreenChip, L"-screen-pressed"},
+                                 BarLook{kQuitChip, kQuitChip, L"-quit-pressed"}, BarLook{kMinChip, kMinChip, L"-min-pressed"}}) {
             Order o;
             o.view = base;
             o.view.full = full;
@@ -3075,9 +3089,10 @@ void test_save(const std::wstring& prefix, const std::wstring& frame_png, bool w
         }
     }
     if (layout) {
-        for (int which : {kScreenChip, kQuitChip}) {
+        for (int which : {kMinChip, kScreenChip, kQuitChip}) {
             const RectF r = chip_rect(which, area_w());
-            std::fprintf(layout, "%s %.0f %.0f %.0f %.0f\n", which == kQuitChip ? "chip-quit" : "chip-screen", r.X, r.Y, r.Width, r.Height);
+            std::fprintf(layout, "%s %.0f %.0f %.0f %.0f\n", which == kQuitChip ? "chip-quit" : which == kScreenChip ? "chip-screen" : "chip-min", r.X, r.Y,
+                         r.Width, r.Height);
         }
         std::fclose(layout);
     }

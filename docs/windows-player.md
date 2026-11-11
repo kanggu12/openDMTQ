@@ -80,7 +80,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | The keyboard | Text where the game asks for it (Enter ends it, Esc cancels it), Hangul too |
 | The touch keyboard | Comes up when a touch opens the game's text, and types into it |
 | F11, or Alt+Enter | Full screen, and back |
-| The pointer resting at the game's top edge, or on the handle at its top centre | The bar: full screen, and the X that quits after asking |
+| The pointer resting at the game's top edge, or on the handle at its top centre | The bar: minimise, full screen, and the X that quits after asking |
 | Alt+F4 | Nothing: the bar's X quits |
 | Alt alone, F10 | Nothing (no menu mode that would hold the next key) |
 
@@ -99,18 +99,20 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   and its line turns lime. The pointer resting on it, or just around it, brings the bar down. Clicks go through it to
   the game. It shows once the game's picture is up, and goes while the bar is down, while a notice or the question is
   up and while the game holds still.
-  On its left, the OpenDMTQ wordmark as the launcher's header draws it; on its right two buttons in the launcher's own
-  shape and depth (two corners cut, raised, sunk while held): **full screen** (or back to a window) as its secondary
-  button, quiet metal with a lighter plate under the pointer, and an **X** that quits as its main button, in its lime
-  from the start so that it is seen at once. A button acts only when let go where it was pressed (the question's buttons
-  too). The X asks first, in a glass card over the game dimmed and blurred behind it: **Keep playing** as the launcher's
-  main button, or **Quit the game** as its secondary, red under the pointer; so a click by mistake does not end a song.
-  The window's own close button asks the same, and Alt+F4 does nothing. The card keeps within three quarters of the
-  game's width, so a small window on a display at 150 % or 200 % gets a card in proportion to the game. The game holds
-  still while it asks, as a phone's game does when its owner leaves it: a song stops where it was, with the game's own
-  pause screen after. In the question, Left, Right and Tab move the choice (marked with the launcher's cyan keyboard
-  ring), Enter takes it and Esc keeps playing. Minimised, the game holds still the same way, and goes on when it comes
-  back.
+  On its left, the OpenDMTQ wordmark as the launcher's header draws it; on its right three buttons in the launcher's own
+  shape and depth (two corners cut, raised, sunk while held): **minimise** and **full screen** (or back to a window) as
+  its secondary buttons, quiet metal with a lighter plate under the pointer, and an **X** that quits as its main button,
+  in its lime from the start so that it is seen at once. A button acts only when let go where it was pressed (the
+  question's buttons too). Minimise holds the game still, as a minimised window does, and the taskbar brings it back.
+  The X asks first, in a glass card over the game dimmed and blurred behind it: **Keep playing** as the launcher's main
+  button, or **Quit the game** as its secondary, red under the pointer; so a click by mistake does not end a song. In a
+  window the game has a title bar to move it by and a frame to size it by, and no buttons of its own: it is minimised,
+  put in full screen and quit from the bar. The taskbar's Close window asks the same, and Alt+F4 and a double click on
+  the title bar do nothing. The card keeps within three quarters of the game's width, so a small window on a display at
+  150 % or 200 % gets a card in proportion to the game. The game holds still while it asks, as a phone's game does when
+  its owner leaves it: a song stops where it was, with the game's own pause screen after. In the question, Left, Right
+  and Tab move the choice (marked with the launcher's cyan keyboard ring), Enter takes it and Esc keeps playing.
+  Minimised, the game holds still the same way, and goes on when it comes back.
 - **Nothing of it is in the game's way**: the notice, the FPS counter and the handle let every click through to the game,
   and no piece takes the keyboard from the game's window (each is a window that never takes the focus; a click on the
   bar or the question gives the keyboard back to the game). Their pictures are made on a thread of their own, so the

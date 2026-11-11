@@ -72,6 +72,8 @@ bool g_pressed = false;
 // Full screen: the frame's place and style before, to go back to.
 bool g_fullscreen = false;
 WINDOWPLACEMENT g_placement{};
+// Whether the frame is minimised (by the bar's minimise, the taskbar or Windows), as the log tells it once each way.
+bool g_minimised = false;
 // A UTF-16 high surrogate from WM_CHAR, waiting for its low half.
 wchar_t g_high = 0;
 // The keys held down, as the phone's keys, with how often each has repeated: lifted when the window loses the keyboard.
@@ -371,6 +373,12 @@ void refresh_loop() {
     }
 }
 
+// The frame's style in a window: a title bar to move it by and a frame to size it by, and no buttons on the title bar:
+// without a system menu Windows draws neither minimise, maximise nor close, so that the game is minimised, put in full
+// screen and quit from its own bar over the game. The minimise box stays, which Windows draws nothing for without the
+// system menu: with it the taskbar minimises the window and brings it back with a click on its button, as any window's.
+constexpr DWORD kWindowStyle = WS_OVERLAPPED | WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX;
+
 // The frame over the whole display it is on, without its border, and back.
 void toggle_fullscreen(HWND h) {
     DWORD style = static_cast<DWORD>(GetWindowLongW(h, GWL_STYLE));
@@ -387,7 +395,7 @@ void toggle_fullscreen(HWND h) {
             g_fullscreen = true;
         }
     } else {
-        SetWindowLongW(h, GWL_STYLE, static_cast<LONG>(style | WS_OVERLAPPEDWINDOW));
+        SetWindowLongW(h, GWL_STYLE, static_cast<LONG>(style | kWindowStyle));
         SetWindowPlacement(h, &g_placement);
         SetWindowPos(h, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
         g_fullscreen = false;
@@ -845,14 +853,17 @@ LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
 LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     switch (msg) {
     case WM_CLOSE:
-        // The window's X (or the taskbar's close): asked first in the overlay's question, so that a click by mistake
-        // mid-song never ends the game.
+        // The taskbar's Close window, or another program asking it to close (the window has no X of its own): asked
+        // first in the overlay's question, so that a click by mistake mid-song never ends the game.
         overlay::ask_quit();
         return 0;
     case WM_SYSCOMMAND:
         // Windows' menu mode from the keyboard (Alt pressed and let go alone, F10, Alt+Space): nothing. It would hold the
         // next keys for the window's menu, so that a note's key after a lone Alt did nothing, or opened the menu.
         if ((w & 0xFFF0) == SC_KEYMENU) return 0;
+        // A maximise asked for by command (a shortcut's, another program's): nothing, as the window has no maximise
+        // button; full screen is the bar's.
+        if ((w & 0xFFF0) == SC_MAXIMIZE) return 0;
         break;
     case kQuitMessage:
         // The question's Quit the game.
@@ -861,9 +872,14 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     case WM_SIZE:
         // Minimised, the game holds still; back, it goes on, to its own pause screen mid-song (overlay_win32.cpp).
         if (w == SIZE_MINIMIZED) {
+            // Said in the log, which the end-to-end test reads (the bar's minimise, the taskbar's restore).
+            if (!g_minimised) jvm::log("player: minimised");
+            g_minimised = true;
             overlay::minimised(true);
             return 0;
         }
+        if (g_minimised) jvm::log("player: back from minimised");
+        g_minimised = false;
         overlay::minimised(false);
         place_game();
         overlay::place();
@@ -1178,12 +1194,14 @@ bool open_window(const std::string& title) {
     if (n > 1) MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wtitle.data(), n);
     // Made hidden, where Windows places a new window (or where the program that started this one asked), and sized for
     // its display before it shows.
-    g_frame = CreateWindowExW(0, frame.lpszClassName, wtitle.c_str(), WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN, CW_USEDEFAULT, CW_USEDEFAULT,
+    g_frame = CreateWindowExW(0, frame.lpszClassName, wtitle.c_str(), kWindowStyle | WS_CLIPCHILDREN, CW_USEDEFAULT, CW_USEDEFAULT,
                               app().width, app().height, nullptr, nullptr, instance, nullptr);
     if (!g_frame) {
         jvm::log("player: cannot make a window (error %lu)", GetLastError());
         return false;
     }
+    jvm::log("player: the window has a title bar and a frame, no buttons of its own (style %08lx)",
+             static_cast<unsigned long>(GetWindowLongW(g_frame, GWL_STYLE)));
     if (app().fit_screen) {
         fit_display();
     } else {
