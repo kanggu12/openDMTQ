@@ -119,8 +119,7 @@ litestream:
     accessKeyId: ""
     secretAccessKey: ""
 
-# Single-node SeaweedFS S3 for trying the chart out. Not highly available; use real object
-# storage (or an HA SeaweedFS) in production.
+# Bundled SeaweedFS S3: one pod, one copy on one node.
 objectStore:
   enabled: false
   image:

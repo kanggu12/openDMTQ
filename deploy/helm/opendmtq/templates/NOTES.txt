@@ -25,12 +25,3 @@ Admin pages, ID {{ .Values.admin.user | default "admin" }}; the password:
   then open http://localhost:8791/opendmtq/admin/
   The API is beside them, at /opendmtq/api/v1/, with a token made on the Accounts page (docs/api.md).
 {{- end }}
-{{- if not .Values.litestream.enabled }}
-
-WARNING: litestream.enabled=false. The game database lives in an emptyDir and is lost
-whenever the api pod is replaced.
-{{- else if .Values.objectStore.enabled }}
-
-NOTE: the bundled object store is a single pod for evaluation. Point litestream.s3 at durable
-object storage for production.
-{{- end }}

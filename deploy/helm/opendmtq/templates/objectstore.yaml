@@ -1,6 +1,6 @@
 {{- if .Values.objectStore.enabled }}
 {{- $full := include "opendmtq.fullname" . }}
-# Single-node SeaweedFS S3 for evaluation. Its data survives pod restarts (PVC), not node loss.
+# The bundled SeaweedFS S3, one pod. Its data survives pod restarts (PVC), not node loss.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
