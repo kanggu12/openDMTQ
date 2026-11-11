@@ -67,7 +67,22 @@ class AdminStrings(unittest.TestCase):
         self.assertEqual(used - set(strings.STRINGS["en"]), set())
 
     def test_every_key_in_the_table_is_used(self):
-        self.assertEqual(set(strings.STRINGS["en"]) - used_keys(), set())
+        # A key's words for one ({key}.one) are used wherever the key is, with its count.
+        used = used_keys()
+        self.assertEqual({k for k in strings.STRINGS["en"] if k not in used and k.removesuffix(".one") not in used}, set())
+
+    def test_the_words_for_one_go_with_a_count(self):
+        # Each {key}.one stands for its key's words when {n} is 1: that key counts with {n}, and the words for one fill in
+        # the same values but the count.
+        for lang, table in strings.STRINGS.items():
+            for key, words in table.items():
+                if key.endswith(".one"):
+                    base = table.get(key.removesuffix(".one"), "")
+                    self.assertIn("{n}", base, f"{lang} {key}")
+                    self.assertEqual(values_in(words) | {"n"}, values_in(base) | {"n"}, f"{lang} {key}")
+        self.assertEqual(strings.text("en", "setup.song_count", n=1), "1 song")
+        self.assertEqual(strings.text("en", "setup.song_count", n=2), "2 songs")
+        self.assertEqual(strings.text("ko", "setup.song_count", n=1), "1곡")
 
     def test_the_korean_follows_the_house_rules(self):
         for key, text in strings.STRINGS["ko"].items():
@@ -98,6 +113,13 @@ class PortalStrings(unittest.TestCase):
         self.assertEqual(set(self.en), set(self.ko))
         for key, text in self.en.items():
             self.assertEqual(set(re.findall(r"{(\w+)}", text)), set(re.findall(r"{(\w+)}", self.ko[key])), key)
+
+    def test_the_words_for_one_go_with_a_count(self):
+        # A page's t('key', ['n' => 1]) takes {key}.one (t_table() in lib.php): its key counts with {n}.
+        for table in (self.en, self.ko):
+            for key, text in table.items():
+                if key.endswith(".one"):
+                    self.assertIn("{n}", table.get(key.removesuffix(".one"), ""), key)
 
     def test_the_server_name_is_read_from_the_process_environment(self):
         # Under Apache, plain getenv('SERVER_NAME') is the visitor's host name, not the setting.

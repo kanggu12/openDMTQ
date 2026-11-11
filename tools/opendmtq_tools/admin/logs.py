@@ -13,7 +13,7 @@ import time
 from flask import redirect, render_template, request, url_for
 from markupsafe import Markup
 
-from . import charts, core, insights, players, song_pages, status
+from . import charts, core, insights, players, recordings, song_pages, status
 from .core import ago, app, BASE, db, t, tp
 
 LOG_KINDS = {"game": "logs.kind_game", "files": "logs.kind_files", "app": "logs.kind_app", "site": "logs.kind_site",
@@ -52,7 +52,27 @@ CHANGE_WORDS = {
     # A token the API refused, as a failed sign-in is noted: by "API", with the address it came from.
     "api:refused": "change.api_refused",
     "login:ok": "change.login_ok", "login:failed": "change.login_failed", "logout:": "change.logout",
+    # The setup's steps and the Maintenance page's stop (setup.py): the owner signed in by the server PC's own link, the
+    # game's files brought in, the address changed, the server stopped.
+    "setup:signin": "change.setup_signin", "setup:import": "change.setup_import", "setup:address": "change.setup_address",
+    "server:stop": "change.server_stop",
 }
+
+
+def target_words(what, target):
+    """What a line was about, in the page's language where it was noted as the pages' own values: the broadcast settings
+    ("on, smooth": what new players start with, and the quality) and the recordings' limits ("25 GB / 40 d"). Anything
+    else, and a line in another shape, as it was written."""
+    if what == "recordings_page:settings":
+        start, _, quality = target.partition(", ")
+        if start in ("on", "off") and quality in recordings.QUALITY_WORDS:
+            return tp("change.settings_to", start=tp("live.new_on" if start == "on" else "live.new_off"),
+                      quality=tp(recordings.QUALITY_WORDS[quality]))
+    elif what == "recordings_page:limits":
+        m = re.fullmatch(r"([0-9.]+) GB / ([0-9]+) d", target)
+        if m:
+            return tp("change.limits_to", gb=m.group(1), n=int(m.group(2)))
+    return target
 
 
 def change_view(entry):
@@ -72,7 +92,7 @@ def change_view(entry):
                 target = song_pages.song_title(int(target))
         except (ValueError, sqlite3.Error):
             pass
-    return dict(entry, ago=ago(entry["at"]), words=words, target=target, who=entry.get("who", ""))
+    return dict(entry, ago=ago(entry["at"]), words=words, target=target_words(what, target), who=entry.get("who", ""))
 
 
 def changes():

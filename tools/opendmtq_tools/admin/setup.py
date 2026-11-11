@@ -993,7 +993,8 @@ def change_address(typed, before_restart=None):
             before_restart()
         with open(os.path.join(RUN_DIR, "restart.request"), "w", encoding="ascii") as f:
             f.write(str(int(time.time())))
-    changed("setup:address", host)
+    # The address as it now is, its port too: the one the pages and phones use from here.
+    changed("setup:address", new)
     return new
 
 

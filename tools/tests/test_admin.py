@@ -4,6 +4,7 @@ the public site's stylesheet, fonts and icon kept for when the game server is do
 Flask is installed in the tools image only; outside it these tests are skipped (CI runs them there).
 """
 
+import ast
 import csv
 import datetime
 import errno
@@ -1051,6 +1052,67 @@ class ChangeLogPageTest(unittest.TestCase):
                     # On a saved backup, its own page.
                     owner = "backup_action" if page == "backups_page" and action in ("delete", "restore") else page
                     self.assertIn(f"{owner}:{action}", admin.logs.CHANGE_WORDS, name)
+
+    def test_every_change_the_code_notes_has_its_words(self):
+        # Every changed() call in the admin's modules, read from their source: the code it notes, or the codes a code made
+        # of a value can be (that value's every case named here, where the code takes them from), each in CHANGE_WORDS
+        # with words in both languages. A new call, or a new value in one, fails here until it has its words.
+        # A value's cases: the actions an account's buttons and the API send (refused otherwise), a player's (players.html
+        # and the API), a recording's verbs (recordings.html, act_on()).
+        cases = {("accounts.py", "action"): admin.accounts.ACTIONS, ("players.py", "action"): ("rename", "reset", "delete", "live-on", "live-off"),
+                 ("recordings.py", "verb"): ("hide", "show", "delete", "delete-player")}
+
+        def codes(module, node):
+            """The strings a code's expression can be: a string, either of two (x if ... else y), pieces added, an f-string."""
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                return {node.value}
+            if isinstance(node, ast.Name):
+                values = cases.get((module, node.id))
+                self.assertIsNotNone(values, f"{module}: which cases can {node.id} be?")
+                return set(values)
+            if isinstance(node, ast.IfExp):
+                return codes(module, node.body) | codes(module, node.orelse)
+            if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+                return {a + b for a in codes(module, node.left) for b in codes(module, node.right)}
+            if isinstance(node, ast.JoinedStr):
+                out = {""}
+                for part in node.values:
+                    piece = codes(module, part) if isinstance(part, ast.Constant) else codes(module, part.value)
+                    out = {a + b for a in out for b in piece}
+                return out
+            self.fail(f"{module}: a code the test cannot read: {ast.unparse(node)}")
+
+        folder = os.path.dirname(admin.__file__)
+        noted = set()
+        for name in sorted(os.listdir(folder)):
+            if not name.endswith(".py"):
+                continue
+            with open(os.path.join(folder, name), encoding="utf-8") as f:
+                tree = ast.parse(f.read())
+            for call in ast.walk(tree):
+                if isinstance(call, ast.Call) and isinstance(call.func, ast.Name) and call.func.id == "changed" and call.args:
+                    noted |= codes(name, call.args[0])
+        # The calls are all there: the setup's, the sign-in's and the API's too.
+        self.assertGreater(len(noted), 35)
+        for what in sorted(noted):
+            self.assertIn(what, admin.logs.CHANGE_WORDS, what)
+            for lang in ("en", "ko"):
+                self.assertIn(admin.logs.CHANGE_WORDS[what], admin.strings.STRINGS[lang], what)
+
+    def test_the_settings_and_limits_read_in_the_pages_language(self):
+        # The values the Broadcasts page saves, as the line holds them, in the words the page has for them.
+        with Install() as install:
+            admin.insights.audit_note(install.path("state"), "recordings_page:settings", "on, smooth")
+            admin.insights.audit_note(install.path("state"), "recordings_page:limits", "25 GB / 1 d")
+            install.sign_in()
+            page = install.client.get("/opendmtq/admin/logs?tab=changes").get_data(as_text=True)
+            self.assertIn("New players: Start on; quality: Smooth", page)
+            self.assertIn("25 GB, 1 day", page)
+            install.client.set_cookie("opendmtq_lang", "ko")
+            page = install.client.get("/opendmtq/admin/logs?tab=changes").get_data(as_text=True)
+            self.assertIn("새 플레이어: 켜고 시작, 화질: 고프레임", page)
+            self.assertIn("25 GB, 1일", page)
+            self.assertNotIn("on, smooth", page)
 
     def test_something_unknown_stays_as_it_was_written(self):
         with Install() as install:

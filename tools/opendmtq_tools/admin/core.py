@@ -224,8 +224,8 @@ def lang():
 
 def t(key, **values):
     """The text for key in the page language, as HTML: the table's own markup stays and every value is
-    escaped. Fit for flash() and {{ }} in the pages."""
-    raw = strings.STRINGS[lang()].get(key) or strings.STRINGS["en"].get(key)
+    escaped. Fit for flash() and {{ }} in the pages. A count of one takes the words for one (strings.raw_text)."""
+    raw = strings.raw_text(lang(), key, values)
     return key if raw is None else Markup(raw).format(**values)
 
 

@@ -38,7 +38,7 @@ page_header(t('songs.title'), 'songs');
         <span class="t"><?= h(song_title($s)) ?></span>
         <span class="a"><?= h($s['artist_name']) ?></span>
         <?php // Only songs somebody has a record on say so; the line stays, so that all tiles of a row end together. ?>
-        <span class="p"><?= $db && $n > 0 ? ($n === 1 ? t('records.one') : t('records.many', ['n' => $n])) : '' ?></span>
+        <span class="p"><?= $db && $n > 0 ? t('records', ['n' => $n]) : '' ?></span>
       </a>
     <?php endforeach; ?>
   </div>

@@ -33,7 +33,7 @@
   {# The machine the server runs on: what it has in use now, and the last day of its processors, its memory and the game
      server's answers. Looked at again with the tiles. #}
   <section class="card resources span-12" id="resources">
-    <h2>{{ t('m.title') }} <span class="meta-inline">{{ t('m.meta', cores=machine.cores, up=machine.up) if machine.up else t('m.meta_cores', cores=machine.cores) }}</span></h2>
+    <h2>{{ t('m.title') }} <span class="meta-inline">{{ t('m.meta', n=machine.cores, up=machine.up) if machine.up else t('m.meta_cores', n=machine.cores) }}</span></h2>
     <div class="res-grid">
       <dl class="res-rows">
         {% for name, meter, words in machine.meters %}<div><dt>{{ name }}</dt><dd>{{ meter }}<span class="res-val">{{ words }}</span></dd></div>{% endfor %}

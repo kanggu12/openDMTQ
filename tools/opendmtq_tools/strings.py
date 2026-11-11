@@ -39,6 +39,7 @@ STRINGS = {
         "chart.day": "Plays on {day}: {n}",
         "chart.week": "Plays in the week of {day}: {n}",
         "chart.hour": "{day} {hour}:00: {n} plays",
+        "chart.hour.one": "{day} {hour}:00: 1 play",
         "dash.c_days": "Plays, last 30 days",
         "dash.c_days_total": "{n} in all",
         "dash.c_when": "When people play, last 4 weeks",
@@ -49,8 +50,10 @@ STRINGS = {
         "dash.c_disk_own": "OpenDMTQ's {size}, on its own",
         "disk.ours": "OpenDMTQ",
         "m.title": "Resources",
-        "m.meta": "This machine: {cores} processors, up for {up}",
-        "m.meta_cores": "This machine: {cores} processors",
+        "m.meta": "This machine: {n} processors, up for {up}",
+        "m.meta.one": "This machine: 1 processor, up for {up}",
+        "m.meta_cores": "This machine: {n} processors",
+        "m.meta_cores.one": "This machine: 1 processor",
         "m.mem": "Memory",
         "m.swap": "Swap",
         "m.disk": "Disk",
@@ -76,6 +79,7 @@ STRINGS = {
         "dur.hm": "{h} h {m} min",
         "dur.m": "{m} min",
         "players.day_tip": "{day}: {n} plays",
+        "players.day_tip.one": "{day}: 1 play",
         "players.days_label": "Plays a day, the last two weeks",
         "dash.active_week": "{n} played in the last 7 days",
         "dash.plays_week": "{n} in the last 7 days",
@@ -127,6 +131,13 @@ STRINGS = {
         "change.login_ok": "Signed in",
         "change.login_failed": "Failed sign-in",
         "change.logout": "Signed out",
+        "change.setup_signin": "Signed in from the server PC",
+        "change.setup_import": "Imported game files",
+        "change.setup_address": "Changed the server's address",
+        "change.server_stop": "Stopped the server",
+        "change.settings_to": "New players: {start}; quality: {quality}",
+        "change.limits_to": "{gb} GB, {n} days",
+        "change.limits_to.one": "{gb} GB, 1 day",
         "device.app": "Game app",
         "device.bot": "Script or bot",
         "device.browser": "Browser",
@@ -200,6 +211,7 @@ STRINGS = {
         "app.prune_unknown": "Nothing deleted: the build on offer is unclear. Build the app again first.",
         "app.confirm_prune": "Delete every build except the app on offer?",
         "app.pruned": "Deleted {n} builds and freed {size}.",
+        "app.pruned.one": "Deleted 1 build and freed {size}.",
         "bak.saved_sum": "{size} in all",
         "bak.auto_is_on": "A backup a day when something changed. The latest 7 are kept.",
         "bak.auto_is_off": "Daily backups are off.",
@@ -299,8 +311,10 @@ STRINGS = {
         "setup.what_built": "An app OpenDMTQ built: import the game's own app instead",
         "setup.what_not_game": "Another app, not the game",
         "setup.what_files": "Client data and song data, {n} songs",
+        "setup.what_files.one": "Client data and song data, 1 song",
         "setup.what_files_no_songs": "Client data without song data: the game starts, with nothing to play yet",
         "setup.what_songs": "Song data alone: {n} songs",
+        "setup.what_songs.one": "Song data alone: 1 song",
         "setup.what_with_app": "The Android app is inside too.",
         "setup.what_ipa": "iPhone app: does not work here, the Android app (.apk) is needed",
         "setup.what_part": "A part of an archive in parts: import its first part, with every part in one folder",
@@ -309,13 +323,16 @@ STRINGS = {
         "setup.what_neither": "Not the game's app, client data or song data",
         "setup.what_gone": "Not there any more",
         "setup.parts": "{n} more parts",
+        "setup.parts.one": "1 more part",
         "setup.have_apk": "Android app",
         "setup.have_data": "Client data",
         "setup.have_songs": "Songs",
         "setup.data_missing": "{n} of its files are missing ({first}, ...): the game stops at its start without them. Import the client data again.",
+        "setup.data_missing.one": "One of its files is missing ({first}): the game stops at its start without it. Import the client data again.",
         "setup.in_place": "in place",
         "setup.not_yet": "not yet",
         "setup.song_count": "{n} songs",
+        "setup.song_count.one": "1 song",
         "setup.found": "Found on the server PC",
         "setup.found_none": "Nothing found in Downloads, on the Desktop or in Documents. Open the folder with your files below.",
         "setup.found_tree": "Client data and song data folder: {path}",
@@ -863,6 +880,7 @@ STRINGS = {
         "chart.day": "{day}: {n}회",
         "chart.week": "{day}부터 한 주: {n}회",
         "chart.hour": "{day}요일 {hour}시: {n}회",
+        "chart.hour.one": "{day}요일 {hour}시: 1회",
         "dash.c_days": "최근 30일 플레이",
         "dash.c_days_total": "모두 {n}회",
         "dash.c_when": "플레이 시간대 (최근 4주)",
@@ -873,8 +891,10 @@ STRINGS = {
         "dash.c_disk_own": "OpenDMTQ가 쓰는 {size}의 내역",
         "disk.ours": "OpenDMTQ",
         "m.title": "리소스",
-        "m.meta": "이 컴퓨터: 프로세서 {cores}개, {up}째 가동 중",
-        "m.meta_cores": "이 컴퓨터: 프로세서 {cores}개",
+        "m.meta": "이 컴퓨터: 프로세서 {n}개, {up}째 가동 중",
+        "m.meta.one": "이 컴퓨터: 프로세서 1개, {up}째 가동 중",
+        "m.meta_cores": "이 컴퓨터: 프로세서 {n}개",
+        "m.meta_cores.one": "이 컴퓨터: 프로세서 1개",
         "m.mem": "메모리",
         "m.swap": "스왑",
         "m.disk": "디스크",
@@ -900,6 +920,7 @@ STRINGS = {
         "dur.hm": "{h}시간 {m}분",
         "dur.m": "{m}분",
         "players.day_tip": "{day}: 플레이 {n}회",
+        "players.day_tip.one": "{day}: 플레이 1회",
         "players.days_label": "하루 플레이 수, 최근 2주",
         "dash.active_week": "최근 7일 {n}명 플레이",
         "dash.plays_week": "최근 7일 {n}회",
@@ -951,6 +972,13 @@ STRINGS = {
         "change.login_ok": "로그인",
         "change.login_failed": "로그인 실패",
         "change.logout": "로그아웃",
+        "change.setup_signin": "서버 PC에서 로그인",
+        "change.setup_import": "게임 파일 가져옴",
+        "change.setup_address": "서버 주소 변경",
+        "change.server_stop": "서버 끔",
+        "change.settings_to": "새 플레이어: {start}, 화질: {quality}",
+        "change.limits_to": "{gb} GB, {n}일",
+        "change.limits_to.one": "{gb} GB, 1일",
         "device.app": "게임 앱",
         "device.bot": "스크립트 또는 봇",
         "device.browser": "브라우저",
@@ -1022,7 +1050,8 @@ STRINGS = {
         "app.prune": "제공 중인 앱만 남기고 삭제",
         "app.prune_unknown": "삭제하지 않았습니다. 제공 중인 빌드를 알 수 없습니다. 먼저 앱을 다시 빌드하세요.",
         "app.confirm_prune": "제공 중인 앱을 뺀 나머지 빌드를 모두 삭제할까요?",
-        "app.pruned": "빌드 {n}개를 삭제해 {size}를 확보했습니다.",
+        "app.pruned": "앱 {n}개를 삭제해 {size}를 확보했습니다.",
+        "app.pruned.one": "앱 1개를 삭제해 {size}를 확보했습니다.",
         "bak.saved_sum": "모두 {size}",
         "bak.auto_is_on": "바뀐 것이 있으면 하루에 한 번 백업합니다. 최근 7개를 남깁니다.",
         "bak.auto_is_off": "매일 백업이 꺼져 있습니다.",
@@ -1121,8 +1150,10 @@ STRINGS = {
         "setup.what_built": "OpenDMTQ가 만든 앱입니다. 게임의 원래 앱을 가져오세요",
         "setup.what_not_game": "게임 앱이 아닌 다른 앱",
         "setup.what_files": "클라이언트 데이터와 곡 데이터, 곡 {n}개",
+        "setup.what_files.one": "클라이언트 데이터와 곡 데이터, 곡 1개",
         "setup.what_files_no_songs": "곡 데이터가 없는 클라이언트 데이터: 게임은 시작되지만 아직 할 곡이 없습니다",
         "setup.what_songs": "곡 데이터만 있음: {n}곡",
+        "setup.what_songs.one": "곡 데이터만 있음: 1곡",
         "setup.what_with_app": "안드로이드 앱도 들어 있습니다.",
         "setup.what_ipa": "아이폰 앱: 여기서는 못 씁니다. 안드로이드 앱(.apk)이 필요합니다",
         "setup.what_part": "분할 압축의 한 조각: 모든 조각을 한 폴더에 두고 첫 조각을 가져오세요",
@@ -1131,13 +1162,16 @@ STRINGS = {
         "setup.what_neither": "게임 앱도 클라이언트 데이터도 곡 데이터도 아닙니다",
         "setup.what_gone": "이제 없습니다",
         "setup.parts": "조각 {n}개 더",
+        "setup.parts.one": "조각 1개 더",
         "setup.have_apk": "안드로이드 앱",
         "setup.have_data": "클라이언트 데이터",
         "setup.have_songs": "곡",
         "setup.data_missing": "파일 {n}개가 없습니다({first} 등). 이 파일 없이는 게임이 시작 화면에서 멈춥니다. 클라이언트 데이터를 다시 가져오세요.",
+        "setup.data_missing.one": "파일 1개가 없습니다({first}). 이 파일 없이는 게임이 시작 화면에서 멈춥니다. 클라이언트 데이터를 다시 가져오세요.",
         "setup.in_place": "있음",
         "setup.not_yet": "아직 없음",
         "setup.song_count": "{n}곡",
+        "setup.song_count.one": "1곡",
         "setup.found": "서버 PC에서 찾은 파일",
         "setup.found_none": "다운로드, 바탕 화면, 문서 폴더에서 찾지 못했습니다. 아래에서 파일이 든 폴더를 여세요.",
         "setup.found_tree": "클라이언트 데이터와 곡 데이터 폴더: {path}",
@@ -1643,8 +1677,21 @@ STRINGS = {
 }
 
 
+def raw_text(lang, key, values):
+    """The table's words for key in lang (English when that language lacks them), or None when nobody has them. A count
+    of one ({n} is 1) takes the words the table has for one ({key}.one) where it has them: English says "1 play", not
+    "1 plays"."""
+    for table in (STRINGS.get(lang, {}), STRINGS["en"]):
+        # The words for one first, then the key's own, in the language asked for before English.
+        if values.get("n") == 1 and table.get(key + ".one"):
+            return table[key + ".one"]
+        if table.get(key):
+            return table[key]
+    return None
+
+
 def text(lang, key, **values):
-    """The text for key in lang (English when that language lacks it; the key itself when nobody has it),
-    with its {name}s filled in. Nothing is escaped here: see t() in the admin pages."""
-    raw = STRINGS.get(lang, {}).get(key) or STRINGS["en"].get(key)
+    """The text for key in lang (raw_text(); the key itself when nobody has it), with its {name}s filled in. Nothing is
+    escaped here: see t() in the admin pages."""
+    raw = raw_text(lang, key, values)
     return key if raw is None else raw.format(**values)
