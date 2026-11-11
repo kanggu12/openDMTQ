@@ -27,9 +27,10 @@ Only while people play. The server runs while its window is open on Windows, and
 ([everyday use](install.md#everyday-use)).
 
 **How big a computer does it need?**
-Two processor cores and 2 GB of memory; 4 GB leaves room for building the app. At rest the server takes about 170 MB,
-and two cores serve hundreds of requests a second ([measured](../README.md#fast-on-little-hardware)). Disk: about 1 GB,
-plus the songs. [What it runs on](install.md#what-it-runs-on) has the details and the phones.
+2 GB of memory at least; two processor cores and 4 GB are recommended, with room for building the app. At rest the
+server takes about 170 MB, and two cores serve hundreds of requests a second
+([measured](../README.md#fast-on-little-hardware)). Disk: about 1 GB, plus the songs.
+[What it runs on](install.md#what-it-runs-on) has the details and the phones.
 
 **Can friends outside my home play?**
 Yes, with a host name and one forwarded port: [Playing from outside your home](internet.md).
