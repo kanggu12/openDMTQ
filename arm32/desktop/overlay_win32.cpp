@@ -875,7 +875,7 @@ AskLayout ask_layout() {
 // The question's words in the language of the PC.
 const wchar_t* ask_title() { return g_korean ? L"게임을 끝낼까요?" : L"Quit the game?"; }
 // What quitting loses, true on any screen: the player cannot tell whether a song is going on.
-const wchar_t* ask_text() { return g_korean ? L"곡 도중에 끝내면 기록이 남지 않아요." : L"Quitting mid-song loses that song's record."; }
+const wchar_t* ask_text() { return g_korean ? L"곡 도중에 끝내면 기록이 남지 않아요." : L"Quitting mid-song loses the song's record."; }
 const wchar_t* keep_label() { return g_korean ? L"계속하기" : L"Keep playing"; }
 const wchar_t* quit_label() { return g_korean ? L"게임 끝내기" : L"Quit the game"; }
 
