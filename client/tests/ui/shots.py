@@ -515,6 +515,64 @@ def redraw_check(app, problems, tag):
             problems.append("%s: render scale %s: the keyboard left the drop-down (now on %r)" % (tag, value, focused))
 
 
+def opened_list_check(app, out, tag, problems):
+    """A drop-down opened (the Screen page's frame limit), as a person sees it: the list's words start where the closed
+    box's words do, the same choice's words in both at the same column of pixels (once 10 px to the left at 100 % and
+    21 at 200 %, flush with the list's edge); the lit row inside the list's edge, not from edge to edge. The list is a
+    window of its own over the launcher's: the shot is of the screen where the launcher is."""
+    from PIL import Image
+    w = app.words
+    area = app.body
+    select = None
+    for widget in widgets_of(area.inner):
+        if isinstance(widget, widgets.Select) and getattr(widget.master, "control", None) is widget:
+            names = [c.cget("text") for c in widget.master.winfo_children() if c.winfo_class() == "Label"]
+            if w("screen.fps") in names:
+                select = widget
+    if select is None:
+        problems.append("%s: no frame limit drop-down on the Screen page to open" % tag)
+        return
+    area.show_widget(select)
+    app.root.update()
+    tk = app.root.tk
+    tk.call("ttk::combobox::Post", str(select))
+    try:
+        wait_out(app.root, 0.5)
+        popdown = str(tk.call("ttk::combobox::PopdownWindow", str(select)))
+        listbox = popdown + ".f.l"
+        geometry = lambda path: [int(tk.call("winfo", k, path)) for k in ("rootx", "rooty", "width", "height")]  # noqa: E731
+        rx, ry, rw, rh = geometry(str(app.root))
+        target = os.path.join(out, "%s_screen-list-open.png" % tag)
+        subprocess.run(["import", "-window", "root", "-crop", "%dx%d+%d+%d" % (rw, rh, rx, ry), target], check=True)
+        with Image.open(target) as image:
+            image = image.convert("RGB")
+
+        def ink(x_from, x_to, y_from, y_to):
+            # The first column, from the left, with a pixel of the words' light (the list's lit row is darker).
+            for x in range(x_from, x_to):
+                if any(sum(image.getpixel((x - rx, y - ry))) > 300 for y in range(y_from, y_to)):
+                    return x
+            return None
+
+        cx, cy, cw, ch = geometry(str(select))
+        lx, ly, lw, lh = geometry(listbox)
+        # The list's own window: its edge, the rows inside it.
+        px = geometry(popdown)[0]
+        closed = ink(cx + 2, cx + cw // 2, cy + 4, cy + ch - 4)
+        chosen = int(select.current())
+        x, y, _w, h = (int(v) for v in tk.splitlist(tk.call(listbox, "bbox", chosen)))
+        opened = ink(lx, lx + lw // 2, ly + y, ly + y + h)
+        if closed is None or opened is None or abs(closed - opened) > 1:
+            problems.append("%s: the opened list's words start at %r, the closed box's at %r" % (tag, opened and opened - cx,
+                                                                                                closed and closed - cx))
+        # The lit row (the chosen one) starts inside the list's edge, with room before it: the rows do not reach it.
+        if lx - px < 2 * max(1, app.ui.px(1)):
+            problems.append("%s: the opened list's rows reach its edge (%d px in)" % (tag, lx - px))
+    finally:
+        tk.call("ttk::combobox::Unpost", str(select))
+        app.root.update()
+
+
 def counter_check(app, problems, tag):
     """The FPS counter switched from the keyboard on the Screen page: Space on its toggle turns it on, its Position row
     comes under it; Space again turns it off, the row goes; the keyboard stays on the toggle each time, and the corner
@@ -593,6 +651,7 @@ def variants_check(app, site, out, tag, problems):
     measure(app, tag + "_screen-upscaler", problems)
     redraw_check(app, problems, tag)
     counter_check(app, problems, tag)
+    opened_list_check(app, out, tag, problems)
     # A download under way, drawn from its numbers (the real one is in the guide).
     import threading
     app.download = {"done": 47 << 20, "total": 103 << 20, "cancel": threading.Event()}

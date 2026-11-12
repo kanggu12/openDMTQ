@@ -34,20 +34,45 @@ def style_ttk(ui):
     s.theme_use("clam")
     # A drop-down as the site's select: a dark field with a one-pixel seam and a light chevron; lime round it while it
     # has the keyboard, as the site's fields.
+    # Its words begin where they always have, LIST_TEXT logical pixels inside its seam: the room before them is the
+    # style's padding and the spaces before each choice (list_pad), which its opened list's rows have too, so that the
+    # words of the two line up (Select).
+    _pad, pad_width = list_pad(ui)
     s.configure("Dark.TCombobox", fieldbackground=theme.FIELD, background=theme.FIELD, foreground=theme.TEXT,
                 arrowcolor=theme.MUTED, bordercolor=theme.LINE, lightcolor=theme.FIELD, darkcolor=theme.FIELD,
-                selectbackground=theme.FIELD, selectforeground=theme.TEXT, padding=(ui.px(10), ui.px(4)),
-                arrowsize=ui.px(13))
+                selectbackground=theme.FIELD, selectforeground=theme.TEXT,
+                padding=(ui.px(LIST_TEXT) - pad_width, ui.px(4)), arrowsize=ui.px(13))
     s.map("Dark.TCombobox", fieldbackground=[("readonly", theme.FIELD)], foreground=[("readonly", theme.TEXT)],
           background=[("active", theme.FIELD), ("readonly", theme.FIELD)],
           bordercolor=[("focus", theme.OK), ("hover", "#55606c")], arrowcolor=[("disabled", theme.FAINT),
                                                                               ("hover", theme.TEXT)])
-    # The list that drops down is a plain Tk listbox; its colours come from the option database.
+    # The list that drops down is a plain Tk listbox; its colours come from the option database. No border or ring of
+    # its own: the frame round it (below) draws the seam and keeps the room inside it.
     ui.root.option_add("*TCombobox*Listbox.background", theme.FIELD)
     ui.root.option_add("*TCombobox*Listbox.foreground", theme.TEXT)
     ui.root.option_add("*TCombobox*Listbox.selectBackground", theme.RAIL_UP)
     ui.root.option_add("*TCombobox*Listbox.selectForeground", theme.TEXT)
     ui.root.option_add("*TCombobox*Listbox.font", ui.fonts.body)
+    ui.root.option_add("*TCombobox*Listbox.borderWidth", 0)
+    ui.root.option_add("*TCombobox*Listbox.highlightThickness", 0)
+    ui.root.option_add("*TCombobox*Listbox.relief", "flat")
+    # The frame round the opened list: the field's seam as its edge, and inside it room as the closed box has before its
+    # words, so that each row's words start where the box's do (its own spaces, list_pad, then the same) and the row
+    # under the pointer is lit inside that room instead of from edge to edge; a little room above the first and under
+    # the last row too.
+    # Its seam as thick as the closed box's (the face's own edge, combobox_faces), so that inside it the room before the
+    # words is the closed box's padding again.
+    edge = max(1, ui.px(1))
+    side = ui.px(LIST_TEXT) - pad_width
+    s.configure("ComboboxPopdownFrame", background=theme.FIELD, bordercolor=theme.LINE, lightcolor=theme.LINE,
+                darkcolor=theme.LINE, relief="solid", borderwidth=edge)
+    # A frame's room inside it, and the width of its edge, are the frame's own options, which ttk takes from the option
+    # database when it makes the list's frame at the first opening (a style's padding does not reach a frame). The clam
+    # theme's border keeps one pixel more inside its edge than the edge's width (measured: the list's words came 1 px
+    # right of the box's at 100 % and at 200 %), so the room at the sides is a pixel less.
+    ui.root.option_add("*TCombobox*TFrame.padding", "%d %d %d %d" % (max(0, side - 1), ui.px(4), max(0, side - 1),
+                                                                     ui.px(4)))
+    ui.root.option_add("*TCombobox*TFrame.borderWidth", edge)
     quiet_combobox_wheel(ui.root)
     # Labels draw their words from their own edge, as fields and buttons draw theirs: Tk's own room round a label's
     # words (its border and padding, 3 px on Windows) would set every card's words in from the fields under them.
@@ -59,6 +84,21 @@ def style_ttk(ui):
                 lightcolor=theme.RAIL, darkcolor=theme.RAIL, arrowcolor=theme.MUTED, gripcount=0,
                 arrowsize=ui.px(12))
     s.map("Dark.Vertical.TScrollbar", background=[("active", theme.RAIL_UP)])
+
+
+# Where a drop-down's words start, closed and opened: this many logical pixels inside its one-pixel seam.
+LIST_TEXT = 10
+
+
+def list_pad(ui):
+    """The spaces each choice of a drop-down starts with, and their width: the room before a row's words in its opened
+    list, where a Tk listbox has none of its own and lights a row from edge to edge (Select). As many spaces of the
+    words' font as come nearest to 6 logical pixels, the rest of LIST_TEXT being padding (style_ttk), so that a lit
+    row starts that much before its words."""
+    space = max(1, ui.fonts.body.measure(" "))
+    count = max(0, int(round(ui.px(6) / float(space))))
+    pad = " " * count
+    return pad, ui.fonts.body.measure(pad) if pad else 0
 
 
 def combobox_faces(ui, style):
@@ -1044,11 +1084,15 @@ class Slider(tk.Frame):
 
 
 class Select(ttk.Combobox):
-    """A drop-down of (value, text) pairs; command(value) runs on a choice."""
+    """A drop-down of (value, text) pairs; command(value) runs on a choice. Each choice's words start with the same
+    spaces (list_pad), closed and in the opened list, so that the two line up: the list's rows have no room of their
+    own before their words, and the closed box's padding is less by as much (style_ttk). The choices are told apart by
+    their place, never by their words."""
 
     def __init__(self, parent, ui, options, value, command, width=24):
         self.options = list(options)
-        super().__init__(parent, values=[t for _, t in self.options], state="readonly", width=width,
+        pad, _ = list_pad(ui)
+        super().__init__(parent, values=[pad + t for _, t in self.options], state="readonly", width=width,
                          style="Dark.TCombobox", font=ui.fonts.body)
         self.command = command
         self.set_value(value)
