@@ -972,7 +972,7 @@ async function adminFlows(contexts) {
   }
   check('what shows once is in view with the focus after Make token and New password, on a laptop and a phone', outOfView.length === 0,
     outOfView.join('; '));
-  check('one primary button on the Accounts page and the setup\'s Players step, with what shows once or without', notOne.length === 0,
+  check("one primary button on the Accounts page and the setup's Players step, with what shows once or without", notOne.length === 0,
     notOne.join('; '));
 
   // The accounts' buttons stand in the same columns in every row: a button whose word depends on the account (Disable or
