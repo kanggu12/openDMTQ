@@ -36,7 +36,8 @@
 {# What each file is comes after the page shows, asked of setup_what two at a time (admin.js). #}
 <section class="card" data-what-at="{{ url_for('setup_what') }}">
   <h2>{{ t('setup.files_title') }}</h2>
-  <p class="lead">{{ t('setup.files_lead') }}</p>
+  {# On this PC the pages find the files and open its folders; in containers they cannot, and the command line imports. #}
+  <p class="lead">{{ t('setup.files_lead') if host_install else t('setup.files_lead_docker') }}</p>
   {# The two kinds of file and the forms each comes in: what the import takes. #}
   <div class="setup-need">
     <div><h3>{{ t('setup.need_app_title') }}</h3><p>{{ t('setup.need_app') }}</p></div>
