@@ -114,6 +114,25 @@ else
   echo "$plan" | sed 's/^/  /'
   failed=1
 fi
+# What saves and rankings need of the song list (every chart's line and difficulty, the charts of a line and of a song)
+# is kept as one PHP file in the run folder, named after the list file, so that no request decodes the list for it; a
+# list put in the first one's place gets its own file and the first one's goes. With a list of its own in a scratch
+# folder, each step a new PHP process, as each request is.
+# shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
+index=$(docker exec "$NAME" sh -c '
+  d=$(mktemp -d) && mkdir -p "$d/custom" "$d/run" && export OPENDMTQ_CUSTOM="$d/custom" OPENDMTQ_RUN="$d/run"
+  ask="require \"/opt/opendmtq/game/src/rpc.php\"; echo json_encode([odq_patterns(3), odq_patterns(3, 2), odq_patterns(4), array_keys(odq_chart_kinds()), odq_max_song_id()]), \" \";"
+  echo "[{\"song_id\":2,\"song_patterns\":[{\"pattern_id\":11,\"line\":3,\"signature\":0},{\"pattern_id\":12,\"line\":4,\"signature\":1}]}]" > "$d/custom/songList.json"
+  php -r "$ask"; php -r "$ask"; ls "$d/run/songs" | wc -l | tr -d "\n"; echo -n " "
+  echo "[{\"song_id\":2,\"song_patterns\":[{\"pattern_id\":11,\"line\":3,\"signature\":0}]},{\"song_id\":7,\"song_patterns\":[{\"pattern_id\":21,\"line\":3,\"signature\":2}]}]" > "$d/custom/new.json"
+  mv "$d/custom/new.json" "$d/custom/songList.json"
+  php -r "$ask"; ls "$d/run/songs" | wc -l | tr -d "\n"; rm -rf "$d"' 2>&1) || true
+if [ "$index" = '[[11],[11],[12],[11,12],2] [[11],[11],[12],[11,12],2] 1 [[11,21],[11],[],[11,21],7] 1' ]; then
+  echo "PASS the song list's index is kept in one file, read again by the next request, and follows a new list"
+else
+  echo "FAIL the song list's index is not kept, or does not follow a new list: $index"
+  failed=1
+fi
 # A month's board worked out once is kept with the rankings' change number and served again while the number stays; any
 # change of the log, the bests or the players raises it (the triggers of setup-db.php, whoever writes), and the next look
 # works the board out again. On the server's own database and run folder.

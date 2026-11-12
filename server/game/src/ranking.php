@@ -16,20 +16,11 @@ require_once __DIR__ . '/util.php';
  */
 function odq_patterns($line, $songId = NULL)
 {
-    $ids = [];
-    foreach (odq_songs() as $song) {
-        // Only the asked song, when one is asked.
-        if ($songId !== NULL && (int)($song['song_id'] ?? -1) !== $songId) {
-            continue;
-        }
-        foreach ($song['song_patterns'] ?? [] as $pattern) {
-            // Every difficulty of the asked line counts.
-            if ((int)($pattern['line'] ?? 0) === $line) {
-                $ids[] = (int)$pattern['pattern_id'];
-            }
-        }
-    }
-    return $ids;
+    // From the song list's index (content.php): every difficulty of the asked line, in the list's order, of every song
+    // or of the asked one only.
+    $index = odq_song_index();
+    $line = (int)$line;
+    return $songId === NULL ? ($index['lines'][$line] ?? []) : ($index['songs'][(int)$songId][$line] ?? []);
 }
 
 /*

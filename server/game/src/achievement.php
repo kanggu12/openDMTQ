@@ -57,20 +57,9 @@ function odq_achievement_count(array $params)
  */
 function odq_chart_kinds()
 {
-    // Static: a save asks three times (its chart, the achievements before it and after it), and MY PAGE asks again to date
-    // what it lists.
-    static $charts = NULL;
-    if ($charts === NULL) {
-        $charts = [];
-        // Every chart of every song, as the game's song list describes it.
-        foreach (odq_songs() as $song) {
-            foreach ($song['song_patterns'] ?? [] as $pattern) {
-                // A chart the list leaves undescribed counts as no line and no difficulty.
-                $charts[(int)($pattern['pattern_id'] ?? 0)] = [(int)($pattern['line'] ?? 0), (int)($pattern['signature'] ?? -1)];
-            }
-        }
-    }
-    return $charts;
+    // From the song list's index (content.php), which a save, the achievements before and after it and MY PAGE all read
+    // without decoding the list.
+    return odq_song_index()['kinds'];
 }
 
 /*

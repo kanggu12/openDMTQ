@@ -132,7 +132,9 @@ for the site's This month tab and the months before it, which are the game's own
 check account is never ranked. A month's board (TOTAL and the LINE tabs) and the site's totals are worked out once and
 kept in the server's run folder with the number of `BoardStamp`, which triggers raise at every change of `PlayLog`, `Play`
 and `Member`, whoever makes it; while the number stays, a look at a ranking reads what was kept (on a million plays,
-1 ms against 100), and the first look after a change works it out again.
+1 ms against 100), and the first look after a change works it out again. What saves and rankings need of the song
+list (each chart's line and difficulty, the charts of a line and of a song) is kept the same way, as a PHP file named
+after the list's file, so that only the song list's own request decodes its 200 KB.
 
 The achievements on MY PAGE come from what the server knows (level 99 and 999,999 MAX POINT for every player, the best
 scores, the play log), and each keeps the date it was earned on: the save that earns one stores it in

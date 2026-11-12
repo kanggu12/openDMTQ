@@ -33,14 +33,67 @@ function odq_songs(): array
     return $songs;
 }
 
+/*
+ * What most requests need of the song list without decoding its 200 KB each time: every chart's line and difficulty
+ * ('kinds': pattern id => [line, signature]), the charts of each line ('lines': line => [pattern ids]) and of each song's
+ * line ('songs': song id => line => [pattern ids]), each in the list's order, and the highest song id ('max'). Worked out
+ * from the list once and kept as a PHP file in the run folder, named after the list file's identity (its inode, size
+ * and time: the tools put a whole new file in its place, so a changed list is another file), which PHP's opcache keeps
+ * compiled: a save or a ranking then reads it in microseconds where decoding the list took one to three milliseconds.
+ * Without a run folder to write to, it is worked out from the list each time.
+ */
+function odq_song_index(): array
+{
+    // Static: a save asks several times (its chart, the achievements before it and after it).
+    static $index = null;
+    if ($index !== null) {
+        return $index;
+    }
+    $stat = @stat(odq_song_list_path());
+    $file = $stat ? odq_run_dir() . '/songs/index-' . $stat['ino'] . '-' . $stat['size'] . '-' . $stat['mtime'] . '.php' : null;
+    if ($file !== null && is_file($file)) {
+        // The file this very code wrote (below): an array of whole numbers, nothing else.
+        $kept = @include $file;
+        if (is_array($kept) && isset($kept['kinds'], $kept['lines'], $kept['songs'], $kept['max'])) {
+            return $index = $kept;
+        }
+    }
+    $index = ['kinds' => [], 'lines' => [], 'songs' => [], 'max' => 0];
+    foreach (odq_songs() as $song) {
+        $id = (int)($song['song_id'] ?? 0);
+        $index['max'] = max($index['max'], $id);
+        foreach ($song['song_patterns'] ?? [] as $pattern) {
+            $chart = (int)($pattern['pattern_id'] ?? 0);
+            $line = (int)($pattern['line'] ?? 0);
+            // A chart the list leaves undescribed counts as no line and no difficulty.
+            $index['kinds'][$chart] = [$line, (int)($pattern['signature'] ?? -1)];
+            $index['lines'][$line][] = $chart;
+            // By the id the song has in the list, -1 for one without: no request asks for that one.
+            $index['songs'][(int)($song['song_id'] ?? -1)][$line][] = $chart;
+        }
+    }
+    if ($file !== null) {
+        // Written whole under another name, then put in place: a request that includes it never reads half of it.
+        @mkdir(dirname($file), 0700, true);
+        $part = $file . '.' . getmypid();
+        if (@file_put_contents($part, '<?php return ' . var_export($index, true) . ';') !== false && @rename($part, $file)) {
+            // The indexes of earlier lists go: one list, one index.
+            foreach (glob(dirname($file) . '/index-*.php') ?: [] as $old) {
+                if ($old !== $file) {
+                    @unlink($old);
+                }
+            }
+        } else {
+            @unlink($part);
+        }
+    }
+    return $index;
+}
+
 /* The highest song id in the list, 0 without songs. */
 function odq_max_song_id(): int
 {
-    $max = 0;
-    foreach (odq_songs() as $song) {
-        $max = max($max, (int)($song['song_id'] ?? 0));
-    }
-    return $max;
+    return odq_song_index()['max'];
 }
 
 /*

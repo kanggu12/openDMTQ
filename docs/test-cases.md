@@ -269,6 +269,7 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 | GAME-54 | The queries a save makes for the player's achievements, before it and after it | The player's best rows and their clears chart by chart each from one index alone, in its order, never the table once per row | `tests/game/protocol.sh#a save's achievements read the player's rows from one index each` | ui |
 | GAME-55 | The home page's newest records on a log whose newest plays are no records | Read from the index of the record rows alone, never the log read back from its newest play | `tests/game/protocol.sh#the home page's newest records come from the index of record rows` | ui |
 | GAME-56 | A month's board looked at twice, then after a change of a player | The second look takes the board kept from the first; the change raises the rankings' change number and the next look works the board out again | `tests/game/protocol.sh#a month's board is kept until the log, the bests or the players change, then worked out again` | ui |
+| GAME-57 | What saves and rankings need of the song list (each chart's line and difficulty, the charts of a line and of a song), asked by three requests, the last after a new list took the first one's place | Kept as one file in the run folder and read again by the next request without decoding the list; the new list gets its own and the first one's goes | `tests/game/protocol.sh#the song list's index is kept in one file, read again by the next request, and follows a new list` | ui |
 
 ## TS-SERVER: the server and its songs
 
