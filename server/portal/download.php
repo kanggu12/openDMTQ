@@ -29,7 +29,7 @@ $win = windows_client();
 page_header(t('dl.title'), 'download', $start ? '1;url=/apk' : ($building ? '20' : ''));
 ?>
   <?= masthead('DOWNLOAD') ?>
-  <section class="card install" id="install">
+  <section class="card" id="install">
     <?php // The centrepiece: the button and the QR code side by side, then the steps across the whole box. ?>
     <div class="install-head">
       <div class="install-main">
