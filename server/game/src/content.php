@@ -23,14 +23,17 @@ function odq_songs(): array
     // Static: one request may need it several times (a ranking, then the achievements).
     static $songs = null;
     if ($songs === null) {
-        $raw = (string)@file_get_contents(odq_song_list_path());
-        // A list written by a Windows editor may start with a byte-order mark, which json_decode() refuses.
-        $songs = json_decode(preg_replace('/^\xEF\xBB\xBF/', '', $raw), true);
-        if (!is_array($songs)) {
-            $songs = [];
-        }
+        $songs = odq_songs_from((string)@file_get_contents(odq_song_list_path()));
     }
     return $songs;
+}
+
+/* The song objects in a list file's text; text that is no list is an empty one. */
+function odq_songs_from(string $raw): array
+{
+    // A list written by a Windows editor may start with a byte-order mark, which json_decode() refuses.
+    $songs = json_decode(preg_replace('/^\xEF\xBB\xBF/', '', $raw), true);
+    return is_array($songs) ? $songs : [];
 }
 
 /*
@@ -49,17 +52,27 @@ function odq_song_index(): array
     if ($index !== null) {
         return $index;
     }
-    $stat = @stat(odq_song_list_path());
+    // The list opened once: the name the index is kept under and the list it is made from both come from this one file.
+    // The tools put a new list in place under the old name, so the request's earlier read (odq_songs()) may be of the list
+    // before: an index made from that under the new list's name would stay in use until the list changed again.
+    $list = @fopen(odq_song_list_path(), 'rb');
+    $stat = $list ? @fstat($list) : false;
     $file = $stat ? odq_run_dir() . '/songs/index-' . $stat['ino'] . '-' . $stat['size'] . '-' . $stat['mtime'] . '.php' : null;
     if ($file !== null && is_file($file)) {
         // The file this very code wrote (below): an array of whole numbers, nothing else.
         $kept = @include $file;
         if (is_array($kept) && isset($kept['kinds'], $kept['lines'], $kept['songs'], $kept['max'])) {
+            fclose($list);
             return $index = $kept;
         }
     }
+    // Made from the opened file's own text, decoded here: the list this index will be named after.
+    $songs = $list ? odq_songs_from((string)stream_get_contents($list)) : [];
+    if ($list) {
+        fclose($list);
+    }
     $index = ['kinds' => [], 'lines' => [], 'songs' => [], 'max' => 0];
-    foreach (odq_songs() as $song) {
+    foreach ($songs as $song) {
         $id = (int)($song['song_id'] ?? 0);
         $index['max'] = max($index['max'], $id);
         foreach ($song['song_patterns'] ?? [] as $pattern) {
