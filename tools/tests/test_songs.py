@@ -383,8 +383,24 @@ class PutBackCommandTest(LibraryCase):
     def test_without_words_it_makes_the_list_as_at_every_start(self):
         code, out, _ = self.run_main()
         self.assertEqual(code, 0)
-        # rebuild()'s own account, the added song in it.
-        self.assertEqual(json.loads(out)["added"], 1)
+        # rebuild()'s own account in words, the added song and the hidden one in it: no raw JSON in a start's output (the
+        # command line's, the Windows bundle's window).
+        self.assertTrue(out.splitlines()[0].startswith("song list: 3 songs, 1 of them added on the admin pages, 1 hidden"), out)
+        self.assertNotIn("{", out)
+
+    def test_the_rebuild_in_words(self):
+        # One of each takes the words for one; the problems on lines of their own, the first names of the files.
+        done = {"songs": 1, "added": 0, "hidden": 0, "client_files": [], "thumbnails": 1, "tile_failures": [],
+                "missing_game_files": [], "charts_from_pair": ["1"], "charts_unreadable": []}
+        self.assertEqual(songs.summary(done), "song list: 1 song, 1 small jacket made for the site, "
+                                              "1 chart that cannot be loaded plays from its pair")
+        done.update(songs=30, thumbnails=30, charts_from_pair=["1", "2"], charts_unreadable=["3"],
+                    missing_game_files=["a.unity3d", "b.unity3d", "c.unity3d", "d.unity3d"], tile_failures=["x", "y"])
+        self.assertEqual(songs.summary(done).splitlines(), [
+            "song list: 30 songs, 30 small jackets made for the site, 2 charts that cannot be loaded play from their pair",
+            "song list: the client data lacks 4 files of the game's own: a.unity3d, b.unity3d, c.unity3d and 1 more",
+            "song list: 1 chart cannot be loaded, nor its pair",
+            "song list: 2 songs have no picture on their tile in the game (the Songs page says why)"])
 
     def test_run_as_a_program_it_ends_0_when_done_and_1_when_the_copy_failed(self):
         # As ./opendmtq runs it (python3 -m), on the made-up library: the command line goes by the exit code alone.

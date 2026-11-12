@@ -633,9 +633,44 @@ def rebuild():
     # For the setup and the doctor: the game's own files that did not come with the import.
     _write_json(os.path.join(CUSTOM, "missing-game-files.json"), client.game_missing)
     made = thumbnails(song_list)
-    return {"added": len(adds), "hidden": len(hide), "client_files": sorted(changed), "thumbnails": made,
-            "tile_failures": tile_failures, "missing_game_files": client.game_missing,
+    return {"songs": len(song_list), "added": len(adds), "hidden": len(hide), "client_files": sorted(changed),
+            "thumbnails": made, "tile_failures": tile_failures, "missing_game_files": client.game_missing,
             "charts_from_pair": charts_from_pair, "charts_unreadable": charts_unreadable}
+
+
+def summary(done):
+    """What a rebuild did (rebuild()'s account), in words for whoever reads a start's output: the command line, the Windows
+    bundle's window, a pod's log. A line of how many songs the list has and what was made for it, then a line for each
+    thing that is worth a look."""
+    def count(n, one, many):
+        # A number with its words, those for one when it is 1.
+        return f"{n} {one if n == 1 else many}"
+    first = [count(done["songs"], "song", "songs")]
+    # Those of the admin pages: added there, and hidden there (from players, still in the list).
+    if done["added"]:
+        first.append(f"{done['added']} of them added on the admin pages")
+    if done["hidden"]:
+        first.append(f"{done['hidden']} hidden")
+    # The site's small jackets, made once for each song: a first start makes them all.
+    if done["thumbnails"]:
+        first.append(count(done["thumbnails"], "small jacket made for the site", "small jackets made for the site"))
+    # Charts the game cannot load, played from their pair: the songs play the same.
+    if done["charts_from_pair"]:
+        first.append(count(len(done["charts_from_pair"]), "chart that cannot be loaded plays from its pair",
+                           "charts that cannot be loaded play from their pair"))
+    lines = ["song list: " + ", ".join(first)]
+    # What is wrong: the game's own files the import did not bring, charts with no pair to play, tiles with no picture.
+    if done["missing_game_files"]:
+        names = done["missing_game_files"]
+        lines.append(f"song list: the client data lacks {count(len(names), 'file', 'files')} of the game's own: "
+                     + ", ".join(names[:3]) + (f" and {len(names) - 3} more" if len(names) > 3 else ""))
+    if done["charts_unreadable"]:
+        lines.append("song list: " + count(len(done["charts_unreadable"]), "chart cannot be loaded, nor its pair",
+                                          "charts cannot be loaded, nor their pairs"))
+    if done["tile_failures"]:
+        lines.append("song list: " + count(len(done["tile_failures"]), "song has no picture on its tile in the game",
+                                          "songs have no picture on their tile in the game") + " (the Songs page says why)")
+    return "\n".join(lines)
 
 
 def _song_list(adds, hide):
@@ -1141,12 +1176,13 @@ def main(argv=None):
         put-back FOLDER    a restore: a backup's added songs, hidden flags and ids (FOLDER: its custom/, unpacked) in
                            place of these, and the song list made for them, under one lock (put_back)
 
-    Says what it did as JSON. 0 when done, also when the song list could not be made anew (it says why: the songs are
-    back all the same); 1 when the copy failed; 2 for a FOLDER that is no backup's, before anything changed."""
+    Says what it did: the rebuild in words (summary()), for the start's output; put-back as JSON, which the command
+    line's restore reads. 0 when done, also when the song list could not be made anew (it says why: the songs are back
+    all the same); 1 when the copy failed; 2 for a FOLDER that is no backup's, before anything changed."""
     argv = sys.argv[1:] if argv is None else argv
-    # No words: the start's and the import's rebuild, as it always was.
+    # No words: the start's and the import's rebuild, said in a line for the person reading the start.
     if not argv:
-        print(json.dumps(rebuild()), flush=True)
+        print(summary(rebuild()), flush=True)
         return 0
     if len(argv) == 2 and argv[0] == "put-back":
         folder = argv[1]
