@@ -937,7 +937,8 @@ class TokenPageTest(unittest.TestCase):
             page = inst.client.post("/opendmtq/admin/accounts", data={"csrf": csrf, "action": "token", "token_name": "my script", "scope": "write"},
                                     follow_redirects=True).get_data(as_text=True)
             secret = re.search(r'<code id="token-secret">(odq_[0-9a-f]{12}_[A-Za-z0-9_-]{43})</code>', page).group(1)
-            self.assertIn("Token my script made", page)
+            # The name in quotes: a token's name may have spaces in it.
+            self.assertIn("Token “my script” made", page)
             # It works, and it is the owner's.
             self.assertEqual(inst.ask("GET", "/status", token=secret).status_code, 200)
             page = inst.client.get("/opendmtq/admin/accounts").get_data(as_text=True)
@@ -948,7 +949,7 @@ class TokenPageTest(unittest.TestCase):
             self.assertIn("Works", row.group(0))
             page = inst.client.post("/opendmtq/admin/accounts", data={"csrf": csrf, "action": "revoke", "token": row.group(1)},
                                     follow_redirects=True).get_data(as_text=True)
-            self.assertIn("The token my script is revoked.", page)
+            self.assertIn("The token “my script” is revoked.", page)
             self.assertEqual(inst.ask("GET", "/status", token=secret).status_code, 401)
             changes = inst.client.get("/opendmtq/admin/logs?tab=changes").get_data(as_text=True)
             self.assertIn("Made an API token", changes)

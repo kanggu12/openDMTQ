@@ -2337,10 +2337,10 @@ class AccountLinkTest(unittest.TestCase):
             self.assertIn('<option value="7" selected>Sena</option>', page)
             page = self.post(inst, action="link", name="sena", player="9")
             self.assertEqual(AccountsTest.row("sena")["guid"], 9)
-            self.assertIn("sena is linked to Twin (9).", page)
+            self.assertIn("“sena” is linked to “Twin (9)”.", page)
             page = self.post(inst, action="link", name="sena", player="")
             self.assertIsNone(AccountsTest.row("sena")["guid"])
-            self.assertIn("sena is no longer linked to a player.", page)
+            self.assertIn("“sena” is no longer linked to a player.", page)
 
     def test_the_players_are_sent_once_whatever_the_number_of_accounts(self):
         # Each row's list comes from one template on the page (admin.js): the page grows as accounts plus players, not as
@@ -2512,7 +2512,7 @@ class AccountsTest(unittest.TestCase):
             # Disabling, deleting or taking away their own rights: refused, and nothing changes.
             for action in ("off", "delete", "player"):
                 page = other.post("/opendmtq/admin/accounts", data={"csrf": token(), "action": action, "name": "helper"}, follow_redirects=True).get_data(as_text=True)
-                self.assertIn("You are signed in with helper", page, action)
+                self.assertIn("You are signed in with “helper”", page, action)
             row = self.row("helper")
             self.assertEqual((row["off"], row["admin"]), (0, 1))
 

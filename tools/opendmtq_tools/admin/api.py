@@ -672,7 +672,8 @@ def account_rows():
 def account_view(row, choices):
     """An account."""
     names = dict(choices)
-    return {"name": row["name"], "note": row["note"], "admin": bool(row["admin"]), "enabled": not row["off"], "created_at": row["created_at"],
+    # The setup's note in English, whichever language it was made in.
+    return {"name": row["name"], "note": accounts.note_words(row["note"]), "admin": bool(row["admin"]), "enabled": not row["off"], "created_at": row["created_at"],
             "signed_in_at": row["signed_in_at"], "player": row["guid"], "player_name": names.get(row["guid"]) if row["guid"] is not None else None}
 
 

@@ -54,7 +54,7 @@
     <div class="invite-in">
       <div>
         <p class="meta">{{ t('invite.lead') }}</p>
-        <div class="btn-line"><a class="btn btn-primary" href="{{ url_for('accounts_page') }}">{{ t('invite.make') }}</a>{% if server_ok and build and not app_other_host %}<a class="btn" href="{{ invite_url }}">{{ t('invite.open') }}</a>{% endif %}</div>
+        <div class="btn-line"><a class="btn btn-primary" href="{{ url_for('accounts_page') }}">{{ t('acc.create') }}</a>{% if server_ok and build and not app_other_host %}<a class="btn" href="{{ invite_url }}">{{ t('invite.open') }}</a>{% endif %}</div>
       </div>
       {% if qr %}<figure class="invite-qr"><img src="{{ url_for('invite_qr') }}" alt="{{ t('invite.qr') }}" width="124" height="124"><figcaption>{{ t('invite.qr_caption') }}</figcaption></figure>{% endif %}
     </div>

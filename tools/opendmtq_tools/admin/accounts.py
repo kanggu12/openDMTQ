@@ -9,8 +9,9 @@ import time
 
 from flask import flash, redirect, render_template, request, session, url_for
 
+from .. import strings
 from . import apps, auth, core, tokens
-from .core import Refused, ago, app, BASE, changed, db, t, why
+from .core import Refused, ago, app, BASE, changed, db, t, tp, why
 
 # A new account's password, or a new password, shown on the next page only: never in the session's cookie (the browser
 # keeps that) and never twice. Waits ten minutes at most. In memory: the service runs one process. A new API token waits
@@ -20,6 +21,18 @@ _shown_lock = threading.Lock()
 
 # The buttons of an account's row, by the form's action.
 ACTIONS = ("password", "off", "on", "delete", "admin", "player")
+
+# The note the setup's Players step gives the accounts it makes, kept in English whatever the page's language was: the
+# pages show it in their reader's (note_words). Earlier versions kept it in the page's language: those count too.
+SETUP_NOTE = strings.STRINGS["en"]["setup.made_note"]
+SETUP_NOTES = {table["setup.made_note"] for table in strings.STRINGS.values()}
+
+
+def note_words(note):
+    """An account's note as its reader reads it: the setup's own in the page's language (the API's, English), any other as
+    it was typed."""
+    return tp("setup.made_note") if note in SETUP_NOTES else note
+
 
 # The shortest password typed for an account with admin rights. It opens these pages too, and the site's sign-in, which
 # takes the same password, lets more guesses through than theirs. The passwords made here are as long
@@ -71,7 +84,8 @@ def accounts_page():
             # The game's players, to link an account to the one it is.
             players = auth.game_players(con)
             # When each last signed in, as long ago as that was; the moment itself under the pointer.
-            rows = [dict(r, last=ago(r["signed_in_at"]) if r["signed_in_at"] else "")
+            # The setup's note in the reader's language.
+            rows = [dict(r, last=ago(r["signed_in_at"]) if r["signed_in_at"] else "", note=note_words(r["note"]))
                     for r in con.execute("SELECT name, note, admin, created_at, signed_in_at, off, guid FROM SiteUser ORDER BY name COLLATE NOCASE")]
         # The API's tokens, with when each was last used, as long ago as that was.
         listed_tokens = [dict(r, last=ago(r["used_at"]) if r["used_at"] else "") for r in tokens.listing()]
@@ -180,10 +194,10 @@ def change(name, action, acting):
     if own and action != "password":
         raise Refused(409, "own_account", t("acc.self", name=name))
     # Enabling what is enabled, giving rights it has: nothing happens, and nothing goes into the log of changes.
-    already = {"off": (row["off"], f"The account {name} is disabled already."),
-               "on": (not row["off"], f"The account {name} is enabled already."),
-               "admin": (row["admin"], f"The account {name} has admin rights already."),
-               "player": (not row["admin"], f"The account {name} has no admin rights.")}
+    already = {"off": (row["off"], f"The account “{name}” is disabled already."),
+               "on": (not row["off"], f"The account “{name}” is enabled already."),
+               "admin": (row["admin"], f"The account “{name}” has admin rights already."),
+               "player": (not row["admin"], f"The account “{name}” has no admin rights.")}
     if action in already and already[action][0]:
         raise Refused(409, "already_so", message=already[action][1])
     password = auth.account_password() if action == "password" else ""
@@ -227,7 +241,7 @@ def link(name, value):
     if guid is False:
         raise Refused(400, "bad_player", t("acc.bad_player"))
     if guid == (row["guid"] if "guid" in row.keys() else None):
-        raise Refused(409, "already_so", message=f"The account {name} is linked so already.")
+        raise Refused(409, "already_so", message=f"The account “{name}” is linked so already.")
     try:
         with db() as con:
             auth.account_table(con)

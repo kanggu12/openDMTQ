@@ -1014,7 +1014,8 @@ class PlayersTest(unittest.TestCase):
             inst.sign_in()
             self.assertEqual(self.make(inst, "player1").status_code, 302)
             page = inst.page(BASE + "/setup?step=players")
-            self.assertIn("The account player1 is ready", page)
+            # The Accounts page's own words for it, the name in quotes.
+            self.assertIn("Account “player1” made", page)
             password = re.search(r'<dd><code>([^<]+)</code></dd>', page).group(1)
             self.assertIn("ID: player1", page)
             self.assertIn("Accounts so far: 1.", page)
@@ -1026,6 +1027,29 @@ class PlayersTest(unittest.TestCase):
                                  ("made in the setup",))
             finally:
                 con.close()
+
+    def test_the_setups_note_reads_in_the_readers_language(self):
+        # Made from the page in Korean, the note is kept in English, as the API gives it, and the Accounts page shows it in
+        # its reader's language; one an earlier version kept in Korean reads in English to an English reader too.
+        with HostInstall() as inst:
+            inst.sign_in()
+            inst.client.set_cookie("opendmtq_lang", "ko")
+            self.make(inst, "player1")
+            con = sqlite3.connect(admin.core.DB)
+            try:
+                self.assertEqual(con.execute("SELECT note FROM SiteUser WHERE name = 'player1'").fetchone(), ("made in the setup",))
+                con.execute("UPDATE SiteUser SET note = '설정에서 만듦'")
+                con.execute("INSERT INTO SiteUser (name, pass, note, admin, created_at, off) VALUES ('typed', 'x', 'Minho''s phone', 0, 0, 0)")
+                con.commit()
+            finally:
+                con.close()
+            self.assertIn("설정에서 만듦", inst.page(BASE + "/accounts"))
+            inst.client.set_cookie("opendmtq_lang", "en")
+            page = inst.page(BASE + "/accounts")
+            self.assertIn("made in the setup", page)
+            self.assertNotIn("설정에서 만듦", page)
+            # A note typed by hand is the owner's words, in no language of ours.
+            self.assertIn("Minho&#39;s phone", page)
 
     def test_the_password_never_goes_into_the_sessions_cookie(self):
         with HostInstall() as inst:
@@ -1046,7 +1070,7 @@ class PlayersTest(unittest.TestCase):
             for name in ("player1", "x", "has space", "admin"):
                 r = self.make(inst, name)
                 self.assertEqual(r.status_code, 302, name)
-                self.assertNotIn("is ready", inst.page(r.headers["Location"]), name)
+                self.assertNotIn('class="card account-made"', inst.page(r.headers["Location"]), name)
             self.assertEqual(admin.auth.accounts_count()[0], 1)
 
 
@@ -1202,8 +1226,9 @@ class AppStepTest(unittest.TestCase):
             # With the code the build made: the code too.
             inst.write("apk/out/download-qr.svg", "<svg/>")
             page = inst.page(BASE + "/setup?step=app")
-            self.assertIn(f"Open http://{HOST}/ in the browser, or scan this code.", page)
-            self.assertIn('alt="QR code of the app\'s download page"', page)
+            self.assertIn(f"Open http://{HOST}/ in the browser, or scan this code to download the app.", page)
+            # What the code is: the app's download itself (/apk), not the Download page.
+            self.assertIn('alt="QR code of the app\'s download"', page)
 
 
 if __name__ == "__main__":

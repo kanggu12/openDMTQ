@@ -1036,7 +1036,7 @@ def setup_player():
         flash(e.words, e.tone)
         return redirect(url_for("setup_page", step="players"))
     # The password waits on the server for the next page only, never in the session's cookie.
-    accounts.keep_once(name, password, t("setup.made_note"), "acc.made")
+    accounts.keep_once(name, password, accounts.SETUP_NOTE, "acc.made")
     return redirect(url_for("setup_page", step="players"))
 
 
@@ -1046,7 +1046,8 @@ def make_player(name):
     if not auth.ACCOUNT_NAME.fullmatch(name):
         raise Refused(400, "bad_id", t("acc.bad_id"))
     password = auth.account_password()
-    if not auth.account_create(name, password, t("setup.made_note")):
+    # The setup's note in English, whatever the page's language: the pages show it in their reader's.
+    if not auth.account_create(name, password, accounts.SETUP_NOTE):
         raise Refused(409, "id_taken", t("acc.taken", name=name))
     changed("accounts_page:create", name)
     return password
