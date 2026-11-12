@@ -407,7 +407,7 @@ class ReleaseNotesTest(unittest.TestCase):
 
 
 class HostVersionTest(unittest.TestCase):
-    """The version a host install's pages show: a release's number, else the date and commit of a clone. Never git
+    """The version a host install's pages show: a release's number, else a clone's release, and past its tag its commit. Never git
     describe's v1.2.3-4-gabcdef0: the pages put a v before the first part, and showed vv1.2.3."""
 
     @classmethod
@@ -428,11 +428,38 @@ class HostVersionTest(unittest.TestCase):
                 f.write("0.2.0\n")
             self.assertEqual(self.version(d), "0.2.0")
 
-    def test_a_clone_by_the_date_and_commit_of_its_code(self):
-        # A clone that git can read: CI's Python 3.9 container mounts one and has no git, and gives an empty version.
+    def test_a_clone_by_its_release_and_past_it_the_commit(self):
+        # A clone that git can read: CI's Python 3.9 container mounts one and has no git, and gives an empty version. The
+        # release its chart names, with the commit when it is past that release's tag: the same as Docker shows for it
+        # (the command line's code_version()), not a date that a release's own install never shows.
         if not shutil.which("git") or subprocess.run(["git", "-C", ROOT, "rev-parse"], capture_output=True).returncode:
             self.skipTest("not a git checkout")
-        self.assertRegex(self.version(ROOT), r"^\d{4}\.\d\d\.\d\d-[0-9a-f]{7,}$")
+        from opendmtq_cli import system
+        mine = self.version(ROOT)
+        self.assertRegex(mine, r"^\d+\.\d+\.\d+(-[0-9a-f]{7})?$")
+        self.assertTrue(mine.startswith(system.release_of(ROOT)), mine)
+        with mock.patch.object(system, "ROOT", ROOT):
+            self.assertEqual(system.code_version(), mine)
+
+    def test_at_a_releases_tag_the_release_alone(self):
+        # git as a clone of the release's own commit answers it, and as one past it.
+        from opendmtq_cli import system
+        head = "d5e201c16a43a7460d26f6081da00e0fa8c59b77"
+        for tagged, expected in ((head, "0.9.3"), ("1" * 40, "0.9.3-d5e201c")):
+            answers = {("rev-parse", "--short=7", "HEAD"): "d5e201c", ("rev-parse", "HEAD"): head,
+                       ("rev-parse", "-q", "--verify", "refs/tags/v0.9.3^{commit}"): tagged}
+
+            def git(cmd, *args, **kwargs):
+                # Only git, with -C and a folder before what it is asked.
+                return subprocess.CompletedProcess(cmd, 0, answers[tuple(cmd[3:])] + "\n", "")
+            with self.subTest(expected), mock.patch.object(system, "release_of", return_value="0.9.3"), \
+                    mock.patch.object(system.subprocess, "run", git):
+                self.assertEqual(system.code_version(), expected)
+            with self.subTest("host " + expected), tempfile.TemporaryDirectory() as d, mock.patch.object(self.folders.subprocess, "run", git):
+                os.makedirs(os.path.join(d, "deploy", "helm", "opendmtq"))
+                with open(os.path.join(d, "deploy", "helm", "opendmtq", "Chart.yaml"), "w", encoding="utf-8") as f:
+                    f.write('apiVersion: v2\nversion: 0.9.3\nappVersion: "0.9.3"\n')
+                self.assertEqual(self.version(d), expected)
 
     def test_a_copy_with_neither_shows_none(self):
         with tempfile.TemporaryDirectory() as d:

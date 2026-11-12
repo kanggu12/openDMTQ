@@ -124,14 +124,41 @@ def host_timezone():
 
 
 def code_version():
-    """This copy's version as the pages show it: the date and commit of its code ("2026.11.02-c1371df"). Empty when it
-    is no git checkout (a download of the files): the pages then just show none."""
-    try:
-        r = subprocess.run(["git", "-C", str(ROOT), "log", "-1", "--format=%cd-%h", "--date=format:%Y.%m.%d"],
-                           capture_output=True, text=True, timeout=10)
-    except (OSError, subprocess.SubprocessError):
+    """This copy's version as the pages show it, the same for the same code however it was installed (the host install's
+    folders.version(), the Windows bundle's build.sh): the release at its tag ("0.9.3"), past it the release and the
+    commit ("0.9.3-16e0b56"), which the pages show as v0.9.3 with the commit under the pointer. The release is the one the
+    tree names (release_of()). Empty when it is no git checkout (a download of the files): the pages then just show none."""
+    def git_says(*args):
+        # One line from git, or '' when it fails or this is no checkout.
+        try:
+            r = subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            return ""
+        return r.stdout.strip() if r.returncode == 0 else ""
+    commit = git_says("rev-parse", "--short=7", "HEAD")
+    if not commit:
         return ""
-    return r.stdout.strip() if r.returncode == 0 else ""
+    release = release_of(ROOT)
+    # A tree from before its chart named the release: the date and commit of its code, as such trees always said.
+    if not release:
+        return git_says("log", "-1", "--format=%cd-%h", "--date=format:%Y.%m.%d")
+    # At the release's own commit (its tag, wherever it was fetched from): the release alone.
+    at_tag = git_says("rev-parse", "-q", "--verify", f"refs/tags/v{release}^{{commit}}") == git_says("rev-parse", "HEAD")
+    return release if at_tag else f"{release}-{commit}"
+
+
+def release_of(root):
+    """The release a tree is, or comes after: the appVersion of its Helm chart (deploy/helm/opendmtq/Chart.yaml), which
+    each release sets. '' when the tree has none."""
+    try:
+        with open(os.path.join(root, "deploy", "helm", "opendmtq", "Chart.yaml"), encoding="utf-8") as f:
+            for line in f:
+                # appVersion: "0.9.3"
+                if line.startswith("appVersion:"):
+                    return line.split(":", 1)[1].strip().strip('"')
+    except OSError:
+        pass
+    return ""
 
 
 def git(*args):

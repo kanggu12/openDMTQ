@@ -4,7 +4,7 @@
 # with MinGW-w64. It runs in a container with the tools it needs (host/windows/Dockerfile), and checks at the end that
 # every program in the bundle finds the DLLs it needs there or in Windows itself.
 #
-# Usage: host/windows/build.sh [out folder]      (default _work/windows; VERSION=1.2.3 for a release, else date-commit)
+# Usage: host/windows/build.sh [out folder]      (default _work/windows; VERSION=1.2.3 for a release, else release-commit)
 #
 # Apache Lounge keeps only its newest build for download, and PHP moves older builds: each file is also kept in this
 # repository's release named build-inputs, where the build falls back to. To move to a newer one, test the bundle
@@ -42,9 +42,16 @@ SIGNER_SHA=e1299fd6fcf4da527dd53735b56127e8ea922a321128123b9c32d619bba1d835
 
 if [ -z "${IN_BUILD_IMAGE:-}" ]; then
   OUT=$(mkdir -p "${1:-$ROOT/_work/windows}" && cd "${1:-$ROOT/_work/windows}" && pwd)
-  # The version the pages and the program show: a release's, or the date and commit of this tree.
+  # The version the pages and the program show: a release's; else as a clone's (cli/opendmtq_cli/system.py
+  # code_version()): the release the tree names (its Helm chart's appVersion) at its tag, past it with the commit.
   if [ -z "${VERSION:-}" ]; then
-    VERSION="$(git -C "$ROOT" log -1 --format=%cd --date=format:%Y.%m.%d)-$(git -C "$ROOT" rev-parse --short HEAD)"
+    release=$(sed -n 's/^appVersion: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' "$ROOT/deploy/helm/opendmtq/Chart.yaml")
+    head=$(git -C "$ROOT" rev-parse HEAD)
+    if [ "$(git -C "$ROOT" rev-parse -q --verify "refs/tags/v$release^{commit}" || true)" = "$head" ]; then
+      VERSION=$release
+    else
+      VERSION="$release-$(git -C "$ROOT" rev-parse --short=7 HEAD)"
+    fi
   fi
   # OpenDMTQ's own files as a clone has them: those git knows, and new ones it does not ignore.
   (cd "$ROOT" && git ls-files -z --cached --others --exclude-standard -- server tools/opendmtq_tools cli/opendmtq_cli \

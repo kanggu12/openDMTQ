@@ -104,20 +104,38 @@ def tools_env(values, found):
 @functools.lru_cache(maxsize=None)
 def version():
     """The version the pages show: a release's number from the VERSION file (the Windows bundle's, or the one the
-    one-command install writes, "0.2.0"), else the date and commit of a clone's code ("2026.11.07-62ce933"), as with
-    Docker. The pages put a v before the first part and keep what follows the first dash for the pointer, so this is
-    never git describe's "v0.2.0-3-g655895c"."""
+    one-command install writes, "0.2.0"), else a clone's as with Docker (the command line's system.code_version()): the
+    release at its tag ("0.9.3"), past it the release and the commit ("0.9.3-16e0b56"). The pages put a v before the first
+    part and keep what follows the first dash for the pointer, so this is never git describe's "v0.2.0-3-g655895c"."""
     try:
         with open(os.path.join(APP, "VERSION"), encoding="utf-8") as f:
             return f.read().strip()
     except OSError:
         pass
-    try:
-        r = subprocess.run(["git", "-C", APP, "log", "-1", "--format=%cd-%h", "--date=format:%Y.%m.%d"],
-                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10)
+
+    def git_says(*args):
+        # One line from git, or '' when it fails or this is no checkout.
+        try:
+            r = subprocess.run(["git", "-C", APP, *args], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            return ""
         return r.stdout.strip() if r.returncode == 0 else ""
-    except (OSError, subprocess.SubprocessError):
+    commit = git_says("rev-parse", "--short=7", "HEAD")
+    if not commit:
         return ""
+    # The release the tree names: its Helm chart's appVersion, which each release sets.
+    release = ""
+    try:
+        with open(os.path.join(APP, "deploy", "helm", "opendmtq", "Chart.yaml"), encoding="utf-8") as f:
+            release = next((line.split(":", 1)[1].strip().strip('"') for line in f if line.startswith("appVersion:")), "")
+    except OSError:
+        pass
+    # A tree from before its chart named the release: the date and commit of its code.
+    if not release:
+        return git_says("log", "-1", "--format=%cd-%h", "--date=format:%Y.%m.%d")
+    # At the release's own commit (its tag): the release alone.
+    at_tag = git_says("rev-parse", "-q", "--verify", f"refs/tags/v{release}^{{commit}}") == git_says("rev-parse", "HEAD")
+    return release if at_tag else f"{release}-{commit}"
 
 
 def php_command(found):

@@ -326,7 +326,9 @@ async function portalFlows(contexts) {
   // away (its size and date, the way to the steps) and the way to the broadcasts.
   const front = await contexts.signed.newPage();
   const arrived = await front.goto(`${P}/`, { waitUntil: 'domcontentloaded' });
-  check('the home page shows the version beside the logo', /v\d{4}\.\d{2}\.\d{2}/.test(await textOf(front, '.stage-mark')), await textOf(front, '.stage-mark'));
+  // The release (run.sh passes 0.9.3-abc1234, as a clone past a release's tag has it): v0.9.3, the commit under the pointer.
+  check('the home page shows the version beside the logo', /\bv\d+\.\d+\.\d+$/.test((await textOf(front, '.stage-mark')).trim())
+    && await front.$eval('.server-ver', e => e.title) === 'abc1234', await textOf(front, '.stage-mark'));
   check('the front page offers the app and the broadcasts first',
     await front.$eval('.stage-acts .button', a => new URL(a.href).pathname).catch(() => '') === '/apk' && await visible(front, '#watch-live') && await visible(front, '.stage-meta a[href="download.php"]'));
   // The site's answers, its pages, files and JSON alike, are never shown inside another site's page, never taken for

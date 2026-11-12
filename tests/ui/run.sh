@@ -62,14 +62,14 @@ HOST=127.0.0.1:$SITE_PORT
 docker run -d --name "$SITE" --network "$NET" --cpus 2 --memory 1g -u 33:33 --read-only \
   --tmpfs /var/opendmtq:mode=1777 --tmpfs /tmp:mode=1777 \
   -e PUBLIC_HOST="$HOST" -e ADMIN_ON_PUBLIC_PORT=no -e TZ=Asia/Seoul \
-  -e OPENDMTQ_VERSION=2026.11.02-abc1234 \
+  -e OPENDMTQ_VERSION=0.9.3-abc1234 \
   -v "$DATA/content:/srv/content:ro" -v "$DATA/state:/data" -v "$DATA/apk/out:/srv/apk:ro" -v "$DATA/custom:/srv/custom:ro" \
   -p "127.0.0.1:$SITE_PORT:8080" "opendmtq-server:$TAG" >/dev/null
 # The setup pages as a host install shows them (OPENDMTQ_HOST_INSTALL): they look in the owner's home folder, made below.
 docker run -d --name "$ADMIN" --network "$NET" --cpus 2 --memory 1g -u 33:33 --read-only --tmpfs /tmp:mode=1777 \
   --tmpfs /home/player:mode=1777 -e HOME=/home/player -e OPENDMTQ_HOST_INSTALL=yes \
   -e PUBLIC_HOST="$HOST" -e ADMIN_PASSWORD="$PASSWORD" -e SERVER_URL="http://$SITE:8080" -e TZ=Asia/Seoul \
-  -e OPENDMTQ_VERSION=2026.11.02-abc1234 \
+  -e OPENDMTQ_VERSION=0.9.3-abc1234 \
   -v "$DATA/state:/data" -v "$DATA/apk:/apk" -v "$DATA/custom:/custom" -v "$DATA/backups:/backups" \
   -v "$DATA/content:/srv/content:ro" -p "127.0.0.1:$ADMIN_PORT:8000" \
   --entrypoint gunicorn "opendmtq-tools:$TAG" -w 1 --threads 4 -b 0.0.0.0:8000 opendmtq_tools.admin:app >/dev/null
