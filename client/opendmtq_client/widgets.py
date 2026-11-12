@@ -691,7 +691,8 @@ class Button(tk.Canvas):
                             "pressed": colours.get("hover_text", colours["text"]), "disabled": theme.FAINT}
 
     def set_kind(self, kind):
-        """Another kind (a page's main action lit in lime, or quiet while PLAY is the lit one): its faces drawn again."""
+        """Another kind (a page's main action lit in lime, or quiet while PLAY is the lit one), its faces drawn
+        again."""
         if self.LOOKS[kind] == self.look:
             return
         self._take_look(kind)

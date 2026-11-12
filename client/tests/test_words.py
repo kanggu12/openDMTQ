@@ -159,6 +159,31 @@ class Look(unittest.TestCase):
 
 
 
+class Wording(unittest.TestCase):
+    def test_a_unit_after_a_number_has_a_space(self):
+        # "53 MB", "{total} MB", "{hz} Hz" in both languages, as the rest of the product writes them: never "103.2MB".
+        for key, pair in i18n.TEXT.items():
+            for text in pair:
+                self.assertIsNone(re.search(r"[0-9}](KB|MB|GB|Hz|fps)\b", text), (key, text))
+
+    def test_one_word_for_signing_in(self):
+        # Sign in on every button, card and step: never "log in" beside it (Korean says 로그인 for both).
+        for key, (en, _ko) in i18n.TEXT.items():
+            self.assertNotRegex(en, r"(?i)\blog ?in\b", key)
+
+    def test_a_help_line_does_not_name_the_page_its_link_names(self):
+        # The link at the line's right end says SCREEN or SOUND: the line itself says what to do there.
+        for key, page in (("help.trouble.2", "SCREEN"), ("help.trouble.3", "SOUND")):
+            for text in i18n.TEXT[key]:
+                self.assertNotIn(page, text, key)
+
+    def test_the_korean_vsync_hints_say_the_state_they_show_in(self):
+        # Shown while VSync is on (or off): "켜면" (once turned on) would say it is off.
+        for key in ("screen.fps.hint.vsync", "screen.fps.hint.vsync.above", "screen.fps.hint.vsync_rate"):
+            self.assertNotIn("켜면", i18n.TEXT[key][1], key)
+        self.assertNotIn("끄면", i18n.TEXT["screen.fps.hint.free"][1])
+
+
 class KoreanParticles(unittest.TestCase):
     def test_no_mechanical_particles(self):
         # "(으)로", "을(를)" and the like read as a form being filled in: the words are put so that none is needed.

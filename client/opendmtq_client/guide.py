@@ -1,9 +1,9 @@
 """The first-start guide: six steps from nothing to the first song, one question each.
 
-POWER ON (language, what is needed), SERVER (the server's address, or the one the installer brought), LOG IN (the ID and
-password its owner made), DOWNLOAD (that server's app), SOUND CHECK (sound and screen), STAGE START (the ready check,
-then PLAY). Every choice is the same setting the launcher's pages show, so the guide never knows anything the pages do
-not.
+POWER ON (language, what is needed), SERVER (the server's address, or the one the installer brought), SIGN IN (the ID
+and password its owner made), DOWNLOAD (that server's app), SOUND CHECK (sound and screen), STAGE START (the ready
+check, then PLAY). Every choice is the same setting the launcher's pages show, so the guide never knows anything the
+pages do not.
 """
 
 import tkinter as tk
@@ -56,8 +56,8 @@ class Guide:
         self.play_slab = widgets.PlaySlab(bar, ui, w("bottom.play"), self.next)
         self.back_button = widgets.Button(bar, ui, w("guide.back"), self.back)
         self.back_button.pack(side="right", padx=(0, px(10)))
-        # Leaving the guide for the launcher: a quiet link before Back, which the keyboard reaches too (packed by show(),
-        # which leaves it out on the last step, where PLAY is the way on and the setting up is done).
+        # Leaving the guide for the launcher: a quiet link before Back, which the keyboard reaches too (packed by
+        # show(), which leaves it out on the last step, where PLAY is the way on and the setting up is done).
         self.skip = skip = widgets.link(bar, ui, w("guide.skip"), lambda: self.finish(play=False), fg=theme.MUTED,
                                         font=app.fonts.small, chevron=False)
         # The step's page: its name as the page's title over the site's field, its question under it.
@@ -114,7 +114,7 @@ class Guide:
             pages.keep_place(self.body, self.app.root, lambda: self.show(self.index))
 
     def _can_go_on(self):
-        """SERVER needs a server that answered; LOG IN a sign-in; DOWNLOAD the app; the last step what PLAY needs."""
+        """SERVER needs a server that answered; SIGN IN a sign-in; DOWNLOAD the app; the last step what PLAY needs."""
         state, key = self.app.state, STEPS[self.index]
         server = state.server()
         if key == "server":
@@ -199,7 +199,7 @@ class Guide:
         # The address, Connect, and one line under them: connecting, connected, or why not.
         pages.connect_panel(app, parent, self.redraw)
 
-    # ------------------------------------------------------------------------------- 3 LOG IN
+    # ------------------------------------------------------------------------------ 3 SIGN IN
 
     def _login(self, parent):
         app = self.app

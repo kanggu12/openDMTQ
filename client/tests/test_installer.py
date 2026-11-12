@@ -22,13 +22,14 @@ class Installer(unittest.TestCase):
 
     def test_it_names_the_server_it_brings(self):
         asked = installer.plan(None, "0.8.0", False, {"url": "http://club.test", "name": "Club"})
-        self.assertIn("set up for Club", asked[3])
+        # What it sets up, said: OpenDMTQ, to play on that server.
+        self.assertIn("This installer sets OpenDMTQ to play on Club.", asked[3])
 
     def test_it_asks_in_korean(self):
         w = i18n.Words("ko")
         asked = installer.plan(None, "0.8.0", False, {"url": "http://club.test", "name": "Club"}, w)
         self.assertEqual(asked[2], "OpenDMTQ 0.8.0 버전을 설치할까요?")
-        self.assertIn("이 설치 파일은 Club용입니다.", asked[3])
+        self.assertIn("이 설치 파일은 OpenDMTQ가 Club에서 플레이하도록 설정합니다.", asked[3])
         asked = installer.plan("0.7.0", "0.8.0", True, None, w)
         self.assertEqual((asked[1], asked[4]), ("업데이트", "업데이트"))
         self.assertIn("열려 있는 런처는 먼저 닫힙니다.", asked[3])

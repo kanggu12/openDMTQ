@@ -631,7 +631,8 @@ def unnamed_check(app, out, tag, problems):
         for page in ("play", "help"):
             app.go(page)
             settle(app)
-            texts = [x.cget("text") for x in widgets_of(app.body.inner) if isinstance(x, tk.Label) and x.winfo_ismapped()]
+            texts = [x.cget("text") for x in widgets_of(app.body.inner)
+                     if isinstance(x, tk.Label) and x.winfo_ismapped()]
             said = [t for t in texts if netloc in t]
             if said != [server["url"]]:
                 problems.append("%s: a server without a name is named on %s as %r" % (tag, page, said))

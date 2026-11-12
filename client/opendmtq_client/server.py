@@ -205,8 +205,8 @@ def _call(base, path, data=None, cookie=None, timeout=TIMEOUT):
         # An address HTTP refuses (one a launcher kept before normalize() looked at hosts): no address, said as such.
         raise _not_an_address(base) from None
     except http.client.HTTPException as e:
-        # Something at that address answered, but not in HTTP (another kind of service on that port): no OpenDMTQ server.
-        # Neither an OSError nor a ValueError, so it is caught here on its own, its own words kept for the log.
+        # Something at that address answered, but not in HTTP (another kind of service on that port): no OpenDMTQ
+        # server. Neither an OSError nor a ValueError, so it is caught here on its own, its own words kept for the log.
         raise ServerError("%s answered in something other than HTTP (%r)" % (base, e), "error.server.not_opendmtq",
                           base=base) from None
     except (urllib.error.URLError, OSError, ValueError) as e:
