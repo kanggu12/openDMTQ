@@ -403,8 +403,10 @@ TEXT = {
     "setup.tab.update": ("Update", "업데이트"),
     "setup.tab.done": ("Done", "완료"),
     "setup.install.ask": ("Install OpenDMTQ {v}?", "OpenDMTQ {v} 버전을 설치할까요?"),
-    "setup.install.detail": ("It goes into your user folder with a desktop shortcut and needs no administrator rights.",
-                             "사용자 폴더에 설치되고 바탕 화면에 바로가기가 생깁니다. 관리자 권한은 필요 없습니다."),
+    # Velopack's setup makes both shortcuts (vpk's default places): the one on the desktop and the one in the Start menu.
+    "setup.install.detail": ("It goes into your user folder, with shortcuts on the desktop and in the Start menu, and needs "
+                             "no administrator rights.",
+                             "사용자 폴더에 설치되고 바탕 화면과 시작 메뉴에 바로가기가 생깁니다. 관리자 권한은 필요 없습니다."),
     "setup.install": ("Install", "설치"),
     "setup.update.ask": ("Update OpenDMTQ to {v}?", "OpenDMTQ를 {v} 버전으로 업데이트할까요?"),
     "setup.update.detail": ("{have} is installed now. Your servers and settings stay.",
