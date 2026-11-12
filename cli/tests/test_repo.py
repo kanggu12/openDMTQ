@@ -286,6 +286,45 @@ class HostBuilderLineTest(unittest.TestCase):
                                                    "(the details are in "))
 
 
+class HostStatusAppLineTest(unittest.TestCase):
+    """The status's line for the phone app on a host install: before the game files are in, the wait for them, as the
+    window's line at a start says it (builder_outcome); a build that failed with a client there is said as failed."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, os.path.join(ROOT, "host"))
+        from opendmtq_host import commands
+        cls.commands = commands
+
+    def setUp(self):
+        # A data folder of the test's own, as a first start leaves it: no game files, no app, the builder's last end failed.
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.data = tmp.name
+        os.makedirs(os.path.join(self.data, "apk", "base"))
+
+    def app_line(self):
+        lines = []
+        with mock.patch.object(self.commands, "DATA", self.data), \
+                mock.patch.object(self.commands, "say", lambda text: lines.append(text)), \
+                mock.patch.object(self.commands, "settings", lambda: {"PUBLIC_HOST": "192.168.0.20"}), \
+                mock.patch.object(self.commands, "health", lambda values: None), \
+                mock.patch.object(self.commands, "admin_port", lambda values: 8791), \
+                mock.patch.object(self.commands, "app_manifest", lambda: None), \
+                mock.patch.object(self.commands, "build_status", lambda: {"state": "failed"}):
+            self.commands.cmd_status(None)
+        return next(line for line in lines if line.startswith("Phone app"))
+
+    def test_before_the_game_files_the_app_waits_for_them(self):
+        # A first start's builder ends without a client to build from: no failure to show.
+        self.assertEqual(self.app_line(), "Phone app    waits for the game files: built once they are imported")
+
+    def test_a_build_that_failed_with_a_client_there_is_said_as_failed(self):
+        with open(os.path.join(self.data, "apk", "base", "client.apk"), "wb") as f:
+            f.write(b"PK")
+        self.assertEqual(self.app_line(), "Phone app    not built yet (failed)")
+
+
 class HostPlayersLineTest(unittest.TestCase):
     """Where a host install's window says players go (the setup's end, OpenDMTQ.exe apk): the phones, and the PC client
     once the site offers its installer, in the Download page's own words."""

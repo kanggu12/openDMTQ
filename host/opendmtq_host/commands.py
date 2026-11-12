@@ -1,5 +1,6 @@
 """The commands that start, stop and look at the server."""
 
+import glob
 import json
 import os
 import signal
@@ -111,6 +112,11 @@ def cmd_status(args):
         say(f"Players      {h.get('players', 0)}")
     m = app_manifest()
     b = build_status()
+    if not m and not glob.glob(os.path.join(DATA, "apk", "base", "*.apk")):
+        # No game client to build from yet: the import brings it, and the app is built then. The builder's last end
+        # without one is that wait, not a failure (the window's line at a start says the same: server.builder_outcome).
+        say("Phone app    waits for the game files: built once they are imported")
+        return 0
     say(f"Phone app    {m['file'] if m else 'not built yet'}" + (f" ({b.get('state')})" if b.get("state") else ""))
     return 0
 
