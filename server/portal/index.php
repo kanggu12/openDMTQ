@@ -163,7 +163,7 @@ page_header('OpenDMTQ', 'home', '', $stage);
             <?= row_jacket($song, 'feed-jacket') ?>
             <span class="feed-text">
               <span class="who"><a href="player.php?id=<?= (int)$r['mid'] ?>"><?= h(player_name(['nickname' => $r['nickname'], 'id' => $r['mid']])) ?></a></span>
-              <span class="what"><?php if ($song): ?><a href="song.php?id=<?= $sid ?>&amp;chart=<?= (int)$r['pattern_id'] ?>"><?= h(song_title($song)) ?></a><span class="what-chart"><?= h(chart_label($line, $diff, $sig)) ?></span><?php else: ?><?= t('player.chart', ['id' => (int)$r['pattern_id']]) ?><?php endif; ?></span>
+              <span class="what"><?php if ($song): ?><a href="song.php?id=<?= $sid ?>&amp;chart=<?= (int)$r['pattern_id'] ?>"><?= h(song_title($song)) ?></a><span class="what-chart sig<?= (int)$sig ?>"><?= h(chart_label($line, $diff, $sig)) ?></span><?php else: ?><?= t('player.chart', ['id' => (int)$r['pattern_id']]) ?><?php endif; ?></span>
             </span>
             <?php // The grade before the score; under it, how far over their best before (nothing for a first clear). ?>
             <span class="feed-end"><span class="feed-score"><span class="grade g<?= h($r['grade']) ?> feed-grade"><?= h($r['grade']) ?></span><?= number_format($r['score']) ?></span><?php if ($r['before'] !== null && (int)$r['score'] > (int)$r['before']): ?><span class="feed-gain" title="<?= h(tp('rec.up', ['before' => number_format($r['before'])])) ?>">+<?= number_format($r['score'] - $r['before']) ?></span><?php endif; ?><span class="feed-when"><?= h(ago((int)$r['played_at'])) ?></span></span>

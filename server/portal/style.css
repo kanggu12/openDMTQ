@@ -89,11 +89,13 @@
 :is(.lead, .meta, .note, .for-android) { text-wrap: pretty; }
 /* The blur itself where there is power and a mouse: on phones the glass keeps its look without the cost of redrawing. */
 @media (hover: hover) and (min-width: 721px) { :root { --glass-blur: blur(14px) saturate(1.35); } }
-/* The game's scene titles: rankings violet, songs in the timeline's blue, live in red, the console in amber. */
+/* The game's scene titles: rankings violet, songs in the timeline's blue, live in red. The console has no colour of its
+   own, the text's light: its colours are the states' (ok, warning, wrong, on air), and amber beside the warning's yellow
+   read as one more warning on every meter, bar and key. */
 body[data-section="ranking"] { --accent: #c491ff; --accent-ink: #1b0a34; }
 body[data-section="songs"] { --accent: #6fd6ff; --accent-ink: #04202e; }
 body[data-section="live"] { --accent: #ff5f72; --accent-ink: #2b0409; }
-body[data-section="admin"] { --accent: #ffb13d; --accent-ink: #2a1700; }
+body[data-section="admin"] { --accent: #dfe5eb; --accent-ink: #11151a; }
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -327,7 +329,7 @@ img { max-width: 100%; }
   body.signed-out { padding-bottom: 0; }
 }
 
-/* Said across the page while something is wrong: maintenance in amber, trouble in red. */
+/* Said across the page while something is wrong: maintenance in the warning's yellow, trouble in red. */
 .site-alert { background: color-mix(in srgb, var(--warn) 14%, var(--field)); color: #ffe6a0; border-bottom: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); font-size: var(--t-sm); }
 .site-alert.down { background: color-mix(in srgb, var(--bad) 16%, var(--field)); color: #ffc4cb; border-bottom-color: color-mix(in srgb, var(--bad) 50%, transparent); }
 .site-alert p { margin-block: 0; padding-block: 10px; }
@@ -963,7 +965,9 @@ td.actions { width: 1%; text-align: right; }
 .feed .what { display: grid; gap: 1px; color: var(--ash); font-size: var(--t-sm); min-width: 0; overflow-wrap: anywhere; }
 .feed .what a { text-decoration: none; color: var(--chalk); }
 .feed .what a:hover { color: var(--accent); }
-.what-chart { font-size: 12px; font-weight: 600; color: var(--accent); }
+/* The chart in the difficulty's own colour, as the song page and a recording's songs have it; another kind of chart in
+   the quiet text colour. */
+.what-chart { font-size: var(--t-xs); font-weight: 600; color: var(--ash); }
 .feed-end { display: grid; justify-items: end; gap: 1px; }
 .feed-score { font: 700 var(--t-xl)/1.2 var(--display); letter-spacing: 0.01em; font-variant-numeric: tabular-nums; color: #fff; }
 .feed-when { font-size: var(--t-xs); color: var(--ash); white-space: nowrap; }
@@ -1206,7 +1210,7 @@ table.plays td.when { width: 6.5em; color: var(--ash); font-size: var(--t-sm); }
 /* Android only, said as plainly as the button is. */
 .for-android { margin: 12px 0 0; font-size: var(--t-md); color: var(--chalk); }
 /* Three steps in order, big numbers: this one really is a sequence. Grouped by the space between them, with no box each. */
-.steps { list-style: none; counter-reset: step; margin: 28px 0 0; padding: 24px 0 0; border-top: 1px solid rgba(255, 255, 255, 0.12); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 36px; font-size: 14px; line-height: 1.6; color: #dfe5eb; }
+.steps { list-style: none; counter-reset: step; margin: 28px 0 0; padding: 24px 0 0; border-top: 1px solid rgba(255, 255, 255, 0.12); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 36px; font-size: var(--t-md); line-height: 1.6; color: #dfe5eb; }
 .steps li { position: relative; counter-increment: step; min-width: 0; padding-left: 48px; overflow-wrap: break-word; }
 .steps li::before { content: counter(step); position: absolute; left: 0; top: -6px; font: italic 800 44px/1 var(--display); color: var(--accent); }
 /* A step's words, one paragraph; its name first, on a line of its own. */
@@ -1400,13 +1404,13 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
 .chapters button:disabled { cursor: default; }
 .chapters button.on { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .chapters button.on b { color: var(--accent); }
-.ch-time { justify-self: end; font: 700 14px/1.3 var(--display); font-variant-numeric: tabular-nums; color: var(--accent); }
-.chapters b { font-weight: 600; font-size: 14px; color: #fff; overflow-wrap: anywhere; }
-.ch-chart { font-size: 12.5px; color: var(--ash); white-space: nowrap; }
-.ch-chart.sig0 { color: var(--sig0); }
-.ch-chart.sig1 { color: var(--sig1); }
-.ch-chart.sig2 { color: var(--sig2); }
-.ch-chart.sig3 { color: var(--sig3); }
+.ch-time { justify-self: end; font: 700 var(--t-md)/1.3 var(--display); font-variant-numeric: tabular-nums; color: var(--accent); }
+.chapters b { font-weight: 600; font-size: var(--t-md); color: #fff; overflow-wrap: anywhere; }
+.ch-chart { font-size: var(--t-xs); color: var(--ash); white-space: nowrap; }
+:is(.ch-chart, .what-chart).sig0 { color: var(--sig0); }
+:is(.ch-chart, .what-chart).sig1 { color: var(--sig1); }
+:is(.ch-chart, .what-chart).sig2 { color: var(--sig2); }
+:is(.ch-chart, .what-chart).sig3 { color: var(--sig3); }
 /* The song playing: a line along its foot as far as it has come. */
 .chapters button { position: relative; }
 .chapters button.on::after { content: ""; position: absolute; left: 0; bottom: 0; width: var(--done, 0%); height: 2px; background: var(--accent); }

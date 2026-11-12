@@ -127,7 +127,7 @@ table.accounts td.account-rights { white-space: nowrap; }
    width of the name it shows (field-sizing), not of the longest name in it, and gives way, cutting the name, only where
    the row has no more room: a name of twenty wide letters on the narrowest tablet. */
 .account-link select { flex: 1 1 auto; min-width: 0; height: auto; align-self: stretch; padding-block: 0; field-sizing: content; }
-/* A song's plays: the count, a thin amber bar against the most played song's, and when it was last played under them. */
+/* A song's plays: the count, a thin bar against the most played song's, and when it was last played under them. */
 td.song-plays { width: 11em; }
 /* One box for the three, so that on a phone, where the cell is a row of its label and its value, they stay together. */
 .plays-cell { display: grid; min-width: 8em; }
@@ -596,7 +596,7 @@ table.tokens .token-id { font: var(--t-xs)/1.4 var(--mono); }
 .logtable td.date { font-variant-numeric: tabular-nums; color: var(--ash); }
 .log-path { font-family: var(--mono); font-size: var(--t-xs) !important; overflow-wrap: anywhere; }
 .log-method { color: var(--ash); }
-.code { display: inline-block; min-width: 2.7em; padding: 1px 6px; text-align: center; font: 700 13px/1.45 var(--display); font-variant-numeric: tabular-nums; background: var(--rail-up); }
+.code { display: inline-block; min-width: 2.7em; padding: 1px 6px; text-align: center; font: 700 var(--t-sm)/1.45 var(--display); font-variant-numeric: tabular-nums; background: var(--rail-up); }
 .code.s2 { color: #c8f7a5; }
 .code.s3 { color: #b5e6ff; }
 .code.s4 { color: #2a1f00; background: var(--warn); }

@@ -12,8 +12,8 @@ from markupsafe import Markup
 PARTS = ("#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#9085e9")
 # A whole's part that is no part of anything (free space): the panel's own quiet grey. And what is there but not ours.
 QUIET = "#46505b"
-# OpenDMTQ's own part of a whole: the admin pages' amber.
-OURS = "#ffb13d"
+# OpenDMTQ's own part of a whole: the console's light (its section colour, style.css), the brightest of the three.
+OURS = "#dfe5eb"
 OTHER = "#7b8794"
 # The drawing space of a chart over time: as wide as this, 100 high, and this much of the height kept free over the top guide.
 PLOT_WIDTH = 720
