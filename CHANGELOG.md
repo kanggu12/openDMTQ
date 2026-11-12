@@ -6,6 +6,16 @@ one of fixes, changes and smaller additions raises the patch number. Each releas
 
 ## [Unreleased]
 
+### Changed
+
+- The player for Windows: the handle at the game's top centre is a short piece of the game's green line with a small
+  glass tab hanging from it and a chevron pointing down, so that it shows where the bar comes from (26 by 19 pixels in
+  a 1280x720 game, was a line 28 by 5). It follows the game's scale in a window of any shape, clear of the header's
+  buttons and words.
+- The player for Windows: the bar slides down out of the game's top edge and back up, in step with the display, with
+  the handle on its foot; the broadcast notice and the FPS counter at the top move with it. With Windows' animation
+  effects off it comes and goes at once.
+
 ### Fixed
 
 - The game server: a save and a ranking no longer read the whole song list at each request; two processor cores now take
