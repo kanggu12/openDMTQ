@@ -4,7 +4,8 @@
 // defaults. Then the numbers of the frame counter that one of the settings shows (frame_rate.cpp): its looks at the
 // count of frames through the game's start, a stretch with no frame, frames again and a hold. Then the size the overlay
 // over the game is drawn at and the smallest game area the window holds (overlay_scale.h), over Windows' scales and the
-// game's sizes. Prints ALL CHECKS PASSED when every check held.
+// game's sizes, with the size of the overlay's handle, which keeps clear of the game's header at every size. Prints ALL
+// CHECKS PASSED when every check held.
 #include "frame_rate.h"
 #include "overlay_scale.h"
 #include "player.h"
@@ -255,6 +256,49 @@ void overlay_scale_checks() {
     check(own, "every area above the floor's reach: the game's own scale, its height over 720");
 }
 
+// The handle's size (overlay_scale.h): the game's own scale exactly, and clear of the game's header at every size.
+void handle_size_checks() {
+    using player::overlay::handle_scale_for;
+    using player::overlay::kHeaderFreeHalf;
+    using player::overlay::kHeaderFreeRows;
+    using player::overlay::kLeastAreaH;
+    using player::overlay::kTabTall;
+    using player::overlay::kTabTallLit;
+    using player::overlay::rail_rows;
+    using player::overlay::scale_for;
+    using player::overlay::shade_rows;
+    using player::overlay::tab_half;
+    check(handle_scale_for(720) == 1.0f && handle_scale_for(1080) == 1.5f && handle_scale_for(2160) == 3.0f,
+          "the handle at 720, 1080 and 2160 lines: the game's own scale, 1, 1.5 and 3");
+    check(handle_scale_for(720) == scale_for(720, 1.5f) && handle_scale_for(1080) == scale_for(1080, 1.5f) && handle_scale_for(2160) == scale_for(2160, 1.5f),
+          "1280x720, 1920x1080 and 4K at 150 %: the handle at the scale of the rest of the overlay");
+    // Below the other pieces' floor the handle still follows the game: it is never pressed, and so stays in proportion.
+    check(handle_scale_for(405) == 0.5625f && scale_for(405, 1.5f) == 0.75f, "the smallest area at 150 %: the handle at the game's 0.5625, not at the floor's 0.75");
+    check(handle_scale_for(270) == 0.375f && handle_scale_for(270) < scale_for(270, 1.0f), "the smallest area at 100 %: the game's 0.375, below the floor's 0.5");
+    // The tab at 720 lines: below the header's empty rows it keeps within the room the header leaves beside the centre,
+    // at rest and deeper with the pointer on it (deeper, never wider).
+    check(tab_half(kHeaderFreeRows) <= kHeaderFreeHalf, "the tab keeps within 12 of the centre from the header's first row down, at 720 lines");
+    check(tab_half(kTabTall) < tab_half(kHeaderFreeRows) && tab_half(kTabTallLit) < tab_half(kTabTall) && tab_half(kTabTallLit) > 0,
+          "the tab narrows toward its foot, at rest and lit, and still has a foot");
+    check(tab_half(0) * 2 == player::overlay::kTabTop, "the tab is as wide as its top at the game's edge");
+    // Every area the window can hold, in pixels at the handle's scale: the rail and its shade stay within the header's
+    // empty rows, and the tab below them within the header's room.
+    bool rail_clear = true, tab_clear = true, rail_there = true;
+    for (int h = kLeastAreaH; h <= 2160; ++h) {
+        const float k = handle_scale_for(h);
+        // The header's empty rows and its room beside the centre, at this size.
+        const float rows = kHeaderFreeRows * k, half = kHeaderFreeHalf * k;
+        rail_clear = rail_clear && static_cast<float>(rail_rows(k) + shade_rows(k)) <= rows;
+        rail_there = rail_there && rail_rows(k) >= 1 && shade_rows(k) >= 0;
+        tab_clear = tab_clear && tab_half(kHeaderFreeRows) * k <= half;
+    }
+    check(rail_clear, "every area from 270 to 2160 lines: the rail and its shade lie within the header's empty rows");
+    check(rail_there, "and the rail is at least a pixel at every size");
+    check(tab_clear, "and the tab below them keeps within the header's room beside the centre");
+    check(rail_rows(1.0f) == 2 && shade_rows(1.0f) == 1 && rail_rows(1.5f) == 3 && rail_rows(3.0f) == 6 && shade_rows(3.0f) == 3 && shade_rows(0.375f) == 0,
+          "the rail 2 rows and its shade 1 at 720 lines, 6 and 3 at 4K, the shade none in the smallest window");
+}
+
 }  // namespace
 
 int main() {
@@ -379,6 +423,8 @@ int main() {
     frame_counter_checks();
     // The overlay's scale and the smallest game area.
     overlay_scale_checks();
+    // The handle's size.
+    handle_size_checks();
     if (g_failed) {
         std::printf("%d of %d checks FAILED\n", g_failed, g_checks);
         return 1;

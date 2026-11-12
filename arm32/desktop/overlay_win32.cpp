@@ -25,11 +25,12 @@
 //   the start; held, a button is sunk. The window itself has no buttons: the game is minimised, put in full screen and
 //   quit from here. It stays while the pointer is on it and goes up soon after it leaves, so it never sits on the
 //   game's own controls at the top while they are used. No key brings it.
-// - The handle: a small tab hanging from the game's top edge at its centre, in the shape of the game's own tabs, its
-//   charcoal faint and the game's green line along its foot, which says where the bar is; with the pointer on it, a
-//   little taller and its line lime. Clicks go through it to the game; the pointer resting on it brings the bar down.
-//   Hidden while the bar is down, while the question or a notice is up, while the game is held, and before the game's
-//   first picture.
+// - The handle: the game's green line along its top edge at the centre (a short piece of the bar's own foot line),
+//   with a small tab of glass hanging from it in the lean of the game's own tabs and a chevron pointing down in the
+//   tab, which says that a bar comes down from here; with the pointer on it, lime and a little deeper. As large as the
+//   game's header leaves room for, at the game's own scale, so that it covers nothing of the game's. Clicks go through
+//   it to the game; the pointer resting on it brings the bar down. Hidden while the bar is down, while the question or
+//   a notice is up, while the game is held, and before the game's first picture.
 // - The question before quitting: the bar's X and the taskbar's Close window ask it. The game dims and blurs behind a
 //   card of glass with the question, the game's green line under it, a thin X, Keep playing as the launcher's lime main
 //   button and Quit the game as its secondary, red under the pointer; the keys' choice in the launcher's cyan keyboard
@@ -54,7 +55,7 @@
 // The game's frame behind the glass, read on the render thread; the glass and the faces.
 #include "glass_capture.h"
 #include "overlay_glass.h"
-// The overlay's scale, the game's own with a floor at Windows' scale.
+// The overlay's scale, the game's own with a floor at Windows' scale; the handle's own scale and its tab's sizes.
 #include "overlay_scale.h"
 
 #include <algorithm>
@@ -364,6 +365,8 @@ struct Paint {
     int look_serial = 0;
     // The window's place in the game's area.
     int x = 0, y = 0;
+    // The handle's alone: the rows of its rail at its picture's top.
+    int lip = 0;
     // The frame behind it, blurred, for the place it was made for, and the hash of what it was made from.
     Backdrop backdrop;
     std::uint64_t backdrop_from = 0;
@@ -535,27 +538,32 @@ int chip_at(int x, int y) {
 
 // ---- the handle's size and place (both threads)
 
-// The handle's place at 720 lines: a box 44 by 10, 2 below the game's top edge, centred, which the pointer rests on
-// within 10 more on either side and below it (a small target, easy to reach; the handle as drawn is smaller, inside it);
-// its window that box and 3 more on every side.
-constexpr float kHandleW = 44, kHandleH = 10, kHandleTop = 2, kHandleRoom = 3, kHandleReach = 10;
-// The handle as drawn, at 720 lines: a tab 28 wide at its foot, 5 high (7 with the pointer on it), hanging from the
-// game's top edge, its sides leaning out 0.268 a pixel down as the game's own tabs' do (15 degrees: measured on its 2
-// LINE and 3 LINE tabs at 1080 lines); a line a pixel high along its foot.
-constexpr float kTabFoot = 28, kTabTall = 5, kTabTallLit = 7, kTabLean = 0.268f, kTabLine = 1;
+// Where the pointer rests on the handle, at 720 lines: a box 44 by 10, 2 below the game's top edge, centred, and 10
+// more on either side and below it (a small target, easy to reach: the tab as drawn hangs inside it, and its rail's
+// ends beyond it lie on the game's top edge, where a resting pointer brings the bar as well).
+constexpr float kHandleW = 44, kHandleH = 10, kHandleTop = 2, kHandleReach = 10;
+// The handle as drawn, at 720 lines (overlay_scale.h has its tab's sizes, which a check holds to the game's header):
+// its rail 88 wide (112 with the pointer on it), fading out over three tenths of its length toward either end as the
+// bar's own foot line does; the tab's foot corners rounded 3.6 and its outline 2 wide; in the tab a chevron pointing
+// down, 12.6 wide and 5.9 deep, its top 5.4 below the edge (8.4 with the pointer on it: pulled down), 2.5 thick.
+constexpr float kRailWide = 88, kRailWideLit = 112, kRailFade = 0.3f;
+constexpr float kTabRound = 3.6f, kTabEdge = 2;
+constexpr float kChevWide = 12.6f, kChevDeep = 5.9f, kChevTop = 5.4f, kChevTopLit = 8.4f, kChevStroke = 2.5f;
+// How strong each part is: the tab's charcoal glass at 78 % with a little light at its top that is gone by its foot;
+// the rail and the outline at 95 % at rest, the shade under the rail at 35 %; the chevron at 96 %.
+constexpr float kTabGlass = 0.78f, kTabSheen = 0.06f, kHandleLine = 0.95f, kRailShadeAlpha = 0.35f, kChevAlpha = 0.96f;
+// The room the handle's window keeps beside and below what is drawn (its smooth edges).
+constexpr float kHandleRoom = 4;
 
-// The handle's box in the game's area.
+// The handle's own scale: the game's exactly, with no floor (overlay_scale.h says why).
+float handle_scale() { return handle_scale_for(area_h()); }
+// A length of the handle's at 720 lines as pixels at its scale, unrounded.
+float hpx(float at720) { return at720 * handle_scale(); }
+
+// The box the pointer rests on, in the game's area.
 RectF handle_pill() {
     const float w = fpx(kHandleW), h = fpx(kHandleH);
     return RectF(std::floor((static_cast<float>(area_w()) - w) / 2), fpx(kHandleTop), std::round(w), std::round(h));
-}
-
-// The handle's window in the game's area: its box and the room around it.
-RECT handle_window() {
-    const RectF pill = handle_pill();
-    const int room = px(kHandleRoom);
-    return RECT{static_cast<LONG>(pill.X) - room, std::max(0L, static_cast<LONG>(pill.Y) - room), static_cast<LONG>(pill.X + pill.Width) + room,
-                static_cast<LONG>(pill.Y + pill.Height) + room};
 }
 
 // Whether (x, y) of the game's area is on the handle, as the pointer rests there: its box and its reach, from the top.
@@ -1053,50 +1061,181 @@ void notice_look(Paint& p, const std::string& text, bool live, int corner) {
 
 // ---- the handle's look (the painter's)
 
-// The handle, as picked from three drawn over the game's frames: a small tab in the shape of the game's own tabs hanging
-// from its top edge at the centre (kTabFoot and the rest), the game's charcoal at 40 %, a line of the game's green along
-// its foot at 70 %; with the pointer on it (`lit`) 7 high and its line the lime, whole. The line takes the foot's place
-// rather than lying over the charcoal, so that it is the same green on any frame. No glass: nothing of the frame is read
-// for it. Its picture is the handle's window, at the place it goes to.
-std::shared_ptr<Canvas> handle_picture(int& x, int& y, bool lit) {
-    const RECT win = handle_window();
-    x = win.left;
-    y = win.top;
-    auto c = std::make_shared<Canvas>(std::max(1L, win.right - win.left), std::max(1L, win.bottom - win.top));
-    if (!c->bits) return c;
-    std::memset(c->bits, 0, static_cast<std::size_t>(c->w) * static_cast<std::size_t>(c->h) * 4);
-    // The tab in its window: centred on the handle's box, its top on the game's top edge.
-    const RectF box = handle_pill();
-    const float cx = box.X + box.Width / 2 - static_cast<float>(win.left), top = -static_cast<float>(win.top);
-    const float foot = fpx(kTabFoot), tall = fpx(lit ? kTabTallLit : kTabTall), line = std::max(1.0f, fpx(kTabLine));
-    // Its width at a depth below its top: the foot's, less the lean on either side for the height above the foot.
-    auto across = [&](float depth) { return foot - 2.0f * (tall - depth) * kTabLean; };
-    // The whole tab and its foot's line, each as a shape's coverage of the window's pixels.
-    const std::vector<float> tab = coverage(c->w, c->h, [&](Graphics& g) {
-        const PointF shape[] = {PointF(cx - across(0) / 2, top), PointF(cx + across(0) / 2, top), PointF(cx + foot / 2, top + tall),
-                                PointF(cx - foot / 2, top + tall)};
-        SolidBrush white(Color(255, 255, 255, 255));
-        g.FillPolygon(&white, shape, 4);
-    });
-    const std::vector<float> foot_line = coverage(c->w, c->h, [&](Graphics& g) {
-        const PointF shape[] = {PointF(cx - across(tall - line) / 2, top + tall - line), PointF(cx + across(tall - line) / 2, top + tall - line),
-                                PointF(cx + foot / 2, top + tall), PointF(cx - foot / 2, top + tall)};
-        SolidBrush white(Color(255, 255, 255, 255));
-        g.FillPolygon(&white, shape, 4);
-    });
-    // The line's colour and strength, and the charcoal's: at rest the game's green at 70 %, lit its lime whole.
-    const Color& green = lit ? tone::kLime : game::kLine;
-    const float line_alpha = lit ? 1.0f : 0.70f, body_alpha = 0.40f;
-    auto* px = static_cast<std::uint32_t*>(c->bits);
-    for (std::size_t i = 0; i < tab.size(); ++i) {
-        // The line where it lies, the charcoal over the rest of the tab; premultiplied, as the window takes them.
-        const float l = std::min(foot_line[i], tab[i]) * line_alpha, b = std::max(0.0f, tab[i] - foot_line[i]) * body_alpha;
-        const float a = l + b;
-        if (a <= 0.0f) continue;
-        const auto ch = [&](float line_c, float body_c) { return static_cast<std::uint32_t>(std::lround(std::min(255.0f, line_c * l + body_c * b))); };
-        px[i] = static_cast<std::uint32_t>(std::lround(std::min(255.0f, a * 255.0f))) << 24 | ch(green.GetR(), kTintR) << 16 |
-                ch(green.GetG(), kTintG) << 8 | ch(green.GetB(), kTintB);
+// A picture worked out a pixel at a time: each pixel's colour and opacity as floats, premultiplied, so that parts laid
+// over one another keep their own colours where they meet (the green line is the same green on the glass as beside it).
+struct Layers {
+    int w, h;
+    std::vector<float> r, g, b, a;
+    Layers(int width, int height)
+        : w(width), h(height), r(static_cast<std::size_t>(width) * static_cast<std::size_t>(height), 0.0f), g(r), b(r), a(r) {}
+    // A part laid over what is there: `mask` its share of each pixel, in the colour (0 to 255 each) at `strength`.
+    void lay(const std::vector<float>& mask, float red, float green, float blue, float strength) {
+        for (std::size_t i = 0; i < mask.size(); ++i) {
+            const float part = std::clamp(mask[i] * strength, 0.0f, 1.0f);
+            // Nothing of it on this pixel.
+            if (part <= 0.0f) continue;
+            // The part over what was there, as one sheet of colour over another.
+            r[i] = red * part + r[i] * (1.0f - part);
+            g[i] = green * part + g[i] * (1.0f - part);
+            b[i] = blue * part + b[i] * (1.0f - part);
+            a[i] = part + a[i] * (1.0f - part);
+        }
     }
+    void lay(const std::vector<float>& mask, const Color& colour, float strength) {
+        lay(mask, static_cast<float>(colour.GetR()), static_cast<float>(colour.GetG()), static_cast<float>(colour.GetB()), strength);
+    }
+    // The whole of it into a window's picture, as bytes: premultiplied, as the window takes them.
+    void into(Canvas& c) const {
+        auto* px = static_cast<std::uint32_t*>(c.bits);
+        const auto byte = [](float v) { return static_cast<std::uint32_t>(std::lround(std::clamp(v, 0.0f, 255.0f))); };
+        for (std::size_t i = 0; i < a.size(); ++i) px[i] = byte(a[i] * 255.0f) << 24 | byte(r[i]) << 16 | byte(g[i]) << 8 | byte(b[i]);
+    }
+};
+
+// A convex outline's sides each moved in by `by` (its corners in order): each new corner where two moved sides meet.
+std::vector<PointF> moved_in(const std::vector<PointF>& p, float by) {
+    if (by <= 0.0f) return p;
+    const std::size_t n = p.size();
+    // Which way the outline turns (the sign of its area): that says which side of a side is the inside.
+    float area = 0.0f;
+    for (std::size_t i = 0; i < n; ++i) area += p[i].X * p[(i + 1) % n].Y - p[(i + 1) % n].X * p[i].Y;
+    const float turn = area > 0.0f ? 1.0f : -1.0f;
+    // Each side as a point on it, moved in, and its direction.
+    struct Side {
+        float x, y, dx, dy;
+    };
+    std::vector<Side> sides;
+    for (std::size_t i = 0; i < n; ++i) {
+        const PointF from = p[i], to = p[(i + 1) % n];
+        float dx = to.X - from.X, dy = to.Y - from.Y;
+        const float length = std::sqrt(dx * dx + dy * dy);
+        dx /= length;
+        dy /= length;
+        // Moved along its normal toward the inside.
+        sides.push_back(Side{from.X - dy * turn * by, from.Y + dx * turn * by, dx, dy});
+    }
+    std::vector<PointF> out;
+    for (std::size_t i = 0; i < n; ++i) {
+        // The corner between the side before and this one: where their lines cross.
+        const Side& before = sides[(i + n - 1) % n];
+        const Side& here = sides[i];
+        const float cross = before.dx * here.dy - before.dy * here.dx;
+        // Two sides in one line have no crossing: the moved point itself.
+        if (std::fabs(cross) < 1e-6f) {
+            out.push_back(PointF(here.x, here.y));
+            continue;
+        }
+        const float along = ((here.x - before.x) * here.dy - (here.y - before.y) * here.dx) / cross;
+        out.push_back(PointF(before.x + before.dx * along, before.y + before.dy * along));
+    }
+    return out;
+}
+
+// A convex outline with its corners rounded by `radius`, the whole of it shrunk by `shrunk` on every side, as each
+// pixel's share of it: the outline's sides moved in by the larger of the two, and a round pen as wide as what is left
+// of the radius drawn around that.
+std::vector<float> rounded_outline(int w, int h, const std::vector<PointF>& p, float radius, float shrunk) {
+    const float in = std::max(radius, shrunk), round = in - shrunk;
+    const std::vector<PointF> core = moved_in(p, in);
+    return coverage(w, h, [&](Graphics& g) {
+        SolidBrush white(Color(255, 255, 255, 255));
+        g.FillPolygon(&white, core.data(), static_cast<INT>(core.size()));
+        // No radius left: its corners are sharp.
+        if (round <= 0.01f) return;
+        Pen pen(Color(255, 255, 255, 255), round * 2);
+        pen.SetLineJoin(LineJoinRound);
+        g.DrawPolygon(&pen, core.data(), static_cast<INT>(core.size()));
+    });
+}
+
+// The handle, as picked from thirty drawn over the game's frames at its real sizes: the game's green line along its top
+// edge at the centre (the rail: the bar's own foot line, a short piece of it in sight), fading out toward its ends, and
+// a small tab of charcoal glass hanging from it, its sides leaning in as the game's own tabs' do and the line going on
+// around it as its outline; in the tab a white chevron pointing down, which says that a bar comes down from here. With
+// the pointer on it (`lit`) the line, the outline and the chevron are the lime, the rail longer and the tab deeper, its
+// chevron lower, as if pulled. As large as the game's header leaves room for at its top centre, at the game's own
+// scale: it covers none of the game's words or buttons on any of its screens. No glass is read for it: its charcoal
+// lies straight on the game. Its picture is the handle's window, its place in the game's area in x and y; `lip` the
+// rows of its rail and the shade under it.
+std::shared_ptr<Canvas> handle_picture(int& x, int& y, int& lip, bool lit) {
+    const float k = handle_scale();
+    const float rail_w = hpx(lit ? kRailWideLit : kRailWide), top_w = hpx(kTabTop), tall = hpx(lit ? kTabTallLit : kTabTall);
+    // The window: the rail's width (the widest part) and the tab's height, with room for their smooth edges; as even or
+    // odd across as the game's area, so that the tab's middle is the area's middle exactly.
+    const int w = static_cast<int>(std::ceil(std::max(rail_w, top_w) / 2 + kHandleRoom)) * 2 + area_w() % 2;
+    const int h = static_cast<int>(std::ceil(tall + kHandleRoom));
+    x = (area_w() - w) / 2;
+    y = 0;
+    // The lines' widths in whole pixels, so that they stay crisp: the rail, the shade under it (overlay_scale.h's
+    // rows, which a check holds within the header's empty rows), the tab's outline.
+    const float rail_h = static_cast<float>(rail_rows(k)), shade_h = static_cast<float>(shade_rows(k));
+    const float edge = std::max(1.0f, std::round(hpx(kTabEdge)));
+    lip = static_cast<int>(rail_h + shade_h);
+    auto c = std::make_shared<Canvas>(w, h);
+    if (!c->bits) return c;
+    const float cx = static_cast<float>(area_w()) / 2 - static_cast<float>(x);
+    Layers picture(w, h);
+    // The tab's outline: from well above the window (so that it meets the game's edge square) down its leaning sides to
+    // its foot.
+    const float above = 20 * k;
+    const auto half = [&](float depth) { return top_w / 2 - depth * kTabLean; };
+    const std::vector<PointF> tab = {PointF(cx - half(-above), -above), PointF(cx + half(-above), -above), PointF(cx + half(tall), tall),
+                                     PointF(cx - half(tall), tall)};
+    const float radius = hpx(kTabRound);
+    const std::vector<float> glass = rounded_outline(w, h, tab, radius, 0);
+    // The glass: the overlay's charcoal, then a little light at its top that is gone by its foot.
+    picture.lay(glass, static_cast<float>(kTintR), static_cast<float>(kTintG), static_cast<float>(kTintB), kTabGlass);
+    {
+        std::vector<float> sheen = glass;
+        for (int row = 0; row < h; ++row) {
+            const float light = std::max(0.0f, 1.0f - static_cast<float>(row) / std::max(1.0f, tall));
+            for (int col = 0; col < w; ++col) sheen[static_cast<std::size_t>(row) * static_cast<std::size_t>(w) + static_cast<std::size_t>(col)] *= light;
+        }
+        picture.lay(sheen, 255, 255, 255, kTabSheen);
+    }
+    // The line's colour and strength: the game's green at rest, its lime, whole, with the pointer on it.
+    const Color& line = lit ? tone::kLime : game::kLine;
+    const float line_alpha = lit ? 1.0f : kHandleLine;
+    // The outline: what the glass has that the same shape shrunk by the outline's width has not.
+    {
+        const std::vector<float> inside = rounded_outline(w, h, tab, radius, edge);
+        std::vector<float> outline(glass.size());
+        for (std::size_t i = 0; i < outline.size(); ++i) outline[i] = std::max(0.0f, glass[i] - inside[i]);
+        picture.lay(outline, line, line_alpha);
+    }
+    // The rail along the game's top edge, either side of the tab (it stops just inside the tab's top corners, where the
+    // outline takes over), whole in its middle and fading out toward both ends; a line of shade under it, which keeps
+    // it seen on a white picture.
+    {
+        std::vector<float> rail(glass.size(), 0.0f), shade(glass.size(), 0.0f);
+        const float gap = top_w - hpx(1.6f);
+        for (int row = 0; row < h && static_cast<float>(row) < rail_h + shade_h; ++row) {
+            for (int col = 0; col < w; ++col) {
+                // The pixel's middle, from the rail's left end.
+                const float at = static_cast<float>(col) + 0.5f - (cx - rail_w / 2);
+                if (at < 0.0f || at > rail_w || std::fabs(at - rail_w / 2) < gap / 2) continue;
+                const float along = at / rail_w;
+                const float whole = std::min({1.0f, along / kRailFade, (1.0f - along) / kRailFade});
+                (static_cast<float>(row) < rail_h ? rail : shade)[static_cast<std::size_t>(row) * static_cast<std::size_t>(w) + static_cast<std::size_t>(col)] = whole;
+            }
+        }
+        picture.lay(shade, 0, 0, 0, kRailShadeAlpha);
+        picture.lay(rail, line, line_alpha);
+    }
+    // The chevron: two strokes meeting at its point, round at their ends and where they meet.
+    {
+        const float wide = hpx(kChevWide), deep = hpx(kChevDeep), top = hpx(lit ? kChevTopLit : kChevTop);
+        const std::vector<float> chevron = coverage(w, h, [&](Graphics& g) {
+            Pen pen(Color(255, 255, 255, 255), std::max(1.0f, hpx(kChevStroke)));
+            pen.SetLineJoin(LineJoinRound);
+            pen.SetStartCap(LineCapRound);
+            pen.SetEndCap(LineCapRound);
+            const PointF arms[] = {PointF(cx - wide / 2, top), PointF(cx, top + deep), PointF(cx + wide / 2, top)};
+            g.DrawLines(&pen, arms, 3);
+        });
+        picture.lay(chevron, lit ? tone::kLime : tone::kPrimary, lit ? 1.0f : kChevAlpha);
+    }
+    picture.into(*c);
     return c;
 }
 
@@ -1204,7 +1343,7 @@ Painted paint_counter(const Order& o, Paint& p) {
 Painted paint_handle(const Order& o, Paint& p) {
     const Drawing d(o.view);
     if (p.made_for != o.key || !p.picture) {
-        p.picture = handle_picture(p.x, p.y, o.lit);
+        p.picture = handle_picture(p.x, p.y, p.lip, o.lit);
         p.made = ++g_made;
         p.made_for = o.key;
     }

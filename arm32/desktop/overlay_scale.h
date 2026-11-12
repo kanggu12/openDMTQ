@@ -1,6 +1,7 @@
-// How large the player for Windows draws what it lays over the game (overlay_win32.cpp), and the smallest game area its
-// window holds (window_win32.cpp): plain arithmetic, apart from any window, so that a check (settingstest.cpp) can take
-// it through Windows' scales and the game's sizes.
+// How large the player for Windows draws what it lays over the game (overlay_win32.cpp), the smallest game area its
+// window holds (window_win32.cpp), and the size of the handle at the game's top centre, which has a scale of its own:
+// plain arithmetic, apart from any window, so that a check (settingstest.cpp) can take it through Windows' scales and
+// the game's sizes.
 //
 // The game lays itself out for 720 lines and grows with its area, whatever Windows' scale: its words and buttons are 1.5
 // times their 720-line size at 1080 lines and 3 times at 4K. The overlay is drawn at the game's own scale, so that in a
@@ -39,5 +40,34 @@ inline int at_scale(int logical, float dpi) {
     // A hair over a whole number is that number: a scale like 1.75 comes from a division of the display's dpi by 96.
     return static_cast<int>(std::ceil(static_cast<float>(logical) * dpi - 0.001f));
 }
+
+// ---- the handle
+
+// The handle at the game's top centre is the one piece of the overlay that is never pressed (the pointer rests on it,
+// and its reach is larger than its picture), so it needs no least size to be hit: it is drawn at the game's own scale
+// exactly, its area's height over 720, whatever Windows' scale. It then keeps its proportion to the game's own header
+// in a window of any size, and what it clears at 720 lines it clears everywhere.
+inline float handle_scale_for(int area_h) { return static_cast<float>(area_h) / kGameLines; }
+
+// The handle's tab at 720 lines: 25.6 wide where it hangs from the game's top edge, its sides leaning in 0.268 a pixel
+// down as the game's own tabs' do (15 degrees), 18.5 high and 23 with the pointer on it; the line it hangs from (its
+// rail) 2 high with a line of shade under it. As large as the game's header leaves room for (below).
+constexpr float kTabTop = 25.6f, kTabTall = 18.5f, kTabTallLit = 23, kTabLean = 0.268f;
+constexpr float kRailTall = 2, kRailShade = 1;
+
+// The rail's rows and the rows of the shade under it, in pixels at the handle's `scale`: whole, so that both stay
+// crisp; the rail at least one, the shade none where less than half a pixel of it is left (the smallest windows).
+inline int rail_rows(float scale) { return std::max(1, static_cast<int>(std::lround(kRailTall * scale))); }
+inline int shade_rows(float scale) { return static_cast<int>(std::lround(kRailShade * scale)); }
+
+// Half the tab's width at `depth` below the game's top edge, at 720 lines.
+constexpr float tab_half(float depth) { return kTabTop / 2 - depth * kTabLean; }
+
+// What the game shows nearest its top centre, measured on its frames at 720 lines: on the screens with its header (the
+// music list, the downloads, the nickname), the header's last button ends 12 left of the centre and starts at row 5;
+// its rows above that are empty across, and the words right of the centre start 38 away. So the handle may be any
+// width in its first 5 rows, and must keep within 12 of the centre below them; on every other screen the top centre
+// shows only the picture behind.
+constexpr float kHeaderFreeRows = 5, kHeaderFreeHalf = 12;
 
 }  // namespace player::overlay

@@ -97,10 +97,13 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   start so that it is seen at once. A button acts only when let go where it was pressed. Minimise holds the game still,
   and the taskbar brings it back. While the bar is down, the broadcast notice and an FPS counter in a top corner move
   down under it. It is tall enough to cover the game's own X at the top right of its song and music screens whole.
-- **The handle**: a small tab hanging from the game's top edge at its centre, in the shape of the game's own tabs, the
-  game's charcoal with its green line along the foot, says where the bar is; with the pointer on it, it grows a little
-  and its line turns lime. The pointer resting on it, or just around it, brings the bar down. It shows once the game's
-  picture is up, and goes while the bar is down, while a notice or the question is up and while the game holds still.
+- **The handle**: the game's green line along its top edge at the centre, with a small tab of glass hanging from it in
+  the lean of the game's own tabs and a chevron pointing down in the tab, says that the bar comes down from here; with
+  the pointer on it the line and the chevron turn lime and the tab grows deeper. The pointer resting on it, or just
+  around it, brings the bar down. It is as large as the game's own header leaves room for at its top centre (26 by 19
+  pixels in a 1280x720 game, in proportion in any other), so it covers none of the game's words or buttons on any
+  screen. It shows once the game's picture is up, and goes while the bar is down, while a notice or the question is up
+  and while the game holds still.
 - **Quitting**: the X asks first, in a glass card over the game dimmed and blurred behind it: **Keep playing** as the
   launcher's main button, or **Quit the game** as its secondary, red under the pointer; so a click by mistake does not
   end a song. Its buttons too act only when let go where they were pressed; Left, Right and Tab move the choice (marked
@@ -116,7 +119,8 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   over 720 lines: 1.5 at 1080 lines, 3 at 4K), whatever Windows' scale is, so a small window gets small pieces and a
   display at 150 % has them cover no more of the game than at 100 %. They are never drawn below half their 720-line
   size at Windows' scale, so the bar's buttons stay large enough to hit; the smallest game area, 480x270 at Windows'
-  scale, leaves them room. The pointer keeps Windows' own size.
+  scale, leaves them room. The handle alone, which is never pressed, keeps the game's own scale in a window of any
+  size. The pointer keeps Windows' own size.
 - **Nothing of it is in the game's way**: the notice, the FPS counter and the handle let every click through to the
   game, and no piece takes the keyboard from the game's window (each is a window that never takes the focus; a click on
   the bar or the question gives the keyboard back to the game).
