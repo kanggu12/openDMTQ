@@ -321,7 +321,8 @@ def _uninstall(delete_data, yes):
     # Said before the uninstaller starts: it closes what runs from the program's folder, this console copy too.
     _say("Uninstalling: OpenDMTQ is gone from this PC in a few seconds. Your records stay on the servers.")
     try:
-        removal.uninstall()
+        # After --delete-data, Velopack's log of the uninstall goes with the program too (removal.uninstall).
+        removal.uninstall(delete_all=delete_data)
     except OSError as e:
         _say("The uninstaller did not start: %s" % e, error=True)
         return 2

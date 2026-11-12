@@ -260,7 +260,8 @@ title says so alone), and says where it can be watched.
     game's data and the language stay (`--reset`). **Forget** on the **Online** page does that for one server (`--forget URL`).
   - **Uninstall** removes the program, its shortcuts and its entry in Windows' Apps (`--uninstall`). It asks whether
     the settings, sign-ins and game data stay for a later install or go too (`--uninstall --delete-data`). With them
-    goes the device id, and a later install is a new player, unless the account transfer below brings this one back.
+    go the device id and the logs of the installs (the installer's in `%TEMP%`, Velopack's in `%LOCALAPPDATA%\velopack`),
+    and a later install is a new player, unless the account transfer below brings this one back.
     Windows' Settings, Apps uninstalls too, and keeps the data.
 - **The account:** a PC is a player of its own, apart from the same person's phone. The server gives each new device a
   new account, and the device id the PC goes by is kept in the game's folder: deleting that folder makes this PC a new

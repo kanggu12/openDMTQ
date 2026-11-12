@@ -34,6 +34,27 @@ SETUP_NAME = "velopack-setup.exe"
 SETUP_LIMIT = 300
 # Velopack's logs of earlier runs kept in the temporary folder.
 LOGS_KEPT = 5
+# The installer's own log in the temporary folder (with the one before it, .1, past its size), and Velopack's setup's log
+# of each run beside it, by the time it started: what Help's Delete all takes from there too (removal.leftovers).
+LOG_NAME = "OpenDMTQ-setup.log"
+RUN_LOG = "OpenDMTQ-setup-%s.log"
+
+
+def log_folder():
+    """Where the installer writes its logs and Velopack's setup's: the temporary folder (a test names its own)."""
+    return tempfile.gettempdir()
+
+
+def run_log():
+    """A new run's log for Velopack's setup, named by the time it starts."""
+    return os.path.join(log_folder(), RUN_LOG % time.strftime("%Y%m%d-%H%M%S"))
+
+
+def is_log(name):
+    """Whether a file in the log folder is one of the installer's: its own log and the one before it, or a run's."""
+    run_start, run_end = RUN_LOG.split("%s")
+    return (name == LOG_NAME or name.startswith(LOG_NAME + ".")
+            or (name.startswith(run_start) and name.endswith(run_end)))
 
 
 def app_dir():
@@ -184,7 +205,7 @@ class Installer:
         self.failure = None
         # The server this installer brings, read once from its own file.
         self.server = brought()
-        self.log_path = os.path.join(tempfile.gettempdir(), "OpenDMTQ-setup-%s.log" % time.strftime("%Y%m%d-%H%M%S"))
+        self.log_path = run_log()
         self.root.protocol("WM_DELETE_WINDOW", self._close_window)
         self.ask()
 
@@ -340,14 +361,15 @@ class Installer:
 def _logging():
     """The installer's own log next to Velopack's, in the temporary folder, with a size cap; Velopack's logs of
     earlier runs beyond the last few are removed."""
-    folder = tempfile.gettempdir()
-    handler = logging.handlers.RotatingFileHandler(os.path.join(folder, "OpenDMTQ-setup.log"), maxBytes=200_000,
+    folder = log_folder()
+    handler = logging.handlers.RotatingFileHandler(os.path.join(folder, LOG_NAME), maxBytes=200_000,
                                                    backupCount=1, encoding="utf-8")
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     root = logging.getLogger("opendmtq_client")
     root.setLevel(logging.INFO)
     root.addHandler(handler)
-    runs = sorted(glob.glob(os.path.join(folder, "OpenDMTQ-setup-2*.log")))
+    # Each run's name starts with its year (RUN_LOG), so the oldest come first.
+    runs = sorted(glob.glob(os.path.join(folder, RUN_LOG % "2*")))
     for old in runs[:-LOGS_KEPT]:
         try:
             os.remove(old)
@@ -385,7 +407,7 @@ def main(argv=None):
             # As the dialog does: Velopack would replace the player's files under the game.
             log.error("a game is running: the silent install waits for it to close (run it again then)")
             return 3
-        path = os.path.join(tempfile.gettempdir(), "OpenDMTQ-setup-%s.log" % time.strftime("%Y%m%d-%H%M%S"))
+        path = run_log()
         setup = None
         try:
             setup = run_setup(path)

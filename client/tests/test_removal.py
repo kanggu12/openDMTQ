@@ -108,6 +108,36 @@ class Removal(Folder):
         self.assertFalse(os.path.exists(self.root))
         self.assertEqual(os.listdir(os.path.dirname(self.root)), [])
 
+    def test_delete_all_takes_opendmtqs_own_logs_elsewhere_too(self):
+        # Velopack's log of OpenDMTQ (and the one before it) in Velopack's folder, beside another program's; the
+        # installer's logs in the temporary folder (its own, the one before it, Velopack's setup's of two runs), beside
+        # other programs' files and a folder that only looks like one of them.
+        velopack = os.path.join(st.local_dir(), "velopack")
+        write(velopack, {"velopack_OpenDMTQ.Client.log": b"v" * 2000, "velopack_OpenDMTQ.Client.log.old": b"o" * 1000,
+                         "velopack_Another.App.log": b"theirs"})
+        ours = {"OpenDMTQ-setup.log": b"i" * 300, "OpenDMTQ-setup.log.1": b"j" * 300,
+                "OpenDMTQ-setup-20261112-235959.log": b"s" * 400, "OpenDMTQ-setup-20261113-001500.log": b"t" * 400}
+        write(self.setup_logs, dict(ours, **{"other.log": b"x", "OpenDMTQ-setup-notes.txt": b"y"}))
+        os.makedirs(os.path.join(self.setup_logs, "OpenDMTQ-setup-folder.log"))
+        before = removal.everything_size()
+        self.assertEqual(sorted(os.path.basename(p) for p in removal.leftovers()),
+                         sorted(list(ours) + ["velopack_OpenDMTQ.Client.log", "velopack_OpenDMTQ.Client.log.old"]))
+        # Counted in what Delete all says it frees.
+        for path in removal.leftovers():
+            os.remove(path)
+        self.assertEqual(before - removal.everything_size(), 2000 + 1000 + 1400)
+        write(velopack, {"velopack_OpenDMTQ.Client.log": b"v" * 2000})
+        write(self.setup_logs, ours)
+        self.assertEqual(removal.delete_everything(), [])
+        self.assertEqual(listing(velopack), {"velopack_Another.App.log"})
+        self.assertEqual(set(os.listdir(self.setup_logs)), {"other.log", "OpenDMTQ-setup-notes.txt",
+                                                            "OpenDMTQ-setup-folder.log"})
+        # Velopack's folder with nothing else in it goes too.
+        os.remove(os.path.join(velopack, "velopack_Another.App.log"))
+        write(velopack, {"velopack_OpenDMTQ.Client.log": b"v"})
+        self.assertEqual(removal.delete_everything(), [])
+        self.assertFalse(os.path.exists(velopack))
+
     def test_delete_all_in_a_folder_of_ones_own_choice(self):
         # OPENDMTQ_CLIENT_DIR names a folder that may hold other files: only the launcher's go.
         own = os.path.join(self.home, "chosen")
@@ -240,6 +270,14 @@ class Uninstall(Folder):
         # Not from inside the folder that is going.
         cwd = popen.call_args[1]["cwd"]
         self.assertFalse(os.path.abspath(cwd).startswith(self.install))
+
+    def test_after_delete_all_velopacks_log_of_the_uninstall_goes_with_the_program(self):
+        # Update.exe would write its log of the uninstall in Velopack's folder, where Delete all has just deleted it.
+        with mock.patch.object(subprocess, "Popen") as popen:
+            removal.uninstall(delete_all=True)
+        command, = popen.call_args[0]
+        self.assertEqual(command, [os.path.join(self.install, "Update.exe"), "--uninstall", "--silent",
+                                   "--log", os.path.join(self.install, "uninstall.log")])
 
     def test_a_copied_folder_has_no_uninstaller(self):
         os.environ.pop("OPENDMTQ_INSTALL_ROOT")

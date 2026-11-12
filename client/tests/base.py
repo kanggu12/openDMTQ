@@ -41,8 +41,16 @@ class Folder(unittest.TestCase):
         with open(self.player, "w", encoding="utf-8") as f:
             f.write(FAKE_PLAYER)
         os.environ["OPENDMTQ_PLAYER"] = self.player
+        # The installer's logs in a temporary folder of the test's own, never the system's (Delete all takes them).
+        from unittest import mock
+        from opendmtq_client import installer
+        self.setup_logs = os.path.join(self.home, "temp")
+        os.makedirs(self.setup_logs)
+        self.logs_patch = mock.patch.object(installer, "log_folder", lambda: self.setup_logs)
+        self.logs_patch.start()
 
     def tearDown(self):
+        self.logs_patch.stop()
         for k, v in self.saved.items():
             if v is None:
                 os.environ.pop(k, None)

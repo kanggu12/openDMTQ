@@ -11,7 +11,8 @@ Three removals, from the least to the most:
 
   clear_game_data()    empties the game's folders and keeps the id: the game downloads its data again, and this PC
                        stays the player it is on the server
-  delete_everything()  the second and third places whole, the id with them
+  delete_everything()  the second and third places whole, the id with them, and OpenDMTQ's own logs elsewhere: Velopack's
+                       log of it and the installer's logs in the temporary folder (leftovers())
   uninstall()          the program, by Velopack's own uninstaller, which also takes the shortcuts and Windows' entry
 
 Nothing here asks: the window and the command line ask first (maintenance.py, main.py). A link or a Windows junction is
@@ -42,6 +43,12 @@ OWN_NAMES = (st.FILE_NAME, srv.TRUST_FILE, preset.FILE_NAME, updates.PENDING, pl
 OWN_STARTS = (st.FILE_NAME + ".broken-", player.SETTINGS + ".", ".settings-", ".trust-", ".preset-")
 LOGS, LOG_NAMES = "logs", ("launcher.log", "launcher.log.1", "launcher.log.2")
 SERVERS = "servers"
+# Velopack's own log of OpenDMTQ's installs, updates and uninstalls, written by Update.exe (the one before it kept as .old
+# past 1 MB), in the folder Velopack keeps for every program it installs (%LOCALAPPDATA%\velopack).
+VELOPACK_FOLDER, VELOPACK_LOG = "velopack", "velopack_%s.log" % installed.PACKAGE_ID
+# Velopack's log of the uninstall after Delete all: inside the install folder, which goes whole a few seconds after
+# Update.exe ends, so that the uninstall leaves no log of its own behind in Velopack's folder.
+UNINSTALL_LOG = "uninstall.log"
 # Windows' tag of a junction (the stat module has it on Windows only).
 JUNCTION = getattr(stat, "IO_REPARSE_TAG_MOUNT_POINT", 0xA0000003)
 # CREATE_NO_WINDOW and CREATE_NEW_PROCESS_GROUP: the uninstaller shows nothing and outlives this program.
@@ -176,6 +183,8 @@ def everything_size():
                      if name.lower() == ID_FOLDER and _is_link(os.path.join(folder, name)))
     if not _inside(own, root):
         total += sum(_counted(path) for path in _own_paths(own))
+    # OpenDMTQ's own logs outside its folders go too.
+    total += sum(_counted(path) for path in leftovers())
     return total
 
 
@@ -324,7 +333,34 @@ def delete_everything():
     for name in _names(root):
         _delete(os.path.join(root, name), failed)
     _rmdir(root)
+    # Then its own logs elsewhere: Velopack's and the installer's.
+    _delete_leftovers(failed)
     return failed
+
+
+def leftovers():
+    """OpenDMTQ's own files outside its folders, which Delete all takes with them: Velopack's log of OpenDMTQ (and the
+    one before it), and the installer's logs in the temporary folder (its own, and Velopack's setup's of each run).
+    Other programs' files beside them stay."""
+    from opendmtq_client import installer
+    velopack = os.path.join(st.local_dir(), VELOPACK_FOLDER)
+    # Velopack's folder holds the logs of every program it installed: only OpenDMTQ's own by their names.
+    found = [os.path.join(velopack, name) for name in _names(velopack) if name in (VELOPACK_LOG, VELOPACK_LOG + ".old")]
+    # The temporary folder holds everyone's files: only the installer's, by their names (installer.is_log).
+    temp = installer.log_folder()
+    found += [os.path.join(temp, name) for name in _names(temp) if installer.is_log(name)]
+    # Files only: a folder by such a name is none of the installer's.
+    return [path for path in found if not os.path.isdir(path) or _is_link(path)]
+
+
+def _delete_leftovers(failed):
+    """Delete OpenDMTQ's own files outside its folders (leftovers()), and Velopack's folder when that empties it."""
+    for path in leftovers():
+        # Each one inside the temporary folder in a test (a test points LOCALAPPDATA and the log folder at its own).
+        safety.refuse_deleting_in_tests(path)
+        _delete(path, failed)
+    # Velopack's folder goes only when nothing of another program's is left in it.
+    _rmdir(os.path.join(st.local_dir(), VELOPACK_FOLDER))
 
 
 def can_uninstall():
@@ -337,16 +373,20 @@ def can_uninstall():
     return root
 
 
-def uninstall():
+def uninstall(delete_all=False):
     """Start Velopack's uninstaller and return at once; the caller ends this program right after.
 
     Update.exe --uninstall --silent asks nothing and shows nothing: it closes what still runs from the install folder,
     removes the shortcuts, Windows' entry for the program and, a few seconds later, the folder itself. It leaves the
-    data folders alone.
+    data folders alone. After Delete all (`delete_all`), its own log goes into the install folder, which goes whole
+    after it, instead of Velopack's folder, where the log Delete all has just deleted would come back.
     """
     root = can_uninstall()
     safety.refuse_deleting_in_tests(root)
     command = [installed.updater(root), "--uninstall", "--silent"]
+    if delete_all:
+        # Update.exe's --log names its log file for this run (a global option, after the command as before it).
+        command += ["--log", os.path.join(root, UNINSTALL_LOG)]
     log.info("uninstalling: %s", " ".join(command))
     # Started from outside the install folder, which could not go while a program's current folder is in it.
     subprocess.Popen(command, cwd=tempfile.gettempdir(), close_fds=True,

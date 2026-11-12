@@ -142,9 +142,10 @@ def uninstall_program(app):
     if _not_now(app):
         return
 
-    def start():
+    def start(delete_all=False):
         try:
-            removal.uninstall()
+            # After Delete all, Velopack's log of the uninstall goes with the program too (removal.uninstall).
+            removal.uninstall(delete_all=delete_all)
         except Exception as e:  # noqa: BLE001  (Update.exe that did not start: said, and the window stays)
             log.exception("the uninstaller did not start")
             dialogs.tell(app, "error", w("help.uninstall"), w("help.uninstall.failed"),
@@ -163,7 +164,7 @@ def uninstall_program(app):
         if failed:
             dialogs.tell(app, "warn", w("help.uninstall"), w("help.uninstall.left"),
                          w("help.uninstall.left.detail", n=len(failed), folder=removal.data_root()))
-        start()
+        start(delete_all=True)
 
     def counted(total, error):
         if error is not None:

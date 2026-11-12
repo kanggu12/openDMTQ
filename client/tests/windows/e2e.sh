@@ -16,7 +16,8 @@
 #   6. Clear game data: the id alone stays; the FPS counter switched on from the command line (the launcher's window
 #      closed for it, then opened again), and the game starts again with the same id and gets to its menu, the counter
 #      up at its bottom right, a click on its place reaching the game
-#   7. Uninstall with the data: refused while the window is open, then the program, its shortcut and its data gone
+#   7. Uninstall with the data: refused while the window is open, then the program, its shortcut, its data and its
+#      logs (Velopack's and the installer's) gone
 # Every step leaves a screenshot of the virtual screen in OUT_DIR, and the logs.
 #
 #   TEST_SITE=URL TEST_NET=NETWORK TEST_APK=DIR TEST_TOOLS=IMAGE ACCOUNT_FILE=FILE client/tests/windows/e2e.sh BUILD_DIR OUT_DIR
@@ -442,9 +443,14 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   # Velopack's uninstall hook starts the launcher once more: it must not make the data folder again.
   sleep 3
   [ ! -e \"\$LOCAL/OpenDMTQ\" ] || { echo 'FAIL: the data stayed'; find \"\$LOCAL/OpenDMTQ\" | head; exit 1; }
+  # Its logs elsewhere went too: Velopack's of OpenDMTQ (its uninstall's own went with the program's folder), and the
+  # installer's in the temporary folder.
+  TEMPDIR=\$(winepath -u 'C:\\users\\root\\AppData\\Local\\Temp' 2>/dev/null)
+  left=\$(ls \"\$LOCAL\"/velopack/velopack_OpenDMTQ.Client.log* \"\$TEMPDIR\"/OpenDMTQ-setup*.log* 2>/dev/null)
+  [ -z \"\$left\" ] || { echo \"FAIL: logs stayed: \$left\"; exit 1; }
   shortcut=\$(find / -iname 'OpenDMTQ*.lnk' -path '*drive_c*' 2>/dev/null | head -n 1)
   [ -z \"\$shortcut\" ] || { echo \"FAIL: a shortcut stayed: \$shortcut\"; exit 1; }
-  echo 'uninstalled: the program, its shortcut and its data are gone'
+  echo 'uninstalled: the program, its shortcut, its data and its logs are gone'
   snap uninstalled
   wineserver -k
   echo 'e2e done'

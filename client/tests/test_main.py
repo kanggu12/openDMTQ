@@ -469,6 +469,9 @@ class Maintenance(Folder):
             code, said = self.run_main(["--uninstall", "--delete-data", "--yes"])
         self.assertEqual(code, 0)
         popen.assert_called_once()
+        # Velopack's log of this uninstall goes into the install folder, which goes whole after it.
+        self.assertEqual(popen.call_args[0][0][1:], ["--uninstall", "--silent", "--log",
+                                                     os.path.join(self.install, "uninstall.log")])
         self.assertFalse(os.path.exists(removal.data_root()))
         # The launcher's folder here is one of the test's choosing: the launcher's files went, the other stays.
         self.assertEqual(listing(st.config_dir()), {"notes.txt"})
