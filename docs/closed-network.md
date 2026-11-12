@@ -1,8 +1,8 @@
 # Without internet
 
-A server and phones on a network with no way out: a lab, an office LAN, a router with nothing behind it. OpenDMTQ needs the
-internet only to get its programs onto the server. After that nothing it does asks for the internet: the setup, the app's
-build, the server and the game all stay on your network.
+For the server's owner whose server and phones are on a network with no way out: a lab, an office LAN, a router with
+nothing behind it. OpenDMTQ needs the internet only to get its programs onto the server. After that nothing it does asks
+for the internet: the setup, the app's build, the server and the game all stay on your network.
 
 | Way of running | On a closed network | What you carry in |
 |---|---|---|

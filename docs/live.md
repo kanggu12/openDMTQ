@@ -1,5 +1,8 @@
 # Live broadcasts
 
+For the server's owner: players' plays shown live on the site, and their recordings. What a player sees of it:
+[broadcasting](play.md#broadcasting).
+
 ![The live page: a player's broadcast, who is on air, and past broadcasts](images/live.jpg)
 
 A player's play can be shown on the site as a live broadcast. Broadcasts are off for the server until the owner turns

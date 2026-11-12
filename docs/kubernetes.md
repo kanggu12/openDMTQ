@@ -1,6 +1,7 @@
 # Kubernetes and high availability
 
-The Helm chart in `deploy/helm/opendmtq` splits the server by what each part needs.
+For the server's owner on a Kubernetes cluster: the Helm chart in `deploy/helm/opendmtq` splits the server by what
+each part needs.
 
 <p align="center">
   <img src="images/fig-kubernetes.svg" alt="The Helm chart. Phones and browsers reach the router Service on publicHost; two routers send the game's files to the asset servers (two to N, files only) and the rest to the api pod, exactly one: its init containers, the server, the admin sidecar and Litestream, which copies every commit to S3-compatible storage and restores the newest copy at start. A ReadWriteMany data volume holds content, the apps, the added songs and backups; the builder Job writes the app after install and upgrade" width="100%">

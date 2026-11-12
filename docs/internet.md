@@ -1,6 +1,6 @@
 # Playing from outside your home
 
-By default the server is reachable on your local network only. To play anywhere, give it a host
+For the server's owner: by default the server is reachable on your local network only. To play anywhere, give it a host
 name that points at your public IP and forward one TCP port to it.
 
 This guide is for Docker Compose, which brings the HTTPS the site's sign-in needs on the internet. A host install

@@ -1,6 +1,6 @@
 # arm32
 
-Runs 32-bit ARM Android code on 64-bit-only phones.
+For anyone changing the runtime, which runs 32-bit ARM Android code on 64-bit-only phones.
 
 The game client contains only 32-bit ARM code (Unity 5.6, IL2CPP), and newer phones (Pixel 7 and later, Galaxy S24
 and later, and others whose chips dropped 32-bit support) cannot execute it. There is no 64-bit build of

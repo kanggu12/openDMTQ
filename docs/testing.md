@@ -1,7 +1,7 @@
 # Testing
 
-Everything OpenDMTQ is tested with, where it runs, and what stands between a change and a live server. The cases themselves,
-one table per area with what checks each, are in [test-cases.md](test-cases.md).
+For anyone changing the code: everything OpenDMTQ is tested with, where it runs, and what stands between a change and a live
+server. The cases themselves, one table per area with what checks each, are in [test-cases.md](test-cases.md).
 
 The game's files cannot go in this repository, and so not on GitHub's machines either. That splits the tests in two: what runs
 in CI on every push, without them, and what runs on a machine that has them (`tests/qa.sh`). A release and a deploy ask for

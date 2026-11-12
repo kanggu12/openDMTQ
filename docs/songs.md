@@ -1,8 +1,8 @@
 # Songs
 
-OpenDMTQ comes without songs. A server gets them in two ways: imported from the owner's own copy of the game's
-song data, or added one by one as song packages on the admin pages. With neither, the game starts with an empty
-song list.
+For the server's owner: OpenDMTQ comes without songs. A server gets them in two ways: imported from the owner's own copy
+of the game's song data, or added one by one as song packages on the admin pages. With neither, the game starts with an
+empty song list.
 
 <p align="center">
   <img src="images/fig-songs-flow.svg" alt="Songs: the song data is imported into data/content; a song package added on the admin pages goes to data/custom/songs with ids from 1001; hiding and showing writes data/custom/hidden.json. songs.py rebuilds, before every start and after every change, the song list game.getSongList offers and data/custom/web with the client's tables, tiles and patch manifest. The phone gets the list, what changed at its next start, and a song's files from data/content when first picked" width="100%">

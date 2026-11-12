@@ -1,7 +1,8 @@
 # Test cases
 
-One table per test suite. **Checked by** points at what checks the case, as `` `file#text` ``: the text is the test's name or the
-line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage** says where it runs ([testing.md](testing.md)):
+For anyone changing the code: one table per test suite. **Checked by** points at what checks the case, as `` `file#text` ``:
+the text is the test's name or the line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage** says where
+it runs ([testing.md](testing.md)):
 
 - `ui`: CI's `ui` job, on a push to main or a pull request: the game server's contract, an upgrade from the last release and the pages, on stand-in
   files (`tests/game/protocol.sh`, `tests/upgrade/run.sh`, `tests/ui/run.sh`)

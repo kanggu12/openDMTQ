@@ -59,7 +59,8 @@ every server lists the parts at `/opendmtq/licenses.php`, linked from the site's
 
 ## If you play
 
-- For questions about a server, please ask the person who runs it.
+- For questions about a server, please ask the person who runs it. How to play on one:
+  [playing on a server](play.md).
 
 ## Developers and contributors
 

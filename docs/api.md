@@ -1,9 +1,9 @@
 # The API
 
-Everything the admin pages show and do, and what the players' site shows, as JSON over HTTP. For a script that makes
-a backup every night, a bot that posts new records, a monitor that asks whether the game server is well, or a program
-of your own that runs the server. Whatever a person can do on the admin pages, the API can do the same way: each route
-calls the same code as the page's form.
+For the server's owner and the programs that run a server: everything the admin pages show and do, and what the players'
+site shows, as JSON over HTTP. For a script that makes a backup every night, a bot that posts new records, a monitor
+that asks whether the game server is well, or a program of your own that runs the server. Whatever a person can do on
+the admin pages, the API can do the same way: each route calls the same code as the page's form.
 
 ## Where it is
 

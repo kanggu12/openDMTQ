@@ -1,8 +1,8 @@
 # The game's files
 
-OpenDMTQ ships none of the game's files: you need your own copy of the game's Android app and of its client data, and
-of its song data for the songs. This page says what each has to be, the forms the import takes, and how to check your
-files before you import them. Please use only files you have the right to use.
+For the server's owner: OpenDMTQ ships none of the game's files, and you need your own copy of the game's Android app
+and of its client data, and of its song data for the songs. This page says what each has to be, the forms the import
+takes, and how to check your files before you import them. Please use only files you have the right to use.
 
 | | Needed | What it gives |
 |---|---|---|
