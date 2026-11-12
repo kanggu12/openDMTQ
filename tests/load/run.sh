@@ -17,6 +17,8 @@ NET=odq-loadtest
 SITE=odq-loadtest-site
 ADMIN=odq-loadtest-admin
 BUILDER=odq-loadtest-builder
+# A second server whose database's disk is small, for the full disk round.
+SMALL=odq-loadtest-small
 SITE_PORT=${SITE_PORT:-18611}
 # Two cores for everything: the last two, unless asked for others.
 N=$(nproc)
@@ -29,7 +31,7 @@ mkdir -p "$OUT"
 
 # What the containers wrote belongs to their user: removed from inside an image.
 cleanup() {
-  docker rm -f "$SITE" "$ADMIN" "$BUILDER" >/dev/null 2>&1 || true
+  docker rm -f "$SITE" "$ADMIN" "$BUILDER" "$SMALL" >/dev/null 2>&1 || true
   docker network rm "$NET" >/dev/null 2>&1 || true
   docker run --rm -u 0 -v "$DATA:/d" --entrypoint sh "opendmtq-server:$TAG" -c 'rm -rf /d/* /d/.[!.]*' >/dev/null 2>&1 || true
   rmdir "$DATA" 2>/dev/null || true
@@ -48,7 +50,7 @@ mkdir -p "$DATA/state" "$DATA/apk/base" "$DATA/apk/out" "$DATA/custom" "$DATA/ba
 cp "$base" "$DATA/apk/base/"
 chmod -R a+rwX "$DATA"
 docker network create "$NET" >/dev/null 2>&1 || true
-docker rm -f "$SITE" "$ADMIN" "$BUILDER" >/dev/null 2>&1 || true
+docker rm -f "$SITE" "$ADMIN" "$BUILDER" "$SMALL" >/dev/null 2>&1 || true
 # As compose.yaml runs them, held to the same two cores; memory capped only so that a runaway cannot take the machine's.
 docker run -d --name "$SITE" --network "$NET" --cpuset-cpus "$CORES" --memory 2g -u 33:33 --read-only \
   --tmpfs /var/opendmtq:mode=1777 --tmpfs /tmp:mode=1777 \
@@ -61,6 +63,13 @@ docker run -d --name "$ADMIN" --network "$NET" --cpuset-cpus "$CORES" --memory 1
   -v "$ROOT/data/content:/srv/content:ro" \
   --entrypoint gunicorn "opendmtq-tools:$TAG" -w 1 --threads 8 -b 0.0.0.0:8000 opendmtq_tools.admin:app >/dev/null
 
+# The same server again with its data folder on a disk of 48 MB of its own (a fresh database), for the full disk round.
+docker run -d --name "$SMALL" --network "$NET" --cpuset-cpus "$CORES" --memory 512m -u 33:33 --read-only \
+  --tmpfs /var/opendmtq:mode=1777 --tmpfs /tmp:mode=1777 --tmpfs /data:size=48m,mode=1777 \
+  -e PUBLIC_HOST="$HOST" -e ADMIN_ON_PUBLIC_PORT=no -e TZ=Asia/Seoul \
+  -v "$ROOT/data/content:/srv/content:ro" -v "$DATA/apk/out:/srv/apk:ro" -v "$DATA/custom:/srv/custom:ro" \
+  -p "127.0.0.1:$((SITE_PORT + 1)):8080" "opendmtq-server:$TAG" >/dev/null
+
 # Until the server answers, or give up with its log.
 for _ in $(seq 1 120); do
   curl -sf -o /dev/null "http://127.0.0.1:$SITE_PORT/opendmtq/health.php" && break
@@ -71,6 +80,10 @@ if ! curl -sf -o /dev/null "http://127.0.0.1:$SITE_PORT/opendmtq/health.php"; th
   docker logs --tail 30 "$SITE" >&2
   exit 1
 fi
+for _ in $(seq 1 60); do
+  curl -sf -o /dev/null "http://127.0.0.1:$((SITE_PORT + 1))/opendmtq/health.php" && break
+  sleep 1
+done
 
 # The players through the game's own logins, then their earlier plays straight into the database.
 python3 "$ROOT/tests/load/load.py" "http://127.0.0.1:$SITE_PORT" seed "$SEED_PLAYERS" "$DATA/state/load-guids.txt"
@@ -82,7 +95,12 @@ docker exec "$ADMIN" python3 -c 'import sys; from opendmtq_tools.admin import au
 export ADMIN BUILDER CORES HOST DATA TAG
 # Not stopped by a failed round: the server's log below is what tells why.
 set +e
+# The server's memory as Docker counts it, its kill and start, its database's check; the small server's.
+L="bash $ROOT/tests/load/server.sh"
 SEEDED="$DATA/state/load-guids.txt" OUT="$OUT" HEAVY_CMD="bash $ROOT/tests/load/heavy.sh" VIEWER=loadviewer:load-viewer-pass \
+  MEM_CMD="docker stats --no-stream --format '{{.MemUsage}}' $SITE" CRASH_CMD="$L kill $SITE $SITE_PORT" \
+  CHECK_CMD="$L check $SITE" FULL_SITE="http://127.0.0.1:$((SITE_PORT + 1))" FULL_FILL_CMD="$L fill $SMALL" \
+  FULL_FREE_CMD="$L free $SMALL" FULL_CHECK_CMD="$L check $SMALL" \
   python3 "$ROOT/tests/load/load.py" "http://127.0.0.1:$SITE_PORT" | tee "$OUT/load.txt"
 status=${PIPESTATUS[0]}
 set -e

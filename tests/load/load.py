@@ -11,17 +11,23 @@ Run by tests/load/run.sh against a throwaway server it starts on two processor c
   broadcast  the same players while BROADCASTERS players broadcast (a SEGMENT_KB segment every two seconds) and VIEWERS
              browsers watch them on the site (the list of who is on, the playlist and the newest segment, every 2.5 s).
   heavy      the same players while HEAVY_CMD runs (run.sh: a backup and a build of the app on the same two cores).
+  crash      the players saving back to back while the server is killed and started again (CRASH_CMD).
+  full disk  a second server whose database's disk fills up (FULL_SITE and its commands).
 
-Each round lasts PHASE_S seconds, the heavy one until its work is done if that is later. Every save of the players is
-counted: stored, refused (the client then offers to retry), an HTTP error, or no answer within TIMEOUT_S. The test passes
-when none of the players' saves fails in any round, every segment of the broadcasts is taken, every look at the list of
-who is on is answered, and the heavy work ends well; the times are printed for each round.
+Each round lasts PHASE_S seconds, the heavy one until its work is done if that is later; MEM_CMD's samples give the
+server's most memory in each. Every save of the players is counted: stored, refused (the client then offers to retry), an
+HTTP error, or no answer within TIMEOUT_S. The test passes when none of the players' saves fails in any of the first
+rounds, every segment of the broadcasts is taken, every look at the list of who is on is answered, and the heavy work
+ends well; after the kill nothing answered as stored is gone, the database is whole and saves are stored again; on the
+full disk each save is refused with the retry code and nothing of it kept, the server answers, and with room again saves
+are stored. The times are printed for each round.
 
 Usage: python3 tests/load/load.py SITE_URL                      the rounds
        python3 tests/load/load.py SITE_URL seed COUNT FILE      COUNT players through the game's logins: "guid udid" lines
 Environment: PLAYERS (8), PHASE_S (60), SONG_S (3), FLOOD (24), BROADCASTERS (2), VIEWERS (30), SEGMENT_KB (500),
 TIMEOUT_S (15), SEEDED (the seed step's file, at least PLAYERS + 1 + BROADCASTERS players), VIEWER (ID:password of a
-site account), HEAVY_CMD, OUT (a folder for results.json).
+site account), HEAVY_CMD, MEM_CMD, CRASH_CMD, CHECK_CMD, FULL_SITE, FULL_FILL_CMD, FULL_FREE_CMD, FULL_CHECK_CMD (run.sh
+sets them), OUT (a folder for results.json).
 """
 
 import hashlib
@@ -30,6 +36,7 @@ import http.cookiejar
 import json
 import os
 import random
+import re
 import subprocess
 import sys
 import threading
@@ -59,16 +66,29 @@ SEGMENT_KB = int(os.environ.get("SEGMENT_KB", "500"))
 TIMEOUT_S = float(os.environ.get("TIMEOUT_S", "15"))
 # Where results.json goes, if anywhere.
 OUT = os.environ.get("OUT", "")
+# What run.sh gives for the rounds that reach past HTTP: a command printing the server's memory in use (Docker's own
+# figure), one that kills the server and starts it again until it answers, one printing its database's integrity check;
+# a second server whose database's disk is small, with commands that fill that disk, free it and check its database.
+MEM_CMD = os.environ.get("MEM_CMD", "")
+CRASH_CMD = os.environ.get("CRASH_CMD", "")
+CHECK_CMD = os.environ.get("CHECK_CMD", "")
+FULL_SITE = os.environ.get("FULL_SITE", "").rstrip("/")
+FULL_FILL_CMD = os.environ.get("FULL_FILL_CMD", "")
+FULL_FREE_CMD = os.environ.get("FULL_FREE_CMD", "")
+FULL_CHECK_CMD = os.environ.get("FULL_CHECK_CMD", "")
 # The game's signing key: the same in every copy of the game, so any client can sign (docs/architecture.md).
 KEY = b"DMQGLBlive1"
 
 
 class Conn:
-    """One kept connection to the server, as a phone keeps one, opened again when the server closes it."""
+    """One kept connection to the server (or to `base`, another one), as a phone keeps one, opened again when the server
+    closes it."""
 
-    def __init__(self):
+    def __init__(self, base=None):
         # Not opened until the first request.
         self.c = None
+        # Where it goes: the server under test unless another is named.
+        self.parts = urllib.parse.urlsplit(base) if base else PARTS
 
     def send(self, method, path, body=None, headers=None):
         """(HTTP status, body) of one request; raises when no answer comes within TIMEOUT_S."""
@@ -76,7 +96,7 @@ class Conn:
         for attempt in (1, 2):
             # A fresh connection when there is none.
             if self.c is None:
-                self.c = http.client.HTTPConnection(PARTS.hostname, PARTS.port, timeout=TIMEOUT_S)
+                self.c = http.client.HTTPConnection(self.parts.hostname, self.parts.port, timeout=TIMEOUT_S)
             try:
                 # The request, read whole so the connection can carry the next one.
                 self.c.request(method, path, body, headers or {})
@@ -113,9 +133,9 @@ def rpc(conn, method, params):
     return status, reply, took
 
 
-def new_player(udid):
-    """A player made through the game's own two logins: their guid."""
-    conn = Conn()
+def new_player(udid, base=None):
+    """A player made through the game's own two logins (on `base`, another server, when named): their guid."""
+    conn = Conn(base)
     # The platform login, which trusts the device id it is given.
     _, raw = conn.post("/api/accounts/v3/global/login_dmq", urllib.parse.urlencode({"udid": udid}).encode(),
                        {"Content-Type": "application/x-www-form-urlencoded"})
@@ -337,6 +357,11 @@ def run_round(name, charts, players=(), savers=(), flood_guid=None, broadcasters
     t0 = time.time()
     for t in threads:
         t.start()
+    # The server's memory through the round, sampled beside it.
+    memory_stop, peak = threading.Event(), [0.0]
+    memory = threading.Thread(target=sampler, args=(memory_stop, peak))
+    if MEM_CMD:
+        memory.start()
     heavy = None
     if heavy_cmd:
         # The heavy work starts once the players are under way; its own time and end are kept.
@@ -353,7 +378,142 @@ def run_round(name, charts, players=(), savers=(), flood_guid=None, broadcasters
     out = {k: v.summary(seconds) for k, v in tally.items() if v.ends}
     if heavy:
         out["heavy work"] = heavy
+    if MEM_CMD:
+        memory_stop.set()
+        memory.join()
+        out["server memory"] = {"peak_mib": peak[0]}
     print(f"== {name} ({seconds:.0f} s)")
+    for k, v in out.items():
+        print(f"  {k}: {json.dumps(v)}")
+    sys.stdout.flush()
+    return out
+
+
+def mib(text):
+    """Docker's "123.4MiB / 2GiB" as MiB, from the part before the slash; None when it says nothing that reads so."""
+    found = re.match(r"\s*([\d.]+)\s*(B|kB|KiB|MB|MiB|GB|GiB)\b", text or "")
+    if not found:
+        return None
+    # Docker's own units, decimal and binary, each as MiB.
+    per = {"B": 1 / 2**20, "kB": 1000 / 2**20, "KiB": 1 / 1024, "MB": 10**6 / 2**20, "MiB": 1, "GB": 10**9 / 2**20, "GiB": 1024}
+    return round(float(found.group(1)) * per[found.group(2)], 1)
+
+
+def sampler(stop, peak):
+    """The server's memory (MEM_CMD) about every second until `stop` is set: the most seen, in MiB, kept in peak[0]."""
+    while not stop.is_set():
+        try:
+            got = mib(subprocess.run(MEM_CMD, shell=True, capture_output=True, text=True, timeout=10).stdout)
+            if got is not None:
+                peak[0] = max(peak[0], got)
+        except Exception:
+            # A sample missed (the command slow or gone for a moment): the next one counts.
+            pass
+        stop.wait(1)
+
+
+def crash_round(players, charts):
+    """The server killed (SIGKILL, as a crash or an out-of-memory kill would end it) while the players save back to back,
+    then started again (CRASH_CMD, which returns once it answers): every save it answered as stored must still be there,
+    its database whole (CHECK_CMD), and saves stored again once it answers. Returns its figures, printed too."""
+    stop, lock = threading.Event(), threading.Lock()
+    # (guid, chart) -> the best score the server answered as stored for it.
+    told = {}
+    # Before the kill, while it is down and once it answers again.
+    phase = ["before"]
+    tally = {k: Tally() for k in ("before", "down", "after")}
+
+    def keep_saving(guid):
+        conn = Conn()
+        while not stop.is_set():
+            pattern = random.choice(charts)[2]
+            # The phase it was sent in, which the answer counts for.
+            when = phase[0]
+            try:
+                st, r, took = save(conn, guid, pattern)
+                end = outcome(st, r)
+                tally[when].add(end, took)
+                if end == "stored":
+                    with lock:
+                        told[(guid, pattern)] = max(told.get((guid, pattern), 0), int(r["result"]["score"]))
+            except Exception:
+                tally[when].add("no answer")
+                # Not a busy loop against a server that is down.
+                time.sleep(0.2)
+
+    threads = [threading.Thread(target=keep_saving, args=(g,)) for g in players]
+    t0 = time.time()
+    for t in threads:
+        t.start()
+    time.sleep(5)
+    phase[0] = "down"
+    k0 = time.time()
+    p = subprocess.run(CRASH_CMD, shell=True, capture_output=True, text=True)
+    back = round(time.time() - k0, 1)
+    phase[0] = "after"
+    time.sleep(5)
+    stop.set()
+    for t in threads:
+        t.join()
+    seconds = time.time() - t0
+    # What each player was told against what the server has now, through the game's own request for a player's bests.
+    wanted = {}
+    for (g, pattern), score in told.items():
+        wanted.setdefault(g, {})[pattern] = score
+    lost, conn = [], Conn()
+    for g, charts_told in wanted.items():
+        _, r, _ = rpc(conn, "game.getOwnPatternScore", [g])
+        have = {int(row["pattern_id"]): int(row["score"]) for row in ((r or {}).get("result") or [])}
+        lost += [(g, pt, s, have.get(pt)) for pt, s in charts_told.items() if have.get(pt, -1) < s]
+    integrity = subprocess.run(CHECK_CMD, shell=True, capture_output=True, text=True).stdout.strip() if CHECK_CMD else ""
+    out = {k: v.summary(seconds) for k, v in tally.items() if v.ends}
+    out["restart"] = {"seconds": back, "exit": p.returncode, "tail": (p.stdout + p.stderr)[-300:]}
+    out["stored and told"] = len(told)
+    out["lost"] = lost[:5] + ([f"and {len(lost) - 5} more"] if len(lost) > 5 else [])
+    out["integrity"] = integrity
+    print(f"== crash ({seconds:.0f} s)")
+    for k, v in out.items():
+        print(f"  {k}: {json.dumps(v)}")
+    sys.stdout.flush()
+    return out
+
+
+def full_round():
+    """A second server whose database's disk is small (FULL_SITE): a player's saves stored; the disk filled to its last
+    byte (FULL_FILL_CMD); the saves then refused with the code after which the client offers to retry, nothing of them
+    kept, the server answering its other requests; room again (FULL_FREE_CMD) and the saves stored; the database whole
+    after (FULL_CHECK_CMD). Returns its figures, printed too."""
+    conn = Conn(FULL_SITE)
+    _, reply, _ = rpc(conn, "game.getSongList", [])
+    charts = [p["pattern_id"] for s in reply["result"]["songs"] for p in s["song_patterns"]]
+    guid = new_player(f"load-full-{random.randrange(10**9)}", FULL_SITE)
+
+    def saves(n):
+        """How n saves of the player ended, each on a chart of its own (none of them earlier on this server)."""
+        ends = {}
+        for _ in range(n):
+            try:
+                st, r, _ = save(conn, guid, charts.pop(random.randrange(len(charts))))
+                end = outcome(st, r)
+            except Exception:
+                end = "no answer"
+            ends[end] = ends.get(end, 0) + 1
+        return ends
+
+    out = {"before": saves(3)}
+    fill = subprocess.run(FULL_FILL_CMD, shell=True, capture_output=True, text=True)
+    out["filled"] = (fill.stdout + fill.stderr).strip()[-200:]
+    out["full"] = saves(10)
+    # The rest of the game's requests while the disk is full: its song list and the player's bests.
+    st, r, _ = rpc(conn, "game.getSongList", [])
+    st2, r2, _ = rpc(conn, "game.getOwnPatternScore", [guid])
+    out["answers while full"] = st == 200 and r is not None and st2 == 200 and r2 is not None
+    # What the full disk kept: the three saves from before, nothing of the ten.
+    out["rows while full"] = len((r2 or {}).get("result") or [])
+    subprocess.run(FULL_FREE_CMD, shell=True, capture_output=True, text=True)
+    out["after"] = saves(3)
+    out["integrity"] = subprocess.run(FULL_CHECK_CMD, shell=True, capture_output=True, text=True).stdout.strip()
+    print("== full disk")
     for k, v in out.items():
         print(f"  {k}: {json.dumps(v)}")
     sys.stdout.flush()
@@ -409,6 +569,11 @@ def main():
         "broadcast": run_round("broadcast", charts, players=players, broadcasters=casters, viewers=VIEWERS, account=account),
         "heavy": run_round("heavy", charts, players=players, heavy_cmd=os.environ.get("HEAVY_CMD")),
     }
+    # The server killed and started again, then a full disk: when run.sh gives the commands for them.
+    if CRASH_CMD:
+        results["crash"] = crash_round(players, charts)
+    if FULL_SITE:
+        results["full"] = full_round()
     if OUT:
         with open(os.path.join(OUT, "results.json"), "w") as f:
             json.dump(results, f, indent=2)
@@ -435,6 +600,24 @@ def main():
     # A heavy round whose work failed measured nothing heavy.
     hw = results["heavy"].get("heavy work")
     verdict(hw is None or hw["exit"] == 0, f"heavy: its work {'ended well' if not hw or hw['exit'] == 0 else hw['tail']}")
+    # Killed mid-save and started again: nothing it said it stored is gone, the database whole, saves stored again.
+    crash = results.get("crash")
+    if crash:
+        verdict(crash["restart"]["exit"] == 0, f"crash: the server answers again {crash['restart']['seconds']} s after the kill")
+        verdict(crash["stored and told"] > 0 and not crash["lost"],
+                f"crash: every save answered as stored is still there ({crash['stored and told']}; lost {crash['lost']})")
+        verdict(crash["integrity"] == "ok", f"crash: the database is whole after the kill ({crash['integrity']})")
+        after = crash.get("after", {}).get("ends", {})
+        verdict(after.get("stored", 0) > 0, f"crash: saves are stored again once it answers {after}")
+    # A full disk: refused with the retry code and nothing kept, the server answering; room again and they are stored.
+    full = results.get("full")
+    if full:
+        verdict(full["before"] == {"stored": 3} and full["after"] == {"stored": 3},
+                f"full disk: saves stored before it and after room comes back ({full['before']}, {full['after']})")
+        verdict(full["full"] == {"refused SVC.05099": 10} and full["rows while full"] == 3,
+                f"full disk: each save refused with the code the client retries on, nothing of it kept ({full['full']})")
+        verdict(full["answers while full"], "full disk: the server answers its other requests meanwhile")
+        verdict(full["integrity"] == "ok", f"full disk: the database is whole after ({full['integrity']})")
     return 1 if bad else 0
 
 

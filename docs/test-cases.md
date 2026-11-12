@@ -304,6 +304,8 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 | SRV-31 | Players play on two cores while one address saves as fast as it can over every connection the edge lets it hold | Every save of the players is stored | `tests/load/load.py#the players' saves:` | qa |
 | SRV-32 | Players play while two others broadcast and thirty browsers watch them on the site | Every segment taken, every viewer signed in, every look at who is on answered, every save stored | `tests/load/load.py#the viewers' looks at who is on` | qa |
 | SRV-33 | Players play while the server makes a backup and builds the app on the same two cores | Both end well, and every save is stored | `tests/load/load.py#ended well` | qa |
+| SRV-34 | The server killed (SIGKILL) while players save back to back, then started again | Answering again within a minute; every save it answered as stored still there; the database's integrity check ok; saves stored again | `tests/load/load.py#every save answered as stored is still there` | qa |
+| SRV-35 | The database's disk full while a player saves | Each save refused with SVC.05099, which the game offers to retry, nothing of it kept; the server answering its other requests; with room again saves stored; the database whole | `tests/load/load.py#each save refused with the code the client retries on` | qa |
 
 ## TS-CLI: the command line
 
