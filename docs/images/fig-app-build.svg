@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 460" width="956" height="460" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="How the app is built. The owner's APK, original or changed for another server, is read for which client it is from its contents. patch_apk.py points its four hosts at this server in the IL2CPP metadata and the platform SDK, and changes the game's code, screens and project settings where the bytes match. The shim and, for phones without 32-bit support, the arm32 runtime are added beside the game's 32-bit libraries. The package and the name follow this server (TECHNIKA Q and the server's name), and the app is signed with the server's own key, v1, v2 and v3. data/apk/out keeps it with a manifest; the site offers it at /apk with a QR code, phones install it, and the PC client's launcher downloads the same app. builder.py runs this at every start and skips it when nothing it depends on changed">
+<rect x="-28" y="-28" width="956" height="460" rx="16" fill="#11151a"/>
+<path d="M0,0 H192 L204,12 V112 H0 Z" fill="#1a1f25" stroke="#ffb13d" stroke-width="2" stroke-linejoin="round"/>
+<text x="14" y="33.75" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,190">Your APK</text>
+<text x="14" y="52.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,190">original or changed for</text>
+<text x="14" y="70.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,190">another server, any</text>
+<text x="14" y="87.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,190">version (data/apk/base)</text>
+<path d="M232,0 H424 L436,12 V112 H232 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="246" y="25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="246,422">Which client</text>
+<text x="246" y="44" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="246,422">read from its contents,</text>
+<text x="246" y="61.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="246,422">never its name; an app</text>
+<text x="246" y="79" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="246,422">this builder made is</text>
+<text x="246" y="96.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="246,422">refused</text>
+<path d="M204.5,56 L224,56" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M231,56 L222.0,60.5 L222.0,51.5 Z" fill="#7b8794" data-tip="231,56"/>
+<path d="M464,0 H656 L668,12 V112 H464 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="478" y="25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="478,654">Pointed here</text>
+<text x="478" y="44" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="478,654">the four hosts in the</text>
+<text x="478" y="61.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="478,654">IL2CPP metadata and</text>
+<text x="478" y="79" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="478,654">the platform SDK, to</text>
+<text x="478" y="96.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="478,654">this server's address</text>
+<path d="M436.5,56 L456,56" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M463,56 L454.0,60.5 L454.0,51.5 Z" fill="#7b8794" data-tip="463,56"/>
+<path d="M696,0 H888 L900,12 V112 H696 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="710" y="25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="710,886">Changed</text>
+<text x="710" y="44" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="710,886">code, screens, settings,</text>
+<text x="710" y="61.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="710,886">where the bytes match:</text>
+<text x="710" y="79" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="710,886">no buttons that lead</text>
+<text x="710" y="96.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="710,886">nowhere, full resolution</text>
+<path d="M668.5,56 L688,56" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M695,56 L686.0,60.5 L686.0,51.5 Z" fill="#7b8794" data-tip="695,56"/>
+<path d="M798,112.5 L798,134 L102,134 L102,148" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M102,155 L97.5,146.0 L106.5,146.0 Z" fill="#7b8794" data-tip="102,155"/>
+<path d="M0,156 H192 L204,168 V268 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="181" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,190">Runtime added</text>
+<text x="14" y="200" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,190">the shim, and the arm32</text>
+<text x="14" y="217.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,190">runtime for phones</text>
+<text x="14" y="235" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,190">without 32-bit support</text>
+<text x="14" y="252.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,190">(pack_arm64.py)</text>
+<path d="M232,156 H424 L436,168 V268 H232 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="246" y="181" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="246,422">Named for it</text>
+<text x="246" y="200" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="246,422">a package of its own, the</text>
+<text x="246" y="217.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="246,422">name TECHNIKA Q with the</text>
+<text x="246" y="235" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="246,422">server's name: apps of two</text>
+<text x="246" y="252.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="246,422">servers sit side by side</text>
+<path d="M204.5,212 L224,212" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M231,212 L222.0,216.5 L222.0,207.5 Z" fill="#7b8794" data-tip="231,212"/>
+<path d="M464,156 H656 L668,168 V268 H464 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="478" y="181" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="478,654">Signed</text>
+<text x="478" y="200" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="478,654">v1, v2 and v3, with the</text>
+<text x="478" y="217.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="478,654">server's own key (kept in</text>
+<text x="478" y="235" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="478,654">data/apk/keystore): each</text>
+<text x="478" y="252.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="478,654">build installs over the last</text>
+<path d="M436.5,212 L456,212" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M463,212 L454.0,216.5 L454.0,207.5 Z" fill="#7b8794" data-tip="463,212"/>
+<path d="M696,156 H888 L900,168 V268 H696 Z" fill="#1a1f25" stroke="#8cf23d" stroke-width="2" stroke-linejoin="round"/>
+<text x="710" y="189.75" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="710,886">data/apk/out</text>
+<text x="710" y="208.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="710,886">the app and its manifest;</text>
+<text x="710" y="226.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="710,886">the site offers it at</text>
+<text x="710" y="243.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="710,886">/apk, with a QR code</text>
+<path d="M668.5,212 L688,212" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M695,212 L686.0,216.5 L686.0,207.5 Z" fill="#7b8794" data-tip="695,212"/>
+<path d="M464,320 H656 L668,332 V404 H464 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="478" y="348.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="478,654">Android phones</text>
+<text x="478" y="367.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="478,654">install it from the site,</text>
+<text x="478" y="385" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="478,654">after signing in</text>
+<path d="M696,320 H888 L900,332 V404 H696 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="710" y="348.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="710,886">Windows PCs</text>
+<text x="710" y="367.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="710,886">the launcher downloads</text>
+<text x="710" y="385" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="710,886">the same app</text>
+<path d="M758,268.5 L758,290 L566,290 L566,312" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M566,319 L561.5,310.0 L570.5,310.0 Z" fill="#7b8794" data-tip="566,319"/>
+<path d="M798,268.5 L798,312" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M798,319 L793.5,310.0 L802.5,310.0 Z" fill="#7b8794" data-tip="798,319"/>
+<text x="0" y="350" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="0,444">builder.py runs all of it at every start, and</text>
+<text x="0" y="368" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="0,444">skips it when nothing it depends on changed:</text>
+<text x="0" y="386" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="0,444">the address, the APK, the patcher, the key,</text>
+<text x="0" y="404" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="0,444">the runtime</text>
+</svg>

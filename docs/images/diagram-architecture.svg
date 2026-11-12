@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 720" width="956" height="720" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="How OpenDMTQ fits together. Android phones run the game in the app the server builds, on 64-bit-only phones too, and send the game's requests, its downloads and broadcasts. Windows PCs do the same through the player, and the launcher signs in and gets the app. Browsers open the site, live video, the admin pages and their API. Everything reaches the server's one public port, where Apache's site.conf sends each path to its part: the game server (/DMQ/rpc and the SDK's paths: logins, scores, rankings, saves), the game's files (/DMQ/Songs, /patch and /viewImg: what phones download), live (/live/: broadcast uploads, kept as recordings), the players' site (/opendmtq/, /apk and /windows: rankings, songs, the live view, the app and the PC installer) and the admin pages (/opendmtq/admin and /opendmtq/api: setup, songs, players, backups and the API). The parts keep their data in data/: the SQLite database of accounts and scores, the imported files, the apps and the recordings. The setup imports the owner's own copy of the game's files, which are not in this repository, and the app builder patches the owner's APK for this server and signs it at every start, with the PC client's installer beside it">
+<rect x="-28" y="-28" width="956" height="720" rx="16" fill="#11151a"/>
+<path d="M0,168 H886 L900,182 V572 H0 Z" fill="#11151a" stroke="#8cf23d" stroke-width="2" stroke-linejoin="round"/>
+<path d="M0,0 H268 L280,12 V84 H0 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="14" y="28.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="14,266">Android phones</text>
+<text x="14" y="47.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,266">the game, in the server's own app,</text>
+<text x="14" y="65" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="14,266">on 64-bit-only phones too</text>
+<path d="M120,84.5 L120,176" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M120,183 L115.5,174.0 L124.5,174.0 Z" fill="#7b8794" data-tip="120,183"/>
+<text x="132" y="124" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="130,280">the game's requests,</text>
+<text x="132" y="138" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="130,280">its downloads,</text>
+<text x="132" y="152" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="130,280">broadcasts</text>
+<path d="M310,0 H578 L590,12 V84 H310 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="324" y="28.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="324,576">Windows PCs</text>
+<text x="324" y="47.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="324,576">the launcher signs in, gets the app;</text>
+<text x="324" y="65" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="324,576">the player runs the game</text>
+<path d="M430,84.5 L430,176" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M430,183 L425.5,174.0 L434.5,174.0 Z" fill="#7b8794" data-tip="430,183"/>
+<text x="442" y="124" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="440,590">the same as phones,</text>
+<text x="442" y="138" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="440,590">and the launcher's</text>
+<text x="442" y="152" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="440,590">sign-in and app</text>
+<path d="M620,0 H888 L900,12 V84 H620 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="634" y="28.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="634,886">Browsers</text>
+<text x="634" y="47.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="634,886">players: rankings, songs, live;</text>
+<text x="634" y="65" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="634,886">you: the admin pages</text>
+<path d="M740,84.5 L740,176" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M740,183 L735.5,174.0 L744.5,174.0 Z" fill="#7b8794" data-tip="740,183"/>
+<text x="752" y="124" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="750,900">the site, live video,</text>
+<text x="752" y="138" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="750,900">the admin pages</text>
+<text x="752" y="152" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="750,900">and their API</text>
+<rect x="14" y="184" width="872" height="40" rx="4" fill="#1a1f25" stroke="#3a434d" stroke-width="1"/>
+<text x="28" y="209.5" font-size="15" font-weight="700" fill="#eef2f6" text-anchor="start" data-box="28,190">OpenDMTQ server</text>
+<text x="196" y="209" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="196,872">one public port: Apache's site.conf sends each path to its part</text>
+<path d="M32,224.5 L32,264" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M32,271 L27.5,262.0 L36.5,262.0 Z" fill="#7b8794" data-tip="32,271"/>
+<text x="42" y="239" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="40,178">/DMQ/rpc and</text>
+<text x="42" y="253" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="40,178">the SDK's paths</text>
+<path d="M14,272 H166 L178,284 V368 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="28" y="297.75" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,164">Game server</text>
+<text x="28" y="316.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,164">logins, scores,</text>
+<text x="28" y="334.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,164">rankings, saves</text>
+<text x="28" y="351.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,164">(PHP)</text>
+<path d="M96,368.5 L96,393.5" fill="none" stroke="#7b8794" stroke-width="1.6"/>
+<path d="M209,224.5 L209,264" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M209,271 L204.5,262.0 L213.5,262.0 Z" fill="#7b8794" data-tip="209,271"/>
+<text x="219" y="239" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="217,355">/DMQ/Songs,</text>
+<text x="219" y="253" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="217,355">/patch, /viewImg</text>
+<path d="M191,272 H343 L355,284 V368 H191 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="205" y="297.75" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="205,341">Game files</text>
+<text x="205" y="316.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="205,341">what the game</text>
+<text x="205" y="334.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="205,341">downloads: client</text>
+<text x="205" y="351.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="205,341">data, songs</text>
+<path d="M273,368.5 L273,393.5" fill="none" stroke="#7b8794" stroke-width="1.6"/>
+<path d="M386,224.5 L386,264" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M386,271 L381.5,262.0 L390.5,262.0 Z" fill="#7b8794" data-tip="386,271"/>
+<text x="396" y="239" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="394,532">/live/state,</text>
+<text x="396" y="253" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="394,532">/live/upload</text>
+<path d="M368,272 H520 L532,284 V368 H368 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="382" y="297.75" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="382,518">Live</text>
+<text x="382" y="316.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="382,518">broadcast</text>
+<text x="382" y="334.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="382,518">uploads, kept as</text>
+<text x="382" y="351.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="382,518">recordings</text>
+<path d="M450,368.5 L450,393.5" fill="none" stroke="#7b8794" stroke-width="1.6"/>
+<path d="M563,224.5 L563,264" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M563,271 L558.5,262.0 L567.5,262.0 Z" fill="#7b8794" data-tip="563,271"/>
+<text x="573" y="239" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="571,709">/opendmtq/,</text>
+<text x="573" y="253" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="571,709">/apk, /windows</text>
+<path d="M545,272 H697 L709,284 V368 H545 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="559" y="297.75" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="559,695">Players' site</text>
+<text x="559" y="316.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="559,695">rankings, songs,</text>
+<text x="559" y="334.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="559,695">live view, the app</text>
+<text x="559" y="351.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="559,695">and the installer</text>
+<path d="M627,368.5 L627,393.5" fill="none" stroke="#7b8794" stroke-width="1.6"/>
+<path d="M740,224.5 L740,264" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M740,271 L735.5,262.0 L744.5,262.0 Z" fill="#7b8794" data-tip="740,271"/>
+<text x="750" y="239" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="748,886">/opendmtq/admin,</text>
+<text x="750" y="253" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="748,886">/opendmtq/api</text>
+<path d="M722,272 H874 L886,284 V368 H722 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="736" y="297.75" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="736,872">Admin pages</text>
+<text x="736" y="316.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="736,872">setup, songs,</text>
+<text x="736" y="334.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="736,872">players, backups,</text>
+<text x="736" y="351.75" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="736,872">and their API</text>
+<path d="M804,368.5 L804,393.5" fill="none" stroke="#7b8794" stroke-width="1.6"/>
+<path d="M14,394 H874 L886,406 V448 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="28" y="416.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,872">data/</text>
+<text x="28" y="435.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,872">on the server's own disk: the database (SQLite: accounts, scores, rankings), the imported files, the apps, recordings</text>
+<path d="M14,478 H431.5 L443.5,490 V556 H14 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="28" y="503.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="28,429.5">Setup and import</text>
+<text x="28" y="522.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,429.5">finds your files, says what each one is,</text>
+<text x="28" y="540" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="28,429.5">and imports them into data/</text>
+<path d="M228.75,477.5 L228.75,456" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M228.75,449 L233.2,458.0 L224.2,458.0 Z" fill="#7b8794" data-tip="228.75,449"/>
+<path d="M456.5,478 H874 L886,490 V556 H456.5 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="470.5" y="503.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="470.5,872">App builder</text>
+<text x="470.5" y="522.5" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="470.5,872">your APK patched for this server and signed,</text>
+<text x="470.5" y="540" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="470.5,872">at every start; the PC installer beside it</text>
+<path d="M671.25,477.5 L671.25,456" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M671.25,449 L675.8,458.0 L666.8,458.0 Z" fill="#7b8794" data-tip="671.25,449"/>
+<path d="M170,600 H718 L730,612 V664 H170 Z" fill="#1a1f25" stroke="#ffb13d" stroke-width="2" stroke-linejoin="round"/>
+<text x="184" y="627.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="184,716">Your copy of the game's files</text>
+<text x="184" y="646.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="184,716">the Android app (APK), its client data and its song data: not in this repository</text>
+<path d="M228.75,599.5 L228.75,564" fill="none" stroke="#ffb13d" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M228.75,557 L233.2,566.0 L224.2,566.0 Z" fill="#ffb13d" data-tip="228.75,557"/>
+<path d="M671.25,599.5 L671.25,564" fill="none" stroke="#ffb13d" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M671.25,557 L675.8,566.0 L666.8,566.0 Z" fill="#ffb13d" data-tip="671.25,557"/>
+</svg>

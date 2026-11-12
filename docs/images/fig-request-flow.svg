@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 602" width="956" height="602" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="A game request on its way. The phone's app, or the player on a PC, posts a batch of calls to /DMQ/rpc over plain HTTP, signed with the Fp header. With Docker Compose the edge, nginx on the public port, passes the connection to Apache's plain door; without containers Apache holds the port itself. site.conf sends the path to game/index.php, which hands the batch to src/rpc.php: at most 64 calls and 2 MB, and a batch with a save or a shop call needs a good signature, else 403 and nothing runs. Each call goes in order to the handler odq_methods names for it, which reads and writes the SQLite database; a save keeps the best and the log row in one transaction. The results go back in the calls' order as JSON, gzip-compressed when the client asks; an unknown method answers SVC.05008, which the client takes without a popup">
+<rect x="-28" y="-28" width="956" height="602" rx="16" fill="#11151a"/>
+<path d="M810,44.5 V542" stroke="#3a434d" stroke-width="1.2" stroke-dasharray="3 5"/>
+<path d="M630,44.5 V542" stroke="#3a434d" stroke-width="1.2" stroke-dasharray="3 5"/>
+<path d="M450,44.5 V542" stroke="#3a434d" stroke-width="1.2" stroke-dasharray="3 5"/>
+<path d="M270,44.5 V542" stroke="#3a434d" stroke-width="1.2" stroke-dasharray="3 5"/>
+<path d="M90,44.5 V542" stroke="#3a434d" stroke-width="1.2" stroke-dasharray="3 5"/>
+<rect x="4" y="362" width="892" height="124" rx="8" fill="#1a1f25" fill-opacity="0.55" stroke="#3a434d" stroke-width="1"/>
+<path d="M8,0 H160 L172,12 V44 H8 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="22" y="26.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="22,158">Phone or PC</text>
+<path d="M188,0 H340 L352,12 V44 H188 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="202" y="26.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="202,338">Edge (nginx)</text>
+<path d="M368,0 H520 L532,12 V44 H368 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="382" y="26.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="382,518">Apache</text>
+<path d="M548,0 H700 L712,12 V44 H548 Z" fill="#1a1f25" stroke="#8cf23d" stroke-width="2" stroke-linejoin="round"/>
+<text x="562" y="26.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="562,698">Game server</text>
+<path d="M728,0 H880 L892,12 V44 H728 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
+<text x="742" y="26.5" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="742,878">SQLite</text>
+<path d="M90,94 L262,94" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M269,94 L260.0,98.5 L260.0,89.5 Z" fill="#7b8794" data-tip="269,94"/>
+<text x="180" y="73" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="96,264">POST /DMQ/rpc: calls,</text>
+<text x="180" y="87" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="96,264">signed, plain HTTP</text>
+<rect x="284" y="116" width="152" height="63" rx="6" fill="#11151a" stroke="#3a434d" stroke-width="1"/>
+<text x="294" y="133" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="294,428">with Compose only;</text>
+<text x="294" y="150" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="294,428">elsewhere Apache</text>
+<text x="294" y="167" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="294,428">holds the port</text>
+<path d="M270,221 L442,221" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M449,221 L440.0,225.5 L440.0,216.5 Z" fill="#7b8794" data-tip="449,221"/>
+<text x="360" y="200" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="276,444">passed to Apache's</text>
+<text x="360" y="214" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="276,444">plain door</text>
+<path d="M450,271 L622,271" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M629,271 L620.0,275.5 L620.0,266.5 Z" fill="#7b8794" data-tip="629,271"/>
+<text x="540" y="250" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="456,624">site.conf: index.php,</text>
+<text x="540" y="264" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="456,624">then src/rpc.php</text>
+<rect x="644" y="293" width="152" height="63" rx="6" fill="#11151a" stroke="#3a434d" stroke-width="1"/>
+<text x="654" y="310" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="654,788">up to 64 calls, 2 MB;</text>
+<text x="654" y="327" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="654,788">a save or a shop call</text>
+<text x="654" y="344" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="654,788">unsigned: 403</text>
+<text x="14" y="380" font-size="12" font-weight="600" fill="#aeb8c3" text-anchor="start" data-box="14,886">Each call in order, to the handler odq_methods() names for it</text>
+<path d="M630,426 L802,426" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M809,426 L800.0,430.5 L800.0,421.5 Z" fill="#7b8794" data-tip="809,426"/>
+<text x="720" y="405" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="636,804">reads, writes; a save</text>
+<text x="720" y="419" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="636,804">is one transaction</text>
+<path d="M810,462 L638,462" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M631,462 L640.0,457.5 L640.0,466.5 Z" fill="#7b8794" data-tip="631,462"/>
+<text x="720" y="455" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="636,804">rows</text>
+<path d="M630,520 L98,520" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
+<path d="M91,520 L100.0,515.5 L100.0,524.5 Z" fill="#7b8794" data-tip="91,520"/>
+<text x="360" y="499" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="96,624">the results in the calls' order: JSON, gzip-compressed when asked;</text>
+<text x="360" y="513" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="96,624">a method it does not know answers SVC.05008, which the client takes quietly</text>
+</svg>
