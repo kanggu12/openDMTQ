@@ -183,6 +183,13 @@ class Wording(unittest.TestCase):
             self.assertNotIn("켜면", i18n.TEXT[key][1], key)
         self.assertNotIn("끄면", i18n.TEXT["screen.fps.hint.free"][1])
 
+    def test_no_shortcut_the_player_does_not_take(self):
+        # F11 and Alt+Enter left the player (the bar's full screen button and the Screen page switch it): no word of
+        # them on any page, in either language.
+        for key, pair in i18n.TEXT.items():
+            for text in pair:
+                self.assertNotRegex(text, r"F11|Alt\+Enter", key)
+
 
 class KoreanParticles(unittest.TestCase):
     def test_no_mechanical_particles(self):

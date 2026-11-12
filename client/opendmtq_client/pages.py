@@ -439,7 +439,7 @@ def build_controls(app, parent):
     groups = (("controls.mouse", ("controls.click", "controls.drag", "controls.wheel", "controls.menu",
                                   "controls.minimise")),
               ("controls.touch", ("controls.fingers", "controls.edges", "controls.bar")),
-              ("controls.keyboard", ("controls.esc", "controls.f11", "controls.alt_f4", "controls.typing")))
+              ("controls.keyboard", ("controls.esc", "controls.alt_f4", "controls.typing")))
     for n, (title, keys) in enumerate(groups):
         card = _card(parent, ui, w(title), last=n == len(groups) - 1)
         for i, key in enumerate(keys):
