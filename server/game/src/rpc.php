@@ -87,6 +87,9 @@ function odq_method_key($method): string
     return is_string($method) ? ltrim(strtolower($method), '\\') : '';
 }
 
+/* The most calls one request may hold: the game's largest batch (14, right after its login) with room to spare. */
+const ODQ_MAX_CALLS = 64;
+
 /*
  * The game signs each request: an Fp header with md5(secret key + body), the key being the one the login reply
  * gave it. It is checked for what cannot be undone by a look at the rankings: saving a play and the shop. That
@@ -146,6 +149,11 @@ function odq_call($method, $params): array
 function odq_rpc(string $body): array
 {
     $data = json_decode($body, true);
+    // More calls than the game ever sends in one request (its start batch has 14) are no game's: refused whole before any
+    // runs, so that one request cannot hold a worker for thousands of calls.
+    if (is_array($data) && count($data) > ODQ_MAX_CALLS) {
+        return [413, '[]'];
+    }
     if (!odq_signature_ok($body, $data)) {
         return [403, '[]'];
     }
