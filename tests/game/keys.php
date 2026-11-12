@@ -87,15 +87,15 @@ check('a first play with the header X-OpenDMTQ-Keys: 1 is saved, its play and it
     ($first['is_new_record'] ?? null) === true && marks($db, $a) === [1, 1], json_encode([$first, marks($db, $a)]));
 // Worse, by touch: 90 notes at 100 % and 10 breaks.
 $worse = save($base, $a, 90, 10, null);
-check('a worse play without the header is marked as played by touch, and the best keeps the keyboard\'s mark',
+check("a worse play without the header is marked as played by touch, and the best keeps the keyboard's mark",
     ($worse['is_new_record'] ?? null) === false && marks($db, $a) === [0, 1], json_encode([$worse, marks($db, $a)]));
 // The same score again by touch: no new best, so the best stays the keyboard's, which got there first.
 $tie = save($base, $a, 100, 0, null);
-check('a tie by touch leaves the best to the keyboard\'s play that got there first',
+check("a tie by touch leaves the best to the keyboard's play that got there first",
     ($tie['is_new_record'] ?? null) === false && marks($db, $a) === [0, 1], json_encode([$tie, marks($db, $a)]));
 // Better by touch: 200 notes at 100 %, 85,000, over the keyboard's 65,000.
 $better = save($base, $a, 200, 0, null);
-check('a new best by touch clears the best\'s mark', ($better['is_new_record'] ?? null) === true && marks($db, $a) === [0, 0],
+check("a new best by touch clears the best's mark", ($better['is_new_record'] ?? null) === true && marks($db, $a) === [0, 0],
     json_encode([$better, marks($db, $a)]));
 // The other way round on another chart: a first play by touch, then a better one with the keyboard.
 save($base, $b, 90, 10, null);

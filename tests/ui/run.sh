@@ -5,7 +5,8 @@
 # recordings, players on air, under maintenance, what people do on the pages, and broadcasts off again with all of that. Layout findings, screenshots and the list of results go to the report folder.
 #
 # Usage: tests/ui/run.sh [report folder, default _work/ui-report]
-# ONLY="full flows" runs those stages (the checker's own, self, and the setup always run first). KEEP=1 leaves the stack up afterwards.
+# ONLY="full flows" runs those stages (the checker's own, self, and the setup always run first); keys is the keyboard's marks.
+# KEEP=1 leaves the stack up afterwards.
 # NO_BUILD=1 uses the images already tagged opendmtq-*:uitest.
 set -euo pipefail
 
@@ -173,6 +174,23 @@ export SITE_URL="http://127.0.0.1:$SITE_PORT" ADMIN_URL="http://127.0.0.1:$ADMIN
 python3 "$UI/feed.py" record
 
 stage full
+
+# The keyboard's mark: what the database holds of the plays and bests (seed.php made some with the keyboard), for the pages'
+# marks to be held to (audit.js keys): every play [id, player, chart, score, when, keys, record], every best [player, chart,
+# score, keys], and each chart's song.
+# shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
+docker exec "$SITE" php -r '
+  $d = new SQLite3("/data/dmtq.db3", SQLITE3_OPEN_READONLY);
+  $out = ["plays" => [], "bests" => [], "songs" => []];
+  $r = $d->query("SELECT id, user_id, pattern_id, score, played_at, keys, is_record FROM PlayLog ORDER BY id");
+  while ($row = $r->fetchArray(SQLITE3_NUM)) { $out["plays"][] = $row; }
+  $r = $d->query("SELECT user_id, pattern_id, score, keys FROM Play ORDER BY user_id, pattern_id");
+  while ($row = $r->fetchArray(SQLITE3_NUM)) { $out["bests"][] = $row; }
+  foreach (json_decode(file_get_contents("/srv/content/songs.json"), true) as $song) {
+      foreach ($song["song_patterns"] as $chart) { $out["songs"][$chart["pattern_id"]] = $song["song_id"]; }
+  }
+  echo json_encode($out);' > "$REPORT/keys.json"
+stage keys
 
 # Two players on air while the pages that change are looked at; told to stop, the feed ends both broadcasts.
 if wanted air; then

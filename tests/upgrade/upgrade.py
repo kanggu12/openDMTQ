@@ -80,11 +80,12 @@ def note(what):
 
 # ------------------------------------------------------------------ the game's side
 
-def call(method, params):
-    """One request of the game, signed as the game signs: its result. An error is a failure of the test itself."""
+def call(method, params, headers=None):
+    """One request of the game, signed as the game signs: its result. An error is a failure of the test itself. headers: more
+    of them, as the PC client's player adds X-OpenDMTQ-Keys to a save made with the keyboard."""
     body = json.dumps([{"id": 1, "method": method, "params": params}]).encode()
     fp = hashlib.md5(KEY + body).hexdigest()
-    status, _, reply = request(plain, SITE + "/DMQ/rpc", body, {"Content-Type": "application/json", "Fp": fp})
+    status, _, reply = request(plain, SITE + "/DMQ/rpc", body, {"Content-Type": "application/json", "Fp": fp, **(headers or {})})
     assert status == 200, f"{method}: HTTP {status}"
     answer = json.loads(reply)[0]
     assert answer["error"] is None, f"{method}: {answer['error']}"
@@ -99,10 +100,12 @@ def phone(udid):
     return guid, token.split("|")[0]
 
 
-def play(guid, chart, misses=0):
-    """A play of 100 notes saved, with that many of them missed: the server's reply."""
+def play(guid, chart, misses=0, keys=False):
+    """A play of 100 notes saved, with that many of them missed: the server's reply. keys: played with the keyboard, which
+    the PC client's player says with the save's header X-OpenDMTQ-Keys: 1."""
     counts = [0, misses] + [0] * 10 + [100 - misses]
-    return call("game.savePlayResult", [guid, chart, counts, 100 - misses, 0, [0, 0, 0], [0, 0, 0], "t"])
+    return call("game.savePlayResult", [guid, chart, counts, 100 - misses, 0, [0, 0, 0], [0, 0, 0], "t"],
+                {"X-OpenDMTQ-Keys": "1"} if keys else None)
 
 
 def reads(guid, puid):
@@ -351,6 +354,17 @@ def after():
             missing = sorted(set(old) - set(new or {})) if isinstance(old, dict) else []
             check(f"the API's {path} still answers", new_status == status and not missing, f"{status} before, {new_status} now; gone: {missing}")
 
+    # The plays of the release before, every one of them still there, and none marked as played with the keyboard: the column
+    # that says it is added with 0 for each (server/game/bin/setup-db.php).
+    status, logged = api(token, "/logs/plays")
+    old = [(p["player"], p["score"], p["at"]) for p in kept["api"]["/logs/plays"][1]["items"]]
+    new = [(p["player"], p["score"], p["at"]) for p in (logged or {}).get("items", [])]
+    check(f"every play of the release before is kept ({len(old)}), and none is marked as a keyboard play",
+          status == 200 and len(old) == 3 and new == old and all(p.get("keys") is False for p in logged["items"]),
+          f"{status} {old} before, {new} now, {[p.get('keys') for p in (logged or {}).get('items', [])]}")
+    records = api(token, f"/site/players/{guid}/records")[1]
+    check("and no best of theirs either", records and [r.get("keys") for r in records["items"]] == [False] * len(records["items"]), records)
+
     # The game's side: the same phones are the same players, and read what they read before.
     check("a phone is the player it was", phone("upgrade-phone-1") == (guid, puid) and phone("upgrade-phone-2")[0] == other)
     for who, old in sorted(kept["reads"].items()):
@@ -385,6 +399,13 @@ def after():
     # Writing on the old data: a new record, a new phone, a switch flipped on the Players page.
     better = play(guid, 2)
     check("a play after the upgrade is saved", better["is_new_record"] is True, json.dumps(better)[:200])
+    # A play with the keyboard on the upgraded data: marked on the play and on the best it sets.
+    keyboard = play(guid, 3, keys=True)
+    newest = api(token, f"/site/players/{guid}")[1]["recent"][0]
+    records = {r["chart"]: r.get("keys") for r in api(token, f"/site/players/{guid}/records")[1]["items"]}
+    check("a keyboard play after the upgrade is marked on the play and on its best, and only there",
+          keyboard["is_new_record"] is True and (newest["chart"], newest.get("keys")) == (3, True) and records == {1: False, 2: False, 3: True},
+          f"{newest} {records}")
     third = phone("upgrade-phone-3")[0]
     check("a new phone gets a new player", third not in (guid, other) and health()["players"] == 3)
     switch(admin, other, "live-on")
@@ -417,6 +438,14 @@ def after():
           and state("upgrade-phone-2")["on"] is True and broadcasts(admin) is True)
     check("the token made before still works after the restore", api(token, "/players")[0] == 200)
     check("both recordings are still listed after it", len(recorded(admin)) == 2, recorded(admin))
+    # The restored database is the release before's, which had no column for the keyboard's mark: the restore adds it while
+    # the server runs, its plays and bests read as by touch, and the server's next keyboard save is kept and marked.
+    restored = [p.get("keys") for p in api(token, "/logs/plays")[1]["items"]]
+    marked = play(guid, 4, keys=True)
+    records = {r["chart"]: r.get("keys") for r in api(token, f"/site/players/{guid}/records")[1]["items"]}
+    check("after the restore every play of the backup reads as by touch, and a keyboard play is saved and marked",
+          restored == [False] * len(restored) and len(restored) >= 3 and marked["is_new_record"] is True and records.get(4) is True
+          and records.get(1) is False, f"{restored} {records}")
 
 
 # ------------------------------------------------------------------ a server nobody broadcast on

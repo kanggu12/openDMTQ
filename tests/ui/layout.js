@@ -162,7 +162,9 @@ window.layoutAudit = function layoutAudit() {
     const classes = new Map();
     rows.forEach((row, i) => {
       for (const el of row.querySelectorAll('[class]')) {
-        if (!seen(el) || el.closest('[aria-hidden="true"]') || el.closest('details') || el.matches('.btn, .btn *, form, form *, .live-mark, .mark')) continue;
+        // Marks that go with the text beside them (a grade's AC and PP, LIVE after a name, the keyboard before a score) move
+        // with it, as a score's first figure does in a column of right-aligned scores.
+        if (!seen(el) || el.closest('[aria-hidden="true"]') || el.closest('details') || el.matches('.btn, .btn *, form, form *, .live-mark, .mark, .keys-mark')) continue;
         // Inside a box marked as laid out on purpose (cells coloured by value): its parts are not columns. The box is.
         if (el.parentElement && el.parentElement.closest('[data-layout-ok]')) continue;
         const key = el.classList[0];

@@ -2,6 +2,7 @@
 //   node audit.js self     the checker itself finds each planted defect (defects.html)
 //   node audit.js empty    every page of a server with nothing on it
 //   node audit.js full     every page with players, plays, recordings and an app, at five widths, in both languages
+//   node audit.js keys     the keyboard's marks on the site and the admin pages, held to the database (keys.json in OUT)
 //   node audit.js air      the pages that change while players are on air, and the video playing
 //   node audit.js maint    the owner turns maintenance on: the notice, whole, on every page that shows it; then off again
 //   node audit.js down     the game server stopped: the owner's pages keep their look and say what is wrong
@@ -658,6 +659,227 @@ async function portalFlows(contexts) {
   await songs.close();
 }
 
+// The keyboard's mark (PAGE-36 to PAGE-39, ADM-93 to ADM-95): the PC client's player says a play was made with the keyboard,
+// and the game server keeps it with the play and with the best that play set (seed.php writes them so: 민호 always, 유나 every
+// fourth play). Held to what the database says (run.sh writes it to keys.json beside the report): each play and best a keyboard
+// play made has the mark before its score, and no other; each total, month's score and past month's score that counts such
+// bests has it with how many, worked out here from the plays themselves. Both languages, a phone's width and a laptop's.
+const KEY_WORDS = { en: ['Keyboard play', n => (n === 1 ? 'Includes 1 keyboard play' : `Includes ${n} keyboard plays`)],
+  ko: ['키보드 플레이', n => `키보드 플레이 기록 ${n}개 포함`] };
+async function keyboardMarks(contexts) {
+  const truth = JSON.parse(fs.readFileSync(path.join(OUT, 'keys.json'), 'utf8'));
+  // Every play [id, player, chart, score, when, keys, record] and every best [player, chart, score, keys], from the database.
+  const plays = truth.plays, bests = truth.bests;
+  const best = new Map(bests.map(([who, chart, score, keys]) => [`${who}-${chart}`, { score, keys: !!keys }]));
+  // A month's scores as the game adds them up: each chart's top score that month (capped as the rankings cap it), the play
+  // that got there first; a player's count is how many of those a keyboard play set. Months begin at midnight UTC.
+  const monthKeys = (since, until) => {
+    const top = new Map();
+    for (const [id, who, chart, score, at, keys] of plays) {
+      if (at < since || at >= until) continue;
+      const capped = Math.min(Math.max(score, 0), 2147483647), k = `${who}-${chart}`, b = top.get(k);
+      if (!b || capped > b.score || (capped === b.score && (at < b.at || (at === b.at && id < b.id)))) top.set(k, { score: capped, at, id, keys, who });
+    }
+    const out = {};
+    for (const b of top.values()) if (b.keys) out[b.who] = (out[b.who] || 0) + 1;
+    return out;
+  };
+  const monthStart = back => { const d = new Date(); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - back, 1) / 1000; };
+  // How many of each player's bests a keyboard play set: what the rankings' totals count.
+  const allTime = {};
+  for (const [who, , , keys] of bests) if (keys) allTime[who] = (allTime[who] || 0) + 1;
+  check('the stand-in players include keyboard plays and bests, and plays by touch', plays.some(p => p[5]) && plays.some(p => !p[5])
+    && bests.some(b => b[3]) && bests.some(b => !b[3]) && !allTime[1], JSON.stringify(allTime));
+  const wrong = [], hidden = [], shot = [], layout = [];
+  let viewsSeen = 0;
+  // Every mark of a page with what it stands for: its row's key (player, chart, score as the row shows them) and its words.
+  const read = page => page.evaluate(() => {
+    const num = el => Number((el && el.textContent || '').replace(/[^0-9]/g, '')) || 0;
+    const id = (a, key) => a ? Number(new URL(a.href, location.href).searchParams.get(key)) : 0;
+    const mark = el => { const m = el && el.querySelector('.keys-mark'); return m ? [m.getAttribute('title'), m.getAttribute('aria-label'), m.getAttribute('role')] : null; };
+    // Each mark where it stands: on a line with what it marks, 4 to 8 px from it (before a score's first figure, or after a
+    // name on the podium), at a phone's width too, whole and on the screen.
+    const placed = [...document.querySelectorAll('.keys-mark')].map(m => {
+      const r = m.getBoundingClientRect(), s = getComputedStyle(m);
+      const after = !!m.closest('.pod-who');
+      let text = after ? m.previousSibling : m.nextSibling;
+      while (text && text.nodeType === 1 && !text.textContent.trim()) text = after ? text.previousSibling : text.nextSibling;
+      const range = document.createRange();
+      if (text) range.selectNodeContents(text);
+      const t = text ? range.getBoundingClientRect() : { left: 0, right: 0, top: 0, bottom: 0 };
+      const gap = after ? r.left - t.right : t.left - r.right, middle = (r.top + r.bottom) / 2 - (t.top + t.bottom) / 2;
+      return { ok: s.display !== 'none' && s.visibility !== 'hidden' && Math.round(r.width) === 20 && Math.round(r.height) === 12 && r.left >= 0
+        && r.right <= document.documentElement.clientWidth && !!text && gap >= 4 && gap <= 8 && Math.abs(middle) <= 4,
+        at: `${m.parentElement.className || m.parentElement.tagName} ${Math.round(gap)}px ${Math.round(middle)}px` };
+    });
+    const rows = sel => [...document.querySelectorAll(sel)];
+    return {
+      placed,
+      // A song's leaderboard: the player and the mark of each row.
+      board: rows('table.board tbody tr').map(r => ({ who: id(r.querySelector('td.name a'), 'id'), mark: mark(r) })),
+      // A player's page: their recent plays and best records (chart, score, mark), and the count beside the grades.
+      lists: rows('.stack .card table.plays').map(t => [...t.querySelectorAll('tbody tr')].map(r => ({
+        chart: id(r.querySelector('td.song-cell a'), 'chart'), score: num(r.querySelector('td.r')), mark: mark(r.querySelector('td.r')) }))),
+      counted: rows('.grades .g-item').filter(g => g.querySelector('.keys-mark')).map(g => [num(g), mark(g)]),
+      // The home page: the newest records (player, chart, score, mark) and the top players (player, mark).
+      records: rows('#records .feed li').map(l => ({ who: id(l.querySelector('.who a'), 'id'), chart: id(l.querySelector('.what a'), 'chart'),
+        score: num(l.querySelector('.feed-score > span:last-child')), mark: mark(l.querySelector('.feed-score')) })),
+      top: rows('.feed.ranks li').map(l => ({ who: id(l.querySelector('.who a'), 'id'), mark: mark(l) })),
+      // The rankings: the podium and the table (player, mark), and each month before (its name, its first three).
+      ranked: [...rows('.podium .pod').map(p => ({ who: id(p.querySelector('.pod-name'), 'id'), mark: mark(p.querySelector('.pod-who')) })),
+        ...rows('table.board tbody tr').map(r => ({ who: id(r.querySelector('td.name a'), 'id'), mark: mark(r) }))],
+      months: rows('.past-month').map(m => ({ name: m.querySelector('h3').textContent.trim(),
+        top: [...m.querySelectorAll('.past-top li')].map(l => ({ who: id(l.querySelector('a'), 'id'), mark: mark(l.querySelector('b')) })) })),
+      // The admin pages' plays: the status page's newest and the Plays tab (player, score, mark).
+      admin: rows('table.compact.recent tbody tr, table.playlog tbody tr').map(r => ({
+        who: id(r.querySelector('td.who a'), 'id') || id(r.querySelector('td.primary a'), 'player'), score: num(r.querySelector('td.r')), mark: mark(r.querySelector('td.r')) })),
+      all: document.querySelectorAll('.keys-mark').length,
+    };
+  });
+  // A mark is as it should be: there when wanted (true: a play's or a best's; a number: a total's, counting that many), with
+  // its words in the page's language, named for a screen reader; none when not (null).
+  const same = (where, got, want, lang) => {
+    const words = want === true ? KEY_WORDS[lang][0] : typeof want === 'number' && want > 0 ? KEY_WORDS[lang][1](want) : null;
+    const ok = words === null ? got === null : !!got && got[0] === words && got[1] === words && got[2] === 'img';
+    if (!ok) wrong.push(`${where}: ${JSON.stringify(got)}, wanted ${JSON.stringify(words)}`);
+  };
+  // What every row of a page should have, and the page's own marks, at a laptop's width in English, a phone's in Korean and in
+  // English. In those three views the marks are where they belong and nowhere else.
+  const views = [['en', 1280], ['ko', 360], ['en', 360]];
+  const look = async (name, url, judge) => {
+    for (const [lang, width] of views) {
+      const page = await contexts.signed.newPage();
+      await page.setViewport({ width, height: width < 500 ? 740 : 900, hasTouch: width < 500, isMobile: width < 500 });
+      await page.setCookie({ name: 'opendmtq_lang', value: lang, url });
+      await page.goto(url, { waitUntil: 'networkidle2' });
+      const seen = await read(page);
+      const before = wrong.length;
+      judge(seen, lang, `${name} ${lang}${width}`);
+      for (const p of seen.placed) if (!p.ok) hidden.push(`${name} ${lang}${width}: ${p.at}`);
+      // The views with marks, for people to look at.
+      if (seen.all) {
+        await page.screenshot({ path: path.join(OUT, 'shots', `keys-${name}-${lang}-${width}.jpg`), type: 'jpeg', quality: 80, fullPage: true });
+        shot.push(`${name}-${lang}-${width}`);
+      }
+      if (wrong.length > before) console.log(`  ${name} ${lang}${width}: ${seen.all} marks`);
+      // The layout with the marks in it, as the sweeps measure every page (one check for all these views, below).
+      for (const f of [...await audit(page), ...await twoPrimaries(page)]) layout.push(`${name} ${lang}${width}: ${f.kind} ${f.at} ${f.detail}`.slice(0, 160));
+      viewsSeen++;
+      await page.close();
+    }
+  };
+  // Song boards: charts whose bests are some the keyboard's and some by touch, and one with none of the keyboard's.
+  const charts = new Map();
+  for (const [who, chart, , keys] of bests) {
+    const c = charts.get(chart) || { keys: 0, touch: 0 };
+    c[keys ? 'keys' : 'touch']++;
+    charts.set(chart, c);
+  }
+  const mixed = [...charts].filter(([, c]) => c.keys && c.touch).map(([chart]) => chart).slice(0, 2);
+  const plain = [...charts].filter(([, c]) => !c.keys && c.touch > 1).map(([chart]) => chart).slice(0, 1);
+  let boardRows = 0;
+  for (const chart of [...mixed, ...plain]) {
+    await look(`song-chart-${chart}`, `${P}/song.php?id=${truth.songs[chart]}&chart=${chart}`, (seen, lang, at) => {
+      for (const r of seen.board) same(`${at} player ${r.who}`, r.mark, best.get(`${r.who}-${chart}`).keys ? true : null, lang);
+      boardRows += seen.board.length;
+    });
+  }
+  check("a song's leaderboard marks the bests a keyboard play set, and no other", mixed.length === 2 && plain.length === 1 && boardRows > 6
+    && wrong.length === 0, wrong.slice(0, 6).join(' ; '));
+  // Players' pages: all of one's plays by keys, some of another's, none of Sena's.
+  const before = wrong.length;
+  for (const who of [2, 3, 1]) {
+    await look(`player-${who}`, `${P}/player.php?id=${who}`, (seen, lang, at) => {
+      const [recent = [], records = []] = seen.lists;
+      for (const r of recent) {
+        // The play of that chart and score. Two such plays that differ in the mark cannot tell the row: not judged.
+        const found = plays.filter(p => p[1] === who && p[2] === r.chart && p[3] === r.score);
+        if (!found.length) wrong.push(`${at} recent ${r.chart} ${r.score}: no such play`);
+        else if (new Set(found.map(p => !!p[5])).size === 1) same(`${at} recent ${r.chart} ${r.score}`, r.mark, found[0][5] ? true : null, lang);
+      }
+      for (const r of records) same(`${at} best ${r.chart}`, r.mark, best.get(`${who}-${r.chart}`).keys ? true : null, lang);
+      const count = bests.filter(b => b[0] === who && b[3]).length;
+      if (count ? !(seen.counted.length === 1 && seen.counted[0][0] === count) : seen.counted.length) wrong.push(`${at} count ${JSON.stringify(seen.counted)} for ${count}`);
+      for (const [, m] of seen.counted) same(`${at} count`, m, true, lang);
+      if (!recent.length || !records.length) wrong.push(`${at}: no plays or records listed`);
+    });
+  }
+  check("a player's page marks their plays and bests the keyboard made, and counts them beside the grades; none on a player who plays by touch",
+    wrong.length === before, wrong.slice(before, before + 6).join(' ; '));
+  // The home page: the newest records, and the top players' totals.
+  const home = wrong.length;
+  await look('home', `${P}/`, (seen, lang, at) => {
+    for (const r of seen.records) {
+      const found = plays.filter(p => p[1] === r.who && p[2] === r.chart && p[3] === r.score && p[6]);
+      same(`${at} record ${r.who} ${r.chart} ${r.score}`, r.mark, found.length === 1 && found[0][5] ? true : null, lang);
+    }
+    for (const r of seen.top) same(`${at} top ${r.who}`, r.mark, allTime[r.who] || null, lang);
+    if (!seen.records.some(r => r.mark) || !seen.top.some(r => r.mark)) wrong.push(`${at}: no mark among the records or the top players`);
+  });
+  check("the home page marks the newest records a keyboard play set, and the totals that count such bests with how many",
+    wrong.length === home, wrong.slice(home, home + 6).join(' ; '));
+  // The rankings: every tab of totals, this month (the month's own bests), and the months before.
+  const ranks = wrong.length;
+  for (const sort of ['total', 's_count']) {
+    await look(`rankings-${sort}`, `${P}/ranking.php?sort=${sort}`, (seen, lang, at) => {
+      for (const r of seen.ranked) same(`${at} ${r.who}`, r.mark, allTime[r.who] || null, lang);
+    });
+  }
+  const thisMonth = monthKeys(monthStart(0), Number.MAX_SAFE_INTEGER);
+  let pastNamed = 0;
+  await look('rankings-month', `${P}/ranking.php?sort=month`, (seen, lang, at) => {
+    for (const r of seen.ranked) same(`${at} ${r.who}`, r.mark, thisMonth[r.who] || null, lang);
+    // The months before with plays, newest first, as the page lists them; each by its name in English.
+    const months = [];
+    for (let back = 1; back <= 6; back++) {
+      if (plays.some(p => p[4] >= monthStart(back) && p[4] < monthStart(back - 1))) months.push(back);
+    }
+    seen.months.forEach((m, i) => {
+      const back = months[i], counts = monthKeys(monthStart(back), monthStart(back - 1));
+      const name = new Date(monthStart(back) * 1000).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+      if (lang === 'en' && m.name !== name) wrong.push(`${at} month ${i}: ${m.name}, wanted ${name}`);
+      pastNamed++;
+      for (const r of m.top) same(`${at} ${m.name} ${r.who}`, r.mark, counts[r.who] || null, lang);
+    });
+  });
+  check("the rankings mark each total, this month's score and each past month's score that counts bests a keyboard play set, with how many",
+    wrong.length === ranks && pastNamed > 0 && Object.keys(thisMonth).length > 0, wrong.slice(ranks, ranks + 6).join(' ; ') + ` ${pastNamed} ${JSON.stringify(thisMonth)}`);
+  // Nowhere else: pages that show no scores have no mark.
+  const nowhere = wrong.length;
+  for (const [name, url] of [['songs', `${P}/songs.php`], ['live', `${P}/live.php`], ['download', `${P}/download.php`]]) {
+    const page = await contexts.signed.newPage();
+    await page.setViewport({ width: 1280, height: 900 });
+    await page.goto(url, { waitUntil: 'networkidle2' });
+    const n = await page.$$eval('.keys-mark', ms => ms.length);
+    if (n) wrong.push(`${name}: ${n} marks`);
+    await page.close();
+  }
+  check('pages that show no score have no keyboard mark', wrong.length === nowhere, wrong.slice(nowhere).join(' ; '));
+  // The admin pages: the status page's newest plays and the Plays tab, by the player and the score of each row.
+  const owner = wrong.length;
+  let adminRows = 0;
+  for (const [name, url] of [['admin-status', `${A}/`], ['admin-plays', `${A}/logs?tab=plays`]]) {
+    await look(name, url, (seen, lang, at) => {
+      for (const r of seen.admin) {
+        const found = plays.filter(p => p[1] === r.who && p[3] === r.score);
+        // Two plays of one player with one score that differ in the mark cannot tell the row: not judged.
+        if (found.length && found.every(p => !!p[5] === !!found[0][5])) {
+          same(`${at} ${r.who} ${r.score}`, r.mark, found[0][5] ? true : null, lang);
+          adminRows++;
+        }
+      }
+      if (!seen.admin.some(r => r.mark)) wrong.push(`${at}: no marked play`);
+    });
+  }
+  check("the admin pages mark the plays a keyboard play made, on the status page and the Plays tab", wrong.length === owner && adminRows > 20,
+    wrong.slice(owner, owner + 6).join(' ; ') + ` (${adminRows} rows)`);
+  check("every keyboard mark stands beside what it marks, on its line, whole and on the screen, at a phone's width too", hidden.length === 0,
+    hidden.slice(0, 8).join(' ; '));
+  check(`the pages with keyboard marks: nothing wrong with the layout (${viewsSeen} views)`, layout.length === 0 && viewsSeen >= 30,
+    layout.slice(0, 8).join(' ; '));
+  console.log(`  pictures: ${shot.join(', ')}`);
+}
+
 // The replay player as a viewer uses it.
 async function replayFlows(contexts) {
   const page = await contexts.signed.newPage();
@@ -1195,6 +1417,8 @@ async function adminFlows(contexts) {
     await sweep(contexts, EMPTY, FEW_WIDTHS);
   } else if (stage === 'full') {
     await sweep(contexts, FULL, ALL_WIDTHS);
+  } else if (stage === 'keys') {
+    await keyboardMarks(contexts);
   } else if (stage === 'air') {
     // The video really runs, and the page says who is on.
     const page = await contexts.signed.newPage();
