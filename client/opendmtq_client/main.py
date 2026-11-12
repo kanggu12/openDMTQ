@@ -334,7 +334,8 @@ def _status(state):
     if server is None:
         _say("server: none (connect with --server URL)")
     else:
-        _say("server: %s (%s)" % (server["name"], server["url"]))
+        # Its name and address, or its address once when it has no name of its own (as the ready check's line says it).
+        _say("server: %s" % st.label(server))
         signed = state.signed_in(server)
         _say("signed in: %s" % (server["account"] if signed else "no" + (" (%s, ended)" % server["account"]
                                                                           if server.get("account") else "")))
@@ -592,7 +593,7 @@ def _servers(state):
         _say("No servers yet (connect with --server URL).")
         return
     for server in sorted(state.servers, key=lambda s: s["url"] != state.current):
-        _say("%s %s (%s)" % ("*" if server["url"] == state.current else " ", server["name"], server["url"]))
+        _say("%s %s" % ("*" if server["url"] == state.current else " ", st.label(server)))
 
 
 def _run(state, args, jobs):

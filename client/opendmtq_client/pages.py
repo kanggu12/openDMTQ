@@ -96,8 +96,13 @@ def _server_card(app, parent):
         main_button(app, line, w("online.signin"), lambda: app.nav_go("online")).pack(side="right", anchor="n")
     words = tk.Frame(line, bg=theme.PANEL)
     words.pack(side="left", fill="x", expand=True)
-    widgets.label(words, ui, server["name"], font=ui.fonts.body_bold, wrap_margin=0).pack(fill="x")
-    widgets.label(words, ui, server["url"], font=ui.fonts.small, fg=theme.MUTED, wrap_margin=0).pack(fill="x")
+    if st.has_own_name(server):
+        # Its name, and its address under it.
+        widgets.label(words, ui, server["name"], font=ui.fonts.body_bold, wrap_margin=0).pack(fill="x")
+        widgets.label(words, ui, server["url"], font=ui.fonts.small, fg=theme.MUTED, wrap_margin=0).pack(fill="x")
+    else:
+        # A server with no name of its own calls itself by its address: said once, in the name's place.
+        widgets.label(words, ui, server["url"], font=ui.fonts.body_bold, wrap_margin=0).pack(fill="x")
     widgets.divider(card.body, ui)
     account = (w("play.signed", account=server["account"]) if signed else
                w("play.not_signed", account=server["account"]) if server.get("account") else w("play.no_account"))
@@ -766,8 +771,9 @@ def known_servers(app, parent, rerender):
         forget_button.pack(side="right")
         pick_button = widgets.Button(line, ui, w("online.pick"), pick)
         pick_button.pack(side="right", padx=(0, ui.px(8)))
-        widgets.label(line, ui, "%s  ·  %s" % (s["name"], s["url"]), wrap_margin=12,
-                      beside=(forget_button, pick_button)).pack(side="left", fill="x")
+        # Its name and address, or its address once when it has no name of its own.
+        named = "%s  ·  %s" % (s["name"], s["url"]) if st.has_own_name(s) else s["url"]
+        widgets.label(line, ui, named, wrap_margin=12, beside=(forget_button, pick_button)).pack(side="left", fill="x")
 
 
 def forget_server(app, server, rerender):

@@ -149,6 +149,20 @@ class State(Folder):
         s.remove_server("http://a.test")
         self.assertIsNone(s.current)
 
+    def test_a_server_without_a_name_is_said_by_its_address_once(self):
+        # A site without SERVER_NAME answers its address (PUBLIC_HOST) for its name; an entry kept without a name has
+        # its address for one: the address alone then, not "192.168.0.5:8080 (http://192.168.0.5:8080)".
+        s = st.LauncherState()
+        named = s.add_server("http://club.test:8790", "Club", "club.test:8790")
+        self.assertTrue(st.has_own_name(named))
+        self.assertEqual(st.label(named), "Club (http://club.test:8790)")
+        for name, address in (("192.0.2.5:8080", "192.0.2.5:8080"), ("http://192.0.2.5:8080", ""),
+                              ("192.0.2.5", ""), ("Site.Test:8080", "site.test:8080"), ("", "")):
+            url = "http://site.test:8080" if "Site" in name else "http://192.0.2.5:8080"
+            server = st._server({"url": url, "name": name, "address": address})
+            self.assertFalse(st.has_own_name(server), name)
+            self.assertEqual(st.label(server), url, name)
+
     def test_the_installers_server_is_taken_once(self):
         preset.hand_over({"url": "http://example.test:8790", "name": "Club"})
         self.assertEqual(preset.take(), {"url": "http://example.test:8790", "name": "Club"})

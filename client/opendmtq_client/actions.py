@@ -13,6 +13,7 @@ import sys
 
 from opendmtq_client import apps, player, playing, safety
 from opendmtq_client import server as srv
+from opendmtq_client import state as st
 
 log = logging.getLogger("opendmtq_client")
 
@@ -91,7 +92,8 @@ def readiness(state, reached=None):
         return lines + [Check("server", False, "no server chosen", page="online")]
     answered = not isinstance(reached, BaseException)
     if answered:
-        lines.append(Check("server", True, "%s (%s)" % (server["name"], server["url"]), page="online"))
+        # Its name and address, or its address once when it has no name of its own.
+        lines.append(Check("server", True, st.label(server), page="online"))
     else:
         # Not answering: nothing on this PC to fix, and PLAY still plays the app this PC has (it says so).
         lines.append(Check("server", False, str(reached), page="online", blocks=False))
@@ -156,7 +158,6 @@ def forget(state, url):
 def reset(state):
     """Start over (Help's Start over, --reset): every server's app on this PC goes, and the state is a first start's,
     the guide next; the language stays as it was, chosen or Windows'. The caller asks first, and saves."""
-    from opendmtq_client import state as st
     for server in list(state.servers):
         apps.remove(server["url"])
     picked = state.picked_language

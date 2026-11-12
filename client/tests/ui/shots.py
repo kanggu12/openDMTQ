@@ -616,6 +616,31 @@ def variants_check(app, site, out, tag, problems):
     app.state.current = before
     app.state.save()
     app.refresh_checks()
+    unnamed_check(app, out, tag, problems)
+
+
+def unnamed_check(app, out, tag, problems):
+    """A server with no name of its own (a site without SERVER_NAME calls itself by its address): its address once on
+    the PLAY page's card and in Help's ready check, never "192.0.2.5:8080" over "http://192.0.2.5:8080"."""
+    import tkinter as tk
+    import urllib.parse
+    server = app.state.server()
+    name, netloc = server["name"], urllib.parse.urlsplit(server["url"]).netloc
+    server["name"] = netloc
+    try:
+        for page in ("play", "help"):
+            app.go(page)
+            settle(app)
+            texts = [x.cget("text") for x in widgets_of(app.body.inner) if isinstance(x, tk.Label) and x.winfo_ismapped()]
+            said = [t for t in texts if netloc in t]
+            if said != [server["url"]]:
+                problems.append("%s: a server without a name is named on %s as %r" % (tag, page, said))
+            if page == "play":
+                shot(app.root, out, "%s_play-unnamed" % tag)
+                measure(app, "%s_play-unnamed" % tag, problems)
+    finally:
+        server["name"] = name
+        app.state.save()
 
 
 def dialogs_check(app, out, tag, problems):

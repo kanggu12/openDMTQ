@@ -103,6 +103,25 @@ def _server(entry):
     }
 
 
+def has_own_name(server):
+    """False for a server that gave no name of its own: a site without SERVER_NAME calls itself by its address (its
+    PUBLIC_HOST), and an entry kept without a name has its address for one. Its address alone is said then, once."""
+    import urllib.parse
+    name = (server.get("name") or "").strip().lower().rstrip("/")
+    parts = urllib.parse.urlsplit(server["url"])
+    # Every way the launcher may hold the server's address: as it writes it, its host and port, its host, and the
+    # address the server says its app is built for.
+    addresses = {server["url"].lower(), parts.netloc.lower(), (parts.hostname or "").lower(),
+                 str(server.get("address") or "").strip().lower()}
+    return bool(name) and name not in addresses
+
+
+def label(server):
+    """A server as one line names it (a ready check's line, --status, --servers): its name and its address, or its
+    address alone when it has no name of its own (has_own_name)."""
+    return "%s (%s)" % (server["name"], server["url"]) if has_own_name(server) else server["url"]
+
+
 class LauncherState:
     """The remembered settings. Each field has a safe default, so a missing file means a first start.
 
