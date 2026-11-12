@@ -334,6 +334,18 @@ function odq_account_known(int $guid): ?bool
 }
 
 /*
+ * True when the request that brings a save says the play was made with the keyboard: the PC client's player sends
+ * X-OpenDMTQ-Keys: 1 with the save when any lane key was pressed during that song, and no such header otherwise; a phone
+ * never sends it. Only the value 1 marks a play. The mark is kept with the play and its best (game.savePlayResult) for
+ * the site and the admin pages to show; nothing the game reads, its rankings among them, depends on it.
+ */
+function odq_save_by_keys(): bool
+{
+    // Apache gives each header of the request as HTTP_ and its name in capitals, its dashes as underscores.
+    return trim((string)($_SERVER['HTTP_X_OPENDMTQ_KEYS'] ?? '')) === '1';
+}
+
+/*
  * The reply for a save the database did not take. A code the client does not know opens its "retry?" popup
  * (see rpc.php), which sends the same result again: the score is not lost as long as the player retries,
  * instead of being shown as saved and gone.
@@ -348,7 +360,9 @@ function odq_save_failed(): OdqReply
  * the end of a play. judgementStat counts the notes by judgement: index 1 the breaks, 2 the 1 % judgement, 3 to
  * 12 the 10 % to 100 % ones. The score and the accuracy are worked out here from those counts, as the official
  * server did; the best of each per chart is kept (Play), every play is logged (PlayLog), and the reply names the
- * achievements the play earned.
+ * achievements the play earned. A play the request marks as made with the keyboard (odq_save_by_keys()) is marked on
+ * its log row, and on the best row when it sets the best score; a new best by touch clears the mark again. The reply
+ * is the same either way.
  */
 function odq_game_save_play(array $p)
 {
@@ -397,6 +411,8 @@ function odq_game_save_play(array $p)
     $ratio = odq_clamp($ratio, 0, 1000);
     // What the player held before this play, to tell what it earns.
     $had = odq_achievement_ids($guid);
+    // Whether this play was made with the keyboard, as the request says: 1 or 0, the column's values.
+    $keys = odq_save_by_keys() ? 1 : 0;
 
     $db = odq_db();
     // The best row and the log row together or not at all, waiting out other writers (busy timeout).
@@ -414,15 +430,18 @@ function odq_game_save_play(array $p)
     $first = $last === null;
     $record = $first || $total > $last;
     if ($first) {
-        $w = $db->prepare('INSERT INTO Play (pattern_id, user_id, score, grade, isAllCombo, isPerfectPlay, judgement)
-                           VALUES (:p, :g, :score, :grade, :combo, :perfect, :ratio)');
+        // The first play on the chart is its best: its keyboard mark with it.
+        $w = $db->prepare('INSERT INTO Play (pattern_id, user_id, score, grade, isAllCombo, isPerfectPlay, judgement, keys)
+                           VALUES (:p, :g, :score, :grade, :combo, :perfect, :ratio, :keys)');
     } else {
         // Every expression sees the old row: the score and the accuracy keep their best, the grade follows the best
-        // accuracy, and the two marks only ever turn on.
+        // accuracy, and the two marks only ever turn on. The keyboard's mark follows the best score: the mark of the play
+        // that beats it (one by touch clears it), the old one's while no play does (a tie keeps the play that got there first).
         $w = $db->prepare("UPDATE Play SET score = max(score, :score), judgement = max(judgement, :ratio),
                            grade = CASE WHEN :ratio > judgement THEN :grade ELSE grade END,
                            isAllCombo = CASE WHEN isAllCombo = 'N' THEN :combo ELSE isAllCombo END,
-                           isPerfectPlay = CASE WHEN isPerfectPlay = 'N' THEN :perfect ELSE isPerfectPlay END
+                           isPerfectPlay = CASE WHEN isPerfectPlay = 'N' THEN :perfect ELSE isPerfectPlay END,
+                           keys = CASE WHEN :score > score THEN :keys ELSE keys END
                            WHERE pattern_id = :p AND user_id = :g");
     }
     $stored = false;
@@ -434,12 +453,14 @@ function odq_game_save_play(array $p)
         $w->bindValue(':combo', $allCombo ? 'Y' : 'N', SQLITE3_TEXT);
         $w->bindValue(':perfect', $perfect ? 'Y' : 'N', SQLITE3_TEXT);
         $w->bindValue(':ratio', $ratio, SQLITE3_INTEGER);
+        $w->bindValue(':keys', $keys, SQLITE3_INTEGER);
         // A second save of the same first play at the same moment is refused by the index Play_one.
         $stored = @$w->execute() !== false;
     }
-    // Every play is logged, for the monthly rankings and the achievements' dates; a failure here loses no score.
-    $l = @$db->prepare('INSERT INTO PlayLog (user_id, pattern_id, score, grade, judgement, is_record, played_at)
-                        VALUES (:g, :p, :score, :grade, :ratio, :record, :at)');
+    // Every play is logged, for the monthly rankings and the achievements' dates; a failure here loses no score. With
+    // the keyboard's mark: the site marks the play itself, and the month's best when this play set it.
+    $l = @$db->prepare('INSERT INTO PlayLog (user_id, pattern_id, score, grade, judgement, is_record, played_at, keys)
+                        VALUES (:g, :p, :score, :grade, :ratio, :record, :at, :keys)');
     if ($l) {
         $l->bindValue(':g', $guid, SQLITE3_INTEGER);
         $l->bindValue(':p', $pattern, SQLITE3_INTEGER);
@@ -448,6 +469,7 @@ function odq_game_save_play(array $p)
         $l->bindValue(':ratio', $ratio, SQLITE3_INTEGER);
         $l->bindValue(':record', $record ? 1 : 0, SQLITE3_INTEGER);
         $l->bindValue(':at', time(), SQLITE3_INTEGER);
+        $l->bindValue(':keys', $keys, SQLITE3_INTEGER);
         @$l->execute();
     }
     // Kept only when the best row was written and the commit works; otherwise nothing of it.

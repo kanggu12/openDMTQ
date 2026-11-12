@@ -98,8 +98,38 @@ foreach (GAME_TABLES as $sql) {
 // Every saved play, for the monthly rankings, the achievements' dates and the web pages: the game's own table
 // keeps only each player's best. A year of it is kept (below).
 $db->exec('CREATE TABLE IF NOT EXISTS PlayLog (id INTEGER PRIMARY KEY, user_id INTEGER, pattern_id INTEGER,
-           score INTEGER, grade TEXT, judgement INTEGER, is_record INTEGER, played_at INTEGER)');
+           score INTEGER, grade TEXT, judgement INTEGER, is_record INTEGER, played_at INTEGER,
+           keys INTEGER NOT NULL DEFAULT 0)');
 $db->exec('CREATE INDEX IF NOT EXISTS PlayLog_time ON PlayLog (played_at)');
+/*
+ * Whether a play was made with the keyboard: 1 when the save said so (the PC client's X-OpenDMTQ-Keys header,
+ * src/game.php), on the play's own row and on the best row that play set. A table from before it gets the column here,
+ * with 0 in every row it has, so that every older play and best reads as one made by touch; the game's own Play table
+ * gets it this way on a new database too, which keeps that table as earlier servers made it otherwise. Before the merge
+ * below, which reads it. The same as keys_columns() in the admin pages (backups.py), which a restored database goes
+ * through.
+ */
+foreach (['Play', 'PlayLog'] as $table) {
+    // The table's columns now: added only where it is missing, as SQLite has no "add a column unless it is there".
+    $has_keys = function () use ($db, $table): bool {
+        $columns = @$db->query("PRAGMA table_info($table)");
+        while ($columns && ($column = $columns->fetchArray(SQLITE3_ASSOC))) {
+            if ($column['name'] === 'keys') {
+                return true;
+            }
+        }
+        return false;
+    };
+    if (!$has_keys()) {
+        // Silenced: another start at the same moment may have added it first, which the look below finds.
+        @$db->exec("ALTER TABLE $table ADD COLUMN keys INTEGER NOT NULL DEFAULT 0");
+    }
+    // Without the column every save would be refused (it writes the mark): the server does not start, and says why.
+    if (!$has_keys()) {
+        fwrite(STDERR, "opendmtq: cannot add the column keys to the table $table: " . $db->lastErrorMsg() . "\n");
+        exit(1);
+    }
+}
 // When each player earned each achievement (MY PAGE): the save that earns one stores it, once. Apart from
 // PlayLog, which keeps a year: an achievement once earned stays, with its date. Only the admin pages reset or
 // delete the rows of a player. The same statement as ACHIEVEMENT_TABLE in the admin pages.
@@ -109,21 +139,24 @@ $db->exec('CREATE INDEX IF NOT EXISTS Play_pattern ON Play (pattern_id, score)')
 
 // Each player has one row per chart. Two saves at the same moment once made two, which the rankings summed:
 // such rows become one, the best of each (the same as PLAY_MERGE in the admin pages, for a database restored
-// while the server runs), and the unique index below keeps it so.
+// while the server runs), and the unique index below keeps it so. The keyboard's mark is the top score's, as the
+// play that set that score marked it.
 $db->exec('BEGIN IMMEDIATE');
 $db->exec('CREATE TEMP TABLE PlayMerged AS
            SELECT p.pattern_id, p.user_id, MAX(p.score) AS score,
                   (SELECT q.grade FROM Play q WHERE q.pattern_id = p.pattern_id AND q.user_id = p.user_id
                     ORDER BY q.judgement DESC LIMIT 1) AS grade,
-                  MAX(p.isAllCombo) AS isAllCombo, MAX(p.isPerfectPlay) AS isPerfectPlay, MAX(p.judgement) AS judgement
+                  MAX(p.isAllCombo) AS isAllCombo, MAX(p.isPerfectPlay) AS isPerfectPlay, MAX(p.judgement) AS judgement,
+                  (SELECT q.keys FROM Play q WHERE q.pattern_id = p.pattern_id AND q.user_id = p.user_id
+                    ORDER BY q.score DESC LIMIT 1) AS keys
              FROM Play p WHERE p.pattern_id IS NOT NULL AND p.user_id IS NOT NULL
             GROUP BY p.pattern_id, p.user_id HAVING COUNT(*) > 1');
 $merged = (int)$db->querySingle('SELECT COUNT(*) FROM PlayMerged');
 $kept = true;
 if ($merged) {
     $kept = $db->exec('DELETE FROM Play WHERE (pattern_id, user_id) IN (SELECT pattern_id, user_id FROM PlayMerged)')
-        && $db->exec('INSERT INTO Play (pattern_id, user_id, score, grade, isAllCombo, isPerfectPlay, judgement)
-                      SELECT pattern_id, user_id, score, grade, isAllCombo, isPerfectPlay, judgement FROM PlayMerged');
+        && $db->exec('INSERT INTO Play (pattern_id, user_id, score, grade, isAllCombo, isPerfectPlay, judgement, keys)
+                      SELECT pattern_id, user_id, score, grade, isAllCombo, isPerfectPlay, judgement, keys FROM PlayMerged');
 }
 @$db->exec('DROP TABLE PlayMerged');
 // All of it or nothing: the removal alone would lose the scores.
@@ -156,6 +189,11 @@ $db->exec('CREATE INDEX IF NOT EXISTS Member_udid ON Member (udid)');
 // page read the log back from its newest play until it had found them, all of it on a server whose plays were seldom
 // records (2.4 s a page on a million plays, against 0.06).
 $db->exec('CREATE INDEX IF NOT EXISTS PlayLog_records ON PlayLog (played_at, id) WHERE is_record = 1');
+// The site's keyboard marks on the rankings (portal/ranking_lib.php): how many of each player's bests a keyboard play set,
+// and which charts each player played with the keyboard in a month. From indexes of the keyboard's rows alone, which a
+// save by touch never writes to: the rankings read no more than the keyboard's plays and bests.
+$db->exec('CREATE INDEX IF NOT EXISTS Play_keys ON Play (user_id) WHERE keys = 1');
+$db->exec('CREATE INDEX IF NOT EXISTS PlayLog_keys ON PlayLog (played_at, user_id, pattern_id) WHERE keys = 1');
 // The rankings' change number: one row, raised by these triggers at every change of the play log, the best scores and
 // the players, whoever makes it (a save, the admin pages, a start's repairs). A month's board worked out once is kept
 // with the number it was worked out at (src/ranking.php, odq_month_board()) and served again while the number stays,

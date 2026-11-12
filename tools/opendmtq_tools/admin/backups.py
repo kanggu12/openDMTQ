@@ -30,18 +30,25 @@ KEEP_AUTO_BACKUPS = 7
 
 # What a database restored while the server runs needs that the server only does at its start
 # (server/game/bin/setup-db.php, the same statements): the play history, and one row per player and chart, the
-# best of each, with the indexes the rankings read. A backup from an older version has none of it.
+# best of each, with the indexes the rankings read. A backup from an older version has none of it. A merged row's
+# keyboard mark is the top score's, as the play that set that score marked it.
 PLAY_MERGE = """CREATE TEMP TABLE PlayMerged AS
     SELECT p.pattern_id, p.user_id, MAX(p.score) AS score,
            (SELECT q.grade FROM Play q WHERE q.pattern_id = p.pattern_id AND q.user_id = p.user_id
              ORDER BY q.judgement DESC LIMIT 1) AS grade,
-           MAX(p.isAllCombo) AS isAllCombo, MAX(p.isPerfectPlay) AS isPerfectPlay, MAX(p.judgement) AS judgement
+           MAX(p.isAllCombo) AS isAllCombo, MAX(p.isPerfectPlay) AS isPerfectPlay, MAX(p.judgement) AS judgement,
+           (SELECT q.keys FROM Play q WHERE q.pattern_id = p.pattern_id AND q.user_id = p.user_id
+             ORDER BY q.score DESC LIMIT 1) AS keys
       FROM Play p WHERE p.pattern_id IS NOT NULL AND p.user_id IS NOT NULL
      GROUP BY p.pattern_id, p.user_id HAVING COUNT(*) > 1;
 DELETE FROM Play WHERE (pattern_id, user_id) IN (SELECT pattern_id, user_id FROM PlayMerged);
-INSERT INTO Play (pattern_id, user_id, score, grade, isAllCombo, isPerfectPlay, judgement)
-    SELECT pattern_id, user_id, score, grade, isAllCombo, isPerfectPlay, judgement FROM PlayMerged;
+INSERT INTO Play (pattern_id, user_id, score, grade, isAllCombo, isPerfectPlay, judgement, keys)
+    SELECT pattern_id, user_id, score, grade, isAllCombo, isPerfectPlay, judgement, keys FROM PlayMerged;
 DROP TABLE PlayMerged;"""
+
+# The tables that keep the keyboard's mark (a play made with the PC client's keys, which the game server's save stores:
+# server/game/src/game.php): the play's own row and the best it set.
+KEYS_TABLES = ("Play", "PlayLog")
 
 # When each player earned each achievement (MY PAGE): the game server's save stores one when a play earns it
 # (server/game/src/achievement.php), and it stays while the play log keeps only a year. The server creates the table
@@ -60,13 +67,16 @@ BOARD_STAMP = "CREATE TABLE IF NOT EXISTS BoardStamp (n INTEGER NOT NULL);\n" \
         for table in ("PlayLog", "Play", "Member") for change in ("INSERT", "UPDATE", "DELETE"))
 
 SCHEMA = """CREATE TABLE IF NOT EXISTS PlayLog (id INTEGER PRIMARY KEY, user_id INTEGER, pattern_id INTEGER,
-        score INTEGER, grade TEXT, judgement INTEGER, is_record INTEGER, played_at INTEGER);
+        score INTEGER, grade TEXT, judgement INTEGER, is_record INTEGER, played_at INTEGER,
+        keys INTEGER NOT NULL DEFAULT 0);
 CREATE INDEX IF NOT EXISTS PlayLog_time ON PlayLog (played_at);
 CREATE INDEX IF NOT EXISTS PlayLog_board ON PlayLog (user_id, played_at, pattern_id, score);
 DROP INDEX IF EXISTS PlayLog_user;
 CREATE INDEX IF NOT EXISTS PlayLog_chart ON PlayLog (pattern_id, played_at);
 CREATE INDEX IF NOT EXISTS PlayLog_clears ON PlayLog (user_id, pattern_id, grade);
 CREATE INDEX IF NOT EXISTS PlayLog_records ON PlayLog (played_at, id) WHERE is_record = 1;
+CREATE INDEX IF NOT EXISTS Play_keys ON Play (user_id) WHERE keys = 1;
+CREATE INDEX IF NOT EXISTS PlayLog_keys ON PlayLog (played_at, user_id, pattern_id) WHERE keys = 1;
 CREATE INDEX IF NOT EXISTS Play_held ON Play (user_id, pattern_id, score, grade, isAllCombo, isPerfectPlay);
 CREATE INDEX IF NOT EXISTS Play_pattern ON Play (pattern_id, score);
 CREATE UNIQUE INDEX IF NOT EXISTS Play_one ON Play (pattern_id, user_id);
@@ -150,8 +160,22 @@ def make_backup(reason, protect=None):
     return os.path.basename(path)
 
 
+def keys_columns(con):
+    """The keyboard's mark (KEYS_TABLES' column keys) added to the tables of a database from before it, with 0 in every row
+    they have: every older play and best reads as one made by touch, and the server's next save can store the mark. As
+    the server's start adds it (server/game/bin/setup-db.php). A table the database does not have yet is left to SCHEMA,
+    which makes it with the column."""
+    for table in KEYS_TABLES:
+        # The table's columns: none when there is no such table.
+        columns = {row[1] for row in con.execute(f"PRAGMA table_info({table})")}
+        if columns and "keys" not in columns:
+            con.execute(f"ALTER TABLE {table} ADD COLUMN keys INTEGER NOT NULL DEFAULT 0")
+
+
 def bring_schema_up_to_date(con):
     """A database restored while the server runs: what the server would do with it at its next start."""
+    # The keyboard's column first: the merge reads it, and SCHEMA's indexes of the keyboard's rows are made on it.
+    keys_columns(con)
     con.executescript("BEGIN IMMEDIATE;" + PLAY_MERGE + "COMMIT;" + SCHEMA)
     auth.account_table(con)
     tokens.token_table(con)

@@ -1011,6 +1011,41 @@ class RestoreSchemaTest(unittest.TestCase):
             self.assertEqual(con.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             con.close()
 
+    def test_an_older_backup_gets_the_keyboards_mark_with_every_row_by_touch(self):
+        # A backup from before the keyboard's mark (the PC client's X-OpenDMTQ-Keys, which the game server's save stores on
+        # the play and on the best it sets): restored while the server runs, the server's next save writes the mark, so the
+        # column must be there from the restored database's first moment, as the server's start adds it. Every row of the
+        # backup, two that become one included, reads as a play by touch; the indexes of the keyboard's rows are there; and a
+        # change of the mark still raises the rankings' change number.
+        with Install() as inst:
+            snap = inst.path("old.db3")
+            old_game_database(snap, [(1, 7, 100, "B", "N", "N", 800), (1, 7, 300, "A", "Y", "N", 900), (2, 7, 50, "C", "N", "N", 700)])
+            # The play log as the release before made it: no column for the mark.
+            with sqlite3.connect(snap) as con:
+                con.execute("CREATE TABLE PlayLog (id INTEGER PRIMARY KEY, user_id INTEGER, pattern_id INTEGER, score INTEGER, "
+                            "grade TEXT, judgement INTEGER, is_record INTEGER, played_at INTEGER)")
+                con.executemany("INSERT INTO PlayLog (user_id, pattern_id, score, grade, judgement, is_record, played_at) VALUES (7, ?, ?, 'A', 900, 1, ?)",
+                                [(1, 300, 1000), (2, 50, 2000)])
+            with tarfile.open(inst.path("backups/opendmtq-20200101-000000-manual.tar.gz"), "w:gz") as tar:
+                tar.add(snap, arcname="dmtq.db3")
+            old_game_database(admin.core.DB, [])
+            r = inst.client.post("/opendmtq/admin/backups/opendmtq-20200101-000000-manual.tar.gz",
+                                 data={"csrf": page_token(inst), "action": "restore"})
+            self.assertEqual(r.status_code, 302)
+            con = sqlite3.connect(admin.core.DB)
+            for table in ("Play", "PlayLog"):
+                # The column as the server's start makes it: a whole number, never null, 0 when nothing says otherwise.
+                column = [c for c in con.execute(f"PRAGMA table_info({table})") if c[1] == "keys"]
+                self.assertEqual([(c[2], c[3], c[4]) for c in column], [("INTEGER", 1, "0")], table)
+            self.assertEqual(con.execute("SELECT pattern_id, score, keys FROM Play ORDER BY 1").fetchall(), [(1, 300, 0), (2, 50, 0)])
+            self.assertEqual(con.execute("SELECT keys FROM PlayLog ORDER BY id").fetchall(), [(0,), (0,)])
+            names = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type = 'index'")}
+            self.assertLessEqual({"Play_keys", "PlayLog_keys"}, names)
+            was = con.execute("SELECT n FROM BoardStamp").fetchone()[0]
+            con.execute("UPDATE Play SET keys = 1 WHERE pattern_id = 2")
+            self.assertEqual(con.execute("SELECT n FROM BoardStamp").fetchone()[0], was + 1)
+            con.close()
+
     def test_a_restore_moves_the_change_number_past_the_live_ones(self):
         # The server keeps each ranking with the change number it was worked out at, and takes it while the number in the
         # database is not higher (src/ranking.php, odq_kept()). A backup's number is an older, lower one: restored as it

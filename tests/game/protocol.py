@@ -115,6 +115,16 @@ def save(guid, chart, stat):
     return one("game.savePlayResult", [guid, chart, stat, sum(stat[2:]), 0, [0, 0, 0], [0, 0, 0], "t"])
 
 
+def save_with(guid, chart, stat, headers):
+    """The same save with more headers on its request, as the PC client's player adds X-OpenDMTQ-Keys to it: the HTTP status
+    and the call's result and error."""
+    body = json.dumps([{"id": 0, "method": "game.savePlayResult", "params": [guid, chart, stat, sum(stat[2:]), 0, [0, 0, 0], [0, 0, 0], "t"]}]).encode()
+    # Signed over the body alone, as the game signs it: a header of the request is not in the signature.
+    status, _, data = post("/DMQ/rpc", body, {"Content-Type": "application/json", "Fp": hashlib.md5(KEY.encode() + body).hexdigest(), **headers})
+    reply = json.loads(data) if data else [{}]
+    return status, reply[0].get("result"), reply[0].get("error")
+
+
 # ------------------------------------------------------------------ the start of a phone
 
 status, _, body = post("/DMQ/rpc", json.dumps([{"id": 0, "method": "service.getInfo", "params": ["1.3.4", "ANDROID"]}]).encode(),
@@ -309,6 +319,33 @@ else:
 result, error = save(checker, 11, notes(at100=10000))
 check("10,000 notes of one judgement are still a play", error is None and result["score"] == 10000 * 200 + 45000,
       json.dumps([result, error])[:200])
+
+# ------------------------------------------------------------------ a play made with the keyboard
+
+# The PC client's player adds X-OpenDMTQ-Keys: 1 to the save's request when a lane key was pressed during the song, and no
+# such header otherwise. The server keeps the mark for the site (tests/game/keys.php checks what it stores); the game
+# itself must see no difference. Two new players play song 3's 2LINE NORMAL (chart 19) the same way, one with the header
+# and one without, then a play of each that is no new best. Their replies are the same, and so are their rows on the
+# game's rankings and their own scores.
+kay, tee = phone("protocol-phone-keys", "Kay"), phone("protocol-phone-touch", "Tee")
+status_k, by_keys, error_k = save_with(kay, 19, notes(at90=10, at100=90), {"X-OpenDMTQ-Keys": "1"})
+status_t, by_touch, error_t = save_with(tee, 19, notes(at90=10, at100=90), {})
+check("a save with X-OpenDMTQ-Keys: 1 is answered as the same save without it", status_k == status_t == 200
+      and error_k is None and error_t is None and by_keys == by_touch and by_keys["is_new_record"] is True,
+      json.dumps([status_k, by_keys, error_k, status_t, by_touch, error_t])[:300])
+# A worse play of each, the header the other way round: no new best, the same reply.
+_, again_k, _ = save_with(kay, 19, notes(breaks=10, at100=90), {})
+_, again_t, _ = save_with(tee, 19, notes(breaks=10, at100=90), {"X-OpenDMTQ-Keys": "1"})
+check("and a worse play with it as one without it", again_k == again_t and again_k["is_new_record"] is False,
+      json.dumps([again_k, again_t])[:300])
+# The game's own rankings and scores: the two players tie on the song (90 notes at 100 % and 10 at 90 %, with the ALL
+# COMBO bonus: 34,800), the older account first, and each reads the same best but for their own id.
+names.update({kay: "Kay", tee: "Tee"})
+board = rows(one("game.getLineScoreRangeWithLevel", [3, 3, 1, 5])[0]["scores"])
+mine = [dict(one("game.getOwnPatternScore", [who])[0][0], guid=None) for who in (kay, tee)]
+check("the game's rankings and own scores show the keyboard's play as any other",
+      board == [(1, "Kay", 34800), (2, "Tee", 34800)] and mine[0] == mine[1] and mine[0]["score"] == 34800,
+      json.dumps([board, mine])[:300])
 
 # ------------------------------------------------------------------ what the client also relies on
 

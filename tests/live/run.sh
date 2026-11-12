@@ -203,10 +203,12 @@ case "$reply" in
 esac
 echo "PASS a save whose statement fails keeps nothing and says so"
 
-# A database from before these rules: two rows for a player and chart become the best of each at start.
+# A database from before these rules: two rows for a player and chart become the best of each at start. The columns are
+# named: the table has the keyboard's mark after them (setup-db.php).
 # shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
 docker exec "$SITE" php -r '$d = new SQLite3("/data/dmtq.db3"); $d->exec("DROP INDEX Play_one");
-  $q = $d->prepare("INSERT INTO Play VALUES (:p, 77, 100, \"B\", \"Y\", \"N\", 800), (:p, 77, 300, \"A\", \"N\", \"N\", 700)");
+  $q = $d->prepare("INSERT INTO Play (pattern_id, user_id, score, grade, isAllCombo, isPerfectPlay, judgement)
+    VALUES (:p, 77, 100, \"B\", \"Y\", \"N\", 800), (:p, 77, 300, \"A\", \"N\", \"N\", 700)");
   $q->bindValue(":p", (int)$argv[1], SQLITE3_INTEGER); $q->execute();' "$MERGED"
 docker restart "$SITE" >/dev/null
 for _ in $(seq 1 60); do curl -sf -o /dev/null "http://127.0.0.1:$SITE_PORT/opendmtq/health.php" && break; sleep 1; done
@@ -228,7 +230,8 @@ docker exec "$SITE" php -r '
   $d = new SQLite3("/data/dmtq.db3");
   $start = gmmktime(0, 0, 0, (int)gmdate("n"), 1, (int)gmdate("Y"));
   $d->exec("INSERT INTO Member (id, nickname, guid, udid) VALUES (4242, \"LastMonth\", \"4242\", \"live-smoke-last-month\")");
-  $q = $d->prepare("INSERT INTO Play VALUES (:last, 4242, 999999, \"S\", \"N\", \"N\", 1000), (:this, 4242, 5, \"F\", \"N\", \"N\", 100)");
+  $q = $d->prepare("INSERT INTO Play (pattern_id, user_id, score, grade, isAllCombo, isPerfectPlay, judgement)
+    VALUES (:last, 4242, 999999, \"S\", \"N\", \"N\", 1000), (:this, 4242, 5, \"F\", \"N\", \"N\", 100)");
   $q->bindValue(":last", (int)$argv[1], SQLITE3_INTEGER); $q->bindValue(":this", (int)$argv[2], SQLITE3_INTEGER); $q->execute();
   $q = $d->prepare("INSERT INTO PlayLog (user_id, pattern_id, score, grade, judgement, is_record, played_at) VALUES (4242, :last, 999999, \"S\", 1000, 1, :before), (4242, :this, 5, \"F\", 100, 1, :now)");
   $q->bindValue(":last", (int)$argv[1], SQLITE3_INTEGER); $q->bindValue(":this", (int)$argv[2], SQLITE3_INTEGER);

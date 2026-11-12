@@ -4,8 +4,8 @@
 # loopback with an empty database, runs the checks, and removes everything again. Needs nothing but Docker and Python 3.
 #
 # Usage: tests/game/protocol.sh        (PORT, default 18701; KEEP=1 leaves the server up)
-# Also runs tests/game/lock.php and tests/game/names.php on the same database, and fails on any PHP warning in the server's
-# log.
+# Also runs tests/game/lock.php, tests/game/names.php and tests/game/keys.php on the same database, and fails on any PHP
+# warning in the server's log.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -57,6 +57,10 @@ docker run --rm -u 33:33 -v "$DATA/state:/data" -v "$ROOT/tests/game:/t:ro" --en
 # Players' names that are no UTF-8, as an older server's database can hold them: the start batch that lists one, and the
 # next start's repair of them (tests/game/names.php), inside the running server, on its database and at its own address.
 docker exec -i "$NAME" php -- /data/dmtq.db3 http://127.0.0.1:8080 < "$ROOT/tests/game/names.php" || failed=1
+# The keyboard's mark (X-OpenDMTQ-Keys on a save of the PC client's player): what the play's row and the best keep, as the
+# best changes hands, and the column a database from before it gets at the next start (tests/game/keys.php), inside the
+# running server, on its database and at its own address.
+docker exec -i "$NAME" php -- /data/dmtq.db3 http://127.0.0.1:8080 < "$ROOT/tests/game/keys.php" || failed=1
 # The monthly rankings read the play log from one index alone (PlayLog_board, setup-db.php), never the table once per
 # play: the plan SQLite makes of the statement the server runs (odq_month_board_sql()), for TOTAL and a line's tab, on
 # the server's own database.
