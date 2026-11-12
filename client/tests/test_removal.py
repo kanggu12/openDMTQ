@@ -316,14 +316,15 @@ class Uninstall(Folder):
         self.assertNotIn("_PYI_APPLICATION_HOME_DIR", env)
 
     def test_the_cards_copy_goes_after_it(self):
-        # Windows' command processor deletes the copy a few seconds after the card's program ends: one command line, as
-        # cmd.exe reads it (a list would be quoted whole, its inner quotes as \", which cmd.exe takes for the name's).
+        # Windows' command processor deletes the copy a few seconds after the card's program ends (ping's wait, which
+        # needs no keyboard, as choice does): one command line, as cmd.exe reads it (a list would be quoted whole, its
+        # inner quotes as \", which cmd.exe takes for the name's).
         import sys
         copy = os.path.join(tempfile.gettempdir(), removal.CARD_COPY % 4242)
         with mock.patch.object(sys, "platform", "win32"), mock.patch.object(subprocess, "Popen") as popen:
             removal._remove_later(copy)
         command, = popen.call_args[0]
-        self.assertEqual(command, 'cmd.exe /C choice /C Y /N /D Y /T 3 & rmdir /s /q "%s"' % copy)
+        self.assertEqual(command, 'cmd.exe /C ping -n 6 127.0.0.1 > nul & rmdir /s /q "%s"' % copy)
         # Never a folder of another name, nor one outside the temporary folder: the program's own folder stays.
         for other in (os.path.join(tempfile.gettempdir(), "OpenDMTQ"), os.path.join(self.install, "current")):
             with mock.patch.object(sys, "platform", "win32"), mock.patch.object(subprocess, "Popen") as popen:
