@@ -26,8 +26,10 @@ class Worded(Exception):
 # whose marks are found is the one; the order puts the disk and the files before the network, as a full disk during a
 # download is still a full disk.
 FAULTS = (
+    # Velopack's setup says a disk short of room before it begins as "OpenDMTQ requires at least 187.19 MB disk space
+    # to be installed. There is only 57.59 MB available."
     ("disk_full", re.compile(r"(os|win)\s?error\]? (112|39)\b|errno 28\b|not enough space|no space left|disk (is )?full"
-                             r"|insufficient (disk )?space", re.I)),
+                             r"|insufficient (disk )?space|requires at least .* disk space", re.I)),
     ("in_use", re.compile(r"(os|win)\s?error\]? (32|33)\b|errno (16|26)\b|being used by another process"
                           r"|text file busy|resource busy|\bin use\b", re.I)),
     ("denied", re.compile(r"(os|win)\s?error\]? 5\b|errno (1|13)\b|access is denied|permission denied"

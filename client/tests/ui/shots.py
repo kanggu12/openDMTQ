@@ -1082,9 +1082,9 @@ def installer_check(out, tag, lang, problems):
             if code == 0:
                 f.write("printf '<version>%s</version>' > '%s/current/sq.version'\n" % (version, app))
             else:
-                # Velopack's way of writing a full disk in its log, in its own words.
-                f.write("echo '[setup:500] [12:00:01] [ERROR] Error: IO error: There is not enough space on the disk. "
-                        "(os error 112)' >> \"$3\"\n")
+                # Velopack's setup's own line for a disk short of room, as it wrote it under Wine on a 150 MB disk.
+                f.write("echo '[setup:488] [12:00:01] [ERROR] An error has occurred: OpenDMTQ requires at least 187.19 "
+                        "MB disk space to be installed. There is only 57.59 MB available.' >> \"$3\"\n")
             f.write("exit %d\n" % code)
         os.chmod(path, 0o755)
         os.environ["OPENDMTQ_VELOPACK_SETUP"] = path
@@ -1157,7 +1157,7 @@ def installer_check(out, tag, lang, problems):
     shot(inst.root, out, "%s_setup-failed" % tag)
     problems.extend("%s_setup-failed: %s" % (tag, p) for p in inst.dialog.layout_problems())
     # The full disk said in the installer's language, then where the log is; Velopack's own words only in the logs.
-    if not (inst.dialog.detail or "").startswith(w("fault.disk_full") + "\n") or "os error" in inst.dialog.detail:
+    if not (inst.dialog.detail or "").startswith(w("fault.disk_full") + "\n") or "57.59" in inst.dialog.detail:
         problems.append("%s: the failure did not say the full disk plainly: %r" % (tag, inst.dialog.detail))
     inst.root.destroy()
     # A game running: the installer waits instead of replacing the player under it.

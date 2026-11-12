@@ -97,6 +97,9 @@ class Words(unittest.TestCase):
              "respond after a period of time (os error 10060)", "no_answer"),
             ("Network error: Http error: timeout: global", "no_answer"),
             ("Error: IO error: There is not enough space on the disk. (os error 112)", "disk_full"),
+            # Velopack's setup's own line for a disk short of room, as it wrote it under Wine on a 150 MB disk.
+            ("An error has occurred: OpenDMTQ requires at least 187.19 MB disk space to be installed. There is only "
+             "57.59 MB available.", "disk_full"),
             ("[Errno 28] No space left on device: '/tmp/x'", "disk_full"),
             ("IO error: The process cannot access the file because it is being used by another process. (os error 32)",
              "in_use"),
