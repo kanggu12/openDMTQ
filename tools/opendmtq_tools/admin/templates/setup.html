@@ -154,7 +154,8 @@
     <div><dt>{{ t('acc.password') }}</dt><dd><code>{{ made.password }}</code></dd></div>
   </dl>
   <textarea class="input invite-box" id="account-message" rows="5" readonly aria-label="{{ t('acc.message') }}">{{ message }}</textarea>
-  <div class="btn-line"><button type="button" class="btn btn-primary" data-copy="#account-message" data-done="{{ t('copy.done') }}" data-fail="{{ t('copy.failed') }}">{{ t('invite.copy') }}</button></div>
+  {# Plain: the step's one primary button is the one that makes an account. #}
+  <div class="btn-line"><button type="button" class="btn" data-copy="#account-message" data-done="{{ t('copy.done') }}" data-fail="{{ t('copy.failed') }}">{{ t('invite.copy') }}</button></div>
 </section>
 {% endif %}
 <section class="card">
@@ -167,7 +168,8 @@
     <button class="btn btn-primary">{{ t('setup.make') }}</button>
   </form>
   <p class="meta">{{ t('setup.players_count', n=accounts) }} <a href="{{ url_for('accounts_page') }}">{{ t('nav.accounts') }}</a></p>
-  {% if accounts %}<div class="btn-line"><a class="btn btn-primary" href="{{ url_for('setup_page', step='app') }}">{{ t('setup.next') }}</a></div>{% endif %}
+  {# Next, plain: Make an account above stays the step's one primary button, as players are made here one after another. #}
+  {% if accounts %}<div class="btn-line"><a class="btn" href="{{ url_for('setup_page', step='app') }}">{{ t('setup.next') }}</a></div>{% endif %}
 </section>
 
 {% else %}

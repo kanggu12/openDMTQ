@@ -11,7 +11,8 @@
     <div><dt>{{ t('acc.password') }}</dt><dd><code>{{ shown.password }}</code></dd></div>
   </dl>
   <textarea class="input invite-box" id="account-message" rows="5" readonly aria-label="{{ t('acc.message') }}">{{ message }}</textarea>
-  <div class="btn-line"><button type="button" class="btn btn-primary" data-copy="#account-message" data-done="{{ t('copy.done') }}" data-fail="{{ t('copy.failed') }}">{{ t('invite.copy') }}</button></div>
+  {# Plain: the page's one primary button is Make an account's, even with this panel on the same screen. #}
+  <div class="btn-line"><button type="button" class="btn" data-copy="#account-message" data-done="{{ t('copy.done') }}" data-fail="{{ t('copy.failed') }}">{{ t('invite.copy') }}</button></div>
 </section>
 {% endif %}
 {# An API token just made: the token itself, once, as a new password is. The server keeps only its hash. Its form is at
@@ -24,7 +25,8 @@
     <div><dt>{{ t('tok.value') }}</dt><dd><code id="token-secret">{{ shown_token.token }}</code></dd></div>
     <div><dt>{{ t('tok.scope') }}</dt><dd>{{ t('tok.scope_write') if shown_token.scope == 'write' else t('tok.scope_read') }}</dd></div>
   </dl>
-  <div class="btn-line"><button type="button" class="btn btn-primary" data-copy="#token-secret" data-done="{{ t('copy.done') }}" data-fail="{{ t('copy.failed') }}">{{ t('tok.copy') }}</button></div>
+  {# Plain, as the message's copy button above: the page's one primary button is Make an account's. #}
+  <div class="btn-line"><button type="button" class="btn" data-copy="#token-secret" data-done="{{ t('copy.done') }}" data-fail="{{ t('copy.failed') }}">{{ t('tok.copy') }}</button></div>
 </section>
 {% endif %}
 <section class="card">
@@ -95,7 +97,8 @@
     <label class="field grow">{{ t('tok.name') }} <input class="input" name="token_name" required maxlength="40" autocomplete="off" placeholder="{{ t('tok.name_hint') }}" data-bad="{{ tp('tok.bad_name') }}"></label>
     {# Read first: a token that changes nothing is the one to give a script that only looks. #}
     <label class="field">{{ t('tok.scope') }} <select class="input" name="scope">{% for s in scopes %}<option value="{{ s }}">{{ t('tok.scope_write') if s == 'write' else t('tok.scope_read') }}</option>{% endfor %}</select></label>
-    <button class="btn btn-primary">{{ t('tok.create') }}</button>
+    {# Plain: the page's one primary button is Make an account's, which a laptop's screen shows with this one. #}
+    <button class="btn">{{ t('tok.create') }}</button>
   </form>
   {% if broken %}<p class="empty">{{ t('dash.db_short') }}</p>
   {% elif not tokens %}<p class="empty">{{ t('tok.none') }}</p>

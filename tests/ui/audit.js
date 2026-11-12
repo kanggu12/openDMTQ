@@ -931,26 +931,49 @@ async function adminFlows(contexts) {
     const r = e.getBoundingClientRect();
     return { top: Math.round(r.top), bottom: Math.round(r.bottom), screen: innerHeight, focused: document.activeElement === e };
   }).catch(() => null);
-  const outOfView = [];
+  // The page's primary buttons that can be pressed: one on each of these screens, Make an account's. The copy buttons, Make
+  // token and the setup's Next are plain, with a panel shown once or without.
+  const primaries = p => p.$$eval('.btn-primary', bs => bs.filter(b => !b.disabled && b.getBoundingClientRect().height > 0)
+    .map(b => b.textContent.trim()));
+  const outOfView = [], notOne = [];
   for (const [size, width, height] of [['laptop', 1366, 768], ['phone', 390, 844]]) {
     const p = await contexts.signed.newPage();
     await p.setViewport({ width, height, isMobile: width < 500, hasTouch: width < 500 });
     await p.goto(`${A}/accounts`, { waitUntil: 'domcontentloaded' });
+    const plain = await primaries(p);
     await p.$eval('#tokens input[name=token_name]', e => e.scrollIntoView({ block: 'center' }));
     await p.type('#tokens input[name=token_name]', `in view ${size}`);
     await press(p, '#tokens form button');
     const token = await panelAt(p);
+    const withToken = await primaries(p);
     const row = 'table.accounts form:has(input[name=action][value=password]):has(input[name=name][value="inview"]) button';
     await p.$eval(row, e => e.scrollIntoView({ block: 'center' }));
     await pressAndConfirm(p, row);
     const password = await panelAt(p);
-    for (const [what, at] of [['Make token', token], ['New password', password]]) {
+    const withPassword = await primaries(p);
+    // The setup's Players step, before and after it makes an account.
+    await p.goto(`${A}/setup?step=players`, { waitUntil: 'domcontentloaded' });
+    const step = await primaries(p);
+    await p.type('main form.form-row input[name=name]', `step${size}`);
+    await press(p, 'main form.form-row button');
+    const made = await p.$eval('section.account-made', e => {
+      const r = e.getBoundingClientRect();
+      return { top: Math.round(r.top), bottom: Math.round(r.bottom), screen: innerHeight, focused: document.activeElement === e };
+    }).catch(() => null);
+    const stepMade = await primaries(p);
+    for (const [what, at] of [['Make token', token], ['New password', password], ["the setup's Make an account", made]]) {
       if (!at || at.top < 0 || at.bottom > at.screen || !at.focused) outOfView.push(`${what} at ${size}: ${JSON.stringify(at)}`);
+    }
+    for (const [what, found] of [['accounts', plain], ['accounts with a token', withToken], ['accounts with a password', withPassword],
+      ["the setup's Players step", step], ["the setup's Players step with an account made", stepMade]]) {
+      if (found.length !== 1) notOne.push(`${what} at ${size}: ${found.join(' + ') || 'none'}`);
     }
     await p.close();
   }
   check('what shows once is in view with the focus after Make token and New password, on a laptop and a phone', outOfView.length === 0,
     outOfView.join('; '));
+  check('one primary button on the Accounts page and the setup\'s Players step, with what shows once or without', notOne.length === 0,
+    notOne.join('; '));
 
   // The accounts' buttons stand in the same columns in every row: a button whose word depends on the account (Disable or
   // Enable, Give or Remove admin rights) is as wide as its other word too. Now with an admin, a player and a switched-off
