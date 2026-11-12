@@ -32,6 +32,9 @@ from . import axml, filelock, il2cpp, pack_arm64, qr, unity_assets
 VERSION = "1.11.0"
 # data/apk: base/ in, out/ and keystore/ written. The image mounts it at /apk; a host install names it.
 APK_DIR = os.environ.get("OPENDMTQ_APK", "/apk")
+# The command that imports on this install, for the messages that name it: the Windows bundle's program (the only one
+# that runs these tools on Windows), else ./opendmtq (Docker Compose and the host installs on Linux and macOS).
+CLI = "OpenDMTQ.exe" if os.name == "nt" else "./opendmtq"
 # Pinned tools: baked into the image, fetched into .host/ by a host install (host/install.sh).
 APKTOOL = os.environ.get("OPENDMTQ_APKTOOL") or "/opt/apktool.jar"
 SIGNER = pack_arm64.SIGNER
@@ -887,8 +890,9 @@ def find_base(base_dir, name=None):
             # import of these.
             why = "; ".join(f"{os.path.basename(f)}: {describe(info)}" for f, info in infos.items())
             raise SystemExit(f"data/apk/base holds no game client to build from ({why}); "
-                             "import the game's Android app with ./opendmtq import <folder>")
-        raise SystemExit("no base APK in data/apk/base; run ./opendmtq import <folder> first")
+                             f"import the game's Android app with {CLI} import <folder>")
+        # Named as this install runs it: OpenDMTQ.exe import in the Windows bundle's window, ./opendmtq import elsewhere.
+        raise SystemExit(f"no base APK in data/apk/base; run {CLI} import <folder> first")
     usable = {sha256(f): f for f, info in infos.items() if info["kind"] in ("original", "other server")}
     if len(usable) > 1:
         print(f"data/apk/base holds different clients ({', '.join(os.path.basename(f) for f in sorted(usable.values()))}); "

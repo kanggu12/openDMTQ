@@ -288,6 +288,21 @@ class ChoiceTest(unittest.TestCase):
         self.assertIn("./opendmtq import", str(e.exception))
         self.assertNotIn("`", str(e.exception))
 
+    def test_with_no_client_it_names_the_import_of_the_install_it_runs_in(self):
+        # The Windows bundle's window shows the builder's words (OpenDMTQ.exe apk, runtime): its own program, never the
+        # command of a Linux install; elsewhere ./opendmtq, as before.
+        self.assertEqual(patch_apk.CLI, "OpenDMTQ.exe" if os.name == "nt" else "./opendmtq")
+        for command in ("OpenDMTQ.exe", "./opendmtq"):
+            with mock.patch.object(patch_apk, "CLI", command), self.assertRaises(SystemExit) as e:
+                patch_apk.find_base(self.base)
+            self.assertEqual(str(e.exception), "no base APK in data/apk/base; run %s import <folder> first" % command)
+            # A client that is no game client to build from: the same command in its sentence.
+            apk(os.path.join(self.base, "friend.apk"), COMMON + ["http://10.0.0.5/DMQ/rpc"], dex=b"dex" + patch_apk.HOOK_CLASS)
+            with mock.patch.object(patch_apk, "CLI", command), self.assertRaises(SystemExit) as e:
+                patch_apk.find_base(self.base)
+            self.assertIn("with %s import <folder>" % command, str(e.exception))
+            os.remove(os.path.join(self.base, "friend.apk"))
+
 
 class ScreenNeedsTest(unittest.TestCase):
     """A screen edit that goes with a code edit stays out when the code edit did not fit (another client version)."""

@@ -247,6 +247,45 @@ class HostServiceTest(unittest.TestCase):
         self.assertIn("<string>/Users/a/R&amp;D &lt;1&gt;/openDMTQ/host</string>", plist)
 
 
+class HostBuilderLineTest(unittest.TestCase):
+    """The line a host install's window (the Windows bundle's above all) gives the app builder's end at a start, in words:
+    on a first start, the wait for the game files rather than an exit status."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, os.path.join(ROOT, "host"))
+        from opendmtq_host import server
+        cls.server = server
+
+    def setUp(self):
+        # A data folder of the test's own, as a first start has it: no game files, no app.
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.data = tmp.name
+        os.makedirs(os.path.join(self.data, "apk", "base"))
+        os.makedirs(os.path.join(self.data, "apk", "out"))
+
+    def outcome(self, code):
+        with mock.patch.object(self.server, "DATA", self.data):
+            return self.server.builder_outcome(code)
+
+    def test_a_first_start_waits_for_the_game_files(self):
+        # The builder ends with 1 when there is no client to build from (patch_apk.find_base): said as the wait it is.
+        self.assertEqual(self.outcome(1), "the phone app waits for the game files: it is built once they are imported")
+        self.assertNotIn("status", self.outcome(1))
+
+    def test_the_end_of_a_build_in_words(self):
+        self.assertEqual(self.outcome(0), "the phone app is ready")
+        # With a client there, a failure is one: the builder's own reason, as build.json keeps it for the admin pages.
+        with open(os.path.join(self.data, "apk", "base", "client.apk"), "wb") as f:
+            f.write(b"PK")
+        self.assertTrue(self.outcome(1).startswith("the phone app could not be built (the details are in "))
+        with open(os.path.join(self.data, "apk", "out", "build.json"), "w", encoding="utf-8") as f:
+            f.write('{"state": "failed", "error": "apktool.jar failed (exit status 1)"}')
+        self.assertTrue(self.outcome(1).startswith("the phone app could not be built: apktool.jar failed (exit status 1) "
+                                                   "(the details are in "))
+
+
 class HostAdminConfTest(unittest.TestCase):
     """The admin pages' part of a host install's Apache settings (host/opendmtq_host/apache.py): the API goes where the pages
     go, and nowhere they do not."""

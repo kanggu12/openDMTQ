@@ -1,5 +1,6 @@
 """The running server: Apache with PHP, the admin pages and the database keeper, watched and started again."""
 
+import glob
 import json
 import logging
 import logging.handlers
@@ -211,6 +212,30 @@ def wait_healthy(values, timeout=START_WAIT, gone=None):
     return None
 
 
+def builder_outcome(code):
+    """The window's line for the app builder's end at a start, in words: a first start has no game files yet, and the
+    builder ending without them is the wait for them (the setup's first step imports them, and the app is built then),
+    never a failure to show by its exit status."""
+    if code == 0:
+        # Built, or already the app for this address (build.json says which; the admin pages show it).
+        return "the phone app is ready"
+    if not glob.glob(os.path.join(DATA, "apk", "base", "*.apk")):
+        # No game client to build from: the import brings it (setup.py have_base_apk() looks the same way).
+        return "the phone app waits for the game files: it is built once they are imported"
+    try:
+        # The builder's own reason, as the admin pages show it, from the status it wrote as it ended.
+        with open(os.path.join(DATA, "apk", "out", "build.json"), encoding="utf-8") as f:
+            reason = json.load(f).get("error")
+    except (OSError, ValueError, AttributeError):
+        # No status to read: the log has the builder's own lines.
+        reason = None
+    # Where the builder's own lines went (Server.log), for the details the window has no room for.
+    where = os.path.join(LOGS, "programs.log")
+    if reason:
+        return f"the phone app could not be built: {reason} (the details are in {where})"
+    return f"the phone app could not be built (the details are in {where})"
+
+
 def announce_when_up(server, open_the_setup):
     """Say when the server first answers, and only then open the setup in the browser (its pages take their look from
     the server). The first start can be slow, as an antivirus looks at every new program, so this goes on looking for
@@ -319,7 +344,7 @@ class Server:
     def build_app(self):
         """The app builder, as at every start with Docker Compose: it writes data/apk/out/build.json as it goes."""
         self.builder = spawn(PYTHON + ["-m", "opendmtq_tools.builder"], tools_env(self.values, self.found), self.log)
-        logging.info("app builder finished with status %d", self.builder.wait())
+        logging.info(builder_outcome(self.builder.wait()))
 
     def watch(self):
         """Until asked to stop: a program that stopped by itself is started again, at most five times a minute."""
