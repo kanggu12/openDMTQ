@@ -114,6 +114,8 @@ What the replies rely on, as the client behaves:
 - **The signature.** The game signs every request: an `Fp` header with MD5 of the key its login reply gave and the body.
   A batch with a save or a shop call needs it (`403` otherwise). That stops anything that merely posts to the address.
   Someone who has read the app can still sign requests.
+- **Size.** A request holds at most 64 calls (the game's largest batch, right after its login, has 14) and a body of at
+  most 2 MB, as the Helm chart's router lets through: a larger one is refused whole (`413`) before any call runs.
 - **Saving a play.** The score, the accuracy and the grade are worked out from the counts of each judgement, as the
   official server did. The best row (`Play`) and the log row (`PlayLog`) go in one transaction; a save the database did
   not take answers `SVC.05099`. Scores are kept within what the client reads (32-bit) and accuracies within 100 %. A
@@ -132,9 +134,11 @@ for the site's This month tab and the months before it, which are the game's own
 check account is never ranked. A month's board (TOTAL and the LINE tabs) and the site's totals are worked out once and
 kept in the server's run folder with the number of `BoardStamp`, which triggers raise at every change of `PlayLog`, `Play`
 and `Member`, whoever makes it; while the number stays, a look at a ranking reads what was kept (on a million plays,
-1 ms against 100), and the first look after a change works it out again. What saves and rankings need of the song
-list (each chart's line and difficulty, the charts of a line and of a song) is kept the same way, as a PHP file named
-after the list's file, so that only the song list's own request decodes its 200 KB.
+1 ms against 100), and the first look after a change works it out again. A restore on the admin pages, which the
+server runs through, moves the number past every one the live database had used, so that nothing kept before it is
+taken for the restored data's. What saves and rankings need of the song list (each chart's line and difficulty, the
+charts of a line and of a song) is kept the same way, as a PHP file named after the list's file and made from that very
+file, so that only the song list's own request decodes its 200 KB.
 
 The achievements on MY PAGE come from what the server knows (level 99 and 999,999 MAX POINT for every player, the best
 scores, the play log), and each keeps the date it was earned on: the save that earns one stores it in
