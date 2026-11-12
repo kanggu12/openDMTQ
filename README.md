@@ -19,10 +19,10 @@
 
 <p align="center">
   <a href="#quick-start">Quick start</a> &nbsp;|&nbsp;
+  <a href="#what-it-does">What it does</a> &nbsp;|&nbsp;
   <a href="#how-it-works">How it works</a> &nbsp;|&nbsp;
-  <a href="#features">Features</a> &nbsp;|&nbsp;
-  <a href="#guides">Guides</a> &nbsp;|&nbsp;
-  <a href="#contribute">Contribute</a>
+  <a href="#for-contributors">For contributors</a> &nbsp;|&nbsp;
+  <a href="#guides">Guides</a>
 </p>
 
 <p align="center">
@@ -40,33 +40,51 @@ same app in the OpenDMTQ PC client.
 > data for the songs. Please use only files you have the right to use. OpenDMTQ is an unofficial, non-commercial
 > project, not affiliated with or endorsed by NEOWIZ.
 
-| Play | Host a server | Contribute |
-| :--- | :--- | :--- |
-| Install the app on an Android phone from the server's page (64-bit-only phones included), or the PC client on Windows. [Playing on a server](docs/play.md) | Bring your own copy of the game's files, then run one download or one command. [Quick start](#quick-start) | No game files needed: the tests use stand-ins. [Where to start](#contribute) |
-
-## How it works
-
-<p align="center">
-  <img src="docs/images/diagram-architecture.svg" alt="How OpenDMTQ fits together: phones, PCs and browsers reach the server's one port, which sends each path to the game server, the game's files, live broadcasts, the players' site or the admin pages; the setup imports your game files and the app builder patches your APK" width="100%">
-</p>
-
-The patched app points the game's four official hosts at your server, which answers the game, its login, its downloads
-and the website from one address. The game server is OpenDMTQ's own code ([architecture](docs/architecture.md)).
-Accounts, scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#privacy)).
-
 ## Quick start
 
-### Host a server
+Two ways to begin, each complete on its own: playing on a server, and running one.
 
-You need your own copy of the game's Android app (`.apk`) and its client data, and its song data for the songs
-([what each has to be](docs/game-files.md)). The setup finds them in Downloads or on the Desktop by a name with `dmtq`,
-`djmax` or `technika` in it, or in a folder you pick, and says what each one is before it imports anything.
+<table>
+<tr>
+<th width="50%" align="left">Play</th>
+<th width="50%" align="left">Host a server</th>
+</tr>
+<tr>
+<td valign="top">
+
+With the account the server's owner made for you:
+
+1. On an **Android phone**, open the address the owner gives you (or scan their QR code) and sign in.
+2. Tap **Download app (.apk)** and install it. The app is the game, connected to that server; 64-bit-only phones play
+   too. [iPhones cannot](docs/game-files.md#iphones).
+3. On a **Windows PC**, download the installer for Windows from the same page instead. Its launcher signs in and keeps
+   the game up to date.
+
+**[The players' guide](docs/play.md)**
+
+</td>
+<td valign="top">
+
+With your own copy of the game's Android app, its client data, and its song data for the songs
+([what they are](docs/game-files.md)):
+
+1. Start the server with the commands below for your system.
+2. The setup opens in the browser. It finds your files in Downloads or on the Desktop, says what each one is, asks for
+   the address phones use and an account for each player, and builds the app.
+3. Give each player the address and their account: the setup makes the message to send.
+
+**[The server guide](docs/install.md)**
+
+</td>
+</tr>
+</table>
 
 <p align="center">
   <img src="docs/images/setup.jpg" alt="The setup in the browser: the game's Android app, the client data and the song data found in Downloads, each labeled with what it is, with a button to import them" width="100%">
 </p>
 
-**Windows 10 or 11**, in Windows PowerShell:
+**Windows 10 or 11**, in Windows PowerShell. The setup opens in the browser once the server answers; the server runs
+while its window is open, and Windows Firewall asks to allow it on private networks:
 
 ```powershell
 cd ~
@@ -75,18 +93,15 @@ tar.exe -xf OpenDMTQ-windows.zip
 start .\OpenDMTQ\OpenDMTQ.exe
 ```
 
-The server starts, and the setup opens in the browser once it answers. The server runs while its window is open. When
-Windows Firewall asks, allow it on private networks, and set your Wi-Fi to Private if it is public.
-
-**Debian, Ubuntu, or a Mac with Homebrew**, as your own user, not root (it asks for your password to install packages):
+**Debian, Ubuntu, or a Mac with Homebrew**, as your own user, not root (it asks for your password to install packages;
+without a screen it prints the setup's address):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/main/host/get.sh | sh
 ```
 
-It installs into `~/openDMTQ` and opens the setup in the browser; without a screen it prints the setup's address.
-
-**Docker** on Linux, macOS, or Windows with WSL, with Docker 23 or newer and Compose, Python 3.9 or newer and git:
+**Docker** on Linux, macOS, or Windows with WSL, with Docker 23 or newer and Compose, Python 3.9 or newer and git. Files
+in another place: `./opendmtq setup --from <folder>`; it ends with the admin pages' address, where accounts are made:
 
 ```sh
 git clone https://github.com/kanggu12/openDMTQ.git
@@ -94,37 +109,10 @@ cd openDMTQ
 ./opendmtq setup
 ```
 
-Files in another place: `./opendmtq setup --from <folder>`. It ends with the admin pages' address (`./opendmtq status`
-shows it again), where each player's account is made, under **Accounts**.
-
 **Kubernetes:** the Helm chart, with a volume for the game files and S3 storage:
 [install on a cluster](docs/kubernetes.md#install-on-a-cluster).
 
-The setup then asks for the address phones use and an account for each player, and builds the app.
-[Installing, step by step](docs/install.md).
-
-### Play
-
-On a server someone runs, with the account its owner made for you ([playing on a server](docs/play.md)):
-
-- **Android phone:** open the address the owner gives you, sign in and install the app. On the same Wi-Fi as the server,
-  or [over the internet](docs/internet.md) when the owner sets that up; [iPhones cannot](docs/game-files.md#iphones).
-- **Windows PC:** on the same page, download the installer for Windows. Its launcher signs in and keeps the game up to
-  date ([the PC client](docs/windows-player.md)).
-
-### What it runs on
-
-| Server | Minimum | Recommended |
-| :--- | :--- | :--- |
-| **Computer** | 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker; 2 GB of memory | 2 cores, 4 GB |
-| **Disk** | 1 GB without the songs | 7 GB with every song |
-
-| Clients | Minimum | Recommended |
-| :--- | :--- | :--- |
-| **Phones** | Android 5.0 | Android 8 or newer to broadcast |
-| **PCs** | The PC client: 64-bit Windows 10 or 11 on an x64 processor (Intel or AMD), a graphics card with Direct3D 11, 1 GB of free memory, 390 MB of disk | A touch screen, for several fingers at once |
-
-## Features
+## What it does
 
 - **Nothing to set on a phone.** No hosts file, proxy app or certificate: one app from the server's page.
 - **The game's online features.** Accounts, scores, monthly and per-song rankings, achievements and maintenance
@@ -175,15 +163,70 @@ Plain PHP and SQLite, with no database server to run. Two CPU cores handle hundr
   <img src="docs/images/chart-requests.svg" alt="The game's requests on two cores with eight phones and a million plays: half of the answers within 2.4 milliseconds for a sign-in, 2.5 for every chart's ranking, 6.8 for one song's, 8.5 for the song list and 18.3 for saving a play" width="100%">
 </p>
 
+### Where things stand
+
+- **Plays:** Android phones and tablets, 64-bit-only ones included, and Windows PCs through the PC client, with the
+  game's online features, the players' site, live broadcasts and the admin pages.
+- **Does not play:** iPhones and iPads, which cannot run the game's Android app ([why](docs/game-files.md#iphones)).
+- **Tested** before every release on the real game files, under Wine and on Windows itself, on Debian and Ubuntu and
+  with Docker ([testing](docs/testing.md)).
+
+## How it works
+
+<p align="center">
+  <img src="docs/images/diagram-architecture.svg" alt="How OpenDMTQ fits together: phones, PCs and browsers reach the server's one port, which sends each path to the game server, the game's files, live broadcasts, the players' site or the admin pages; the setup imports your game files and the app builder patches your APK" width="100%">
+</p>
+
+The patched app points the game's four official hosts at your server, which answers the game, its login, its downloads
+and the website from one address. The game server is OpenDMTQ's own code ([architecture](docs/architecture.md)).
+Accounts, scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#privacy)).
+
+## For contributors
+
+OpenDMTQ is MIT licensed and developed in the open. None of the game's files are needed to work on it: the tests use
+stand-ins of their own. [CONTRIBUTING.md](CONTRIBUTING.md) describes how to build and test each part, and
+[the architecture guide](docs/architecture.md) how they fit together.
+
+| Path | What it is |
+| :--- | :--- |
+| `server/game/` | The game server: the game's requests, its login, saves and rankings (PHP on SQLite) |
+| `server/portal/` | The players' site: rankings, songs, profiles, live broadcasts |
+| `tools/opendmtq_tools/` | The admin pages and their API, the setup, the importer and the app builder (Python) |
+| `arm32/` | The runtime that runs the game's 32-bit code on phones and PCs, and the PC client's player (C++) |
+| `client/` | The PC client's launcher and installer (Python) |
+| `cli/`, `host/`, `deploy/` | The command line, the host install and the Windows bundle, the Helm chart |
+| `tests/` | The suites: the game server's contract, the pages, upgrades, load, the PC client under Wine |
+
+Report a bug or ask for a feature in [Issues](https://github.com/kanggu12/openDMTQ/issues/new/choose); see what changed
+in [CHANGELOG.md](CHANGELOG.md), and report security problems through [SECURITY.md](.github/SECURITY.md).
+
+## What it runs on
+
+| Server | Minimum | Recommended |
+| :--- | :--- | :--- |
+| **Computer** | 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker; 2 GB of memory | 2 cores, 4 GB |
+| **Disk** | 1 GB without the songs | 7 GB with every song |
+
+| Clients | Minimum | Recommended |
+| :--- | :--- | :--- |
+| **Phones** | Android 5.0 | Android 8 or newer to broadcast |
+| **PCs** | The PC client: 64-bit Windows 10 or 11 on an x64 processor (Intel or AMD), a graphics card with Direct3D 11, 1 GB of free memory, 390 MB of disk | A touch screen, for several fingers at once |
+
 ## Guides
 
+### For players
+
 | Guide | What it covers |
-|---|---|
-| **Playing** | |
+| :--- | :--- |
 | [Playing on a server](docs/play.md) | The app on Android phones and tablets: signing in, installing, updates, broadcasting, which devices |
 | [The PC client](docs/windows-player.md) | Playing on a Windows PC: the installer, the launcher, controls, graphics and sound |
-| **Running a server** | |
-| [Installing](docs/install.md) | Each system step by step, everyday use, updates and backups, what it runs on |
+| [Troubleshooting](docs/troubleshooting.md#for-players) | When the app or the PC client does not work |
+
+### For server owners
+
+| Guide | What it covers |
+| :--- | :--- |
+| [Installing](docs/install.md) | Each system step by step, everyday use, updates and backups |
 | [The game's files](docs/game-files.md) | What the app, the client data and the song data have to be |
 | [The site and the admin pages](docs/admin.md) | The setup, the app, songs, players, backups |
 | [Songs](docs/songs.md) | Importing songs, adding your own |
@@ -192,22 +235,14 @@ Plain PHP and SQLite, with no database server to run. Two CPU cores handle hundr
 | [Kubernetes](docs/kubernetes.md) | The Helm chart, failover, backups to S3 |
 | [Without internet](docs/closed-network.md) | A server and phones on a closed network |
 | [The API](docs/api.md) | All the admin pages show and do, and what the players' site shows, as JSON |
-| [Troubleshooting](docs/troubleshooting.md) | When something does not work, for players and for the server |
-| [Questions and answers](docs/faq.md) | What it needs, which phones, players outside the home, privacy |
-| **Working on the code** | |
-| [Architecture](docs/architecture.md) · [Testing](docs/testing.md) | How it is built and checked |
+| [Troubleshooting](docs/troubleshooting.md#for-server-owners) · [Questions and answers](docs/faq.md) | When something does not work; what people ask first |
 
-## Contribute
+### For contributors
 
-OpenDMTQ is MIT licensed and developed in the open: its own game server, site, app patcher, runtime and PC client,
-with every change checked by the tests in this repository.
-
-- **Report a bug or ask for a feature** in [Issues](https://github.com/kanggu12/openDMTQ/issues/new/choose).
-- **Change the code.** None of the game's files are needed: the tests use stand-ins of their own.
-  [CONTRIBUTING.md](CONTRIBUTING.md) describes each part, its code and its tests, and
-  [the architecture guide](docs/architecture.md) how they fit together.
-- **See what changed** in [CHANGELOG.md](CHANGELOG.md), and report security problems through
-  [SECURITY.md](.github/SECURITY.md).
+| Guide | What it covers |
+| :--- | :--- |
+| [Architecture](docs/architecture.md) | How the parts fit together, each part's code and how it is checked |
+| [Testing](docs/testing.md) · [Test cases](docs/test-cases.md) | What runs before a change reaches a release, and every case |
 
 ## Credits and license
 

@@ -8,7 +8,9 @@ OpenDMTQ is a server, which its owner runs, and the clients its players play on:
 and the PC client for Windows. Each has its own guides below. New here? The [README](../README.md#quick-start) has the
 quick start for each way to run a server, and [Questions and answers](faq.md) covers what people ask first.
 
-## Playing
+<a id="playing"></a>
+
+## For players
 
 | Guide | For |
 | :--- | :--- |
@@ -16,7 +18,9 @@ quick start for each way to run a server, and [Questions and answers](faq.md) co
 | [The PC client](windows-player.md) | Playing on a Windows PC: the installer from the site, the launcher, the controls and the bar over the game, the picture and the sound settings, broadcasting, what it needs and keeps |
 | [Troubleshooting for players](troubleshooting.md#for-players) | What a phone or a PC can check when the site, the app or the game does not work |
 
-## Running a server
+<a id="running-a-server"></a>
+
+## For server owners
 
 | Guide | For |
 | :--- | :--- |
@@ -33,7 +37,9 @@ quick start for each way to run a server, and [Questions and answers](faq.md) co
 | [Questions and answers](faq.md) | What it needs, which phones, playing from outside your home, what leaves your computer |
 | [License and notice](notice.md) | What the project is, its license, the third-party parts |
 
-## Working on the code
+<a id="working-on-the-code"></a>
+
+## For contributors
 
 | Guide | For |
 | :--- | :--- |
