@@ -1,6 +1,7 @@
 """Clear game data, Delete all and Uninstall, on folders of the test's own (removal.py)."""
 
 import os
+import shutil
 import stat
 import subprocess
 import tempfile
@@ -278,6 +279,112 @@ class Uninstall(Folder):
         command, = popen.call_args[0]
         self.assertEqual(command, [os.path.join(self.install, "Update.exe"), "--uninstall", "--silent",
                                    "--log", os.path.join(self.install, "uninstall.log")])
+
+    def test_the_launchers_own_uninstall_tells_its_hook(self):
+        # Help's Uninstall and --uninstall have said what happens: the hook their uninstaller runs shows no card.
+        with mock.patch.object(subprocess, "Popen") as popen:
+            removal.uninstall()
+        self.assertEqual(popen.call_args[1]["env"][removal.FROM_LAUNCHER], "1")
+        with mock.patch.dict(os.environ, {removal.FROM_LAUNCHER: "1"}), mock.patch.object(subprocess, "Popen") as popen:
+            self.assertIsNone(removal.card_after_uninstall(os.path.join(self.install, "current", "OpenDMTQ.exe")))
+        popen.assert_not_called()
+
+    def test_an_uninstall_from_windows_apps_ends_with_the_launchers_card(self):
+        # Windows' Settings, Apps runs the uninstaller on its own: the hook copies the launcher's window copy and what it
+        # runs with out of the program's folder, and starts the copy to wait for the uninstaller (the hook's parent).
+        program = os.path.join(self.install, "current", "OpenDMTQ.exe")
+        write(os.path.join(self.install, "current"), {"OpenDMTQ.exe": b"MZ launcher", "_internal/python312.dll": b"py",
+                                                      "_internal/opendmtq_client/assets/a.ttf": b"font",
+                                                      "player/opendmtq-player.exe": b"MZ player"})
+        os.environ.pop(removal.FROM_LAUNCHER, None)
+        with mock.patch.dict(os.environ, {"_PYI_APPLICATION_HOME_DIR": os.path.dirname(program)}), \
+                mock.patch.object(subprocess, "Popen") as popen:
+            copy = removal.card_after_uninstall(program)
+        self.addCleanup(shutil.rmtree, copy, True)
+        # In the temporary folder, outside the program's that goes, by the name only such copies have.
+        self.assertEqual(os.path.dirname(copy), tempfile.gettempdir())
+        self.assertTrue(os.path.basename(copy).startswith("OpenDMTQ-uninstalled-"))
+        self.assertFalse(copy.startswith(self.install))
+        # The launcher and its _internal, not the player.
+        self.assertEqual(listing(copy), {"OpenDMTQ.exe", "_internal/python312.dll", "_internal/opendmtq_client/assets/a.ttf"})
+        command, = popen.call_args[0]
+        self.assertEqual(command, [os.path.join(copy, "OpenDMTQ.exe"), "--uninstalled", str(removal._parent_pid())])
+        self.assertEqual(removal._parent_pid(), os.getppid())
+        self.assertEqual(popen.call_args[1]["cwd"], copy)
+        env = popen.call_args[1]["env"]
+        self.assertEqual(env["PYINSTALLER_RESET_ENVIRONMENT"], "1")
+        self.assertNotIn("_PYI_APPLICATION_HOME_DIR", env)
+
+    def test_the_card_says_what_went_and_what_stayed(self):
+        from opendmtq_client import i18n
+        w = i18n.Words("en")
+        gone = os.path.join(self.home, "gone")
+        # The settings, sign-ins and game data stayed, with their size and folder.
+        write(os.path.join(removal.data_root(), "com.example.game"), GAME)
+        kind, title, message, detail = removal.uninstalled_card(w, gone)
+        self.assertEqual((kind, title, message), ("info", "Uninstall", "OpenDMTQ is uninstalled."))
+        self.assertEqual(detail.split("\n")[0], "Gone: the program, its shortcuts and its entry in Windows' Apps.")
+        self.assertIn("Kept for a later install: the settings, sign-ins and game data (%s) in %s."
+                      % (removal.megabytes(removal.everything_size()), removal.data_root()), detail)
+        # Nothing stayed (deleted before): said so.
+        shutil.rmtree(removal.data_root())
+        self.assertIn("Nothing of OpenDMTQ's stays on this PC.", removal.uninstalled_card(w, gone)[3])
+        # The program still there after the uninstaller ended: said as it is, in Korean too.
+        os.makedirs(os.path.join(self.install, "current"), exist_ok=True)
+        kind, _title, message, detail = removal.uninstalled_card(i18n.Words("ko"), self.install)
+        self.assertEqual((kind, message), ("warn", "OpenDMTQ를 다 지우지 못했습니다."))
+        self.assertIn(self.install, detail)
+
+    def test_windows_apps_entry_is_made_quiet(self):
+        # Velopack writes Settings, Apps' entry with a plain --uninstall (its own window at the end): made the same as its
+        # quiet one, once; an entry quiet already, none at all, or a launcher not installed is left as it is. A stand-in
+        # for Windows' registry answers.
+        import sys
+        from opendmtq_client import installed
+        entries = {installed.UNINSTALL_KEY: {"UninstallString": '"%s" --uninstall' % os.path.join(self.install,
+                                                                                                    "Update.exe")}}
+
+        class Key:
+            def __init__(self, path):
+                self.values = entries[path]
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        def open_key(root, path, reserved, access):
+            if path not in entries:
+                raise FileNotFoundError(2, "The system cannot find the file specified")
+            return Key(path)
+
+        def query(key, name):
+            if name not in key.values:
+                raise FileNotFoundError(2, "The system cannot find the file specified")
+            return key.values[name], 1
+
+        def set_value(key, name, reserved, kind, value):
+            key.values[name] = value
+
+        winreg = types.SimpleNamespace(HKEY_CURRENT_USER=1, KEY_QUERY_VALUE=1, KEY_SET_VALUE=2, REG_SZ=1,
+                                       OpenKey=open_key, QueryValueEx=query, SetValueEx=set_value)
+        with mock.patch.dict(sys.modules, {"winreg": winreg}), mock.patch.object(sys, "platform", "win32"):
+            self.assertTrue(installed.quiet_uninstall())
+            quiet = '"%s" --uninstall --silent' % os.path.join(self.install, "Update.exe")
+            self.assertEqual(entries[installed.UNINSTALL_KEY]["UninstallString"], quiet)
+            # Quiet already: nothing written again.
+            self.assertFalse(installed.quiet_uninstall())
+            # An install folder named by the installer, as it is after its setup.
+            entries[installed.UNINSTALL_KEY]["UninstallString"] = '"X:\\Update.exe" --uninstall'
+            self.assertTrue(installed.quiet_uninstall(self.install))
+            # No entry, and no install: nothing.
+            entries.clear()
+            self.assertFalse(installed.quiet_uninstall())
+            os.environ.pop("OPENDMTQ_INSTALL_ROOT")
+            self.assertFalse(installed.quiet_uninstall())
+        # Off Windows, nothing is asked.
+        self.assertFalse(installed.quiet_uninstall(self.install))
 
     def test_a_copied_folder_has_no_uninstaller(self):
         os.environ.pop("OPENDMTQ_INSTALL_ROOT")

@@ -130,6 +130,16 @@ def failure_line(log_path):
     return lines[-1].split("[ERROR]", 1)[1].strip()[:300] or None
 
 
+def quiet_entry():
+    """Windows' entry for the program just installed, made quiet (installed.quiet_uninstall), a failure in the log only:
+    the install itself is done and good either way."""
+    from opendmtq_client import installed
+    try:
+        installed.quiet_uninstall(app_dir())
+    except Exception:  # noqa: BLE001  (the registry refusing: Velopack's own window at an uninstall, nothing else)
+        log.exception("could not make Windows' uninstall of OpenDMTQ quiet")
+
+
 def start_launcher():
     """Start the installed launcher the way its shortcut does (Velopack's stub picks the current version)."""
     stub = os.path.join(app_dir(), "OpenDMTQ.exe")
@@ -327,6 +337,9 @@ class Installer:
         if found != __version__:
             self.failed(self.words("setup.wrong_version", found=found, here=__version__))
             return
+        # Velopack's setup has written Windows' entry in Settings, Apps last: made quiet now, so that an uninstall there
+        # ends with the launcher's card rather than Velopack's window (installed.quiet_uninstall).
+        quiet_entry()
         self.show("info", self.words("setup.tab.done"), self.words("setup.done", v=__version__),
                   self.words("setup.starting"), progress=True)
         self._start_or_say()
@@ -412,6 +425,9 @@ def main(argv=None):
         try:
             setup = run_setup(path)
             code = setup.wait(timeout=SETUP_LIMIT)
+            if code == 0:
+                # As the dialogs do once Velopack's setup is done: Windows' entry made quiet.
+                quiet_entry()
             if code == 0 and "--no-start" not in argv:
                 start_launcher()
         except (OSError, subprocess.TimeoutExpired):

@@ -330,6 +330,16 @@ TEXT = {
     "help.uninstall.failed": ("Uninstall failed", "제거 실패"),
     "help.uninstall.failed.detail": ("The uninstaller did not start: {error}\nWindows' Settings, Apps removes OpenDMTQ too.",
                                      "제거 프로그램이 시작되지 않았습니다: {error}\nWindows 설정의 앱에서도 OpenDMTQ를 제거할 수 있습니다."),
+    # The card after an uninstall from Windows' Settings, Apps (removal.show_uninstalled): what went, what stayed.
+    "uninstalled.done": ("OpenDMTQ is uninstalled.", "OpenDMTQ를 제거했습니다."),
+    "uninstalled.gone": ("Gone: the program, its shortcuts and its entry in Windows' Apps.",
+                         "지운 것: 프로그램, 바로가기, Windows 앱 목록의 항목."),
+    "uninstalled.kept": ("Kept for a later install: the settings, sign-ins and game data ({size}) in {folder}. Your records stay on the server.",
+                         "다시 설치할 때 쓰도록 남긴 것: {folder}의 설정, 로그인, 게임 데이터({size}). 기록은 서버에 그대로 있습니다."),
+    "uninstalled.nothing": ("Nothing of OpenDMTQ's stays on this PC. Your records stay on the server.",
+                            "이 PC에 OpenDMTQ의 것은 남지 않았습니다. 기록은 서버에 그대로 있습니다."),
+    "uninstalled.partly": ("OpenDMTQ was not removed whole.", "OpenDMTQ를 다 지우지 못했습니다."),
+    "uninstalled.partly.detail": ("Its program stayed in {folder}.", "프로그램이 {folder}에 남았습니다."),
 
     # -------------------------------------------------------------------------------------------- about
     "about.sub": ("The launcher's own settings and updates.", "런처 자체의 설정과 업데이트입니다."),

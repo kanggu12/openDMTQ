@@ -45,14 +45,18 @@ from opendmtq_client import values as choices
 log = logging.getLogger("opendmtq_client")
 # The launcher window's mutex while this process holds it (_single_instance): the window is open.
 _window_mutex = None
+# The argument of the card after an uninstall from Windows' Settings, Apps, and the uninstaller's process number after
+# it: the uninstall hook starts its copy of the launcher with them (removal.card_after_uninstall), nothing else does.
+UNINSTALLED = "--uninstalled"
 
 
 def _velopack_hooks(argv):
     """Let Velopack handle its install, update and uninstall events; it exits the process for those.
 
-    OpenDMTQ registers nothing to do in them. So when Velopack itself fails in one, the failure is logged and the
-    process ends as a finished hook would: the installer does not report a partly failed install over a step OpenDMTQ
-    never needed.
+    OpenDMTQ does two things in them: after an update, Windows' entry in Settings, Apps made quiet again (Velopack has
+    just written it again without --silent: installed.quiet_uninstall); before an uninstall, the card after it, unless
+    the launcher started it (removal.card_after_uninstall). When Velopack itself fails in one, the failure is logged
+    and the process ends as a finished hook would: the installer does not report a partly failed install over it.
     """
     try:
         import velopack
@@ -60,13 +64,42 @@ def _velopack_hooks(argv):
         # Run from source or a copied folder: there is no installer around.
         return
     try:
-        velopack.App().run()
+        app = velopack.App()
+        # Each is a fast hook, which Velopack ends the process after: what it does must take moments.
+        app.on_after_update_fast_callback(lambda version: _hook("the update's", _quiet_entry))
+        app.on_before_uninstall_fast_callback(lambda version: _hook("the uninstall's", _card_after_uninstall))
+        app.run()
     except SystemExit:
         raise
     except BaseException:  # noqa: BLE001  (a Rust panic arrives as a BaseException, which Exception misses)
         log.exception("Velopack start-up hook failed")
         if any(a.startswith("--veloapp-") for a in argv):
             sys.exit(0)
+
+
+def _hook(name, job):
+    """A hook's work, its failure in the log: Velopack's binding prints a hook's error where no one sees it, then ends
+    the process as if it had worked, and the install, update or uninstall goes on either way."""
+    try:
+        job()
+    except Exception:  # noqa: BLE001  (logged; nothing of OpenDMTQ's hook may stop Velopack's work)
+        log.exception("%s hook failed", name)
+
+
+def _quiet_entry():
+    """Windows' entry for OpenDMTQ in Settings, Apps made quiet (installed.quiet_uninstall), its failure in the log:
+    an entry that stays as Velopack wrote it costs Velopack's own window at an uninstall, nothing else."""
+    from opendmtq_client import installed
+    try:
+        installed.quiet_uninstall()
+    except Exception:  # noqa: BLE001  (the registry refusing: the launcher starts all the same)
+        log.exception("could not make Windows' uninstall of OpenDMTQ quiet")
+
+
+def _card_after_uninstall():
+    """The uninstall hook's part: the card after an uninstall the launcher did not start (removal.card_after_uninstall)."""
+    from opendmtq_client import removal
+    removal.card_after_uninstall()
 
 
 def _logging(make=True):
@@ -514,11 +547,21 @@ def _jobs(args, maintenance=True):
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     # The log first, so a failure in Velopack's own start-up handling is written down too. Not in the uninstall hook
-    # after Delete all: the folder it was in is gone, and a log would make it again.
-    _logging(make=not any(a.startswith("--veloapp-uninstall") for a in argv))
+    # after Delete all, nor in the card after an uninstall: the folder it was in may be gone, and a log would make it
+    # again.
+    _logging(make=not any(a.startswith("--veloapp-uninstall") or a == UNINSTALLED for a in argv))
     # The arguments as given: the password never is one (it comes from standard input).
     log.info("OpenDMTQ %s started%s", __version__, (": " + " ".join(argv)) if argv else "")
+    if argv[:1] == [UNINSTALLED] and len(argv) == 2 and argv[1].isdigit():
+        # The copy the uninstall hook made in the temporary folder (removal.card_after_uninstall): the card after the
+        # uninstall, and nothing of Velopack's or of the launcher's own, whose program is gone.
+        from opendmtq_client import removal
+        dpi.aware()
+        return removal.show_uninstalled(int(argv[1]))
     _velopack_hooks(argv)
+    # Windows' entry in Settings, Apps made quiet at each start too: an install or an update made before this launcher
+    # could, or one whose hook did not run (installed.quiet_uninstall).
+    _quiet_entry()
     args = parse(argv)
     jobs = _jobs(args)
     if jobs and _writes(args) and window_open():

@@ -264,7 +264,8 @@ title says so alone), and says where it can be watched.
     the settings, sign-ins and game data stay for a later install or go too (`--uninstall --delete-data`). With them
     go the device id and the logs of the installs (the installer's in `%TEMP%`, Velopack's in `%LOCALAPPDATA%\velopack`),
     and a later install is a new player, unless the account transfer below brings this one back.
-    Windows' Settings, Apps uninstalls too, and keeps the data.
+    Windows' Settings, Apps uninstalls too and keeps the data; it ends with the launcher's card, which says what went
+    and what stayed.
 - **The account:** a PC is a player of its own, apart from the same person's phone. The server gives each new device a
   new account, and the device id the PC goes by is kept in the game's folder: deleting that folder makes this PC a new
   player. The game's own account transfer carries a player to another device: on the device that has the player,

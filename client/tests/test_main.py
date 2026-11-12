@@ -511,6 +511,48 @@ class Maintenance(Folder):
             self.run_main(["--veloapp-uninstall", "0.8.0"])
         self.assertFalse(os.path.exists(removal.data_root()))
 
+    def test_velopacks_hooks_do_what_opendmtq_asks_of_them(self):
+        # A stand-in for Velopack's module runs the hook its arguments name, as the real one does, then ends the process:
+        # after an update Windows' entry is made quiet again; before an uninstall the card's copy is made.
+        done, given = [], {}
+
+        class App:
+            def __init__(self):
+                self.hooks = {}
+
+            def on_after_update_fast_callback(self, callback):
+                self.hooks["--veloapp-updated"] = callback
+
+            def on_before_uninstall_fast_callback(self, callback):
+                self.hooks["--veloapp-uninstall"] = callback
+
+            def run(self):
+                # Velopack reads the process's arguments: here, the ones this test gives main().
+                hook = self.hooks.get(given["argv"][0])
+                if hook:
+                    hook(given["argv"][1])
+                    raise SystemExit(0)
+
+        velopack = types.SimpleNamespace(App=App)
+        with mock.patch.dict(sys.modules, {"velopack": velopack}), \
+                mock.patch("opendmtq_client.installed.quiet_uninstall", lambda folder=None: done.append("quiet")), \
+                mock.patch.object(removal, "card_after_uninstall", lambda program=None: done.append("card")):
+            for hook, said in (("--veloapp-updated", "quiet"), ("--veloapp-uninstall", "card")):
+                given["argv"] = [hook, "0.9.6"]
+                done.clear()
+                with self.assertRaises(SystemExit):
+                    self.run_main(given["argv"])
+                self.assertEqual(done, [said])
+
+    def test_the_card_after_an_uninstall_runs_on_its_own(self):
+        # The copy the uninstall hook starts: its card, nothing of Velopack's, no window of the launcher's.
+        with mock.patch.object(removal, "show_uninstalled", return_value=0) as card, \
+                mock.patch.object(main, "_velopack_hooks") as hooks, mock.patch.object(main.dpi, "aware"):
+            code, said = self.run_main(["--uninstalled", "4242"])
+        self.assertEqual(code, 0)
+        card.assert_called_once_with(4242)
+        hooks.assert_not_called()
+
     def test_uninstall_waits_for_the_window_and_the_game(self):
         with mock.patch.object(main, "window_open", return_value=True), \
                 mock.patch.object(subprocess, "Popen") as popen:

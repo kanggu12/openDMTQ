@@ -15,6 +15,9 @@ Three removals, from the least to the most:
                        log of it and the installer's logs in the temporary folder (leftovers())
   uninstall()          the program, by Velopack's own uninstaller, which also takes the shortcuts and Windows' entry
 
+An uninstall started elsewhere (Windows' Settings, Apps) ends with the launcher's own card, which says what went and what
+stayed (card_after_uninstall, show_uninstalled): Velopack's uninstaller runs silent there too (installed.quiet_uninstall).
+
 Nothing here asks: the window and the command line ask first (maintenance.py, main.py). A link or a Windows junction is
 removed as itself and never followed, except a game's folder or its data folder that is one (moved to another disk):
 what it holds is the game's, and goes as if it were in place.
@@ -22,6 +25,7 @@ what it holds is the game's, and goes as if it were in place.
 
 import logging
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -53,6 +57,18 @@ UNINSTALL_LOG = "uninstall.log"
 JUNCTION = getattr(stat, "IO_REPARSE_TAG_MOUNT_POINT", 0xA0000003)
 # CREATE_NO_WINDOW and CREATE_NEW_PROCESS_GROUP: the uninstaller shows nothing and outlives this program.
 DETACHED = 0x08000000 | 0x00000200
+# In the environment of Velopack's uninstaller when the launcher itself starts it (Help's Uninstall, --uninstall): the
+# uninstall hook it runs finds it there (Velopack hands its hooks its own environment) and shows no card after, as the
+# launcher has said what happens already.
+FROM_LAUNCHER = "OPENDMTQ_UNINSTALL_FROM_LAUNCHER"
+# The launcher's copy that shows the card after an uninstall started elsewhere: in the temporary folder, outside the
+# program's folder that goes, named after the hook that made it.
+CARD_COPY = "OpenDMTQ-uninstalled-%d"
+# How long that copy waits for the uninstaller to end before it shows the card all the same (seconds): Velopack gives
+# its hook a minute, then removes the program in a few seconds.
+CARD_WAIT = 180
+# SYNCHRONIZE: the right to wait for a process to end, all the card's copy asks of the uninstaller's.
+SYNCHRONIZE = 0x00100000
 
 
 class RemovalError(errors.Worded):
@@ -388,7 +404,148 @@ def uninstall(delete_all=False):
         # Update.exe's --log names its log file for this run (a global option, after the command as before it).
         command += ["--log", os.path.join(root, UNINSTALL_LOG)]
     log.info("uninstalling: %s", " ".join(command))
-    # Started from outside the install folder, which could not go while a program's current folder is in it.
-    subprocess.Popen(command, cwd=tempfile.gettempdir(), close_fds=True,
+    # Started from outside the install folder, which could not go while a program's current folder is in it. The hook it
+    # runs learns that the launcher started it, and shows no card after it (card_after_uninstall).
+    subprocess.Popen(command, cwd=tempfile.gettempdir(), close_fds=True, env=dict(os.environ, **{FROM_LAUNCHER: "1"}),
                      creationflags=DETACHED if sys.platform == "win32" else 0,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def card_after_uninstall(program=None):
+    """Velopack's uninstall hook: its uninstaller runs the launcher with --veloapp-uninstall from the program's folder
+    before it removes it, waits for it, then ends what still runs from there. After an uninstall the launcher did not
+    start (Windows' Settings, Apps: no FROM_LAUNCHER in the environment), a copy of the launcher, made in the temporary
+    folder, waits for the uninstaller to end and then shows the card that says what went and what stayed
+    (show_uninstalled); this hook ends at once. `program` is the launcher's window copy (OpenDMTQ.exe, this program once
+    frozen). Returns the copy's folder, or None when no card is to come."""
+    if os.environ.get(FROM_LAUNCHER) == "1":
+        # Help's Uninstall or --uninstall: the launcher said what happens before the uninstaller started.
+        log.info("the launcher started this uninstall: no card after it")
+        return None
+    program = program or (sys.executable if getattr(sys, "frozen", False) else None)
+    if program is None:
+        # Run from source: no program to copy, and no install to uninstall.
+        return None
+    here = os.path.dirname(os.path.abspath(program))
+    copy = os.path.join(tempfile.gettempdir(), CARD_COPY % os.getpid())
+    # The window copy and what it runs with (PyInstaller's _internal beside it); not the player, nor the licences.
+    os.makedirs(copy, exist_ok=True)
+    shutil.copy2(program, copy)
+    shutil.copytree(os.path.join(here, "_internal"), os.path.join(copy, "_internal"), dirs_exist_ok=True)
+    # A program of its own, not a part of this one: PyInstaller's notes to a program it starts itself are left out.
+    env = {k: v for k, v in os.environ.items() if not k.upper().startswith(("_PYI_", "_MEIPASS"))}
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    # The uninstaller is this hook's parent: the copy waits for it to end.
+    command = [os.path.join(copy, os.path.basename(program)), "--uninstalled", str(_parent_pid())]
+    log.info("the card after the uninstall comes from %s", copy)
+    try:
+        # From its own folder, apart from this process: the uninstaller ends this one at once after it, never the copy.
+        subprocess.Popen(command, cwd=copy, close_fds=True, env=env,
+                         creationflags=DETACHED if sys.platform == "win32" else 0,
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError:
+        # No card then, and no copy left behind in the temporary folder for it.
+        shutil.rmtree(copy, ignore_errors=True)
+        raise
+    return copy
+
+
+def _parent_pid():
+    """This process's parent's number (the uninstaller, for its hook), as Windows keeps it for the process: Python's
+    os.getppid() asks Windows' PssCaptureSnapshot for it, which Wine has none of (the hook ended in Wine's crash
+    dialog); NtQueryInformationProcess has it on Windows and under Wine alike. 0 when it cannot be read."""
+    if sys.platform != "win32":
+        return os.getppid()
+    import ctypes
+    from ctypes import wintypes
+
+    class BasicInformation(ctypes.Structure):
+        # PROCESS_BASIC_INFORMATION: each field a pointer wide on 64-bit Windows, the parent's number the last.
+        _fields_ = [("exit_status", ctypes.c_void_p), ("peb", ctypes.c_void_p), ("affinity", ctypes.c_void_p),
+                    ("priority", ctypes.c_void_p), ("pid", ctypes.c_void_p), ("parent", ctypes.c_void_p)]
+
+    info = BasicInformation()
+    kernel, ntdll = ctypes.windll.kernel32, ctypes.windll.ntdll
+    kernel.GetCurrentProcess.restype = wintypes.HANDLE
+    ntdll.NtQueryInformationProcess.argtypes = [wintypes.HANDLE, wintypes.ULONG, ctypes.c_void_p, wintypes.ULONG,
+                                                ctypes.c_void_p]
+    # ProcessBasicInformation (0), about this process; 0 is NTSTATUS's success.
+    if ntdll.NtQueryInformationProcess(kernel.GetCurrentProcess(), 0, ctypes.byref(info), ctypes.sizeof(info), None):
+        return 0
+    return int(info.parent or 0)
+
+
+def _wait_for(pid, seconds):
+    """Wait for the process `pid` to end, `seconds` at most; at once when it is gone already or cannot be asked."""
+    if sys.platform != "win32":
+        # The tests' own stand-in: no process to wait for.
+        return
+    import ctypes
+    kernel = ctypes.windll.kernel32
+    handle = kernel.OpenProcess(SYNCHRONIZE, False, int(pid))
+    if not handle:
+        # Ended already (its number is no process now), or not ours to ask: the card does not wait.
+        return
+    try:
+        kernel.WaitForSingleObject(handle, int(seconds * 1000))
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def _wait_gone(folder, seconds):
+    """Wait for `folder` to be gone, `seconds` at most, looking twice a second."""
+    import time
+    end = time.monotonic() + seconds
+    while os.path.isdir(folder) and time.monotonic() < end:
+        time.sleep(0.5)
+
+
+def uninstalled_card(words, program_folder):
+    """The card after an uninstall, as standalone()'s first four arguments (kind, title, message, detail): what went (the
+    program, its shortcuts, its entry in Windows' Apps) and what stayed (the settings, sign-ins and game data with their
+    size and folder), or that the program stayed in `program_folder` when the uninstaller left its program there."""
+    w = words
+    if os.path.isdir(os.path.join(program_folder, "current")):
+        # The uninstaller removes the program before it ends: what is left was in use, or not its to remove.
+        return "warn", w("help.uninstall"), w("uninstalled.partly"), w("uninstalled.partly.detail", folder=program_folder)
+    size = everything_size() if os.path.isdir(data_root()) else 0
+    kept = w("uninstalled.kept", size=megabytes(size), folder=data_root()) if size else w("uninstalled.nothing")
+    return "info", w("help.uninstall"), w("uninstalled.done"), w("uninstalled.gone") + "\n" + kept
+
+
+def show_uninstalled(pid, wait=CARD_WAIT):
+    """The card after an uninstall from Windows' Settings, Apps, in the copy card_after_uninstall made: once the
+    uninstaller (process `pid`) has ended, uninstalled_card() in the launcher's language, then the copy removed a few
+    seconds after it ends."""
+    from opendmtq_client import dialogs, i18n, installer
+    if pid:
+        _wait_for(pid, wait)
+    else:
+        # The uninstaller's number could not be read: the program's folder going says it has done its work.
+        _wait_gone(os.path.join(installer.app_dir(), "current"), wait)
+    try:
+        # The player's language, from the settings that stayed; Windows' when there are none.
+        language = st.LauncherState.load().language
+    except st.StateError:
+        language = st.system_language()
+    w = i18n.Words(language)
+    kind, title, message, detail = uninstalled_card(w, installer.app_dir())
+    log.info("uninstalled from Windows' Apps: %s", message)
+    dialogs.standalone(kind, title, message, detail, [(w("common.ok"), True, "home")], 0, True, language)
+    _remove_later(os.path.dirname(os.path.abspath(sys.executable)))
+    return 0
+
+
+def _remove_later(copy):
+    """The card's copy removed a few seconds after this program ends, by Windows' command processor (a program cannot
+    delete its own files while it runs), as Velopack removes its own uninstaller: only a copy named as the hook names
+    one, in the temporary folder."""
+    temp = os.path.realpath(tempfile.gettempdir())
+    named = os.path.basename(copy).startswith(CARD_COPY.split("%")[0])
+    if sys.platform != "win32" or not named or os.path.dirname(os.path.realpath(copy)) != temp:
+        # A launcher run any other way never deletes the folder it runs from.
+        return
+    # choice waits 3 s, then rmdir takes the copy whole.
+    command = 'choice /C Y /N /D Y /T 3 & rmdir /s /q "%s"' % copy
+    subprocess.Popen(["cmd.exe", "/C", command], cwd=temp, close_fds=True, creationflags=DETACHED,
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
