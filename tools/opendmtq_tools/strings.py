@@ -97,7 +97,8 @@ STRINGS = {
         "invite.open": "Open the download page",
         "invite.qr": "QR code of the app's download",
         "invite.qr_caption": "Or scan it to download the app",
-        "invite.text": "TECHNIKA Q server (OpenDMTQ)\nSign in and download the app (.apk): {url}\nID: {id}\nPassword: {password}\nFor Android phones and tablets.",
+        "invite.text": "{app}, an OpenDMTQ server\nSign in and download the app (.apk): {url}\nID: {id}\nPassword: {password}\nFor Android phones and tablets.",
+        "invite.text_pc": "{app}, an OpenDMTQ server\nSign in and download the app (.apk): {url}\nID: {id}\nPassword: {password}\nFor Android phones and tablets.\nOn a Windows PC: the same page, Download the installer (.exe).",
         "copy.done": "Copied",
         "copy.failed": "Select it and copy it by hand",
         # The log page.
@@ -939,7 +940,8 @@ STRINGS = {
         "invite.open": "내려받기 페이지 열기",
         "invite.qr": "앱 내려받기 QR 코드",
         "invite.qr_caption": "또는 이 코드를 찍어 앱 내려받기",
-        "invite.text": "TECHNIKA Q 서버(OpenDMTQ)\n로그인하고 앱(.apk) 내려받기: {url}\n아이디: {id}\n비밀번호: {password}\nAndroid 폰과 태블릿 전용입니다.",
+        "invite.text": "{app}, OpenDMTQ 서버\n로그인하고 앱(.apk) 내려받기: {url}\n아이디: {id}\n비밀번호: {password}\nAndroid 폰과 태블릿용입니다.",
+        "invite.text_pc": "{app}, OpenDMTQ 서버\n로그인하고 앱(.apk) 내려받기: {url}\n아이디: {id}\n비밀번호: {password}\nAndroid 폰과 태블릿용입니다.\nWindows PC: 같은 페이지의 설치 파일(.exe) 내려받기",
         "copy.done": "복사했습니다",
         "copy.failed": "직접 선택해서 복사하세요",
         # The log page.

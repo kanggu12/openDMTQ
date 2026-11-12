@@ -97,8 +97,11 @@ def build_error():
 
 
 def invite_text(url, name, password):
-    """The message to send a friend with their new account: where to sign in and get the app, their ID and password."""
-    return tp("invite.text", url=url, id=name, password=password)
+    """The message to send a player with their new account: the server by the name its app has on their phone, where to
+    sign in and get the app, their ID and password, and the installer for Windows on the same page when the site hands
+    one out (windows_client.offered, as the Download page decides)."""
+    pc = windows_client.offered(os.path.join(core.APK, "out"))
+    return tp("invite.text_pc" if pc else "invite.text", app=core.app_name(), url=url, id=name, password=password)
 
 
 def friends_address(health):

@@ -10,6 +10,7 @@ import datetime
 import errno
 import gzip
 import hashlib
+import html
 import importlib.util
 import io
 import json
@@ -1213,6 +1214,29 @@ class InviteTest(unittest.TestCase):
                 self.assertIn(f"ID: {name}", page)
                 self.assertNotIn("(.apk): http://localhost", page)
                 self.assertNotIn("(.apk): /opendmtq", page)
+
+    def test_the_message_names_the_server_and_the_pc_installer_when_the_site_has_it(self):
+        # The server by the name its app has on the phone (SERVER_NAME, else the address), and the installer for Windows
+        # on the same page once the site hands one out (windows.json beside it, at its size), in both languages.
+        with Install() as install, mock.patch.dict(os.environ, {"SERVER_NAME": "Living Room"}):
+            install.sign_in()
+            page = html.unescape(self.message(install, "friend1"))
+            self.assertIn("TECHNIKA Q (Living Room), an OpenDMTQ server\nSign in", page)
+            self.assertIn("For Android phones and tablets.</textarea>", page)
+            self.assertNotIn("Windows", page.split('id="account-message"')[1].split("</textarea>")[0])
+            out = os.path.join(admin.core.APK, "out")
+            os.makedirs(out, exist_ok=True)
+            with open(os.path.join(out, "OpenDMTQ-Setup.exe"), "wb") as f:
+                f.write(b"MZ" + b"\0" * 98)
+            with open(os.path.join(out, "windows.json"), "w", encoding="utf-8") as f:
+                json.dump({"file": "OpenDMTQ-Setup.exe", "size": 100, "sha256": "0", "version": "0.9.6"}, f)
+            page = html.unescape(self.message(install, "friend2"))
+            self.assertIn("For Android phones and tablets.\nOn a Windows PC: the same page, Download the installer (.exe).", page)
+            install.client.set_cookie("opendmtq_lang", "ko")
+            page = html.unescape(self.message(install, "friend3"))
+            self.assertIn("TECHNIKA Q (Living Room), OpenDMTQ 서버", page)
+            self.assertIn("Android 폰과 태블릿용입니다.\nWindows PC: 같은 페이지의 설치 파일(.exe) 내려받기", page)
+            self.assertNotIn("전용", page)
 
     def test_the_message_says_https_where_the_site_is_on_it(self):
         with Install() as install, mock.patch.multiple(admin.core, PUBLIC_HOST="play.example.com:8790", server_health=lambda fresh=False: {"ok": True, "https": True}):
