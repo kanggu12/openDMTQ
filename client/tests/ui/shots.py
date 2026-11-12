@@ -339,6 +339,8 @@ def play_fits(app, name, tag, problems):
     bottom bar after a game that closed by itself). At the smallest window, 960x640, the Last game card begins at the
     bar with the page's cards as they are, so the page scrolls for its button there."""
     import tkinter as tk
+    # Its two columns end on one line, at every size (play_fills).
+    play_fills(app, name, problems)
     area = app.body
     c = area.canvas
     area.to_top()
@@ -362,6 +364,30 @@ def play_fits(app, name, tag, problems):
     if not actions:
         # The check looked at something: PLAY has Check again at least.
         problems.append("%s: no button on the PLAY page to look at" % name)
+
+
+def card_titled(app, title):
+    """The card on the page with this title (the way a person finds it), or None."""
+    for widget in widgets_of(app.body.inner):
+        if isinstance(widget, widgets.Card) and widget.head is not None and any(
+                child.winfo_class() == "Label" and child.cget("text") == title for child in widget.head.winfo_children()):
+            return widget
+    return None
+
+
+def play_fills(app, name, problems):
+    """The PLAY page's two columns end on one line: the ready check as tall as How to play and Last game together, never
+    a slab of the page's dark field under it beside them (0.9.6 left one there once the card was only as tall as its
+    rows)."""
+    w = app.words
+    app.root.update()
+    ready, last = card_titled(app, w("play.ready")), card_titled(app, w("play.last"))
+    if ready is None or last is None:
+        problems.append("%s: no Ready check or Last game card on the PLAY page" % name)
+        return
+    ends = [card.winfo_rooty() + card.winfo_height() for card in (ready, last)]
+    if abs(ends[0] - ends[1]) > 1:
+        problems.append("%s: the ready check ends %d px above the Last game card" % (name, ends[1] - ends[0]))
 
 
 def wheel_check(app, problems):

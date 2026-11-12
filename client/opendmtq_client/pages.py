@@ -129,11 +129,12 @@ def build_play(app, parent):
     ui, w = app.ui, app.words
     _server_card(app, parent)
     left, right = _columns(parent, ui)
-    # Left: the ready check, filled in when the worker thread finishes it, as tall as its rows. Check again stands at its
-    # title's right end, as on Help: stretched to the right column's height, the card left its button at its foot under
-    # room it did not use, and under the bottom bar at the window's own size (client/tests/ui/shots.py, play_fits).
+    # Left: the ready check, filled in when the worker thread finishes it, as tall as the column, so that the row's cards
+    # end on one line. Check again stands at its title's right end, as on Help, and its rows from the top: the room the
+    # column gives it lies under them, and nothing of it goes under the bottom bar at the window's own size
+    # (client/tests/ui/shots.py, play_fits).
     ready = widgets.Card(left, ui, w("play.ready"))
-    ready.pack(fill="x", anchor="n")
+    ready.pack(fill="both", expand=True)
     widgets.Button(ready.head, ui, w("help.recheck"), lambda: app.refresh_checks(force=True)).pack(side="right")
     app.check_box = tk.Frame(ready.body, bg=theme.PANEL)
     app.check_box.pack(fill="x")
