@@ -1078,6 +1078,17 @@ async function adminFlows(contexts) {
   const bad = '/tmp/not-a-package.zip';
   fs.writeFileSync(bad, 'not a zip file');
   await (await page.$('input[type=file]')).uploadFile(bad);
+  // With a file chosen the upload's button can be pressed, and is the page's one primary button to a screen; on the
+  // Backups page too, where Back up now is that one, with a file chosen in its upload box (not sent).
+  const songChosen = await twoPrimaries(page);
+  const backups = await contexts.signed.newPage();
+  await backups.setViewport({ width: 1280, height: 900 });
+  await backups.goto(`${A}/backups`, { waitUntil: 'domcontentloaded' });
+  await (await backups.$('form.upload input[type=file]')).uploadFile(bad);
+  const backupChosen = await twoPrimaries(backups);
+  await backups.close();
+  check('one primary button to a screen with a file chosen to upload, on the Songs and the Backups pages',
+    songChosen.length === 0 && backupChosen.length === 0, [...songChosen, ...backupChosen].map(f => f.at).join('; '));
   await press(page, 'form[enctype] button:not([type=button])');
   check('a bad song package is refused in words', /\S/.test(await textOf(page, '.flash')), (await textOf(page, '.flash')).slice(0, 100));
   await noFindings(page, 'the songs page after a refused package');

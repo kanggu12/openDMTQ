@@ -182,7 +182,7 @@ line it prints, and `cli/tests/test_repo.py` fails when either is gone. **Stage*
 | ADM-88 | The setup's account note, made in one language and read in the other, or kept in Korean by an earlier version | In the reader's language; English in the API; a typed note as typed | `tools/tests/test_setup.py#test_the_setups_note_reads_in_the_readers_language` | unit |
 | ADM-89 | The message for a new player on a named server, with and without the PC client's installer on the site | Names the server as its app is named, and the installer when the site has it, in both languages | `tools/tests/test_admin.py#test_the_message_names_the_server_and_the_pc_installer_when_the_site_has_it` | unit |
 | ADM-90 | The admin pages fetch the site's stylesheet and fonts | By their own name, which the Requests log counts as Admin pages | `tools/tests/test_admin.py#test_the_site_is_asked_by_the_pages_own_name` | unit |
-| ADM-91 | Every admin page in every view and state the pages' tests reach, at every width | At most one primary button on a screen; the checker finds two planted on one screen, not one far down the page | `tests/ui/audit.js#kind: 'two-primaries'`, `tests/ui/audit.js#the checker sees two-primaries` | ui |
+| ADM-91 | Every admin page in every view and state the pages' tests reach, at every width | At most one primary button on a screen; the checker finds two planted on one screen, not one far down the page | `tests/ui/audit.js#kind: 'two-primaries'`, `tests/ui/audit.js#the checker sees two-primaries`, `tests/ui/audit.js#one primary button to a screen with a file chosen to upload` | ui |
 
 ## TS-API: the HTTP API
 
