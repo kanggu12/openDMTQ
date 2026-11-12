@@ -3706,8 +3706,9 @@ void test_save(const std::wstring& prefix, const std::wstring& frame_png, bool w
         Painted got = paint_handle(o, p);
         if (!got.picture) continue;
         save_png(*got.picture, prefix + (lit ? L"handle-lit.png" : L"handle.png"));
+        // Each at its own place: lit, its window is wider (its rail is longer) and deeper.
+        layout_line(layout, lit ? "handle-lit" : "handle", got.x, got.y, got.picture.get());
         if (lit) continue;
-        layout_line(layout, "handle", got.x, got.y, got.picture.get());
         const RectF pill = handle_pill();
         if (layout) std::fprintf(layout, "handle-pill %.0f %.0f %.0f %.0f\n", pill.X, pill.Y, pill.Width, pill.Height);
     }
