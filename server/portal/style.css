@@ -65,11 +65,20 @@
   --ctl: 42px;
   --ctl-sm: 34px;
   --cut: 16px;
-  /* The type scale: everything small on the site is one of these. */
+  /* The type scale: every text of the site and the admin pages is one of these six, by what it is. Only the wordmark
+     and the display's big words and figures (20 px and up: section names, places, scores) have sizes of their own. */
+  /* The wide face's small tags (KOR, LIVE, SERVER, the menu at the thumb), a chart's axis and legend. */
+  --t-2xs: 11px;
+  /* Captions: a time, the line under a name, a label over a figure, a mark, a table's heading. */
   --t-xs: 12px;
+  /* Secondary text: notes, hints, a field's label, small buttons, the admin pages' lists. */
   --t-sm: 13px;
-  --t-md: 15px;
-  --t-lg: 18px;
+  /* Body text: paragraphs, messages, buttons, tabs, fields, the site's lists. */
+  --t-md: 14px;
+  /* A small heading, a hero's lead, a figure in a row, a field on a phone (Safari zooms in under 16 px). */
+  --t-lg: 16px;
+  /* Headings, the name a card is about, the big buttons. */
+  --t-xl: 18px;
   /* How quickly anything that answers the pointer moves. */
   --quick: 0.14s;
   /* The sweep's time across the front page; its notes count on the same. */
@@ -217,7 +226,7 @@ img { max-width: 100%; }
   align-items: center;
   gap: 6px;
   padding: 0 13px;
-  font: 800 13.5px/1 var(--wide);
+  font: 800 var(--t-sm)/1 var(--wide);
   letter-spacing: 0.015em;
   white-space: nowrap;
   color: var(--ash);
@@ -228,12 +237,12 @@ img { max-width: 100%; }
 .nav > a.on { color: var(--accent); }
 .nav > a.on::after { content: ""; position: absolute; inset: auto 8px -1px; height: 3px; background: var(--accent); }
 /* Who is on air: a small red count on LIVE, everywhere. */
-.onair { display: inline-flex; align-items: center; gap: 3px; font: 700 11.5px/1 var(--display); color: var(--bad); }
+.onair { display: inline-flex; align-items: center; gap: 3px; font: 700 var(--t-2xs)/1 var(--display); color: var(--bad); }
 .onair::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 6px var(--bad); }
 
 /* The bar's right end: how the server is, the language, signing in. */
 .bar-end { display: flex; align-items: center; gap: 14px; flex: none; margin-left: auto; }
-.state { display: inline-flex; align-items: center; gap: 6px; font: 700 10.5px/1 var(--wide); letter-spacing: 0.08em; color: var(--ash); white-space: nowrap; }
+.state { display: inline-flex; align-items: center; gap: 6px; font: 700 var(--t-2xs)/1 var(--wide); letter-spacing: 0.08em; color: var(--ash); white-space: nowrap; }
 .state i { width: 7px; height: 7px; border-radius: 50%; }
 .state.ok i { background: var(--ok); box-shadow: 0 0 7px var(--ok); }
 .state.maint i { background: var(--warn); box-shadow: 0 0 7px var(--warn); }
@@ -241,7 +250,7 @@ img { max-width: 100%; }
 
 /* Two short keys for the language, each with the language's own name for those who cannot read the other. */
 .lang-switch { display: flex; background: var(--rail); }
-.lang-switch a { position: relative; padding: 0 8px; font: 700 10.5px/30px var(--wide); letter-spacing: 0.04em; color: var(--ash); text-decoration: none; }
+.lang-switch a { position: relative; padding: 0 8px; font: 700 var(--t-2xs)/30px var(--wide); letter-spacing: 0.04em; color: var(--ash); text-decoration: none; }
 .lang-switch a:hover { color: #fff; }
 /* Which one it is now, in metal: the bar's one lit key is the one that signs in. */
 .lang-switch a.on { color: #fff; background: var(--rail-up); }
@@ -255,7 +264,7 @@ img { max-width: 100%; }
   padding: 0 13px;
   border: 0;
   cursor: pointer;
-  font: 700 13px/30px var(--text-face);
+  font: 700 var(--t-sm)/30px var(--text-face);
   color: var(--chalk);
   text-decoration: none;
   white-space: nowrap;
@@ -276,7 +285,7 @@ img { max-width: 100%; }
    sections in a smaller face up to 1000 px so that they fit there. (The admin pages keep their own menu: .nav.pages.) */
 .tabbar { display: none; }
 @media (max-width: 900px) { .state { font-size: 0; gap: 0; } }
-@media (max-width: 1000px) { .nav > a { padding: 0 8px; font-size: 12px; } }
+@media (max-width: 1000px) { .nav > a { padding: 0 8px; font-size: var(--t-xs); } }
 /* Up to 900 px the wordmark smaller and the bar's gaps tighter: a phone on its side (740 px) then keeps every section
    in its one row (they were 39 px too wide there). The bar is lower only on a phone held upright. */
 @media (max-width: 900px) {
@@ -306,7 +315,7 @@ img { max-width: 100%; }
     gap: 4px;
     height: 54px;
     padding-inline: 5px;
-    font: 800 clamp(10px, 2.95vw, 11.5px)/1 var(--wide);
+    font: 800 var(--t-2xs)/1 var(--wide);
     letter-spacing: 0;
     color: var(--ash);
     text-decoration: none;
@@ -344,7 +353,7 @@ main > * { min-width: 0; }
   background-clip: text;
   color: transparent;
 }
-.masthead p { margin: 0; color: var(--ash); font-size: 14px; text-wrap: balance; }
+.masthead p { margin: 0; color: var(--ash); font-size: var(--t-md); text-wrap: balance; }
 
 /* A panel: the game's gunmetal, a shade lighter at its head, one corner cut. */
 .card {
@@ -364,13 +373,13 @@ h2 {
   align-items: baseline;
   gap: 2px 10px;
   margin: 0 0 14px;
-  font: 800 18px/1.25 var(--text-face);
+  font: 800 var(--t-xl)/1.25 var(--text-face);
   letter-spacing: -0.012em;
   color: #fff;
   overflow-wrap: anywhere;
   text-wrap: balance;
 }
-h3 { margin: 18px 0 8px; font-size: 15px; font-weight: 700; color: #fff; }
+h3 { margin: 18px 0 8px; font-size: var(--t-lg); font-weight: 700; color: #fff; }
 /* At the title line's end. The padding makes it big enough to tap; the negative margin keeps the line as it was. */
 h2 .more {
   margin: -11px 0 -11px auto;
@@ -406,7 +415,7 @@ h2 .more:hover { color: var(--accent); }
 .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); }
 .stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .num { font: 800 32px/1.1 var(--display); letter-spacing: 0.005em; color: #fff; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-.lbl { color: var(--ash); font-size: 12.5px; }
+.lbl { color: var(--ash); font-size: var(--t-xs); }
 .stats-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 520px) {
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -416,15 +425,15 @@ h2 .more:hover { color: var(--accent); }
 /* ------------------------------------------------------------------ text */
 
 p { margin: 0 0 10px; }
-.lead { margin: 0 0 12px; color: var(--ash); font-size: 14px; max-width: 74ch; }
+.lead { margin: 0 0 12px; color: var(--ash); font-size: var(--t-md); max-width: 74ch; }
 .meta { color: var(--ash); font-size: var(--t-sm); margin: 8px 0 0; overflow-wrap: anywhere; }
 .note { color: var(--ash); font-size: var(--t-sm); margin: 12px 0 0; max-width: 74ch; }
 /* Nothing to show yet: said once, in the middle of the space the list would fill. */
-.empty { margin: 0; padding: 26px 12px; text-align: center; color: var(--ash); font-size: 14px; }
+.empty { margin: 0; padding: 26px 12px; text-align: center; color: var(--ash); font-size: var(--t-md); }
 .empty p { margin: 0; }
 .empty .btn-line { justify-content: center; }
-/* Messages: one spacing, tinted by what they mean. Amber a notice, red a failure, the section's colour a success. */
-.warn, .error, .done { margin: 12px 0; padding: 11px 14px; font-size: 14px; }
+/* Messages: one spacing, tinted by what they mean. Yellow a notice, red a failure, the section's colour a success. */
+.warn, .error, .done { margin: 12px 0; padding: 11px 14px; font-size: var(--t-md); }
 .warn { background: color-mix(in srgb, var(--warn) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 42%, transparent); color: #ffe6a0; }
 .error { background: color-mix(in srgb, var(--bad) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 46%, transparent); color: #ffc4cb; }
 .done { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 42%, transparent); color: color-mix(in srgb, var(--accent) 55%, #fff); }
@@ -436,9 +445,10 @@ th abbr[title] { text-decoration: none; cursor: help; }
    .ui for what the reader finds on screen and taps: weight, no quotes or box;
    code for a file name, a command or an address: the mono face on a faint ground;
    .app-name for the app's name: all of it as one piece of code, the title and the server together. */
-code { font-family: var(--mono); font-size: 0.86em; background: rgba(255, 255, 255, 0.09); padding: 0.08em 0.3em; overflow-wrap: anywhere; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+/* Code a step under the text: the mono face is wide for its size. */
+code { font-family: var(--mono); font-size: var(--t-xs); background: rgba(255, 255, 255, 0.09); padding: 0.08em 0.3em; overflow-wrap: anywhere; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .ui { font-weight: 700; color: #fff; }
-.app-name { font-family: var(--mono); font-size: 0.86em; font-weight: 600; color: #fff; background: rgba(255, 255, 255, 0.09); padding: 0.08em 0.36em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.app-name { font-family: var(--mono); font-size: var(--t-xs); font-weight: 600; color: #fff; background: rgba(255, 255, 255, 0.09); padding: 0.08em 0.36em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 /* Each piece of the address stays whole; lines break only between them (<wbr>). */
 .app-name .addr span { white-space: nowrap; }
 
@@ -457,7 +467,7 @@ code { font-family: var(--mono); font-size: 0.86em; background: rgba(255, 255, 2
   padding: 10px 26px;
   margin: 0;
   border: 0;
-  font: 800 19px/1.15 var(--text-face);
+  font: 800 var(--t-xl)/1.15 var(--text-face);
   letter-spacing: -0.01em;
   text-align: center;
   text-decoration: none;
@@ -484,7 +494,7 @@ code { font-family: var(--mono); font-size: 0.86em; background: rgba(255, 255, 2
   padding: 0 16px;
   margin: 0;
   border: 0;
-  font: 700 14px/1 var(--text-face);
+  font: 700 var(--t-md)/1 var(--text-face);
   letter-spacing: -0.005em;
   text-decoration: none;
   white-space: nowrap;
@@ -503,20 +513,20 @@ code { font-family: var(--mono); font-size: 0.86em; background: rgba(255, 255, 2
 .btn-danger { color: #ffb3bc; background: color-mix(in srgb, var(--bad) 18%, var(--rail)); }
 .btn-danger:hover { color: #2b0409; background: var(--bad); }
 /* In lists, where many stand together. */
-.btn-sm { height: var(--ctl-sm); min-width: 76px; padding: 0 11px; font-size: 13px; }
+.btn-sm { height: var(--ctl-sm); min-width: 76px; padding: 0 11px; font-size: var(--t-sm); }
 /* Touch screens get the full height everywhere: a small button is small for a finger. */
 @media (pointer: coarse) { .btn-sm { height: var(--ctl); } }
 /* Not available yet (an upload without a file, a build running): plain, so it reads as waiting. */
 .btn[disabled], .btn[disabled]:hover { color: #8d97a2; background: var(--rail); filter: none; cursor: not-allowed; }
 
-.field { display: grid; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--ash); }
+.field { display: grid; gap: 6px; min-width: 0; font-size: var(--t-sm); font-weight: 600; color: var(--ash); }
 .input, .field input, .field textarea, input.search {
   width: 100%;
   height: var(--ctl);
   margin: 0;
   padding: 0 13px;
   font: inherit;
-  font-size: 15px;
+  font-size: var(--t-md);
   font-weight: 400;
   color: var(--chalk);
   background: #0e1216;
@@ -532,7 +542,7 @@ code { font-family: var(--mono); font-size: 0.86em; background: rgba(255, 255, 2
 /* A field the form's check found empty (forms.js, and the server's answer): its edge in the error's red, until typed in. */
 .field input[aria-invalid="true"]:not(:focus) { border-color: color-mix(in srgb, var(--bad) 75%, transparent); }
 .input::placeholder, .field input::placeholder, input.search::placeholder { color: #8d97a2; }
-.input-sm { height: var(--ctl-sm); padding: 0 10px; font-size: 14px; }
+.input-sm { height: var(--ctl-sm); padding: 0 10px; font-size: var(--t-md); }
 @media (pointer: coarse) { .input-sm { height: var(--ctl); } }
 /* A list to pick from: one arrow on every system. */
 select.input {
@@ -630,7 +640,7 @@ input[type=checkbox]:focus-visible { outline: 2px solid var(--accent); outline-o
 .drop input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .drop-text { display: grid; gap: 2px; min-width: 0; flex: 1; }
 .drop-title { font-weight: 600; overflow-wrap: anywhere; }
-.drop-hint { color: var(--ash); font-size: 13px; overflow-wrap: anywhere; }
+.drop-hint { color: var(--ash); font-size: var(--t-sm); overflow-wrap: anywhere; }
 /* The button only shows where to tap; taps land on the file field over the whole box. */
 .drop-pick { flex: none; pointer-events: none; }
 /* Dropping a file needs a mouse: phones and tablets do not mention it. */
@@ -641,7 +651,7 @@ input[type=checkbox]:focus-visible { outline: 2px solid var(--accent); outline-o
 .tabs { display: flex; flex-wrap: wrap; gap: 3px; margin: 0 0 16px; border-bottom: 2px solid var(--accent); }
 .tabs a {
   padding: 9px 22px 8px;
-  font: 700 14px/1.3 var(--text-face);
+  font: 700 var(--t-md)/1.3 var(--text-face);
   text-align: center;
   text-decoration: none;
   color: var(--ash);
@@ -667,7 +677,7 @@ main > .tabs { margin-bottom: 0; }
 .tabs.charts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; margin-bottom: 18px; border: 0; }
 .chart-row { display: grid; grid-template-columns: 4.2em repeat(4, minmax(0, 1fr)); gap: 7px; align-items: center; }
 /* Space for the count at the tab's right end where it fits; elsewhere the tab's tooltip says it. */
-.chart-line { grid-column: 1; grid-row: 1; font: italic 800 13.5px/1 var(--wide); letter-spacing: 0.01em; color: var(--ash); }
+.chart-line { grid-column: 1; grid-row: 1; font: italic 800 var(--t-sm)/1 var(--wide); letter-spacing: 0.01em; color: var(--ash); }
 .tabs.charts a {
   --d: var(--accent);
   grid-row: 1;
@@ -676,7 +686,7 @@ main > .tabs { margin-bottom: 0; }
   align-items: baseline;
   gap: 8px;
   padding: 10px 12px;
-  font: 700 15px/1.2 var(--display);
+  font: 700 var(--t-lg)/1.2 var(--display);
   letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
@@ -687,7 +697,7 @@ main > .tabs { margin-bottom: 0; }
 }
 .tabs.charts a:hover { color: #fff; background: color-mix(in srgb, var(--d) 28%, var(--rail)); }
 .tabs.charts a.on, .tabs.charts a.on:hover { color: #0b0e11; background: var(--d); }
-.tabs.charts .n { font: 500 12.5px/1.2 var(--text-face); letter-spacing: 0; opacity: 0.9; }
+.tabs.charts .n { font: 500 var(--t-xs)/1.2 var(--text-face); letter-spacing: 0; opacity: 0.9; }
 @media (max-width: 1000px) { .tabs.charts .n { display: none; } }
 /* Easy, Normal, Hard and Expert in the game's colours for them. A song with no Easy chart, as most are, has no hole where it
    would go. */
@@ -703,8 +713,8 @@ main > .tabs { margin-bottom: 0; }
 @media (max-width: 700px) {
   .chart-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px 5px; }
   .tabs.charts:has(.sig0) .chart-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .chart-line { grid-column: 1 / -1; grid-row: 1; font-size: 12px; }
-  .tabs.charts a { grid-row: 2; justify-content: center; padding: 10px 2px; font-size: 13.5px; letter-spacing: 0; }
+  .chart-line { grid-column: 1 / -1; grid-row: 1; font-size: var(--t-xs); }
+  .tabs.charts a { grid-row: 2; justify-content: center; padding: 10px 2px; font-size: var(--t-sm); letter-spacing: 0; }
   .tabs.charts .sig1 { grid-column: 1; }
   .tabs.charts .sig2 { grid-column: 2; }
   .tabs.charts .sig3 { grid-column: 3; }
@@ -717,19 +727,19 @@ main > .tabs { margin-bottom: 0; }
 /* ------------------------------------------------------------------ tables */
 
 .table-scroll { overflow-x: auto; }
-table { --cell: 10px; width: 100%; border-collapse: collapse; font-size: 14px; }
+table { --cell: 10px; width: 100%; border-collapse: collapse; font-size: var(--t-md); }
 th, td { padding: 11px var(--cell); border-bottom: 1px solid rgba(255, 255, 255, 0.075); text-align: left; white-space: nowrap; vertical-align: middle; }
-th { color: var(--ash); font-weight: 600; font-size: 12.5px; border-bottom-color: var(--seam); }
+th { color: var(--ash); font-weight: 600; font-size: var(--t-xs); border-bottom-color: var(--seam); }
 tbody tr:last-child td { border-bottom: 0; }
 /* The row under the pointer. Touch screens have no such thing, so nothing stays lit after a tap. */
 @media (hover: hover) { tbody tr { transition: background-color var(--quick); } tbody tr:hover { background: rgba(255, 255, 255, 0.045); } }
 td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
-td.r { font-family: var(--display); font-weight: 700; font-size: 16px; letter-spacing: 0.01em; }
+td.r { font-family: var(--display); font-weight: 700; font-size: var(--t-lg); letter-spacing: 0.01em; }
 /* The name takes the room the numbers do not need: the number columns stay together on the right. */
 table.board th.name, table.board td.name { width: 100%; }
 /* The column a ranking is sorted by. */
 th.sorted { color: var(--accent); font-weight: 700; }
-td.sorted { color: var(--accent); font-weight: 800; font-size: 17px; }
+td.sorted { color: var(--accent); font-weight: 800; font-size: var(--t-xl); }
 /* A name that links (player, song) takes its whole cell as the tap target. */
 td { position: relative; }
 td > a:not(.btn) { text-decoration: none; }
@@ -737,7 +747,7 @@ td > a:not(.btn)::after { content: ""; position: absolute; inset: 0; }
 td > a:not(.btn):hover { color: var(--accent); }
 /* Right-aligned, so the digits stay in one column. */
 td.rank, th.rank { text-align: right; }
-td.rank { width: 2.4em; color: var(--ash); font: italic 800 18px/1 var(--display); }
+td.rank { width: 2.4em; color: var(--ash); font: italic 800 var(--t-xl)/1 var(--display); }
 /* Player names wrap, anywhere if they must: a long nickname may not push the other columns off a phone. */
 td.name { white-space: normal; overflow-wrap: anywhere; font-weight: 600; }
 table.compact td { padding-block: 9px; }
@@ -745,7 +755,7 @@ table.compact td:first-child { white-space: normal; padding-left: 0; }
 table.compact td:last-child { padding-right: 0; }
 td.flag { width: 1%; }
 @media (max-width: 420px) {
-  table { --cell: 6px; font-size: 13.5px; }
+  table { --cell: 6px; font-size: var(--t-sm); }
   th, td { padding-block: 10px; }
   /* A long name wraps rather than push the score out of the screen. */
   table.board td.name { min-width: 92px; overflow-wrap: anywhere; }
@@ -769,7 +779,7 @@ td.actions { width: 1%; text-align: right; }
   table.data thead { display: none; }
   table.data tr { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 7px 10px; padding: 12px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.075); }
   table.data td { grid-column: 1 / -1; display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; align-items: center; width: auto; padding: 0; border: 0; text-align: left; white-space: normal; }
-  table.data td::before { content: attr(data-label); color: var(--ash); font: 500 12.5px/1.35 var(--text-face); letter-spacing: 0; }
+  table.data td::before { content: attr(data-label); color: var(--ash); font: 500 var(--t-xs)/1.35 var(--text-face); letter-spacing: 0; }
   /* A value of several parts stays in the value's column, each at its own width. */
   table.data td > * { grid-column: 2; justify-self: start; }
   table.data td.rank, table.data td.primary, table.data td.sub, table.data td.actions { display: block; }
@@ -777,10 +787,10 @@ td.actions { width: 1%; text-align: right; }
   table.data td.rank { grid-column: 1; grid-row: 1; width: auto; min-width: 1.4em; }
   table.data td.primary { grid-column: 2; grid-row: 1; font-weight: 600; }
   table.data td.primary:first-child { grid-column: 1 / -1; }
-  table.data td.sub { grid-column: 2; color: var(--ash); font-size: 13.5px; }
+  table.data td.sub { grid-column: 2; color: var(--ash); font-size: var(--t-sm); }
   table.data td.actions { padding-top: 8px; }
   table.data .btns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
-  table.data .btn, table.data .input-sm { height: var(--ctl); font-size: 14px; }
+  table.data .btn, table.data .input-sm { height: var(--ctl); font-size: var(--t-md); }
   table.data .btns .btn { width: 100%; min-width: 0; }
 }
 
@@ -862,10 +872,14 @@ td.actions { width: 1%; text-align: right; }
 .stage-mark .logo .m b { background: linear-gradient(180deg, #f1ffe4 0%, var(--accent) 58%, #58c31b 100%); -webkit-background-clip: text; background-clip: text; }
 .server-ver { flex: none; display: grid; gap: 3px; padding: 0 0 clamp(4px, 1vw, 14px) clamp(10px, 1.6vw, 16px); position: relative; color: #fff; }
 .server-ver::before { content: ""; position: absolute; left: 0; top: 2px; bottom: clamp(4px, 1vw, 14px); width: 2px; background: var(--accent); transform: skewX(-14deg); }
-.server-ver span { font: italic 800 11px/1 var(--wide); letter-spacing: 0.08em; color: #d7dde4; }
-.server-ver b { font: 800 clamp(17px, 2.3vw, 26px)/1.05 var(--display); letter-spacing: 0.01em; font-variant-numeric: tabular-nums; }
-.stage h2 { display: block; margin: 0 0 6px; font-size: clamp(19px, 2.4vw, 25px); letter-spacing: -0.02em; }
-.stage .lead { margin: 0 0 18px; color: #d7dde4; font-size: 15px; }
+.server-ver span { font: italic 800 var(--t-2xs)/1 var(--wide); letter-spacing: 0.08em; color: #d7dde4; }
+/* A display figure: the scale's heading size on a phone, then growing with the wordmark from 20 px. */
+.server-ver b { font: 800 var(--t-xl)/1.05 var(--display); letter-spacing: 0.01em; font-variant-numeric: tabular-nums; }
+@media (min-width: 870px) { .server-ver b { font-size: clamp(20px, 2.3vw, 26px); } }
+/* The site's name over the lead: the scale's heading size on a phone, then growing with the stage from 20 px. */
+.stage h2 { display: block; margin: 0 0 6px; font-size: var(--t-xl); letter-spacing: -0.02em; }
+@media (min-width: 834px) { .stage h2 { font-size: clamp(20px, 2.4vw, 25px); } }
+.stage .lead { margin: 0 0 18px; color: #d7dde4; font-size: var(--t-lg); }
 .stage-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
 .stage-acts .button { width: auto; min-width: 230px; }
 /* The way to the broadcasts, beside the download and as big: the live section's red, dark while nobody is on air so that the
@@ -878,7 +892,7 @@ td.actions { width: 1%; text-align: right; }
   min-width: 200px;
   min-height: 54px;
   padding: 10px 24px;
-  font: 800 19px/1.15 var(--text-face);
+  font: 800 var(--t-xl)/1.15 var(--text-face);
   letter-spacing: -0.01em;
   color: #fff;
   text-decoration: none;
@@ -946,22 +960,22 @@ td.actions { width: 1%; text-align: right; }
 .feed .who a { text-decoration: none; }
 .feed .who a:hover { color: var(--accent); }
 /* The title whole, and the chart on a line of its own in the section's colour, so that it does not read as part of the title. */
-.feed .what { display: grid; gap: 1px; color: var(--ash); font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+.feed .what { display: grid; gap: 1px; color: var(--ash); font-size: var(--t-sm); min-width: 0; overflow-wrap: anywhere; }
 .feed .what a { text-decoration: none; color: var(--chalk); }
 .feed .what a:hover { color: var(--accent); }
 .what-chart { font-size: 12px; font-weight: 600; color: var(--accent); }
 .feed-end { display: grid; justify-items: end; gap: 1px; }
-.feed-score { font: 700 17px/1.2 var(--display); letter-spacing: 0.01em; font-variant-numeric: tabular-nums; color: #fff; }
-.feed-when { font-size: 12px; color: var(--ash); white-space: nowrap; }
+.feed-score { font: 700 var(--t-xl)/1.2 var(--display); letter-spacing: 0.01em; font-variant-numeric: tabular-nums; color: #fff; }
+.feed-when { font-size: var(--t-xs); color: var(--ash); white-space: nowrap; }
 /* A new record's grade before its score, and how far it went over the player's best before. */
 .feed-score:has(.feed-grade) { display: inline-flex; justify-content: space-between; align-items: baseline; gap: 6px; min-width: 6.2em; }
-.feed-grade { font-size: 15px; }
-.feed-gain { font: 700 12.5px/1.2 var(--display); font-variant-numeric: tabular-nums; color: var(--accent); }
+.feed-grade { font-size: var(--t-lg); }
+.feed-gain { font: 700 var(--t-xs)/1.2 var(--display); font-variant-numeric: tabular-nums; color: var(--accent); }
 /* Top players: the place in a leaning number, the whole row leading to the player. */
 .feed.ranks li { grid-template-columns: 2.2em minmax(0, 1fr) auto; }
 .feed.ranks .who a::after { content: ""; position: absolute; inset: 0; }
 .feed-rank { justify-self: end; font: italic 800 25px/1 var(--display); color: var(--ash); }
-.feed.ranks .feed-score { font-size: 19px; }
+.feed.ranks .feed-score { font-size: var(--t-xl); }
 /* First place in the LIFE gauge's colours, second and third in silver and bronze: the game's own top three. */
 .place-1 { padding-right: 0.08em; background: var(--life); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .place-2 { color: #dfe6ed; }
@@ -974,12 +988,12 @@ td.actions { width: 1%; text-align: right; }
 /* The hall of fame: a box per month before, newest first, each with its first three in the podium's numbers. */
 .past-months { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 14px; }
 .past-month { padding: 14px 16px 12px; background: var(--rail); }
-.past-month h3 { margin: 0 0 10px; font-size: 14px; color: var(--chalk); }
+.past-month h3 { margin: 0 0 10px; font-size: var(--t-md); color: var(--chalk); }
 .past-top { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .past-top li { display: grid; grid-template-columns: 1.6em minmax(0, 1fr) auto; align-items: baseline; gap: 8px; }
 .past-top a { min-width: 0; overflow-wrap: anywhere; color: #fff; font-weight: 600; text-decoration: none; }
 .past-top a:hover { color: var(--accent); }
-.past-top b { font: 700 15px/1 var(--display); font-variant-numeric: tabular-nums; color: #fff; }
+.past-top b { font: 700 var(--t-lg)/1 var(--display); font-variant-numeric: tabular-nums; color: #fff; }
 .past-place { font: italic 800 20px/1 var(--display); color: var(--ash); }
 /* The signed-in player's own place, wherever it shows: a wash of the section's colour inside a thin rim of it, the
    ring the podium gives their card. No stripe at one end: the whole row is theirs. */
@@ -1020,13 +1034,13 @@ td.actions { width: 1%; text-align: right; }
 .pod-place { grid-row: 1 / span 3; justify-self: start; font: italic 800 58px/1 var(--display); }
 .pod-who, .pod-score, .pod-sub { grid-column: 2; }
 .pod-who { overflow-wrap: anywhere; }
-.pod-name { font-size: 18px; font-weight: 700; color: #fff; text-decoration: none; }
+.pod-name { font-size: var(--t-xl); font-weight: 700; color: #fff; text-decoration: none; }
 .pod-name::after { content: ""; position: absolute; inset: 0; }
 .pod-name:focus-visible { outline: none; }
 .pod-name:focus-visible::after { outline: 2px solid var(--cyan); outline-offset: -3px; }
 .pod .live-mark { z-index: 1; }
 .pod-score { font: 800 26px/1.1 var(--display); letter-spacing: 0.01em; font-variant-numeric: tabular-nums; color: var(--accent); }
-.pod-sub { font-size: 12.5px; color: var(--ash); }
+.pod-sub { font-size: var(--t-xs); color: var(--ash); }
 .pod.first { order: 2; padding-block: 28px 26px; }
 .pod.first .pod-place { font-size: 84px; }
 .pod.first .pod-name { font-size: 22px; }
@@ -1067,7 +1081,7 @@ td.actions { width: 1%; text-align: right; }
   .song:hover .t { color: var(--accent); }
 }
 @keyframes tile-sweep { from { left: 0; } to { left: 100%; } }
-.song .t { padding: 8px 10px 2px; font-weight: 700; font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; transition: color var(--quick); }
+.song .t { padding: 8px 10px 2px; font-weight: 700; font-size: var(--t-md); line-height: 1.3; overflow-wrap: anywhere; transition: color var(--quick); }
 .song .a { padding: 0 10px; color: var(--ash); font-size: var(--t-xs); line-height: 1.4; overflow-wrap: anywhere; }
 .song .p { padding: 3px 10px 0; color: var(--accent); font-size: 12px; font-weight: 700; line-height: 1.4; }
 .song:focus-visible { outline-offset: -3px; }
@@ -1081,7 +1095,7 @@ td.actions { width: 1%; text-align: right; }
 .songhead-pic { flex: none; width: 240px; height: 180px; object-fit: cover; background: linear-gradient(160deg, #2a3138, #14181d); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16), 0 10px 34px rgba(0, 0, 0, 0.6); }
 .songhead-text { flex: 1; min-width: 0; }
 .songhead h2 { display: block; margin: 0 0 8px; font: 800 clamp(26px, 4.2vw, 44px)/1.2 var(--display); letter-spacing: 0.01em; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); }
-.songhead dl { display: flex; flex-wrap: wrap; gap: 4px 22px; margin: 0; font-size: 14px; }
+.songhead dl { display: flex; flex-wrap: wrap; gap: 4px 22px; margin: 0; font-size: var(--t-md); }
 .songhead dl div { display: flex; gap: 7px; min-width: 0; }
 .songhead dt { color: #c5ced7; }
 .songhead dd { margin: 0; font-weight: 600; color: #fff; overflow-wrap: anywhere; }
@@ -1108,17 +1122,17 @@ td.actions { width: 1%; text-align: right; }
 .grade-bar { display: flex; height: 8px; margin: 18px 0 8px; background: var(--rail); }
 .grade-bar i { display: block; min-width: 2px; background: var(--g); }
 .grades { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; }
-.g-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font: 700 15px/1.5 var(--display); font-variant-numeric: tabular-nums; color: #fff; }
+.g-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font: 700 var(--t-lg)/1.5 var(--display); font-variant-numeric: tabular-nums; color: #fff; }
 
 /* Grades in the game's way: a heavy leaning letter that needs no box. S is the best, and lit. */
-.grade { --g: #9aa5b1; display: inline-block; min-width: 1.05em; padding-right: 0.08em; text-align: center; font: italic 800 19px/1 var(--wide); color: var(--g); }
+.grade { --g: #9aa5b1; display: inline-block; min-width: 1.05em; padding-right: 0.08em; text-align: center; font: italic 800 var(--t-xl)/1 var(--wide); color: var(--g); }
 .gS { --g: #a4f55f; text-shadow: 0 0 10px rgba(140, 242, 61, 0.55); }
 .gA { --g: #6fd6ff; }
 .gB { --g: #c491ff; }
 .gC { --g: #ffd24d; }
 .gD { --g: #ff9a5c; }
 .gE, .gF { --g: #9aa5b1; }
-.mark { display: inline-block; padding: 1px 6px; font: 800 12px/1.5 var(--display); letter-spacing: 0.04em; }
+.mark { display: inline-block; padding: 1px 6px; font: 800 var(--t-xs)/1.5 var(--display); letter-spacing: 0.04em; }
 /* Beside a grade's tall letter the mark sits on its middle, not on its foot. */
 .grade + .mark { vertical-align: 0.2em; }
 .mark.ac { background: #1d5fc9; color: #fff; }
@@ -1140,9 +1154,9 @@ td.actions { width: 1%; text-align: right; }
 .activity i.c4, .activity-steps i.c4 { background: color-mix(in srgb, var(--accent) 85%, var(--rail)); }
 .activity i.c5, .activity-steps i.c5 { background: var(--accent); }
 .activity i[data-tip]:hover { box-shadow: 0 0 0 1px #fff; }
-.activity-months { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; margin-bottom: 4px; font: 500 12px/1.2 var(--display); font-variant-numeric: tabular-nums; color: var(--ash); }
+.activity-months { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; margin-bottom: 4px; font: 500 var(--t-xs)/1.2 var(--display); font-variant-numeric: tabular-nums; color: var(--ash); }
 .activity-months span { white-space: nowrap; }
-.activity-key { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--ash); }
+.activity-key { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 8px; font-size: var(--t-xs); color: var(--ash); }
 .activity-steps { display: flex; gap: 2px; }
 .activity-steps i { width: 13px; height: 13px; }
 /* Records by LINE mode: a name, a bar, its number. The bars share out the height of the box beside them. */
@@ -1150,22 +1164,22 @@ td.actions { width: 1%; text-align: right; }
 .card:has(> .levels) { align-self: stretch; display: flex; flex-direction: column; }
 .levels { flex: 1; display: grid; gap: 6px; align-content: space-evenly; }
 .level { display: grid; grid-template-columns: 3.4em minmax(0, 1fr) 4.6em; align-items: center; gap: 12px; }
-.level-name { font: italic 800 12.5px/1 var(--wide); color: var(--ash); white-space: nowrap; }
+.level-name { font: italic 800 var(--t-xs)/1 var(--wide); color: var(--ash); white-space: nowrap; }
 .level-bar { display: flex; gap: 2px; height: 10px; background: var(--rail); }
 .level-bar i { display: block; height: 100%; background: var(--g); text-shadow: none; }
-.level b { font: 700 15px/1 var(--display); font-variant-numeric: tabular-nums; text-align: right; color: #fff; }
-.level b small { display: inline-block; min-width: 2.4em; text-align: left; font-size: 12.5px; color: var(--ash); }
+.level b { font: 700 var(--t-lg)/1 var(--display); font-variant-numeric: tabular-nums; text-align: right; color: #fff; }
+.level b small { display: inline-block; min-width: 2.4em; text-align: left; font-size: var(--t-xs); color: var(--ash); }
 /* The one tooltip of a page's charts. */
-.chart-tip { position: fixed; z-index: 40; max-width: 320px; padding: 5px 9px; font-size: 12.5px; font-weight: 600; color: #fff; background: rgba(21, 26, 32, 0.96); box-shadow: var(--glass-rim), 0 6px 18px rgba(0, 0, 0, 0.5); pointer-events: none; }
+.chart-tip { position: fixed; z-index: 40; max-width: 320px; padding: 5px 9px; font-size: var(--t-xs); font-weight: 600; color: #fff; background: rgba(21, 26, 32, 0.96); box-shadow: var(--glass-rim), 0 6px 18px rgba(0, 0, 0, 0.5); pointer-events: none; }
 /* A player's lists: jacket, song and chart, score, mark, time. */
 table.plays { table-layout: fixed; }
 table.plays td { overflow-wrap: anywhere; padding-block: 8px; }
 table.plays td.jk { width: 76px; padding-right: 0; }
 table.plays td.song-cell { font-weight: 600; white-space: normal; }
-table.plays td.chart { width: 10.5em; color: var(--ash); font-size: 13px; }
+table.plays td.chart { width: 10.5em; color: var(--ash); font-size: var(--t-sm); }
 table.plays td.r { width: 6.5em; }
 table.plays td.flag { width: 5em; }
-table.plays td.when { width: 6.5em; color: var(--ash); font-size: 13px; }
+table.plays td.when { width: 6.5em; color: var(--ash); font-size: var(--t-sm); }
 .chart-sub { display: none; }
 @media (max-width: 620px) {
   td.when, td.chart { display: none; }
@@ -1178,8 +1192,8 @@ table.plays td.when { width: 6.5em; color: var(--ash); font-size: 13px; }
   table.plays td.jk { grid-column: 1; grid-row: 1 / span 2; width: auto; padding: 0; }
   table.plays td.song-cell { display: contents; }
   table.plays td.song-cell > a { grid-column: 2; grid-row: 1; font-weight: 600; overflow-wrap: anywhere; }
-  .chart-sub { display: block; grid-column: 2; grid-row: 2; color: var(--ash); font-size: 12.5px; font-weight: 400; overflow-wrap: anywhere; }
-  table.plays td.r { grid-column: 3; grid-row: 1; justify-self: end; width: auto; font-size: 15px; }
+  .chart-sub { display: block; grid-column: 2; grid-row: 2; color: var(--ash); font-size: var(--t-xs); font-weight: 400; overflow-wrap: anywhere; }
+  table.plays td.r { grid-column: 3; grid-row: 1; justify-self: end; width: auto; font-size: var(--t-lg); }
   /* At the score's right edge: the grade (or NEW) last, a mark before it, so that grades and scores end on one line. */
   table.plays td.flag { grid-column: 3; grid-row: 2; justify-self: end; display: flex; flex-direction: row-reverse; align-items: center; gap: 6px; width: auto; padding: 0; }
 }
@@ -1190,14 +1204,14 @@ table.plays td.when { width: 6.5em; color: var(--ash); font-size: 13px; }
 .install-main { min-width: 0; }
 .install .button { max-width: 460px; min-height: 60px; font-size: 21px; }
 /* Android only, said as plainly as the button is. */
-.for-android { margin: 12px 0 0; font-size: 14px; color: var(--chalk); }
+.for-android { margin: 12px 0 0; font-size: var(--t-md); color: var(--chalk); }
 /* Three steps in order, big numbers: this one really is a sequence. Grouped by the space between them, with no box each. */
 .steps { list-style: none; counter-reset: step; margin: 28px 0 0; padding: 24px 0 0; border-top: 1px solid rgba(255, 255, 255, 0.12); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 36px; font-size: 14px; line-height: 1.6; color: #dfe5eb; }
 .steps li { position: relative; counter-increment: step; min-width: 0; padding-left: 48px; overflow-wrap: break-word; }
 .steps li::before { content: counter(step); position: absolute; left: 0; top: -6px; font: italic 800 44px/1 var(--display); color: var(--accent); }
 /* A step's words, one paragraph; its name first, on a line of its own. */
 .step-text { margin: 0; }
-.step-text > b:first-child { display: block; margin-bottom: 4px; font-size: 16px; font-weight: 800; color: #fff; }
+.step-text > b:first-child { display: block; margin-bottom: 4px; font-size: var(--t-lg); font-weight: 800; color: #fff; }
 .notes { margin: 16px 0 0; padding: 0; list-style: none; color: var(--ash); font-size: var(--t-sm); }
 .notes li { margin: 4px 0; }
 .notes b { font-weight: 700; color: #fff; }
@@ -1205,7 +1219,7 @@ table.plays td.when { width: 6.5em; color: var(--ash); font-size: 13px; }
 /* The screen each step meets on the phone, drawn small and dark like Android's, the part to press ringed in the section's
    colour; at the foot of its step, so that the three line up. */
 .steps li { display: flex; flex-direction: column; }
-.screen { display: grid; align-content: center; gap: 8px; min-height: 104px; margin-top: auto; padding: 12px 14px; background: #0c0f13; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; font: 400 13px/1.35 var(--text-face); color: #e8edf2; }
+.screen { display: grid; align-content: center; gap: 8px; min-height: 104px; margin-top: auto; padding: 12px 14px; background: #0c0f13; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; font: 400 var(--t-sm)/1.35 var(--text-face); color: #e8edf2; }
 .steps li > .screen { margin-top: 14px; }
 /* Side by side, the three steps share two rows (subgrid): their words in the first, their screens in the second. A
    screen that needs more room (the app's icon over its name) makes the row taller for all three, so that the screens
@@ -1216,17 +1230,17 @@ table.plays td.when { width: 6.5em; color: var(--ash); font-size: 13px; }
   .steps li > .screen { margin-top: 0; }
 }
 .screen-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.screen-file { flex: none; display: grid; place-items: center; width: 38px; height: 46px; font: 800 11px/1 var(--wide); color: #0c0f13; background: var(--accent); clip-path: polygon(0 0, 70% 0, 100% 22%, 100% 100%, 0 100%); }
+.screen-file { flex: none; display: grid; place-items: center; width: 38px; height: 46px; font: 800 var(--t-2xs)/1 var(--wide); color: #0c0f13; background: var(--accent); clip-path: polygon(0 0, 70% 0, 100% 22%, 100% 100%, 0 100%); }
 .screen-text { display: grid; gap: 2px; min-width: 0; }
 .screen-text b { font-weight: 600; color: #fff; overflow-wrap: anywhere; }
-.screen-text small { color: #aab4be; font-size: 12px; }
-.screen-title { font-size: 15px; font-weight: 700; color: #fff; }
+.screen-text small { color: #aab4be; font-size: var(--t-xs); }
+.screen-title { font-size: var(--t-md); font-weight: 700; color: #fff; }
 .screen-switch { position: relative; flex: none; width: 40px; height: 22px; margin-left: auto; border-radius: 11px; background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
 .screen-switch::after { content: ""; position: absolute; right: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #0c0f13; }
 .screen-home { justify-items: center; text-align: center; }
 .screen-icon { display: block; width: 56px; height: 56px; border-radius: 14px; overflow: hidden; background: #1c2229; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent); }
 .screen-icon img { display: block; width: 100%; height: 100%; }
-.screen-home .app-name { font-size: 12.5px; color: #fff; }
+.screen-home .app-name { font-size: var(--t-xs); color: #fff; }
 /* A phone: the number beside the step's name and the words under both, which leaves the app's name room for one line. */
 @media (max-width: 520px) {
   .steps li { padding-left: 0; }
@@ -1240,7 +1254,7 @@ table.plays td.when { width: 6.5em; color: var(--ash); font-size: 13px; }
 .help[open] summary { color: #fff; }
 /* Closed and last in its card: the summary's tap padding (11px) is not added to the card's at the foot. */
 .help:last-child:not([open]) { margin-bottom: -11px; }
-.help ul { margin: 1px 0 0; padding: 0; list-style: none; color: #dfe5eb; font-size: 14px; }
+.help ul { margin: 1px 0 0; padding: 0; list-style: none; color: #dfe5eb; font-size: var(--t-md); }
 .help b { color: #fff; }
 .help li { margin: 6px 0; }
 
@@ -1251,7 +1265,7 @@ table.plays td.when { width: 6.5em; color: var(--ash); font-size: 13px; }
 .door { display: grid; justify-items: center; gap: 14px; margin-top: clamp(8px, 7vh, 72px); text-align: center; }
 .door-mark { --mark: clamp(44px, 9vw, 92px); justify-content: center; }
 .door-mark .m { filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.55)); }
-.door-line { margin: 0; font-size: clamp(15px, 1.8vw, 18px); font-weight: 700; color: #fff; text-wrap: balance; }
+.door-line { margin: 0; font-size: var(--t-xl); font-weight: 700; color: #fff; text-wrap: balance; }
 .door + .signin { margin-top: 4px; }
 body.signed-out:has(.door) .bar .logo { visibility: hidden; }
 /* Whose account is signed in, in the bar beside the way out: a player as the game's lobby shows one, a round badge with
@@ -1267,7 +1281,7 @@ body.signed-out:has(.door) .bar .logo { visibility: hidden; }
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  font: 800 15px/1 var(--display);
+  font: 800 var(--t-lg)/1 var(--display);
   color: var(--accent-ink);
   /* The section's colour lit from the top left, like the game's badges, inside a thin ring of it apart from the bar. */
   background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--accent) 55%, #fff), var(--accent) 58%, color-mix(in srgb, var(--accent) 72%, #000));
@@ -1275,8 +1289,8 @@ body.signed-out:has(.door) .bar .logo { visibility: hidden; }
 }
 /* At most 12em wide: a long name wraps there instead of pushing the sections out of the bar. */
 .who-text { display: grid; gap: 1px; min-width: 0; max-width: 12em; line-height: 1.2; }
-.who-name { font-size: 13.5px; font-weight: 700; color: #fff; overflow-wrap: anywhere; transition: color var(--quick); }
-.who-sub { font-size: 11.5px; font-weight: 500; color: var(--ash); overflow-wrap: anywhere; }
+.who-name { font-size: var(--t-sm); font-weight: 700; color: #fff; overflow-wrap: anywhere; transition: color var(--quick); }
+.who-sub { font-size: var(--t-2xs); font-weight: 500; color: var(--ash); overflow-wrap: anywhere; }
 /* Leading to the player's own page (an account linked to its game player): the name takes the section's colour under the
    pointer and the badge brightens. */
 a.auth-who:hover .who-name { color: var(--accent); }
@@ -1288,7 +1302,7 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
 @media (max-width: 720px) { .auth-form { gap: 10px; } }
 .signin h2 { font-size: 22px; }
 .signin-form { display: grid; gap: 14px; margin: 16px 0 0; }
-.signin-form .field input { height: 46px; font-size: 16px; }
+.signin-form .field input { height: 46px; font-size: var(--t-lg); }
 .signin-form .button { margin-top: 4px; }
 /* A phone held sideways, as the game's own web view shows this page (its score viewer is behind the sign-in): the wordmark
    beside the form, smaller, so that the form is on the screen without scrolling. What else the page says (a notice) goes
@@ -1300,7 +1314,7 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
   .door-mark { --mark: clamp(34px, 6.5vw, 60px); }
   .door + .signin { margin-top: 0; }
   .signin { padding-block: 16px; }
-  .signin h2 { font-size: 19px; }
+  .signin h2 { font-size: var(--t-xl); }
   .signin-form { gap: 10px; margin-top: 10px; }
   .signin-form .field input { height: 40px; }
 }
@@ -1313,14 +1327,14 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
 }
 
 /* The footer: what this site is, in two short lines, and the ways on. */
-.foot { flex: none; color: var(--ash); font-size: 12.5px; line-height: 1.6; background: #0d1014; border-top: 1px solid var(--seam); }
+.foot { flex: none; color: var(--ash); font-size: var(--t-xs); line-height: 1.6; background: #0d1014; border-top: 1px solid var(--seam); }
 .foot-in { display: flex; justify-content: space-between; align-items: center; gap: 14px 32px; padding-block: 16px 18px; }
 .foot-note { min-width: 0; }
 .foot-note p { margin: 0; }
 .foot-keys { flex: none; display: flex; align-items: center; gap: 4px 14px; flex-wrap: wrap; }
 .foot-tag { color: var(--ash); white-space: nowrap; }
 /* A small link by its name, in the menus' face. */
-.key { position: relative; display: block; padding: 6px 0; font: 700 11px/1 var(--wide); letter-spacing: 0.05em; color: var(--chalk); text-decoration: none; white-space: nowrap; }
+.key { position: relative; display: block; padding: 6px 0; font: 700 var(--t-2xs)/1 var(--wide); letter-spacing: 0.05em; color: var(--chalk); text-decoration: none; white-space: nowrap; }
 .key::after { content: ""; position: absolute; inset: -8px -6px; }
 .key:hover { color: var(--accent); }
 @media (max-width: 720px) {
@@ -1331,7 +1345,7 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
 /* ------------------------------------------------------------------ live view */
 
 /* A LIVE link next to a player's name. Text, with a larger invisible area for a finger. */
-.live-mark { position: relative; margin-left: 6px; font: 800 12px/1 var(--display); letter-spacing: 0.06em; color: var(--bad); text-decoration: none; white-space: nowrap; }
+.live-mark { position: relative; margin-left: 6px; font: 800 var(--t-xs)/1 var(--display); letter-spacing: 0.06em; color: var(--bad); text-decoration: none; white-space: nowrap; }
 .live-mark:hover { text-decoration: underline; }
 .live-mark::after { content: ""; position: absolute; inset: -12px -6px; }
 
@@ -1362,7 +1376,7 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
 .past-pic::before { content: "DMTQ"; position: absolute; inset: 0; display: grid; place-items: center; font: italic 800 26px/1 var(--wide); color: rgba(255, 255, 255, 0.1); }
 .past-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }
 .past:hover .past-pic img { transform: scale(1.04); }
-.past-len { position: absolute; right: 6px; bottom: 6px; padding: 1px 6px; font: 700 12px/1.45 var(--display); font-variant-numeric: tabular-nums; color: #fff; background: rgba(8, 10, 13, 0.82); }
+.past-len { position: absolute; right: 6px; bottom: 6px; padding: 1px 6px; font: 700 var(--t-xs)/1.45 var(--display); font-variant-numeric: tabular-nums; color: #fff; background: rgba(8, 10, 13, 0.82); }
 /* How far this viewer got. */
 .past-seen { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--accent); }
 .past-text { display: grid; gap: 1px; min-width: 0; }
@@ -1371,8 +1385,8 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
 /* The recording playing now: a ring inside its picture (drawn outside it, the side list's scroll box cut it off on
    two sides). Over the picture, and never in the pointer's way. */
 .past.on .past-pic::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 0 2px var(--accent); pointer-events: none; }
-.past .doing { color: var(--chalk); font-size: 13px; overflow-wrap: anywhere; }
-.past-when { color: var(--ash); font-size: 12.5px; }
+.past .doing { color: var(--chalk); font-size: var(--t-sm); overflow-wrap: anywhere; }
+.past-when { color: var(--ash); font-size: var(--t-xs); }
 @media (min-width: 1040px) {
   .watch.has-player:not(.wide) .past-list { grid-template-columns: minmax(0, 1fr); gap: 10px; padding-right: 4px; }
   .watch.has-player:not(.wide) .past { grid-template-columns: 128px minmax(0, 1fr); gap: 10px; align-items: start; }
@@ -1405,10 +1419,10 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
   .chapters .ch-chart { grid-column: 3; }
 }
 /* Picking up where this viewer left off, for a few seconds on the picture, and the way back to the start. */
-.live-resume { position: absolute; left: 12px; bottom: 82px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; max-width: calc(100% - 24px); padding: 6px 12px; font-size: 13px; color: #fff; background: rgba(12, 15, 19, 0.82); box-shadow: var(--glass-rim); }
+.live-resume { position: absolute; left: 12px; bottom: 82px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; max-width: calc(100% - 24px); padding: 6px 12px; font-size: var(--t-sm); color: #fff; background: rgba(12, 15, 19, 0.82); box-shadow: var(--glass-rim); }
 .live-resume[hidden] { display: none; }
 /* The network is gone and what was in hand has played. */
-.live-lost { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); padding: 6px 14px; font-size: 13.5px; font-weight: 600; color: #fff; background: rgba(12, 15, 19, 0.82); box-shadow: var(--glass-rim); white-space: nowrap; }
+.live-lost { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); padding: 6px 14px; font-size: var(--t-sm); font-weight: 600; color: #fff; background: rgba(12, 15, 19, 0.82); box-shadow: var(--glass-rim); white-space: nowrap; }
 .live-lost[hidden] { display: none; }
 /* A press that brought the controls back is not over yet: a second one must reach the picture, not what appeared under it. */
 .live-stage.just-woke .live-ctl { pointer-events: none; }
@@ -1429,7 +1443,7 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
 .air-days i.c4 { background: color-mix(in srgb, var(--accent) 85%, transparent); }
 .air-days i.c5 { background: var(--accent); }
 .air-days i:hover { box-shadow: 0 0 0 1px #fff; }
-.air-days-ends { display: flex; justify-content: space-between; width: min(100%, 520px); margin: 4px 0 12px; color: var(--ash); font-size: 11.5px; }
+.air-days-ends { display: flex; justify-content: space-between; width: min(100%, 520px); margin: 4px 0 12px; color: var(--ash); font-size: var(--t-2xs); }
 .off-air { position: relative; display: grid; align-content: center; justify-items: center; gap: 4px; min-height: clamp(190px, 30vh, 320px); text-align: center; overflow: hidden; }
 .off-air > :not(.off-air-word) { position: relative; max-width: 56ch; }
 /* The days and their two ends as wide as each other: a width in letters would differ, their letters being of two sizes. */
@@ -1437,7 +1451,7 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
 .off-air-word { position: absolute; inset: 0; display: grid; place-items: center; font: italic 800 clamp(48px, 11vw, 132px)/1 var(--wide); letter-spacing: 0.02em; color: rgba(255, 255, 255, 0.05); white-space: nowrap; pointer-events: none; user-select: none; }
 /* REPLAY in metal: a section's red is for what is live. */
 #mast.is-replay .word { background: linear-gradient(180deg, #fff 8%, #8d97a2 72%); -webkit-background-clip: text; background-clip: text; }
-.live-empty-head { font-size: var(--t-lg); font-weight: 700; color: #fff; }
+.live-empty-head { font-size: var(--t-xl); font-weight: 700; color: #fff; }
 /* The live page with broadcasts off for the server: the box with the way home under its words, a little apart. */
 .live-off .btn-line { justify-content: center; margin-top: 12px; }
 .live-empty p { margin: 0 0 6px; }
@@ -1458,8 +1472,8 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
 .live-stage.idle { cursor: none; }
 .live-stage.idle .live-ctl { opacity: 0; pointer-events: none; }
 .ctl-gap { flex: 1; }
-.ctl-time { flex: none; margin: 0 8px; font: 700 13.5px/1 var(--display); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; text-shadow: 0 1px 2px #000; }
-.ctl-word { font: 700 13.5px/1 var(--display) !important; font-variant-numeric: tabular-nums; }
+.ctl-time { flex: none; margin: 0 8px; font: 700 var(--t-sm)/1 var(--display); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; text-shadow: 0 1px 2px #000; }
+.ctl-word { font: 700 var(--t-sm)/1 var(--display) !important; font-variant-numeric: tabular-nums; }
 /* The timeline: played in the section's colour, loaded lighter, the rest faint; marks where songs begin. */
 .ctl-track { position: relative; height: 22px; margin: 0 6px 2px; }
 .live-ctl input.ctl-seek { position: absolute; inset: 0; width: 100%; height: 22px; margin: 0; padding: 0; background: none; cursor: pointer; -webkit-appearance: none; appearance: none; --p: 0%; --b: 0%; }
@@ -1472,7 +1486,7 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
 .ctl-marks i { position: absolute; top: 0; height: 6px; transition: top 0.1s, height 0.1s, background-color 0.1s; }
 .ctl-marks i.cut { border-left: 2px solid rgba(8, 10, 13, 0.92); }
 .ctl-marks i.hot { top: -2px; height: 10px; background: rgba(255, 255, 255, 0.22); }
-.ctl-bubble { position: absolute; bottom: 24px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; max-width: 70%; padding: 3px 8px; font-size: 12.5px; font-weight: 600; color: #fff; background: rgba(21, 26, 32, 0.94); box-shadow: var(--glass-rim); pointer-events: none; }
+.ctl-bubble { position: absolute; bottom: 24px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; max-width: 70%; padding: 3px 8px; font-size: var(--t-xs); font-weight: 600; color: #fff; background: rgba(21, 26, 32, 0.94); box-shadow: var(--glass-rim); pointer-events: none; }
 /* The song's jacket at the bubble's start, and the time and the name beside it, cut short with dots when long. */
 .bubble-pic { flex: none; display: block; width: 36px; height: 36px; margin: 2px 0 2px -5px; object-fit: cover; background: #0c0f13; }
 .bubble-text { min-width: 0; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
@@ -1480,36 +1494,36 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
 .live-pill.replay { background: #47505b; }
 .live-pill.replay i { display: none; }
 /* Connection details, over the picture's corner. */
-.live-stats { position: absolute; right: 10px; top: 10px; display: grid; grid-template-columns: auto auto; gap: 1px 12px; margin: 0; padding: 8px 11px; font-size: 12px; line-height: 1.5; color: #fff; background: rgba(12, 15, 19, 0.82); box-shadow: var(--glass-rim); }
+.live-stats { position: absolute; right: 10px; top: 10px; display: grid; grid-template-columns: auto auto; gap: 1px 12px; margin: 0; padding: 8px 11px; font-size: var(--t-xs); line-height: 1.5; color: #fff; background: rgba(12, 15, 19, 0.82); box-shadow: var(--glass-rim); }
 .live-stats dt { color: #c5ced7; }
-.live-stats dd { margin: 0; font: 700 13px/1.4 var(--display); font-variant-numeric: tabular-nums; text-align: right; }
+.live-stats dd { margin: 0; font: 700 var(--t-sm)/1.4 var(--display); font-variant-numeric: tabular-nums; text-align: right; }
 /* A short word in the picture's middle: where a tap went, the speed now. */
 .live-flash { position: absolute; left: 50%; top: 50%; padding: 8px 16px; font: 800 22px/1 var(--display); color: #fff; background: rgba(12, 15, 19, 0.72); opacity: 0; transform: translate(-50%, -50%); transition: opacity 0.18s; pointer-events: none; }
 .live-flash.on { opacity: 1; }
 /* A recording that came to its end. */
 .live-end { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; background: rgba(8, 10, 13, 0.6); }
 /* Behind a broadcast on a slow connection: the way to now. */
-.go-live { height: 24px; padding: 0 10px; border: 0; font: 700 12.5px/1 var(--text-face); color: #2b0409; background: #ff8d9e; cursor: pointer; pointer-events: auto; }
+.go-live { height: 24px; padding: 0 10px; border: 0; font: 700 var(--t-xs)/1 var(--text-face); color: #2b0409; background: #ff8d9e; cursor: pointer; pointer-events: auto; }
 
 /* Live, and plain to see: a solid red mark that stays on the picture, with its pulsing light; beside it how long the
    broadcast has run, and who and what while the controls are there, over a shade of their own (the game's colours can
    be anything). The frame around the picture is lit too. */
 .live-stage.is-live { box-shadow: 0 0 0 2px #ff3148, 0 0 34px rgba(255, 49, 72, 0.42); }
-.live-pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px 5px 10px; font: 800 13px/1 var(--wide); letter-spacing: 0.08em; color: #fff; background: #e4122c; }
+.live-pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px 5px 10px; font: 800 var(--t-sm)/1 var(--wide); letter-spacing: 0.08em; color: #fff; background: #e4122c; }
 .live-pill i { width: 8px; height: 8px; border-radius: 50%; background: #fff; box-shadow: 0 0 6px #fff; animation: live-pulse 1.4s ease-in-out infinite; }
 @keyframes live-pulse { 50% { opacity: 0.3; } }
 /* A recording's mark: the same shape, in metal, with no light. */
 .live-pill.replay { background: #47505b; }
 .live-pill.replay i { display: none; }
 .live-top { position: absolute; inset: 0 0 auto; display: flex; align-items: center; gap: 10px; min-width: 0; padding: 12px 14px 30px; background: linear-gradient(180deg, rgba(0, 0, 0, 0.6) 0%, transparent 100%); pointer-events: none; }
-.live-clock { padding: 4px 8px; font: 700 13px/1 var(--display); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; color: #fff; background: rgba(0, 0, 0, 0.6); }
+.live-clock { padding: 4px 8px; font: 700 var(--t-sm)/1 var(--display); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; color: #fff; background: rgba(0, 0, 0, 0.6); }
 .live-clock:empty { display: none; }
 .live-title { display: none; align-items: baseline; gap: 8px; min-width: 0; color: #fff; text-shadow: 0 1px 3px #000; white-space: nowrap; overflow: hidden; }
 .live-stage:fullscreen .live-title { display: flex; }
-.live-title b { flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; font-size: 16px; font-weight: 700; }
-.live-title span { font-size: 13px; color: #e3e6ea; overflow: hidden; text-overflow: ellipsis; transition: opacity 0.25s; }
+.live-title b { flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; font-size: var(--t-lg); font-weight: 700; }
+.live-title span { font-size: var(--t-sm); color: #e3e6ea; overflow: hidden; text-overflow: ellipsis; transition: opacity 0.25s; }
 .live-stage.idle .live-title span { opacity: 0; }
-@media (max-width: 520px) { .live-resume { bottom: 62px; left: 8px; } .live-top { padding: 8px 10px 14px; gap: 7px; } .live-pill { font-size: 11px; padding: 4px 8px; } .live-clock { font-size: 12px; padding: 3px 6px; } .live-title b { font-size: 14px; } .live-title span { font-size: 12px; } }
+@media (max-width: 520px) { .live-resume { bottom: 62px; left: 8px; } .live-top { padding: 8px 10px 14px; gap: 7px; } .live-pill { font-size: var(--t-2xs); padding: 4px 8px; } .live-clock { font-size: var(--t-xs); padding: 3px 6px; } .live-title b { font-size: var(--t-md); } .live-title span { font-size: var(--t-xs); } }
 
 /* Who it is, under the picture. On a phone the song has the whole width under the name, the key after it. */
 .live-info { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px 12px; margin-top: 16px; min-width: 0; }
@@ -1521,9 +1535,9 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
   .live-info { grid-template-columns: minmax(0, 1fr); align-items: start; }
   .live-acts { grid-column: 1 / -1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 }
-.live-name { justify-self: start; font-size: 18px; font-weight: 700; line-height: 1.4; color: #fff; text-decoration: none; overflow-wrap: anywhere; }
+.live-name { justify-self: start; font-size: var(--t-xl); font-weight: 700; line-height: 1.4; color: #fff; text-decoration: none; overflow-wrap: anywhere; }
 .live-name:hover { color: var(--accent); }
-.live-doing { font-size: 13px; color: var(--ash); overflow-wrap: anywhere; }
+.live-doing { font-size: var(--t-sm); color: var(--ash); overflow-wrap: anywhere; }
 
 /* Cards of those on air, like a video site's: the picture with its marks, the name, what they play. */
 .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 14px; }
@@ -1533,12 +1547,12 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
 .thumb-pic::before { content: "DMTQ"; position: absolute; inset: 0; display: grid; place-items: center; font: italic 800 34px/1 var(--wide); color: rgba(255, 255, 255, 0.13); }
 .thumb-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }
 .thumb:hover .thumb-pic img { transform: scale(1.04); }
-.thumb-pic .live-pill { position: absolute; left: 8px; top: 8px; padding: 4px 8px; font-size: 11px; gap: 5px; }
+.thumb-pic .live-pill { position: absolute; left: 8px; top: 8px; padding: 4px 8px; font-size: var(--t-2xs); gap: 5px; }
 .thumb-pic .live-pill i { width: 6px; height: 6px; }
-.thumb-time { position: absolute; right: 8px; bottom: 8px; padding: 2px 6px; font: 700 12px/1.3 var(--display); font-variant-numeric: tabular-nums; color: #fff; background: rgba(0, 0, 0, 0.72); }
+.thumb-time { position: absolute; right: 8px; bottom: 8px; padding: 2px 6px; font: 700 var(--t-xs)/1.3 var(--display); font-variant-numeric: tabular-nums; color: #fff; background: rgba(0, 0, 0, 0.72); }
 .thumb-who { display: block; margin-top: 8px; font-weight: 700; color: #fff; overflow-wrap: anywhere; }
 .thumb:hover .thumb-who { color: var(--bad); }
-.thumb-what { display: block; font-size: 13px; color: var(--ash); overflow-wrap: anywhere; }
+.thumb-what { display: block; font-size: var(--t-sm); color: var(--ash); overflow-wrap: anywhere; }
 /* The section heading's light. */
 .on-air-dot { display: inline-block; width: 10px; height: 10px; margin-right: 8px; vertical-align: 1px; border-radius: 50%; background: #ff3148; box-shadow: 0 0 8px #ff3148; animation: live-pulse 1.4s ease-in-out infinite; }
 /* Video is late: the browser's own controls would show this, and they are off while live. */
@@ -1606,12 +1620,12 @@ table.board.parts td.name a::after { content: none; }
   table.board.parts tr:last-child { border-bottom: 0; }
   table.board.parts td { padding: 1px 0; border: 0; }
   table.board.parts td.name:first-child { font-weight: 700; color: #fff; }
-  table.board.parts td.name:not(:first-child) { color: var(--ash); font-size: 13.5px; }
+  table.board.parts td.name:not(:first-child) { color: var(--ash); font-size: var(--t-sm); }
 }
 .license-fold { margin-top: 10px; }
 .license-fold summary { cursor: pointer; padding: 8px 0; color: var(--accent); font-weight: 600; }
 .license-fold:last-child:not([open]) { margin-bottom: -8px; }
-.license-text { margin: 8px 0 0; font-size: 12px; line-height: 1.5; color: var(--ash); white-space: pre-wrap; overflow-wrap: anywhere; }
+.license-text { margin: 8px 0 0; font-size: var(--t-xs); line-height: 1.5; color: var(--ash); white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* A page that leads nowhere: the number big, the way back under it. */
 .lost { display: grid; gap: 4px; justify-items: start; padding-block: 18px; }
