@@ -3192,8 +3192,15 @@ void start(HWND frame, HWND game, const Hooks& hooks, bool korean) {
     GdiplusStartup(&g_gdiplus, &input, nullptr);
     // The player's own faces and the wordmark's pictures, from its folder (Windows' own faces, and the name in words,
     // where they are not there), before the painter draws with them.
-    load_fonts();
+    const bool own_faces = load_fonts();
     load_art();
+    // Which face the words are drawn in, said once: a log shows at a glance a player whose own faces did not load.
+    {
+        char line[200];
+        std::snprintf(line, sizeof line, "player: the overlay's words are drawn in %s%s", words_face(Weight::kRegular, g_korean).c_str(),
+                      own_faces ? "" : " (Windows' own: no Pretendard in fonts beside the player)");
+        note(line);
+    }
     // The notice, the frame counter and the handle let clicks through to the game; the bar and the question take
     // theirs. The counter first, so that the windows made after it are above it; the handle after the bar, above it:
     // on the bar's way it hangs from the bar's foot, over the bar's shadow, never under it; the question above all.

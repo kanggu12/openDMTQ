@@ -53,6 +53,9 @@ std::unique_ptr<Gdiplus::Font> font(Weight weight, float px, bool korean);
 std::unique_ptr<Gdiplus::Font> wide_font(float px);
 // Loads the player's own faces from fonts\ beside the program, once, after GDI+ has started; whether they were there.
 bool load_fonts();
+// The name of the face font() draws that weight in for the language (Pretendard's, or Windows' own where the player's
+// are not there), for the player's log and the checks (glasstest.cpp).
+std::string words_face(Weight weight, bool korean);
 
 // ---- the wordmark
 

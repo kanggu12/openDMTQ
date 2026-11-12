@@ -334,7 +334,7 @@ built the guest programs:
 ```sh
 arm32/build_desktop.sh      # Linux: the runner, the player and their tests, in _work/arm32/build-desktop-x86_64
 arm32/test_desktop.sh       # the same guest programs and checks on this machine, and the player's parts
-arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest livenettest player    # Windows, cross-built with llvm-mingw
+arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest livenettest glasstest player    # Windows, cross-built with llvm-mingw
 arm32/test_windows.sh       # the Windows programs' tests under Wine
 arm32/bundle_windows.sh     # the player for Windows as a release ships it
 ```

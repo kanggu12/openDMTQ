@@ -102,7 +102,7 @@ You do not have to run them all: pick the line for what you changed, and CI runs
 | `host/windows/` | `tests/windows/wine.sh` (builds the bundle and runs it under Wine) | Docker |
 | how a server gets its programs | `tests/closed/run.sh` does [Without internet](docs/closed-network.md) step by step, all but the PC client's installer, on a network with no way out | Docker on Linux; kind, Helm and root for Kubernetes |
 | `arm32/` | `arm32/build.sh arm64-v8a`, then `arm32/test.sh` on a device (see [arm32/README.md](arm32/README.md)) | Docker, git, adb and a phone or an emulator of the same ABI |
-| `arm32/desktop/`, the player for Windows | `arm32/build.sh`, then `arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest livenettest player` and `arm32/test_windows.sh` (its tests under Wine) | Docker, git |
+| `arm32/desktop/`, the player for Windows | `arm32/build.sh`, then `arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest livenettest glasstest player` and `arm32/test_windows.sh` (its tests under Wine) | Docker, git |
 | `deploy/helm/` | `helm lint deploy/helm/opendmtq -f deploy/kind/values.yaml --set publicHost=10.0.0.5` | Helm |
 | a shell script | `shellcheck <the script>`; for `arm32/*.sh`, `shellcheck --severity=warning -x -P arm32 <the script>` | ShellCheck |
 

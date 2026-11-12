@@ -8,14 +8,14 @@
 #   arm32/test_windows.sh
 #
 # The guest programs and the guest's system libraries come from the Android build (arm32/build.sh) in _work/arm32; the
-# Windows programs from arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest livenettest.
+# Windows programs from arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest livenettest glasstest.
 set -eu
 # The repository, wherever this script is called from.
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(dirname "$here")
 # Both builds must be there: the Windows programs, and the guest programs the runner runs.
-for exe in arm32run jvmtest audiotest mediatest settingstest livenettest; do
-  [ -f "$root/_work/arm32/build-windows-x86_64/$exe.exe" ] || { echo "no $exe.exe: run arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest livenettest" >&2; exit 1; }
+for exe in arm32run jvmtest audiotest mediatest settingstest livenettest glasstest; do
+  [ -f "$root/_work/arm32/build-windows-x86_64/$exe.exe" ] || { echo "no $exe.exe: run arm32/build_windows.sh arm32run jvmtest audiotest mediatest settingstest livenettest glasstest" >&2; exit 1; }
 done
 [ -f "$root/_work/arm32/guest/basic" ] || { echo "no guest programs: run arm32/build.sh" >&2; exit 1; }
 # The test image, made again only when its file changed (Docker's cache).
@@ -70,6 +70,12 @@ fi
 out=$(timeout 120 wine $b/settingstest.exe 2>&1 | tr -d "\r" || true)
 if echo "$out" | grep -q "ALL CHECKS PASSED"; then echo "PASS settings ($(echo "$out" | grep " checks$"))"
 else echo "FAIL settings"; echo "$out" | grep -v "^player: settings" | tail -n 15 | sed "s/^/    /"; failed=1
+fi
+# The faces of the overlay over the game (arm32/desktop/glasstest.cpp): Pretendard from fonts beside the program (the
+# build puts them there, as beside the player), for English and Korean alike, every Hangul syllable a glyph of its own.
+out=$(timeout 120 wine $b/glasstest.exe 2>&1 | tr -d "\r" || true)
+if echo "$out" | grep -q "ALL CHECKS PASSED"; then echo "PASS glass ($(echo "$out" | grep " checks$"))"
+else echo "FAIL glass"; echo "$out" | tail -n 15 | sed "s/^/    /"; failed=1
 fi
 # The broadcast requests to the server (arm32/tests/host/live_net_test.cpp, which CI runs on Linux), here through the
 # Windows layer of the runtime, whose sockets the player uses too: against stand-in servers on 127.0.0.1 (the loopback of

@@ -4,9 +4,10 @@
 #
 #   arm32/test_windows.ps1 -Folder <folder>
 #
-# The folder holds build-windows-x86_64\*.exe, sysroot\, guest\ and media-test.mp4 (a red picture and a 1000 Hz tone, as
-# arm32/test_windows.sh makes it with FFmpeg). Each program has a time limit, as in arm32/test_windows.sh: one that hangs
-# is ended and named as a failure, and the tests after it still run. Windows PowerShell 5.1 and PowerShell 7 both run it.
+# The folder holds build-windows-x86_64\*.exe and its fonts\, sysroot\, guest\ and media-test.mp4 (a red picture and a
+# 1000 Hz tone, as arm32/test_windows.sh makes it with FFmpeg). Each program has a time limit, as in
+# arm32/test_windows.sh: one that hangs is ended and named as a failure, and the tests after it still run. Windows
+# PowerShell 5.1 and PowerShell 7 both run it.
 param([Parameter(Mandatory = $true)][string]$Folder)
 # The programs write to stderr as they go, which is no failure: Windows PowerShell 5.1 would stop at its first line.
 $ErrorActionPreference = 'Continue'
@@ -95,8 +96,9 @@ Write-Result 'bridge' (([regex]::Matches($run.Text, 'returned 1005')).Count -eq 
 # Eight host threads become guest threads 5 ms apart while the running ones create and join guest threads.
 $run = Invoke-Program $runner @('--sysroot', $sysroot, '--agent', (Join-Path $guest 'arm32-agent'), '--call', "$guestDir/libplugin.so", 'plugin_spawn', '--threads', '8', '--stagger', '5', '100') 120
 Write-Result 'bridge-spawn' (([regex]::Matches($run.Text, '(?m)returned 100$')).Count -eq 8) $run
-# The Java VM the desktop player hosts the game in, the player's mixer, and its PC settings file.
-foreach ($program in @('jvmtest', 'audiotest', 'settingstest')) {
+# The Java VM the desktop player hosts the game in, the player's mixer, its PC settings file, and the faces of its overlay
+# (from build-windows-x86_64\fonts, as beside the player).
+foreach ($program in @('jvmtest', 'audiotest', 'settingstest', 'glasstest')) {
     $run = Invoke-Program (Join-Path $bin "$program.exe") @() 300
     Write-Result $program ($run.Text -match 'ALL CHECKS PASSED') $run
 }

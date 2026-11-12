@@ -52,11 +52,26 @@ std::wstring program_folder() {
     }
 }
 
-// A family of a collection by name, or null when it is not there.
-std::unique_ptr<FontFamily> family_of(const wchar_t* name, PrivateFontCollection* collection) {
-    if (!collection) return nullptr;
-    auto f = std::make_unique<FontFamily>(name, collection);
+// The family of a collection that holds one font file: the one the collection lists, taken from it, not looked up by its
+// name (Wine's GDI+ lists Pretendard in the collection and still finds no family of that name in it, so the overlay's
+// words fell back to a face of Wine's with no Hangul, and Korean showed as boxes). Null when the file was not there.
+std::unique_ptr<FontFamily> family_in(PrivateFontCollection* collection) {
+    if (!collection || collection->GetFamilyCount() < 1) return nullptr;
+    // One family to fill: GDI+ gives it a copy of the collection's own, which it lets go of with it.
+    auto f = std::make_unique<FontFamily>();
+    INT found = 0;
+    if (collection->GetFamilies(1, f.get(), &found) != Ok || found < 1) return nullptr;
     return f->GetLastStatus() == Ok && f->IsAvailable() ? std::move(f) : nullptr;
+}
+
+// A family's name as UTF-8 ("" when GDI+ will not say), for the player's log.
+std::string family_name(const FontFamily& family) {
+    WCHAR name[LF_FACESIZE] = {};
+    if (family.GetFamilyName(name) != Ok) return "";
+    const int n = WideCharToMultiByte(CP_UTF8, 0, name, -1, nullptr, 0, nullptr, nullptr);
+    std::string out(static_cast<std::size_t>(n > 0 ? n - 1 : 0), '\0');
+    if (n > 1) WideCharToMultiByte(CP_UTF8, 0, name, -1, out.data(), n, nullptr, nullptr);
+    return out;
 }
 
 // Windows' own face for the language's script, kept (the overlay asks for it at every drawing).
@@ -245,11 +260,19 @@ bool load_fonts() {
         g_collections[i] = std::make_unique<PrivateFontCollection>();
         g_collections[i]->AddFontFile((folder + files[i]).c_str());
     }
-    g_regular = family_of(L"Pretendard", g_collections[0].get());
-    g_semibold = family_of(L"Pretendard SemiBold", g_collections[1].get());
-    g_bold = family_of(L"Pretendard", g_collections[2].get());
-    g_wide = family_of(L"DMTQ Wide", g_collections[3].get());
+    // Each face from its own collection: Pretendard's regular, its semibold ("Pretendard SemiBold" in Windows' terms),
+    // its bold, DMTQ Wide.
+    g_regular = family_in(g_collections[0].get());
+    g_semibold = family_in(g_collections[1].get());
+    g_bold = family_in(g_collections[2].get());
+    g_wide = family_in(g_collections[3].get());
     return g_regular != nullptr;
+}
+
+std::string words_face(Weight weight, bool korean) {
+    // As font() picks it: the player's own face of that weight, else Windows' own for the language's script.
+    const FontFamily* family = weight == Weight::kBold ? g_bold.get() : weight == Weight::kSemiBold ? g_semibold.get() : g_regular.get();
+    return family_name(family ? *family : windows_face(korean));
 }
 
 // ---- the wordmark

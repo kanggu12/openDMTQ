@@ -143,6 +143,16 @@ if(NOT ANDROID)
     target_include_directories(livenettest PRIVATE src)
     target_compile_options(livenettest PRIVATE -Wall -Wextra)
     target_link_libraries(livenettest PRIVATE ${PLAYER_POSIX})
+    # The faces the overlay over the game draws its words in (desktop/overlay_glass.cpp), loaded as the player loads
+    # them: the launcher's own font files in fonts\ beside it, as beside the player.
+    add_executable(glasstest desktop/glasstest.cpp desktop/overlay_glass.cpp)
+    target_include_directories(glasstest PRIVATE desktop)
+    target_compile_options(glasstest PRIVATE -Wall -Wextra -Wno-unused-parameter)
+    target_link_libraries(glasstest PRIVATE gdiplus)
+    set(GLASSTEST_FONTS ${CMAKE_CURRENT_SOURCE_DIR}/../client/opendmtq_client/assets/fonts)
+    add_custom_command(TARGET glasstest POST_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:glasstest>/fonts
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GLASSTEST_FONTS}/Pretendard-Regular.ttf ${GLASSTEST_FONTS}/Pretendard-SemiBold.ttf
+                       ${GLASSTEST_FONTS}/Pretendard-Bold.ttf ${GLASSTEST_FONTS}/DMTQWide-ExtraBold.ttf $<TARGET_FILE_DIR:glasstest>/fonts)
   endif()
   # The desktop player: the runtime and the JNI bridge on that VM (arm32/desktop). The bridges are the app's own (EGL,
   # GL, the Android API and OpenSL ES, with the generated GL thunks); the desktop files stand in for the phone's Java and
