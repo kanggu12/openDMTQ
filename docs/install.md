@@ -1,6 +1,7 @@
 # Installing
 
-Each way to run OpenDMTQ, step by step. The [quick start](../README.md#quick-start) has the short version of each.
+For the server's owner: each way to run OpenDMTQ's server, step by step. The [quick start](../README.md#quick-start)
+has the short version of each.
 
 All four run the same server. Phones join over the same Wi-Fi, or over the internet once the server is
 [reachable from outside](internet.md).
@@ -103,25 +104,11 @@ an account for each player. To update, `git pull`, then `./opendmtq up`.
 The Helm chart needs a volume with the game files and S3-compatible storage for the database first:
 [install on a cluster](kubernetes.md#install-on-a-cluster) has the commands.
 
-## On each Android phone
+## <a id="on-each-android-phone"></a><a id="on-a-windows-pc"></a>The players
 
-Each player needs an account: make them in the setup, or later on the admin pages' **Accounts** page.
-
-1. In Chrome or Samsung Internet, open the server's address exactly as the setup shows it, or scan its QR code. Not
-   inside a messenger app.
-2. Sign in with the player's account, tap **Download app (.apk)** and install it. Allow installs from the browser when
-   Android asks.
-3. Start the game and allow storage access. It downloads its data from the server on the first start.
-
-## On a Windows PC
-
-The same accounts play on a PC ([the PC client](windows-player.md)).
-
-1. On the server's site, sign in and open **Download**. Under **On a computer (Windows)**, download the installer.
-2. Run it and choose **Install**: no administrator rights, set up for the server. If Windows says it protected your
-   PC: **More info**, then **Run anyway**.
-3. The launcher signs in with the player's account, downloads the game, and asks about the picture and the sound once.
-   Then **PLAY**.
+Each player needs an account: make them in the setup, or later on the admin pages' **Accounts** page, where each one
+comes with the message to send its player. With it, a player signs in on the server's site and installs the app on an
+Android phone or tablet, or the PC client on a Windows PC: [playing on a server](play.md).
 
 ## Everyday use
 
@@ -178,20 +165,14 @@ then restart.
 
 ## What it runs on
 
-| | Minimum | Recommended |
+| Server | Minimum | Recommended |
 |---|---|---|
-| **Server** | 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker; 2 GB of memory | 2 cores, 4 GB |
+| **Computer** | 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker; 2 GB of memory | 2 cores, 4 GB |
 | **Disk** | 1 GB without the songs | 7 GB with every song |
-| **Phones** | Android 5.0 | Android 8 or newer to broadcast |
-| **PCs** | 64-bit Windows 10 or 11 on an x64 processor, a graphics card with Direct3D 11, 1 GB of free memory, 390 MB of disk | A touch screen |
 
 At rest the server takes about 170 MB of memory, and up to 1.6 GB for half a minute while it builds the app. The client
 data takes about 120 MB and the song data 4.5 GB; each app build about 110 MB, the last ten kept. Broadcast recordings
-take up to 20 GB more.
-
-The PC client's game takes about 1 GB of memory and 190 to 450 MB on the graphics card. Measured on a Ryzen 9 9950X with
-an RTX 4090 that stayed at its idle clock (225 to 590 MHz), at 240 frames a second from 1920x1080 to 3840x2160: a frame
-took the graphics card 0.2 to 1.0 ms (the most at 3840x2160 with CMAA 2) and the game's main thread 1.5 to 3.4 ms.
+take up to 20 GB more. What the players' phones and PCs need: [which devices](play.md#which-devices).
 
 Tested on Windows Server 2022 and Wine, Debian 12, Ubuntu 24.04, Docker on Linux and a three-node Kubernetes cluster,
 with a Galaxy S26 Ultra (Android 17, no 32-bit support) and the Android 11 emulator.
