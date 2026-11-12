@@ -11,11 +11,13 @@
 #      still) and the taskbar's restore (the game going on, no bar by itself), then a minimise with the bar down and a
 #      restore as Windows makes them, the window's pop-ups hidden and shown again (the bar stays gone); the bar's X
 #      pressed while the bar slides down (it asks all the same); the bar's X asking (the game held still), Keep playing,
-#      then the X and Quit the game, the launcher back
+#      then the X and Quit the game, the launcher back; its Screen, Sound and Controls pages by the keyboard alone, two
+#      keys for keyboard play taken on Controls by their places, on a US and on a French layout
 #   5. Repair from the command line: a file of the player and one of the launcher put back as they were installed
-#   6. Clear game data: the id alone stays; the FPS counter switched on from the command line (the launcher's window
-#      closed for it, then opened again), and the game starts again with the same id and gets to its menu, the counter
-#      up at its bottom right, a click on its place reaching the game
+#   6. Clear game data: the id alone stays; the FPS counter switched on and 4 LINE's keys set from the command line (the
+#      launcher's window closed for it, then opened again), and the game starts again with the same id and gets to its
+#      menu, the counter up at its bottom right, a click on its place reaching the game, the player's settings file
+#      carrying keyboard play's keys
 #   7. Uninstall with the data: refused while the window is open, then the program, its shortcut, its data and its
 #      logs (Velopack's and the installer's) gone
 # Every step leaves a screenshot of the virtual screen in OUT_DIR, and the logs.
@@ -385,8 +387,23 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
        \"\$(md5sum < /out/\$(printf %02d \$step)-sound-page.png | cut -d' ' -f1)\" ]; then
     echo 'FAIL: the Screen and Sound clicks showed the same page'; exit 1
   fi
+  # Keyboard play on the Controls page, by the keyboard alone: Right and Enter on the menu open it; Tab moves the menu's
+  # ring along ONLINE, HELP and LAUNCHER, then leaves the menu for the page's switch, then goes to 2 LINE's first lane's
+  # key and its empty box; Enter makes the box wait, and the key right of L goes in by its place, read through Windows'
+  # layout: Semicolon. Then 2 LINE's second lane's empty box with a French layout (AZERTY) on the X server, which Wine
+  # takes as Windows' layout: the key that prints A there, at the US layout's Q place, goes in as Q, with A beside it in
+  # grey (and M beside Semicolon); the US layout back after.
+  xdotool key Right Return; sleep 3
+  xdotool key Tab Tab Tab Tab Tab Tab Return; sleep 1; xdotool key semicolon; sleep 3; snap controls-key
+  xdotool key Tab Tab Return; sleep 1; setxkbmap fr; sleep 3; xdotool key a; sleep 3; snap controls-key-french
+  setxkbmap us; sleep 3
   # The command line's view of the same state, without secrets.
   wine \"\$LOCAL/OpenDMTQ.Client/current/OpenDMTQ-cmd.exe\" --status 2>&1 | tr -d '\r' > /out/status.txt
+  grep -q 'keys_2line=F/Semicolon J/Q' /out/status.txt \\
+    || { echo 'FAIL: the keys pressed on the Controls page did not go in by their places'; exit 1; }
+  grep -q \"keyboard play: 2 LINE lane 2 box 2 took Q ('A' on this keyboard)\" \"\$LOCAL\"/OpenDMTQ/client/logs/launcher.log \\
+    || { echo 'FAIL: the key that prints A on a French layout did not go in as Q with its A'; exit 1; }
+  echo 'keyboard play: the Controls page took the keys by their places'
   # The sound devices as the Sound page asks the player for them (Wine's own, here).
   wine \"\$LOCAL/OpenDMTQ.Client/current/OpenDMTQ-cmd.exe\" --audio-devices 2>&1 | tr -d '\r' >> /out/status.txt
   cat /out/status.txt
@@ -414,6 +431,9 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   wait_for 20 '[ -z \"\$(window \"^OpenDMTQ\$\")\" ]' || { snap launcher-stays-for-set; echo 'FAIL: the launcher did not close for --set'; exit 1; }
   CMD --set show_fps=on | tee /out/set-counter.txt
   grep -q 'show_fps=on, fps_position=bottom_right' /out/set-counter.txt || { echo 'FAIL: --set show_fps=on did not put the counter on at the bottom right'; exit 1; }
+  # 4 LINE's keys from the command line, the digits' row: kept in the names the player takes.
+  CMD --set 'keys_4line=1 2 3 4' | tee /out/set-keys.txt
+  grep -q 'keys_4line=1 2 3 4' /out/set-keys.txt || { echo 'FAIL: --set keys_4line did not take the digits'; exit 1; }
   wine \"\$CUR/OpenDMTQ.exe\" > /out/launcher-again.log 2>&1 &
   wait_for 60 '[ -n \"\$(xdotool search --onlyvisible --name \"^OpenDMTQ\$\" 2>/dev/null)\" ]' \\
     || { snap launcher-not-again; echo 'FAIL: the launcher did not open again'; exit 1; }
@@ -427,6 +447,13 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   sleep 5; snap game-again
   [ \"\$(md5sum < \"\$ID\")\" = \"\$id_before\" ] || { echo 'FAIL: the game took another id after clearing'; exit 1; }
   echo 'the game started again with the same id'
+  # Keyboard play in the player's settings file, as the launcher wrote it for this game: on, the keys taken on the
+  # Controls page and from the command line, and the default between them.
+  settings=\"\$LOCAL/OpenDMTQ/client/player-settings.txt\"
+  for line in 'keyboard=on' 'keys_2line=F/Semicolon J/Q' 'keys_3line=D F J' 'keys_4line=1 2 3 4'; do
+    grep -qx \"\$line\" \"\$settings\" || { echo \"FAIL: the player's settings file has no \$line\"; exit 1; }
+  done
+  echo 'the settings file carries keyboard play and its keys'
   game=\$(xdotool search --name 'TECHNIKA' 2>/dev/null | tail -n 1)
   eval \$(xdotool getwindowgeometry --shell \"\$game\")
   xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5
