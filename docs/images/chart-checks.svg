@@ -1,32 +1,35 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 418" width="956" height="418" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="2086 automated checks: Tools and admin pages (unit) 658; The server on the real game files 330; Command line and repository (unit) 227; All pages in a real browser 189; An upgrade from the last release 178; The PC client (unit) 174; Host install on a clean system 130; Windows bundle under Wine 115; The game server's contract 85">
-<rect x="-28" y="-28" width="956" height="418" rx="16" fill="#11151a"/>
-<text x="0" y="18" font-size="19" font-weight="700" fill="#eef2f6" text-anchor="start" data-box="0,900">2,086 automated checks before a change reaches a server</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 452" width="956" height="452" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="2134 automated checks: Tools and admin pages (unit) 669; The server on the real game files 330; Command line and repository (unit) 228; All pages in a real browser 193; The PC client (unit) 187; An upgrade from the last release 178; Host install on a clean system 130; Windows bundle under Wine 115; The game server's contract 88; Players sharing one server under load 16">
+<rect x="-28" y="-28" width="956" height="452" rx="16" fill="#11151a"/>
+<text x="0" y="18" font-size="19" font-weight="700" fill="#eef2f6" text-anchor="start" data-box="0,900">2,134 automated checks before a change reaches a server</text>
 <text x="0" y="42" font-size="13" fill="#aeb8c3" text-anchor="start" data-box="0,900">Run on every change: most on stand-in files, so that nobody needs the game's files to work on the code.</text>
 <text x="0" y="85" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">Tools and admin pages (unit)</text>
 <path d="M330.0,70.0 H836.0 Q840.0,70.0 840.0,74.0 V86.0 Q840.0,90.0 836.0,90.0 H330.0 Z" fill="#8cf23d"/>
-<text x="848" y="85" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">658</text>
+<text x="848" y="85" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">669</text>
 <text x="0" y="119" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">The server on the real game files</text>
-<path d="M330.0,104.0 H581.8 Q585.8,104.0 585.8,108.0 V120.0 Q585.8,124.0 581.8,124.0 H330.0 Z" fill="#8cf23d"/>
-<text x="593.775" y="119" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">330</text>
+<path d="M330.0,104.0 H577.6 Q581.6,104.0 581.6,108.0 V120.0 Q581.6,124.0 577.6,124.0 H330.0 Z" fill="#8cf23d"/>
+<text x="589.57" y="119" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">330</text>
 <text x="0" y="153" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">Command line and repository (unit)</text>
-<path d="M330.0,138.0 H501.9 Q505.9,138.0 505.9,142.0 V154.0 Q505.9,158.0 501.9,158.0 H330.0 Z" fill="#8cf23d"/>
-<text x="513.942" y="153" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">227</text>
+<path d="M330.0,138.0 H499.8 Q503.8,138.0 503.8,142.0 V154.0 Q503.8,158.0 499.8,158.0 H330.0 Z" fill="#8cf23d"/>
+<text x="511.812" y="153" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">228</text>
 <text x="0" y="187" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">All pages in a real browser</text>
-<path d="M330.0,172.0 H472.5 Q476.5,172.0 476.5,176.0 V188.0 Q476.5,192.0 472.5,192.0 H330.0 Z" fill="#8cf23d"/>
-<text x="484.489" y="187" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">189</text>
-<text x="0" y="221" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">An upgrade from the last release</text>
-<path d="M330.0,206.0 H464.0 Q468.0,206.0 468.0,210.0 V222.0 Q468.0,226.0 464.0,226.0 H330.0 Z" fill="#8cf23d"/>
-<text x="475.964" y="221" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">178</text>
-<text x="0" y="255" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">The PC client (unit)</text>
-<path d="M330.0,240.0 H460.9 Q464.9,240.0 464.9,244.0 V256.0 Q464.9,260.0 460.9,260.0 H330.0 Z" fill="#8cf23d"/>
-<text x="472.863" y="255" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">174</text>
+<path d="M330.0,172.0 H473.1 Q477.1,172.0 477.1,176.0 V188.0 Q477.1,192.0 473.1,192.0 H330.0 Z" fill="#8cf23d"/>
+<text x="485.13" y="187" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">193</text>
+<text x="0" y="221" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">The PC client (unit)</text>
+<path d="M330.0,206.0 H468.6 Q472.6,206.0 472.6,210.0 V222.0 Q472.6,226.0 468.6,226.0 H330.0 Z" fill="#8cf23d"/>
+<text x="480.556" y="221" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">187</text>
+<text x="0" y="255" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">An upgrade from the last release</text>
+<path d="M330.0,240.0 H461.7 Q465.7,240.0 465.7,244.0 V256.0 Q465.7,260.0 461.7,260.0 H330.0 Z" fill="#8cf23d"/>
+<text x="473.695" y="255" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">178</text>
 <text x="0" y="289" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">Host install on a clean system</text>
-<path d="M330.0,274.0 H426.8 Q430.8,274.0 430.8,278.0 V290.0 Q430.8,294.0 426.8,294.0 H330.0 Z" fill="#8cf23d"/>
-<text x="438.76" y="289" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">130</text>
+<path d="M330.0,274.0 H425.1 Q429.1,274.0 429.1,278.0 V290.0 Q429.1,294.0 425.1,294.0 H330.0 Z" fill="#8cf23d"/>
+<text x="437.103" y="289" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">130</text>
 <text x="0" y="323" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">Windows bundle under Wine</text>
-<path d="M330.0,308.0 H415.1 Q419.1,308.0 419.1,312.0 V324.0 Q419.1,328.0 415.1,328.0 H330.0 Z" fill="#8cf23d"/>
-<text x="427.134" y="323" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">115</text>
+<path d="M330.0,308.0 H413.7 Q417.7,308.0 417.7,312.0 V324.0 Q417.7,328.0 413.7,328.0 H330.0 Z" fill="#8cf23d"/>
+<text x="425.668" y="323" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">115</text>
 <text x="0" y="357" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">The game server's contract</text>
-<path d="M330.0,342.0 H391.9 Q395.9,342.0 395.9,346.0 V358.0 Q395.9,362.0 391.9,362.0 H330.0 Z" fill="#8cf23d"/>
-<text x="403.881" y="357" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">85</text>
+<path d="M330.0,342.0 H393.1 Q397.1,342.0 397.1,346.0 V358.0 Q397.1,362.0 393.1,362.0 H330.0 Z" fill="#8cf23d"/>
+<text x="405.085" y="357" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">88</text>
+<text x="0" y="391" font-size="13" fill="#eef2f6" text-anchor="start" data-box="0,324">Players sharing one server under load</text>
+<path d="M330.0,376.0 H338.2 Q342.2,376.0 342.2,380.0 V392.0 Q342.2,396.0 338.2,396.0 H330.0 Z" fill="#8cf23d"/>
+<text x="350.197" y="391" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="330,900">16</text>
 </svg>

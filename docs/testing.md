@@ -136,18 +136,23 @@ published.
 
 ## Measurements
 
-The charts here and in the README come from runs like these, on a Ryzen 9 9950X with the container limited to two cores
-(`docker run --cpus 2`). The data is made up: 300 players, 1,500 charts, a million plays over a year, 200 MB of added songs,
-two full request logs, and a home folder with 5,000 files and 600 folders.
+The charts here and in the README come from runs like these, on a Ryzen 9 9950X with the server held to two cores.
+The data is made up: 300 players and a million plays, and for the pages 1,500 charts, 200 MB of added songs, two full
+request logs, and a home folder with 5,000 files and 600 folders.
 
-- **The game's requests:** eight threads, each as a phone with its own account, send one kind of request for six seconds
-  against the server image (signed as the client signs). The chart shows the median, the 95th percentile and the
-  answers a second. A save is the client's two requests.
-- **Before and after:** the same script through the pages' real paths in the test client, best of five (of two for the
-  backup), on the code before and after the tuning, in the same container.
+- **The game's requests:** `REQUESTS=1 tests/load/run.sh`. The server's container on two cores of its own
+  (`--cpuset-cpus`), 300 players and a million plays over 90 days on the owner's songs. Eight threads, each as a phone
+  with its own account, send one kind of request back to back for six seconds (signed as the client signs). The chart
+  shows the median, the 95th percentile and the answers a second. A save is the client's two requests, the result and
+  the player's rank on the song. The ranking of every chart is kept until the next play, so these looks read what the
+  first one kept; the first look after a play took 113 ms.
+- **Before and after:** one request or page at a time on the code before and after the tuning, in the same container
+  (`docker run --cpus 2`): the pages through their real paths in the test client, best of five (of two for the backup);
+  0.9.4's three by the server's own handlers timed in its PHP (the median of ten to fifteen calls) and the rankings page
+  by HTTP, on the requests' server and data.
 
 <p align="center">
-  <img src="images/chart-tuning.svg" alt="Before and after tuning: the in-game ranking of one song from 190 to 6.3 milliseconds; the Logs page looking for new lines from 460 to 21 milliseconds; a backup with 200 MB of added songs from 8 seconds to 528 milliseconds; four threads on one counter in the runtime from 2.9 seconds to 250 milliseconds; the setup searching a full home folder from 143 to 20 milliseconds; the Songs page from 322 to 68 milliseconds; the Status page from 294 to 152 milliseconds; the Players page from 278 to 174 milliseconds" width="100%">
+  <img src="images/chart-tuning.svg" alt="Before and after tuning: the in-game ranking of every chart from 100 to 0.9 milliseconds; the in-game ranking of one song from 190 to 6.3 milliseconds; the Logs page looking for new lines from 460 to 21 milliseconds; a backup with 200 MB of added songs from 8 seconds to 528 milliseconds; the site's rankings page from 90 to 6 milliseconds; saving a play, in the server, from 19 to 1.6 milliseconds; four threads on one counter in the runtime from 2.9 seconds to 250 milliseconds; the setup searching a full home folder from 143 to 20 milliseconds; the Songs page from 322 to 68 milliseconds; the Status page from 294 to 152 milliseconds; the Players page from 278 to 174 milliseconds" width="100%">
 </p>
 
 - **The phone and the runtime:** [arm32/README.md](../arm32/README.md) says how each was measured, on a Galaxy S26 Ultra and
