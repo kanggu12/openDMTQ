@@ -431,6 +431,33 @@ def pages_check(app, out, tag, problems):
             wheel_check(app, problems)
 
 
+def whole_rows_at_top(app, area):
+    """The page area scrolled back, when its top edge cuts a line of text or a control, just far enough that it cuts
+    none (to the gap above what it cut): the part in view starts with whole lines, as little of the page's foot given
+    up for it as can be."""
+    import tkinter as tk
+    from tkinter import ttk
+    c = area.canvas
+    for _ in range(6):
+        app.root.update_idletasks()
+        top = c.canvasy(0)
+        # Where the page's own pixel 0 is on the screen.
+        origin = c.winfo_rooty() - top
+        cut = None
+        for widget in widgets_of(area.inner):
+            # The things a person reads or uses: words, pictures, drop-downs, fields, the canvases of switches,
+            # sliders, rows of tabs and buttons (a frame round them is no line of its own).
+            if not widget.winfo_ismapped() or not isinstance(widget, (tk.Label, ttk.Combobox, tk.Entry, tk.Canvas)):
+                continue
+            start = widget.winfo_rooty() - origin
+            if start < top < start + widget.winfo_height():
+                cut = start if cut is None else min(cut, start)
+        if cut is None:
+            return
+        region = float(str(c.cget("scrollregion")).split()[3])
+        c.yview_moveto(max(0.0, cut - app.ui.px(2)) / region)
+
+
 def redraw_check(app, problems, tag):
     """The Screen page drawn again for a choice keeps its place: scrolled to the Quality card, the render scale chosen
     from the keyboard to 100 % takes the upscaler's row away and back below it, and neither throws the page back to its
@@ -540,10 +567,14 @@ def variants_check(app, site, out, tag, problems):
     app.changed("fps_position", "bottom_right")
     app.go("screen")
     settle(app)
-    # Scrolled to its end, where the Quality card is.
+    # Scrolled to its end, where the Quality card is, then back to the top of the row the window's top edge would cut:
+    # no line of text half out of sight under the header (docs/images/client-screen.png is this screen in English at
+    # 1180x760).
     from opendmtq_client import widgets as wd
     for area in [w for w in widgets_of(app.root) if isinstance(w, wd.ScrollArea) and w.winfo_ismapped()]:
         area.canvas.yview_moveto(1)
+        settle(app)
+        whole_rows_at_top(app, area)
     settle(app)
     shot(app.root, out, tag + "_screen-upscaler")
     measure(app, tag + "_screen-upscaler", problems)
