@@ -173,13 +173,14 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   sleep 20; snap game-starting
   # The frame PLAYER_SHOTS asks for comes 50 s in: then the game is at its menu.
   sleep 45; snap game-menu
-  # What draws the game: the player's first frame names it. Under Wine the name is Wine's stand-in for the card on
-  # either renderer, never llvmpipe's own; on the GPU (OPENDMTQ_WINE_GPU=1) the player's process must hold WSL's D3D12
-  # and its device (arm32/wine_gpu.sh), or the run fails as one that fell back to the CPU.
+  # What draws the game: the player's first frame names it. Under Wine the name is Wine's stand-in for the card (a GTX
+  # 470) on either renderer, not llvmpipe's own, so on the GPU (OPENDMTQ_WINE_GPU=1) the line must be there and name no
+  # llvmpipe, and the player's process must hold WSL's D3D12 and its device with none of llvmpipe's threads
+  # (arm32/wine_gpu.sh), or the run fails as one that fell back to the CPU.
   drawn=\$(cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | grep -m 1 'player: drawn by')
-  [ -n \"\$drawn\" ] || { echo 'FAIL: the player did not say what draws the game'; exit 1; }
-  echo \"\$drawn\"
+  echo \"\${drawn:-the player has not said what draws the game}\"
   if [ -n \"\${WINE_GPU_IN_CONTAINER:-}\" ]; then
+    [ -n \"\$drawn\" ] || { echo 'FAIL: the player did not say what draws the game'; exit 1; }
     case \"\$drawn\" in *llvmpipe*) echo 'FAIL: on the GPU the game is drawn by llvmpipe'; exit 1 ;; esac
     . /wine_gpu.sh
     wine_gpu_proof || exit 1

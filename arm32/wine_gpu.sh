@@ -12,14 +12,16 @@
 # (local by default), so that two checkouts' runs keep their own.
 #
 #   wine_gpu_e2e_image   the PC client's end to end image: opendmtq-client-e2e:local, or its twin on the GPU image
-#                        (client/tests/windows/Dockerfile on arm32/wine-gpu.Dockerfile's image, each built the first time)
+#                        (client/tests/windows/Dockerfile on arm32/wine-gpu.Dockerfile's image, both built at each run,
+#                        from Docker's cache once made)
 #   WINE_GPU_ARGS        docker run's arguments for the renderer (none on the CPU)
 # Inside the container the virtual screen starts as `env -u GALLIUM_DRIVER -u LD_LIBRARY_PATH Xvfb`: Xvfb only shows what
 # it is sent, and with WSL's variables its own OpenGL would open a D3D12 device it never uses (on the CPU the variables
 # are not set and the command is plain Xvfb). There, on the GPU (WINE_GPU_IN_CONTAINER is set):
 #   wine_gpu_proof       whether the player's own process (its first argument ends in OpenDMTQ-Player.exe) draws through
-#                        WSL's D3D12, its memory holding WSL's libd3d12 and /dev/dxg open, and what the container's
-#                        OpenGL is; the finding printed, 1 when it does not (so a GPU run that fell back to the CPU fails)
+#                        WSL's D3D12: the container's OpenGL is D3D12, and the process holds WSL's libd3d12 in its memory
+#                        and /dev/dxg open, with none of llvmpipe's drawing threads; the finding printed, 1 when it does
+#                        not (so a GPU run that fell back to the CPU fails)
 
 # The GPU images' names, a checkout's own when it gives a tag.
 WINE_GPU_TAG=${OPENDMTQ_WINE_GPU_TAG:-local}
@@ -50,15 +52,14 @@ fi
 wine_gpu_e2e_image() {
   # On the CPU: the image the end to end has always used.
   wine_on_gpu || { echo opendmtq-client-e2e:local; return 0; }
-  # The GPU image on the CPU one (made first when it is not there yet), then the end to end's tools on it. Its Mesa is
-  # fetched once, from Debian's backports.
+  # The CPU image made first when it is not there yet, as the end to end makes it. The GPU image on it, then the end to
+  # end's tools on that, built at every run: Docker's cache makes that a moment, and a change to either recipe (or a new
+  # CPU image) reaches the GPU ones, which stay the CPU one with Mesa 25. Mesa is fetched once, from Debian's backports.
   docker image inspect opendmtq-arm32-wine >/dev/null 2>&1 \
     || docker build -q -t opendmtq-arm32-wine -f "$WINE_GPU_DIR/wine.Dockerfile" "$WINE_GPU_DIR" >/dev/null
-  docker image inspect "$WINE_GPU_IMAGE" >/dev/null 2>&1 \
-    || docker build -q -t "$WINE_GPU_IMAGE" -f "$WINE_GPU_DIR/wine-gpu.Dockerfile" "$WINE_GPU_DIR" >/dev/null \
+  docker build -q -t "$WINE_GPU_IMAGE" -f "$WINE_GPU_DIR/wine-gpu.Dockerfile" "$WINE_GPU_DIR" >/dev/null \
     || { echo "FAIL: the GPU image did not build" >&2; return 1; }
-  docker image inspect "$WINE_GPU_E2E_IMAGE" >/dev/null 2>&1 \
-    || docker build -q -t "$WINE_GPU_E2E_IMAGE" --build-arg "BASE=$WINE_GPU_IMAGE" "$WINE_GPU_DIR/../client/tests/windows" >/dev/null \
+  docker build -q -t "$WINE_GPU_E2E_IMAGE" --build-arg "BASE=$WINE_GPU_IMAGE" "$WINE_GPU_DIR/../client/tests/windows" >/dev/null \
     || { echo "FAIL: the GPU end to end image did not build" >&2; return 1; }
   echo "$WINE_GPU_E2E_IMAGE"
 }
@@ -66,14 +67,18 @@ wine_gpu_e2e_image() {
 wine_gpu_proof() {
   # Only in a container on the GPU.
   [ -n "${WINE_GPU_IN_CONTAINER:-}" ] || return 0
-  local d first d3d12 dxg fd renderer
+  local d first d3d12 dxg fd t soft renderer
   # What the container's OpenGL is, in Mesa's own words (the player's Direct3D 11 reaches it through Wine), and the
-  # version of the 64-bit Mesa the player uses.
+  # version of the 64-bit Mesa the player uses: D3D12 on the card, or llvmpipe when Mesa could not reach it.
   renderer=$(glxinfo -B 2>/dev/null | sed -n 's/^OpenGL renderer string: //p' | head -n 1)
   echo "the container's OpenGL: ${renderer:-none}, Mesa $(dpkg-query -W -f '${Version}' libgl1-mesa-dri:amd64 2>/dev/null)"
+  case "$renderer" in
+    D3D12*) ;;
+    *) echo "FAIL: the container's OpenGL is not D3D12 on the graphics card"; return 1 ;;
+  esac
   for d in /proc/[0-9]*; do
     # The player's own process: Wine gives it its Windows command line, the program first.
-    first=$(tr '\0' '\n' < "$d/cmdline" 2>/dev/null | head -n 1)
+    first=$(tr '\0' '\n' 2>/dev/null < "$d/cmdline" | head -n 1)
     case "$first" in *OpenDMTQ-Player.exe) ;; *) continue ;; esac
     # WSL's D3D12 library in its memory: Mesa's d3d12 driver loaded it in this process (llvmpipe never does).
     d3d12=$(grep -c /usr/lib/wsl/lib/libd3d12 "$d/maps" 2>/dev/null)
@@ -82,13 +87,19 @@ wine_gpu_proof() {
     for fd in "$d"/fd/*; do
       [ "$(readlink "$fd" 2>/dev/null)" = /dev/dxg ] && dxg=$((dxg + 1))
     done
-    # Both: the card draws its frames.
-    if [ "${d3d12:-0}" -gt 0 ] && [ "${dxg:-0}" -gt 0 ]; then
+    # Its threads named as llvmpipe names its drawing threads: Mesa fell back to the CPU after reaching for the card
+    # (WSL's library and its device can stay open after a d3d12 screen that failed).
+    soft=0
+    for t in "$d"/task/*/comm; do
+      case "$(cat "$t" 2>/dev/null)" in llvmpipe-*) soft=$((soft + 1)) ;; esac
+    done
+    # Both, and none of those: the card draws its frames.
+    if [ "${d3d12:-0}" -gt 0 ] && [ "${dxg:-0}" -gt 0 ] && [ "$soft" = 0 ]; then
       echo "the player draws on the GPU: its process ${d#/proc/} has WSL's libd3d12 in its memory and /dev/dxg open"
       return 0
     fi
   done
   # None: Mesa fell back to drawing on the CPU (or the player is gone), which a GPU run must not pass as.
-  echo "FAIL: the player does not draw on the GPU: no process of OpenDMTQ-Player.exe has WSL's libd3d12 and /dev/dxg"
+  echo "FAIL: the player does not draw on the GPU: no process of OpenDMTQ-Player.exe has WSL's libd3d12 and /dev/dxg without llvmpipe's threads"
   return 1
 }

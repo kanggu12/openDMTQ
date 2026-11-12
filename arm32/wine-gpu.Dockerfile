@@ -6,7 +6,8 @@
 # call to the graphics card through WSL's /dev/dxg. Debian 12's Mesa (22.3) has that driver at OpenGL 4.2 without
 # ARB_polygon_offset_clamp, and Wine's Direct3D needs it for feature level 10 and up: ANGLE then finds no Direct3D 11
 # device, and the game no OpenGL ES. Debian's backports for the same release have Mesa 25, whose d3d12 driver is at
-# OpenGL 4.6 with it. Everything else stays the release's, so the two images differ in Mesa alone.
+# OpenGL 4.6 with it. The rest stays the release's: the two images differ in Mesa (with what Mesa 25 needs from the
+# backports, its LLVM among them) and in glxinfo.
 #
 #   docker build -t opendmtq-arm32-wine-gpu:local -f arm32/wine-gpu.Dockerfile arm32   (after wine.Dockerfile's image)
 #
@@ -22,4 +23,4 @@ RUN echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/s
     && rm -rf /var/lib/apt/lists/*
 # Refused at build time when the Mesa installed is older than the 25 the driver needs to be at (a backports line that
 # went back would build an image that draws nothing on the GPU).
-RUN v=$(dpkg-query -W -f '${Version}' libgl1-mesa-dri) && echo "Mesa $v" && [ "${v%%.*}" -ge 25 ]
+RUN v=$(dpkg-query -W -f '${Version}' libgl1-mesa-dri:amd64) && echo "Mesa $v" && [ "${v%%.*}" -ge 25 ]
