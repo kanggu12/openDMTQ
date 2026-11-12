@@ -18,6 +18,8 @@ $rank = $me['rank'] ?? null;
 $best = $me ? rows($db, "SELECT * FROM Play WHERE user_id = :id ORDER BY score DESC", [':id' => $id]) : [];
 $recent = ($me && has_playlog($db)) ? rows($db, "SELECT * FROM PlayLog WHERE user_id = :id ORDER BY played_at DESC, id DESC LIMIT 15", [':id' => $id]) : [];
 $grades = array_count_values(array_column($best, 'grade'));
+// How many of their bests a keyboard play set: beside the counts of the grades and the game's two marks.
+$keys = count(array_filter($best, fn($r) => !empty($r['keys'])));
 $charts = charts();
 $songs = songs_by_id();
 // When each best record was set: the newest play that set a record on its chart. Records older than
@@ -149,6 +151,9 @@ if (!$me): ?>
         <?php if ($me['perfect'] > 0): ?>
           <span class="g-item"><?= mark('pp') ?><?= (int)$me['perfect'] ?></span>
         <?php endif; ?>
+        <?php if ($keys > 0): ?>
+          <span class="g-item"><?= keys_mark(['keys' => 1]) ?><?= $keys ?></span>
+        <?php endif; ?>
       </p>
     <?php endif; ?>
   </section>
@@ -181,7 +186,8 @@ if (!$me): ?>
     </div>
   <?php endif; ?>
   <?php // Both lists have the same columns at fixed widths (style.css table.plays): jacket, song, chart, score, mark,
-        // time. So the two cards' columns line up, one above the other. ?>
+        // time. So the two cards' columns line up, one above the other. A play made with the keyboard, and a best a keyboard
+        // play set, have the keyboard's mark before the score. ?>
   <div class="stack">
     <?php // Nothing played at all: one box says so, not one for each list. ?>
     <?php if (!$recent && !$best): ?>
@@ -194,7 +200,7 @@ if (!$me): ?>
       <?php else: ?>
         <div class="table-scroll"><table class="compact plays"><tbody>
         <?php foreach ($recent as $r): $when = ago((int)$r['played_at']); ?>
-          <tr><?= chart_cells((int)$r['pattern_id'], $charts, $songs, $when) ?><td class="r"><?= number_format($r['score']) ?></td><td class="flag"><?= $r['is_record'] ? '<span class="mark new" title="' . h(tp('mark.new')) . '">NEW</span>' : '' ?></td><td class="meta-inline when"><?= h($when) ?></td></tr>
+          <tr><?= chart_cells((int)$r['pattern_id'], $charts, $songs, $when) ?><td class="r"><?= keys_mark($r) ?><?= number_format($r['score']) ?></td><td class="flag"><?= $r['is_record'] ? '<span class="mark new" title="' . h(tp('mark.new')) . '">NEW</span>' : '' ?></td><td class="meta-inline when"><?= h($when) ?></td></tr>
         <?php endforeach; ?>
         </tbody></table></div>
       <?php endif; ?>
@@ -206,7 +212,7 @@ if (!$me): ?>
       <?php else: ?>
         <div class="table-scroll"><table class="compact plays"><tbody>
         <?php foreach (array_slice($best, 0, 30) as $r): $when = ago($set_at[(int)$r['pattern_id']] ?? null); ?>
-          <tr><?= chart_cells((int)$r['pattern_id'], $charts, $songs, $when) ?><td class="r"><?= number_format($r['score']) ?></td><td class="flag"><?= grade_cell($r) ?></td><td class="meta-inline when"><?= h($when) ?></td></tr>
+          <tr><?= chart_cells((int)$r['pattern_id'], $charts, $songs, $when) ?><td class="r"><?= keys_mark($r) ?><?= number_format($r['score']) ?></td><td class="flag"><?= grade_cell($r) ?></td><td class="meta-inline when"><?= h($when) ?></td></tr>
         <?php endforeach; ?>
         </tbody></table></div>
       <?php endif; ?>

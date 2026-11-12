@@ -88,6 +88,51 @@ function play_figures(SQLite3 $db): array
     });
 }
 
+/* How many of each player's bests a keyboard play set (Play's keys, which the game server's save keeps: game/src/game.php),
+   by guid: the mark on a total. From the index of the keyboard's bests alone (Play_keys, server/game/bin/setup-db.php), so
+   that a server where nobody plays with the keyboard reads nothing for it. tests/game/protocol.sh checks the plan. */
+const KEYS_BESTS = "SELECT p.user_id, COUNT(*) AS n FROM Play p WHERE p.keys = 1 GROUP BY p.user_id";
+
+/* For one month's board (from :since to before :until), how many of the charts it counts had a keyboard play as each
+   player's best that month: the month's top score on the chart, the play that got there first (as a best row keeps the
+   play that set it), capped as the board caps it. Only the charts a player played with the keyboard that month are looked
+   at, from the index of the keyboard's plays (PlayLog_keys); each one's best from that player's plays of that chart
+   (PlayLog_clears): the + before the times keeps SQLite from reading the whole chart's month instead (PlayLog_chart), every
+   player's plays of it. tests/game/protocol.sh checks the plan SQLite makes of it. */
+const MONTH_KEYS = "SELECT k.user_id, COUNT(*) AS n FROM (
+        SELECT DISTINCT l.user_id, l.pattern_id FROM PlayLog l
+         WHERE l.keys = 1 AND l.played_at >= :since AND l.played_at < :until) k
+     WHERE (SELECT b.keys FROM PlayLog b
+             WHERE b.user_id = k.user_id AND b.pattern_id = k.pattern_id AND +b.played_at >= :since AND +b.played_at < :until
+             ORDER BY MIN(MAX(b.score, 0), 2147483647) DESC, b.played_at, b.id LIMIT 1) = 1
+     GROUP BY k.user_id";
+
+/* Players' counts by guid from one of the two statements above, kept by $name while nothing in the log, the bests or the
+   players changes (odq_kept()), as the totals beside them are. Players with none are left out. */
+function keys_counts(SQLite3 $db, string $name, string $sql, array $params = []): array
+{
+    return odq_kept($db, $name, function () use ($db, $sql, $params) {
+        $counts = [];
+        foreach (rows($db, $sql, $params) as $row) {
+            $counts[(int)$row['user_id']] = (int)$row['n'];
+        }
+        return $counts;
+    });
+}
+
+/* How many of each player's bests a keyboard play set, by guid (KEYS_BESTS): what the totals of every month count. */
+function keys_bests(SQLite3 $db): array
+{
+    return keys_counts($db, 'site keys', KEYS_BESTS);
+}
+
+/* How many of the charts of each player's month (from $since to before $until) had a keyboard play as its best, by guid
+   (MONTH_KEYS): what a month's score counts. */
+function month_keys(SQLite3 $db, int $since, int $until): array
+{
+    return keys_counts($db, 'month keys ' . json_encode([$since, $until]), MONTH_KEYS, [':since' => $since, ':until' => $until]);
+}
+
 /* Each player's total (PLAYER_TOTALS) by guid, players with an account only, kept as play_figures() is. */
 function play_totals(SQLite3 $db): array
 {
@@ -102,17 +147,20 @@ function play_totals(SQLite3 $db): array
 
 /* Every player with ranking figures, best total first. Best score per chart is what counts. The
    id is the player's guid (for most players also their Member id), as player.php takes it. Scores are
-   added up first and matched to names here: the same join in SQL took twice as long. */
+   added up first and matched to names here: the same join in SQL took twice as long. keys: how many of
+   their bests a keyboard play set. */
 function players(SQLite3 $db): array
 {
     $figures = play_figures($db);
+    // How many of each one's bests a keyboard play set: the mark beside their figures.
+    $keys = keys_bests($db);
     // What a player who has not played shows.
     $none = ['charts' => 0, 'total' => 0, 's_count' => 0, 'ac' => 0, 'perfect' => 0, 'avg_judgement' => 0];
     $rows = [];
     foreach (rows($db, PLAYER_ROWS, [':check' => CHECK_UDID]) as $row) {
         $id = (int)$row['guid'];
         $mine = array_merge($none, array_intersect_key($figures[$id] ?? [], $none));
-        $rows[] = ['id' => $id, 'nickname' => $row['nickname']] + $mine;
+        $rows[] = ['id' => $id, 'nickname' => $row['nickname'], 'keys' => $keys[$id] ?? 0] + $mine;
     }
     // Highest total first, the older account on a tie, as the in-game rankings.
     usort($rows, fn($a, $b) => [$b['total'], $a['id']] <=> [$a['total'], $b['id']]);
@@ -143,7 +191,7 @@ function month_name(int $at): string
 
 /* The players of one month (from $since to before $until), best first: the game's own board of that month, every chart
    (odq_month_board()), so that the site ranks a month as the game does, with the names as every page shows them.
-   id, name, score, charts. */
+   id, name, score, charts, and keys: how many of those charts had a keyboard play as the month's best. */
 function month_players(SQLite3 $db, int $since, int $until): array
 {
     // The site's own read-only handle: the board only reads.
@@ -157,9 +205,11 @@ function month_players(SQLite3 $db, int $since, int $until): array
     foreach (rows($db, PLAYER_ROWS, [':check' => CHECK_UDID]) as $m) {
         $names[(int)$m['guid']] = $m['nickname'];
     }
+    // How many of the charts each one's score counts had a keyboard play as that month's best: the mark beside the score.
+    $keys = month_keys($db, $since, $until);
     $rows = [];
     foreach ($board as [$guid, $score, $charts]) {
-        $row = ['id' => $guid, 'nickname' => $names[$guid] ?? '', 'score' => $score, 'charts' => $charts];
+        $row = ['id' => $guid, 'nickname' => $names[$guid] ?? '', 'score' => $score, 'charts' => $charts, 'keys' => $keys[$guid] ?? 0];
         // "Player <n>" in the page's language for a player without a name.
         $row['name'] = player_name($row);
         $rows[] = $row;
@@ -181,7 +231,8 @@ function past_months(SQLite3 $db, int $count = 6): array
     return $out;
 }
 
-/* The best players who have played, in the order of players(): id, name and total only. */
+/* The best players who have played, in the order of players(): id, name, total, and how many of their bests a keyboard
+   play set. */
 function top_players(SQLite3 $db, int $limit): array
 {
     // Highest total first, the older account on a tie, as players() and the in-game rankings.
@@ -194,13 +245,15 @@ function top_players(SQLite3 $db, int $limit): array
     foreach (rows($db, PLAYER_ROWS, [':check' => CHECK_UDID]) as $row) {
         $names[(int)$row['guid']] = $row['nickname'];
     }
+    // How many of each one's bests a keyboard play set, as the rankings mark them.
+    $keys = keys_bests($db);
     $rows = [];
     foreach ($first as $guid) {
         // A player whose account went since the totals were kept is left out, as the join left them out.
         if (!array_key_exists($guid, $names)) {
             continue;
         }
-        $row = ['id' => $guid, 'nickname' => $names[$guid], 'total' => $totals[$guid]];
+        $row = ['id' => $guid, 'nickname' => $names[$guid], 'total' => $totals[$guid], 'keys' => $keys[$guid] ?? 0];
         $row['name'] = player_name($row);
         $rows[] = $row;
     }

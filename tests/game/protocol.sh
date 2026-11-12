@@ -118,6 +118,27 @@ else
   echo "$plan" | sed 's/^/  /'
   failed=1
 fi
+# The site's keyboard marks beside a total and a month's score count what keyboard plays set from indexes of the keyboard's
+# rows alone (Play_keys, PlayLog_keys; setup-db.php), each month's chart from that player's own plays of it (PlayLog_clears):
+# a server where few play with the keyboard reads few rows for them, and none of the rest of the log.
+# shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
+plan=$(docker exec "$NAME" php -r '
+  require "/opt/opendmtq/portal/ranking_lib.php";
+  foreach (["bests" => KEYS_BESTS, "month" => MONTH_KEYS] as $what => $sql) {
+      $r = odq_db()->query("EXPLAIN QUERY PLAN " . $sql);
+      while ($r && ($row = $r->fetchArray(SQLITE3_ASSOC))) {
+          echo $what, ": ", $row["detail"], "\n";
+      }
+  }' 2>&1) || true
+if grep -qx 'bests: SCAN p USING COVERING INDEX Play_keys' <<<"$plan" \
+  && grep -qx 'month: SEARCH l USING COVERING INDEX PlayLog_keys (played_at>? AND played_at<?)' <<<"$plan" \
+  && grep -qx 'month: SEARCH b USING INDEX PlayLog_clears (user_id=? AND pattern_id=?)' <<<"$plan" && ! grep -q 'SCAN [lb]\b' <<<"$plan"; then
+  echo "PASS the site's keyboard marks read the keyboard's bests and plays from their own indexes"
+else
+  echo "FAIL the site's keyboard marks read more than the keyboard's rows:"
+  echo "$plan" | sed 's/^/  /'
+  failed=1
+fi
 # What saves and rankings need of the song list (every chart's line and difficulty, the charts of a line and of a song)
 # is kept as one PHP file in the run folder, named after the list file, so that no request decodes the list for it; a
 # list put in the first one's place gets its own file and the first one's goes. With a list of its own in a scratch

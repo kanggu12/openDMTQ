@@ -990,6 +990,30 @@ function grade_cell(array $r): string
     return $out;
 }
 
+/* The keyboard's mark, before a score that a keyboard play made ('' for one by touch): $r is a row of Play (a best, marked
+   with the play that set it) or of PlayLog (a play), whose keys column the game server's save keeps (game/src/game.php).
+   A small keyboard, as the site draws its marks (style.css .keys-mark); its words as its title for a pointer and as its
+   name for a screen reader. */
+function keys_mark(array $r): string
+{
+    if (empty($r['keys'])) {
+        return '';
+    }
+    $words = h(tp('mark.keys'));
+    return '<span class="keys-mark" role="img" aria-label="' . $words . '" title="' . $words . '"></span>';
+}
+
+/* The same mark before a total that counts $n bests a keyboard play set ('' for none): the rankings' scores, which add up
+   bests, some of them the keyboard's. Its words say how many. */
+function keys_count_mark(int $n): string
+{
+    if ($n <= 0) {
+        return '';
+    }
+    $words = h(tp('mark.keys_in', ['n' => $n]));
+    return '<span class="keys-mark" role="img" aria-label="' . $words . '" title="' . $words . '"></span>';
+}
+
 /* ---------------------------------------------------------------------- download sign-in */
 
 // Cookie that asks the download page to start the download once (just signed in from a download link).

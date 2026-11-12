@@ -1,5 +1,6 @@
 <?php
-/* Overall ranking: best score per chart, summed. */
+/* Overall ranking: best score per chart, summed. A sum that counts bests a keyboard play set has the keyboard's mark,
+   which says how many (lib.php keys_count_mark()). */
 require __DIR__ . '/lib.php';
 // For those signed in only (a stranger goes to the sign-in page and comes back here).
 require_sign_in();
@@ -56,10 +57,11 @@ page_header(t('rank.title'), 'ranking');
   <?php if ($podium): ?>
     <div class="podium" style="--places:<?= count($podium) ?>">
       <?php foreach ($podium as $i => $p): ?>
-        <?php // The whole box leads to the player (the name's link stretches over it); a LIVE mark leads to their broadcast. ?>
+        <?php // The whole box leads to the player (the name's link stretches over it); a LIVE mark leads to their broadcast. The
+              // keyboard's mark goes beside the name here: a phone's narrow box has no room for it beside the big score. ?>
         <div class="pod <?= ['first', 'second', 'third'][$i] ?><?= (int)$p['id'] === $me ? ' me' : '' ?>">
           <span class="pod-place place-<?= $i + 1 ?>"><?= $i + 1 ?></span>
-          <span class="pod-who"><a class="pod-name" href="player.php?id=<?= (int)$p['id'] ?>"><?= h($p['name']) ?></a><?= live_mark($db, (int)$p['id']) ?></span>
+          <span class="pod-who"><a class="pod-name" href="player.php?id=<?= (int)$p['id'] ?>"><?= h($p['name']) ?></a><?= keys_count_mark((int)$p['keys']) ?><?= live_mark($db, (int)$p['id']) ?></span>
           <span class="pod-score"><?= $value($p) ?></span>
           <span class="pod-sub"><?= $sorts[$sort] ?></span>
         </div>
@@ -86,7 +88,7 @@ page_header(t('rank.title'), 'ranking');
           <tr<?= (int)$p['id'] === $me ? ' class="me"' : '' ?>>
             <td class="rank"><?= $first_rank + $i ?></td>
             <td class="name"><a href="player.php?id=<?= (int)$p['id'] ?>"><?= h($p['name']) ?></a><?= live_mark($db, (int)$p['id']) ?></td>
-            <td class="r sorted"><?= number_format($p['score']) ?></td>
+            <td class="r sorted"><?= keys_count_mark((int)$p['keys']) ?><?= number_format($p['score']) ?></td>
             <td class="r"><?= (int)$p['charts'] ?></td>
           </tr>
         <?php endforeach; ?>
@@ -102,7 +104,7 @@ page_header(t('rank.title'), 'ranking');
           <tr<?= (int)$p['id'] === $me ? ' class="me"' : '' ?>>
             <td class="rank"><?= $first_rank + $i ?></td>
             <td class="name"><a href="player.php?id=<?= (int)$p['id'] ?>"><?= h($p['name']) ?></a><?= live_mark($db, (int)$p['id']) ?></td>
-            <td class="<?= $col('total') ?>"><?= number_format($p['total']) ?></td>
+            <td class="<?= $col('total') ?>"><?= keys_count_mark((int)$p['keys']) ?><?= number_format($p['total']) ?></td>
             <td class="<?= $col('charts', true) ?>"><?= (int)$p['charts'] ?></td>
             <td class="<?= $col('s_count', true) ?>"><?= (int)$p['s_count'] ?></td>
             <td class="r opt"><?= (int)$p['ac'] ?></td>
@@ -128,7 +130,7 @@ page_header(t('rank.title'), 'ranking');
           <h3><?= h($name) ?></h3>
           <ol class="past-top">
             <?php foreach ($top as $i => $p): ?>
-              <li<?= (int)$p['id'] === $me ? ' class="me"' : '' ?>><span class="past-place place-<?= $i + 1 ?>"><?= $i + 1 ?></span><a href="player.php?id=<?= (int)$p['id'] ?>"><?= h($p['name']) ?></a><b><?= number_format($p['score']) ?></b></li>
+              <li<?= (int)$p['id'] === $me ? ' class="me"' : '' ?>><span class="past-place place-<?= $i + 1 ?>"><?= $i + 1 ?></span><a href="player.php?id=<?= (int)$p['id'] ?>"><?= h($p['name']) ?></a><b><?= keys_count_mark((int)$p['keys']) ?><?= number_format($p['score']) ?></b></li>
             <?php endforeach; ?>
           </ol>
         </div>

@@ -137,7 +137,7 @@ page_header('OpenDMTQ', 'home', '', $stage);
           <li<?= (int)$p['id'] === $me ? ' class="me"' : '' ?>>
             <b class="feed-rank<?= $i < 3 ? ' place-' . ($i + 1) : '' ?>"><?= $i + 1 ?></b>
             <span class="who"><a href="player.php?id=<?= (int)$p['id'] ?>"><?= h($p['name']) ?></a></span>
-            <span class="feed-score"><?= number_format($p['total']) ?></span>
+            <span class="feed-score"><?= keys_count_mark((int)$p['keys']) ?><?= number_format($p['total']) ?></span>
           </li>
         <?php endforeach; ?>
         </ul>
@@ -160,8 +160,10 @@ page_header('OpenDMTQ', 'home', '', $stage);
               <span class="who"><a href="player.php?id=<?= (int)$r['mid'] ?>"><?= h(player_name(['nickname' => $r['nickname'], 'id' => $r['mid']])) ?></a></span>
               <span class="what"><?php if ($song): ?><a href="song.php?id=<?= $sid ?>&amp;chart=<?= (int)$r['pattern_id'] ?>"><?= h(song_title($song)) ?></a><span class="what-chart sig<?= (int)$sig ?>"><?= h(chart_label($line, $diff, $sig)) ?></span><?php else: ?><?= t('player.chart', ['id' => (int)$r['pattern_id']]) ?><?php endif; ?></span>
             </span>
-            <?php // The grade before the score; under it, how far over their best before (nothing for a first clear). ?>
-            <span class="feed-end"><span class="feed-score"><span class="grade g<?= h($r['grade']) ?> feed-grade"><?= h($r['grade']) ?></span><?= number_format($r['score']) ?></span><?php if ($r['before'] !== null && (int)$r['score'] > (int)$r['before']): ?><span class="feed-gain" title="<?= h(tp('rec.up', ['before' => number_format($r['before'])])) ?>">+<?= number_format($r['score'] - $r['before']) ?></span><?php endif; ?><span class="feed-when"><?= h(ago((int)$r['played_at'])) ?></span></span>
+            <?php // The grade before the score, the keyboard's mark beside the score of a keyboard play (one item with it, so
+                  // that the grade and the score stay at the two ends); under it, how far over their best before (nothing for a
+                  // first clear). ?>
+            <span class="feed-end"><span class="feed-score"><span class="grade g<?= h($r['grade']) ?> feed-grade"><?= h($r['grade']) ?></span><span><?= keys_mark($r) ?><?= number_format($r['score']) ?></span></span><?php if ($r['before'] !== null && (int)$r['score'] > (int)$r['before']): ?><span class="feed-gain" title="<?= h(tp('rec.up', ['before' => number_format($r['before'])])) ?>">+<?= number_format($r['score'] - $r['before']) ?></span><?php endif; ?><span class="feed-when"><?= h(ago((int)$r['played_at'])) ?></span></span>
           </li>
         <?php endforeach; ?>
         </ul>

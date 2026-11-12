@@ -1142,6 +1142,27 @@ td.actions { width: 1%; text-align: right; }
 .mark.ac { background: #1d5fc9; color: #fff; }
 .mark.pp { background: linear-gradient(90deg, #ff3b96, #a65cff, #2fb4ff); color: #fff; }
 .mark.new { background: var(--accent); color: var(--accent-ink); }
+/* A score a keyboard play made (lib.php keys_mark()): a small keyboard before it, in the shape of the site's keys (two
+   corners cut), its keys on whole pixels so that it stays sharp at its own size. The quiet text colour: colour is for
+   grades and states, and this says only how the score was played. One drawing, as a mask, so that it takes the colour.
+   Its middle on the middle of the figures beside it, whatever their size (a table's, the podium's): theirs is about 0.35em
+   over the line they stand on, and the mark is 12 px high. */
+.keys-mark {
+  display: inline-block;
+  flex: none;
+  width: 20px;
+  height: 12px;
+  margin-right: 6px;
+  vertical-align: calc(0.35em - 6px);
+  background: var(--ash);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 12'%3E%3Cpath fill-rule='evenodd' d='M2 0H20V10L18 12H0V2ZM2 2h2v2H2ZM5 2h2v2H5ZM8 2h2v2H8ZM11 2h2v2h-2ZM14 2h4v2h-4ZM2 5h3v2H2ZM6 5h2v2H6ZM9 5h2v2H9ZM12 5h2v2h-2ZM15 5h3v2h-3ZM5 8h10v2H5Z'/%3E%3C/svg%3E") center / 20px 12px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 12'%3E%3Cpath fill-rule='evenodd' d='M2 0H20V10L18 12H0V2ZM2 2h2v2H2ZM5 2h2v2H5ZM8 2h2v2H8ZM11 2h2v2h-2ZM14 2h4v2h-4ZM2 5h3v2H2ZM6 5h2v2H6ZM9 5h2v2H9ZM12 5h2v2h-2ZM15 5h3v2h-3ZM5 8h10v2H5Z'/%3E%3C/svg%3E") center / 20px 12px no-repeat;
+}
+/* In a count's item, whose gap is between them already, it adds none of its own. */
+.g-item .keys-mark { margin-right: 0; }
+/* On the podium it follows the name, in the name's size for its middle: beside the big score a phone's narrow box would put it
+   on a line of its own. */
+.pod-who .keys-mark { margin: 0 0 0 6px; font-size: var(--t-xl); }
 
 /* A player's twelve weeks: a column per week, one colour, stronger with more plays that day. A fixed height: the grid is as
    wide as its box, and no taller on a wide screen. Over it where each month begins, under it what the colours mean. */

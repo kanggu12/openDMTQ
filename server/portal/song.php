@@ -89,7 +89,8 @@ if (!$song): ?>
           <tr>
             <td class="rank"><?= $i + 1 ?></td>
             <td class="name"><a href="player.php?id=<?= (int)$r['mid'] ?>"><?= h(player_name(['nickname' => $r['nickname'], 'id' => $r['mid']])) ?></a></td>
-            <td class="r"><?= number_format($r['score']) ?></td>
+            <?php // A best a keyboard play set has the keyboard's mark before its score. ?>
+            <td class="r"><?= keys_mark($r) ?><?= number_format($r['score']) ?></td>
             <td><?= grade_cell($r) ?></td>
             <td class="r acc"><?= accuracy($r['judgement']) ?></td>
           </tr>
