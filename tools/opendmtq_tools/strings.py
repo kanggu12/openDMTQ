@@ -26,11 +26,13 @@ STRINGS = {
         "alert.maintenance": "Maintenance is on: players see the notice and cannot start the game.",
         "alert.auto_failed": "The daily backup could not be made: {detail}.",
         # What takes the disk.
+        "disk.game": "Game files",
         "disk.rec": "Recordings",
         "disk.bak": "Backups",
-        "disk.app": "App builds",
+        "disk.app": "Apps and runtime",
         "disk.song": "Added songs",
         "disk.db": "Database",
+        "disk.rest": "Logs and the rest",
         "disk.other": "Everything else",
         "disk.free": "Free",
         # The charts.
@@ -867,11 +869,13 @@ STRINGS = {
         "alert.maintenance": "점검 중입니다. 플레이어는 안내만 보고 게임을 시작할 수 없습니다.",
         "alert.auto_failed": "매일 백업을 만들지 못했습니다: {detail}.",
         # What takes the disk.
+        "disk.game": "게임 파일",
         "disk.rec": "녹화",
         "disk.bak": "백업",
-        "disk.app": "앱 빌드",
+        "disk.app": "앱과 런타임",
         "disk.song": "추가한 곡",
         "disk.db": "데이터베이스",
+        "disk.rest": "로그와 나머지",
         "disk.other": "그 외",
         "disk.free": "남은 공간",
         # The charts.

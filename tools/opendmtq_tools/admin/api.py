@@ -310,7 +310,7 @@ def status(args):
         "maintenance": f["maintenance"], "recordings": f["recordings"],
         "disk": {"total": usage.total, "used": usage.used, "free": usage.free,
                  "parts": {"recordings": use["recordings"], "backups": use["backups"], "builds": use["builds"], "songs": use["songs"],
-                           "database": use["db"], "other": use["other"], "free": use["free"]}},
+                           "database": use["db"], "game": use["game"], "rest": use["rest"], "other": use["other"], "free": use["free"]}},
         "attention": [{"level": level, "text": plain(text), "link": link} for level, text, link, _ in attention],
     }
 

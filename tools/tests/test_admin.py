@@ -16,6 +16,7 @@ import json
 import mimetypes
 import os
 import re
+import shutil
 import sqlite3
 import tarfile
 import tempfile
@@ -1420,6 +1421,64 @@ class SafetyTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class DiskPartsTest(unittest.TestCase):
+    """What takes the data disk: everything OpenDMTQ keeps, by its parts, as the folders hold it."""
+
+    def test_every_folder_of_ours_counts_and_a_linked_file_once(self):
+        with Install() as inst, mock.patch.object(admin.songs, "CONTENT", inst.path("content")), \
+                mock.patch.object(admin.status, "HTTPS", inst.path("https")):
+            sizes = {}
+
+            def put(rel, n):
+                # n bytes at rel, noted under its part.
+                os.makedirs(os.path.dirname(inst.path(rel)), exist_ok=True)
+                with open(inst.path(rel), "wb") as f:
+                    f.write(b"x" * n)
+            parts = {"game": [("content/web/patch/data.lz4", 7000), ("content/songs.json", 300), ("apk/base/client.apk", 5000)],
+                     "recordings": [("state/live-rec/7/1798000000/0.ts", 4000), ("state/live-rec/limits.json", 30)],
+                     "builds": [("apk/out/OpenDMTQ-a.apk", 3000), ("apk/out/OpenDMTQ-Setup.exe", 2000), ("apk/out/latest.json", 90),
+                                ("apk/arm32/libarm32.so", 1500), ("apk/keystore/opendmtq.jks", 40), ("apk/OpenDMTQ-Setup.exe", 2000)],
+                     "backups": [("backups/opendmtq-2026-11-12.tar.gz", 900)],
+                     "db": [("state/dmtq.db3", 800), ("state/dmtq.db3-wal", 80)],
+                     "songs": [("custom/songs/1001/song.fpk", 600)],
+                     "rest": [("state/logs/access.log", 200), ("state/admin-settings.json", 20), ("custom/thumbs/a.jpg", 70),
+                              ("custom/songList.json", 50), ("https/ca.crt", 10)]}
+            for part, files in parts.items():
+                for rel, n in files:
+                    put(rel, n)
+                sizes[part] = sum(n for _, n in files)
+            # A broadcast's piece in its stream and in its recording, one file with two names: counted with the recording.
+            os.makedirs(inst.path("state/live/7"))
+            os.link(inst.path("state/live-rec/7/1798000000/0.ts"), inst.path("state/live/7/0.ts"))
+            admin.status._disk_cache.clear()
+            counted = admin.status.disk_counts()
+            self.assertEqual({part: counted[part] for part in parts}, sizes)
+            # Every byte written, once.
+            self.assertEqual(sum(counted[part] for part in parts), sum(sizes.values()))
+            # Through the API's figures too, with the same names the page draws.
+            use = admin.status.disk_use(shutil.disk_usage(inst.root))
+            self.assertEqual((use["game"], use["builds"], use["rest"]), (sizes["game"], sizes["builds"], sizes["rest"]))
+            inst.sign_in()
+            page = inst.client.get("/opendmtq/admin/").get_data(as_text=True)
+            for words in ("Game files", "Apps and runtime", "Logs and the rest"):
+                self.assertIn(words, page)
+
+    def test_a_folder_on_another_disk_is_no_part_of_this_one(self):
+        # A Kubernetes volume mounted inside the state folder (the recordings') is another disk: not this one's.
+        with Install() as inst:
+            os.makedirs(inst.path("state/live-rec/7/1"))
+            with open(inst.path("state/live-rec/7/1/0.ts"), "wb") as f:
+                f.write(b"x" * 1000)
+            here = os.stat(inst.path("state")).st_dev
+            self.assertEqual(admin.insights.folder_size(inst.path("state"), device=here), 1000)
+            self.assertEqual(admin.insights.folder_size(inst.path("state"), device=here + 1), 0)
+            real = os.lstat
+            other = lambda p, *a, **k: os.stat_result((*real(p)[:2], here + 1, *real(p)[3:])) if p.endswith("live-rec") else real(p, *a, **k)
+            with mock.patch.object(admin.insights.os, "lstat", other):
+                self.assertEqual(admin.insights.folder_size(inst.path("state"), device=here), 0)
 
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")

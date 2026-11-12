@@ -173,12 +173,16 @@ SHAPES = {
         Field("used", "integer", "In use (bytes)."),
         Field("free", "integer", "Free (bytes)."),
         Field("parts", "DiskParts", "What takes it.")]),
-    "DiskParts": Shape("What takes the data disk (bytes), counted at most every minute.", [
+    "DiskParts": Shape("What takes the data disk (bytes), counted at most every minute: OpenDMTQ's parts, each folder as it is on "
+                       "this disk, a file linked twice once; then what is not OpenDMTQ's, and what is free.", [
         Field("recordings", "integer", "Recordings."),
         Field("backups", "integer", "Backups."),
-        Field("builds", "integer", "App builds."),
+        Field("builds", "integer", "The apps for players and what the builder keeps to make them: the installer for Windows, the runtime "
+              "for newer phones, the signing key (data/apk, but the game's client)."),
         Field("songs", "integer", "Added songs."),
         Field("database", "integer", "The database."),
+        Field("game", "integer", "The game's files brought in: the client data, the song data and the client (data/content, data/apk/base)."),
+        Field("rest", "integer", "The rest of what OpenDMTQ keeps: logs, settings, the site's copies of the jackets, broadcasts on their way."),
         Field("other", "integer", "Everything else on the disk."),
         Field("free", "integer", "Free.")]),
     "Attention": Shape("A thing to look at.", [

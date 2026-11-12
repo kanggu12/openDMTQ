@@ -74,49 +74,68 @@ def attention(health, counts, saved, backup_age, on, build, failed, usage):
 _disk_cache = {}
 
 
-def _size_of(path):
-    try:
-        return os.path.getsize(path)
-    except OSError:
-        return 0
+# Where the site's certificate authority is kept for the pages (compose mounts data/https/public there): ours, and small.
+HTTPS = os.environ.get("OPENDMTQ_HTTPS") or "/srv/https"
+# OpenDMTQ's own parts of the data disk, in the order the status page draws them, each with its words: the game's files
+# brought in, the recordings, the apps for players with what the builder keeps to make them, the backups, the database,
+# the songs added here, and the rest of what it keeps (logs, settings, the site's copies of the jackets, a broadcast's
+# pieces on their way, the certificate).
+OWN_PARTS = (("game", "disk.game"), ("recordings", "disk.rec"), ("builds", "disk.app"), ("backups", "disk.bak"),
+             ("db", "disk.db"), ("songs", "disk.song"), ("rest", "disk.rest"))
 
 
 def disk_counts():
-    """The slow figures of the data disk: the bytes of the recordings, backups, builds (the app's), songs (added ones) and
-    db (the database), and how many recordings there are (recording_count), from the same look at them. Counted at most
-    every minute, and again after a backup is made or a recording deleted (they empty _disk_cache)."""
+    """The slow figures of the data disk: the bytes of everything OpenDMTQ keeps on it, by its parts (OWN_PARTS: game,
+    recordings, builds, backups, db, songs and rest), each folder walked as it is (insights.folder_size: on this disk
+    alone, a file linked twice once), and how many recordings there are (recording_count). Counted at most every minute,
+    and again after a backup is made or a recording deleted (they empty _disk_cache)."""
     # A copy, taken at once: another request may empty the cache while this one reads it.
     seen = dict(_disk_cache)
     if time.time() - seen.get("at", 0) <= 60:
         return seen
+    state = os.path.dirname(core.DB)
+    # The disk the database is on: the status page's disk. A folder on another one (a Kubernetes volume of its own) is
+    # no part of it.
     try:
-        db_size = sum(os.path.getsize(core.DB + end) for end in ("", "-wal", "-shm") if os.path.exists(core.DB + end))
+        disk = os.stat(state).st_dev
     except OSError:
-        db_size = 0
-    # The recordings' bytes and their count in one look: reading every recording is the slow part.
-    count, size = recordings.rec_totals()
-    fresh = {"at": time.time(), "recordings": size, "recording_count": count,
-             "backups": sum(_size_of(os.path.join(core.BACKUPS, f[0])) for f in backups.backup_files()),
-             "builds": sum(b["size"] for b in apps.builds()), "songs": insights.folder_size(os.path.join(songs.CUSTOM, "songs")),
-             "db": db_size}
+        disk = None
+    linked = set()
+    size = lambda path, skip=(): insights.folder_size(path, device=disk, seen=linked, skip=skip)
+    db_files = [core.DB + end for end in ("", "-wal", "-shm")]
+    rec, base, added = recordings.rec_root(), os.path.join(core.APK, "base"), os.path.join(songs.CUSTOM, "songs")
+    fresh = {"at": time.time(),
+             # The imported client data and song data, and the game's client the app is built from.
+             "game": size(songs.CONTENT) + size(base),
+             "recordings": size(rec),
+             # data/apk but the client: the apps for players, the installer for Windows, the runtime for newer phones,
+             # the signing key.
+             "builds": size(core.APK, skip=[base]),
+             "backups": size(core.BACKUPS),
+             "db": sum(size(f) for f in db_files),
+             "songs": size(added),
+             # The state folder's and the custom folder's rest, and the certificate.
+             "rest": size(state, skip=[rec] + db_files) + size(songs.CUSTOM, skip=[added]) + size(HTTPS),
+             # How many recordings: reading each one is the slow part, done here with the rest.
+             "recording_count": recordings.rec_totals()[0]}
     _disk_cache.update(fresh)
     return fresh
 
 
 def disk_use(usage):
-    """What takes the data disk, in bytes: recordings, backups, builds (the app's), songs (added ones), db (the database),
-    other (what is not ours, still part of the whole) and free (disk_counts(), with the disk's own figures)."""
+    """What takes the data disk, in bytes: OpenDMTQ's parts (OWN_PARTS), other (what is not ours, still part of the
+    whole) and free (disk_counts(), with the disk's own figures)."""
     counted = disk_counts()
-    use = {name: counted[name] for name in ("recordings", "backups", "builds", "songs", "db")}
+    use = {name: counted[name] for name, _ in OWN_PARTS}
     # The rest of what the disk holds is not ours, and still part of the whole: without it the free part reads far too big.
     return dict(use, other=max(0, usage.used - sum(use.values())), free=usage.free)
 
 
 def disk_parts(usage):
-    """What takes the data disk: [(name, bytes, shown)], for the status page (disk_use, in words)."""
+    """What takes the data disk: [(name, bytes, shown)], for the status page (disk_use, in words): OpenDMTQ's parts, then
+    what is not ours and what is free."""
     use = disk_use(usage)
-    known = [("disk.rec", "recordings"), ("disk.bak", "backups"), ("disk.app", "builds"), ("disk.song", "songs"), ("disk.db", "db"),
-             ("disk.other", "other"), ("disk.free", "free")]
+    known = list((key, name) for name, key in OWN_PARTS) + [("disk.other", "other"), ("disk.free", "free")]
     return [(t(key), use[name], human(use[name])) for key, name in known]
 
 # The machine the server runs on, for the status page: its processors, memory, swap, load and how long it has been up.
@@ -406,11 +425,13 @@ def dashboard():
     disk = disk_parts(usage)
     # The whole disk with OpenDMTQ's part as one, then that part alone at its own scale: on a big disk its pieces would be
     # slivers of a pixel.
-    own = disk[:5]
+    own = disk[:len(OWN_PARTS)]
     own_total = sum(p[1] for p in own)
-    disk_chart = charts.segments([(tp("disk.ours"), own_total, human(own_total))] + disk[5:], tp("dash.c_disk"),
+    disk_chart = charts.segments([(tp("disk.ours"), own_total, human(own_total))] + disk[len(OWN_PARTS):], tp("dash.c_disk"),
                                  colours=[charts.OURS, charts.OTHER, charts.QUIET])
-    disk_own = charts.segments(own, tp("dash.c_disk_own", size=human(own_total)), colours=list(charts.PARTS[:5])) if own_total else ""
+    # A colour for each named part, and the rest in the panel's quiet grey: it is no one thing.
+    disk_own = charts.segments(own, tp("dash.c_disk_own", size=human(own_total)),
+                               colours=list(charts.PARTS[:len(OWN_PARTS) - 1]) + [charts.OTHER]) if own_total else ""
     # The button is for the owner, from where this page was opened; the message is for a friend, who needs the address all
     # phones use (localhost or a link without a host is no use to them).
     invite_url = f"{core.public_url()}/opendmtq/download.php"

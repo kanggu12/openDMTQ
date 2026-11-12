@@ -104,17 +104,56 @@ def player_activity(con, days=14, now=None):
     return out
 
 
-def folder_size(path):
-    """All the bytes under a folder; 0 if it is not there. The one count of a folder's bytes: the status page's disk
-    figures and the backups' choice of compression both use it."""
+def folder_size(path, device=None, seen=None, skip=()):
+    """All the bytes under a folder (a file: its own); 0 if it is not there. The one count of a folder's bytes: the
+    status page's disk figures and the backups' choice of compression both use it. As du -x counts them, with these:
+    device, only what lies on that disk (os.stat's st_dev), so that a folder mounted from another disk inside this one,
+    or one on another disk itself, is left out; seen, a set the files with more than one name are noted in, so that a
+    file linked from two folders (a broadcast's piece in its stream and in its recording) counts once over all the calls
+    that share it; skip, folders and files under path not to count (counted on their own)."""
+    try:
+        top = os.stat(path)
+    except OSError:
+        return 0
+    if device is not None and top.st_dev != device:
+        return 0
+    left_out = {os.path.abspath(p) for p in skip}
+    # A file named on its own (the database): its bytes, once.
+    if not os.path.isdir(path):
+        return _bytes_once(top, seen)
     total = 0
-    for base, _, names in os.walk(path):
+    for base, folders, names in os.walk(path):
+        # Not into what is counted elsewhere, nor (with device) into a mount of another disk.
+        folders[:] = [f for f in folders if os.path.abspath(os.path.join(base, f)) not in left_out
+                      and (device is None or _on_device(os.path.join(base, f), device))]
         for name in names:
+            full = os.path.join(base, name)
+            if os.path.abspath(full) in left_out:
+                continue
             try:
-                total += os.path.getsize(os.path.join(base, name))
+                # The link's own size for a symbolic link: what it points to is counted where it is, if it is ours.
+                total += _bytes_once(os.lstat(full), seen)
             except OSError:
                 pass
     return total
+
+
+def _bytes_once(stat, seen):
+    """A file's bytes, or 0 when another of its names was counted already (seen holds those with more than one)."""
+    if seen is not None and stat.st_nlink > 1:
+        key = (stat.st_dev, stat.st_ino)
+        if key in seen:
+            return 0
+        seen.add(key)
+    return stat.st_size
+
+
+def _on_device(path, device):
+    """True when path is on that disk (and not a link: os.walk does not follow those)."""
+    try:
+        return os.lstat(path).st_dev == device
+    except OSError:
+        return False
 
 
 # ------------------------------------------------------------------------------------------- the request log

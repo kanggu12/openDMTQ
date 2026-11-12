@@ -1722,13 +1722,15 @@ The data disk.
 
 #### DiskParts
 
-What takes the data disk (bytes), counted at most every minute.
+What takes the data disk (bytes), counted at most every minute: OpenDMTQ's parts, each folder as it is on this disk, a file linked twice once; then what is not OpenDMTQ's, and what is free.
 
 - `recordings` (integer): Recordings.
 - `backups` (integer): Backups.
-- `builds` (integer): App builds.
+- `builds` (integer): The apps for players and what the builder keeps to make them: the installer for Windows, the runtime for newer phones, the signing key (data/apk, but the game's client).
 - `songs` (integer): Added songs.
 - `database` (integer): The database.
+- `game` (integer): The game's files brought in: the client data, the song data and the client (data/content, data/apk/base).
+- `rest` (integer): The rest of what OpenDMTQ keeps: logs, settings, the site's copies of the jackets, broadcasts on their way.
 - `other` (integer): Everything else on the disk.
 - `free` (integer): Free.
 
