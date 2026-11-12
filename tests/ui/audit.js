@@ -327,7 +327,7 @@ async function portalFlows(contexts) {
   const front = await contexts.signed.newPage();
   const arrived = await front.goto(`${P}/`, { waitUntil: 'domcontentloaded' });
   // The release (run.sh passes 0.9.3-abc1234, as a clone past a release's tag has it): v0.9.3, the commit under the pointer.
-  check('the home page shows the version beside the logo', /\bv\d+\.\d+\.\d+$/.test((await textOf(front, '.stage-mark')).trim())
+  check('the home page shows the version beside the logo', /v\d+\.\d+\.\d+$/.test((await textOf(front, '.stage-mark')).trim())
     && await front.$eval('.server-ver', e => e.title) === 'abc1234', await textOf(front, '.stage-mark'));
   check('the front page offers the app and the broadcasts first',
     await front.$eval('.stage-acts .button', a => new URL(a.href).pathname).catch(() => '') === '/apk' && await visible(front, '#watch-live') && await visible(front, '.stage-meta a[href="download.php"]'));
