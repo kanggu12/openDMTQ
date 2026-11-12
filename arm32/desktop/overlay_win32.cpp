@@ -34,7 +34,8 @@
 // - The handle: the game's green line along its top edge at the centre (a short piece of the bar's own foot line),
 //   with a small tab of glass hanging from it in the lean of the game's own tabs and a chevron pointing down in the
 //   tab, which says that a bar comes down from here; with the pointer on it, lime and a little deeper. As large as the
-//   game's header leaves room for, at the game's own scale, so that it covers nothing of the game's. Clicks go through
+//   game's header leaves room for, at the game's own scale, so that it covers no button and no word of the game's (it
+//   stands on the top end of the header's hairline divider, which is at the centre: overlay_scale.h). Clicks go through
 //   it to the game; the pointer resting on it brings the bar down, and the handle then goes down with the bar's foot,
 //   fading, and comes back up with it. Hidden while the bar is down, while the question or a notice is up, while the
 //   game is held, and before the game's first picture.
@@ -1180,7 +1181,7 @@ std::shared_ptr<Canvas> handle_picture(int& x, int& y, int& lip, bool lit) {
     x = (area_w() - w) / 2;
     y = 0;
     // The lines' widths in whole pixels, so that they stay crisp: the rail, the shade under it (overlay_scale.h's
-    // rows, which a check holds within the header's empty rows), the tab's outline.
+    // rows, which a check holds within the header's rows above its buttons), the tab's outline.
     const float rail_h = static_cast<float>(rail_rows(k)), shade_h = static_cast<float>(shade_rows(k));
     const float edge = std::max(1.0f, std::round(hpx(kTabEdge)));
     lip = static_cast<int>(rail_h + shade_h);

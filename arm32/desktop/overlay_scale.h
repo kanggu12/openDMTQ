@@ -73,9 +73,14 @@ constexpr float tab_half(float depth) { return kTabTop / 2 - depth * kTabLean; }
 
 // What the game shows nearest its top centre, measured on its frames at 720 lines: on the screens with its header (the
 // music list, the downloads, the nickname), the header's last button ends 12 left of the centre and starts at row 5;
-// its rows above that are empty across, and the words right of the centre start 38 away. So the handle may be any
-// width in its first 5 rows, and must keep within 12 of the centre below them; on every other screen the top centre
-// shows only the picture behind.
+// its rows above that hold no button and no word, and the words right of the centre start 34 away. So the handle may
+// be any width in its first 5 rows, and must keep within 12 of the centre below them.
+//
+// One thing of the header's is at the centre itself, and no handle at the top centre is clear of it: the header's
+// divider, an engraved hairline 3 wide (two columns darker than the header, one lighter) from the top edge down to the
+// header's foot, about 58 rows. The tab stands on its top end and covers its first rows (as deep as the tab: 19 of
+// them at rest, 23 with the pointer on it); the line goes on below the tab's foot. The checks hold the handle clear of
+// the buttons and the words; they say nothing of the divider.
 constexpr float kHeaderFreeRows = 5, kHeaderFreeHalf = 12;
 
 }  // namespace player::overlay

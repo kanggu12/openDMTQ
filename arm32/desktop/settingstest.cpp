@@ -286,14 +286,15 @@ void handle_size_checks() {
     check(handle_scale_for(960, 720) == 0.75f && handle_scale_for(1152, 720) == 0.9f, "a 4:3 and a 16:10 area 720 high: the handle at the width's 0.75 and 0.9");
     check(handle_scale_for(1680, 720) == 1.0f && handle_scale_for(2560, 1080) == 1.5f, "a 21:9 area: the handle at the height's scale");
     check(handle_scale_for(1920, 1200) == 1.5f && handle_scale_for(2560, 1600) == 2.0f, "a 16:10 display in full screen: the handle at the width's scale");
-    // The tab at 720 lines: below the header's empty rows it keeps within the room the header leaves beside the centre,
-    // at rest and deeper with the pointer on it (deeper, never wider).
+    // The tab at 720 lines: below the header's rows above its buttons it keeps within the room the buttons and the words
+    // leave beside the centre, at rest and deeper with the pointer on it (deeper, never wider). The header's divider at
+    // the centre itself is under any handle there, and is no part of these checks (overlay_scale.h).
     check(tab_half(kHeaderFreeRows) <= kHeaderFreeHalf, "the tab keeps within 12 of the centre from the header's first row down, at 720 lines");
     check(tab_half(kTabTall) < tab_half(kHeaderFreeRows) && tab_half(kTabTallLit) < tab_half(kTabTall) && tab_half(kTabTallLit) > 0,
           "the tab narrows toward its foot, at rest and lit, and still has a foot");
     check(tab_half(0) * 2 == player::overlay::kTabTop, "the tab is as wide as its top at the game's edge");
     // Every area the window can hold, in pixels at the handle's scale: the rail and its shade stay within the header's
-    // empty rows, and the tab below them within the header's room.
+    // rows above its buttons, and the tab below them within the room its buttons and words leave.
     // In each shape from 4:3 to 21:9: the header's own scale there is the smaller of the width's and the height's.
     bool rail_clear = true, tab_clear = true, rail_there = true, never_larger = true;
     const float shapes[] = {4.0f / 3.0f, 16.0f / 10.0f, 16.0f / 9.0f, 21.0f / 9.0f};
@@ -304,7 +305,7 @@ void handle_size_checks() {
             const float k = handle_scale_for(w, h);
             // The game's header at this size: its layout fitted into the area, as measured on its frames.
             const float header = std::min(static_cast<float>(w) / 1280.0f, static_cast<float>(h) / 720.0f);
-            // The header's empty rows and its room beside the centre, at this size.
+            // The header's rows above its buttons and its room beside the centre, at this size.
             const float rows = kHeaderFreeRows * header, half = kHeaderFreeHalf * header;
             never_larger = never_larger && k <= header;
             rail_clear = rail_clear && static_cast<float>(rail_rows(k) + shade_rows(k)) <= rows;
@@ -313,9 +314,9 @@ void handle_size_checks() {
         }
     }
     check(never_larger, "every area from 270 to 2160 lines, 4:3 to 21:9: the handle is never at a larger scale than the game's header");
-    check(rail_clear, "there the rail and its shade lie within the header's empty rows");
+    check(rail_clear, "there the rail and its shade lie within the header's rows above its buttons");
     check(rail_there, "and the rail is at least a pixel at every size");
-    check(tab_clear, "and the tab below them keeps within the header's room beside the centre");
+    check(tab_clear, "and the tab below them keeps within the room the header's buttons and words leave beside the centre");
     check(rail_rows(1.0f) == 2 && shade_rows(1.0f) == 1 && rail_rows(1.5f) == 3 && rail_rows(3.0f) == 6 && shade_rows(3.0f) == 3 && shade_rows(0.375f) == 0,
           "the rail 2 rows and its shade 1 at 720 lines, 6 and 3 at 4K, the shade none in the smallest window");
 }
