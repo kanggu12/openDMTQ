@@ -172,11 +172,32 @@ def cmd_runtime(args):
     return 0 if args.no_app else cmd_apk(args)
 
 
+def installer_offered():
+    """True when the site hands out the PC client's installer: data/apk/out/windows.json says one, and its file is
+    there at the size it says (tools/opendmtq_tools/windows_client.py offered(), which the site reads the same way)."""
+    out = os.path.join(DATA, "apk", "out")
+    try:
+        with open(os.path.join(out, "windows.json"), encoding="utf-8") as f:
+            made = json.load(f)
+        # The file the site would hand out, at the size the builder wrote down when it put it there.
+        return os.path.getsize(os.path.join(out, os.path.basename(str(made.get("file", ""))))) == made.get("size")
+    # No installer yet (none was found or fetched), or one gone or not readable: the site offers none, nor is it said.
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
 def show_address(values):
-    """Where phones go, as text and (in a terminal that draws it) a QR code."""
+    """Where phones and PCs go, as text and (in a terminal that draws it) a QR code."""
     url = f"http://{values['PUBLIC_HOST']}/"
-    where = "on the same Wi-Fi" if env.is_lan_only(values["PUBLIC_HOST"]) else "from anywhere"
+    lan = env.is_lan_only(values["PUBLIC_HOST"])
+    where = "on the same Wi-Fi" if lan else "from anywhere"
     say(f"\nOn a phone {where}, open {url}, sign in, and tap Download app (.apk).")
+    # The same site offers the PC client for Windows once the builder has put its installer beside the app (the Windows
+    # bundle brings one; other installs fetch it): said with the button's own words, as the Download page shows them.
+    if installer_offered():
+        pc_where = "on the same network" if lan else "from anywhere"
+        say(f"On a Windows PC {pc_where}, open the same address, sign in, and choose Download the installer (.exe): it "
+            "installs the PC client, set up for this server.")
     # The Windows console draws the QR code's blocks twice as wide in some fonts: the site shows it there instead.
     if not WINDOWS:
         tool("qr", url, values=values)

@@ -16,11 +16,14 @@ Start
 2. Start OpenDMTQ.exe. The setup opens in your browser.
 3. The setup finds your files in Downloads, on the Desktop or in Documents. If they are elsewhere, paste their path or
    open their folder. Each file says what it is and whether it can be used. Then the setup takes you through the address
-   phones use, an account for each player, and the app.
+   phones and PCs use, an account for each player, and the app.
 4. When Windows asks whether Apache may use the network, allow it on private networks. If your Wi-Fi is set as a public
-   network, phones cannot connect: in Settings, Network & internet, open your Wi-Fi and choose Private.
+   network, phones and other PCs cannot connect: in Settings, Network & internet, open your Wi-Fi and choose Private.
 5. On a phone on the same Wi-Fi, open the address the setup shows, sign in with the player's account, tap "Download app
    (.apk)", and install it.
+6. On a Windows PC on the same network, open the same address and sign in: under "On a computer (Windows)", choose
+   "Download the installer (.exe)" and run it. It installs the PC client (this bundle brings it), set up for this
+   server.
 
 The server runs while the window is open. To stop it, close the window, or on the admin pages open Maintenance and
 press "Stop the server".

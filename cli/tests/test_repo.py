@@ -286,6 +286,52 @@ class HostBuilderLineTest(unittest.TestCase):
                                                    "(the details are in "))
 
 
+class HostPlayersLineTest(unittest.TestCase):
+    """Where a host install's window says players go (the setup's end, OpenDMTQ.exe apk): the phones, and the PC client
+    once the site offers its installer, in the Download page's own words."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, os.path.join(ROOT, "host"))
+        from opendmtq_host import commands
+        cls.commands = commands
+
+    def setUp(self):
+        # A data folder of the test's own: an app, and no installer beside it yet.
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.data = tmp.name
+        os.makedirs(os.path.join(self.data, "apk", "out"))
+
+    def said(self):
+        lines = []
+        with mock.patch.object(self.commands, "DATA", self.data), \
+                mock.patch.object(self.commands, "say", lambda text: lines.append(text)), \
+                mock.patch.object(self.commands, "tool", lambda *a, **k: 0):
+            self.commands.show_address({"PUBLIC_HOST": "192.168.0.20:8080"})
+        return "\n".join(lines)
+
+    def test_where_players_go_names_the_pc_client_once_the_site_offers_it(self):
+        # No installer beside the app yet: the phones' line alone, as the site has no button for a PC either.
+        said = self.said()
+        self.assertIn("On a phone on the same Wi-Fi, open http://192.168.0.20:8080/, sign in, and tap Download app (.apk).",
+                      said)
+        self.assertNotIn("Windows PC", said)
+        # The builder put the installer there (windows.json and its file at that size): the PC's line, with the button's
+        # own words on the Download page.
+        out = os.path.join(self.data, "apk", "out")
+        with open(os.path.join(out, "OpenDMTQ-Setup-192.168.0.20-8080.exe"), "wb") as f:
+            f.write(b"MZ" * 10)
+        with open(os.path.join(out, "windows.json"), "w", encoding="utf-8") as f:
+            f.write('{"file": "OpenDMTQ-Setup-192.168.0.20-8080.exe", "size": 20}')
+        self.assertIn("On a Windows PC on the same network, open the same address, sign in, and choose Download the "
+                      "installer (.exe): it installs the PC client, set up for this server.", self.said())
+        # One cut short is not offered by the site, nor said here.
+        with open(os.path.join(out, "windows.json"), "w", encoding="utf-8") as f:
+            f.write('{"file": "OpenDMTQ-Setup-192.168.0.20-8080.exe", "size": 999}')
+        self.assertNotIn("Windows PC", self.said())
+
+
 class HostAdminConfTest(unittest.TestCase):
     """The admin pages' part of a host install's Apache settings (host/opendmtq_host/apache.py): the API goes where the pages
     go, and nowhere they do not."""

@@ -151,5 +151,7 @@ def summary(values):
         say("")
         say("Leave this window open while people play. To stop the server, close it, or press Stop the server on the "
             "admin pages, under Maintenance.")
+        # Phones and the PC client reach the server alike: a public network keeps both out.
         say("Windows may ask whether Apache may use the network: allow it on private networks. If your Wi-Fi is set "
-            "as a public network, phones cannot connect: in Settings, Network & internet, choose Private for it.")
+            "as a public network, phones and other PCs cannot connect: in Settings, Network & internet, choose Private "
+            "for it.")
