@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 436" width="956" height="436" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="How long the game's requests take with eight phones at once, on two processor cores and a database of a million plays: Sign-in 2.7 milliseconds; Ranking of every chart 2.8 milliseconds; The song list 10.3 milliseconds; Ranking of one song 12.6 milliseconds; Saving a play 27.3 milliseconds">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-28 -28 956 436" width="956" height="436" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', Helvetica, Arial, sans-serif" role="img" aria-label="How long the game's requests take with eight phones at once, on two processor cores and a database of a million plays: Sign-in 2.4 milliseconds; Ranking of every chart 2.5 milliseconds; Ranking of one song 6.8 milliseconds; The song list 8.5 milliseconds; Saving a play 18.3 milliseconds">
 <rect x="-28" y="-28" width="956" height="436" rx="16" fill="#11151a"/>
 <text x="0" y="18" font-size="19" font-weight="700" fill="#eef2f6" text-anchor="start" data-box="0,900">Answers in milliseconds, on two processor cores</text>
 <text x="0" y="42" font-size="13" fill="#aeb8c3" text-anchor="start" data-box="0,900">The game's own requests, with eight phones at once and a million saved plays.</text>
@@ -12,39 +12,39 @@
 <text x="720" y="330" font-size="11.5" fill="#8b96a2" text-anchor="middle" data-box="680,760">1 s</text>
 <text x="900" y="76" font-size="11.5" fill="#8b96a2" text-anchor="end" data-box="740,900">answers a second</text>
 <text x="0" y="111.5" font-size="13.5" fill="#eef2f6" text-anchor="start" data-box="0,184">Sign-in</text>
-<path d="M266.2,107 H307.1" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
-<path d="M307.1,102 V112" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
-<circle cx="266.2" cy="107.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
-<text x="266.208" y="96" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="middle" data-box="232.208,300.208">2.7 ms</text>
-<text x="900" y="111.5" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="740,900">2,768</text>
+<path d="M257.2,107 H300.1" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
+<path d="M300.1,102 V112" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
+<circle cx="257.2" cy="107.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
+<text x="257.171" y="96" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="middle" data-box="223.171,291.171">2.4 ms</text>
+<text x="900" y="111.5" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="740,900">3,086</text>
 <text x="0" y="157.5" font-size="13.5" fill="#eef2f6" text-anchor="start" data-box="0,184">Ranking of every chart</text>
-<path d="M269.0,153 H318.0" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
-<path d="M318.0,148 V158" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
-<circle cx="269.0" cy="153.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
-<text x="268.998" y="142" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="middle" data-box="234.998,302.998">2.8 ms</text>
-<text x="900" y="157.5" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="740,900">2,506</text>
-<text x="0" y="203.5" font-size="13.5" fill="#eef2f6" text-anchor="start" data-box="0,184">The song list</text>
-<path d="M368.9,199 H410.5" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
-<path d="M410.5,194 V204" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
-<circle cx="368.9" cy="199.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
-<text x="368.935" y="188" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="middle" data-box="334.935,402.935">10.3 ms</text>
-<text x="900" y="203.5" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="740,900">675</text>
-<text x="0" y="249.5" font-size="13.5" fill="#eef2f6" text-anchor="start" data-box="0,184">Ranking of one song</text>
-<path d="M384.4,245 H425.8" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
-<path d="M425.8,240 V250" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
-<circle cx="384.4" cy="245.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
-<text x="384.399" y="234" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="middle" data-box="350.399,418.399">12.6 ms</text>
-<text x="900" y="249.5" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="740,900">623</text>
+<path d="M260.3,153 H307.1" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
+<path d="M307.1,148 V158" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
+<circle cx="260.3" cy="153.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
+<text x="260.303" y="142" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="middle" data-box="226.303,294.303">2.5 ms</text>
+<text x="900" y="157.5" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="740,900">2,907</text>
+<text x="0" y="203.5" font-size="13.5" fill="#eef2f6" text-anchor="start" data-box="0,184">Ranking of one song</text>
+<path d="M337.1,199 H409.6" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
+<path d="M409.6,194 V204" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
+<circle cx="337.1" cy="199.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
+<text x="337.077" y="188" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="middle" data-box="303.077,371.077">6.8 ms</text>
+<text x="900" y="203.5" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="740,900">975</text>
+<text x="0" y="249.5" font-size="13.5" fill="#eef2f6" text-anchor="start" data-box="0,184">The song list</text>
+<path d="M354.2,245 H394.6" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
+<path d="M394.6,240 V250" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
+<circle cx="354.2" cy="245.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
+<text x="354.197" y="234" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="middle" data-box="320.197,388.197">8.5 ms</text>
+<text x="900" y="249.5" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="740,900">818</text>
 <text x="0" y="295.5" font-size="13.5" fill="#eef2f6" text-anchor="start" data-box="0,184">Saving a play</text>
-<path d="M443.7,291 H512.6" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
-<path d="M512.6,286 V296" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
-<circle cx="443.7" cy="291.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
-<text x="443.722" y="280" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="middle" data-box="409.722,477.722">27.3 ms</text>
-<text x="900" y="295.5" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="740,900">255</text>
+<path d="M413.0,291 H465.4" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
+<path d="M465.4,286 V296" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
+<circle cx="413.0" cy="291.0" r="5.5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
+<text x="413.033" y="280" font-size="12.5" font-weight="600" fill="#eef2f6" text-anchor="middle" data-box="379.033,447.033">18.3 ms</text>
+<text x="900" y="295.5" font-size="13.5" font-weight="600" fill="#eef2f6" text-anchor="end" data-box="740,900">393</text>
 <circle cx="6.0" cy="350.0" r="5" fill="#8cf23d" stroke="#11151a" stroke-width="2"/>
 <text x="18" y="354" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="18,240">half of the answers came this fast</text>
 <path d="M250,350 H274 M274,345 V355" stroke="#55606c" stroke-width="2" stroke-linecap="round"/>
 <text x="282" y="354" font-size="12" fill="#aeb8c3" text-anchor="start" data-box="282,420">95 of 100 by here</text>
 <text x="900" y="354" font-size="12" fill="#8b96a2" text-anchor="end" data-box="430,900">A save is the game's two requests.</text>
-<text x="0" y="374" font-size="12" fill="#8b96a2" text-anchor="start" data-box="0,900">The ranking of every chart is kept until the next play: the first look after one took 113 ms.</text>
+<text x="0" y="374" font-size="12" fill="#8b96a2" text-anchor="start" data-box="0,900">The ranking of every chart is kept until the next play: the first look after one took 103 ms.</text>
 </svg>

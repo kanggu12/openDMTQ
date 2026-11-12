@@ -124,7 +124,7 @@ Plain PHP on SQLite, with no database server to look after. Two cores answer hun
 ([how it was measured](docs/testing.md#measurements)).
 
 <p align="center">
-  <img src="docs/images/chart-requests.svg" alt="The game's requests with eight phones at once, on two processor cores and a million saved plays. Half of the answers within: sign-in 2.7 milliseconds, ranking of every chart 2.8 (kept until the next play; the first look after one took 113), the song list 10.3, ranking of one song 12.6, saving a play 27.3. Answers a second: 2,768, 2,506, 675, 623 and 255" width="100%">
+  <img src="docs/images/chart-requests.svg" alt="The game's requests with eight phones at once, on two processor cores and a million saved plays. Half of the answers within: sign-in 2.4 milliseconds, ranking of every chart 2.5 (kept until the next play; the first look after one took 103), ranking of one song 6.8, the song list 8.5, saving a play 18.3. Answers a second: 3,086, 2,907, 975, 818 and 393" width="100%">
 </p>
 
 ## How it works

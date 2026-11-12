@@ -145,7 +145,7 @@ request logs, and a home folder with 5,000 files and 600 folders.
   with its own account, send one kind of request back to back for six seconds (signed as the client signs). The chart
   shows the median, the 95th percentile and the answers a second. A save is the client's two requests, the result and
   the player's rank on the song. The ranking of every chart is kept until the next play, so these looks read what the
-  first one kept; the first look after a play took 113 ms.
+  first one kept; the first look after a play took 103 ms.
 - **Before and after:** one request or page at a time on the code before and after the tuning, in the same container
   (`docker run --cpus 2`): the pages through their real paths in the test client, best of five (of two for the backup);
   0.9.4's three by the server's own handlers timed in its PHP (the median of ten to fifteen calls) and the rankings page
