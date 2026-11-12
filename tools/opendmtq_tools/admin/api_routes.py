@@ -80,6 +80,11 @@ PARAMS = {
     "chart": ("integer", "A chart's id (the song list's pattern id)."),
 }
 
+# Whether a play was made with the keyboard, which the PC client's player says with its save (the header X-OpenDMTQ-Keys):
+# on a play, and on a best for the play that set it. The site marks such a score with a small keyboard.
+KEYS_PLAY = "True when it was played with the keyboard of the PC client's player."
+KEYS_BEST = "True when the play that set it was played with the keyboard of the PC client's player."
+
 # A player's own token of who a number belongs to (?seen=), for the players' writes.
 SEEN = Field("seen", "string", "The player's seen value from the list. When given, the change happens only while the number "
              "still belongs to the same player (409 stale otherwise). A deleted player's number goes to the next new phone.",
@@ -158,6 +163,7 @@ SHAPES = {
         Field("score", "integer", "The score."),
         Field("grade", "string", "The grade."),
         Field("new_record", "boolean", "True when it beat the player's best."),
+        Field("keys", "boolean", KEYS_PLAY),
         Field("at", "integer", "When (Unix time).")]),
     "BackupFacts": Shape("The backups, as the status page counts them.", [
         Field("newest", "string", "The newest backup made here (uploaded ones do not count).", nullable=True),
@@ -424,6 +430,7 @@ SHAPES = {
         Field("grade", "string", "The grade."),
         Field("accuracy", "number", "The accuracy (percent)."),
         Field("new_record", "boolean", "True when it beat the player's best."),
+        Field("keys", "boolean", KEYS_PLAY),
         Field("at", "integer", "When (Unix time).")]),
     "PlaysSummary": Shape("What a list of plays adds up to.", [
         Field("plays", "integer", "Plays."),
@@ -537,7 +544,8 @@ SHAPES = {
     "BoardPlace": Shape("A place on a leaderboard.", [
         Field("place", "integer", "The place."), Field("player", "integer", "The player's number."), Field("name", "string", "The player's name."),
         Field("score", "integer", "The score."), Field("grade", "string", "The grade."), Field("all_combo", "boolean", "An all combo (AC)."),
-        Field("perfect_play", "boolean", "A perfect play (PP)."), Field("accuracy", "number", "The accuracy (percent).")]),
+        Field("perfect_play", "boolean", "A perfect play (PP)."), Field("accuracy", "number", "The accuracy (percent)."),
+        Field("keys", "boolean", KEYS_BEST)]),
     "Rankings": Shape("The site's rankings, by a tab.", [
         Field("sort", "string", "The tab.", enum=["total", "s_count", "perfect", "charts"]),
         Field("items", "[Ranked]", "The players with some of what is ranked, in its order.")]),
@@ -547,14 +555,17 @@ SHAPES = {
         Field("id", "integer", "Their number."), Field("name", "string", "Their name."),
         Field("charts", "integer", "Charts played (with a record)."), Field("total", "integer", "Best scores summed."),
         Field("s_count", "integer", "S grades."), Field("all_combos", "integer", "All combos."), Field("perfect_plays", "integer", "Perfect plays."),
-        Field("accuracy", "number", "Their average accuracy (percent, to the tenth, the half rounded up as the site does).")]),
+        Field("accuracy", "number", "Their average accuracy (percent, to the tenth, the half rounded up as the site does)."),
+        Field("keys_charts", "integer", "Of their records, those a keyboard play set: the site marks their total with a keyboard when there are any.")]),
     "MonthRankings": Shape("This month's rankings, as the game ranks them.", [
         Field("items", "[MonthPlayer]", "This month's players, best first: the sum of each one's best score per chart this month."),
         Field("starts_anew", "integer", "When the next month begins: the first of the month at midnight UTC (Unix time)."),
         Field("past_months", "[PastMonth]", "The months before, newest first, with their first three (six months back at most).")]),
     "MonthPlayer": Shape("A player of a month.", [
         Field("place", "integer", "Their place.", optional=True), Field("id", "integer", "Their number."), Field("name", "string", "Their name."),
-        Field("score", "integer", "Their month's score."), Field("charts", "integer", "Charts they played that month.")]),
+        Field("score", "integer", "Their month's score."), Field("charts", "integer", "Charts they played that month."),
+        Field("keys_charts", "integer", "Of those charts, those whose best that month a keyboard play set: the site marks their score with a "
+              "keyboard when there are any.")]),
     "PastMonth": Shape("A month before.", [
         Field("month", "string", "The month (YYYY-MM, UTC)."), Field("start", "integer", "Its start (Unix time)."),
         Field("end", "integer", "Its end (Unix time)."), Field("top", "[MonthPlayer]", "Its first three.")]),
@@ -567,6 +578,7 @@ SHAPES = {
               nullable=True),
         Field("grades", "{integer}", "Their best records by grade, only the grades they have."),
         Field("records", "integer", "Their best records (GET /site/players/{player}/records lists them)."),
+        Field("keys_charts", "integer", "Of those records, those a keyboard play set."),
         Field("recent", "[SitePlay]", "Their last 15 plays."),
         Field("activity", "Activity12", "The last 12 weeks, day by day."),
         Field("levels", "[Level]", "Their records by the chart's level."),
@@ -581,7 +593,8 @@ SHAPES = {
         Field("chart", "integer", "The chart."), Field("song", "integer", "Its song.", nullable=True),
         Field("title", "string", "Its song's title.", nullable=True), Field("chart_name", "string", "Its name.", nullable=True),
         Field("score", "integer", "The score."), Field("grade", "string", "The grade."), Field("accuracy", "number", "The accuracy (percent)."),
-        Field("new_record", "boolean", "True when it beat the player's best."), Field("at", "integer", "When (Unix time)."),
+        Field("new_record", "boolean", "True when it beat the player's best."), Field("keys", "boolean", KEYS_PLAY),
+        Field("at", "integer", "When (Unix time)."),
         Field("player", "integer", "The player's number.", optional=True), Field("name", "string", "The player's name.", optional=True),
         Field("best_before", "integer", "The player's best on that chart before it.", nullable=True, optional=True)]),
     "SitePlays": Shape("Plays.", [Field("items", "[SitePlay]", "Newest first.")]),
@@ -591,6 +604,7 @@ SHAPES = {
         Field("title", "string", "Its song's title.", nullable=True), Field("chart_name", "string", "Its name.", nullable=True),
         Field("score", "integer", "The score."), Field("grade", "string", "The grade."), Field("all_combo", "boolean", "An all combo (AC)."),
         Field("perfect_play", "boolean", "A perfect play (PP)."), Field("accuracy", "number", "The accuracy (percent)."),
+        Field("keys", "boolean", KEYS_BEST),
         Field("set_at", "integer", "When it was set (null for a record older than the play log).", nullable=True)]),
     "BroadcastSettings": Shape("The server's broadcasts as a whole (the Broadcasts page).", [
         Field("on", "boolean", "True while broadcasts are on: only then do phones and PCs send video and does the site show broadcasts."),
@@ -635,7 +649,8 @@ SHAPES = {
         Field("built_at", "string", "When it was built."), Field("size", "integer", "Its size (bytes).", nullable=True),
         Field("for_this_address", "boolean", "True when it is for this server's address: only then can players use it.")]),
     "TopPlayer": Shape("A best player.", [Field("id", "integer", "Their number."), Field("name", "string", "Their name."),
-                                          Field("total", "integer", "Best scores summed.")]),
+                                          Field("total", "integer", "Best scores summed."),
+                                          Field("keys_charts", "integer", "Of their records, those a keyboard play set.")]),
 }
 
 # Each part of the API, in the order the reference has them.

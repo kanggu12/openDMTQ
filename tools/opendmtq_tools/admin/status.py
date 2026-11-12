@@ -16,10 +16,12 @@ from .core import ago, app, BASE, db, human, t, tp
 
 
 def recent_plays(con, limit=6):
-    """The newest plays, for the dashboard: who, which song and chart, score, grade and when."""
+    """The newest plays, for the dashboard: who, which song and chart, score, grade, whether it was played with the keyboard
+    (keyboard) and when."""
     names = song_pages.chart_names()
     try:
-        rows = con.execute(f"""SELECT l.user_id, m.nickname, l.pattern_id, l.score, l.grade, l.is_record, l.played_at
+        # Every column of the play: the keyboard's mark is one of them where the game server has added it.
+        rows = con.execute(f"""SELECT l.*, m.nickname
                                 FROM PlayLog l JOIN ({core.PLAYER_ROWS}) m ON m.guid = l.user_id
                                ORDER BY l.played_at DESC, l.id DESC LIMIT ?""", (core.CHECK_UDID, limit)).fetchall()
     except sqlite3.OperationalError:
@@ -27,7 +29,8 @@ def recent_plays(con, limit=6):
     # The moment as well as how long ago: the API gives the time.
     return [{"id": r["user_id"], "who": (r["nickname"] or "").strip() or tp("player.fallback", id=r["user_id"]),
              "song": names.get(r["pattern_id"], ("", ""))[0], "chart": names.get(r["pattern_id"], ("", ""))[1],
-             "score": r["score"], "grade": r["grade"], "new": r["is_record"], "ago": ago(r["played_at"]), "at": r["played_at"]} for r in rows]
+             "score": r["score"], "grade": r["grade"], "new": r["is_record"], "keyboard": core.by_keys(r),
+             "ago": ago(r["played_at"]), "at": r["played_at"]} for r in rows]
 
 
 def attention(health, counts, saved, backup_age, on, build, failed, usage):

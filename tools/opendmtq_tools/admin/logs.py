@@ -321,7 +321,8 @@ def plays_found(con, wanted, limit=-1, offset=0):
     where, args = plays_where(wanted)
     names = song_pages.chart_names()
     word = wanted["q"].lower()
-    rows = con.execute(f"""SELECT l.user_id, m.nickname, l.pattern_id, l.score, l.grade, l.judgement, l.is_record, l.played_at
+    # Every column of the play: the keyboard's mark is one of them where the game server has added it.
+    rows = con.execute(f"""SELECT l.*, m.nickname
                              FROM PlayLog l JOIN ({core.PLAYER_ROWS}) m ON m.guid = l.user_id
                             {where}
                             ORDER BY l.played_at DESC, l.id DESC LIMIT ? OFFSET ?""", [core.CHECK_UDID] + args + [limit, offset])
@@ -331,19 +332,20 @@ def plays_found(con, wanted, limit=-1, offset=0):
         if word and word not in f"{who} {song} {chart}".lower():
             continue
         yield {"id": r["user_id"], "who": who, "song": song, "chart": chart, "score": r["score"], "grade": r["grade"],
-               "judgement": r["judgement"], "new": r["is_record"], "when": r["played_at"]}
+               "judgement": r["judgement"], "new": r["is_record"], "keyboard": core.by_keys(r), "when": r["played_at"]}
 
 
 def plays_csv(found, name="opendmtq-plays.csv"):
     """The plays asked for as a file, all of them and not one page, in the page's order, for a spreadsheet."""
     out = io.StringIO()
     # The mark that tells a spreadsheet on Windows this is UTF-8, as in the players' file.
-    out.write("\ufefftime,player_id,player,song,chart,score,grade,accuracy,new_record\n")
+    # The keyboard's mark last: a spreadsheet made from the columns before it still finds them where they were.
+    out.write("\ufefftime,player_id,player,song,chart,score,grade,accuracy,new_record,keys\n")
     for p in found:
         at = datetime.datetime.fromtimestamp(p["when"]).strftime("%Y-%m-%d %H:%M:%S")
         # The game keeps accuracy in tenths of a percent. What the phone sent is text like any other.
         out.write(f'{at},{p["id"]},{players.csv_text(p["who"])},{players.csv_text(p["song"])},{players.csv_text(p["chart"])},{p["score"]},{players.csv_text(p["grade"])},'
-                  f'{(p["judgement"] or 0) / 10:.1f},{1 if p["new"] else 0}\n')
+                  f'{(p["judgement"] or 0) / 10:.1f},{1 if p["new"] else 0},{1 if p["keyboard"] else 0}\n')
     r = app.response_class(out.getvalue(), mimetype="text/csv; charset=utf-8")
     r.headers["Content-Disposition"] = f'attachment; filename="{name}"'
     return r

@@ -101,8 +101,9 @@
     <h2>{{ t('dash.recent') }} <a class="more" href="{{ url_for('logs_page', tab='plays') }}">{{ t('dash.all_plays') }}</a></h2>
     {% if not counts %}<p class="empty">{{ t('dash.db_short') }}</p>{% elif not recent %}<p class="empty">{{ t('dash.recent_none') }}</p>{% else %}
     <table class="compact recent"><tbody>
+      {# A play made with the keyboard has the keyboard's mark before its score, as on the site. #}
       {% for r in recent %}
-      <tr><td class="who"><a href="{{ public_url }}/opendmtq/player.php?id={{ r.id }}">{{ r.who }}</a></td><td class="what">{{ r.song }}<span class="chart-name">{{ r.chart }}<span class="when-sub">{{ r.ago }}</span></span></td><td class="r">{{ '{:,}'.format(r.score) }}</td><td class="flag"><span class="flag-in"><span class="grade g{{ r.grade }}">{{ r.grade }}</span>{% if r.new %}<span class="mark new">{{ t('dash.new') }}</span>{% endif %}</span></td><td class="when">{{ r.ago }}</td></tr>
+      <tr><td class="who"><a href="{{ public_url }}/opendmtq/player.php?id={{ r.id }}">{{ r.who }}</a></td><td class="what">{{ r.song }}<span class="chart-name">{{ r.chart }}<span class="when-sub">{{ r.ago }}</span></span></td><td class="r">{% if r.keyboard %}{{ keys_mark() }}{% endif %}{{ '{:,}'.format(r.score) }}</td><td class="flag"><span class="flag-in"><span class="grade g{{ r.grade }}">{{ r.grade }}</span>{% if r.new %}<span class="mark new">{{ t('dash.new') }}</span>{% endif %}</span></td><td class="when">{{ r.ago }}</td></tr>
       {% endfor %}
     </tbody></table>
     {% endif %}

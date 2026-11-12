@@ -2375,19 +2375,61 @@ class PlaysTabTest(unittest.TestCase):
             # The mark that tells a spreadsheet on Windows this is UTF-8.
             self.assertTrue(text.startswith("﻿"))
             rows = list(csv.reader(io.StringIO(text.lstrip("﻿"))))
-            self.assertEqual(rows[0], ["time", "player_id", "player", "song", "chart", "score", "grade", "accuracy", "new_record"])
+            self.assertEqual(rows[0], ["time", "player_id", "player", "song", "chart", "score", "grade", "accuracy", "new_record", "keys"])
             self.assertEqual(len(rows), 121)
-            # Newest first, as on the page, accuracy as a percentage.
-            self.assertEqual(rows[1], ["2026-10-01 10:01:59", "7", "Sena", "Paper Planes", "2LINE Easy 1", "119", "A", "95.8", "0"])
+            # Newest first, as on the page, accuracy as a percentage; played by touch.
+            self.assertEqual(rows[1], ["2026-10-01 10:01:59", "7", "Sena", "Paper Planes", "2LINE Easy 1", "119", "A", "95.8", "0", "0"])
 
     def test_nothing_in_the_file_is_read_as_a_formula(self):
         with Install() as inst:
             self.server(inst, [(8, 2, 777, 900, "2026-10-01 10:00:00"), (11, 1, 1, 900, "2026-10-01 09:00:00")])
             rows = list(csv.reader(io.StringIO(inst.client.get("/opendmtq/admin/logs?tab=plays&csv=1").get_data(as_text=True).lstrip("﻿"))))
             self.assertEqual(rows[1][2:4], ["'=Yuna", "'-Neon Rain"])
-            self.assertEqual(rows[1][-1], "1")
+            # A new record, by touch.
+            self.assertEqual(rows[1][-2:], ["1", "0"])
             # A quote in a name stays in its field.
             self.assertEqual(rows[2][2], 'Q"uote')
+
+    def test_a_play_with_the_keyboard_is_marked_on_the_tab_on_the_status_page_and_in_the_file(self):
+        # The PC client's player says a play was made with the keyboard (its save's X-OpenDMTQ-Keys header), and the game
+        # server keeps that with the play (PlayLog's keys). The Plays tab and the status page's newest plays mark that play's
+        # score with the site's keyboard, its words as its title; the file has the mark as its last column, 1 or 0.
+        with Install() as inst:
+            self.server(inst, [(7, 1, 101, 900, "2026-10-01 10:00:00"), (9, 2, 202, 900, "2026-10-01 11:00:00")])
+            with sqlite3.connect(admin.core.DB) as con:
+                con.execute("UPDATE PlayLog SET keys = 1 WHERE score = 202")
+            for path in ("/opendmtq/admin/logs?tab=plays", "/opendmtq/admin/"):
+                with self.subTest(path):
+                    page = inst.client.get(path).get_data(as_text=True)
+                    # Each row of plays, by its score: only the keyboard's has the mark.
+                    rows = {score: row for row in re.findall(r"<tr>(.*?)</tr>", page, re.S)
+                            for score in re.findall(r">(101|202)</td>", row)}
+                    self.assertEqual({score: 'class="keys-mark"' in row for score, row in rows.items()}, {"101": False, "202": True})
+                    self.assertIn('class="keys-mark" role="img" aria-label="Keyboard play" title="Keyboard play"', rows["202"])
+            rows = list(csv.reader(io.StringIO(inst.client.get("/opendmtq/admin/logs?tab=plays&csv=1").get_data(as_text=True).lstrip("\ufeff"))))
+            self.assertEqual([(row[5], row[-1]) for row in rows], [("score", "keys"), ("202", "1"), ("101", "0")])
+
+    def test_a_database_the_server_has_not_brought_up_to_date_lists_every_play_as_by_touch(self):
+        # The admin service can be up before the server after an upgrade: the database has no keyboard's column yet (the
+        # server's start adds it). The pages that list plays list them all the same, none of them marked.
+        with Install() as inst:
+            old_game_database(admin.core.DB, [(1, 7, 101, "A", "N", "N", 900)])
+            member_rows(admin.core.DB, [(7, "Sena", "a")])
+            with sqlite3.connect(admin.core.DB) as con:
+                con.execute("CREATE TABLE PlayLog (id INTEGER PRIMARY KEY, user_id INTEGER, pattern_id INTEGER, score INTEGER, "
+                            "grade TEXT, judgement INTEGER, is_record INTEGER, played_at INTEGER)")
+                con.execute("INSERT INTO PlayLog (user_id, pattern_id, score, grade, judgement, is_record, played_at) VALUES (7, 1, 101, 'A', 900, 1, ?)",
+                            (int(time.time()) - 60,))
+            inst.sign_in()
+            for path in ("/opendmtq/admin/logs?tab=plays", "/opendmtq/admin/"):
+                with self.subTest(path):
+                    r = inst.client.get(path)
+                    page = r.get_data(as_text=True)
+                    self.assertEqual(r.status_code, 200)
+                    self.assertIn(">101</td>", page)
+                    self.assertNotIn('class="keys-mark"', page)
+            rows = list(csv.reader(io.StringIO(inst.client.get("/opendmtq/admin/logs?tab=plays&csv=1").get_data(as_text=True).lstrip("\ufeff"))))
+            self.assertEqual([(row[5], row[-1]) for row in rows], [("score", "keys"), ("101", "0")])
 
     def test_a_filter_that_leaves_nothing_says_so_and_offers_the_way_back(self):
         with Install() as inst:

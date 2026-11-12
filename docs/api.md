@@ -1692,6 +1692,7 @@ A play on the status page.
 - `score` (integer): The score.
 - `grade` (string): The grade.
 - `new_record` (boolean): True when it beat the player's best.
+- `keys` (boolean): True when it was played with the keyboard of the PC client's player.
 - `at` (integer): When (Unix time).
 
 #### BackupFacts
@@ -2224,6 +2225,7 @@ A play in the log.
 - `grade` (string): The grade.
 - `accuracy` (number): The accuracy (percent).
 - `new_record` (boolean): True when it beat the player's best.
+- `keys` (boolean): True when it was played with the keyboard of the PC client's player.
 - `at` (integer): When (Unix time).
 
 #### PlaysSummary
@@ -2443,6 +2445,7 @@ A place on a leaderboard.
 - `all_combo` (boolean): An all combo (AC).
 - `perfect_play` (boolean): A perfect play (PP).
 - `accuracy` (number): The accuracy (percent).
+- `keys` (boolean): True when the play that set it was played with the keyboard of the PC client's player.
 
 #### Rankings
 
@@ -2465,6 +2468,7 @@ A player of the rankings.
 - `all_combos` (integer): All combos.
 - `perfect_plays` (integer): Perfect plays.
 - `accuracy` (number): Their average accuracy (percent, to the tenth, the half rounded up as the site does).
+- `keys_charts` (integer): Of their records, those a keyboard play set: the site marks their total with a keyboard when there are any.
 
 #### MonthRankings
 
@@ -2483,6 +2487,7 @@ A player of a month.
 - `name` (string): Their name.
 - `score` (integer): Their month's score.
 - `charts` (integer): Charts they played that month.
+- `keys_charts` (integer): Of those charts, those whose best that month a keyboard play set: the site marks their score with a keyboard when there are any.
 
 #### PastMonth
 
@@ -2508,6 +2513,7 @@ A player's page on the site.
 - `accuracy` (number, or null): Their average accuracy (percent, to the tenth, the half rounded up as the site does); null with no plays.
 - `grades` (object of integer): Their best records by grade, only the grades they have.
 - `records` (integer): Their best records (GET /site/players/{player}/records lists them).
+- `keys_charts` (integer): Of those records, those a keyboard play set.
 - `recent` (list of [SitePlay](#siteplay)): Their last 15 plays.
 - `activity` ([Activity12](#activity12)): The last 12 weeks, day by day.
 - `levels` (list of [Level](#level)): Their records by the chart's level.
@@ -2541,6 +2547,7 @@ A play on the site.
 - `grade` (string): The grade.
 - `accuracy` (number): The accuracy (percent).
 - `new_record` (boolean): True when it beat the player's best.
+- `keys` (boolean): True when it was played with the keyboard of the PC client's player.
 - `at` (integer): When (Unix time).
 - `player` (integer, optional): The player's number.
 - `name` (string, optional): The player's name.
@@ -2571,6 +2578,7 @@ A best record.
 - `all_combo` (boolean): An all combo (AC).
 - `perfect_play` (boolean): A perfect play (PP).
 - `accuracy` (number): The accuracy (percent).
+- `keys` (boolean): True when the play that set it was played with the keyboard of the PC client's player.
 - `set_at` (integer, or null): When it was set (null for a record older than the play log).
 
 #### BroadcastSettings
@@ -2662,5 +2670,6 @@ A best player.
 - `id` (integer): Their number.
 - `name` (string): Their name.
 - `total` (integer): Best scores summed.
+- `keys_charts` (integer): Of their records, those a keyboard play set.
 
 <!-- reference: end -->

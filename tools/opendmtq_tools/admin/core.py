@@ -263,6 +263,21 @@ def app_name():
     return f"TECHNIKA Q ({server_name()})"
 
 
+def by_keys(row):
+    """True when a row of Play (a best) or PlayLog (a play) was played with the keyboard: its keys column, which the game
+    server's save keeps (server/game/src/game.php). A database the server has not brought up to date has no such column
+    (the admin service can be up first after an upgrade, server/game/bin/setup-db.php adds it): every play there is one by
+    touch."""
+    return "keys" in row.keys() and bool(row["keys"])
+
+
+def keys_mark():
+    """The keyboard's mark before a score a keyboard play made, as the site draws it (lib.php keys_mark(), .keys-mark in the
+    portal's style.css), its words in the page's language as its title and as its name for a screen reader."""
+    words = t("mark.keys")
+    return Markup('<span class="keys-mark" role="img" aria-label="{}" title="{}"></span>').format(words, words)
+
+
 def app_name_html(label=None):
     """An app's name as HTML, styled as a name (.app-name in the portal's style.css): the title, then the
     server's name in pieces that stay whole, so a long address wraps after a dot or before the port and
@@ -369,7 +384,9 @@ def template_globals():
             "host_install": setup.HOST_INSTALL,
             # On Kubernetes: nothing on these pages starts or stops the server's parts.
             "kubernetes": setup.IN_KUBERNETES,
-            "app_name_html": app_name_html, "device_words": logs.device_words}
+            "app_name_html": app_name_html, "device_words": logs.device_words,
+            # The keyboard's mark before a score a keyboard play made (the dashboard's plays, the Plays tab).
+            "keys_mark": keys_mark}
 
 
 def read_text(raw):

@@ -88,6 +88,7 @@ STRINGS = {
         "dash.plays_week": "{n} in the last 7 days",
         "dash.no_backup": "Nothing saved yet",
         "dash.new": "NEW",
+        "mark.keys": "Keyboard play",
         "dash.all_plays": "All plays",
         "dash.version": "OpenDMTQ",
         # Inviting a friend.
@@ -935,6 +936,7 @@ STRINGS = {
         "dash.plays_week": "최근 7일 {n}회",
         "dash.no_backup": "아직 저장된 백업 없음",
         "dash.new": "NEW",
+        "mark.keys": "키보드 플레이",
         "dash.all_plays": "전체 플레이",
         "dash.version": "OpenDMTQ",
         # Inviting a friend.

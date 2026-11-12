@@ -82,7 +82,8 @@
         {# A name narrows the list to that player's plays. #}
         {% if not one %}<td class="primary"><a href="{{ url_for('logs_page', tab='plays', player=p.id) }}">{{ p.who }}</a></td>{% endif %}
         <td data-label="{{ t('logs.th_song') }}" class="play-song"><span>{{ p.song }}</span><span class="runtime">{{ p.chart }}</span></td>
-        <td data-label="{{ t('logs.th_score') }}" class="r">{{ '{:,}'.format(p.score) }}</td>
+        {# A play made with the keyboard has the keyboard's mark before its score, as on the site. #}
+        <td data-label="{{ t('logs.th_score') }}" class="r">{% if p.keyboard %}{{ keys_mark() }}{% endif %}{{ '{:,}'.format(p.score) }}</td>
         <td data-label="{{ t('logs.th_grade') }}" class="play-grade"><span><span class="grade g{{ p.grade }}">{{ p.grade }}</span>{% if p.new %}<span class="mark new">{{ t('dash.new') }}</span>{% endif %}</span></td>
       </tr>
     {% endfor %}

@@ -302,7 +302,7 @@ def status(args):
         "version": os.environ.get("OPENDMTQ_VERSION") or None, "address": core.PUBLIC_HOST, "instance": setup.STARTED,
         "game_server": game_server(health), "counts": f["counts"],
         "recent": [{"player": r["id"], "name": str(r["who"]), "song": r["song"], "chart": r["chart"], "score": r["score"], "grade": r["grade"],
-                    "new_record": bool(r["new"]), "at": r["at"]} for r in f["recent"]],
+                    "new_record": bool(r["new"]), "keys": r["keyboard"], "at": r["at"]} for r in f["recent"]],
         "backups": {"newest": saved[0][0] if saved else None, "newest_at": int(saved[0][1]) if saved else None,
                     "daily": bool(core.settings().get("auto_backup")), "daily_failure": backups._auto_failure or None},
         "app": {"on_offer": build_view(build) if build else None, "build_error": plain(f["failed"]) if f["failed"] else None,
@@ -1076,7 +1076,8 @@ def logs_plays(args):
                    "grades": [{"grade": g_, "plays": summed.grades[g_]} for g_ in site.GRADES if summed.grades.get(g_)],
                    "days": [{"day": d.isoformat(), "plays": n} for d, n in sorted(summed.days.items()) if n]}
     return {"items": [{"player": p["id"], "name": str(p["who"]), "song": p["song"], "chart": p["chart"], "score": p["score"], "grade": p["grade"],
-                       "accuracy": site.accuracy(p["judgement"] or 0), "new_record": bool(p["new"]), "at": p["when"]} for p in found["plays"]],
+                       "accuracy": site.accuracy(p["judgement"] or 0), "new_record": bool(p["new"]), "keys": p["keyboard"], "at": p["when"]}
+                      for p in found["plays"]],
             "total": found["total"], "page": page, "pages": found["last_page"],
             "players": [{"id": guid, "name": name} for guid, name in found["people"]], "summary": summary}
 

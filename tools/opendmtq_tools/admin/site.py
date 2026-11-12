@@ -31,6 +31,22 @@ PLAYER_FIGURES = f"""COUNT(p.pattern_id) AS charts, SUM({SCORE_SQL}) AS total, S
 PLAYER_TOTALS = f"""SELECT p.user_id, SUM({SCORE_SQL}) AS total FROM Play p
                      WHERE p.user_id IN (SELECT guid FROM ({core.PLAYER_ROWS})) GROUP BY p.user_id"""
 
+# How many of each player's bests a keyboard play set (KEYS_BESTS in ranking_lib.php): from the index of the keyboard's bests
+# alone (Play_keys, server/game/bin/setup-db.php).
+KEYS_BESTS = "SELECT p.user_id, COUNT(*) AS n FROM Play p WHERE p.keys = 1 GROUP BY p.user_id"
+
+# For one month's board (from the first ? to before the second, both twice), how many of the charts it counts had a keyboard
+# play as each player's best that month: the month's top score on the chart, the play that got there first (MONTH_KEYS in
+# ranking_lib.php, which binds :since and :until by name). The + before the times: each chart's best from that player's
+# plays of it (PlayLog_clears), not from the whole chart's month.
+MONTH_KEYS = """SELECT k.user_id, COUNT(*) AS n FROM (
+        SELECT DISTINCT l.user_id, l.pattern_id FROM PlayLog l
+         WHERE l.keys = 1 AND l.played_at >= ? AND l.played_at < ?) k
+     WHERE (SELECT b.keys FROM PlayLog b
+             WHERE b.user_id = k.user_id AND b.pattern_id = k.pattern_id AND +b.played_at >= ? AND +b.played_at < ?
+             ORDER BY MIN(MAX(b.score, 0), 2147483647) DESC, b.played_at, b.id LIMIT 1) = 1
+     GROUP BY k.user_id"""
+
 # The orders the rankings page has, by its tabs: total best score (the default), this month, S grades, perfect plays,
 # charts played.
 SORTS = ("total", "month", "s_count", "perfect", "charts")
@@ -137,26 +153,50 @@ def has_playlog(con):
     return bool(con.execute("SELECT 1 FROM sqlite_master WHERE name = 'PlayLog'").fetchone())
 
 
-def _figures(row):
-    """A player's figures as the API says them."""
+def keys_counts(con, sql, args=()):
+    """Players' counts by guid from KEYS_BESTS or MONTH_KEYS, players with none left out. None at all in a database the game
+    server has not brought up to date (the admin service can be up first after an upgrade): it has no keyboard's column, and
+    every play there is one by touch."""
+    try:
+        return {int(r[0]): int(r[1]) for r in con.execute(sql, args)}
+    except sqlite3.OperationalError:
+        return {}
+
+
+def keys_bests(con):
+    """How many of each player's bests a keyboard play set, by guid (KEYS_BESTS)."""
+    return keys_counts(con, KEYS_BESTS)
+
+
+def month_keys(con, since, until):
+    """How many of the charts of each player's month (from since to before until) had a keyboard play as its best, by guid
+    (MONTH_KEYS)."""
+    return keys_counts(con, MONTH_KEYS, (since, until, since, until))
+
+
+def _figures(row, keys=0):
+    """A player's figures as the API says them; keys: how many of their bests a keyboard play set."""
     return {"id": int(row["id"]), "name": player_name(row["nickname"], row["id"]), "charts": int(row["charts"] or 0),
             "total": int(row["total"] or 0), "s_count": int(row["s_count"] or 0), "all_combos": int(row["ac"] or 0),
             "perfect_plays": int(row["perfect"] or 0),
             # None with no plays: the site shows a dash there, not 0.0%.
-            "accuracy": accuracy(row["avg_judgement"]) if int(row["charts"] or 0) else None}
+            "accuracy": accuracy(row["avg_judgement"]) if int(row["charts"] or 0) else None,
+            # The site's keyboard mark beside their total, with this number in its words.
+            "keys_charts": keys}
 
 
 def players(con):
     """Every player with the rankings' figures, best total first, the older account first on a tie; rank among those
-    who played (players() in lib.php)."""
+    who played (players() in lib.php), and how many of their bests a keyboard play set."""
     figures = {int(r["user_id"]): r for r in con.execute(f"SELECT p.user_id, {PLAYER_FIGURES} FROM Play p GROUP BY p.user_id")
                if r["user_id"] is not None}
+    keys = keys_bests(con)
     rows = []
     for r in con.execute(core.PLAYER_ROWS, (core.CHECK_UDID,)):
         f = figures.get(int(r["guid"]))
         rows.append(_figures({"id": r["guid"], "nickname": r["nickname"], "charts": f["charts"] if f else 0, "total": f["total"] if f else 0,
                               "s_count": f["s_count"] if f else 0, "ac": f["ac"] if f else 0, "perfect": f["perfect"] if f else 0,
-                              "avg_judgement": f["avg_judgement"] if f else 0}))
+                              "avg_judgement": f["avg_judgement"] if f else 0}, keys.get(int(r["guid"]), 0)))
     rows.sort(key=lambda p: (-p["total"], p["id"]))
     rank = 0
     for p in rows:
@@ -182,7 +222,8 @@ def month_start(back=0):
 
 def month_players(con, since, until):
     """The players of one month, best first, as the game ranks them: the sum of each one's best score per chart in that
-    month from the play log, the older account first on a tie (month_players() in ranking_lib.php, the game's odq_month_board())."""
+    month from the play log, the older account first on a tie (month_players() in ranking_lib.php, the game's odq_month_board()),
+    and how many of those charts had a keyboard play as that month's best."""
     rows = con.execute(
         f"""SELECT m.guid AS id, m.nickname, b.score, b.charts FROM (
                 SELECT guid, SUM(best) AS score, COUNT(*) AS charts FROM (
@@ -191,7 +232,9 @@ def month_players(con, since, until):
                  GROUP BY guid) b
               JOIN ({core.PLAYER_ROWS}) m ON m.guid = b.guid
              ORDER BY b.score DESC, m.guid ASC""", (since, until, core.CHECK_UDID)).fetchall()
-    return [{"id": int(r["id"]), "name": player_name(r["nickname"], r["id"]), "score": int(r["score"]), "charts": int(r["charts"])} for r in rows]
+    keys = month_keys(con, since, until)
+    return [{"id": int(r["id"]), "name": player_name(r["nickname"], r["id"]), "score": int(r["score"]), "charts": int(r["charts"]),
+             "keys_charts": keys.get(int(r["id"]), 0)} for r in rows]
 
 
 def rankings(con, sort):
@@ -232,7 +275,7 @@ def player_figures(con, guid):
              WHERE m.guid = ?""", (core.CHECK_UDID, guid, guid)).fetchone()
     if not row:
         return None
-    out = _figures(row)
+    out = _figures(row, keys_bests(con).get(int(guid), 0))
     out["rank"] = None
     if out["charts"] > 0:
         # Those ahead of them: a higher total, or the same total and a lower id.
@@ -243,9 +286,10 @@ def player_figures(con, guid):
 
 
 def _play(row, charts, by_id):
-    """A play from the play log as the site lists it."""
+    """A play from the play log as the site lists it, with whether it was played with the keyboard."""
     return dict(chart_info(row["pattern_id"], charts, by_id), score=int(row["score"] or 0), grade=row["grade"],
-                accuracy=accuracy(row["judgement"]), new_record=bool(row["is_record"]), at=int(row["played_at"] or 0))
+                accuracy=accuracy(row["judgement"]), new_record=bool(row["is_record"]), keys=core.by_keys(row),
+                at=int(row["played_at"] or 0))
 
 
 def player_page(con, guid):
@@ -291,7 +335,8 @@ def player_page(con, guid):
 
 def player_records(con, guid):
     """A player's best records, best score first, each with when it was set (the newest play that set a record on its
-    chart; None for records older than the play log). None for somebody who is no player."""
+    chart; None for records older than the play log) and whether the play that set it was played with the keyboard. None
+    for somebody who is no player."""
     if not player_figures(con, guid):
         return None
     charts, by_id = chart_map(), songs_by_id()
@@ -301,7 +346,7 @@ def player_records(con, guid):
             "SELECT pattern_id, MAX(played_at) FROM PlayLog WHERE user_id = ? AND is_record = 1 GROUP BY pattern_id", (guid,))}
     return [dict(chart_info(r["pattern_id"], charts, by_id), score=int(r["score"] or 0), grade=r["grade"],
                  all_combo=r["isAllCombo"] == "Y", perfect_play=r["isPerfectPlay"] == "Y", accuracy=accuracy(r["judgement"]),
-                 set_at=set_at.get(int(r["pattern_id"] or 0)))
+                 keys=core.by_keys(r), set_at=set_at.get(int(r["pattern_id"] or 0)))
             for r in con.execute("SELECT * FROM Play WHERE user_id = ? ORDER BY score DESC", (guid,))]
 
 
@@ -356,8 +401,8 @@ def song_page(con, song_id):
 
 
 def board(con, pattern):
-    """A chart's leaderboard (song.php): the best 100, by score, then accuracy, then the older account. None for a
-    chart the server does not list."""
+    """A chart's leaderboard (song.php): the best 100, by score, then accuracy, then the older account, each with whether
+    the play that set it was played with the keyboard. None for a chart the server does not list."""
     info = chart_info(pattern)
     if info["song"] is None:
         return None
@@ -367,16 +412,18 @@ def board(con, pattern):
         (core.CHECK_UDID, pattern, BOARD_SHOWN)).fetchall()
     items = [{"place": i, "player": int(r["mid"]), "name": player_name(r["nickname"], r["mid"]), "score": int(r["score"] or 0),
               "grade": r["grade"], "all_combo": r["isAllCombo"] == "Y", "perfect_play": r["isPerfectPlay"] == "Y",
-              "accuracy": accuracy(r["judgement"])} for i, r in enumerate(rows, 1)]
+              "accuracy": accuracy(r["judgement"]), "keys": core.by_keys(r)} for i, r in enumerate(rows, 1)]
     return dict(info, items=items)
 
 
 def top_players(con, limit):
-    """The best players who have played, in the order of the rankings: id, name and total only (top_players() in
-    lib.php, as the home page lists them)."""
+    """The best players who have played, in the order of the rankings: id, name, total and how many of their bests a
+    keyboard play set (top_players() in lib.php, as the home page lists them)."""
     rows = con.execute(f"""SELECT m.guid AS id, m.nickname, a.total FROM ({PLAYER_TOTALS}) a JOIN ({core.PLAYER_ROWS}) m ON m.guid = a.user_id
                             ORDER BY a.total DESC, m.guid ASC LIMIT ?""", (core.CHECK_UDID, core.CHECK_UDID, limit)).fetchall()
-    return [{"id": int(r["id"]), "name": player_name(r["nickname"], r["id"]), "total": int(r["total"] or 0)} for r in rows]
+    keys = keys_bests(con)
+    return [{"id": int(r["id"]), "name": player_name(r["nickname"], r["id"]), "total": int(r["total"] or 0),
+             "keys_charts": keys.get(int(r["id"]), 0)} for r in rows]
 
 
 def recent_plays(con, limit, records_only=False, player=None):

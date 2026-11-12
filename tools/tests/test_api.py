@@ -1365,6 +1365,105 @@ class SameFiguresTest(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class KeysTest(unittest.TestCase):
+    """The keyboard's mark: the PC client's player says a play was made with the keyboard (its save's X-OpenDMTQ-Keys
+    header), and the game server keeps it with the play (PlayLog's keys) and with the best that play set (Play's keys). Every
+    answer that lists plays or bests says it (keys), as the site marks them; every answer that lists totals or a month's
+    scores counts the bests a keyboard play set (keys_charts), as the site's mark beside a total says."""
+
+    @staticmethod
+    def marked(inst):
+        """The template server with Sena's best on chart 12 set by a keyboard play, a minute ago: this month's too."""
+        with sqlite3.connect(admin.core.DB) as con:
+            con.execute("UPDATE Play SET keys = 1 WHERE user_id = 7 AND pattern_id = 12")
+            con.execute("UPDATE PlayLog SET keys = 1, played_at = ? WHERE user_id = 7 AND pattern_id = 12", (now() - 60,))
+
+    def test_every_play_and_best_says_whether_the_keyboard_played_it(self):
+        with Server() as inst:
+            self.marked(inst)
+            # A chart's leaderboard, a player's records and their page's plays, the newest plays and records, the home page's.
+            board = {p["name"]: p["keys"] for p in inst.ask("GET", "/site/charts/12/ranking").get_json()["items"]}
+            self.assertEqual(board, {"Sena": True})
+            board = {p["name"]: p["keys"] for p in inst.ask("GET", "/site/charts/11/ranking").get_json()["items"]}
+            self.assertEqual(board, {"Sena": False, "Yuna": False})
+            records = {r["chart"]: r["keys"] for r in inst.ask("GET", "/site/players/7/records").get_json()["items"]}
+            self.assertEqual(records, {11: False, 12: True})
+            page = inst.ask("GET", "/site/players/7").get_json()
+            self.assertEqual(([(p["chart"], p["keys"]) for p in page["recent"]], page["keys_charts"]), ([(12, True), (11, False)], 1))
+            for path in ("/site/plays/recent", "/site/plays/recent?records=true"):
+                plays = [(p["player"], p["chart"], p["keys"]) for p in inst.ask("GET", path).get_json()["items"]]
+                self.assertEqual(sorted(plays), sorted([(7, 12, True), (7, 11, False), (8, 11, False)] + ([(8, 11, False)] if "records" not in path else [])), path)
+            home = inst.ask("GET", "/site/home").get_json()
+            self.assertEqual(sorted((p["player"], p["chart"], p["keys"]) for p in home["records"]), [(7, 11, False), (7, 12, True), (8, 11, False)])
+            # The admin pages' newest plays and the Plays tab.
+            recent = {(p["player"], p["score"]): p["keys"] for p in inst.ask("GET", "/status").get_json()["recent"]}
+            self.assertEqual(recent, {(7, 800000): True, (7, 900000): False, (8, 700000): False, (8, 600000): False})
+            logged = {(p["player"], p["score"]): p["keys"] for p in inst.ask("GET", "/logs/plays").get_json()["items"]}
+            self.assertEqual(logged, recent)
+            # The file of plays: the mark as its last column.
+            lines = [line.split(",") for line in inst.ask("GET", "/logs/plays/download").get_data(as_text=True).lstrip("﻿").splitlines()]
+            self.assertEqual(sorted((line[5], line[-1]) for line in lines), [("600000", "0"), ("700000", "0"), ("800000", "1"), ("900000", "0"), ("score", "keys")])
+
+    def test_every_total_counts_the_bests_a_keyboard_play_set(self):
+        with Server() as inst:
+            self.marked(inst)
+            # Every tab of the rankings, the home page's best players, a player's page.
+            ranked = {p["name"]: p["keys_charts"] for p in inst.ask("GET", "/site/rankings").get_json()["items"]}
+            self.assertEqual(ranked, {"Sena": 1, "Yuna": 0})
+            top = {p["name"]: p["keys_charts"] for p in inst.ask("GET", "/site/home").get_json()["top"]}
+            self.assertEqual(top, {"Sena": 1, "Yuna": 0})
+            self.assertEqual([inst.ask("GET", f"/site/players/{guid}").get_json()["keys_charts"] for guid in (7, 8, 9)], [1, 0, 0])
+            # This month: Sena's best on chart 12 this month is the keyboard's play.
+            month = {p["name"]: p["keys_charts"] for p in inst.ask("GET", "/site/rankings/month").get_json()["items"]}
+            self.assertEqual(month["Sena"], 1)
+            self.assertEqual(month.get("Yuna", 0), 0)
+
+    def test_a_months_best_is_the_play_that_got_there_first(self):
+        # A month's score adds up each chart's top score that month: the mark counts a chart when the play that first got to
+        # that score was a keyboard play. A better play by touch takes the chart from it, a tie by touch after it does not, and
+        # a tie by touch before it keeps the chart by touch.
+        with Server() as inst:
+            t = now()
+            with sqlite3.connect(admin.core.DB) as con:
+                con.execute("DELETE FROM PlayLog")
+                con.executemany("INSERT INTO PlayLog (user_id, pattern_id, score, grade, judgement, is_record, played_at, keys) VALUES (?, ?, ?, 'A', 900, 0, ?, ?)",
+                                # Sena: chart 11 by keys then a tie by touch (kept); chart 12 by keys then better by touch (gone).
+                                [(7, 11, 500, t - 300, 1), (7, 11, 500, t - 200, 0), (7, 12, 500, t - 300, 1), (7, 12, 600, t - 200, 0),
+                                 # Yuna: chart 11 by touch then a tie by keys (by touch); chart 21 by keys only.
+                                 (8, 11, 500, t - 300, 0), (8, 11, 500, t - 200, 1), (8, 21, 400, t - 100, 1)])
+            month = {p["name"]: p["keys_charts"] for p in inst.ask("GET", "/site/rankings/month").get_json()["items"]}
+            self.assertEqual(month, {"Sena": 1, "Yuna": 1})
+
+    def test_a_database_the_server_has_not_brought_up_to_date_says_none_were(self):
+        # The admin service can be up before the server after an upgrade: the database has no keyboard's column yet (the
+        # server's start adds it). Every answer comes as before, every play and best by touch.
+        with Install() as inst, mock.patch.object(admin.songs, "CONTENT", inst.path("content")):
+            old_game_database(admin.core.DB, [(11, 7, 900000, "S", "Y", "N", 950)])
+            member_rows(admin.core.DB, [(7, "Sena", "phone-a")])
+            with sqlite3.connect(admin.core.DB) as con:
+                con.execute("CREATE TABLE PlayLog (id INTEGER PRIMARY KEY, user_id INTEGER, pattern_id INTEGER, score INTEGER, "
+                            "grade TEXT, judgement INTEGER, is_record INTEGER, played_at INTEGER)")
+                con.execute("INSERT INTO PlayLog (user_id, pattern_id, score, grade, judgement, is_record, played_at) VALUES (7, 11, 900000, 'S', 950, 1, ?)",
+                            (now() - 60,))
+            os.makedirs(inst.path("content"))
+            inst.write("content/songs.json", json.dumps([{"song_id": 1, "name": "paperplanes", "full_name": "Paper Planes",
+                                                          "song_patterns": [{"pattern_id": 11, "line": 3, "signature": 1, "difficulty": 3}]}]))
+            # A token to ask with, made as the Accounts page makes one (it adds the tokens' table, which the game never reads).
+            with admin.app.test_request_context():
+                _, secret = tokens.make("old", "read", ("admin", True, None))
+            ask = lambda path: inst.client.get(V1 + path, headers={"Authorization": "Bearer " + secret})
+            answers = {path: ask(path) for path in ("/site/charts/11/ranking", "/site/players/7/records", "/site/players/7", "/site/rankings",
+                                                    "/site/rankings/month", "/site/home", "/status", "/logs/plays")}
+            self.assertEqual({path: r.status_code for path, r in answers.items()}, dict.fromkeys(answers, 200))
+            self.assertEqual([p["keys"] for p in answers["/site/charts/11/ranking"].get_json()["items"]], [False])
+            self.assertEqual([p["keys"] for p in answers["/site/players/7/records"].get_json()["items"]], [False])
+            self.assertEqual([p["keys_charts"] for p in answers["/site/rankings"].get_json()["items"]], [0])
+            self.assertEqual([p["keys_charts"] for p in answers["/site/rankings/month"].get_json()["items"]], [0])
+            self.assertEqual([p["keys"] for p in answers["/status"].get_json()["recent"]], [False])
+            self.assertEqual([p["keys"] for p in answers["/logs/plays"].get_json()["items"]], [False])
+
+
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class AsTheSiteCountsTest(unittest.TestCase):
     """The players' site's figures as the site counts them (server/portal): what a player's levels count, and how the
     months of the rankings are named, whatever zone the server's clock is in."""
@@ -2075,12 +2174,14 @@ class SameQueriesAsTheSiteTest(unittest.TestCase):
         self.assertIn(taken, php)
         php = php.replace(taken, f"const SCORE_SQL = '{GAME_SCORE_SQL}';")
         ours = {"PLAYER_ROWS": admin.core.PLAYER_ROWS, "SCORE_SQL": admin.site.SCORE_SQL,
-                "PLAYER_FIGURES": admin.site.PLAYER_FIGURES, "PLAYER_TOTALS": admin.site.PLAYER_TOTALS}
+                "PLAYER_FIGURES": admin.site.PLAYER_FIGURES, "PLAYER_TOTALS": admin.site.PLAYER_TOTALS,
+                # The keyboard's counts beside a total and a month's score.
+                "KEYS_BESTS": admin.site.KEYS_BESTS, "MONTH_KEYS": admin.site.MONTH_KEYS}
         for name, query in ours.items():
             # Each on its own: a change to one the others take in shows in all of them.
             with self.subTest(name):
-                # PHP binds the check account by name (:check), Python by place (?).
-                theirs = re.sub(r":check\b", "?", php_constant(php, name))
+                # PHP binds the check account and a month's bounds by name (:check, :since, :until), Python by place (?).
+                theirs = re.sub(r":(?:check|since|until)\b", "?", php_constant(php, name))
                 self.assertEqual(self.same(query), self.same(theirs))
 
     def test_the_games_score_cap_is_the_one_read_above(self):
