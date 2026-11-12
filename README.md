@@ -14,7 +14,7 @@
   <a href="https://github.com/kanggu12/openDMTQ/actions/workflows/ci.yml"><img src="https://github.com/kanggu12/openDMTQ/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/kanggu12/openDMTQ/releases/latest"><img src="https://img.shields.io/badge/download-latest%20release-8cf23d" alt="Download the latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8cf23d" alt="License: MIT"></a>
-  <a href="#quick-start"><img src="https://img.shields.io/badge/runs%20on-Windows%20%7C%20Linux%20%7C%20macOS-2c343d" alt="Runs on Windows, Linux and macOS"></a>
+  <a href="#quick-start"><img src="https://img.shields.io/badge/server%20runs%20on-Windows%20%7C%20Linux%20%7C%20macOS-2c343d" alt="The server runs on Windows, Linux and macOS"></a>
 </p>
 
 <p align="center">
@@ -41,7 +41,7 @@ it: phones install that copy from the server's web page, and Windows PCs play th
 
 | Play | Host a server | Contribute |
 | :--- | :--- | :--- |
-| Phones install the app from your server's page, 64-bit-only ones too; Windows PCs, the [PC client](docs/windows-player.md). | Your own copy of the game's files, then one download or one command. [Quick start](#quick-start) | No game files needed: the tests make their own. [Where to start](#contribute) |
+| Phones install the app from the server's page, 64-bit-only ones too; Windows PCs, the PC client. [Playing on a server](docs/play.md) | Your own copy of the game's files, then one download or one command. [Quick start](#quick-start) | No game files needed: the tests make their own. [Where to start](#contribute) |
 
 ## How it works
 
@@ -96,16 +96,19 @@ cd openDMTQ
 In the browser on Windows, Linux and macOS, the setup takes you through your files, the address, the players' accounts
 and the app. With Docker it runs in the terminal, and the accounts are made on the admin pages, under **Accounts**. On
 each Android phone, open the address the setup shows, sign in and install the app; on a Windows PC, download the
-installer from the same page.
+installer from the same page ([playing on a server](docs/play.md)).
 
 [Installing, step by step](docs/install.md).
 
 ### What it runs on
 
-| | Minimum | Recommended |
+| Server | Minimum | Recommended |
 | :--- | :--- | :--- |
-| **Server** | 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker; 2 GB of memory | 2 cores, 4 GB |
+| **Computer** | 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker; 2 GB of memory | 2 cores, 4 GB |
 | **Disk** | 1 GB without the songs | 7 GB with every song |
+
+| Clients | Minimum | Recommended |
+| :--- | :--- | :--- |
 | **Phones** | Android 5.0 | Android 8 or newer to broadcast |
 | **PCs** | The PC client: 64-bit Windows 10 or 11 on an x64 processor (Intel or AMD), a graphics card with Direct3D 11, 1 GB of free memory, 390 MB of disk | A touch screen, for several fingers at once |
 
@@ -169,18 +172,22 @@ Plain PHP on SQLite, with no database server to look after. Two cores answer hun
 
 | Guide | What it covers |
 |---|---|
-| [Installing](docs/install.md) | Each system step by step, the phones and PCs, everyday use, updates and backups, what it runs on |
-| [The game's files](docs/game-files.md) | What the app, the client data and the song data have to be |
-| [Questions and answers](docs/faq.md) | What it needs, which phones, players outside the home, privacy |
-| [The site and the admin pages](docs/admin.md) | The setup, the app, songs, players, backups |
-| [The API](docs/api.md) | All the admin pages show and do, and what the players' site shows, as JSON |
+| **Playing** | |
+| [Playing on a server](docs/play.md) | The app on Android phones and tablets: signing in, installing, updates, broadcasting, which devices |
 | [The PC client](docs/windows-player.md) | Playing on a Windows PC: the installer, the launcher, the picture and the sound |
+| **Running a server** | |
+| [Installing](docs/install.md) | Each system step by step, everyday use, updates and backups, what it runs on |
+| [The game's files](docs/game-files.md) | What the app, the client data and the song data have to be |
+| [The site and the admin pages](docs/admin.md) | The setup, the app, songs, players, backups |
 | [Songs](docs/songs.md) | Importing songs, adding your own |
 | [Playing from outside your home](docs/internet.md) | A host name, one forwarded port, HTTPS |
-| [Live broadcasts](docs/live.md) | Watching players in a song, recordings |
+| [Live broadcasts](docs/live.md) | Broadcasts of players in a song, recordings |
 | [Kubernetes](docs/kubernetes.md) | The Helm chart, failover, backups to S3 |
 | [Without internet](docs/closed-network.md) | A server and phones on a closed network |
-| [Troubleshooting](docs/troubleshooting.md) | When something does not work |
+| [The API](docs/api.md) | All the admin pages show and do, and what the players' site shows, as JSON |
+| [Troubleshooting](docs/troubleshooting.md) | When something does not work, for players and for the server |
+| [Questions and answers](docs/faq.md) | What it needs, which phones, players outside the home, privacy |
+| **Working on the code** | |
 | [Architecture](docs/architecture.md) · [Testing](docs/testing.md) | How it is built and checked |
 
 ## Contribute
