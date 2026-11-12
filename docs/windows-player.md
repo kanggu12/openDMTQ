@@ -35,7 +35,7 @@ closed); while a game runs it installs nothing and ends with 3.
 | **Play** | The server and the account, the checks before a start (the player, the server, the sign-in, the app), how to play, the last play, and **PLAY** |
 | **Screen** | Full screen or a window, the window's size, VSync, the frame limit, the FPS counter and its position, the render scale and its upscaler, anti-aliasing |
 | **Sound** | The volume, the device, **Shared** or **Exclusive**, the buffer |
-| **Controls** | What the touch screen, the mouse and the keyboard do |
+| **Controls** | Keyboard play: on or off, and the keys of each lane of 2, 3 and 4 LINE; what the touch screen, the mouse and the keyboard do |
 | **Online** | The servers, the sign-in, the app on this PC and a check for a newer one |
 | **Help** | The checks, what to try when something does not work, the logs, and repairing, clearing, starting over and uninstalling |
 | **Launcher** | The language, updates of the launcher, the first-start guide again |
@@ -49,6 +49,15 @@ itself, and without internet nothing is said. Without internet, the installer fr
 updates it instead, once the server has a newer one; the servers and the settings stay. While the game runs the launcher steps aside, and comes back when the
 game ends.
 
+**Controls** sets keyboard play. **Play with keys** turns it on or off (on at first). While it is on, a table shows the
+lanes of 2, 3 and 4 LINE from the top, each with a box for its key and one for a second key: click a box (or Tab to it
+and press Enter), then press the key. The key goes in by its place on the keyboard, and is named as the US layout's key
+at that place (`Semicolon` for the key right of L), so another layout plays the same places; in grey beside the name,
+what the PC's own layout prints there when it says more (`;`, or `Ö` on a German keyboard). A key that another lane of
+the same LINE plays already, or one no lane takes (Enter, the arrows, the numpad, Shift), is refused in words under the
+table, and the box waits for another. Esc keeps the key that was there, Delete takes away a key the lane has a second
+of, and **Reset keys** puts back F J, D F J and D F J K. The game reads the keys at the next **PLAY**.
+
 ### The command line
 
 `OpenDMTQ-cmd.exe`, in `%LOCALAPPDATA%\OpenDMTQ.Client\current`, does the same from the command line: `--status`
@@ -57,7 +66,7 @@ game ends.
 window opens on its pages), `--servers` (the servers it knows, as **Online** lists them), `--open-log player|launcher`, `--play`,
 `--update`, `--forget URL`, `--reset`, `--repair`, `--clear-game-data` and `--uninstall [--delete-data]`, with `--yes`
 to answer their questions (`--help` lists them all). While the launcher's window is open, the flags that change what
-it keeps are refused. `--set` takes the settings of the **Screen** and **Sound** pages:
+it keeps are refused. `--set` takes the settings of the **Screen**, **Sound** and **Controls** pages:
 
 | Setting | Values (the default first) | On the page |
 | :--- | :--- | :--- |
@@ -74,6 +83,10 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | `audio_mode` | `shared`, `exclusive` | Mode |
 | `audio_buffer` | `normal`, `low`, `safe` | Buffer |
 | `volume` | `100`, or any number from 0 to 100 | Volume |
+| `keyboard` | `on`, `off` | Play with keys |
+| `keys_2line` | `"F J"`: the lanes from the top apart by spaces, a lane's keys one or two joined by `/` (`"F/G J"`), each named as the US layout's key at its place: `A` to `Z`, `0` to `9`, `Space`, `Semicolon`, `Quote`, `Comma`, `Period`, `Slash`, `LeftBracket`, `RightBracket`, `Backslash`, `Minus`, `Equals`, `Grave`; a key in two lanes refused | 2 LINE's lanes |
+| `keys_3line` | `"D F J"`, three lanes as `keys_2line` has two | 3 LINE's lanes |
+| `keys_4line` | `"D F J K"`, four lanes as `keys_2line` has two | 4 LINE's lanes |
 | `language` | `system` (Windows' display language), `en`, `ko`: the same as `--language` | Language, on the **Launcher** page; the game and what the player draws over it speak it too |
 
 ## In the game
