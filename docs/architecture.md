@@ -3,27 +3,53 @@
 How the parts of OpenDMTQ fit together, for anyone who wants to change them. The guides for running a server are in
 [README.md](README.md).
 
+<p align="center">
+  <img src="images/diagram-architecture.svg" alt="How OpenDMTQ fits together: phones, PCs and browsers reach the server's one public port, where site.conf sends each path to the game server, the game's files, live broadcasts, the players' site or the admin pages, which keep their data in data/. The setup imports the owner's game files, and the app builder patches the owner's APK for this server at every start" width="100%">
+</p>
+
 ## The parts
 
-With Docker Compose:
+Each part, where its code starts, and what checks it: CI on every push and pull request, `qa.sh` on a machine with the
+game's files, or a run by hand ([testing](testing.md)).
+
+| Part | What it does | Code, and where to start | Checked by |
+| :--- | :--- | :--- | :--- |
+| Edge | The one public port with Docker Compose: plain HTTP for the game, HTTPS for browsers | `server/edge` (`nginx.conf`) | its two configurations (CI) |
+| Game server | Every request of the game and of its platform SDK | `server/game`: `index.php`, then `src/rpc.php` (`odq_methods`) | `tests/game/protocol.sh` (CI); `tests/live/run.sh` and `tests/load/run.sh` on the real files (`qa.sh`) |
+| Server's start | The server image's start: the database, the settings, then Apache | `server/entrypoint.sh`, top to bottom | the images' start without game files (CI) |
+| Routing | Which path goes to which part, for every kind of install | `server/apache/site.conf` | the contract and the pages (CI) |
+| Players' site | Rankings, songs, players, the app's download, live broadcasts | `server/portal`: `lib.php`, then the page | `tests/ui/run.sh`, every page at five widths in both languages (CI) |
+| Live broadcasts | The uploads of phones and PCs, the live window, recordings | `server/game/live`, `server/portal/live.php` | `tests/live/run.sh` (`qa.sh`), the transport stream writer (CI) |
+| Admin pages and API | The setup, app builds, songs, players, accounts, recordings, backups, the maintenance notice ([api.md](api.md)) | `tools/opendmtq_tools/admin`, a module per page (`status.py`, `apps.py`, `song_pages.py`, `players.py`, `accounts.py`, `recordings.py`, `backups.py`, `logs.py`, `setup.py`); what they share in `core.py` (settings, language, database) and `auth.py` (sign-in); the API in `api.py`, its routes in `api_routes.py`. Start at the page's module, then `core.py` | `tools/tests` (`test_admin.py`, `test_api.py`, `test_setup.py`), the pages, `tests/upgrade/run.sh` (CI) |
+| App builder | Patches the owner's APK for this server's address | `tools/opendmtq_tools/builder.py`, `patch_apk.py` (the tools are plain Python, the one you change is where to start) | `tools/tests` (CI); `test_real_client.py` on the real clients (`qa.sh`); `tests/game/tour.sh` on an emulator (by hand) |
+| Import | Takes the game's data files from the owner's folder or archive | `tools/opendmtq_tools/importer.py` | `tools/tests/test_importer.py` (CI), `tests/host/run.sh` |
+| Song list | The song list and the client's tables, from what was imported and added | `tools/opendmtq_tools/songs.py` | `tools/tests/test_songs.py`, `test_song_files.py` (CI) |
+| arm32 runtime | Runs the 32-bit game on phones without 32-bit support | `arm32/` ([its guide](../arm32/README.md)); handed out by `tools/opendmtq_tools/runtime.py` | built in CI; `arm32/test.sh` on a device (by hand) |
+| PC client | The installer and the launcher for Windows PCs | `client/` ([its guide](../client/README.md)) | `client/tests` and its screens (CI), the installer on Windows (CI), `client/tests/windows/e2e.sh` (by hand) |
+| Player for Windows | Runs the server's app on Windows: the arm32 runtime on a layer for Windows, a Java VM of its own, ANGLE, WASAPI, Media Foundation, the overlay | `arm32/desktop`, `arm32/jvm`, `arm32/src/win`; the installer handed out by `tools/opendmtq_tools/windows_client.py` | `arm32/test_windows.sh` under Wine and `arm32/test_windows.ps1` on Windows, `arm32/tests/host` (CI) |
+| Command line | Setup, import, start and stop, deploy, checks, backups | `./opendmtq` with `cli/`: start at `cli/opendmtq_cli/app.py` (`main`); `cli/install.sh` puts it on the PATH and, with `--service`, starts the server at boot; `cli/firewall.ps1` lets phones reach a server in WSL | `cli/tests` (CI) |
+| Host install | The same server without containers, and the Windows bundle | `host/`: `get.sh` and `install.sh` for Linux and macOS, `windows/` for the Windows bundle, and the program itself, a package in layers (`paths`, `settings`, `apache`, `server`, `commands`, `setup`): start at `opendmtq_host/server.py` (`Server`) | `tests/host/run.sh`, `tests/windows/wine.sh`, `tests/windows/run.ps1` (CI) |
+| Helm chart | The same images on Kubernetes, with a router in front ([kubernetes.md](kubernetes.md)) | `deploy/helm` (`values.yaml`) | the chart against Kubernetes' schemas (CI), `tests/ha/failover.sh` (by hand) |
+| Database | One SQLite file shared by the game server, the site and the admin pages ([below](#the-database)) | `server/game/bin/setup-db.php` | `tests/upgrade/run.sh` (CI) |
+| The tests | The tests beyond unit tests: the contract, the pages, an upgrade, the live server, the host install, the Windows bundle | `tests/` ([testing.md](testing.md)) | [what runs where](testing.md#what-runs-where) |
+
+How each part runs, with Docker Compose and without containers:
+
+| Part | With Docker Compose | Without containers |
+| :--- | :--- | :--- |
+| Edge | `edge` (nginx) | none: Apache holds the port, plain HTTP only |
+| Server: the game server, the platform's login, the players' site, live broadcasts, the files the game downloads | `server` (Apache with PHP) | Apache with PHP's module, started by `host/opendmtq_host` |
+| Admin pages | `admin` (Flask on gunicorn) | Flask on waitress |
+| App builder | `builder`, at every start | run at every start |
+| Import | `importer`, one-shot | plain Python |
+| Song list | `tools`, before every start | before every start |
+| arm32 runtime | ready-made from a release into `data/apk/arm32`, added to the app by the app builder | the same |
+| PC client | in a release's tools image, which the Helm chart runs too; images built from the source have none, and the app builder fetches the latest release's into `data/apk` | the Windows bundle has it; a host install takes it from its kit or fetches the latest release's into `data/apk` |
+| Command line | `./opendmtq` | `./opendmtq`, passed on to `host/opendmtq_host`; `OpenDMTQ.exe` on Windows |
 
 <p align="center">
   <img src="images/fig-parts-docker.svg" alt="The parts with Docker Compose. Phones (plain HTTP) and browsers (HTTPS) reach the edge, nginx on the one public port, which ends HTTPS and passes each connection to one of Apache's two doors; site.conf sends it to the game server, the players' site or, for /opendmtq/admin, the admin pages, which the owner also opens at localhost:8791. The game server, the site and the admin pages work on data/; the builder puts the app, and the PC client's installer beside it, in data/apk/out at every start" width="100%">
 </p>
-
-| Part | What it does | Code | With Docker Compose | Without containers |
-| :--- | :--- | :--- | :--- | :--- |
-| Edge | The one public port: plain HTTP for the game, HTTPS for browsers | `server/edge` | `edge` (nginx) | none: Apache holds the port, plain HTTP only |
-| Server | The game server, the platform's login, the players' site, live broadcasts, the files the game downloads | `server/game`, `server/portal`, `server/apache` | `server` (Apache with PHP) | Apache with PHP's module, started by `host/opendmtq_host` |
-| Admin pages | The setup, app builds, songs, players, accounts, recordings, backups, the maintenance notice, and their API ([api.md](api.md)) | `tools/opendmtq_tools/admin` | `admin` (Flask on gunicorn) | Flask on waitress |
-| App builder | Patches the owner's APK for this server's address | `tools/opendmtq_tools/builder.py`, `patch_apk.py` | `builder`, at every start | run at every start |
-| Import | Takes the game's data files from the owner's folder or archive | `tools/opendmtq_tools/importer.py` | `importer`, one-shot | plain Python |
-| Song list | The song list and the client's tables, from what was imported and added | `tools/opendmtq_tools/songs.py` | `tools`, before every start | before every start |
-| arm32 runtime | Runs the 32-bit game on phones without 32-bit support | `arm32/`; handed out by `tools/opendmtq_tools/runtime.py` | ready-made from a release into `data/apk/arm32`, added to the app by the app builder | the same |
-| PC client | The installer and the launcher for Windows PCs, and the player that runs the server's app there: the arm32 runtime on a layer for Windows, a Java VM of its own, ANGLE, WASAPI, Media Foundation | `client/`, `arm32/desktop`, `arm32/jvm`, `arm32/src/win`; the installer handed out by `tools/opendmtq_tools/windows_client.py` | in a release's tools image, which the Helm chart runs too; images built from the source have none, and the app builder fetches the latest release's into `data/apk` | the Windows bundle has it; a host install takes it from its kit or fetches the latest release's into `data/apk` |
-| Command line | Setup, start and stop, checks, backups | `opendmtq`, `cli/opendmtq_cli`, `host/opendmtq_host` | `./opendmtq` | `./opendmtq`, passed on to `host/opendmtq_host`; `OpenDMTQ.exe` on Windows |
-
-The Helm chart runs the same images with a router in front ([kubernetes.md](kubernetes.md)).
 
 ## One address for four hosts
 
@@ -48,6 +74,12 @@ does (the same throttle, and the site's cookie back), and `?app` describes the a
 the client then downloads from `/apk`.
 
 ## How a request is answered
+
+A game request on its way to the database and back:
+
+<p align="center">
+  <img src="images/fig-request-flow.svg" alt="A game request on its way: a signed batch of calls to /DMQ/rpc passes the edge (with Docker Compose) and Apache's site.conf to index.php and src/rpc.php, which checks its size and signature and runs each call's handler against the SQLite database; the results go back in order as JSON, gzip-compressed when asked" width="100%">
+</p>
 
 `server/apache/site.conf` is the whole site. Each of the server's doors includes it (`server/apache/opendmtq.conf`), and
 a host install includes it in the Apache configuration it writes. Its folders come from environment variables
@@ -198,6 +230,10 @@ fetches the images of its screens from the server), so the server reports itself
 
 `tools/opendmtq_tools/patch_apk.py`, run by the builder.
 
+<p align="center">
+  <img src="images/fig-app-build.svg" alt="How the app is built: the owner's APK is read for which client it is, pointed at this server, changed where the bytes match, given the shim and the arm32 runtime, named for this server and signed with its key, then offered at /apk to phones and to the PC client's launcher" width="100%">
+</p>
+
 - **Which client** (`inspect`): from its contents, never its name. The original has the official game RPC literal. A
   copy changed for another server has the same literal with another host; every literal and SDK string on that host
   is pointed at this server (`address_edits`, `redirect_smali`), and an SDK edit it already has counts as made. An app
@@ -256,6 +292,19 @@ when the newest build already matches the address, the base APK, the patcher ver
 bundle (and its file is the size its manifest records). A new build takes the place of the old file whole, and only
 one build runs at a time. Each run leaves its outcome in `data/apk/out/build.json`, which the site, the admin pages
 and `./opendmtq doctor` read.
+
+## The PC client
+
+<p align="center">
+  <img src="images/fig-pc-client.svg" alt="The PC client's parts: the installer from the site, the launcher that signs in through client.php and gets the app from /apk, and the player: the server's app on the arm32 runtime, its picture on ANGLE over Direct3D 11 with the upscalers and anti-aliasing, its sound and video, its glass overlay and its broadcasts, which reach the server as a phone's do" width="100%">
+</p>
+
+The installer (`client/packaging/windows`, Velopack) puts the launcher and the player for Windows in the user's
+folder. The launcher (`client/opendmtq_client`) is the person's side: it talks to the site through `client.php` and
+`/apk` (above), keeps each server's app, and writes the player's settings into a file it starts the player with. The
+player (`arm32/desktop`) is the game's side: the server's app on the arm32 runtime, its picture, sound, video, overlay
+and broadcasts; its requests reach the server as a phone's do. What each does for a player, and how the player's
+picture and overlay work, is in [the PC client](windows-player.md#how-it-works).
 
 ## Start-up
 
