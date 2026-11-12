@@ -20,12 +20,13 @@
 {% endmacro %}
 
 {# The import form for one folder or file: its path, the songs or not, and the button. The choice only where the files
-   may hold both the client data and the song data: an app has no songs, the songs alone are nothing but songs. #}
+   may hold both the client data and the song data: an app has no songs, the songs alone are nothing but songs. The
+   button plain: a list has one for each file and folder, and the step's one primary button is the way on (Next). #}
 {% macro import_form(path, label, choice=True) %}
 <form method="post" action="{{ url_for('setup_import') }}" class="setup-import">
   <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="path" value="{{ path }}">
   {% if choice %}<label class="check"><input type="checkbox" name="songs" value="yes" checked> {{ t('setup.songs_too') }}</label>{% else %}<input type="hidden" name="songs" value="yes">{% endif %}
-  <button class="btn btn-primary" data-again {% if job %}disabled{% endif %}>{{ label }}</button>
+  <button class="btn" data-again {% if job %}disabled{% endif %}>{{ label }}</button>
 </form>
 {% endmacro %}
 

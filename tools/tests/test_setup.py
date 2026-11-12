@@ -725,7 +725,8 @@ class ImportTest(unittest.TestCase):
             r, job = self.run_import(inst, inst.path("home/Downloads/songs"))
             self.assertEqual(job["env"]["IMPORT_SONGS"], "yes")
             page = inst.page(BASE + "/setup?step=files&dir=" + inst.path("home/Downloads/songs"))
-            self.assertRegex(page, r'<input type="hidden" name="songs" value="yes">\s*<button class="btn btn-primary" data-again >'
+            # The import buttons plain: the step's one primary button is its way on.
+            self.assertRegex(page, r'<input type="hidden" name="songs" value="yes">\s*<button class="btn" data-again >'
                                    r'Import from this folder')
             self.assertNotIn("Import the songs too", page)
 

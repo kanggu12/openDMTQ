@@ -12,11 +12,11 @@
 {% elif not songs %}<p class="flash note" role="status">{{ t('songs.none_yet_host' if host_install else 'songs.none_yet') }}</p>{% endif %}
 {% if host_install %}
 {# On the server PC itself: the client data and the song data as they were downloaded, imported through the setup's
-   first step. #}
+   first step. Plain: Add song below is the page's one primary button. #}
 <section class="card">
   <h2>{{ t('songs.from_folder') }}</h2>
   <p class="lead">{{ t('songs.from_folder_lead') }}</p>
-  <div class="btn-line"><a class="btn btn-primary" href="{{ url_for('setup_page', step='files') }}#found">{{ t('songs.from_folder_button') }}</a></div>
+  <div class="btn-line"><a class="btn" href="{{ url_for('setup_page', step='files') }}#found">{{ t('songs.from_folder_button') }}</a></div>
 </section>
 {% endif %}
 <section class="card">
