@@ -37,6 +37,10 @@ def name_of(widget):
         return "PLAY"
     if isinstance(widget, widgets.Header):
         return "the menu"
+    if getattr(widget, "odq_where", None):
+        # A lane's box on the Controls page: its mode, lane and box.
+        name, lane, slot = widget.odq_where
+        return "%s lane %d box %d" % (name, lane + 1, slot + 1)
     if isinstance(widget, tk.Label) and widget.cget("text"):
         return "link %r" % widget.cget("text")
     return widget.winfo_class()
@@ -159,6 +163,40 @@ def main():
         shots.settle(app)
         if app.state.values["audio_buffer"] != "normal":
             problems.append("Sound: a second step of the buffer did nothing (%s)" % app.state.values["audio_buffer"])
+
+    # ---- The Controls page's keyboard play: Tab goes to the switch, then each mode's boxes from its top lane, a lane's
+    # key before its second, then Reset keys, then PLAY; each box it reaches comes into view; Enter makes a box wait for
+    # a key, and Tab on a waiting box goes on to the next and stops the wait.
+    from opendmtq_client import values as choices
+    app.nav_go("controls")
+    shots.settle(app)
+    area = app.body
+    order = tab_order(app.header)
+    page = [x for x in order if str(x).startswith(str(area.inner) + ".")]
+    expected = [(name, lane, slot) for name, count in choices.LANES.items() for lane in range(count) for slot in (0, 1)]
+    found = [getattr(x, "odq_where", None) for x in page[1:-1]]
+    if (not page or not isinstance(page[0], widgets.Toggle) or found != expected or not isinstance(page[-1], widgets.Button)
+            or page[-1].words != w("controls.keys.reset") or order[-1] is not app.play_button):
+        problems.append("Controls: Tab goes %s, not the switch, the boxes, Reset keys then PLAY"
+                        % " -> ".join(name_of(x) for x in order))
+    for widget in page:
+        widget.focus_set()
+        app.root.update()
+        if not in_view(area, widget):
+            problems.append("Controls: %s reached by Tab stayed out of view" % name_of(widget))
+    boxes = [x for x in page if isinstance(x, widgets.KeyBox)]
+    if len(boxes) == len(expected):
+        boxes[0].focus_set()
+        app.root.update()
+        boxes[0].event_generate("<Return>")
+        shots.settle(app)
+        if not boxes[0].waiting:
+            problems.append("Controls: Enter on a box did not make it wait for a key")
+        boxes[0].event_generate("<Tab>")
+        shots.settle(app)
+        if boxes[0].waiting or app.root.focus_get() is not boxes[1]:
+            problems.append("Controls: Tab on a waiting box left it %s, the keyboard on %r" % (
+                "waiting" if boxes[0].waiting else "still", app.root.focus_get()))
 
     # ---- The guide's SOUND CHECK: VSync switched with Space keeps the step's place and the keyboard.
     app.state.guide_done = False

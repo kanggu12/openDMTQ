@@ -674,6 +674,210 @@ def counter_check(app, problems, tag):
         problems.append("%s: switching the FPS counter changed its corner (%s, was %s)" % (tag, app.state.values["fps_position"], corner))
 
 
+def keys_fit(app, name, problems):
+    """The keys card's table whole inside its card: as wide as it asks to be (a narrower one cuts its last column off,
+    inside the card, where measure() looks only at the window's edge), and every box inside the card's room."""
+    app.root.update()
+    card = card_titled(app, app.words("controls.keys"))
+    boxes = [x for x in widgets_of(app.body.inner) if isinstance(x, widgets.KeyBox) and x.winfo_ismapped()]
+    if card is None or not boxes:
+        return
+    table = boxes[0].master.master
+    if table.winfo_reqwidth() > table.winfo_width() + 1:
+        problems.append("%s: the keys' table is %d px wide where it needs %d" % (name, table.winfo_width(),
+                                                                                table.winfo_reqwidth()))
+    # The card's room: inside its padding (Card's 24 logical pixels).
+    right = card.winfo_rootx() + card.winfo_width() - app.ui.px(24)
+    for box in boxes:
+        if box.winfo_rootx() + box.winfo_width() > right + 1:
+            problems.append("%s: the box of %s lane %d reaches %d px past its card's room" % (
+                name, box.odq_where[0], box.odq_where[1] + 1, box.winfo_rootx() + box.winfo_width() - right))
+
+
+def keys_check(app, out, tag, problems):
+    """The Controls page's keyboard play as a person uses it, by the mouse and the keys (X11's key codes, Linux's key
+    numbers plus 8, as the virtual screen sends them): a box clicked waits; a key another lane of the mode plays, and one
+    no lane takes, refused in words with nothing changed and the box still waiting; Esc keeps; a key on a lane's empty
+    box goes in as its second by its place, with what the keyboard prints there beside it, saved, the keyboard on that
+    box; Delete takes it away and refuses a lane's only key; Reset keys; the switch off and on, the keyboard on it. Its
+    states shot and measured (waiting, refused, a second key, every lane on two long keys with Windows' prints beside
+    them, off), and the table's boxes on one middle in a lane, beside its number, and from one line in a column."""
+    from opendmtq_client import theme
+    from opendmtq_client import values as choices
+    w = app.words
+    app.go("controls")
+    settle(app)
+
+    def box(name, lane, slot):
+        """The box of a mode's lane, as the page has it now."""
+        for widget in widgets_of(app.body.inner):
+            if isinstance(widget, widgets.KeyBox) and widget.odq_where == (name, lane, slot):
+                return widget
+        return None
+
+    def boxes():
+        return [x for x in widgets_of(app.body.inner) if isinstance(x, widgets.KeyBox) and x.winfo_ismapped()]
+
+    def line():
+        """The line under the table: the last thing its card's body holds."""
+        found = boxes()
+        return found[0].master.master.master.pack_slaves()[-1] if found else None
+
+    def press(target, code, keysym):
+        """A key pressed with the keyboard on `target`, as the virtual screen sends it."""
+        target.focus_set()
+        app.root.update()
+        target.event_generate("<KeyPress>", keycode=code, keysym=keysym)
+        settle(app)
+
+    def click(target):
+        target.event_generate("<Button-1>", x=5, y=5)
+        settle(app)
+
+    def said(text, colour, what):
+        found = line()
+        if found is None or found.cget("text") != text or str(found.cget("fg")).lower() != colour.lower():
+            problems.append("%s: %s: the line under the keys says %r in %s" % (
+                tag, what, found and found.cget("text"), found and found.cget("fg")))
+
+    hint = w("controls.keys.hint")
+    # ---- the table: 9 lanes' keys and their empty boxes; each lane's boxes on one middle with its number; each mode's
+    # boxes from one line.
+    if len(boxes()) != 18:
+        problems.append("%s: the keys card has %d boxes, not 18 (9 lanes, each a key and an empty box)" % (tag, len(boxes())))
+        return
+    table = boxes()[0].master.master
+    for row in range(1, 5):
+        middles = [b.winfo_rooty() + b.winfo_height() / 2.0 for b in boxes() if int(b.master.grid_info()["row"]) == row]
+        number = table.grid_slaves(row=row, column=0)
+        middles += [n.winfo_rooty() + n.winfo_height() / 2.0 for n in number]
+        if max(middles) - min(middles) > 1:
+            problems.append("%s: lane %d's boxes and number have middles at %r" % (tag, row, middles))
+    for column in range(1, 4):
+        starts = {b.winfo_rootx() for b in boxes() if int(b.master.grid_info()["column"]) == column
+                  and b.odq_where[2] == 0}
+        if len(starts) != 1:
+            problems.append("%s: the column of %s starts at %r" % (tag, choices.mode(list(choices.LANES)[column - 1]),
+                                                                 sorted(starts)))
+    said(hint, theme.MUTED, "at first")
+    # ---- a box clicked waits for a key.
+    target = box("keys_3line", 0, 0)
+    click(target)
+    target = box("keys_3line", 0, 0)
+    if not target.waiting or app.root.focus_get() is not target:
+        problems.append("%s: a click did not make 3 LINE's first box wait with the keyboard" % tag)
+    said(w("controls.keys.wait", lane=1, mode="3 LINE", keyname="D"), theme.TEXT, "waiting")
+    shot(app.root, out, tag + "_controls-waiting")
+    measure(app, tag + "_controls-waiting", problems)
+    keys_fit(app, tag + "_controls-waiting", problems)
+    # ---- J, which 3 LINE's third lane plays: refused, nothing changed, the box still waiting.
+    press(target, 44, "j")
+    said(w("error.keys.taken", keyname="J", lane=3, mode="3 LINE"), theme.WARN, "J on 3 LINE's first lane")
+    if app.state.values["keys_3line"] != "D F J" or not box("keys_3line", 0, 0).waiting:
+        problems.append("%s: a key another lane plays changed %r or stopped the wait" % (tag, app.state.values["keys_3line"]))
+    shot(app.root, out, tag + "_controls-refused")
+    measure(app, tag + "_controls-refused", problems)
+    keys_fit(app, tag + "_controls-refused", problems)
+    # ---- Enter, which no lane takes: refused by its name; then Esc keeps D and stops the wait.
+    press(box("keys_3line", 0, 0), 36, "Return")
+    said(w("controls.keys.cannot", keyname="Enter"), theme.WARN, "Enter on a waiting box")
+    press(box("keys_3line", 0, 0), 9, "Escape")
+    said(hint, theme.MUTED, "after Esc")
+    if box("keys_3line", 0, 0).waiting or app.state.values["keys_3line"] != "D F J":
+        problems.append("%s: Esc did not keep the box as it was" % tag)
+    # ---- a second key: the semicolon's place on 2 LINE's first lane, what it prints beside its name, saved.
+    click(box("keys_2line", 0, 1))
+    said(w("controls.keys.wait.second", lane=1, mode="2 LINE"), theme.TEXT, "the empty box waiting")
+    press(box("keys_2line", 0, 1), 47, "semicolon")
+    second = box("keys_2line", 0, 1)
+    if app.state.values["keys_2line"] != "F/Semicolon J" or second is None or (second.key, second.printed) != (
+            "Semicolon", ";"):
+        problems.append("%s: the semicolon's place as 2 LINE's second key gave %r, its box %r" % (
+            tag, app.state.values["keys_2line"], second and (second.key, second.printed)))
+    elif app.root.focus_get() is not second or app.status_text != w("status.saved"):
+        problems.append("%s: after a key went in the keyboard is on %r, the status line says %r" % (
+            tag, app.root.focus_get(), app.status_text))
+    shot(app.root, out, tag + "_controls-second")
+    measure(app, tag + "_controls-second", problems)
+    keys_fit(app, tag + "_controls-second", problems)
+    # ---- Delete takes it away; on a lane's only key it is refused.
+    click(box("keys_2line", 0, 1))
+    press(box("keys_2line", 0, 1), 119, "Delete")
+    if app.state.values["keys_2line"] != "F J":
+        problems.append("%s: Delete on a second key left %r" % (tag, app.state.values["keys_2line"]))
+    click(box("keys_2line", 1, 0))
+    press(box("keys_2line", 1, 0), 119, "Delete")
+    said(w("error.keys.one", lane=2, mode="2 LINE"), theme.WARN, "Delete on a lane's only key")
+    press(box("keys_2line", 1, 0), 9, "Escape")
+    # ---- another key in a box's place, then Reset keys puts every default back.
+    click(box("keys_4line", 3, 0))
+    press(box("keys_4line", 3, 0), 46, "l")
+    if app.state.values["keys_4line"] != "D F J L":
+        problems.append("%s: L on 4 LINE's last lane gave %r" % (tag, app.state.values["keys_4line"]))
+    button(app, w("controls.keys.reset")).press()
+    settle(app)
+    if any(app.state.values[name] != choices.DEFAULTS[name] for name in choices.LANES):
+        problems.append("%s: Reset keys left %r" % (tag, [app.state.values[name] for name in choices.LANES]))
+    # ---- every lane on two long keys, with what Windows' layout prints beside each (the US layout's here), at the
+    # window's size: nothing cut off or past its edge.
+    app.key_prints.update(choices.US_PRINT)
+    longest = ["LeftBracket/RightBracket", "Semicolon/Quote", "Backslash/Equals", "Comma/Period"]
+    for name, count in choices.LANES.items():
+        app.changed(name, " ".join(longest[:count]))
+    app.go("controls")
+    settle(app)
+    shot(app.root, out, tag + "_controls-long")
+    measure(app, tag + "_controls-long", problems)
+    keys_fit(app, tag + "_controls-long", problems)
+    # The same with the names drawn wider, as Windows draws Pretendard (rows.py's measure of it): still in the window.
+    bold = app.fonts.body_bold
+    size = int(bold.cget("size"))
+    bold.configure(size=size + 1)
+    try:
+        app.go("controls")
+        settle(app)
+        measure(app, tag + "_controls-long with wider names", problems)
+        keys_fit(app, tag + "_controls-long with wider names", problems)
+    finally:
+        bold.configure(size=size)
+    app.key_prints.clear()
+    for name in choices.LANES:
+        app.changed(name, choices.DEFAULTS[name])
+    # ---- the switch, by the keyboard: off takes the table and Reset keys away, on brings them back, the keyboard on
+    # the switch each time, and the switch where it was (under the pointer that switched it).
+    app.go("controls")
+    settle(app)
+    card = card_titled(app, w("controls.keys"))
+    for on in (False, True):
+        switch = next((x for x in widgets_of(card) if isinstance(x, widgets.Toggle)), None) if card else None
+        if switch is None:
+            problems.append("%s: no switch on the keys card" % tag)
+            return
+        switch.focus_set()
+        settle(app)
+        before = switch.winfo_rooty()
+        switch.event_generate("<space>")
+        settle(app)
+        card = card_titled(app, w("controls.keys"))
+        focus = app.root.focus_get()
+        if isinstance(focus, widgets.Toggle) and abs(focus.winfo_rooty() - before) > 1:
+            problems.append("%s: keyboard play %s: the switch moved %d px" % (tag, "on" if on else "off",
+                                                                            focus.winfo_rooty() - before))
+        shown = len(boxes())
+        reset_shown = any(isinstance(x, widgets.Button) and x.words == w("controls.keys.reset") and x.winfo_ismapped()
+                          for x in widgets_of(app.body.inner))
+        if app.state.values["keyboard"] != ("on" if on else "off") or (shown == 18) != on or reset_shown != on:
+            problems.append("%s: keyboard play %s: %r, %d boxes, Reset keys %s" % (
+                tag, "on" if on else "off", app.state.values["keyboard"], shown, "shown" if reset_shown else "gone"))
+        if not isinstance(focus, widgets.Toggle):
+            problems.append("%s: keyboard play %s: the keyboard left the switch (now on %r)" % (tag, "on" if on else "off", focus))
+        if not on:
+            shot(app.root, out, tag + "_controls-off")
+            measure(app, tag + "_controls-off", problems)
+    app.go("controls")
+    settle(app)
+
+
 def variants_check(app, site, out, tag, problems):
     """Pages in their other states: a window's size row, a download under way, signed out, other servers, a crash."""
     w = app.words
@@ -1466,6 +1670,8 @@ def main():
     guide.finish(play=False)
     settle(app)
     pages_check(app, args.out, tag, problems)
+    # Keyboard play on the Controls page, its states and its keys.
+    keys_check(app, args.out, tag, problems)
     # Online's address field after a failed Connect, as the guide's SERVER step above.
     app.go("online")
     settle(app)

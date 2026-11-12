@@ -1273,6 +1273,73 @@ class Field(tk.Canvas):
         self.odq_picture = self.faces[state]
 
 
+class KeyBox(tk.Canvas):
+    """A lane's key as the Controls page shows it: a box let into its card as a text field is (art.field_face), as tall
+    as a button, the key's name in it and, in grey after the name, what this PC's keyboard prints at its place when that
+    says more (keys.beside); an empty box shows a grey + (a second key to add). While it waits for a key (set_waiting)
+    the accent goes round it, as round a field while it is typed in; under the pointer its edges are brighter; Tab
+    reaches it, the keyboard's cyan ring round it while it has the keyboard and does not wait."""
+
+    # The room either side of the words, as a field keeps it, and between the name and what the keyboard prints (logical
+    # pixels).
+    PAD, GAP = 10, 6
+
+    def __init__(self, parent, ui, key=None, printed=None):
+        self.ui, self.bg = ui, parent.cget("bg")
+        px = ui.px
+        super().__init__(parent, bg=self.bg, highlightthickness=0, bd=0, cursor="hand2")
+        # The key it shows (None: the empty box), and the grey print beside it (None: nothing more to say).
+        self.key, self.printed = key, printed
+        self.waiting, self.under = False, False
+        # Tab reaches it: the ring round it is the canvas's own, so its drawing starts inside the ring.
+        focus_ring(self, ui, self.bg)
+        self.inset = int(self.cget("highlightthickness"))
+        self.odq_inset = self.inset
+        name_font, print_font = ui.fonts.body_bold, ui.fonts.small
+        words = key or "+"
+        # The words' width: the name, then the print after its gap.
+        name_width = name_font.measure(words)
+        words_width = name_width + (px(self.GAP) + print_font.measure(printed) if printed else 0)
+        height = px(Button.HEIGHT)
+        # A key of one letter is a square box, as a key's cap; a longer name widens it.
+        width = max(height, words_width + 2 * px(self.PAD))
+        self.configure(width=width, height=height)
+        # Each state's face, made once: the pointer and the wait only swap them.
+        self.faces = {state: art.field_face(width, height, state, ui.scale, bg=self.bg)
+                      for state in ("normal", "hover", "focus")}
+        self.images = {state: ImageTk.PhotoImage(face, master=self) for state, face in self.faces.items()}
+        self.face = self.create_image(self.inset, self.inset, image=self.images["normal"], anchor="nw")
+        # The words in the box's middle, the name in the labels' face, the print smaller and grey.
+        x, middle = self.inset + (width - words_width) // 2, self.inset + height // 2
+        self.create_text(x, middle, text=words, font=name_font, fill=theme.TEXT if key else theme.MUTED, anchor="w")
+        if printed:
+            self.create_text(x + name_width + px(self.GAP), middle, text=printed, font=print_font, fill=theme.MUTED,
+                             anchor="w")
+        self.bind("<Enter>", lambda e: self._paint(under=True))
+        self.bind("<Leave>", lambda e: self._paint(under=False))
+        self._paint()
+
+    def set_waiting(self, on):
+        """Waiting for a key (the accent round it, the cyan ring away: the accent says where the key goes), or not."""
+        self.waiting = bool(on)
+        self.configure(highlightcolor=self.bg if self.waiting else theme.CYAN)
+        self._paint()
+
+    def _paint(self, under=None):
+        """The face for the box's state: the accent while it waits, brighter edges under the pointer, else normal."""
+        if under is not None:
+            self.under = under
+        state = "focus" if self.waiting else ("hover" if self.under else "normal")
+        self.itemconfigure(self.face, image=self.images[state])
+        # A dialog draws the window behind it from the widgets (snapshot.py): the face where it shows, inside the ring's
+        # room in the card's colour.
+        from PIL import Image
+        face = self.faces[state]
+        whole = Image.new("RGB", (face.width + 2 * self.inset, face.height + 2 * self.inset), art._rgb(self.bg))
+        whole.paste(face, (self.inset, self.inset))
+        self.odq_picture = whole
+
+
 class Progress(tk.Frame):
     """A progress bar with its words under it (a download): set(fraction, text) moves it; fraction None shows the
     track alone, for work whose size is not known yet."""

@@ -40,7 +40,7 @@ OLD_FPS_POSITION = "top_left"
 AUDIO_MODE = ("shared", "exclusive")
 # How much sound is kept ahead of the device: less latency, or fewer breaks on a busy PC.
 AUDIO_BUFFER = ("low", "normal", "safe")
-# Keyboard play: the lanes' keys play a song's lanes, or play nothing (the mouse and a touch screen play either way).
+# Keyboard play: the lanes' keys play a song's lanes, or play nothing.
 KEYBOARD = ("on", "off")
 # Each LINE mode's keys, by its setting's name, and how many lanes the mode has (the game's rows, counted from the top).
 LANES = {"keys_2line": 2, "keys_3line": 3, "keys_4line": 4}
@@ -57,7 +57,7 @@ KEYS = tuple((letter, scan, letter.lower()) for row, first in (("QWERTYUIOP", 0x
     ("Space", 0x39, " "), ("Semicolon", 0x27, ";"), ("Quote", 0x28, "'"), ("Comma", 0x33, ","), ("Period", 0x34, "."),
     ("Slash", 0x35, "/"), ("LeftBracket", 0x1A, "["), ("RightBracket", 0x1B, "]"), ("Backslash", 0x2B, "\\"),
     ("Minus", 0x0C, "-"), ("Equals", 0x0D, "="), ("Grave", 0x29, "`"))
-# The names alone, in that order (the words that list them say A to Z, 0 to 9, then the rest).
+# The names alone, in that order: the letters by the keyboard's rows, the digits, then the signs and Space.
 KEY_NAMES = tuple(name for name, _scan, _print in KEYS)
 # A name to its place, and a place back to its name.
 SCAN = {name: scan for name, scan, _print in KEYS}

@@ -10,7 +10,7 @@ import os
 import threading
 import tkinter as tk
 
-from opendmtq_client import actions, apps, dialogs, displays, i18n, maintenance, player, theme, updates, widgets
+from opendmtq_client import actions, apps, dialogs, displays, i18n, keys, maintenance, player, theme, updates, widgets
 from opendmtq_client import server as srv
 from opendmtq_client import state as st
 from opendmtq_client import values as choices
@@ -448,6 +448,8 @@ def build_sound(app, parent):
 
 def build_controls(app, parent):
     ui, w = app.ui, app.words
+    # First keyboard play, the page's one card of settings: on or off, and while on, the lanes' keys.
+    lanes_card(app, parent)
     # The game's bar over it in each group by the way it comes: the pointer, a finger, and the keys it does not take.
     groups = (("controls.mouse", ("controls.click", "controls.drag", "controls.wheel", "controls.menu",
                                   "controls.minimise")),
@@ -460,6 +462,206 @@ def build_controls(app, parent):
             if i:
                 widgets.divider(card.body, ui, pady=9)
             widgets.label(card.body, ui, w(key), wrap_margin=0).pack(fill="x")
+
+
+def lanes_card(app, parent):
+    """Keyboard play's card: the switch for it and, while it is on, each LINE mode's lanes with their keys (LaneKeys)
+    and Reset keys at the card's title. Switched, the page is drawn again in place, the lanes coming or going with it,
+    as the Screen page's FPS counter brings its Position row."""
+    ui, w, v = app.ui, app.words, app.state.values
+    card = _card(parent, ui, w("controls.keys"))
+    on = v["keyboard"] == "on"
+
+    def switch(value):
+        app.changed("keyboard", "on" if value else "off")
+        redraw_in_place(app, "controls")
+
+    widgets.setting_row(card.body, ui, w("controls.keys.play"), lambda p: widgets.Toggle(p, ui, on, switch),
+                        w("controls.keys.play.hint." + ("on" if on else "off"))).pack(fill="x")
+    if on:
+        LaneKeys(app, card)
+    else:
+        # The title's line as tall as it is with Reset keys on it: the switch stays where it was, under the pointer that
+        # switched it off.
+        tk.Frame(card.head, bg=theme.PANEL, width=1, height=ui.px(widgets.Button.HEIGHT)).pack(side="right")
+
+
+class LaneKeys:
+    """The lanes of each LINE mode, from the top, with their keys: a table with the lanes' numbers down its left, a
+    column for each of 2, 3 and 4 LINE, and in each lane a box for its key and one for a second key (widgets.KeyBox).
+
+    A click on a box (or Enter or Space on it) makes it wait for a key; the key pressed goes in by its place on the
+    keyboard (keys.place_of), unless the mode plays it in another box, or no lane takes it: refused in words on the line
+    under the table, and the box waits on. Esc keeps what was there, Delete takes away a key the lane has a second of,
+    Tab goes on to the next control, a click on the waiting box stops the wait. A key taken is saved at once and the
+    page drawn again in place, the keyboard on the same box. Reset keys, at the card's title, puts the defaults back."""
+
+    # The room between two modes' columns, between a lane's two boxes, and above and under each lane (logical pixels).
+    COLUMN_GAP, BOX_GAP, LANE_GAP = 24, 6, 3
+
+    def __init__(self, app, card):
+        self.app, self.ui, self.w = app, app.ui, app.words
+        ui, w, px = self.ui, self.w, self.ui.px
+        values = app.state.values
+        # The box that waits for a key, or None.
+        self.waiting = None
+        # A plain button, as Check again is on the PLAY page: the screen's lime action stays PLAY's.
+        self.reset_button = widgets.Button(card.head, ui, w("controls.keys.reset"), self.reset)
+        self.reset_button.pack(side="right")
+        widgets.divider(card.body, ui)
+        table = tk.Frame(card.body, bg=theme.PANEL)
+        table.pack(anchor="w")
+        # Each mode's name over its column, as the game's tabs name it, in the launcher's wide face for English names.
+        for column, name in enumerate(choices.LANES, 1):
+            tk.Label(table, text=choices.mode(name), font=ui.fonts.step, fg=theme.MUTED, bg=theme.PANEL).grid(
+                row=0, column=column, sticky="w", padx=(px(self.COLUMN_GAP), 0), pady=(0, px(6)))
+        # The lanes' numbers down the left, from the top, as many as the mode with the most has.
+        for lane in range(max(choices.LANES.values())):
+            tk.Label(table, text=str(lane + 1), font=ui.fonts.body_bold, fg=theme.MUTED, bg=theme.PANEL).grid(
+                row=lane + 1, column=0, sticky="w")
+        # Whether a box shows what the keyboard prints beside its key's name: the line under the table then says what it is.
+        shown = False
+        # Made mode by mode, each from its top lane: Tab goes down a column, then to the next.
+        for column, name in enumerate(choices.LANES, 1):
+            for lane, lane_keys in enumerate(choices.lanes_of(name, values[name])):
+                cell = tk.Frame(table, bg=theme.PANEL)
+                cell.grid(row=lane + 1, column=column, sticky="w", padx=(px(self.COLUMN_GAP), 0),
+                          pady=px(self.LANE_GAP))
+                # The lane's keys, then one empty box while it has room for a second.
+                for slot in range(min(len(lane_keys) + 1, choices.LANE_KEYS)):
+                    key = lane_keys[slot] if slot < len(lane_keys) else None
+                    print_ = keys.beside(key, keys.printed(key, app.key_prints)) if key else None
+                    shown = shown or print_ is not None
+                    box = widgets.KeyBox(cell, ui, key, print_)
+                    box.pack(side="left", padx=(px(self.BOX_GAP) if slot else 0, 0))
+                    # Which box it is: the mode's setting, the lane from the top, the box in the lane.
+                    box.odq_where = (name, lane, slot)
+                    box.bind("<Button-1>", lambda e, b=box: self.clicked(b))
+                    box.bind("<KeyPress>", lambda e, b=box: self.pressed(b, e))
+                    box.bind("<FocusOut>", lambda e, b=box: self.left(b))
+                    # The input method kept away: a key in Hangul mode still comes with its place.
+                    keys.no_typing(box)
+        # What to do, said under the table; what a box waits for, or why a key was refused, said in its place. The
+        # line about the grey prints only while a box shows one.
+        self.hint = i18n.sentences(w("controls.keys.hint"), w("controls.keys.hint.print") if shown else "")
+        self.line = widgets.label(card.body, ui, self.hint, font=ui.fonts.small, fg=theme.MUTED, wrap_margin=0)
+        self.line.pack(fill="x", pady=(px(12), 0))
+        # Tab reaches Reset keys after the boxes: the switch stays the card's first stop whether the lanes are shown or
+        # not, so the page drawn again for it keeps the keyboard on it (keep_place finds a control by its place in the
+        # order). Tk's Tab goes by the stacking order, so the head goes over everything the card holds, made last.
+        # (Misc's own raise: the head is a frame, raised among the card's rows.)
+        tk.Misc.tkraise(card.head)
+
+    # ------------------------------------------------------------------------------------- the line under it
+
+    def say(self, text, colour):
+        """The line under the table, unless the page went meanwhile (a key's FocusOut as the page is drawn again)."""
+        if self.line.winfo_exists():
+            self.line.configure(text=text, fg=colour)
+
+    def prompt(self, box):
+        """What a waiting box waits for: a key for its lane (Esc keeps the one there, Delete takes away one the lane has
+        a second of), or a second key."""
+        name, lane, slot = box.odq_where
+        mode, w = choices.mode(name), self.w
+        if box.key is None:
+            return w("controls.keys.wait.second", lane=lane + 1, mode=mode)
+        lane_keys = choices.lanes_of(name, self.app.state.values[name])[lane]
+        return i18n.sentences(w("controls.keys.wait", lane=lane + 1, mode=mode, keyname=box.key),
+                              w("controls.keys.wait.delete") if len(lane_keys) > 1 else "")
+
+    # ------------------------------------------------------------------------------------------ the wait
+
+    def wait(self, box):
+        """`box` waits for a key, with the keyboard; another box that waited stops."""
+        if self.waiting is not None and self.waiting is not box:
+            self.waiting.set_waiting(False)
+        self.waiting = box
+        box.focus_set()
+        box.set_waiting(True)
+        self.say(self.prompt(box), theme.TEXT)
+
+    def stop(self):
+        """No box waits any more: the line says what to do again."""
+        box, self.waiting = self.waiting, None
+        if box is not None and box.winfo_exists():
+            box.set_waiting(False)
+        self.say(self.hint, theme.MUTED)
+
+    def clicked(self, box):
+        """A click: the box waits for a key, or a waiting box stops."""
+        if self.waiting is box:
+            self.stop()
+        else:
+            self.wait(box)
+
+    def left(self, box):
+        """The keyboard went elsewhere (Tab, another box, another window): the box that waited stops."""
+        if self.waiting is box:
+            self.stop()
+
+    def pressed(self, box, event):
+        """A key pressed on a box: Enter or Space makes a box wait, as a button is pressed; on a waiting box, the key
+        for it. "break" for a key the box took, so that nothing else of the window acts on it."""
+        if self.waiting is not box:
+            if event.keysym in ("Return", "KP_Enter", "space"):
+                self.wait(box)
+                return "break"
+            # Tab and the rest go their way.
+            return None
+        if event.keysym in ("Tab", "ISO_Left_Tab"):
+            # Tab goes on to the next control (Tk's own binding), the box as it was.
+            self.stop()
+            return None
+        if event.keysym == "Escape":
+            self.stop()
+            return "break"
+        name, lane, slot = box.odq_where
+        lanes = choices.lanes_of(name, self.app.state.values[name])
+        if event.keysym in ("BackSpace", "Delete"):
+            if box.key is None:
+                # The empty box has nothing to take away: it stops waiting.
+                self.stop()
+                return "break"
+            self.change(name, lambda: choices.without_key(name, lanes, lane, slot))
+            return "break"
+        key = keys.place_of(event)
+        if key is None:
+            said = keys.label(event)
+            self.say(self.w("controls.keys.cannot", keyname=said) if said else self.w("controls.keys.cannot.any"),
+                     theme.WARN)
+            return "break"
+        if event.char:
+            # What this PC's layout printed there, for the box to show where Windows cannot be asked (keys.printed).
+            self.app.key_prints[key] = event.char
+        self.change(name, lambda: choices.with_key(name, lanes, lane, slot, key), took=(lane, slot, key))
+        return "break"
+
+    def change(self, name, make, took=None):
+        """The lanes `make()` gives saved, and the page drawn again in place with the keyboard on the same box; when it
+        refuses (a key another lane plays, a lane's only key), its words on the line, the box still waiting. `took` is
+        (lane, box, key) for a key pressed, said in the log once it is in."""
+        try:
+            lanes = make()
+        except choices.ChoiceError as e:
+            self.say(self.w.error(e), theme.WARN)
+            return
+        if took is not None:
+            # The key by its place and what this PC prints there: what a player chose, as the window showed it.
+            lane, slot, key = took
+            log.info("keyboard play: %s lane %d box %d took %s (%r on this keyboard)", choices.mode(name), lane + 1,
+                     slot + 1, key, keys.printed(key, self.app.key_prints))
+        self.waiting = None
+        self.app.changed(name, choices.lanes_text(lanes))
+        redraw_in_place(self.app, "controls")
+
+    def reset(self):
+        """Reset keys: each mode's default keys back, saved; the page drawn again in place."""
+        self.waiting = None
+        for name in choices.LANES:
+            if self.app.state.values[name] != choices.DEFAULTS[name]:
+                self.app.changed(name, choices.DEFAULTS[name])
+        redraw_in_place(self.app, "controls")
 
 
 # -------------------------------------------------------------------------------------------- Online

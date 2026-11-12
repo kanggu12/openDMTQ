@@ -63,6 +63,8 @@ class LauncherApp:
         self.quit_after_game = False    # the window was closed while the game ran
         self.dialog = None              # the dialog on show (dialogs.py), while one is
         self.devices = None             # the sound devices the player lists (None: not asked yet)
+        self.key_prints = {}            # what Tk said each place pressed on the Controls page prints, by its key's name
+        #                                 (keys.printed: the boxes show it in grey where Windows' layout cannot be asked)
         self.download = None            # the app's download under way: {"done", "total", "cancel"}
         self.download_bar = None        # the page's progress bar for it, while one is on show
         self.download_error = None      # (i18n.Said, tone): how the last download ended badly (the page shows it)
