@@ -54,7 +54,8 @@ class RequestLogTest(unittest.TestCase):
             self.assertEqual(insights.kind_of(path), kind, path)
 
     def test_what_kind_of_device(self):
-        for ua, device in ((PHONE, "Game app"), ("-", "–"), ("", "–"), ("opendmtq", "Server check"), ("curl/8.0", "Script or bot"), ("python-requests/2", "Script or bot"), (CHROME, "Chrome (Android)"),
+        for ua, device in ((PHONE, "Game app"), ("-", "–"), ("", "–"), ("opendmtq", "Server check"), ("opendmtq-admin", "Admin pages"),
+                           ("curl/8.0", "Script or bot"), ("python-requests/2", "Script or bot"), ("Python-urllib/3.12", "Script or bot"), (CHROME, "Chrome (Android)"),
                            ("Mozilla/5.0 (Windows NT 10.0) Chrome/130 Safari/537 Edg/130", "Edge (Windows)"), ("Mozilla/5.0 (iPhone) Safari/604", "Safari (iPhone)")):
             self.assertEqual(insights.device_of(ua), device, ua)
 

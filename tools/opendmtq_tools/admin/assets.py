@@ -14,6 +14,7 @@ from flask import abort, request
 
 from . import core
 from .core import app
+from .insights import OWN_AGENT
 
 # The public site's stylesheet, fonts and icon, asked of the game server again after a minute (they change when the
 # server is updated). The last good copy of each also waits on the data disk, so these pages keep their look while the
@@ -58,7 +59,8 @@ def _cached(key, url, ctype, keep=ASK_EACH_TIME):
     hit = _css.get(key)
     if not hit or time.time() - hit[0] > _CSS_TTL:
         try:
-            with urllib.request.urlopen(url, timeout=3) as r:
+            # By the pages' own name: the Requests log says these fetches are the admin pages', not a script's.
+            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": OWN_AGENT}), timeout=3) as r:
                 body = r.read()
             # New bytes are new from now; the same bytes keep the moment they last changed.
             changed = hit[2] if hit and hit[1] == body else time.time()

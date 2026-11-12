@@ -188,6 +188,11 @@ def kind_of(path):
     return "other"
 
 
+# How these pages name themselves when they ask the site for its stylesheet, fonts, icon and video player (assets.py): the
+# Requests log then says what they are, not "Script or bot".
+OWN_AGENT = "opendmtq-admin"
+
+
 def device_of(ua):
     """The caller's kind of device in a word or two, for a person reading the list."""
     if not ua or ua == "-":
@@ -195,6 +200,9 @@ def device_of(ua):
     # ./opendmtq check, walking the game's path with its own name.
     if ua == "opendmtq":
         return "Server check"
+    # These pages, fetching the site's look for themselves.
+    if ua == OWN_AGENT:
+        return "Admin pages"
     if "Dalvik" in ua or "UnityPlayer" in ua or "okhttp" in ua:
         return "Game app"
     if re.search(r"bot|crawl|spider|curl|wget|python|scan|zgrab|masscan|Go-http", ua, re.I):

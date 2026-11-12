@@ -375,6 +375,16 @@ class SiteCopiesTest(unittest.TestCase):
             with mock.patch("urllib.request.urlopen", side_effect=down):
                 self.assertEqual(inst.client.get("/opendmtq/style.css").get_data(), b"body { color: red }")
 
+    def test_the_site_is_asked_by_the_pages_own_name(self):
+        # Not as Python's urllib, which the Requests log counted as a script or a bot.
+        with Install() as inst:
+            admin.assets._css.clear()
+            with mock.patch("urllib.request.urlopen", mock.mock_open(read_data=b"body {}")) as asked:
+                inst.client.get("/opendmtq/style.css")
+            sent = asked.call_args.args[0]
+            self.assertEqual(sent.get_header("User-agent"), "opendmtq-admin")
+            self.assertEqual(admin.insights.device_of(sent.get_header("User-agent")), "Admin pages")
+
     def test_a_browser_that_has_the_copy_gets_a_304(self):
         # After a minute these pages' own port answered with every byte again (113 KB of stylesheet and half a megabyte of
         # fonts): now a browser asks with what it has, and gets nothing back while it is the same. As the site keeps them:
@@ -1268,6 +1278,7 @@ class DeviceWordsTest(unittest.TestCase):
     def test_our_own_words_follow_the_language_product_names_do_not(self):
         with admin.app.test_request_context(headers={"Cookie": "opendmtq_lang=ko"}):
             self.assertEqual(str(admin.logs.device_words("Script or bot")), "스크립트 또는 봇")
+            self.assertEqual(str(admin.logs.device_words("Admin pages")), "관리자 페이지")
             self.assertEqual(str(admin.logs.device_words("Chrome (Android)")), "Chrome (Android)")
         with admin.app.test_request_context():
             self.assertEqual(str(admin.logs.device_words("Game app")), "Game app")

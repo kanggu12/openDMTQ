@@ -27,7 +27,8 @@ def ip_words(ip):
 
 def device_words(name):
     """A device as the logs show it: the words of our own in the page's language, product names as they are."""
-    key = {"Game app": "device.app", "Script or bot": "device.bot", "Browser": "device.browser", "Server check": "device.check", "–": "device.unknown"}.get(name)
+    key = {"Game app": "device.app", "Script or bot": "device.bot", "Browser": "device.browser", "Server check": "device.check",
+           "Admin pages": "device.admin", "–": "device.unknown"}.get(name)
     return t(key) if key else name
 
 # What the log of changes calls each thing done in these pages: note_changes() writes the page and the form's action,
