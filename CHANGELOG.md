@@ -6,6 +6,57 @@ one of fixes, changes and smaller additions raises the patch number. Each releas
 
 ## [Unreleased]
 
+### Changed
+
+- The player for Windows: typing in the game's text fields, such as a new player's name, replaces the text they open
+  with; Backspace clears it, and an arrow key keeps it to add to.
+- The player for Windows: the handle brings the bar from the handle, its line and the space right beside its tab, no
+  longer from over the game's own buttons beside it, such as SKIN in the music list.
+- The launcher looks for a newer version once at each start and shows it on the Launcher page and at the window's foot,
+  with Update to that version; nothing installs by itself, and nothing is said offline. `--status` names it too.
+- The launcher: an uninstall from Windows' Settings, Apps ends with the launcher's own card saying what went and what
+  stayed; the PLAY page keeps its buttons in view, the ready check as tall as its rows; an opened drop-down's choices
+  line up with its closed box. The installer names both shortcuts it makes.
+- The admin pages: one primary button to a screen. Making an account has one name on every page and one heading after
+  it, with names in quotes. The message for a new player names the server as its app is named on the phone, and the
+  installer for Windows when the site has it.
+- The admin pages: the setup's App step and the Status page say their code downloads the app; a server in containers
+  says its game files come in through the command line; the empty Players page says when a player shows there; the
+  Status page's disk bars are plain, fill with what is used and count recordings alone.
+- The command line: `up`, `status` and the setup's end name one admin address, with where its password is. The setup
+  says which file names it looks for when it finds none, asks which folder only when there are two real places, and
+  writes a line of words where it wrote JSON, as the Windows bundle's window does.
+- A release's images carry its number, and a copy without git (a source archive, the closed network's copy) shows its
+  version.
+- On a phone, the home page's broadcasts box with nobody on air is two lines high.
+
+### Fixed
+
+- The player for Windows: after the game was minimised and brought back from the taskbar, the bar came back as a still
+  picture over the top of the game, its clicks going to the game underneath; an old FPS count or a finished notice
+  could come back the same way.
+- The player for Windows: a button of the bar pressed while the bar was still sliding down did nothing.
+- The player for Windows: under Wine the overlay's words were not drawn in its own face, and its Korean showed as empty
+  boxes.
+- After a restore on the admin pages, the game's and the site's rankings showed the boards from before it until enough
+  plays came after; they are worked out again from the restored data.
+- The game server: a song list replaced while a request read it could leave saves and rankings with the old list's
+  charts until the list changed again.
+- The Accounts page: a new token or password was above the screen, the page back at its form; it is on screen, with
+  the focus.
+- The Status page counted the recordings' limits as recordings, and the Requests log counted the admin pages' own
+  requests as a script or a bot.
+- The launcher: Help's Start over stood 3 pixels off its column under Windows' fonts; Delete all left Velopack's log
+  and the installer's logs behind.
+- The guides: importing songs with Docker, the Status page's Add a player card, filling the Kubernetes game files
+  volume, what the Windows bundle's backups hold, removing Docker's two images, the PC client's button and sound mode
+  names.
+
+### Security
+
+- The game server takes at most 64 calls in one request and a body of at most 2 MB, as the Helm chart's router already
+  did for bodies: a larger request is refused before any call runs.
+
 ## [0.9.5] - 2026-11-12
 
 ### Changed
