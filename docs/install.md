@@ -94,8 +94,9 @@ server, builds the app, checks it all and ends with a QR code for phones. Files 
 ./opendmtq setup --from ~/games/dmtq
 ```
 
-Sign in to the admin pages as `admin` with `ADMIN_PASSWORD` from `.env`, and make an account for each player. To
-update, `git pull`, then `./opendmtq up`.
+Sign in to the admin pages at the address the setup ends with (`./opendmtq status` shows it again, on this PC
+`http://localhost:8791/opendmtq/admin/` unless port 8791 was taken), as `admin` with `ADMIN_PASSWORD` from `.env`, and make
+an account for each player. To update, `git pull`, then `./opendmtq up`.
 
 ## Kubernetes
 

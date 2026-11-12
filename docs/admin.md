@@ -72,7 +72,7 @@ Where they are:
 
 | Install | Address |
 |---|---|
-| Docker Compose, on the server PC | The address `./opendmtq setup` gives at its end, on the pages' own port (`ADMIN_PORT` and `ADMIN_BIND` in `.env` change it) |
+| Docker Compose, on the server PC | The address `./opendmtq setup` gives at its end, and `./opendmtq up` and `./opendmtq status` too: `http://localhost:8791/opendmtq/admin/`, the pages' own port (`ADMIN_PORT` and `ADMIN_BIND` in `.env` change it) |
 | Docker Compose, from the local network | `https://<server>:<port>/opendmtq/admin/` (a plain-HTTP visit is sent there; with port 80 that is `https://<server>:80/opendmtq/admin/`) |
 | Docker Compose, exposed to the internet | Only on the server PC, unless `./opendmtq expose --admin-public`: then over HTTPS from anywhere |
 | Host install and Windows | On the server PC, the address `./opendmtq status` shows, and on Windows the server's window; from the local network, `http://<server>:<port>/opendmtq/admin/` (without `:<port>` when it is 80) |

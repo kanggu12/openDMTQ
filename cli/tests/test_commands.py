@@ -506,6 +506,21 @@ class MessageTest(unittest.TestCase):
             self.assertIn("http://localhost:9791/opendmtq/admin/", sb.output())
             self.assertIn("http://127.0.0.1:9791/opendmtq/admin/login", sb.urls)
 
+    def test_up_status_and_setup_name_one_admin_address(self):
+        # With the pages on the public port too (the default), up named that address and the setup's end another, and
+        # status none: all three now name the one on this PC, with where its password is, and nothing else of the pages.
+        wanted = "http://localhost:9791/opendmtq/admin/ on this PC  (ID admin, password: ADMIN_PASSWORD in .env)"
+        with Sandbox("PUBLIC_HOST=192.168.0.10\nADMIN_PORT=9791\nADMIN_PASSWORD=x\n") as sb:
+            game_data(sb)
+            with mock.patch.object(app.time, "sleep"):
+                self.assertEqual(sb.call(app.cmd_up), 0, sb.output())
+            self.assertEqual(sb.call(app.cmd_status), 0, sb.output())
+            with mock.patch.object(app, "cmd_up"), mock.patch.object(checks, "end_to_end", return_value=0):
+                self.assertEqual(sb.call(app.cmd_setup, host=None, source=None, rebuild_apk=False, no_firewall=True), 0,
+                                 sb.output())
+            self.assertEqual(sb.output().count(wanted), 3, sb.output())
+            self.assertEqual(sb.output().count("/opendmtq/admin/"), 3, sb.output())
+
     def test_setup_firewall_hint_names_the_port(self):
         with Sandbox("PUBLIC_HOST=192.168.0.10:8080\nLISTEN_PORT=8080\n") as sb:
             game_data(sb)

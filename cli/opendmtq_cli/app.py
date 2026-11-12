@@ -220,6 +220,13 @@ def admin_link(values):
     return f"http://{address}/opendmtq/admin/"
 
 
+def admin_sign_in(values):
+    """Where the owner signs in to the admin pages on this PC, and with what: the one address `up`, `status` and the
+    setup's end all name (their own port, which works on this PC whatever the public port carries), and the ID and where
+    its password is."""
+    return f"{admin_link(values)}  (ID {values.get('ADMIN_USER') or 'admin'}, password: ADMIN_PASSWORD in .env)"
+
+
 def open_firewall(port, internet, replaces=None):
     """Allow phones through the Windows firewall (replaces: the port this server used until now). On trouble, warn with the
     way to do it by hand: the rest of the command (setup, host, expose) still applies."""
@@ -289,12 +296,8 @@ def cmd_up(args):
         time.sleep(1)
     else:
         warn("admin pages are not answering yet; see ./opendmtq logs admin")
-    if values.get("ADMIN_ON_PUBLIC_PORT", "yes") == "yes":
-        # With the HTTPS door, plain visits to the admin pages are sent there.
-        address = f"https://{env.https_address(host)}" if https else f"http://{host}"
-        ok(f"admin pages: {address}/opendmtq/admin/  (ID {values.get('ADMIN_USER') or 'admin'}, password: ADMIN_PASSWORD in .env)")
-    else:
-        ok(f"admin pages: {admin_link(values)}  (ID {values.get('ADMIN_USER') or 'admin'}, password: ADMIN_PASSWORD in .env)")
+    # The address on this PC, as status and the setup's end name it too.
+    ok(f"admin pages: {admin_sign_in(values)}")
     wait_builder(since)
     if checks.app_lacks_runtime():
         warn(checks.no_runtime_notice())
@@ -382,6 +385,9 @@ def cmd_status(args):
         print(f"build      FAILED: {failed} (./opendmtq logs builder)")
     files = backup.listing()
     print(f"backups    {len(files)}{', newest ' + files[0] if files else ''}")
+    # Where to sign in on this PC, as up and the setup's end say it: once there is a server to sign in to.
+    if host != "?":
+        print(f"admin      {admin_sign_in(env.load(ENV_FILE))}")
 
 
 def cmd_logs(args):
@@ -840,7 +846,7 @@ def cmd_setup(args):
     where = "same Wi-Fi" if env.is_lan_only(host) else "anywhere"
     print(f"""
 Done. The site and the app download open to accounts you make: on the admin pages, under Accounts, make one for
-each player ({admin_link(env.load(ENV_FILE))}).
+each player. The admin pages: {admin_sign_in(env.load(ENV_FILE))}
 
 On the phone ({where}):
   1. Open  http://{host}/  in the browser, or scan the code below, and sign in.
