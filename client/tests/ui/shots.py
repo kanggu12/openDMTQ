@@ -787,6 +787,26 @@ def update_failures_check(app, out, tag, problems):
             problems.append("%s: a full disk during the update said %r" % (tag, dialog and dialog.detail))
 
 
+def page_shorter_check(app, tag, problems):
+    """A page at its foot that gets shorter for good (a card gone) still ends at its foot once it has settled: the page
+    area waits a moment before it shrinks under the view (a page made anew in part is short only for a moment), and
+    shrinks then. Help drawn again after it."""
+    area = app.body
+    area.canvas.yview_moveto(1.0)
+    settle(app)
+    cards = [c for c in area.inner.winfo_children()[0].winfo_children() if isinstance(c, widgets.Card)]
+    cards[-1].destroy()
+    wait_out(app.root, 0.5)
+    region = [float(v) for v in str(area.canvas.cget("scrollregion")).split()]
+    seen = area.canvas.winfo_height()
+    content = area._content_top + area.inner.winfo_reqheight() + app.ui.px(area.BOTTOM)
+    if abs(region[3] - max(seen, content)) > 1 or abs(area.canvas.canvasy(0) + seen - region[3]) > 1:
+        problems.append("%s: a page shorter for good ends at %d, its view at %d" % (tag, region[3],
+                                                                                    area.canvas.canvasy(0) + seen))
+    app.go("help")
+    settle(app)
+
+
 def game_end_check(app, out, tag, problems):
     """A game that ends with Help on show: at once, before the ready check comes back (made slow here, as with the
     server away), PLAY is no longer PLAYING and Help shows the game's log (its row, and the line that points at it)."""
@@ -931,17 +951,26 @@ def maintenance_check(app, out, tag, problems):
         shot(app.root, out, "%s_dialog-%s" % (tag, key.replace(".", "-")))
         problems.extend("%s_dialog-%s: %s" % (tag, key, p) for p in dialog.layout_problems())
         dialog.close(None)
-    # Repair with a file of the launcher missing: put back, and said to need a restart.
+    # Repair with a file of the launcher missing: put back, and said to need a restart. The page at its foot first, where
+    # the tools are: the ready check that comes back after the repair leaves it there.
     os.remove(os.path.join(install, "current", "OpenDMTQ.exe"))
+    app.body.canvas.yview_moveto(1.0)
+    settle(app)
+    before = app.body.canvas.canvasy(0)
     done = next_dialog(app, out, "%s_dialog-repaired" % tag, problems, lambda d: not d.progress,
                        lambda d: d.canvas.event_generate("<Return>"))
     button(app, w("help.repair")).press()
     wait_out(app.root, 2.0)
+    settle(app)
     dialog = done.get("dialog")
     if dialog is None or dialog.detail != w("help.repair.done.restart", n=1):
         problems.append("%s: the repair said %r" % (tag, dialog and dialog.detail))
     if not os.path.isfile(os.path.join(install, "current", "OpenDMTQ.exe")):
         problems.append("%s: the repair did not put the launcher's file back" % tag)
+    if before <= 0 or abs(app.body.canvas.canvasy(0) - before) > 1:
+        problems.append("%s: closing the repair's answer moved Help from %d px to %d" % (tag, before,
+                                                                                         app.body.canvas.canvasy(0)))
+    page_shorter_check(app, tag, problems)
     # Clear game data, for real: the id alone stays.
     cleared = removal.game_data_size()
     through_dialog(app, out, "%s_dialog-clear-yes" % tag, button(app, w("help.clear.confirm")).press,

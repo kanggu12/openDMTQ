@@ -295,6 +295,11 @@ class Header(tk.Canvas):
         self.draw()
 
 
+# How long a page that came out shorter than its view reaches waits before it is measured again (ms): the rows made
+# anew have their sizes within a few, in the same turn of the event loop.
+SETTLE = 60
+
+
 class ScrollArea(tk.Frame):
     """The page area, as the site's page: its field with the shards at the edges and the dots in the margins (drawn
     behind on the canvas, art.backdrop), the page's title and a line under it (set_heading), and the page's content in
@@ -317,6 +322,9 @@ class ScrollArea(tk.Frame):
         # The heading's items (the title's picture, the line under it) and where the content starts under them.
         self._heading, self._content_top = [], px(self.TOP)
         self._backdrop_job, self._backdrop_size, self._backdrop_item = None, None, None
+        # The scrolled region's height as last set, and a shorter page waiting to be measured again before the region
+        # shrinks (_relayout).
+        self._region_height, self._shrink_job = 0, None
         # A dialog draws the window from the widgets (snapshot.py): this area's part is made when one asks.
         self.canvas.odq_picture = self._picture_on_show
         # The part of the wheel's turning that has not made a whole step yet (a touchpad sends it a little at a time).
@@ -410,18 +418,47 @@ class ScrollArea(tk.Frame):
                 self.canvas.itemconfigure(item, width=max(px(200), self._column(event.width)))
         self._place_content()
 
-    def _relayout(self):
+    def _relayout(self, settled=False):
         """The scrolled height: the content and the room under it, at least the area's own height; the picture behind
-        drawn again for it (a moment later, once the sizes stop changing)."""
+        drawn again for it (a moment later, once the sizes stop changing).
+
+        A page that comes out shorter than where the part in view reaches keeps its height until it is measured again
+        a moment later (_settle): part of a page made anew, as the ready check's rows each time the check comes back,
+        is laid out once before its new rows have their size, and the canvas keeps its view inside its region, so a
+        page scrolled to its foot would move up by those rows for good (Help after Repair: 88 px). `settled`: measured
+        again, the page is as short as it says."""
         c = self.canvas
         width, seen = max(1, c.winfo_width()), max(1, c.winfo_height())
         bottom = self._content_top + self.inner.winfo_reqheight() + self.ui.px(self.BOTTOM)
-        height = max(seen, bottom)
+        content = max(seen, bottom)
+        height = content
+        # Where the part in view ends on the page.
+        reach = int(c.canvasy(0)) + seen
+        if content < reach and not settled:
+            # Shorter than the view reaches: the region stays as it was until the page has settled.
+            height = max(content, self._region_height)
+            if self._shrink_job is None:
+                self._shrink_job = self.after(SETTLE, self._settle)
+        elif self._shrink_job is not None:
+            # As tall as the view reaches again (the rows have their size): nothing left to measure.
+            self.after_cancel(self._shrink_job)
+            self._shrink_job = None
+        self._region_height = height
         c.configure(scrollregion=(0, 0, width, height))
-        if self._backdrop_size != (width, height):
+        if self._backdrop_size != (width, content):
             if self._backdrop_job is not None:
                 self.after_cancel(self._backdrop_job)
             self._backdrop_job = self.after(60, self._draw_backdrop)
+
+    def _settle(self):
+        """The page measured again once its sizes have settled: as short as it is now, the region follows, and a view
+        past its new foot moves up to it."""
+        self._shrink_job = None
+        if not self.canvas.winfo_exists():
+            return
+        # Every size the page is still working out, worked out first: what is measured is the page as it stays.
+        self.update_idletasks()
+        self._relayout(settled=True)
 
     def _draw_backdrop(self):
         from PIL import ImageTk
