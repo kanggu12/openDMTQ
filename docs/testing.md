@@ -28,7 +28,7 @@ both.
 | The player's HTTP | The player's requests to the game server, on stand-in servers: each asks for gzip as a phone's does, unless the game chose its encodings; an answer compressed for it inflated whole, with a length, in chunks or until the connection closes, read in any pieces, without the compressed body's headers; one cut short, broken, followed by more or inflating past 64 MB fails as a lost connection does, after no more than that; every other answer as it always was (`arm32/tests/host/http_test.cpp`) | see `ci.yml` | CI | no |
 | PC client | The launcher's logic on a stand-in server and player (`client/tests`), then every page, the first-start guide and the dialogs on a virtual screen, in both languages at three window sizes and at 200 %, with a layout check | `(cd client && python3 -m unittest discover -s tests -t .)` (it needs Python with Tk, Pillow and fontTools; CI runs it in the image of `client/tests/ui`), `client/tests/ui/run.sh <folder>` | CI (`client`), `qa.sh` | no |
 | PC client on Windows | The installer as a release builds it, installed silently on Windows itself for the runner's user; its command line (its version, no server yet, the player found), the player's sound devices without a window, the same installer again as a repair, the launcher's Repair of a file of the player gone, and Uninstall with the data: the program, its shortcuts and the data gone | `client/tests/windows/install.ps1` | CI (`client-build`, `client-windows`) | no |
-| PC client, end to end | The installer as the site hands it out, under Wine against a throwaway server: installed through its own dialog, the first-start guide, the sign-in, the app's download, PLAY, Alt+F4 doing nothing, the bar at the game's top edge switching to a window and back, in the window no buttons of its own, the bar's minimise and the taskbar's restore, a minimise and a restore with the bar down as Windows makes them (the window's pop-ups hidden and shown again: the bar stays gone), its X pressed while the bar slides down, its X asking with the game held still, Keep playing, then Quit the game, the launcher back; then Repair, a file of the player and one of the launcher put back as installed; Clear game data, after which the game starts again with the same id; Uninstall with the data, refused while the window is open, then the program, its shortcut, the data and the installs' logs gone | `client/tests/windows/e2e.sh` | by hand, with a change to the client or the player | yes |
+| PC client, end to end | The installer as the site hands it out, under Wine against a throwaway server (on llvmpipe, or on WSL's graphics card, [below](#under-wine)): installed through its own dialog, the first-start guide, the sign-in, the app's download, PLAY, Alt+F4 doing nothing, the bar at the game's top edge switching to a window and back, in the window no buttons of its own, the bar's minimise and the taskbar's restore, a minimise and a restore with the bar down as Windows makes them (the window's pop-ups hidden and shown again: the bar stays gone), its X pressed while the bar slides down, its X asking with the game held still, Keep playing, then Quit the game, the launcher back; then Repair, a file of the player and one of the launcher put back as installed; Clear game data, after which the game starts again with the same id; Uninstall with the data, refused while the window is open, then the program, its shortcut, the data and the installs' logs gone | `client/tests/windows/e2e.sh` (`OPENDMTQ_WINE_GPU=1` on the graphics card) | by hand, with a change to the client or the player | yes |
 | Broadcast colours | The colours a broadcast from Windows says it has (`arm32/tests/host/live_sps_test.cpp`) | see `ci.yml` | CI | no |
 | Broadcast requests | A phone's and the player's requests to the server, on stand-in servers: each within its deadline whether the server answers a byte at a time, not at all or takes no body, or the name's lookup does not answer; an answer too long as none; the server's answer read as meant and odd JSON as nothing; the ids that go in a URL; the upload queue and the quality steps the uploads take (`arm32/tests/host/live_net_test.cpp`); the same test built for Windows, under Wine on the sockets the player for Windows uses (`arm32/test_windows.sh`) | see `ci.yml` | CI | no |
 | Frame limits | Which displays and frame limits keep every frame of the player for Windows on the same number of refreshes, and which go by the clock; by the clock, each frame one frame's time after the last whatever the game's limiter does, and no burst after a late one (`arm32/tests/host/pacing_math_test.cpp`) | see `ci.yml` | CI | no |
@@ -53,6 +53,62 @@ game's own audio output (FMOD, writing to an `AudioTrack`) waits on the emulator
 it. On 2026-11-07 it stalled in 7 of 17 song starts while the machine also built, tested or ran a second copy of the
 game, and in none of 12 on an otherwise idle machine. No stall was in OpenDMTQ's own code, which never waits there. A
 run that stalls fails at "the song's score reaches the server".
+
+## Tests off the desktop
+
+The tests of the player for Windows and of the PC client run on a PC someone may be working at. They put nothing on its
+desktop: no window, no taskbar button, no animation, no sound.
+
+### Under Wine
+
+`arm32/test_windows.sh` and `client/tests/windows/e2e.sh` run in containers, and every window they open is on the
+container's own virtual screen (Xvfb), which nothing shows. The game's frames are drawn there by Mesa's llvmpipe on the
+CPU, as on CI's machines. On WSL 2 with a graphics card, `OPENDMTQ_WINE_GPU=1 client/tests/windows/e2e.sh ...` draws
+them on the card instead (`arm32/wine_gpu.sh`):
+
+- The player is a 64-bit program, so Wine's 64-bit side and Mesa's 64-bit d3d12 driver are all it needs; that driver
+  hands its calls to the card through WSL's `/dev/dxg`. Debian 12's own Mesa (22.3) has it without
+  `ARB_polygon_offset_clamp`, on which Wine's Direct3D offers no more than feature level 9_3 and ANGLE finds no Direct3D
+  11 device: the game would draw nothing. `arm32/wine-gpu.Dockerfile` is the player's Wine image with Mesa 25 from
+  Debian's backports, built the first time (a minute); the two images differ in Mesa alone.
+- The container gets WSL's GPU read only: `/dev/dxg`, `/usr/lib/wsl/lib` and `/usr/lib/wsl/drivers`, with
+  `LD_LIBRARY_PATH=/usr/lib/wsl/lib` and `GALLIUM_DRIVER=d3d12` as WSLg sets them, and no core dumps (WSL would copy
+  each into Windows' temporary folder). Each frame is drawn on the card and read back to the virtual screen.
+- Once the game is at its menu the run fails unless the player's own process holds WSL's `libd3d12` in its memory and
+  `/dev/dxg` open, so a GPU run that fell back to the CPU never passes. The player's `drawn by` line names Wine's
+  stand-in for the card (an NVIDIA GeForce GTX 470) on either renderer; the run says the container's OpenGL renderer
+  beside it (`D3D12 (<the card>)`).
+- What it changes is the test machine's load: the game takes one to one and a half cores instead of six to eight, and
+  anti-aliasing no longer costs it frames. Its numbers are still Wine's (Direct3D 11 becomes OpenGL, then D3D12, and each
+  frame is copied back to the virtual screen), and the GPU timers the player's stats read come back as zero through that
+  chain: a player's PC is measured on Windows itself.
+
+`arm32/test_windows.sh` has nothing to draw, and stays on the CPU image.
+
+### On Windows itself
+
+What Wine does not have is checked on Windows: the display's composition and pace, the card's own Direct3D 11 driver,
+WASAPI's timing, and how Windows treats a window and the pop-ups it owns. Those runs start the player through `cmd`'s
+own `set`, never through a program that presses keys or moves the pointer (Windows Defender once took such a launcher
+away as a trojan); the player's own switches tap, type and save frames inside it (`PLAYER_TAPS`, `PLAYER_KEYS`,
+`PLAYER_SHOTS`). They stay off the desktop with:
+
+- `PLAYER_WINDOW_AT=10000,10000`: the window at a place no monitor has, shown without taking the focus;
+- `PLAYER_WINDOW_UNLISTED=1`: a tool window, which Windows gives no taskbar button and no place in Alt+Tab or Task View,
+  with DWM's animations off for it, and a reason the player cannot start said in its log alone, with no box. The
+  pop-ups over the game are owned tool windows already. The PC client never sets it;
+- `--seconds N`, so that the player ends by itself, and a PC settings file with a window (full screen covers a monitor)
+  and the volume at 0.
+
+Some checks still need the visible desktop, and run only when the person at the PC says so:
+
+- a minimise and a restore from the taskbar: an unlisted window has no button to come back from, and Windows hides and
+  shows again the window's pop-ups on that way;
+- the display's own pace: a window on no monitor is paced by none, and Windows has let such a window's frames out at
+  a 240 Hz display's rate on one evening and at about 21 a second on another, so a run off every monitor says nothing
+  about 240 Hz;
+- full screen, which covers a monitor;
+- what a person has to see or hear.
 
 ## Tests without the game's files
 
