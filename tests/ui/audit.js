@@ -600,6 +600,22 @@ async function portalFlows(contexts) {
   await songs.goto(`${P}/song.php?id=1`, { waitUntil: 'domcontentloaded' });
   const names = await songs.$eval('.chart-row', row => [...row.querySelectorAll('a')].map(a => a.textContent.trim().split(' ')[0]));
   check('a song names its charts as the game does', names.join() === 'Easy,Normal,Hard,Expert', names.join());
+  // The catalog beside the longest title there is (song 25's, five lines and more): no tile has a hole in it. Each one's
+  // artist follows its title, its line of records follows the artist, and the tile ends there; and a row's tiles start on
+  // one line.
+  const catalog = await contexts.signed.newPage();
+  await catalog.setViewport({ width: 1280, height: 900 });
+  await catalog.goto(`${P}/songs.php`, { waitUntil: 'networkidle0' });
+  const holes = await catalog.$$eval('#songs .song', tiles => tiles.map(t => {
+    const box = r => t.querySelector(r).getBoundingClientRect();
+    const [title, artist, records, all] = [box('.t'), box('.a'), box('.p'), t.getBoundingClientRect()];
+    return { name: t.querySelector('.t').textContent.slice(0, 20), gaps: [artist.top - title.bottom, records.top - artist.bottom], end: all.bottom - records.bottom, top: Math.round(all.top) };
+  }));
+  const hollow = holes.filter(h => h.gaps.some(g => g > 4) || h.end > 12);
+  const tops = new Set(holes.slice(0, 6).map(h => h.top));
+  check('a long title leaves no hole in the song tiles beside it', holes.length > 6 && hollow.length === 0 && tops.size === 1,
+    JSON.stringify(hollow.slice(0, 3)) + ` tops ${[...tops]}`);
+  await catalog.close();
   await songs.close();
 }
 

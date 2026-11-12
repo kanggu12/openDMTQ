@@ -902,8 +902,8 @@ td.actions { width: 1%; text-align: right; }
   letter-spacing: -0.01em;
   color: #fff;
   text-decoration: none;
-  background: linear-gradient(180deg, #4c2129 0%, #36171e 100%);
-  box-shadow: inset 0 0 0 1px rgba(255, 95, 114, 0.4);
+  /* The other buttons' metal (.btn): no colour of its own until someone is on air. */
+  background: var(--rail-up);
   clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
   transition: filter var(--quick), transform var(--quick), background-color var(--quick);
 }
@@ -1064,12 +1064,13 @@ td.actions { width: 1%; text-align: right; }
   .pod.first .pod-score { font-size: 30px; }
 }
 
-/* The song catalog: the jacket on top, the words whole under it. Rows of tiles keep one line for each part (subgrid), so
-   titles and artists start on the same line across a row, however long any of them is. */
+/* The song catalog: the jacket on top, the words whole under it, each tile as tall as its own words. The jackets and the
+   titles of a row start on one line; a long title makes its own tile longer and leaves no hole in the others (one line
+   per part across the row left 110 px of nothing in a short tile beside a title of five lines). */
 .songs-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
-.songs-tools input.search { flex: 1 1 280px; height: 46px; margin: 0; font-size: 16px; }
-.songs { display: grid; grid-template-columns: repeat(auto-fill, minmax(186px, 1fr)); gap: 14px 12px; }
-.song { position: relative; display: grid; grid-row: span 4; grid-template-rows: subgrid; grid-template-columns: minmax(0, 1fr); row-gap: 0; min-width: 0; padding-bottom: 10px; color: #fff; text-decoration: none; background: var(--glass-sheen), var(--glass); box-shadow: var(--glass-rim); }
+.songs-tools input.search { flex: 1 1 280px; height: 46px; margin: 0; font-size: var(--t-lg); }
+.songs { display: grid; grid-template-columns: repeat(auto-fill, minmax(186px, 1fr)); gap: 14px 12px; align-items: start; }
+.song { position: relative; display: flex; flex-direction: column; min-width: 0; padding-bottom: 10px; color: #fff; text-decoration: none; background: var(--glass-sheen), var(--glass); box-shadow: var(--glass-rim); }
 /* The jacket's own box: it can grow under the pointer without moving anything. */
 /* With no picture to show, the site's name faintly: a tile that has no jacket, not one that failed to load. */
 .song-pic { position: relative; display: block; aspect-ratio: 4 / 3; overflow: hidden; background: linear-gradient(160deg, #2a3138, #14181d); }
@@ -1085,7 +1086,8 @@ td.actions { width: 1%; text-align: right; }
 @keyframes tile-sweep { from { left: 0; } to { left: 100%; } }
 .song .t { padding: 8px 10px 2px; font-weight: 700; font-size: var(--t-md); line-height: 1.3; overflow-wrap: anywhere; transition: color var(--quick); }
 .song .a { padding: 0 10px; color: var(--ash); font-size: var(--t-xs); line-height: 1.4; overflow-wrap: anywhere; }
-.song .p { padding: 3px 10px 0; color: var(--accent); font-size: 12px; font-weight: 700; line-height: 1.4; }
+/* The records' line, kept with nothing on it too: tiles of the same words end together whether their song has records. */
+.song .p { min-height: calc(var(--t-xs) * 1.4 + 3px); padding: 3px 10px 0; color: var(--accent); font-size: var(--t-xs); font-weight: 700; line-height: 1.4; }
 .song:focus-visible { outline-offset: -3px; }
 @media (max-width: 520px) {
   .songs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 8px; }
