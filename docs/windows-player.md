@@ -1,17 +1,15 @@
 # The PC client
 
+For players on a Windows PC: the PC client is an installer and a launcher that connects to the server, signs in,
+downloads the server's app (the same app its phones install) and keeps it up to date, sets the picture and the sound up
+for the PC, and starts the game in the player for Windows. The game then plays against the server as it does on a
+phone.
+
 <p align="center">
   <img src="images/game-pc-live.jpg" alt="The game on a Windows PC through the player: notes and the judgment line over the song's video, blurred in this picture; the bar of frosted glass down across the top with the OpenDMTQ wordmark, minimise, full screen and the X; under it the broadcast notice, a red LIVE tag with Broadcasting your play, Watch it now or later under LIVE on 192.168.1.10; the FPS counter at the bottom right" width="100%">
 </p>
 
-People can play on a Windows PC as well as on a phone or a tablet. On a PC the game runs in the player for Windows, and
-the PC client sits between the player and the person: an installer, and a launcher that connects to the server, signs
-in, downloads the server's app (the same app its phones install) and keeps it up to date, sets the picture and the
-sound up for the PC, and starts the game. The game then plays against the server as it does on a phone.
-
-![The launcher's PLAY page: the server and the sign-in, the ready check, how to play, the last game, and PLAY](images/client-play.png)
-
-## For players
+## <a id="for-players"></a>Installing
 
 1. On the server's site, sign in and open **Download**. Under **On a computer (Windows)**, choose **Download the
    installer (.exe)**. The file it gives, `OpenDMTQ-Setup-<address>.exe`, is set up for that server.
@@ -28,7 +26,9 @@ servers, each with its own sign-in and app, and plays on the one chosen on the *
 `OpenDMTQ-Setup.exe --silent` installs or updates with no dialog and starts the launcher (`--no-start` leaves it
 closed); while a game runs it installs nothing and ends with 3.
 
-### The launcher
+## The launcher
+
+![The launcher's PLAY page: the server and the sign-in, the ready check, how to play, the last game, and PLAY](images/client-play.png)
 
 | Page | What it has |
 | :--- | :--- |
@@ -48,6 +48,8 @@ updates**. It also looks once at each start, in the background for 10 seconds at
 itself, and without internet nothing is said. Without internet, the installer from the server's **Download** page
 updates it instead, once the server has a newer one; the servers and the settings stay. While the game runs the launcher steps aside, and comes back when the
 game ends.
+
+### The command line
 
 `OpenDMTQ-cmd.exe`, in `%LOCALAPPDATA%\OpenDMTQ.Client\current`, does the same from the command line: `--status`
 (exit 0 when PLAY can go; its last line is the launcher's version, and a newer one when there is), `--server URL`, `--sign-in ID` (the password from standard input), `--sign-out`, `--app`,
@@ -74,7 +76,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | `volume` | `100`, or any number from 0 to 100 | Volume |
 | `language` | `system` (Windows' display language), `en`, `ko`: the same as `--language` | Language, on the **Launcher** page; the game and what the player draws over it speak it too |
 
-### In the game
+## In the game
 
 | Input | What it does in the game |
 | :--- | :--- |
@@ -133,25 +135,6 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 - **The window**: the game has a title bar to move it by and a frame to size it by, dark as the launcher's header (on
   Windows 11 in its very colours; Windows 10 dark where it can), and no buttons of its own: it is minimised, put in
   full screen and quit from the bar. A double click on the title bar does nothing.
-- **Its size**: every piece is drawn at the game's own scale, as the game's words and buttons are (its area's height
-  over 720 lines: 1.5 at 1080 lines, 3 at 4K), whatever Windows' scale is, so a small window gets small pieces and a
-  display at 150 % has them cover no more of the game than at 100 %. They are never drawn below half their 720-line
-  size at Windows' scale, so the bar's buttons stay large enough to hit; the smallest game area, 480x270 at Windows'
-  scale, leaves them room. The handle alone, which is never pressed, keeps the game's own scale in a window of any
-  size and shape. The pointer keeps Windows' own size.
-- **Nothing of it is in the game's way**: the notice, the FPS counter and the handle let every click through to the
-  game, and no piece takes the keyboard from the game's window (each is a window that never takes the focus; a click on
-  the bar or the question gives the keyboard back to the game).
-- **The glass**: the bar, the question, the broadcast notice and the FPS counter are frosted glass over the game, as
-  Windows' own acrylic is made: the game's picture behind each, blurred and a little more saturated, under a charcoal
-  tint, with a faint light at its top, a light edge and a soft shadow; in the game's own shapes, with its small corners,
-  its bevel (a line of light along the top, of shade along the foot) and its green line along the bar's and the
-  notice's foot. Their words keep 4.5:1 against the light behind them: where the game is light under the words, the
-  tint deepens there. With none of them up, the glass costs the game nothing. The words are set in Pretendard, titles
-  and buttons bold, which the player carries in its `fonts` folder with the launcher's wide face. The wordmark is a
-  picture for each of the overlay's scales from 1 to 4, drawn by the launcher's own code
-  (`arm32/desktop/assets/make_wordmark.py`) and carried in the player's `images` folder: at those scales it is drawn
-  pixel for pixel, between them the next larger is drawn down, and below 1 the first one is.
 - **The pointer** over the game is a dart in the logo's look: a chrome left face and a lime right face with a dark rim.
   While the button is down it is all lime and a little smaller. It is sized for Windows' scale, as Windows' own is.
 - **A touch screen** is the player's first input, as a phone's screen is the game's. Windows' own touch feedback stays
@@ -159,11 +142,13 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   a finger that comes in from the screen's edge stays the game's instead of opening Windows' panels. Each touch reaches
   the game as Windows takes it in.
 
+The pieces over the game, how large they are drawn and how their glass is made: [the overlay](#the-overlay).
+
 <p align="center">
   <img src="images/game-pc-quit.jpg" alt="The question before quitting: a card of frosted glass over the game, dimmed and blurred behind it, Quit the game? with Keep playing as the main button, ringed by the keyboard's choice, and Quit the game beside it" width="100%">
 </p>
 
-### The picture
+## The picture
 
 ![The launcher's Screen page: the frame limit, the FPS counter switched on with its position under it, then the render scale at 50 % with AMD FSR 1 as its upscaler, and SMAA](images/client-screen.png)
 
@@ -210,22 +195,11 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   as it was, and a setting of `msaa2`, `msaa4` or `msaa8` reads as CMAA 2. Temporal methods (DLSS, FSR 2 and 3, TAA, DLAA) need what a closed game does not hand
   over (its motion vectors and depth), and frame generation adds delay: none of them is offered.
 
-How it works: with an upscaler or anti-aliasing, the game draws into a framebuffer of the player's own, of the size it
-draws at, which stands in for the window's own framebuffer in every call the game makes that names or reads it (binding,
-reading, invalidating and the questions about it), and the window's surface keeps the window's size. At each swap the
-player's passes draw that frame to the window, the game's GL state saved before and put back after. The broadcast takes
-the picture after them: what players see. The log says once what is in use (`the game draws at 640x360, upscaled by AMD
-FSR 1 to 1280x720`, `anti-aliasing: SMAA`), and what the passes took on the render thread over the first 600 frames.
-With the player's stats on (`ARM32_STATS=1`), every 5 seconds a `stats: picture` line gives each pass's mean time a frame
-on the render thread and on the graphics card (by `EXT_disjoint_timer_query`, which ANGLE has; with its timestamps the
-game's own time on the graphics card too), the swap's whole cost, and how often the game made its context current. `PLAYER_OFFSCREEN=1` has the frames drawn offscreen with no pass at all (a plain copy), to
-measure the redirection by itself.
-
 Measured on a 240 Hz display (4K, RTX 4090): 240 frames a second with VSync, none late in 480, in full screen at 100 %
 and at 50 %; a limit of 120, 120.0 frames a second, none late; VSync off, 240.6 frames a second, 95 % of the frames
-within 4.5 ms of their time; no limit, 733 to 965.
+within 4.5 ms of their time; no limit, 733 to 965. How the passes draw: [the picture's passes](#the-pictures-passes).
 
-### The sound
+## The sound
 
 - **The device:** Windows' default output, which the game follows when Windows changes it mid-game, or one chosen.
 - **Shared or Exclusive.** Shared plays alongside other programs' sound. Exclusive (WASAPI's exclusive mode) takes the
@@ -235,22 +209,23 @@ within 4.5 ms of their time; no limit, 733 to 965.
   or safe for a busy PC.
 - **The volume** of the game, 0 to 100. Windows' own volume still applies.
 
-### Broadcasting
+## Broadcasting
 
 While broadcasts are on for the server and its owner shows a player live, the player broadcasts from the PC as a phone
 does, with Windows' own video and sound encoders, at the quality the owner chose ([live broadcasts](live.md#from-a-pc)). A glass card slides down at the top of the game
 when a broadcast starts and ends, with a red LIVE tag like the game's own tags while it is on (once it is over, its
 title says so alone), and says where it can be watched.
 
-### What it needs, and what it keeps
+## What it needs, and what it keeps
 
 - **What it needs:** 64-bit Windows 10 or 11 on an x64 PC (Intel or AMD), a graphics card with Direct3D 11 and about
-  1 GB of free memory for the game, which takes 190 to 450 MB on the graphics card (measured costs:
-  [what it runs on](install.md#what-it-runs-on)). About
-  390 MB of disk to start: the program about 125 MB with the package **Repair** takes its files from, each server's app
-  about 110 MB, the app's libraries about 40 MB, and
-  the game's data 111 MB after a first start and one song, more with each song it downloads. The installer itself is
-  about 60 MB.
+  1 GB of free memory for the game, which takes 190 to 450 MB on the graphics card. About 390 MB of disk to start: the
+  program about 125 MB with the package **Repair** takes its files from, each server's app about 110 MB, the app's
+  libraries about 40 MB, and the game's data 111 MB after a first start and one song, more with each song it
+  downloads. The installer itself is about 60 MB.
+- **What a frame takes,** measured on a Ryzen 9 9950X with an RTX 4090 that stayed at its idle clock (225 to 590 MHz),
+  at 240 frames a second from 1920x1080 to 3840x2160: 0.2 to 1.0 ms of the graphics card (the most at 3840x2160 with
+  CMAA 2) and 1.5 to 3.4 ms of the game's main thread.
 - **The videos** need Windows' Media Foundation. The N and KN editions of Windows come without it: there, install the
   Media Feature Pack, under Settings, Optional features (in Apps or in System, by the version of Windows). Without it
   the videos are black and silent, and the game goes on.
@@ -286,57 +261,6 @@ title says so alone), and says where it can be watched.
   **OPTION**, **CONNECT ACCOUNT** shows a code; on the other, **OPTION**, **RESTORE DATA** takes it, and that device
   then plays as the same player, with its records.
 
-## For server owners
-
-Nothing to do, unless the server has no internet (below). The site's Download page offers the installer to signed-in
-players, with the server's address and name added to its end as it is handed out: the installer reads them and sets the
-launcher up for the server. The file is the same for every server, so the server builds nothing for it. The admin
-pages' **App** page offers the same installer, and the launcher downloads the app the site offers phones, signed in with
-the player's site account (`client.php` answers it). The `OpenDMTQ.exe` of the server's Windows bundle, which runs the
-server, and the PC client's `OpenDMTQ.exe`, the launcher, are two different programs.
-
-Where the server gets the installer, the first that has one:
-
-- **Beside the server's code:** a release's tools image and the Windows bundle bring it.
-- **`data/apk`:** put there by hand, for a server without internet, or fetched there before.
-- **The latest release:** fetched into `data/apk` when there is none, as Docker Compose from the source and a host
-  install on Linux or macOS do.
-
-A copy in `data/apk` gives way to the latest release's once it is a week old, and stays when that fetch fails. After a
-fetch that failed, the builder waits a day before it tries again: a server without internet does not wait for an answer
-at every start. Without internet, put the release's `OpenDMTQ-Setup.exe` and `OpenDMTQ-Setup.exe.version` in `data/apk`
-([without internet](closed-network.md)). Without an installer the site shows no Windows button, and everything else
-works as before.
-
-The launcher signs in with the site's accounts, made on the admin pages' **Accounts** page, with the same limit on wrong
-passwords as the site. A server reached over HTTPS hands out installers that use it, with the port named (HTTPS answers
-on the game's port). Where the server has its own certificate authority (Docker Compose makes one), the installer
-carries it, and the launcher trusts it for that server alone, beside Windows' own authorities.
-
-## How it works
-
-The player runs the game's own 32-bit Android code, as the app does on phones that cannot run 32-bit apps: the
-[arm32 runtime](../arm32/README.md) translates the game's ARM code (Dynarmic), and a small layer gives it Linux's system
-calls on Windows. In place of Android's Java side, the player has its own stand-in for the classes the game calls. The
-game draws with OpenGL ES, which ANGLE runs on Direct3D 11; on a computer with two GPUs (most gaming laptops) the
-player asks NVIDIA's and AMD's drivers for the fast one, and its log names the GPU that draws the game at its first
-frame. Its sound goes out through WASAPI, and its videos are
-decoded by Media Foundation. Its requests to the server go out as a phone's do, asking for the server's answers
-compressed, which makes its lists of songs and scores many times smaller on the way. The bar, its handle, the question
-before quitting, the notice, the FPS counter and the pointer are drawn by the player over the game's window, each a
-window of its own whose picture a thread of the overlay's makes on the CPU; the UI thread, which stamps the game's keys
-and clicks, only hands the finished pictures to Windows. For their glass, the render thread reads the rectangles of the
-frame behind them as it goes to the window (after the passes), at half and then a quarter of their size (each pixel
-the mean of 4 by 4 of the frame's), into a pixel buffer that a later frame copies out once the graphics card is done,
-so nothing waits for it. It reads at most 20 times a second while a piece is up, and once while the game holds still;
-a piece waits a moment for its first read, and where none comes it is its plain tint, nearly solid. With the stats on, a
-`stats: glass` line every 5 seconds says what that took the render thread a frame, and a `stats: overlay` line what
-the pictures took their thread and the UI thread.
-
-The launcher is Python with Tk, made into a Windows program with PyInstaller; Velopack installs it and updates it. The
-launcher writes the player's settings into a file and starts the player with it (`--app` names the folder of the
-server's app, `--settings` the file).
-
 ## When something goes wrong
 
 - **The game does not start:** the launcher says why on its bottom line, with a link to the player's log (**Open the
@@ -351,5 +275,75 @@ server's app, `--settings` the file).
 - **Windows blocks it with no Run anyway:** Smart App Control is on (step 2 above).
 - **The videos are black and silent:** see the Media Feature Pack above.
 - **It cannot reach the server:** the PC has to reach the server's address, as a phone does: on the same network, or
-  over the internet when the server is set up for it ([playing from outside your home](internet.md)).
+  over the internet when the server is set up for it
+  ([the server's site does not open](troubleshooting.md#the-servers-site-does-not-open)).
 - **The sound breaks up:** choose the **Safe** buffer on the **Sound** page, or **Shared** instead of **Exclusive**.
+
+The rest is the server's: [what to tell its owner](play.md#when-something-does-not-work).
+
+## How it works
+
+The player runs the game's own 32-bit Android code, as the app does on phones that cannot run 32-bit apps: the
+[arm32 runtime](../arm32/README.md) translates the game's ARM code (Dynarmic), and a small layer gives it Linux's system
+calls on Windows. In place of Android's Java side, the player has its own stand-in for the classes the game calls. The
+game draws with OpenGL ES, which ANGLE runs on Direct3D 11; on a computer with two GPUs (most gaming laptops) the
+player asks NVIDIA's and AMD's drivers for the fast one, and its log names the GPU that draws the game at its first
+frame. Its sound goes out through WASAPI, and its videos are
+decoded by Media Foundation. Its requests to the server go out as a phone's do, asking for the server's answers
+compressed, which makes its lists of songs and scores many times smaller on the way.
+
+The launcher is Python with Tk, made into a Windows program with PyInstaller; Velopack installs it and updates it. The
+launcher writes the player's settings into a file and starts the player with it (`--app` names the folder of the
+server's app, `--settings` the file).
+
+### The overlay
+
+- **Its size**: every piece is drawn at the game's own scale, as the game's words and buttons are (its area's height
+  over 720 lines: 1.5 at 1080 lines, 3 at 4K), whatever Windows' scale is, so a small window gets small pieces and a
+  display at 150 % has them cover no more of the game than at 100 %. They are never drawn below half their 720-line
+  size at Windows' scale, so the bar's buttons stay large enough to hit; the smallest game area, 480x270 at Windows'
+  scale, leaves them room. The handle alone, which is never pressed, keeps the game's own scale in a window of any
+  size and shape. The pointer keeps Windows' own size.
+- **Nothing of it is in the game's way**: the notice, the FPS counter and the handle let every click through to the
+  game, and no piece takes the keyboard from the game's window (each is a window that never takes the focus; a click on
+  the bar or the question gives the keyboard back to the game).
+- **The glass**: the bar, the question, the broadcast notice and the FPS counter are frosted glass over the game, as
+  Windows' own acrylic is made: the game's picture behind each, blurred and a little more saturated, under a charcoal
+  tint, with a faint light at its top, a light edge and a soft shadow; in the game's own shapes, with its small corners,
+  its bevel (a line of light along the top, of shade along the foot) and its green line along the bar's and the
+  notice's foot. Their words keep 4.5:1 against the light behind them: where the game is light under the words, the
+  tint deepens there. With none of them up, the glass costs the game nothing. The words are set in Pretendard, titles
+  and buttons bold, which the player carries in its `fonts` folder with the launcher's wide face. The wordmark is a
+  picture for each of the overlay's scales from 1 to 4, drawn by the launcher's own code
+  (`arm32/desktop/assets/make_wordmark.py`) and carried in the player's `images` folder: at those scales it is drawn
+  pixel for pixel, between them the next larger is drawn down, and below 1 the first one is.
+
+The bar, its handle, the question before quitting, the notice, the FPS counter and the pointer are drawn by the player
+over the game's window, each a window of its own whose picture a thread of the overlay's makes on the CPU; the UI
+thread, which stamps the game's keys and clicks, only hands the finished pictures to Windows. For their glass, the
+render thread reads the rectangles of the frame behind them as it goes to the window (after the passes), at half and
+then a quarter of their size (each pixel the mean of 4 by 4 of the frame's), into a pixel buffer that a later frame
+copies out once the graphics card is done, so nothing waits for it. It reads at most 20 times a second while a piece is
+up, and once while the game holds still; a piece waits a moment for its first read, and where none comes it is its plain
+tint, nearly solid. With the stats on, a `stats: glass` line every 5 seconds says what that took the render thread a
+frame, and a `stats: overlay` line what the pictures took their thread and the UI thread.
+
+### The picture's passes
+
+With an upscaler or anti-aliasing, the game draws into a framebuffer of the player's own, of the size it
+draws at, which stands in for the window's own framebuffer in every call the game makes that names or reads it (binding,
+reading, invalidating and the questions about it), and the window's surface keeps the window's size. At each swap the
+player's passes draw that frame to the window, the game's GL state saved before and put back after. The broadcast takes
+the picture after them: what players see. The log says once what is in use (`the game draws at 640x360, upscaled by AMD
+FSR 1 to 1280x720`, `anti-aliasing: SMAA`), and what the passes took on the render thread over the first 600 frames.
+With the player's stats on (`ARM32_STATS=1`), every 5 seconds a `stats: picture` line gives each pass's mean time a frame
+on the render thread and on the graphics card (by `EXT_disjoint_timer_query`, which ANGLE has; with its timestamps the
+game's own time on the graphics card too), the swap's whole cost, and how often the game made its context current. `PLAYER_OFFSCREEN=1` has the frames drawn offscreen with no pass at all (a plain copy), to
+measure the redirection by itself.
+
+## For server owners
+
+Nothing to do, unless the server has no internet: the site's **Download** page offers the installer to signed-in
+players, set up for the server as it is handed out, and the launcher signs in with the site's accounts. Where the
+server gets the installer, and what it needs without internet:
+[the PC client's installer](admin.md#the-pc-clients-installer).

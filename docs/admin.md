@@ -10,7 +10,8 @@ owner sets up and runs the server.
 - **Home:** the server's version beside the logo, the way to the download page, what is on the server, top players,
   newest records.
 - **Download:** for Android, the app (.apk) with its QR code, the three steps to install it, and help; and the PC
-  client's installer for Windows, set up for this server, when the server has it ([the PC client](windows-player.md)).
+  client's installer for Windows, set up for this server, when the server has it
+  ([the PC client's installer](#the-pc-clients-installer)).
 - **Rankings:** the first three on a podium, then the others who have played, by total best score (best score per
   chart, summed), this month's as the game ranks them, or by S grades, perfect plays, charts played. Players with nothing in a category are not listed in
   it. Average accuracy is the game's own figure.
@@ -122,6 +123,33 @@ Backups hold neither live video nor recordings, so they stay small.
 On a host install and in the Windows bundle, the setup imports the game's files and changes the address. With Docker
 Compose those stay on the command line (`./opendmtq import`, `./opendmtq host`, `./opendmtq expose`), because they
 restart the containers. The ports and the passwords are in `.env`; change them there, then restart the server.
+
+## The PC client's installer
+
+The site's **Download** page offers the PC client's installer to signed-in players, with the server's address and name
+added to its end as it is handed out: the installer reads them and sets the launcher up for the server
+([the PC client](windows-player.md)). The file is the same for every server, so the server builds nothing for it; the
+**App** page offers the same installer. The launcher downloads the app the site offers phones, signed in with the
+player's site account (`client.php` answers it), with the same limit on wrong passwords as the site. The `OpenDMTQ.exe`
+of the server's Windows bundle, which runs the server, and the PC client's `OpenDMTQ.exe`, the launcher, are two
+different programs.
+
+Where the server gets the installer, the first that has one:
+
+- **Beside the server's code:** a release's tools image and the Windows bundle bring it.
+- **`data/apk`:** put there by hand, for a server without internet, or fetched there before.
+- **The latest release:** fetched into `data/apk` when there is none, as Docker Compose from the source and a host
+  install on Linux or macOS do.
+
+A copy in `data/apk` gives way to the latest release's once it is a week old, and stays when that fetch fails. After a
+fetch that failed, the builder waits a day before it tries again: a server without internet does not wait for an answer
+at every start. Without internet, put the release's `OpenDMTQ-Setup.exe` and `OpenDMTQ-Setup.exe.version` in `data/apk`
+([without internet](closed-network.md)). Without an installer the site shows no Windows button, and everything else
+works as before.
+
+A server reached over HTTPS hands out installers that use it, with the port named (HTTPS answers on the game's port).
+Where the server has its own certificate authority (Docker Compose makes one), the installer carries it, and the
+launcher trusts it for that server alone, beside Windows' own authorities.
 
 ## Where it runs
 
