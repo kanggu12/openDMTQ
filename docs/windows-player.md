@@ -1,9 +1,9 @@
 # The PC client
 
-For players on a Windows PC: the PC client is an installer and a launcher that connects to the server, signs in,
-downloads the server's app (the same app its phones install) and keeps it up to date, sets the picture and the sound up
-for the PC, and starts the game in the player for Windows. The game then plays against the server as it does on a
-phone.
+For players on a Windows PC, or on Linux under Wine ([below](#on-linux-with-wine)): the PC client is an installer and a
+launcher that connects to the server, signs in, downloads the server's app (the same app its phones install) and keeps
+it up to date, sets the picture and the sound up for the PC, and starts the game in the player for Windows. The game
+then plays against the server as it does on a phone.
 
 <p align="center">
   <img src="images/game-pc-live.jpg" alt="The game on a Windows PC through the player: notes and the judgment line over the song's video, blurred in this picture; the bar of frosted glass down across the top with the OpenDMTQ wordmark, minimise, full screen and the X; under it the broadcast notice, a red LIVE tag with Broadcasting your play, Watch it now or later under LIVE on 192.168.1.10; the FPS counter at the bottom right" width="100%">
@@ -14,9 +14,9 @@ phone.
 1. On the server's site, sign in and open **Download**. Under **On a computer (Windows)**, choose **Download the
    installer (.exe)**. The file it gives, `OpenDMTQ-Setup-<address>.exe`, is set up for that server.
 2. Run it and choose **Install**. It installs for your Windows user, with shortcuts on the desktop and in the Start
-   menu and no administrator rights, and starts the launcher. If Windows says it protected your PC from an unknown app: **More info**, then **Run
-   anyway**. The installer is not signed by a publisher Windows knows. Windows 11's Smart App Control, when it is on,
-   blocks unsigned programs, this one among them, and has no **Run anyway**.
+   menu and no administrator rights, and starts the launcher. If Windows says it protected your PC from an unknown
+   app: **More info**, then **Run anyway**. The installer is not signed by a publisher Windows knows. Windows 11's
+   Smart App Control, when it is on, blocks unsigned programs, this one among them, and has no **Run anyway**.
 3. The launcher's first start walks through the server (already filled in), the sign-in with your site ID, the app's
    download, the picture and the sound, then **PLAY**.
 
@@ -25,6 +25,28 @@ is the same program without a server: its first start asks for the server's addr
 servers, each with its own sign-in and app, and plays on the one chosen on the **Online** page.
 `OpenDMTQ-Setup.exe --silent` installs or updates with no dialog and starts the launcher (`--no-start` leaves it
 closed); while a game runs it installs nothing and ends with 3.
+
+### On Linux, with Wine
+
+The launcher and the player are Windows programs, and on Linux they run under Wine. The project's tests run them so for
+every release, with Wine 11 from WineHQ's stable packages on Debian 12: the installer from the server's site, the first
+start, the game to its menu with its bar, **Repair**, **Clear game data** and uninstalling, drawn by Mesa on the
+processor and, under WSL, on a graphics card.
+
+1. Install Wine from WineHQ's `winehq-stable` package, and GStreamer's decoders, which Wine plays the songs' videos and
+   their sound with. On Debian or Ubuntu:
+
+   ```sh
+   sudo apt install gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libav
+   ```
+
+2. Download the installer from the server's site as above, and run it with Wine. The launcher opens as on Windows:
+
+   ```sh
+   wine ~/Downloads/OpenDMTQ-Setup-*.exe
+   ```
+
+Not tried yet: a Linux desktop's own graphics driver and sound, touch screens, and the Steam Deck.
 
 ## The launcher
 

@@ -25,7 +25,8 @@ on. The server's owner runs it and makes your account.
   32-bit apps, that app has no runtime yet: tell the server's owner.
 - **iPhones and iPads** cannot play: the server hands out the game's Android app, and the iPhone app cannot be pointed
   at another server ([why](game-files.md#iphones)). The site opens on them, with the rankings and the broadcasts.
-- **Windows PCs** play through the PC client ([below](#on-a-windows-pc)).
+- **Windows PCs** play through the PC client ([below](#on-a-windows-pc)), and **Linux PCs** through the same client
+  under Wine ([how](windows-player.md#on-linux-with-wine)).
 
 ## On an Android phone or tablet
 
@@ -58,7 +59,7 @@ The PC client plays the same app on Windows:
    Then **PLAY**.
 
 The launcher keeps the game up to date. [The PC client](windows-player.md) has the rest: the launcher's pages, the
-controls, the picture and the sound, what it keeps.
+controls, the picture and the sound, what it keeps, and how it runs on Linux under Wine.
 
 On the site, a small keyboard beside a score marks a song played with the PC's keys, and beside a total says how many
 such scores it counts; the rankings are one for touch and keys.
