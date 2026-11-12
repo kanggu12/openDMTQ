@@ -832,11 +832,11 @@ def cmd_setup(args):
     port = env.listen_port(env.load(ENV_FILE))
     internet = not env.is_lan_only(host)
     if env.is_wsl():
-        present = system.firewall_rule_present(port, internet)
-        if present:
-            ok(f"Windows firewall rule '{system.firewall_rule_name(port)}'")
-        elif args.no_firewall:
+        # --no-firewall leaves Windows' firewall alone, its question to PowerShell about the rule too.
+        if args.no_firewall:
             warn(f"skipped the firewall; phones cannot connect until TCP {port} is allowed")
+        elif system.firewall_rule_present(port, internet):
+            ok(f"Windows firewall rule '{system.firewall_rule_name(port)}'")
         else:
             open_firewall(port, internet)
     else:

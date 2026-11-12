@@ -215,6 +215,16 @@ class SetupTest(unittest.TestCase):
                 self.assertNotIn("go on past", sb.output())
                 self.assertEqual("own certificate, which browsers warn about once" in sb.output(), internet, sb.output())
 
+    def test_no_firewall_asks_windows_nothing(self):
+        # Not even whether the rule is there: PowerShell is not started at all.
+        with Sandbox(wsl=True) as sb:
+            sb.windows_reachable()
+            game_data(sb)
+            code, _ = self.setup(sb, no_firewall=True)
+            self.assertEqual(code, 0, sb.output())
+            self.assertEqual(sb.scripts, [])
+            self.assertIn("skipped the firewall", sb.output())
+
     def test_firewall_trouble_does_not_stop_setup(self):
         # sudo resets PATH, so powershell.exe may not be found; the rest of setup still applies.
         with Sandbox(wsl=True) as sb:
