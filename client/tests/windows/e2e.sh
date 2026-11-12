@@ -22,6 +22,9 @@
 #
 #   TEST_SITE=URL TEST_NET=NETWORK TEST_APK=DIR TEST_TOOLS=IMAGE ACCOUNT_FILE=FILE client/tests/windows/e2e.sh BUILD_DIR OUT_DIR
 #
+# OPENDMTQ_WINE_GPU=1 runs it on WSL's graphics card instead of Mesa's llvmpipe (arm32/wine_gpu.sh), and fails when the
+# player's process does not draw through WSL's D3D12 once the game is at its menu.
+#
 # The test server is a throwaway OpenDMTQ server with its app built, on a Docker network with no way out (as
 # tests/closed/game.sh starts one): TEST_SITE is its site's address on the network TEST_NET, TEST_APK its data/apk folder
 # (the installer is handed to it there) and TEST_TOOLS the tools image of its version. ACCOUNT_FILE holds a site account
@@ -29,6 +32,8 @@
 # copied. BUILD_DIR is client/packaging/windows/build.sh's OUT_DIR.
 set -u
 ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
+# The renderer: llvmpipe on the CPU, or WSL's graphics card with OPENDMTQ_WINE_GPU=1 (its image and docker's arguments).
+. "$ROOT/arm32/wine_gpu.sh"
 BUILD=$(realpath -m "${1:?usage: e2e.sh BUILD_DIR OUT_DIR}")
 OUT=$(realpath -m "${2:?usage: e2e.sh BUILD_DIR OUT_DIR}")
 SITE=${TEST_SITE:?the site address of the test server}
@@ -45,6 +50,8 @@ docker image inspect opendmtq-arm32-wine >/dev/null 2>&1 \
   || docker build -q -t opendmtq-arm32-wine -f "$ROOT/arm32/wine.Dockerfile" "$ROOT/arm32" >/dev/null
 docker image inspect opendmtq-client-e2e:local >/dev/null 2>&1 \
   || docker build -q -t opendmtq-client-e2e:local "$ROOT/client/tests/windows" >/dev/null
+# The image the game runs in: that one, or its twin with Mesa 25 for WSL's graphics card (OPENDMTQ_WINE_GPU=1).
+E2E_IMAGE=$(wine_gpu_e2e_image) || exit 1
 # The taskbar's part, which Wine has none of (taskbar.c: bringing back a minimised window, reading its title bar's
 # buttons), built with the player's toolchain into OUT_DIR.
 docker image inspect opendmtq-arm32-windows >/dev/null 2>&1 \
@@ -75,11 +82,12 @@ SETUP=$(cd "$OUT" && ls OpenDMTQ-Setup-*.exe | head -n 1)
 [ -n "$SETUP" ] || { echo "FAIL: no installer came" >&2; exit 1; }
 
 # ---- 2 to 4 under Wine, on the virtual screen
-docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -w /out \
+docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -v "$ROOT/arm32/wine_gpu.sh:/wine_gpu.sh:ro" -w /out \
   -e WINEPREFIX=/tmp/wine -e WINEDEBUG=-all -e TZ=Asia/Seoul -e PLAYER_SHOTS=@50 -e PLAYER_TRACE_INPUT=1 -e PLAYER_TRACE_MOTION=1 \
-  opendmtq-client-e2e:local bash -c "
+  "${WINE_GPU_ARGS[@]}" "$E2E_IMAGE" bash -c "
   set -u
-  Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp >/dev/null 2>&1 &
+  # The virtual screen without WSL's variables (on the GPU): it only shows what it is sent.
+  env -u GALLIUM_DRIVER -u LD_LIBRARY_PATH Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp >/dev/null 2>&1 &
   export DISPLAY=:99
   for i in \$(seq 1 30); do [ -e /tmp/.X11-unix/X99 ] && break; sleep 0.3; done
   WINEDLLOVERRIDES='mscoree=;mshtml=' wineboot -i >/dev/null 2>&1
@@ -165,6 +173,17 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   sleep 20; snap game-starting
   # The frame PLAYER_SHOTS asks for comes 50 s in: then the game is at its menu.
   sleep 45; snap game-menu
+  # What draws the game: the player's first frame names it. Under Wine the name is Wine's stand-in for the card on
+  # either renderer, never llvmpipe's own; on the GPU (OPENDMTQ_WINE_GPU=1) the player's process must hold WSL's D3D12
+  # and its device (arm32/wine_gpu.sh), or the run fails as one that fell back to the CPU.
+  drawn=\$(cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | grep -m 1 'player: drawn by')
+  [ -n \"\$drawn\" ] || { echo 'FAIL: the player did not say what draws the game'; exit 1; }
+  echo \"\$drawn\"
+  if [ -n \"\${WINE_GPU_IN_CONTAINER:-}\" ]; then
+    case \"\$drawn\" in *llvmpipe*) echo 'FAIL: on the GPU the game is drawn by llvmpipe'; exit 1 ;; esac
+    . /wine_gpu.sh
+    wine_gpu_proof || exit 1
+  fi
   # 4. Alt+F4 does nothing: the game runs on, not held still. The pointer at the game's top edge shows the bar; its full
   # screen chip switches to a window and back; its X asks first and holds the game still, Keep playing lets it go on,
   # and the X again with Quit the game ends the game, and the launcher comes back. The overlay's sizes are the game's at
