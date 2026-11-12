@@ -4,11 +4,16 @@
 // defaults. Then the numbers of the frame counter that one of the settings shows (frame_rate.cpp): its looks at the
 // count of frames through the game's start, a stretch with no frame, frames again and a hold. Then the size the overlay
 // over the game is drawn at and the smallest game area the window holds (overlay_scale.h), over Windows' scales and the
-// game's sizes, with the size of the overlay's handle, which keeps clear of the game's header at every size. Prints ALL
-// CHECKS PASSED when every check held.
+// game's sizes, with the size of the overlay's handle, which keeps clear of the game's header at every size. Then the
+// overlay's bar on its way down and up (overlay_motion.h): its pace, a turn back midway, Windows' animations off, the
+// rows of it in sight, and the handle and the pieces at the top that move with it. Prints ALL CHECKS PASSED when every
+// check held.
 #include "frame_rate.h"
+#include "overlay_motion.h"
 #include "overlay_scale.h"
 #include "player.h"
+
+#include <cmath>
 
 #include <cstdio>
 #include <string>
@@ -299,6 +304,151 @@ void handle_size_checks() {
           "the rail 2 rows and its shade 1 at 720 lines, 6 and 3 at 4K, the shade none in the smallest window");
 }
 
+// The bar's way down and up (overlay_motion.h): its pace, its times, a turn back midway, Windows' animations off; the
+// rows of it in sight; the handle's part; the pieces at the top.
+void overlay_motion_checks() {
+    using player::overlay::bar_rows;
+    using player::overlay::ease_down;
+    using player::overlay::ease_up;
+    using player::overlay::handle_hang;
+    using player::overlay::handle_opacity;
+    using player::overlay::Hang;
+    using player::overlay::kBarDownMs;
+    using player::overlay::kBarUpMs;
+    using player::overlay::piece_down;
+    using player::overlay::Slide;
+    // The paces: from 0 to 1, never back; down ahead of the time (it slows into its place), up behind it (it gathers
+    // speed).
+    check(ease_down(0) == 0 && ease_down(1) == 1 && ease_up(0) == 0 && ease_up(1) == 1, "both paces go from 0 to 1");
+    check(ease_down(-1) == 0 && ease_down(2) == 1 && ease_up(-1) == 0 && ease_up(2) == 1, "and stay there before the start and after the end");
+    bool rising = true;
+    for (int i = 1; i <= 1000; ++i) {
+        const float before = static_cast<float>(i - 1) / 1000, now = static_cast<float>(i) / 1000;
+        rising = rising && ease_down(now) >= ease_down(before) && ease_up(now) >= ease_up(before);
+    }
+    check(rising, "neither pace ever goes back");
+    check(ease_down(0.25f) > 0.5f && ease_down(0.5f) == 0.875f, "the way down is past its half at a quarter of its time, and at seven eighths at its half");
+    check(ease_up(0.5f) == 0.25f && ease_up(0.25f) > 0.05f, "the way up is a quarter gone at half its time, and already under way at a quarter");
+    // Its times: within what was asked, down longer than up.
+    check(kBarDownMs >= 180 && kBarDownMs <= 240 && kBarUpMs >= 140 && kBarUpMs <= 200 && kBarDownMs > kBarUpMs,
+          "down takes 180 to 240 ms, up 140 to 200 ms, down the longer");
+    // Milliseconds as the clock's nanoseconds.
+    const auto at_ms = [](double n) { return static_cast<std::int64_t>(n * 1e6); };
+    // A whole way down from rest, from a moment of the clock that is not its start.
+    const std::int64_t t0 = at_ms(5000);
+    Slide bar;
+    check(bar.at(t0) == 0 && !bar.moving(t0), "the bar starts up, at rest");
+    bar.aim(1, t0, true);
+    check(bar.moving(t0) && bar.at(t0) == 0, "headed down: on its way, still where it was");
+    check(bar.lasts == at_ms(kBarDownMs), "a whole way down takes its whole time");
+    check(bar.at(t0 + at_ms(kBarDownMs) / 2) == 0.875f, "half its time in, seven eighths down");
+    bool down_rising = true;
+    for (int ms = 1; ms <= kBarDownMs; ++ms) down_rising = down_rising && bar.at(t0 + at_ms(ms)) >= bar.at(t0 + at_ms(ms - 1));
+    check(down_rising, "it never goes back on its way down");
+    check(bar.at(t0 + at_ms(kBarDownMs)) == 1 && !bar.moving(t0 + at_ms(kBarDownMs)), "at its time's end it is down exactly, and at rest");
+    check(bar.at(t0 + at_ms(60000)) == 1, "and stays down");
+    // Headed where it already is, or already goes: nothing changes.
+    const Slide before = bar;
+    bar.aim(1, t0 + at_ms(700), true);
+    check(bar.began == before.began && bar.lasts == before.lasts, "headed down while down: no new way");
+    // A whole way up.
+    const std::int64_t t1 = t0 + at_ms(3000);
+    bar.aim(0, t1, true);
+    check(bar.lasts == at_ms(kBarUpMs) && bar.at(t1) == 1, "a whole way up takes its whole time, from down");
+    bool up_falling = true;
+    for (int ms = 1; ms <= kBarUpMs; ++ms) up_falling = up_falling && bar.at(t1 + at_ms(ms)) <= bar.at(t1 + at_ms(ms - 1));
+    check(up_falling && bar.at(t1 + at_ms(kBarUpMs)) == 0, "it never comes back on its way up, and is up exactly at its end");
+    // A turn back midway on the way down (the question opens): from where it is, in the share of the way up's time
+    // that its place is of the whole way.
+    Slide turned;
+    turned.aim(1, t0, true);
+    const std::int64_t mid = t0 + at_ms(60);
+    const float there = turned.at(mid);
+    check(there > 0.5f && there < 1, "60 ms into its way down the bar is past half, not yet down");
+    turned.aim(0, mid, true);
+    check(std::fabs(turned.at(mid) - there) < 1e-6f, "turned back, it is where it was: no jump");
+    check(turned.moving(mid) && std::llabs(turned.lasts - static_cast<std::int64_t>(static_cast<double>(at_ms(kBarUpMs)) * there)) <= 1,
+          "and its way up from there takes that share of the way up's time");
+    bool back_falling = true;
+    float last = there;
+    for (std::int64_t t = mid; t <= mid + turned.lasts; t += at_ms(1)) {
+        back_falling = back_falling && turned.at(t) <= last + 1e-6f;
+        last = turned.at(t);
+    }
+    check(back_falling && turned.at(mid + turned.lasts) == 0, "it goes up from there and ends up");
+    // A turn back on the way up (the pointer comes back onto the bar): down again from where it is.
+    Slide again;
+    again.rest(1);
+    again.aim(0, t0, true);
+    const std::int64_t later = t0 + at_ms(100);
+    const float left = again.at(later);
+    check(left > 0 && left < 1, "100 ms into its way up the bar is between down and up");
+    again.aim(1, later, true);
+    check(std::fabs(again.at(later) - left) < 1e-6f, "turned back on its way up, it is where it was");
+    check(std::llabs(again.lasts - static_cast<std::int64_t>(static_cast<double>(at_ms(kBarDownMs)) * static_cast<double>(1 - left))) <= 1,
+          "and the rest of the way down takes its share of the way down's time");
+    check(again.at(later + again.lasts) == 1, "it ends down");
+    // Headed the same way while on that way: the way goes on as it is (a look at the pointer changes nothing).
+    Slide steady;
+    steady.aim(1, t0, true);
+    steady.aim(1, t0 + at_ms(50), true);
+    check(steady.began == t0 && steady.lasts == at_ms(kBarDownMs), "headed down again while on its way down: the same way");
+    // Windows' animations off: there at once, both ways, and from midway.
+    Slide still;
+    still.aim(1, t0, false);
+    check(still.at(t0) == 1 && !still.moving(t0), "with Windows' animations off the bar is down at once");
+    still.aim(0, t0 + at_ms(10), false);
+    check(still.at(t0 + at_ms(10)) == 0 && !still.moving(t0 + at_ms(10)), "and up at once");
+    Slide switched_off;
+    switched_off.aim(1, t0, true);
+    switched_off.aim(0, t0 + at_ms(40), false);
+    check(switched_off.at(t0 + at_ms(40)) == 0 && !switched_off.moving(t0 + at_ms(40)), "switched off midway: up at once, nothing left half shown");
+    // Hidden at once (a minimised window): at rest up, whatever it was doing.
+    Slide hidden;
+    hidden.aim(1, t0, true);
+    hidden.rest(0);
+    check(hidden.at(t0 + at_ms(30)) == 0 && !hidden.moving(t0 + at_ms(30)), "put to rest midway: up, at rest");
+    // The rows in sight: none up, all of them down, whole rows in between that never go back along a way, at the
+    // bar's height at each scale (74 at 720 lines: 37 at the floor's half to 222 at 4K).
+    bool rows_whole = true, rows_rising = true;
+    for (int height : {37, 56, 74, 111, 148, 222}) {
+        rows_whole = rows_whole && bar_rows(0, height) == 0 && bar_rows(1, height) == height && bar_rows(-0.5f, height) == 0 && bar_rows(1.5f, height) == height;
+        Slide way;
+        way.aim(1, 0, true);
+        int seen = 0;
+        // A step every 240th of a second, as the fastest display here gives them.
+        for (std::int64_t t = 0; t <= way.lasts; t += 4166667) {
+            const int rows = bar_rows(way.at(t), height);
+            rows_rising = rows_rising && rows >= seen && rows <= height;
+            seen = rows;
+        }
+    }
+    check(rows_whole, "no row of the bar in sight while it is up, every row while it is down, at every scale");
+    check(rows_rising, "and on its way down the rows in sight only grow, step by step");
+    check(bar_rows(0.5f, 74) == 37 && bar_rows(0.875f, 74) == 65, "half down, 37 of 74 rows; seven eighths down, 65");
+    // The handle: whole while the bar is up, gone when it is down, fading evenly between; on the bar's foot, its rail
+    // cut as far as the bar covers it.
+    check(handle_opacity(0) == 1 && handle_opacity(1) == 0 && handle_opacity(0.25f) == 0.75f && handle_opacity(2) == 0 && handle_opacity(-1) == 1,
+          "the handle is whole with the bar up, gone with it down, and fades evenly between");
+    const int lip = 3;
+    bool hung = true;
+    for (int rows = 0; rows <= 74; ++rows) {
+        const Hang hang = handle_hang(rows, lip);
+        // What is left of its picture starts at the bar's foot; its rail goes row by row as the bar covers it, and no
+        // more than its rail is ever cut.
+        hung = hung && hang.down == rows && hang.cut == (rows < lip ? rows : lip);
+    }
+    check(hung, "the handle hangs from the bar's foot, its rail cut row by row as the bar's first rows cover it, and only its rail");
+    const Hang rest = handle_hang(0, lip);
+    check(rest.down == 0 && rest.cut == 0, "with no bar the handle is whole at the game's top edge");
+    // The pieces at the top: lower by the rows in sight; one placed for the bar down stands where one placed for no
+    // bar stands with the whole bar in sight, so nothing moves when its picture is made again.
+    const int height = 74, own = 16;
+    check(piece_down(0, 0) == 0 && piece_down(43, 0) == 43 && piece_down(height, 0) == height, "a piece placed for no bar is lower by the rows of the bar in sight");
+    check(own + piece_down(height, 0) == own + height + piece_down(height, height), "placed again for the bar down, it stands where it stood");
+    check(own + height + piece_down(43, height) == own + piece_down(43, 0), "and on the way up it is where the piece placed for no bar would be");
+}
+
 }  // namespace
 
 int main() {
@@ -423,8 +573,9 @@ int main() {
     frame_counter_checks();
     // The overlay's scale and the smallest game area.
     overlay_scale_checks();
-    // The handle's size.
+    // The handle's size, and the bar's way down and up.
     handle_size_checks();
+    overlay_motion_checks();
     if (g_failed) {
         std::printf("%d of %d checks FAILED\n", g_failed, g_checks);
         return 1;

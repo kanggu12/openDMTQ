@@ -1,7 +1,8 @@
-// What the player for Windows draws over the game: the bar at the top edge with full screen and the X, its handle at the
-// top centre, the question before quitting, the server's notice, the frame counter, the cursor, the pieces as frosted
-// glass over the game's own frame (see overlay_win32.cpp). Its windows and what they do on the UI thread; their pictures
-// made on a thread of its own, so that the UI thread, which stamps the keys and the clicks, never waits for them.
+// What the player for Windows draws over the game: the bar that slides down from the top edge with full screen and the
+// X, its handle at the top centre, the question before quitting, the server's notice, the frame counter, the cursor,
+// the pieces as frosted glass over the game's own frame (see overlay_win32.cpp). Its windows and what they do on the UI
+// thread; their pictures made on a thread of its own, so that the UI thread, which stamps the keys and the clicks,
+// never waits for them.
 #pragma once
 
 #include <windows.h>
@@ -27,8 +28,12 @@ struct Hooks {
     // The count of frames shown and when the last was (player::frames_shown): the frame counter's numbers, and the
     // game's first picture, which the bar comes down for.
     FrameCount (*frames)() = nullptr;
-    // The player's stats are on (ARM32_STATS): every 5 s a line of what the overlay's pictures cost.
+    // The player's stats are on (ARM32_STATS): every 5 s a line of what the overlay's pictures cost, and a line for
+    // each way of the bar down or up (its steps, and the game's frames meanwhile).
     bool stats = false;
+    // The display's refresh interval in nanoseconds as the window knows it (0: not known): the pace of a motion's steps
+    // where the compositor gives none.
+    long long (*refresh_ns)() = nullptr;
 };
 
 // Once the frame and the game's window are made; `korean` for the words.
@@ -72,6 +77,12 @@ HCURSOR cursor(bool pressed);
 // player's own code, and where each goes (layout.txt). No window is shown. Without `words`, the same pictures without
 // their words (the glass under them, for their contrast).
 void test_save(const std::wstring& prefix, const std::wstring& frame, bool words);
+// The probe's look at the bar's way down and its way up over a frame of the game: what the screen shows at the start,
+// a quarter, a half and three quarters of the way's time and at its end, the pieces laid over the frame where a step
+// at that moment puts them (the same arithmetic the windows are moved by), the game's top of each as a PNG named after
+// `prefix` (motion-plain-...: the handle and the bar; motion-busy-...: the notice and a counter at the top left moving
+// with the bar), and each moment's numbers in motion.txt. No window is shown.
+void test_motion(const std::wstring& prefix, const std::wstring& frame);
 // Windows' scale as the probe wants it drawn (1.5 for 150 %), in place of the display's.
 void test_set_dpi(float scale);
 #endif

@@ -654,7 +654,8 @@ void ime_cancel(HWND h) {
 // Checks press keys at seconds of their choosing (PLAYER_KEYS="@seconds:key[/hold_ms];...", the seconds from the window's
 // first showing): esc, enter, space, up, down, f11, alt+enter, alt+f4, each posted to the frame as Windows would send it,
 // down, then up after hold_ms (50 when not given); f11, alt+enter and alt+f4 are there for a check to show that they do
-// nothing. close, the window's own close (its X). Three more act as the mouse
+// nothing. close, the window's own close (its X). bar, the overlay's bar as a finger drawn down from the game's top edge
+// brings it (no key of a player's does), for a check of its way down and up. Three more act as the mouse
 // and the keyboard do: click=x,y presses and lifts the mouse's first button at x,y of the game's pixels on the game's
 // area; text=... types into whichever window has the keyboard then (the text field while the game asks for text), a
 // key at a time, \uXXXX for a character cmd's own set would not carry and \b for Backspace; ime=... the same, each
@@ -663,8 +664,8 @@ void ime_cancel(HWND h) {
 void plan_keys() {
     const char* list = std::getenv("PLAYER_KEYS");
     if (!list || !*list) return;
-    // What a press is: a key, a click or text.
-    enum class Kind { key, click, text, ime, close };
+    // What a press is: a key, a click, text, the window's close, or the overlay's bar as a finger brings it.
+    enum class Kind { key, click, text, ime, close, bar };
     struct Press {
         double at;
         Kind kind;
@@ -700,6 +701,9 @@ void plan_keys() {
         } else if (key == "close") {
             // The window's own close, as its X or the taskbar's Close sends it.
             presses.push_back({at, Kind::close, 0, false, hold, key, 0, 0, {}});
+        } else if (key == "bar") {
+            // The overlay's bar, as a finger drawn down from the game's top edge brings it: down for its 4 s, then up.
+            presses.push_back({at, Kind::bar, 0, false, hold, key, 0, 0, {}});
         } else if (key.rfind("click=", 0) == 0) {
             // x,y in the game's pixels, as PLAYER_TAPS takes them.
             float x = 0, y = 0;
@@ -752,6 +756,12 @@ void plan_keys() {
             if (k.kind == Kind::close) {
                 jvm::log("player: %.1f s: the window's close", k.at);
                 PostMessageW(g_frame, WM_CLOSE, 0, 0);
+                continue;
+            }
+            if (k.kind == Kind::bar) {
+                // On the UI thread, which owns the overlay's windows.
+                jvm::log("player: %.1f s: the bar, as a finger from the top edge", k.at);
+                main_looper().post([] { overlay::show_bar(); });
                 continue;
             }
             if (k.kind == Kind::ime) {
@@ -1296,6 +1306,8 @@ bool open_window(const std::string& title) {
     };
     // What the overlay's pictures cost, with the player's stats.
     hooks.stats = arm32::g_stats;
+    // The display's refresh interval, as the frames are paced by it (watch_display): a motion's steps fall back on it.
+    hooks.refresh_ns = [] { return static_cast<long long>(arm32::g_display_interval.load()); };
     overlay::start(g_frame, g_window, hooks, host_locale().first == "ko");
     // The frame counter in the corner the PC's settings name (none: no counter).
     overlay::show_fps(static_cast<int>(settings().show_fps));

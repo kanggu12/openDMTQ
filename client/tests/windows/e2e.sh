@@ -4,12 +4,12 @@
 #      be), then downloaded from the server's /windows, signed in, with the server on its end
 #   2. installed through its own dialog (Enter on Install), Velopack's setup underneath, the launcher started after
 #   3. the launcher's first-start guide: the server the installer brought, the sign-in, the app's download, PLAY
-#   4. the player reaching the game's menu (a frame of it saved); the bar coming down by itself for 3 seconds when the
-#      game's picture first shows; the handle at the game's top centre (the pointer resting on it brings the bar, a
-#      click on its place reaches the game, the game's window keeps the keyboard); the bar at its top edge switching to a
-#      window and back; in the window, no buttons of its own, and the bar's minimise (the game held still) and the
-#      taskbar's restore (the game going on, no bar by itself); the bar's X asking (the game held still), Keep playing,
-#      then the X and Quit the game, the launcher back
+#   4. the player reaching the game's menu (a frame of it saved); the bar sliding down by itself for 3 seconds when the
+#      game's picture first shows, and back up, by steps; the handle at the game's top centre (the pointer resting on it
+#      brings the bar, a click on its place reaches the game, the game's window keeps the keyboard); the bar at its top
+#      edge switching to a window and back; in the window, no buttons of its own, and the bar's minimise (the game held
+#      still) and the taskbar's restore (the game going on, no bar by itself); the bar's X asking (the game held still),
+#      Keep playing, then the X and Quit the game, the launcher back
 #   5. Repair from the command line: a file of the player and one of the launcher put back as they were installed
 #   6. Clear game data: the id alone stays; the FPS counter switched on from the command line (the launcher's window
 #      closed for it, then opened again), and the game starts again with the same id and gets to its menu, the counter
@@ -73,7 +73,8 @@ SETUP=$(cd "$OUT" && ls OpenDMTQ-Setup-*.exe | head -n 1)
 
 # ---- 2 to 4 under Wine, on the virtual screen
 docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -w /out \
-  -e WINEPREFIX=/tmp/wine -e WINEDEBUG=-all -e TZ=Asia/Seoul -e PLAYER_SHOTS=@50 -e PLAYER_TRACE_INPUT=1 opendmtq-client-e2e:local bash -c "
+  -e WINEPREFIX=/tmp/wine -e WINEDEBUG=-all -e TZ=Asia/Seoul -e PLAYER_SHOTS=@50 -e PLAYER_TRACE_INPUT=1 -e PLAYER_TRACE_MOTION=1 \
+  opendmtq-client-e2e:local bash -c "
   set -u
   Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp >/dev/null 2>&1 &
   export DISPLAY=:99
@@ -183,17 +184,24 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   # The bar: the pointer from the middle of the game to its top edge, then onto a chip of the bar. The game's place and size read again first: the full screen chip changes them.
   # A length of the overlay's at 720 lines in the game's pixels now: times HEIGHT / 720, rounded half up as lround.
   opx() { echo \$(( (2 * \$1 * HEIGHT + 720) / 1440 )); }
-  # The bar came down by itself once the game's picture showed, for 3 s and its 0.3 s fade (0.2 s each way for the
+  # The bar came down by itself once the game's picture showed, for 3 s and its way up, 0.17 s (0.2 s each way for the
   # looks at the log), and went up.
   read down up < /out/reveal.txt
   [ -n \"\$down\" ] || { echo 'FAIL: the bar did not come down when the game first showed'; exit 1; }
   [ -n \"\$up\" ] || { echo 'FAIL: the bar that came down by itself did not go up'; exit 1; }
   held=\$(awk -v a=\"\$down\" -v b=\"\$up\" 'BEGIN { printf \"%.2f\", b - a }')
-  awk -v h=\"\$held\" 'BEGIN { exit !(h >= 2.8 && h <= 4.2) }' || { echo \"FAIL: the bar stayed \$held s by itself, not 3 and its fade\"; exit 1; }
+  awk -v h=\"\$held\" 'BEGIN { exit !(h >= 2.8 && h <= 4.2) }' || { echo \"FAIL: the bar stayed \$held s by itself, not 3 and its way up\"; exit 1; }
   echo \"the bar came down by itself for \$held s when the game first showed\"
+  # It slid down and back up by steps, each way said with its steps (PLAYER_TRACE_MOTION): a way of a fifth of a second
+  # has a dozen of them at 60 a second, and never fewer than six however Wine's timers fall.
+  down_steps=\$(cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | sed -n 's/.*motion: the bar came down: \\([0-9]*\\) steps.*/\\1/p' | head -n 1)
+  up_steps=\$(cat \"\$LOCAL\"/OpenDMTQ/*/player.log 2>/dev/null | sed -n 's/.*motion: the bar went up: \\([0-9]*\\) steps.*/\\1/p' | head -n 1)
+  [ \"\${down_steps:-0}\" -ge 6 ] && [ \"\${up_steps:-0}\" -ge 6 ] \
+    || { echo \"FAIL: the bar did not slide by steps (\${down_steps:-0} down, \${up_steps:-0} up)\"; exit 1; }
+  echo \"the bar slid down in \$down_steps steps and back up in \$up_steps\"
   # The handle's place at the game's top centre, a box 44 by 10 2 below its top edge at 720 lines and 10 around it (the
-  # tab drawn there is smaller): the pointer resting on it brings the bar down; a click on its place, the pointer away
-  # at once, reaches the game; the game's window keeps the keyboard throughout.
+  # tab drawn there hangs inside it): the pointer resting on it brings the bar down; a click on its place, the pointer
+  # away at once, reaches the game; the game's window keeps the keyboard throughout.
   eval \$(xdotool getwindowgeometry --shell \"\$game\")
   moves=\$(focus_moves)
   xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5

@@ -25,12 +25,19 @@
 //   the start; held, a button is sunk. The window itself has no buttons: the game is minimised, put in full screen and
 //   quit from here. It stays while the pointer is on it and goes up soon after it leaves, so it never sits on the
 //   game's own controls at the top while they are used. No key brings it.
+// - Its motion: the bar slides down out of the game's top edge, its foot first, and back up into it (overlay_motion.h:
+//   a fifth of a second, slowing into its place; a little quicker up, gathering speed), never over the window's title
+//   bar above: its window shows only the part of its picture that is below the edge. A step comes with each refresh of
+//   the display and only places pictures made before. The notice and a counter in a top corner move with its foot. A
+//   way turned back midway (the pointer back on it, the question) goes on from where it is. Where Windows shows no
+//   animations, it comes and goes at once.
 // - The handle: the game's green line along its top edge at the centre (a short piece of the bar's own foot line),
 //   with a small tab of glass hanging from it in the lean of the game's own tabs and a chevron pointing down in the
 //   tab, which says that a bar comes down from here; with the pointer on it, lime and a little deeper. As large as the
 //   game's header leaves room for, at the game's own scale, so that it covers nothing of the game's. Clicks go through
-//   it to the game; the pointer resting on it brings the bar down. Hidden while the bar is down, while the question or
-//   a notice is up, while the game is held, and before the game's first picture.
+//   it to the game; the pointer resting on it brings the bar down, and the handle then goes down with the bar's foot,
+//   fading, and comes back up with it. Hidden while the bar is down, while the question or a notice is up, while the
+//   game is held, and before the game's first picture.
 // - The question before quitting: the bar's X and the taskbar's Close window ask it. The game dims and blurs behind a
 //   card of glass with the question, the game's green line under it, a thin X, Keep playing as the launcher's lime main
 //   button and Quit the game as its secondary, red under the pointer; the keys' choice in the launcher's cyan keyboard
@@ -38,8 +45,9 @@
 //   the window comes back and the game draws its picture again before it holds, so the question shows over the game,
 //   not over black. Alt+F4, F11 and Alt+Enter do nothing.
 // - The notice: the server's two-line notice about a broadcast (a title, then where to watch), as a glass card that
-//   slides down at the top of the game, stays for a few seconds and fades. A red LIVE tag with a slanted end, as the
-//   game's tags, while broadcasting; once the broadcast has ended its title says so alone, with no tag.
+//   slides down at the top of the game, stays for a few seconds and fades, stepped with the display as the bar is. A
+//   red LIVE tag with a slanted end, as the game's tags, while broadcasting; once the broadcast has ended its title
+//   says so alone, with no tag.
 // - The cursor: a dart in the logo's chrome and lime, all lime while the mouse's finger is down on the game.
 // - The frame counter: when the PC's settings ask for it, a small glass box like the game's Q and MAX box, at the bottom
 //   right, where it covers the fewest of the game's own labels and buttons, unless another corner is chosen (at the top
@@ -57,6 +65,8 @@
 #include "overlay_glass.h"
 // The overlay's scale, the game's own with a floor at Windows' scale; the handle's own scale and its tab's sizes.
 #include "overlay_scale.h"
+// The bar's way down and up, and the handle's part in it.
+#include "overlay_motion.h"
 
 #include <algorithm>
 #include <atomic>
@@ -64,6 +74,7 @@
 #include <cmath>
 #include <condition_variable>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <cwchar>
 #include <map>
@@ -502,8 +513,10 @@ float crisp(float at, float width) { return std::floor(at - width / 2 + 0.5f) + 
 // What is under the pointer on the bar: nothing, the X (at the right end), the full screen chip (left of it) or the
 // minimise chip (left of that).
 constexpr int kNone = -1, kQuitChip = 0, kScreenChip = 1, kMinChip = 2;
-// Whether the bar's window is on the screen (the UI thread's).
-bool g_bar_up = false;
+// Whether the pieces at the game's top (the notice, a counter in a top corner) are placed under the bar (the UI
+// thread's): from when the bar has come down whole until it has gone up. While the bar is on its way they keep the
+// place they had and are moved with it.
+bool g_bar_room = false;
 
 // The bar's height, the chips' size, the gap between them and their room from the bar's right end, at this scale. 74
 // at 720 lines: the game's own X at the top right of its song and music screens reaches row 70 (its soft edge, measured
@@ -513,11 +526,11 @@ int chip_size() { return px(40); }
 int chip_gap() { return px(10); }
 int chip_margin() { return px(16); }
 
-// The room the bar takes at the top of the game's area while it is down (0 while it is up): what sits at the top moves
-// under it rather than being covered. The painter's view says it for the picture it draws.
+// The room the bar takes at the top of the game's area once it is down (0 once it is up): what sits at the top is
+// placed under it rather than being covered. The painter's view says it for the picture it draws.
 int top_room() {
     if (t_view) return t_view->top_room;
-    return g_bar_up ? bar_height() : 0;
+    return g_bar_room ? bar_height() : 0;
 }
 
 // A chip's square on a bar `w` pixels wide: the X at the right end, the full screen chip left of it, minimise left of
@@ -1155,8 +1168,8 @@ std::vector<float> rounded_outline(int w, int h, const std::vector<PointF>& p, f
 // the pointer on it (`lit`) the line, the outline and the chevron are the lime, the rail longer and the tab deeper, its
 // chevron lower, as if pulled. As large as the game's header leaves room for at its top centre, at the game's own
 // scale: it covers none of the game's words or buttons on any of its screens. No glass is read for it: its charcoal
-// lies straight on the game. Its picture is the handle's window, its place in the game's area in x and y; `lip` the
-// rows of its rail and the shade under it.
+// lies straight on the game. Its picture is the handle's window at rest, its place in the game's area in x and y; `lip`
+// the rows of its rail and the shade under it, which the bar's foot takes the place of as the bar comes down.
 std::shared_ptr<Canvas> handle_picture(int& x, int& y, int& lip, bool lit) {
     const float k = handle_scale();
     const float rail_w = hpx(lit ? kRailWideLit : kRailWide), top_w = hpx(kTabTop), tall = hpx(lit ? kTabTallLit : kTabTall);
@@ -1273,6 +1286,12 @@ struct Painted {
     bool glass = false;
     unsigned made = 0;
     std::string key;
+    // The rows at the picture's top that its motion counts by: the bar's own height above its shadow, the handle's
+    // rail (0 for the others).
+    int rows = 0;
+    // The room the bar took at the game's top in the view its place was worked out for: a piece that moves under the
+    // bar is shown lower or higher by what the bar shows more or less than that.
+    int room = 0;
 };
 
 // The orders waiting and the pictures made, one of each a piece (a newer order takes an older one's place), under the
@@ -1306,7 +1325,7 @@ struct QuestionPaint {
     unsigned made = 0;
 };
 
-// The bar's picture for an order.
+// The bar's picture for an order, whole, at its place when it is down (the UI thread shows the part of it in sight).
 Painted paint_bar(const Order& o, Paint& p) {
     const Drawing d(o.view);
     if (p.made_for != o.key) {
@@ -1314,7 +1333,10 @@ Painted paint_bar(const Order& o, Paint& p) {
         p.made_for = o.key;
     }
     paint_draw(p, *o.shots);
-    return Painted{true, p.picture, p.x, p.y, p.have_backdrop, p.made, o.key};
+    Painted made{true, p.picture, p.x, p.y, p.have_backdrop, p.made, o.key};
+    // Its own rows above its shadow, at this view's scale: what its slide counts by.
+    made.rows = bar_height();
+    return made;
 }
 
 // The notice's picture for an order, at its resting place (the UI thread slides its window).
@@ -1325,7 +1347,10 @@ Painted paint_notice(const Order& o, Paint& p) {
         p.made_for = o.key;
     }
     paint_draw(p, *o.shots);
-    return Painted{true, p.picture, p.x, p.y, p.have_backdrop, p.made, o.key};
+    Painted made{true, p.picture, p.x, p.y, p.have_backdrop, p.made, o.key};
+    // Placed under the room the bar took in this view.
+    made.room = o.view.top_room;
+    return made;
 }
 
 // The counter's picture for an order.
@@ -1336,7 +1361,10 @@ Painted paint_counter(const Order& o, Paint& p) {
         p.made_for = o.key;
     }
     paint_draw(p, *o.shots);
-    return Painted{true, p.picture, p.x, p.y, p.have_backdrop, p.made, o.key};
+    Painted made{true, p.picture, p.x, p.y, p.have_backdrop, p.made, o.key};
+    // In a top corner it is placed under the room the bar took in this view; at the bottom the bar never moves it.
+    made.room = o.corner == 1 || o.corner == 2 ? o.view.top_room : 0;
+    return made;
 }
 
 // The handle's picture for an order: made again only for another view, or with the pointer come on it or gone.
@@ -1347,7 +1375,10 @@ Painted paint_handle(const Order& o, Paint& p) {
         p.made = ++g_made;
         p.made_for = o.key;
     }
-    return Painted{true, p.picture, p.x, p.y, false, p.made, o.key};
+    Painted made{true, p.picture, p.x, p.y, false, p.made, o.key};
+    // Its rail's rows, which the bar's foot takes the place of as the bar comes down.
+    made.rows = p.lip;
+    return made;
 }
 
 // The question's picture for an order: the dimmed, blurred game from a read of the whole frame (the notice laid over it,
@@ -1509,24 +1540,34 @@ struct Shown {
     // the frame behind its new place, and that place grown by the blur's reach, which the read takes in (0: none).
     UINT64 moving = 0;
     glass::Rect next{0, 0, 0, 0};
-    // What the screen shows of it now: the picture's number, its place on the screen and its opacity.
+    // What its picture carries for a motion (Painted's): the rows at its top the motion counts by, and the room the
+    // bar took in the view its place was worked out for.
+    int rows = 0, room = 0;
+    // Where a motion has it now: `down` rows lower than its picture's place, and without the top `cut` rows of its
+    // picture (the bar sliding out of the game's top edge, the handle's rail under the bar's foot).
+    int down = 0, cut = 0;
+    // What the screen shows of it now: the picture's number, its place on the screen, its opacity and its cut.
     unsigned shown_made = 0;
     POINT at{-1, -1};
     BYTE shown_alpha = 0;
+    int shown_cut = 0;
 };
 
 // The time the UI thread spends handing pictures to UpdateLayeredWindow, for the stats line.
 std::uint64_t g_show_count = 0, g_show_ns = 0, g_show_most_ns = 0;
 
 // The piece on the screen as it is now: its picture handed to UpdateLayeredWindow when anything of it changed (the
-// picture, its place, its opacity), and its window shown, without taking the focus, the first time.
+// picture, its place, its opacity, how much of its top is cut), and its window shown, without taking the focus, the
+// first time. A motion's step is this one call: the picture is not made again, only placed, cut and faded.
 void show(Shown& s) {
     if (!s.picture || !s.picture->bits || !showing()) return;
     const RECT a = area();
-    const POINT at{a.left + s.x, a.top + s.y};
-    if (s.up && s.shown_made == s.made && at.x == s.at.x && at.y == s.at.y && s.alpha == s.shown_alpha) return;
+    // Never without its last row (a window has at least one): a piece cut away whole is hidden by its owner instead.
+    const int cut = std::clamp(s.cut, 0, s.picture->h - 1);
+    const POINT at{a.left + s.x, a.top + s.y + s.down};
+    if (s.up && s.shown_made == s.made && at.x == s.at.x && at.y == s.at.y && s.alpha == s.shown_alpha && cut == s.shown_cut) return;
     const std::int64_t began = now_ns();
-    s.picture->show(s.window, at.x, at.y, s.alpha);
+    s.picture->show(s.window, at.x, at.y, s.alpha, cut);
     const auto spent = static_cast<std::uint64_t>(now_ns() - began);
     ++g_show_count;
     g_show_ns += spent;
@@ -1534,18 +1575,21 @@ void show(Shown& s) {
     s.shown_made = s.made;
     s.at = at;
     s.shown_alpha = s.alpha;
+    s.shown_cut = cut;
     if (!s.up) {
         ShowWindow(s.window, SW_SHOWNOACTIVATE);
         s.up = true;
     }
 }
 
-// The piece off the screen.
+// The piece off the screen, at its own place the next time it comes.
 void hide(Shown& s) {
     if (s.up && showing()) ShowWindow(s.window, SW_HIDE);
     s.up = false;
     s.wanted = 0;
     s.moving = 0;
+    s.down = 0;
+    s.cut = 0;
 }
 
 // Whether the piece's picture may go on the screen: one is there, with the frame behind it, or the render thread cannot
@@ -1582,6 +1626,8 @@ void take(Shown& s, Painted& p) {
     s.glass = p.glass;
     s.made = p.made;
     s.key = std::move(p.key);
+    s.rows = p.rows;
+    s.room = p.room;
 }
 
 void glass_wish();
@@ -1589,15 +1635,18 @@ void glass_wish();
 // ---- the bar (the UI thread's)
 
 Shown g_bar;
+// The handle's window too (its own part comes after the bar's): the bar is kept just under it.
+Shown g_handle;
 int g_bar_hover = kNone;
-// When the bar last had the pointer on it (or came), and how long it stays whole after that before it fades.
+// When the bar last had the pointer on it (or came), and how long it stays down after that before it goes up.
 UINT64 g_bar_since = 0, g_bar_stay = 0;
-// The bar's one timer: a look at the pointer while it is whole, each step of its fade after.
+// The bar's one timer: a look for its picture before it comes, a look now and then while it is on its way, a look at
+// the pointer while it is down.
 constexpr UINT_PTR kBarTimer = 2;
-// Whole for 600 ms after the pointer leaves it, then fading over 300 ms a step at a time; shown by a finger, whole for
-// 4 s (a finger has no pointer that stays on it); by itself (the game's first picture, a switch), whole for 3 s. While
-// whole it looks for the pointer ten times a second.
-constexpr UINT64 kBarStayMs = 600, kBarFadeMs = 300, kBarTouchStayMs = 4000, kBarRevealMs = 3000, kBarStepMs = 30, kBarLookMs = 100;
+// Down for 600 ms after the pointer leaves it, then up; shown by a finger, down for 4 s (a finger has no pointer that
+// stays on it); by itself (the game's first picture, a switch), down for 3 s. While down it looks for the pointer ten
+// times a second. Its way down and its way up take overlay_motion.h's times.
+constexpr UINT64 kBarStayMs = 600, kBarTouchStayMs = 4000, kBarRevealMs = 3000, kBarLookMs = 100;
 // Shown by a finger: the pointer Windows parks where the finger was is no mouse on the bar, until the mouse moves.
 bool g_bar_by_touch = false;
 // The chip the mouse's button (or a finger) went down on: it acts only when let go on the same chip, and looks pressed
@@ -1622,17 +1671,33 @@ bool g_rest_armed = false;
 int g_moved_x = -1, g_moved_y = -1;
 // Until when a bar that came by itself stays down whatever the pointer does (0: none).
 UINT64 g_bar_reveal_until = 0;
-// The bar is wanted on the screen (its time not over), or may come (the pointer waits at the edge): the frame behind it
-// is read meanwhile, so that it comes as glass rather than its bare tint.
+// The bar is wanted on the screen (from when it is asked for until it has gone up), or may come (the pointer waits at
+// the edge): the frame behind it is read meanwhile, so that it comes as glass rather than its bare tint.
 bool g_bar_wanted = false, g_bar_coming = false;
 // Why it comes, for the log line when it does.
 const char* g_bar_why = "";
 // What was ordered of the painter last for it: its look and the read it was ordered with.
 std::string g_bar_ordered;
 const void* g_bar_ordered_shots = nullptr;
+// The bar's way between up and down (overlay_motion.h), and where its last step had it.
+Slide g_slide;
+float g_bar_place = 0;
+// Whether a way is under way: from when it began until a step has seen its end and settled the bar (down, or gone).
+// The steps go on until then, whatever the clock says between two looks at it: a way is never left a step short.
+bool g_bar_on_way = false;
+// While on a way the bar's own timer looks this often as well: should the display's steps fail to come, the way still
+// ends in its time.
+constexpr UINT64 kBarWayLookMs = 50;
 
 // Whether the frame is in full screen, as the window says.
 bool full_screen() { return g_hooks.fullscreen && g_hooks.fullscreen(); }
+
+// The rows of the bar in sight now, as its last step showed them (none while it is off the screen).
+int bar_in_sight() { return g_bar.up ? std::max(0, g_bar.rows - g_bar.cut) : 0; }
+
+// How much lower than its picture's place a piece at the game's top is shown now: the rows of the bar in sight, less
+// the room the bar took where its place was worked out. Nothing once the bar has settled and the piece is placed for it.
+int under_bar(const Shown& s) { return piece_down(bar_in_sight(), s.room); }
 
 // The bar's look as text: its size, the scale, the chip under the pointer, the one held, full screen or not.
 std::string bar_key(const View& v) {
@@ -1648,6 +1713,9 @@ void order_bar() {
     v.top_room = 0;
     const std::string key = bar_key(v);
     if (key == g_bar_ordered && g_shots.get() == g_bar_ordered_shots) return;
+    // On its way with a picture of this look: that one picture is only moved, cut and shown until the bar is there (no
+    // picture is made during a motion); the frame's newer reads are taken up again once it has settled.
+    if (g_slide.moving(now_ns()) && g_bar.picture && g_bar.key == key) return;
     g_bar_ordered = key;
     g_bar_ordered_shots = g_shots.get();
     Order o;
@@ -1661,6 +1729,12 @@ void order_bar() {
 void handle_update();
 void counter_place();
 void notice_frame();
+void motion_start();
+void trace_step(const Slide& way, std::int64_t now, float place, int rows);
+void trace_settled(std::int64_t now);
+void trace_cut(std::int64_t now);
+// Whether the bar is being hidden by its own way's last step (bar_step), not put away at once midway.
+bool g_bar_way_over = false;
 
 // The notice and a counter in a top corner, placed again for the bar's coming or going (under it, or back up).
 void move_for_bar() {
@@ -1668,12 +1742,18 @@ void move_for_bar() {
     notice_frame();
 }
 
-// The bar gone: hidden, its timer stopped, nothing under the pointer or held on it.
+// The bar gone: hidden at once wherever its way had it, its timer stopped, nothing under the pointer or held on it.
 void hide_bar() {
     if (!g_bar.window) return;
-    const bool was = g_bar.up;
+    const bool was = g_bar.up, room = g_bar_room;
     hide(g_bar);
-    g_bar_up = false;
+    // Put away at once in the middle of a way (the window minimised): the trace says so.
+    if (!g_bar_way_over) trace_cut(now_ns());
+    // Up, at rest: the next time it comes, from the top edge again.
+    g_slide.rest(0);
+    g_bar_place = 0;
+    g_bar_on_way = false;
+    g_bar_room = false;
     g_bar_wanted = false;
     g_bar_reveal_until = 0;
     KillTimer(g_bar.window, kBarTimer);
@@ -1687,78 +1767,172 @@ void hide_bar() {
     g_bar.picture.reset();
     g_bar.key.clear();
     g_bar_ordered.clear();
-    if (was) {
-        note("player: the bar goes up");
-        move_for_bar();
-    }
+    if (was) note("player: the bar goes up");
+    // The pieces that were placed under it, or moved with it, at their own place again.
+    if (was || room) move_for_bar();
     glass_wish();
     handle_update();
 }
 
-// Whether the mouse's pointer is on the bar's strip at the top of the game's area (shown by a finger, it is not until
-// the mouse moves).
+// Whether the mouse's pointer is on the part of the bar in sight at the top of the game's area (shown by a finger, it
+// is not until the mouse moves).
 bool pointer_on_bar() {
     if (g_bar_by_touch || !g_bar.up) return false;
     POINT p{};
     GetCursorPos(&p);
     const RECT a = area();
-    return p.x >= a.left && p.x < a.right && p.y >= a.top && p.y < a.top + bar_height();
+    return p.x >= a.left && p.x < a.right && p.y >= a.top && p.y < a.top + bar_in_sight();
 }
 
-// The bar at the opacity its time gives it (whole while the pointer is on it and for g_bar_stay after, then fading),
-// at the top of the game's area, or hidden once it faded or while the question is up; its one timer set for its next
-// look. It goes on the screen once its picture for its look now has come (with the frame behind it, or after the wait).
+// The handle's window just above the bar's, whatever showing and hiding did to their order since they were made: on the
+// bar's way the handle hangs from the bar's foot, over the bar's shadow. Only its place among the windows right above
+// the bar changes: it goes under the window that is above the bar now (at the top where the bar is the top one), never
+// over another program's window that the bar is under.
+void handle_above_bar() {
+    if (!showing() || !g_handle.window || !g_bar.window) return;
+    // The window above the bar, the handle itself aside.
+    HWND above = GetWindow(g_bar.window, GW_HWNDPREV);
+    if (above == g_handle.window) above = GetWindow(g_handle.window, GW_HWNDPREV);
+    SetWindowPos(g_handle.window, above ? above : HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+}
+
+// The counter's window where its place and the bar have it now: in a top corner it is lower by the rows of the bar in
+// sight (it moves with the bar's foot); at the bottom the bar never moves it.
+void counter_show();
+// The notice's window where its own slide and the bar have it now.
+void notice_show();
+
+// One step of the bar's way: the part of it that its place now leaves in sight is shown at the game's top edge (the
+// foot of its picture first: it slides out of the edge and never over the window's title bar above), and the handle,
+// the notice and a counter in a top corner are moved with its foot. Down, whole: the pieces at the top are placed for
+// it and made again over the frame behind their new place. Up, out of sight: it is hidden. The pictures are the ones
+// made before the way began: a step only places them.
+void bar_step() {
+    // Only a bar wanted or on the screen is on a way.
+    if (!g_bar.window || !g_bar.picture || !(g_bar_wanted || g_bar.up)) return;
+    const std::int64_t now = now_ns();
+    // The way as it is at this step (a bar that goes is put to rest below, before its last step is told).
+    const Slide way = g_slide;
+    const float place = way.at(now);
+    const int rows = bar_rows(place, g_bar.rows);
+    if (rows <= 0) {
+        // Out of sight. Headed up: gone, the handle and the pieces at the top at their own place again. Headed down: its
+        // first step, nothing of it to show yet.
+        const bool gone = way.to <= 0.0f && g_bar.up;
+        if (gone) {
+            g_bar_way_over = true;
+            hide_bar();
+            g_bar_way_over = false;
+        }
+        trace_step(way, now, place, rows);
+        if (gone) trace_settled(now);
+        return;
+    }
+    const bool coming = !g_bar.up;
+    g_bar_place = place;
+    // Its foot at the edge first: the picture without the rows still above the edge, whole in opacity all the way.
+    g_bar.cut = g_bar.rows - rows;
+    g_bar.alpha = 255;
+    show(g_bar);
+    if (coming && g_bar.up) {
+        g_bar_coming = false;
+        char line[160];
+        std::snprintf(line, sizeof line, "player: the bar comes down (%s)", g_bar_why);
+        note(line);
+        handle_above_bar();
+        glass_wish();
+    }
+    // The handle on its foot, fading; the pieces at the top lower by what is in sight.
+    handle_update();
+    counter_show();
+    notice_show();
+    trace_step(way, now, place, rows);
+    if (way.moving(now)) return;
+    // The way's end seen: settled.
+    g_bar_on_way = false;
+    trace_settled(now);
+    if (g_slide.to >= 1.0f && !g_bar_room) {
+        // Down, whole: from now on the notice and a counter at the top are placed under it (their pictures made again
+        // over the frame behind their new place, which they already stand at), and its own picture follows the frame's
+        // reads again.
+        g_bar_room = true;
+        move_for_bar();
+        order_bar();
+        glass_wish();
+    }
+}
+
+// Whether Windows shows animations (its "Animation effects" setting): where it does not, nothing of the overlay moves
+// by steps, and the pieces come and go at once. Asked of Windows at most twice a second.
+bool animations() {
+    static UINT64 asked = 0;
+    static bool on = true;
+    const UINT64 now = GetTickCount64();
+    if (!asked || now - asked >= 500) {
+        asked = now;
+        BOOL shown = TRUE;
+        // Where Windows cannot say, as if they were on.
+        on = !SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &shown, 0) || shown;
+    }
+    return on;
+}
+
+// The bar where its time has it: down while the pointer is on it and for g_bar_stay after (or a reveal's own time),
+// then up; up at once while the question is up. It sets out on its way down once its picture for its look now has come
+// (with the frame behind it, or after the wait), and on its way up when its time is over; a way under way turns back
+// from where it is. Its one timer is set for its next look.
 void bar_frame() {
     if (!g_bar.window) return;
     const UINT64 now = GetTickCount64();
     if (pointer_on_bar()) {
-        // On it: its time starts again, and it stays whole for kBarStayMs after the pointer leaves.
+        // On it: its time starts again, and it stays down for kBarStayMs after the pointer leaves.
         g_bar_since = now;
         g_bar_stay = kBarStayMs;
     } else {
         // Off it, perhaps between two of its moves: no chip is under the pointer.
         g_bar_hover = kNone;
     }
-    // Whole until the later of its stay after the pointer and a reveal's own time (the pointer leaving it does not
-    // shorten a reveal), then fading.
-    const UINT64 whole_until = std::max(g_bar_since + g_bar_stay, g_bar_reveal_until);
-    float alpha = 1;
-    if (now > whole_until) alpha = 1 - std::min(1.0f, static_cast<float>(now - whole_until) / kBarFadeMs);
-    if (alpha <= 0 || asking()) {
-        hide_bar();
-        return;
-    }
-    if (!g_bar_wanted) {
-        // Wanted from now on: the frame behind it read, and its glass waited for.
-        g_bar_wanted = true;
-        g_bar.wanted = now;
-        glass_wish();
-    }
-    order_bar();
-    g_bar.alpha = static_cast<BYTE>(alpha * 255);
-    // On the screen: the picture for its look now (or, while the next one is made, the one it shows), at its opacity.
-    View v = view_now();
-    v.top_room = 0;
-    const bool current = g_bar.key == bar_key(v);
-    if (g_bar.up || (current && ready(g_bar))) {
-        const bool coming = !g_bar.up;
-        show(g_bar);
-        if (coming && g_bar.up) {
-            g_bar_up = true;
-            g_bar_coming = false;
-            char line[160];
-            std::snprintf(line, sizeof line, "player: the bar comes down (%s)", g_bar_why);
-            note(line);
-            // The notice and a counter at the top move under it; the handle goes while it is down.
-            move_for_bar();
-            handle_update();
+    // Down until the later of its stay after the pointer and a reveal's own time (the pointer leaving it does not
+    // shorten a reveal); the question takes it up.
+    const UINT64 down_until = std::max(g_bar_since + g_bar_stay, g_bar_reveal_until);
+    const bool down = now <= down_until && !asking();
+    if (!g_bar.up) {
+        // Not on the screen, and no longer wanted there (its time ran out before its picture came, or the question
+        // opened): nothing comes.
+        if (!down) {
+            hide_bar();
+            return;
+        }
+        if (!g_bar_wanted) {
+            // Wanted from now on: the frame behind it read, and its glass waited for.
+            g_bar_wanted = true;
+            g_bar.wanted = now;
             glass_wish();
         }
+        order_bar();
+        View v = view_now();
+        v.top_room = 0;
+        if (g_bar.key != bar_key(v) || !ready(g_bar)) {
+            // Its picture for its look now is not there yet (or waits for the frame behind it): a look again soon.
+            SetTimer(g_bar.window, kBarTimer, 15, nullptr);
+            return;
+        }
+    } else if (down) {
+        // On the screen and staying: its look now (a chip lit or held) asked for, if it changed.
+        order_bar();
     }
-    // Not on the screen yet: a look again soon (its picture, or the end of the glass's wait). Fading: the next step.
-    // Whole: the next look at the pointer, or the fade's start if that comes first.
-    UINT64 next = alpha < 1 ? kBarStepMs : std::min(kBarLookMs, whole_until - std::min(whole_until, now) + 1);
-    if (!g_bar.up) next = std::min<UINT64>(next, 15);
+    // Headed where it belongs from where it is (a way already headed there goes on), and its first step at once.
+    g_slide.aim(down ? 1.0f : 0.0f, now_ns(), animations());
+    // On a way from now until a step settles it.
+    if (g_slide.moving(now_ns())) g_bar_on_way = true;
+    bar_step();
+    // Gone (a way up that took no time, or its last step).
+    if (!g_bar.up && !g_bar_wanted) return;
+    // The steps that follow come with the display's refreshes.
+    if (g_bar_on_way) motion_start();
+    // The next look: on a way, soon (the way's end, should no step come); down, at the pointer, or its time's end if
+    // that comes first.
+    const UINT64 next = g_bar_on_way ? kBarWayLookMs : std::min(kBarLookMs, down_until - std::min(down_until, now) + 1);
     SetTimer(g_bar.window, kBarTimer, static_cast<UINT>(std::max<UINT64>(1, next)), nullptr);
 }
 
@@ -1766,7 +1940,7 @@ void bar_frame() {
 // game's own window, its button up), or on the handle while it is there: the wait is over and the bar comes.
 bool pointer_at_edge();
 
-// The bar shown whole, staying `stay` ms (more while the pointer is on it); `why` for the log when it comes down.
+// The bar brought down, staying `stay` ms (more while the pointer is on it); `why` for the log when it comes down.
 void reveal(UINT64 stay, const char* why) {
     if (!g_bar.window || asking()) return;
     if (!g_bar.up && why) g_bar_why = why;
@@ -1799,6 +1973,9 @@ void rest_cancel() {
     }
 }
 
+// The chip under a point of the bar's window as it is shown now: its picture's rows start `cut` above the window's.
+int bar_chip_at(LPARAM l) { return chip_at(static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l)) + g_bar.cut); }
+
 LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     switch (msg) {
     case WM_TIMER:
@@ -1823,17 +2000,18 @@ LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         }
         return 0;
     case WM_NCHITTEST: {
-        // The shadow under the bar is no part of it: the game under it keeps its clicks.
+        // The shadow under the bar is no part of it: the game under it keeps its clicks. On the bar's way, the shadow
+        // starts under the rows in sight.
         POINT p{static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l))};
         ScreenToClient(h, &p);
-        if (p.y >= bar_height()) return HTTRANSPARENT;
+        if (p.y >= bar_in_sight()) return HTTRANSPARENT;
         break;
     }
     case WM_MOUSEMOVE: {
         // A mouse's own move: the pointer is the mouse's again (a finger's moves are Windows' copies, marked).
         if (!from_touch()) g_bar_by_touch = false;
-        // The chip under the pointer lights up.
-        const int now = chip_at(static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l)));
+        // The chip under the pointer lights up (where the bar's way has it now).
+        const int now = bar_chip_at(l);
         if (now != g_bar_hover) {
             g_bar_hover = now;
             bar_frame();
@@ -1843,8 +2021,10 @@ LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         return 0;
     }
     case WM_LBUTTONDOWN:
+        // On its way up for the question: its chips no longer take a press.
+        if (asking()) return 0;
         // Held on a chip: it looks pressed, and the bar keeps the mouse until it is let go.
-        g_bar_pressed = chip_at(static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l)));
+        g_bar_pressed = bar_chip_at(l);
         g_bar_hover = g_bar_pressed;
         SetCapture(h);
         bar_frame();
@@ -1858,7 +2038,7 @@ LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         }
         return 0;
     case WM_LBUTTONUP: {
-        const int chip_now = chip_at(static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l)));
+        const int chip_now = bar_chip_at(l);
         // Only a chip let go of where it was pressed acts: a press slid off it, or onto it from elsewhere, does nothing.
         const int pressed = g_bar_pressed;
         g_bar_pressed = kNone;
@@ -1954,7 +2134,8 @@ void order_question() {
     if (g_notice_up && g_notice.up && g_notice.picture) {
         o.under = g_notice.picture;
         o.under_x = g_notice.x;
-        o.under_y = g_notice.y;
+        // Where the screen has it now: lower than its picture's place while the bar's rows in sight say so.
+        o.under_y = g_notice.y + g_notice.down;
     }
     char key[96];
     std::snprintf(key, sizeof key, "question %dx%d %.4f %d %d %d", o.view.w, o.view.h, static_cast<double>(o.view.dpi), g_choice, g_ask_hover, g_ask_pressed);
@@ -2119,6 +2300,15 @@ std::string fps_key(const View& v) {
     return key;
 }
 
+// The counter where the bar's way has it now (bar_step's part of it).
+void counter_show() {
+    if (!g_fps.window || !g_fps.picture) return;
+    // Only on the screen already: a step never brings it up (counter_place does, once its picture is ready).
+    if (!g_fps.up) return;
+    g_fps.down = g_fps_corner == 1 || g_fps_corner == 2 ? under_bar(g_fps) : 0;
+    show(g_fps);
+}
+
 // The counter where its look and place are now: asked of the painter for a new look or a new read, on the screen once
 // its picture is ready, off it while its reading hides it.
 void counter_place() {
@@ -2143,8 +2333,12 @@ void counter_place() {
     o.key = key;
     order(kCounterPiece, std::move(o));
     g_fps.alpha = kCounterAlpha;
-    // Its picture for this look on the screen; while a new look is made, the one it shows stays.
-    if (g_fps.up || (g_fps.key == key && ready(g_fps))) show(g_fps);
+    // Its picture for this look on the screen; while a new look is made, the one it shows stays. In a top corner it
+    // stands lower by the rows of the bar in sight that its place did not count with.
+    if (g_fps.up || (g_fps.key == key && ready(g_fps))) {
+        g_fps.down = g_fps_corner == 1 || g_fps_corner == 2 ? under_bar(g_fps) : 0;
+        show(g_fps);
+    }
 }
 
 // A look at the count now: what it shows, and when to look again (sooner while it waits for frames).
@@ -2181,12 +2375,16 @@ LRESULT CALLBACK fps_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
 
 std::string g_notice_text;
 bool g_notice_live = false;
-// When it first went on the screen (0: not yet; it slides in from then).
-UINT64 g_notice_shown = 0;
+// When it first went on the screen, on the steady clock in nanoseconds (0: not yet; it slides in from then).
+std::int64_t g_notice_shown = 0;
 constexpr UINT_PTR kNoticeTimer = 1;
 // Sliding in (12 pixels down, fading in, easing out), staying, fading out.
-constexpr UINT64 kSlideMs = 220, kStayMs = 6000, kFadeMs = 300;
+constexpr float kSlideMs = 220, kStayMs = 6000, kFadeMs = 300;
 constexpr float kSlide = 12;
+// Whether it is sliding in or fading out now: the motion's clock steps it then, with the display's refreshes.
+bool g_notice_stepping = false;
+// How far above its resting place its slide in has it now, in pixels.
+int g_notice_drop = 0;
 
 // The notice's look as text: its words, live or not, the counter's corner beside it, its view.
 std::string notice_key(const View& v) {
@@ -2207,10 +2405,19 @@ void order_notice() {
     order(kNoticePiece, std::move(o));
 }
 
+void notice_show() {
+    // Only once it has gone on the screen: its first step is notice_frame's.
+    if (!g_notice_up || !g_notice_shown || !g_notice.picture) return;
+    // Its resting place, less its own slide in, and lower by the rows of the bar in sight that its place did not count
+    // with: the window moves alone (the blur hides the difference).
+    g_notice.down = under_bar(g_notice) - g_notice_drop;
+    show(g_notice);
+}
+
 void notice_frame() {
     if (!g_notice_up) return;
-    const UINT64 now = GetTickCount64();
-    // Its look again for a new place (the bar came or went) or a new size of the game's area.
+    const std::int64_t now = now_ns();
+    // Its look again for a new place (the bar has come down or gone up) or a new size of the game's area.
     const View v = view_now();
     const std::string key = notice_key(v);
     if (g_notice.key != key) order_notice();
@@ -2222,37 +2429,45 @@ void notice_frame() {
         }
         g_notice_shown = now;
     }
-    const UINT64 t = now - g_notice_shown;
+    // Where Windows shows no animations, its slide in and its fade out take no time: it comes and goes at once.
+    const bool animate = animations();
+    const float slide = animate ? kSlideMs : 0.0f, fade = animate ? kFadeMs : 0.0f;
+    const float t = static_cast<float>(now - g_notice_shown) / 1e6f;
     float alpha = 1, drop = 0;
-    if (t < kSlideMs) {
+    if (t < slide) {
         // In: down from a little above, fading in, easing out.
-        const float k = static_cast<float>(t) / kSlideMs;
-        const float ease = 1 - (1 - k) * (1 - k) * (1 - k);
+        const float ease = ease_down(t / slide);
         alpha = ease;
         drop = (1 - ease) * fpx(kSlide);
-    } else if (t > kSlideMs + kStayMs) {
-        alpha = 1 - std::min(1.0f, static_cast<float>(t - kSlideMs - kStayMs) / kFadeMs);
+    } else if (t > slide + kStayMs) {
+        alpha = fade > 0 ? 1 - std::min(1.0f, (t - slide - kStayMs) / fade) : 0.0f;
     }
     // Gone only once the fade out is over: the first frame of the slide in is transparent as well.
-    if (alpha <= 0 && t > kSlideMs) {
+    if (alpha <= 0 && t > slide) {
         KillTimer(g_notice.window, kNoticeTimer);
         hide(g_notice);
         g_notice_up = false;
+        g_notice_stepping = false;
+        g_notice_drop = 0;
         g_notice.picture.reset();
         g_notice.key.clear();
         glass_wish();
         handle_update();
         return;
     }
-    // The picture at its resting place, less the slide: the window moves alone (the blur hides the difference).
-    const int rest = g_notice.y;
-    g_notice.y = rest - static_cast<int>(drop);
+    g_notice_drop = static_cast<int>(drop);
     g_notice.alpha = static_cast<BYTE>(alpha * 255);
-    show(g_notice);
-    g_notice.y = rest;
-    // The next step: every 15 ms while it slides or fades; while it stays, once, when the fade begins.
-    const bool staying = t >= kSlideMs && t < kSlideMs + kStayMs;
-    SetTimer(g_notice.window, kNoticeTimer, staying ? static_cast<UINT>(kSlideMs + kStayMs - t) : 15, nullptr);
+    notice_show();
+    // The next step: with the display's refreshes while it slides or fades (its own timer too, now and then, should
+    // those fail to come); while it stays, once, when the fade begins.
+    const bool staying = t >= slide && t <= slide + kStayMs;
+    g_notice_stepping = !staying;
+    if (staying) {
+        SetTimer(g_notice.window, kNoticeTimer, static_cast<UINT>(std::max(1.0f, slide + kStayMs - t + 1)), nullptr);
+    } else {
+        SetTimer(g_notice.window, kNoticeTimer, 50, nullptr);
+        motion_start();
+    }
 }
 
 LRESULT CALLBACK notice_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
@@ -2267,21 +2482,21 @@ LRESULT CALLBACK notice_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
 
 // ---- the handle (the UI thread's)
 
-Shown g_handle;
 // Whether the game's picture has shown yet: the handle and the bar's reveal wait for it.
 bool g_first_picture = false;
-// Whether the handle is drawn lit (the pointer on its reach), and the view its picture was last asked for: a new view
-// takes it off the screen until its picture comes, a change of light alone keeps the one shown meanwhile.
+// Whether the handle is drawn lit (the pointer on its reach), the view its picture was last asked for (a new view
+// takes it off the screen until its picture comes, a change of light alone keeps the one shown meanwhile), and the
+// look asked of the painter last (asked once, not again at every step).
 bool g_handle_lit = false;
-std::string g_handle_view;
+std::string g_handle_view, g_handle_ordered;
 // While it is lit, the handle's window looks again every 100 ms whether the pointer is still on it: a pointer that leaves
 // over the window's title bar tells the game's window nothing.
 constexpr UINT_PTR kHandleTimer = 1;
 constexpr UINT kHandleCheckMs = 100;
 
-// Whether the handle belongs on the screen now: once the game's picture has shown, while nothing else of the overlay
-// is at the top (the bar, a notice), no question is up and the game runs.
-bool handle_wanted() { return g_first_picture && !g_bar.up && !g_bar_wanted && !g_asking && !g_held && !g_minimised_hold && !g_notice_up; }
+// Whether the handle may be on the screen at all: once the game's picture has shown, while no notice sits at the top,
+// no question is up and the game runs. Where the bar is on its way says the rest (handle_update).
+bool handle_allowed() { return g_first_picture && !g_asking && !g_held && !g_minimised_hold && !g_notice_up; }
 
 // Whether the pointer is on the handle's reach now, over the game's window (the handle lets it through), with no
 // button down and the game not pressed.
@@ -2293,19 +2508,26 @@ bool pointer_on_handle() {
     return on_handle(p.x - a.left, p.y - a.top) && WindowFromPoint(p) == g_game;
 }
 
-// The handle on the screen or off it, as it belongs now, lit while the pointer is on it; its picture asked of the
-// painter for a new view or a change of light.
+// The handle on the screen or off it, as it belongs now, and where the bar's way has it. At rest (no bar): whole, at the
+// game's top edge, lit while the pointer is on it. As the bar comes down it hangs from the bar's foot and fades, its
+// rail cut as the bar's own foot line takes its place, in the look it had when the bar set out; gone before the bar
+// settles. As the bar goes up it comes back the same way. Its picture is asked of the painter for a new view or a
+// change of light.
 void handle_update() {
     if (!g_handle.window) return;
-    if (!handle_wanted()) {
+    if (!handle_allowed()) {
         g_handle_lit = false;
         KillTimer(g_handle.window, kHandleTimer);
         hide(g_handle);
         return;
     }
-    g_handle_lit = pointer_on_handle();
-    // Looked at again while lit, for a pointer that leaves without a word to the game's window.
-    if (g_handle_lit) {
+    // At rest: no bar on the screen and none wanted. Only then does the pointer light it or let it go; under a bar that
+    // is down, whole, it goes unlit, so that it comes back as it rests (the pointer that lit it is on the bar, or gone).
+    const bool resting = !g_bar.up && !g_bar_wanted;
+    if (resting) g_handle_lit = pointer_on_handle();
+    else if (g_bar.up && g_bar_place >= 1.0f) g_handle_lit = false;
+    // Looked at again while lit and at rest, for a pointer that leaves without a word to the game's window.
+    if (g_handle_lit && resting) {
         SetTimer(g_handle.window, kHandleTimer, kHandleCheckMs, nullptr);
     } else {
         KillTimer(g_handle.window, kHandleTimer);
@@ -2317,18 +2539,39 @@ void handle_update() {
     std::snprintf(view, sizeof view, "handle %dx%d %.4f", v.w, v.h, static_cast<double>(v.dpi));
     std::snprintf(key, sizeof key, "%s %s", view, g_handle_lit ? "lit" : "rest");
     if (g_handle.key != key) {
-        Order o;
-        o.view = v;
-        o.key = key;
-        o.lit = g_handle_lit;
-        order(kHandlePiece, std::move(o));
+        if (g_handle_ordered != key) {
+            g_handle_ordered = key;
+            Order o;
+            o.view = v;
+            o.key = key;
+            o.lit = g_handle_lit;
+            order(kHandlePiece, std::move(o));
+        }
         // Its picture for another view comes in a moment: off the screen until then. Lit or not, the one shown stays.
         if (g_handle_view != view && g_handle.up) hide(g_handle);
         g_handle_view = view;
         if (!g_handle.up) return;
     }
-    g_handle.alpha = 255;
+    // Where the bar's last step had it (up, out of sight, while there is none), and what that leaves of the handle.
+    const float place = g_bar.up ? g_bar_place : 0.0f;
+    const BYTE alpha = static_cast<BYTE>(std::lround(255.0f * handle_opacity(place)));
+    if (alpha == 0) {
+        // The bar is down, or nearly: the handle is gone until it goes up again.
+        hide(g_handle);
+        return;
+    }
+    // Not on the screen: it comes at rest, and as a bar on the screen goes up; never while a bar is wanted or coming
+    // down (after the game's first picture the bar comes first, and the handle is first seen as that bar goes up).
+    if (!g_handle.up && !resting && !(g_bar.up && g_slide.to <= 0.0f)) return;
+    // On the bar's foot: lower by the bar's rows in sight, its rail cut as far as the bar covers it.
+    const Hang hang = handle_hang(bar_in_sight(), g_handle.rows);
+    const bool coming = !g_handle.up;
+    g_handle.down = hang.down;
+    g_handle.cut = hang.cut;
+    g_handle.alpha = alpha;
     show(g_handle);
+    // Come onto the screen while a bar is on it (the bar's way up): over the bar's shadow, as on the way down.
+    if (coming && g_handle.up && g_bar.up) handle_above_bar();
 }
 
 LRESULT CALLBACK handle_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
@@ -2558,7 +2801,11 @@ void take_painted() {
         if (accept(g_fps, got[kCounterPiece])) {
             const bool placed = g_fps.picture != nullptr;
             take(g_fps, got[kCounterPiece]);
-            if (g_reading.shown && (g_fps.up || ready(g_fps))) show(g_fps);
+            if (g_reading.shown && (g_fps.up || ready(g_fps))) {
+                // Its new picture where the bar has it now (the same place on the screen as the one before it).
+                g_fps.down = g_fps_corner == 1 || g_fps_corner == 2 ? under_bar(g_fps) : 0;
+                show(g_fps);
+            }
             if (!placed) glass_wish();
         } else {
             glass_wish();
@@ -2607,6 +2854,187 @@ void watch_first() {
     else if (now - g_first_frame_at >= kWatchMostMs) first_picture("no picture brighter than black in 20 s");
 }
 
+// ---- the motion's clock, and what a check reads of a motion (the UI thread's, and a thread of the overlay's own)
+
+// While a piece is on a way, the UI thread steps it once for each refresh of the display, never by a timer's fixed
+// pace: a thread of the overlay's own, the stepper, waits for the compositor's next pass (the moment a layered
+// window's new place is first seen) and posts the clock a message, at most one in its queue at a time, so that a
+// busy UI thread drops steps rather than piling them up. A step only places pictures made before (bar_step,
+// notice_frame): it costs the UI thread a call or two and the game's render thread nothing.
+std::atomic<bool> g_stepping{false}, g_step_posted{false};
+HANDLE g_step_wake = nullptr;
+constexpr UINT kStepMessage = WM_APP + 2;
+// Where the stepper could not be started: the clock window's own timer steps instead, as often as Windows lets it.
+constexpr UINT_PTR kStepTimer = 8;
+
+// A check's trace of the motions (PLAYER_TRACE_MOTION=1): every step said in the log with its time, the rows of the bar
+// in sight and where the handle hangs; after each way, the same stretch of time again with nothing moving, to compare
+// the game's frames with. Without it, with the player's stats on, one line a way.
+bool g_trace_motion = false;
+
+// One way as it is watched: which way, when it began, its steps so far, when the last one was and the longest time
+// between two; the game's count of frames at its start and at its last step, and the longest time between two frames.
+struct Watched {
+    bool on = false, down = false;
+    std::int64_t began = 0, last = 0, longest = 0, until = 0;
+    int steps = 0;
+    FrameCount first, seen;
+    long long longest_frame = 0;
+};
+// The bar's way being watched, and the stretch at rest after it (the trace's).
+Watched g_way, g_still;
+
+// A step of a watched stretch at `now`: counted, its time since the last one kept if it is the longest, and the game's
+// frames since then looked at.
+void watch_step(Watched& w, std::int64_t now) {
+    ++w.steps;
+    // The first step has none before it to be apart from.
+    if (w.steps > 1) w.longest = std::max(w.longest, now - w.last);
+    w.last = now;
+    if (!g_hooks.frames) return;
+    const FrameCount count = g_hooks.frames();
+    if (count.count > w.seen.count) {
+        // The time between the frames shown since the last look, each (one frame as a rule; the mean of several).
+        w.longest_frame = std::max(w.longest_frame, (count.ns - w.seen.ns) / static_cast<long long>(count.count - w.seen.count));
+        w.seen = count;
+    }
+}
+
+// A watched stretch begun at `now`: the game's count of frames as it is then.
+void watch_begin(Watched& w, std::int64_t now, bool down) {
+    w = Watched{};
+    w.on = true;
+    w.down = down;
+    w.began = w.last = now;
+    if (g_hooks.frames) w.first = w.seen = g_hooks.frames();
+}
+
+// What a watched stretch came to, as the end of a log line: its steps and how far apart they were, and the game's
+// frames meanwhile and how far apart those were.
+std::string watch_said(const Watched& w, std::int64_t now) {
+    const double ms = static_cast<double>(now - w.began) / 1e6;
+    const unsigned long long frames = w.seen.count - w.first.count;
+    char line[240];
+    std::snprintf(line, sizeof line,
+                  "%d steps in %.1f ms, %.2f ms apart (the longest %.2f ms); the game showed %llu frames meanwhile, %.2f ms apart (the longest %.2f ms)",
+                  w.steps, ms, w.steps > 1 ? ms / (w.steps - 1) : 0.0, static_cast<double>(w.longest) / 1e6, frames,
+                  frames ? static_cast<double>(w.seen.ns - w.first.ns) / 1e6 / static_cast<double>(frames) : 0.0, static_cast<double>(w.longest_frame) / 1e6);
+    return line;
+}
+
+void trace_settled(std::int64_t now);
+
+// A step of the bar's way `way`, for the trace and the stats: a new way watched from its first step (one cut short by
+// a turn back is said as it is), and with the trace on, the step said.
+void trace_step(const Slide& way, std::int64_t now, float place, int rows) {
+    if (!g_trace_motion && !g_hooks.stats) return;
+    // At rest with nothing watched: no way to tell of.
+    if (!way.moving(now) && !g_way.on) return;
+    if (g_way.on && g_way.began != way.began) {
+        // Turned back midway: the way so far, then the new one from here.
+        note(("player: motion: the bar turned back on its way " + std::string(g_way.down ? "down" : "up") + " after " + watch_said(g_way, now)).c_str());
+        g_way.on = false;
+    }
+    if (!g_way.on) watch_begin(g_way, way.began, way.to > way.from);
+    watch_step(g_way, now);
+    if (!g_trace_motion) return;
+    char line[240];
+    std::snprintf(line, sizeof line,
+                  "player: motion: step %d at %.2f ms: the bar at %.3f, %d of %d rows; the handle %s, %d down, %d cut, opacity %d; the top pieces %d down",
+                  g_way.steps, static_cast<double>(now - g_way.began) / 1e6, static_cast<double>(place), rows, g_bar.rows, g_handle.up ? "up" : "hidden",
+                  g_handle.down, g_handle.cut, g_handle.up ? g_handle.alpha : 0, bar_in_sight());
+    note(line);
+}
+
+// The bar's way is over at `now`: said in a line; with the trace on, the same stretch of time is then watched with
+// nothing moving, for the game's frames to be compared.
+void trace_settled(std::int64_t now) {
+    if (!g_way.on) return;
+    g_way.on = false;
+    note(("player: motion: the bar " + std::string(g_way.down ? "came down: " : "went up: ") + watch_said(g_way, now)).c_str());
+    if (!g_trace_motion) return;
+    watch_begin(g_still, now, g_way.down);
+    g_still.until = now + (now - g_way.began);
+}
+
+// The bar was put away at once at `now` (the window minimised) with a way under way: that way is said as cut short.
+void trace_cut(std::int64_t now) {
+    if (!g_way.on) return;
+    g_way.on = false;
+    note(("player: motion: the bar was put away on its way " + std::string(g_way.down ? "down" : "up") + " after " + watch_said(g_way, now)).c_str());
+}
+
+// The stepper started (or kept going): from now on a step comes with each refresh, until nothing moves any more.
+void motion_start() {
+    if (!g_clock) return;
+    if (!g_step_wake) {
+        // No stepper: the clock window's timer steps.
+        SetTimer(g_clock, kStepTimer, USER_TIMER_MINIMUM, nullptr);
+        return;
+    }
+    if (!g_stepping.exchange(true, std::memory_order_acq_rel)) SetEvent(g_step_wake);
+}
+
+// One step, on the UI thread: everything on a way placed where it is now; with nothing left on a way, the stepper rests.
+void motion_step() {
+    // The bar, with the handle and the pieces at the top. On its way up with the pointer come back onto what is left
+    // of it, it turns back from where it is (bar_frame sees the pointer); else its next step.
+    if (g_bar.up && g_slide.to <= 0.0f && g_slide.moving(now_ns()) && pointer_on_bar()) bar_frame();
+    else bar_step();
+    // The notice's own slide in and fade out.
+    if (g_notice_up && g_notice_stepping) notice_frame();
+    const std::int64_t now = now_ns();
+    if (g_still.on) {
+        // The trace's stretch at rest after a way: steps that move nothing, the game's frames watched as during the way.
+        watch_step(g_still, now);
+        if (now >= g_still.until || g_slide.moving(now)) {
+            g_still.on = false;
+            note(("player: motion: at rest after it, nothing moving: " + watch_said(g_still, now)).c_str());
+        }
+    }
+    // The bar on a way until a step has settled it (not by the clock alone: its way's end may fall between a step and
+    // this look, and the step that settles it must still come).
+    if (g_bar_on_way || (g_notice_up && g_notice_stepping) || g_still.on) return;
+    // Nothing on a way: no more steps until a way begins.
+    g_stepping.store(false, std::memory_order_release);
+    KillTimer(g_clock, kStepTimer);
+}
+
+// The stepper's thread: asleep until a way begins, then a message to the clock at each refresh until none is left.
+void stepper_loop() {
+    // The compositor's wait for its next pass, looked up in System32 rather than linked (the player starts wherever
+    // it did, as with the title bar's colours).
+    using Flush = HRESULT(WINAPI*)();
+    Flush flush = nullptr;
+    if (HMODULE dwm = LoadLibraryExW(L"dwmapi.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32)) flush = reinterpret_cast<Flush>(GetProcAddress(dwm, "DwmFlush"));
+    // A timer finer than the system's tick, for where the compositor gives no pace.
+    HANDLE timer = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+    for (;;) {
+        WaitForSingleObject(g_step_wake, INFINITE);
+        // The waits in a row that came back at once: three, and the compositor is taken not to wait at all here.
+        int quick = 0;
+        while (g_stepping.load(std::memory_order_acquire)) {
+            const std::int64_t before = now_ns();
+            if (flush && quick < 3 && SUCCEEDED(flush())) {
+                // Back within half a millisecond: just before a pass, once; again and again, no wait at all.
+                quick = now_ns() - before < 500000 ? quick + 1 : 0;
+            } else {
+                // No pace from the compositor: the display's own interval as the window knows it (a sixtieth of a
+                // second where it does not), on the finer timer or, without one, by the system's sleep.
+                std::int64_t interval = g_hooks.refresh_ns ? g_hooks.refresh_ns() : 0;
+                if (interval <= 0) interval = 16666667;
+                LARGE_INTEGER due;
+                // Relative, in 100 ns units.
+                due.QuadPart = -std::max<long long>(1, interval / 100);
+                if (timer && SetWaitableTimer(timer, &due, 0, nullptr, nullptr, FALSE)) WaitForSingleObject(timer, 100);
+                else Sleep(static_cast<DWORD>(std::max<std::int64_t>(1, interval / 1000000)));
+            }
+            // One step in the UI thread's queue at a time.
+            if (!g_step_posted.exchange(true, std::memory_order_acq_rel)) PostMessageW(g_clock, kStepMessage, 0, 0);
+        }
+    }
+}
+
 LRESULT CALLBACK clock_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     if (msg == WM_TIMER && w == kGlassTimer) {
         glass_tick();
@@ -2622,6 +3050,12 @@ LRESULT CALLBACK clock_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     }
     if (msg == kPaintedMessage) {
         take_painted();
+        return 0;
+    }
+    if (msg == kStepMessage || (msg == WM_TIMER && w == kStepTimer)) {
+        // The stepper may post its next one from now on.
+        g_step_posted.store(false, std::memory_order_release);
+        motion_step();
         return 0;
     }
     return DefWindowProcW(h, msg, w, l);
@@ -2707,11 +3141,12 @@ void start(HWND frame, HWND game, const Hooks& hooks, bool korean) {
     load_fonts();
     load_art();
     // The notice, the frame counter and the handle let clicks through to the game; the bar and the question take
-    // theirs. The counter and the handle first, so that the windows made after them are above them.
+    // theirs. The counter first, so that the windows made after it are above it; the handle after the bar, above it:
+    // on the bar's way it hangs from the bar's foot, over the bar's shadow, never under it; the question above all.
     g_fps.window = make_window(L"OpenDMTQFrameCounter", fps_proc, true);
-    g_handle.window = make_window(L"OpenDMTQBarHandle", handle_proc, true);
     g_notice.window = make_window(L"OpenDMTQNotice", notice_proc, true);
     g_bar.window = make_window(L"OpenDMTQBar", bar_proc, false);
+    g_handle.window = make_window(L"OpenDMTQBarHandle", handle_proc, true);
     g_ask.window = make_window(L"OpenDMTQQuestion", ask_proc, false);
     // The glass's clock: a window for messages alone, never on the screen.
     WNDCLASSEXW c{};
@@ -2723,6 +3158,11 @@ void start(HWND frame, HWND game, const Hooks& hooks, bool korean) {
     g_clock = CreateWindowExW(0, c.lpszClassName, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, c.hInstance, nullptr);
     // The painter, for the player's life.
     std::thread(painter_loop).detach();
+    // The stepper, likewise: asleep until something is on a way.
+    g_step_wake = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (g_step_wake) std::thread(stepper_loop).detach();
+    // A check's trace of the motions.
+    if (const char* trace = std::getenv("PLAYER_TRACE_MOTION")) g_trace_motion = *trace && *trace != '0';
     // The game's first picture looked for from its first frame.
     if (g_clock) SetTimer(g_clock, kWatchTimer, kWatchMs, nullptr);
     // What the pictures cost, every five seconds, with the stats on.
@@ -2735,6 +3175,8 @@ void notice(const std::string& text, bool live) {
     g_notice_live = live;
     // From its first step, sliding in, once its picture has come; the one shown before goes.
     g_notice_shown = 0;
+    g_notice_stepping = false;
+    g_notice_drop = 0;
     if (g_notice.up) hide(g_notice);
     g_notice.picture.reset();
     g_notice.key.clear();
@@ -2831,7 +3273,8 @@ void ask_quit() {
     g_ask_ahead = fresh;
     g_ask_after = glass::generation();
     g_ask_asked = GetTickCount64();
-    hide_bar();
+    // The bar goes up from where it is (its chips take no press meanwhile); one only wanted so far never comes.
+    bar_frame();
     handle_update();
     // Back from minimised: the window lets the game go on as it comes back (minimised(false)), the question waiting.
     if (IsIconic(g_frame)) ShowWindow(g_frame, SW_RESTORE);
@@ -3015,6 +3458,79 @@ std::shared_ptr<const std::vector<glass::Shot>> test_read() {
     return shots;
 }
 
+// The game's frame from a PNG into the probe's copy of it; false (and a word on stderr) when it is not there or not of
+// the game's area's size.
+bool test_frame(const std::wstring& frame_png) {
+    Bitmap frame(frame_png.c_str());
+    if (frame.GetLastStatus() != Ok || static_cast<int>(frame.GetWidth()) != area_w() || static_cast<int>(frame.GetHeight()) != area_h()) {
+        std::fprintf(stderr, "probe: the frame is not there or not the game area's size (%dx%d)\n", area_w(), area_h());
+        return false;
+    }
+    g_test_frame_w = area_w();
+    g_test_frame_h = area_h();
+    g_test_frame.assign(static_cast<std::size_t>(g_test_frame_w) * static_cast<std::size_t>(g_test_frame_h) * 4, 0);
+    BitmapData data{};
+    Rect all(0, 0, g_test_frame_w, g_test_frame_h);
+    if (frame.LockBits(&all, ImageLockModeRead, PixelFormat32bppARGB, &data) != Ok) return false;
+    for (int y = 0; y < g_test_frame_h; ++y) {
+        const auto* row = static_cast<const std::uint8_t*>(data.Scan0) + static_cast<std::ptrdiff_t>(y) * data.Stride;
+        for (int x = 0; x < g_test_frame_w; ++x) {
+            // BGRA as GDI+ holds it, to the RGBA a read gives.
+            std::uint8_t* q = g_test_frame.data() + (static_cast<std::size_t>(y) * static_cast<std::size_t>(g_test_frame_w) + static_cast<std::size_t>(x)) * 4;
+            q[0] = row[x * 4 + 2];
+            q[1] = row[x * 4 + 1];
+            q[2] = row[x * 4 + 0];
+            q[3] = 255;
+        }
+    }
+    frame.UnlockBits(&data);
+    return true;
+}
+
+// A piece's picture laid over a copy of the game's frame (RGBA, w by h) as its window lies over the game: its top left
+// at (x, y) of the game's area, without its top `cut` rows, at `alpha` as a whole (what show() asks of the window).
+void lay_over(std::vector<std::uint8_t>& rgba, int w, int h, const Canvas& picture, int x, int y, int cut, BYTE alpha) {
+    const auto* from = static_cast<const std::uint8_t*>(picture.bits);
+    for (int row = std::max(0, cut); row < picture.h; ++row) {
+        // The picture's row `cut` is the window's first.
+        const int ty = y + row - cut;
+        if (ty < 0 || ty >= h) continue;
+        for (int col = 0; col < picture.w; ++col) {
+            const int tx = x + col;
+            if (tx < 0 || tx >= w) continue;
+            // Premultiplied BGRA, as the window takes it: over the frame, times the window's opacity.
+            const std::uint8_t* p = from + (static_cast<std::size_t>(row) * static_cast<std::size_t>(picture.w) + static_cast<std::size_t>(col)) * 4;
+            const float whole = static_cast<float>(alpha) / 255.0f, keep = 1.0f - static_cast<float>(p[3]) / 255.0f * whole;
+            std::uint8_t* q = rgba.data() + (static_cast<std::size_t>(ty) * static_cast<std::size_t>(w) + static_cast<std::size_t>(tx)) * 4;
+            for (int c = 0; c < 3; ++c) {
+                q[c] = static_cast<std::uint8_t>(std::lround(std::min(255.0f, static_cast<float>(p[2 - c]) * whole + static_cast<float>(q[c]) * keep)));
+            }
+        }
+    }
+}
+
+// The top `rows` rows of an RGBA picture (w across) as a PNG.
+void save_rows(const std::vector<std::uint8_t>& rgba, int w, int rows, const std::wstring& path) {
+    CLSID png{0x557cf406, 0x1a04, 0x11d3, {0x9a, 0x73, 0x00, 0x00, 0xf8, 0x1e, 0xf3, 0x2e}};
+    Bitmap out(w, rows, PixelFormat32bppARGB);
+    BitmapData data{};
+    Rect all(0, 0, w, rows);
+    if (out.LockBits(&all, ImageLockModeWrite, PixelFormat32bppARGB, &data) != Ok) return;
+    for (int y = 0; y < rows; ++y) {
+        auto* row = static_cast<std::uint8_t*>(data.Scan0) + static_cast<std::ptrdiff_t>(y) * data.Stride;
+        for (int x = 0; x < w; ++x) {
+            // RGBA to the BGRA GDI+ holds.
+            const std::uint8_t* q = rgba.data() + (static_cast<std::size_t>(y) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x)) * 4;
+            row[x * 4 + 0] = q[2];
+            row[x * 4 + 1] = q[1];
+            row[x * 4 + 2] = q[0];
+            row[x * 4 + 3] = 255;
+        }
+    }
+    out.UnlockBits(&data);
+    out.Save(path.c_str(), &png, nullptr);
+}
+
 // One line of the layout file: a piece's picture's name and its window's place and size in the game's area.
 void layout_line(FILE* out, const char* name, int x, int y, const Canvas* c) {
     if (out) std::fprintf(out, "%s %d %d %d %d\n", name, x, y, c ? c->w : 0, c ? c->h : 0);
@@ -3040,32 +3556,7 @@ void test_save(const std::wstring& prefix, const std::wstring& frame_png, bool w
     g_test_quiet = true;
     g_test_no_words = !with_words;
     // The frame behind, as the window would show it: of the game's area's size exactly.
-    {
-        Bitmap frame(frame_png.c_str());
-        if (frame.GetLastStatus() != Ok || static_cast<int>(frame.GetWidth()) != area_w() || static_cast<int>(frame.GetHeight()) != area_h()) {
-            std::fprintf(stderr, "probe: the frame is not there or not the game area's size (%dx%d)\n", area_w(), area_h());
-            return;
-        }
-        g_test_frame_w = area_w();
-        g_test_frame_h = area_h();
-        g_test_frame.assign(static_cast<std::size_t>(g_test_frame_w) * static_cast<std::size_t>(g_test_frame_h) * 4, 0);
-        BitmapData data{};
-        Rect all(0, 0, g_test_frame_w, g_test_frame_h);
-        if (frame.LockBits(&all, ImageLockModeRead, PixelFormat32bppARGB, &data) == Ok) {
-            for (int y = 0; y < g_test_frame_h; ++y) {
-                const auto* row = static_cast<const std::uint8_t*>(data.Scan0) + static_cast<std::ptrdiff_t>(y) * data.Stride;
-                for (int x = 0; x < g_test_frame_w; ++x) {
-                    // BGRA as GDI+ holds it, to the RGBA a read gives.
-                    std::uint8_t* q = g_test_frame.data() + (static_cast<std::size_t>(y) * static_cast<std::size_t>(g_test_frame_w) + static_cast<std::size_t>(x)) * 4;
-                    q[0] = row[x * 4 + 2];
-                    q[1] = row[x * 4 + 1];
-                    q[2] = row[x * 4 + 0];
-                    q[3] = 255;
-                }
-            }
-            frame.UnlockBits(&data);
-        }
-    }
+    if (!test_frame(frame_png)) return;
     // The view the probe draws for: the game's area, the scale it set, the bar up.
     View base;
     base.w = g_test_frame_w;
@@ -3306,6 +3797,90 @@ void test_save(const std::wstring& prefix, const std::wstring& frame_png, bool w
     }
     g_test_quiet = false;
     g_test_no_words = false;
+}
+
+void test_motion(const std::wstring& prefix, const std::wstring& frame_png) {
+    g_test_quiet = true;
+    g_test_no_words = false;
+    if (!test_frame(frame_png)) return;
+    View base;
+    base.w = g_test_frame_w;
+    base.h = g_test_frame_h;
+    base.dpi = window_dpi();
+    const auto shots = test_read();
+    const Drawing drawing(base);
+    // The pictures, each made once as the painter makes it: the bar, the handle at rest and lit, the notice and a
+    // counter at the top left where they stand without the bar.
+    Order o;
+    o.view = base;
+    o.shots = shots;
+    o.key = "probe motion bar";
+    Paint bar_paint, handle_paint, lit_paint, notice_paint, counter_paint;
+    const Painted bar = paint_bar(o, bar_paint);
+    o.key = "probe motion handle";
+    o.lit = false;
+    const Painted handle = paint_handle(o, handle_paint);
+    o.key = "probe motion handle lit";
+    o.lit = true;
+    const Painted lit = paint_handle(o, lit_paint);
+    o.key = "probe motion notice";
+    o.text = g_korean ? "이 플레이를 방송하고 있어요\nMy Server 사이트 LIVE에서 지금도, 끝난 뒤에도 볼 수 있어요" : "Broadcasting your play\nWatch it now or later under LIVE on My Server";
+    o.live = true;
+    o.corner = 1;
+    const Painted notice = paint_notice(o, notice_paint);
+    o.key = "probe motion counter";
+    o.fps = 240;
+    o.ms = 4.2f;
+    const Painted counter = paint_counter(o, counter_paint);
+    if (!bar.picture || !handle.picture || !lit.picture || !notice.picture || !counter.picture) return;
+    FILE* numbers = _wfopen((prefix + L"motion.txt").c_str(), L"w");
+    if (numbers) {
+        // What every moment's numbers are read against: the area, the overlay's scale, the bar's rows, the handle's rail,
+        // the ways' times.
+        std::fprintf(numbers, "area %d %d\nscale %.4f\nbar-rows %d\nhandle-lip %d\ndown-ms %d\nup-ms %d\n", area_w(), area_h(), static_cast<double>(scale()),
+                     bar.rows, handle.rows, kBarDownMs, kBarUpMs);
+    }
+    // What is saved of each: the game's top, twice the bar's own height and its shadow's room.
+    const int kept = std::min(area_h(), bar.rows * 2 + px(kRoomBottom));
+    for (const bool down : {true, false}) {
+        // The whole way, from rest at one end to the other, on a clock that starts at 0.
+        Slide way;
+        way.rest(down ? 0.0f : 1.0f);
+        way.aim(down ? 1.0f : 0.0f, 0, true);
+        const std::int64_t whole = way.lasts;
+        for (const int percent : {0, 25, 50, 75, 100}) {
+            const float place = way.at(whole * percent / 100);
+            const int rows = bar_rows(place, bar.rows);
+            const float opacity = handle_opacity(place);
+            const Hang hang = handle_hang(rows, handle.rows);
+            if (numbers) {
+                std::fprintf(numbers, "%s %d place %.4f rows %d handle-down %d handle-cut %d handle-opacity %.3f pieces-down %d\n", down ? "down" : "up", percent,
+                             static_cast<double>(place), rows, hang.down, hang.cut, static_cast<double>(opacity), rows);
+            }
+            // Two sets: the handle and the bar alone (brought by the pointer on the handle: lit as the bar sets out, at
+            // rest as the bar goes up), and the notice and the counter moving with the bar (no handle beside a notice).
+            for (const bool busy : {false, true}) {
+                std::vector<std::uint8_t> screen = g_test_frame;
+                if (busy) {
+                    // Lower by the rows in sight: both were placed for no bar.
+                    lay_over(screen, g_test_frame_w, g_test_frame_h, *counter.picture, counter.x, counter.y + rows, 0, kCounterAlpha);
+                    lay_over(screen, g_test_frame_w, g_test_frame_h, *notice.picture, notice.x, notice.y + rows, 0, 255);
+                }
+                // The bar over them, its foot at the edge first.
+                if (rows > 0) lay_over(screen, g_test_frame_w, g_test_frame_h, *bar.picture, bar.x, bar.y, bar.rows - rows, 255);
+                // The handle over the bar's shadow, on its foot (its window is above the bar's).
+                if (!busy && opacity > 0.0f) {
+                    const Painted& tab = down ? lit : handle;
+                    lay_over(screen, g_test_frame_w, g_test_frame_h, *tab.picture, tab.x, tab.y + hang.down, hang.cut, static_cast<BYTE>(std::lround(255.0f * opacity)));
+                }
+                wchar_t name[64];
+                std::swprintf(name, 64, L"motion-%ls-%ls-%03d.png", busy ? L"busy" : L"plain", down ? L"down" : L"up", percent);
+                save_rows(screen, g_test_frame_w, kept, prefix + name);
+            }
+        }
+    }
+    if (numbers) std::fclose(numbers);
+    g_test_quiet = false;
 }
 
 void test_set_dpi(float scale) { g_test_dpi = scale; }

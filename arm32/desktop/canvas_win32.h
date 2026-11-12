@@ -52,10 +52,12 @@ struct Canvas {
     std::unique_ptr<Gdiplus::Bitmap> surface() {
         return std::make_unique<Gdiplus::Bitmap>(w, h, w * 4, PixelFormat32bppPARGB, static_cast<BYTE*>(bits));
     }
-    // Shown at (x, y) on the screen, at `alpha` as a whole: a layered window's picture.
-    void show(HWND window, int x, int y, BYTE alpha) {
-        POINT at{x, y}, from{0, 0};
-        SIZE size{w, h};
+    // Shown at (x, y) on the screen, at `alpha` as a whole: a layered window's picture. Without its top `cut` rows, the
+    // window is only as high as what is left of it: a piece that slides out from an edge shows a growing part of its
+    // picture, its place, its size and its opacity all changed in the one call, so that no step shows a half of them.
+    void show(HWND window, int x, int y, BYTE alpha, int cut = 0) {
+        POINT at{x, y}, from{0, cut};
+        SIZE size{w, h - cut};
         BLENDFUNCTION blend{AC_SRC_OVER, 0, alpha, AC_SRC_ALPHA};
         UpdateLayeredWindow(window, nullptr, &at, &size, dc, &from, 0, &blend, ULW_ALPHA);
     }

@@ -89,21 +89,25 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   held note for a second and a half: a click or a held note at the top of a song plays the song and never brings the
   bar, nor does a pointer on its way to the window's title bar. It also comes down by itself for 3 seconds when the
   game's picture first shows (not during its black start) and after each switch between a window and full screen, so
-  that a player sees where it is. It stays while the pointer is on it and goes up soon after the pointer leaves, so it
-  never sits on the game's own controls at the top while they are used. On its left is the OpenDMTQ wordmark as the
+  that a player sees where it is. It slides down out of the game's top edge, its foot first, and back up into it, in
+  about a fifth of a second each way and in step with the display's refreshes, never over the window's title bar; with
+  Windows' animation effects switched off it comes and goes at once. It stays while the pointer is on it and goes up
+  soon after the pointer leaves, so it never sits on the game's own controls at the top while they are used; a pointer
+  that comes back while it goes up turns it back from where it is. On its left is the OpenDMTQ wordmark as the
   launcher's header draws it; on its right are three buttons in the launcher's own shape and depth (two corners cut,
   raised, sunk while held): **minimise** and **full screen** (or back to a window) as secondary buttons, quiet metal
   with a lighter plate under the pointer, and the **X** that quits as the main button, in the launcher's lime from the
   start so that it is seen at once. A button acts only when let go where it was pressed. Minimise holds the game still,
-  and the taskbar brings it back. While the bar is down, the broadcast notice and an FPS counter in a top corner move
-  down under it. It is tall enough to cover the game's own X at the top right of its song and music screens whole.
+  and the taskbar brings it back. The broadcast notice and an FPS counter in a top corner move down with the bar's
+  foot and back up with it. It is tall enough to cover the game's own X at the top right of its song and music screens
+  whole.
 - **The handle**: the game's green line along its top edge at the centre, with a small tab of glass hanging from it in
   the lean of the game's own tabs and a chevron pointing down in the tab, says that the bar comes down from here; with
   the pointer on it the line and the chevron turn lime and the tab grows deeper. The pointer resting on it, or just
-  around it, brings the bar down. It is as large as the game's own header leaves room for at its top centre (26 by 19
-  pixels in a 1280x720 game, in proportion in any other), so it covers none of the game's words or buttons on any
-  screen. It shows once the game's picture is up, and goes while the bar is down, while a notice or the question is up
-  and while the game holds still.
+  around it, brings the bar down: the handle goes down with the bar's foot and fades, and comes back up with it. It is
+  as large as the game's own header leaves room for at its top centre (26 by 19 pixels in a 1280x720 game, in
+  proportion in any other), so it covers none of the game's words or buttons on any screen. It shows once the game's
+  picture is up, and goes while the bar is down, while a notice or the question is up and while the game holds still.
 - **Quitting**: the X asks first, in a glass card over the game dimmed and blurred behind it: **Keep playing** as the
   launcher's main button, or **Quit the game** as its secondary, red under the pointer; so a click by mistake does not
   end a song. Its buttons too act only when let go where they were pressed; Left, Right and Tab move the choice (marked
