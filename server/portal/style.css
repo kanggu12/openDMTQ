@@ -1452,6 +1452,13 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
 /* The days and their two ends as wide as each other: a width in letters would differ, their letters being of two sizes. */
 .off-air > .air-days, .off-air > .air-days-ends { max-width: 100%; }
 .off-air-word { position: absolute; inset: 0; display: grid; place-items: center; font: italic 800 clamp(48px, 11vw, 132px)/1 var(--wide); letter-spacing: 0.02em; color: rgba(255, 255, 255, 0.05); white-space: nowrap; pointer-events: none; user-select: none; }
+/* On a phone the home page's box of broadcasts with nobody on air and none kept is a strip of its two lines, OFF AIR
+   behind them: the screen's height it took (a third of the first screen) goes to what there is to see. The live page's
+   own box, which is all that page has then, keeps its height. */
+@media (max-width: 720px) {
+  .broadcasts .off-air { min-height: 0; padding: 12px 0 4px; }
+  .broadcasts .off-air-word { font-size: 44px; }
+}
 /* REPLAY in metal: a section's red is for what is live. */
 #mast.is-replay .word { background: linear-gradient(180deg, #fff 8%, #8d97a2 72%); -webkit-background-clip: text; background-clip: text; }
 .live-empty-head { font-size: var(--t-xl); font-weight: 700; color: #fff; }
