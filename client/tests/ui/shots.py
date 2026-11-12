@@ -105,8 +105,18 @@ def shot(root, out, name):
     return target
 
 
+def collect():
+    """Python's collector run on the window's thread (main() turns its own runs off): what it frees may be the
+    window's (a dialog's Tk variable, whose end asks Tk), and while no Tk main loop runs, as here, where the tests turn
+    the window by update(), a worker thread that freed one would wait a second for each and fail. In the launcher the
+    main loop runs, and a worker thread's call reaches Tk through it."""
+    import gc
+    gc.collect()
+
+
 def settle(app, seconds=8.0, until=None):
     """Let worker threads (the ready check, the server's answers, a download) finish and reach the window."""
+    collect()
     end = time.time() + seconds
     while time.time() < end:
         app.root.update()
@@ -360,6 +370,7 @@ def wheel_bindings_check(app, problems):
     # Counted with no update between: timers that come and go (the task pump) would move the count. Python's collector
     # runs first and then waits: freeing an old page's pictures (each one a Tcl command too) would move it as well.
     gc.collect()
+    collecting = gc.isenabled()
     gc.disable()
     try:
         before = commands()
@@ -368,7 +379,9 @@ def wheel_bindings_check(app, problems):
             app.body.event_generate("<Leave>")
         after = commands()
     finally:
-        gc.enable()
+        # As it was: main() keeps the collector to the window's thread (collect()).
+        if collecting:
+            gc.enable()
     if after != before:
         problems.append("the page area's wheel left %d Tcl commands after 50 crossings" % (after - before))
     # The pointer over the page, then the window rebuilt in the other language with the pointer away: the first turn of
@@ -1181,6 +1194,9 @@ def main():
     if not safety.on_virtual_display():
         sys.exit("refusing: this opens windows; run it through client/tests/ui/run.sh")
     os.makedirs(args.out, exist_ok=True)
+    # The collector runs on the window's thread only (collect(), at each settle()), never in a worker thread's middle.
+    import gc
+    gc.disable()
     home = tempfile.mkdtemp()
     os.environ["HOME"] = home
     os.environ["OPENDMTQ_CLIENT_DIR"] = os.path.join(home, "client")
