@@ -1,5 +1,70 @@
 # Troubleshooting
 
+For players and the server's owner: what a player can check on a phone or a PC comes first, then
+[what the owner checks on the server](#for-server-owners).
+
+## For players
+
+What a phone or a PC can check. The rest is the server's: [tell its owner](play.md#when-something-does-not-work).
+
+### The server's site does not open
+
+The phone or the PC has to be on the server's network, the same Wi-Fi or the same router, unless the server is
+reachable from the internet. Guest Wi-Fi networks usually keep devices apart. Open the address exactly as the server's
+owner gave it, in Chrome or Samsung Internet. When it still does not open, the server's side is the owner's:
+[the phone cannot open the server page](#the-phone-cannot-open-the-server-page).
+
+### The sign-in is refused
+
+The ID and the password are the ones the server's owner made for you: nobody makes their own, and the owner can give an
+account a new password. After too many wrong passwords the site says **Too many failed sign-ins. Try again in ten
+minutes.** The PC client signs in with the same account, under the same limit.
+
+### The app does not download or install
+
+- **The download page has no app:** with **The app is being built**, the page looks again by itself. **The app could
+  not be built** and **There is no app for this server yet** are the server's: tell its owner
+  ([the app build fails](#the-app-build-fails)).
+- **"App not installed":** the download was cut off, or the storage is full (the app takes a few hundred MB). Free some
+  space and download it again.
+- **Inside a messenger app** (KakaoTalk, LINE and others) a download may fail: **Open in browser** on the page opens it
+  in Chrome or Samsung Internet.
+- **Play Protect** may warn about an app it does not know: choose **Install anyway**.
+- **A newer phone** without 32-bit support (Pixel 7 and later, Galaxy S24 and later, and the others) installs the app
+  only when the app carries OpenDMTQ's runtime. When the download page says the app runs only on devices that can run
+  32-bit apps, tell the server's owner ([the app does not install](#the-app-does-not-install)).
+
+### The game cannot connect, stops at its start or shows no songs
+
+These are the server's: tell its owner. When the server's address changes, its owner builds a new app for it: install
+the new download over the app you have ([the app installs but cannot connect](#the-app-installs-but-cannot-connect)). A
+game that stops at its start, or shows an empty song list, waits for files on the server
+([the game stops at its start](#the-game-stops-at-its-start-or-the-song-list-is-empty)). While the server is under
+maintenance the site says **Under maintenance**, and the game cannot start until it ends.
+
+### The browser warns about the connection
+
+On a server reached over the internet the site is on HTTPS, with a certificate from an authority the server makes for
+itself, so a browser warns on the first visit ("Your connection is not private"). The visit can go on from there
+(Advanced, then Proceed), or the phone can trust the server: [HTTPS](internet.md#https).
+
+### The game downloads data when it starts
+
+On its first start after a fresh install (not an update) the game explains why it needs storage, Android asks, and it
+then fetches its data from the server with a progress bar, about 44 MB with every song's preview, without asking again.
+The data stays in `Android/data/<the app>/files`: later starts and updates over the app ask the server one question and
+fetch nothing. It fetches again when songs were imported, added or removed on the server, and after the app was
+uninstalled, which also takes the data with it.
+
+### A PC does not play
+
+The PC client says why on its bottom line and on its **Help** page, with the player's log. [The PC client's
+troubleshooting](windows-player.md#when-something-goes-wrong) covers a game that does not start, a refused sign-in,
+Windows blocking the installer, black videos and broken sound. A PC reaches the server the same way a phone does, so
+[the server's site does not open](#the-servers-site-does-not-open) applies to it too.
+
+## For server owners
+
 With Docker Compose, start with `./opendmtq doctor`: it checks what the server needs and prints the fix for each
 problem. A host install has no `doctor`: there `./opendmtq status` and `./opendmtq check` show what is running and
 whether the game can reach the server.
@@ -14,7 +79,7 @@ When the game does not start or shows no songs, this chart leads to the right se
   <img src="images/fig-troubleshooting.svg" alt="When the game does not start or shows no songs: if the app does not install, see The app does not install; if the phone cannot open the server's page, see that section; without client data imported, The game stops at its start; if it does not get past its start, The app installs but cannot connect; with no songs in its list, The song list is empty; otherwise the server works" width="100%">
 </p>
 
-## The phone cannot open the server page
+### The phone cannot open the server page
 
 - Phone and server PC must be on the same network: the same Wi-Fi, or the PC wired to the same router. Guest Wi-Fi
   networks usually keep devices apart.
@@ -43,7 +108,7 @@ When the game does not start or shows no songs, this chart leads to the right se
 - `./opendmtq doctor` fails when the port in the address and `LISTEN_PORT` differ: phones would call one port while
   the server listens on the other. `./opendmtq host` sets both.
 
-## The game stops at its start, or the song list is empty
+### The game stops at its start, or the song list is empty
 
 - **No client data.** The game cannot start without the client's tables and the images of its screens, which it
   downloads from the server. The server reports itself unhealthy until they are imported (`./opendmtq doctor` says so,
@@ -55,7 +120,7 @@ When the game does not start or shows no songs, this chart leads to the right se
   (with Docker Compose, `./opendmtq import --songs <folder>`), or add songs one by one on the admin pages
   ([songs.md](songs.md)). The app does not need to be rebuilt: an installed app gets the songs at its next start.
 
-## The app installs but cannot connect
+### The app installs but cannot connect
 
 - **The PC's address changed**, after a router restart for example: the server keeps using the old one. Give it the
   new address with `./opendmtq host <new address>` (on Windows `OpenDMTQ.exe host <new address>`, then close and
@@ -65,7 +130,7 @@ When the game does not start or shows no songs, this chart leads to the right se
 - `./opendmtq check` (`OpenDMTQ.exe check`) walks the same path the app takes. If it passes and the phone still
   fails, the problem is between the phone and the server (see above).
 
-## The app does not install
+### The app does not install
 
 Android says "App not installed" for several reasons. Check them in this order.
 
@@ -89,22 +154,7 @@ Android says "App not installed" for several reasons. Check them in this order.
 To see which phone a player used, find their requests on the Logs page of the admin pages: browsers inside apps
 (KakaoTalk, for example) send the model name, such as `SM-S948N`.
 
-## A PC does not play
-
-The PC client says why on its bottom line and on its **Help** page, with the player's log. [The PC client's
-troubleshooting](windows-player.md#when-something-goes-wrong) covers a game that does not start, a refused sign-in,
-Windows blocking the installer, black videos and broken sound. A PC reaches the server the same way a phone does, so
-the sections above on reaching the server apply to it too.
-
-## The game downloads data when it starts
-
-On its first start after a fresh install (not an update) the game explains why it needs storage, Android asks, and it
-then fetches its data from the server with a progress bar, about 44 MB with every song's preview, without asking again.
-The data stays in `Android/data/<the app>/files`: later starts and updates over the app ask the server one question and
-fetch nothing. It fetches again when songs were imported, added or removed on the server, and after the app was
-uninstalled, which also takes the data with it.
-
-## Setup cannot find the game files
+### Setup cannot find the game files
 
 `setup` looks in the current folder, `~/Downloads` and `~/Desktop` (under WSL, also every Windows user's Downloads and
 Desktop), one folder down in each. It takes archives and apps whose names contain `dmtq`, `djmax` or `technika`,
@@ -123,19 +173,19 @@ any name, with or without a song list, or the songs' `DMQ` folder alone. The And
 changed for another server; the iPhone app is not used, nor is an app OpenDMTQ built. [The game's files](game-files.md)
 has every form the import takes.
 
-## The setup's link does not sign in
+### The setup's link does not sign in
 
 The link the server opens works once, from the server PC, within an hour. Sign in with the user `admin` and the admin
 password instead: the window shows it (on Linux and macOS, `setup` prints it), and it is `ADMIN_PASSWORD` in `.env`. The
 status page then leads to the setup. From another computer, open `http://<server>/opendmtq/admin/setup` and sign in the
 same way.
 
-## Slow or failing under WSL
+### Slow or failing under WSL
 
 Clone the repository inside WSL (for example `~/openDMTQ`), not on the Windows drive (`/mnt/c`): SQLite is slow there,
 and the owner of a file cannot be set. `setup` and `doctor` warn about it.
 
-## The app build fails
+### The app build fails
 
 `./opendmtq up` stops with the reason, and `./opendmtq doctor`, `./opendmtq status` and the Status page of the admin
 pages show it until a build succeeds. `./opendmtq logs builder` has the whole output; on a host install and on Windows
@@ -146,7 +196,7 @@ that failed. If `data/apk/base` holds several different clients, see [several cl
 To choose one, set `BASE_APK=<file name>` in `.env`, or with Docker Compose run `./opendmtq apk --base <file name>`,
 which writes it there.
 
-## The browser warns about the certificate, or HTTPS fails
+### The browser warns about the certificate, or HTTPS fails
 
 With Docker Compose the server's port also answers HTTPS, for browsers (the game keeps to plain HTTP). Its certificate
 comes from an authority the server makes for itself, so browsers warn on the first visit; a phone that installs
@@ -160,7 +210,7 @@ so the game goes on working, and the next `./opendmtq up` makes a new certificat
 
 A host install and the Windows bundle have no HTTPS.
 
-## A host install or the Windows bundle does not start
+### A host install or the Windows bundle does not start
 
 - `./opendmtq setup` names what is missing (Apache, PHP's module, Java, 7-Zip, the pinned tools): run
   `host/install.sh` again. On Windows, unpack the whole zip again. The commands other than `setup`, `start`, `stop`,
@@ -177,7 +227,7 @@ A host install and the Windows bundle have no HTTPS.
 - "no answer from the server, still waiting": the first start can take a few minutes while an antivirus checks the new
   programs. Leave the window open: the setup opens in the browser once the server answers.
 
-## Restoring
+### Restoring
 
 `./opendmtq restore <file>` (a name from `./opendmtq backups`, or the path of an archive copied to this machine)
 checks the archive and that its database can be read and is a game database, saves the current state, stops the
