@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/banner.png" alt="OpenDMTQ, an open-source server for DJMAX Technika Q" width="100%">
+  <img src="images/diagram-architecture.svg" alt="How OpenDMTQ fits together: phones, PCs and browsers reach the server's one public port, where site.conf sends each path to the game server, the game's files, live broadcasts, the players' site or the admin pages, which keep their data in data/. The setup imports the owner's game files, and the app builder patches the owner's APK for this server" width="100%">
 </p>
 
 # Guides

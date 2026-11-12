@@ -1,5 +1,9 @@
 # The PC client
 
+<p align="center">
+  <img src="images/game-pc-live.jpg" alt="The game on a Windows PC through the player: notes and the judgment line over the song's video, blurred in this picture; the bar of frosted glass down across the top with the OpenDMTQ wordmark, minimise, full screen and the X; under it the broadcast notice, a red LIVE tag with Broadcasting your play, Watch it now or later under LIVE on 192.168.1.10; the FPS counter at the bottom right" width="100%">
+</p>
+
 People can play on a Windows PC as well as on a phone or a tablet. On a PC the game runs in the player for Windows, and
 the PC client sits between the player and the person: an installer, and a launcher that connects to the server, signs
 in, downloads the server's app (the same app its phones install) and keeps it up to date, sets the picture and the
@@ -85,6 +89,10 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | Alt+F4 | Nothing: the bar's X quits |
 | Alt alone, F10 | Nothing (no menu mode that would hold the next key) |
 
+<p align="center">
+  <img src="images/overlay-bar.webp" alt="The handle at the game's top centre lights under the pointer, and the bar of frosted glass slides down out of the game's top edge with the wordmark, minimise, full screen and the X, stays, then slides back up" width="100%">
+</p>
+
 - **The bar**: a PC has no phone's buttons around the game, so a bar of frosted glass comes down across the top of the
   game when the pointer rests a moment at the game's very top edge or on the handle, with its button up, or when a
   finger is drawn down from that edge on a touch screen, in either case only once the game has had no click, touch or
@@ -150,6 +158,10 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   off the game (no circles under the fingers, no square for a press and hold, no right click for it), and in full screen
   a finger that comes in from the screen's edge stays the game's instead of opening Windows' panels. Each touch reaches
   the game as Windows takes it in.
+
+<p align="center">
+  <img src="images/game-pc-quit.jpg" alt="The question before quitting: a card of frosted glass over the game, dimmed and blurred behind it, Quit the game? with Keep playing as the main button, ringed by the keyboard's choice, and Quit the game beside it" width="100%">
+</p>
 
 ### The picture
 
