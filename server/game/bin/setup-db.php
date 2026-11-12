@@ -144,6 +144,12 @@ $db->exec('CREATE INDEX IF NOT EXISTS PlayLog_board ON PlayLog (user_id, played_
 $db->exec('DROP INDEX IF EXISTS PlayLog_user');
 // A chart's own ranking, and the admin pages' plays per song and last played: from this index, not the whole log.
 $db->exec('CREATE INDEX IF NOT EXISTS PlayLog_chart ON PlayLog (pattern_id, played_at)');
+// Every save works out the player's achievements twice, before it and after it (src/achievement.php,
+// odq_achievements_held()): their clears counted chart by chart and their best rows with the grade and the two flags.
+// From these two indexes alone, in the order they are counted in: without them each save read the table once for
+// every play the player had and every chart they had played (on a million plays, 19 ms a save against 1.6).
+$db->exec('CREATE INDEX IF NOT EXISTS PlayLog_clears ON PlayLog (user_id, pattern_id, grade)');
+$db->exec('CREATE INDEX IF NOT EXISTS Play_held ON Play (user_id, pattern_id, score, grade, isAllCombo, isPerfectPlay)');
 $db->exec('CREATE INDEX IF NOT EXISTS Member_id ON Member (id)');
 $db->exec('CREATE INDEX IF NOT EXISTS Member_udid ON Member (udid)');
 // The live view: the switch per player (the admin writes it), the upload key of the phone, the notice waiting

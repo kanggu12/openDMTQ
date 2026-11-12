@@ -56,6 +56,8 @@ CREATE INDEX IF NOT EXISTS PlayLog_time ON PlayLog (played_at);
 CREATE INDEX IF NOT EXISTS PlayLog_board ON PlayLog (user_id, played_at, pattern_id, score);
 DROP INDEX IF EXISTS PlayLog_user;
 CREATE INDEX IF NOT EXISTS PlayLog_chart ON PlayLog (pattern_id, played_at);
+CREATE INDEX IF NOT EXISTS PlayLog_clears ON PlayLog (user_id, pattern_id, grade);
+CREATE INDEX IF NOT EXISTS Play_held ON Play (user_id, pattern_id, score, grade, isAllCombo, isPerfectPlay);
 CREATE INDEX IF NOT EXISTS Play_pattern ON Play (pattern_id, score);
 CREATE UNIQUE INDEX IF NOT EXISTS Play_one ON Play (pattern_id, user_id);
 CREATE INDEX IF NOT EXISTS Play_board ON Play (user_id, pattern_id, score);

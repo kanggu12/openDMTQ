@@ -94,6 +94,18 @@ function odq_stored_achievements($guid)
     return $stored;
 }
 
+/* The statement for a player's best rows as the achievements count them (:g, the guid): from Play_held alone. */
+function odq_held_best_sql(): string
+{
+    return 'SELECT pattern_id, ' . odq_sql_score('score') . ' AS score, grade, isAllCombo, isPerfectPlay FROM Play WHERE user_id = :g';
+}
+
+/* The statement for a player's clears counted chart by chart (:g, the guid): from PlayLog_clears alone, in its order. */
+function odq_held_clears_sql(): string
+{
+    return "SELECT pattern_id, COUNT(*) AS n FROM PlayLog WHERE user_id = :g AND grade != 'F' GROUP BY pattern_id";
+}
+
 /*
  * The achievements a player has: those stored, and those their records give by the rules above, from three quick reads:
  * what is stored, their best scores (Play) and their clears counted chart by chart (PlayLog, grouped). That is all a
@@ -112,7 +124,7 @@ function odq_achievements_held($guid)
     $cleared_lines = $combo = $perfect = [];
     $total = 0;
     $db = odq_db();
-    $q = $db ? $db->prepare('SELECT pattern_id, ' . odq_sql_score('score') . ' AS score, grade, isAllCombo, isPerfectPlay FROM Play WHERE user_id = :g') : false;
+    $q = $db ? $db->prepare(odq_held_best_sql()) : false;
     if ($q) {
         $q->bindValue(':g', (int)$guid, SQLITE3_INTEGER);
         $r = $q->execute();
@@ -135,7 +147,7 @@ function odq_achievements_held($guid)
     }
     // Their clears by difficulty, from every play the log has.
     $clears = [];
-    $q = $db ? $db->prepare("SELECT pattern_id, COUNT(*) AS n FROM PlayLog WHERE user_id = :g AND grade != 'F' GROUP BY pattern_id") : false;
+    $q = $db ? $db->prepare(odq_held_clears_sql()) : false;
     if ($q) {
         $q->bindValue(':g', (int)$guid, SQLITE3_INTEGER);
         $r = @$q->execute();

@@ -78,6 +78,26 @@ else
   echo "$plan" | sed 's/^/  /'
   failed=1
 fi
+# A save works out the player's achievements twice, before it and after it: their best rows and their clears chart by
+# chart, each from one index alone (Play_held, PlayLog_clears; setup-db.php) and in its order, never the table once per
+# row (on a million plays that was 19 ms a save against 1.6). The plans of the statements the server runs.
+# shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
+plan=$(docker exec "$NAME" php -r '
+  require "/opt/opendmtq/game/src/rpc.php";
+  foreach (["best" => odq_held_best_sql(), "clears" => odq_held_clears_sql()] as $what => $sql) {
+      $r = odq_db()->query("EXPLAIN QUERY PLAN " . $sql);
+      while ($r && ($row = $r->fetchArray(SQLITE3_ASSOC))) {
+          echo $what, ": ", $row["detail"], "\n";
+      }
+  }' 2>&1) || true
+if grep -q '^best: SEARCH Play USING COVERING INDEX Play_held ' <<<"$plan" \
+  && grep -q '^clears: SEARCH PlayLog USING COVERING INDEX PlayLog_clears ' <<<"$plan" && ! grep -q 'TEMP B-TREE' <<<"$plan"; then
+  echo "PASS a save's achievements read the player's rows from one index each"
+else
+  echo "FAIL a save's achievements read more than one index each:"
+  echo "$plan" | sed 's/^/  /'
+  failed=1
+fi
 # The folder of the built apps that a deployment names (the Helm chart: OPENDMTQ_APK_OUT, APK_DIR in charts from before
 # 2026-11) wins over the image's own default, or the site would find no app there.
 for var in OPENDMTQ_APK_OUT APK_DIR; do
