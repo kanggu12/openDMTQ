@@ -6,6 +6,54 @@ one of fixes, changes and smaller additions raises the patch number. Each releas
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-11-12
+
+### Changed
+
+- The player for Windows: what it shows over the game (the bar, the broadcast notice, the FPS counter and the question
+  before quitting) is drawn at the game's own scale, so on a display at 150 % or 200 % it covers no more of the game
+  than at 100 %; it is never smaller than half its size at Windows' scale. The smallest game window is 480x270 at
+  Windows' scale, and the launcher's Screen page and `--set window=` offer nothing smaller.
+- The launcher: one lime button on each screen; the first-start guide's SOUND CHECK step shows the volume first, under
+  the title Sound and screen, and its last step has no Skip; text picked in a field is in the launcher's colours.
+- The site and the admin pages: one set of text sizes on every page; the download buttons in one size; the home page's
+  new records in their charts' difficulty colours; the admin pages' meters, bars and charts in plain light, so that
+  colour marks a state; the song tiles beside a long title no longer have a hole in them; the way to the broadcasts is
+  red only while someone is on air.
+- Every install shows the same version for the same code: the release, and past it the release and its commit.
+- The API: a player's average accuracy is rounded as the site rounds it, and is null for a player with no plays. A
+  maintenance message is at most 200 characters, on the page and in the API.
+
+### Removed
+
+- The player for Windows: F11 and Alt+Enter no longer switch full screen; the bar's full-screen button and the
+  launcher's Screen page do.
+
+### Fixed
+
+- The game server: on a server with many plays a save read the player's whole history twice, 19 ms of a processor on
+  a million plays; it now reads two indexes, made at the server's next start, and takes under 2.
+- The game server and the site: the TOTAL ranking, the site's rankings, its home page and its list of songs added up
+  every play or best again at each look (100 ms on a million plays); they now keep what they worked out until the
+  next play or change of a player, and answer in about 1 ms. The home page read the whole log on a server whose
+  newest plays were no records (2.4 s); it now reads an index of the records.
+- The player for Windows: on a computer with two GPUs, as most gaming laptops have, it asks NVIDIA's and AMD's
+  drivers for the fast one; its log names the GPU that draws the game.
+- The player for Windows: no key changes the window while the question before quitting is up; closing a minimised game
+  from the taskbar asks over the game's picture instead of a black one; in the smallest windows on a scaled display the
+  bar's buttons no longer cover its wordmark.
+- The launcher: an address with a space is refused in plain words, in the window and with `--server`; after a failed
+  connection the typed address stays; opening OpenDMTQ from the installer no longer says it added a server already in
+  use; update and install errors are in plain words in both languages; PLAY and Help show the game's end at once; Help
+  no longer moves after one of its tools.
+- The site: names with `&` or quotes show as typed on the Live page; the average accuracy is rounded, not cut; a
+  broadcast's time on Live matches its card; pages no longer move when their fonts arrive; the download page says
+  plainly when there is no app yet; the licenses page names the player's fonts and picture effects.
+- The admin pages: the change log says every change in words, in both languages; the disk chart counts the game files,
+  the app, the installer and the runtime as OpenDMTQ's own; the song search finds a song by the number the list shows;
+  the Players page with no players says so plainly; counts of one read right; the Korean pages use one word for each
+  thing.
+
 ## [0.9.3] - 2026-11-12
 
 ### Changed
@@ -594,7 +642,8 @@ one of fixes, changes and smaller additions raises the patch number. Each releas
 - Four ways to run it: the Windows bundle, one command on Linux or macOS, Docker Compose, and a Helm chart for
   Kubernetes.
 
-[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.9.3...HEAD
+[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.9.4...HEAD
+[0.9.4]: https://github.com/kanggu12/openDMTQ/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/kanggu12/openDMTQ/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/kanggu12/openDMTQ/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/kanggu12/openDMTQ/compare/v0.9.0...v0.9.1
