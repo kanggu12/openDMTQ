@@ -1796,6 +1796,37 @@ void handle_above_bar() {
     SetWindowPos(g_handle.window, above ? above : HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 }
 
+// How many windows above the bar's are looked at for the game's own (bar_above_game): it is put right above the bar,
+// with at most the handle between.
+constexpr int kOrderLook = 4;
+
+// The bar's window above the game's, where the game's has got above it. Windows keeps a window above the one that owns
+// it, and there this finds nothing to do. Wine (the checks run on it) puts a window that its screen uncovers a part of
+// right above the window that covered it: the game's window above the bar, each time a step of the bar's way or the
+// handle's going leaves a pixel of the game free. The bar is still seen there, but the mouse is the game's on it: its
+// chips would neither light nor take a click. So each step and each look of the bar puts it back just above the
+// game's window (under the window that is above that one: never over another program's), and the handle above it.
+void bar_above_game() {
+    // Only a bar on the screen has a place among the windows to keep.
+    if (!showing() || !g_bar.window || !g_bar.up || !g_frame) return;
+    // The windows above the bar's, one by one from the bar up.
+    HWND above = g_bar.window;
+    for (int looked = 0; looked < kOrderLook; ++looked) {
+        // The next window up; none: the bar is the top one, the game's is under it.
+        above = GetWindow(above, GW_HWNDPREV);
+        if (!above) return;
+        // Another window (the handle, the question, another program's): the one above it next.
+        if (above != g_frame) continue;
+        // The game's window is above the bar: the bar goes right above it, under the window that is above the game's
+        // now (at the top where the game's is the top one).
+        HWND over = GetWindow(g_frame, GW_HWNDPREV);
+        SetWindowPos(g_bar.window, over ? over : HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+        // The handle over the bar's shadow again, wherever that left it.
+        handle_above_bar();
+        return;
+    }
+}
+
 // The counter's window where its place and the bar have it now: in a top corner it is lower by the rows of the bar in
 // sight (it moves with the bar's foot); at the bottom the bar never moves it.
 void counter_show();
@@ -1834,6 +1865,8 @@ void bar_step() {
     g_bar.cut = g_bar.rows - rows;
     g_bar.alpha = 255;
     show(g_bar);
+    // Above the game's window still: its chips take the pointer.
+    bar_above_game();
     if (coming && g_bar.up) {
         g_bar_coming = false;
         char line[160];
