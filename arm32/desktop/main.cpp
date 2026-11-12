@@ -266,6 +266,11 @@ void make_dirs(const std::string& path) {
 int main(int argc, char** argv) {
     using namespace arm32;
     using player::app;
+#ifdef _WIN32
+    // A test's unlisted run (PLAYER_WINDOW_UNLISTED) asked about first thing: from here on Windows shows no box of its
+    // own for it, a crash's included (window_win32.cpp).
+    player::window_unlisted();
+#endif
     // The sound devices this computer has, for the PC client's choice, as JSON lines: nothing else starts.
     if (argc == 2 && std::string(argv[1]) == "--audio-devices") {
         std::fputs(player::audio::list_devices().c_str(), stdout);

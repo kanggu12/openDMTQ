@@ -419,6 +419,12 @@ void dark_title_bar(HWND h) {
 
 // The frame over the whole display it is on, without its border, and back.
 void toggle_fullscreen(HWND h) {
+    // A test's unlisted window (window_unlisted) stays a window: full screen covers the display nearest to it, which a
+    // window kept off every monitor would put on the person's own. Said in the log, which the test reads.
+    if (!g_fullscreen && window_unlisted()) {
+        jvm::log("player: no full screen for a test's unlisted window: it would cover a monitor");
+        return;
+    }
     DWORD style = static_cast<DWORD>(GetWindowLongW(h, GWL_STYLE));
     if (!g_fullscreen) {
         MONITORINFO mi{};
@@ -1225,8 +1231,8 @@ LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
 
 // A test's window with no animation of its own (window_unlisted), should a check minimise or restore it: DWM's
 // transitions off for it (DWMWA_TRANSITIONS_FORCEDISABLED). dwmapi is looked up in System32 rather than linked, as for the
-// title bar. Best effort: a Windows without the call has the window animate as any other.
-void no_transitions(HWND h) {
+// title bar. Best effort: false where Windows has no such call or turned it down, and the window animates as any other.
+bool no_transitions(HWND h) {
     using SetAttribute = HRESULT(WINAPI*)(HWND, DWORD, LPCVOID, DWORD);
     // The call once, from System32's dwmapi.dll.
     static const SetAttribute set = [] {
@@ -1236,7 +1242,7 @@ void no_transitions(HWND h) {
     // Attribute 3 is DWMWA_TRANSITIONS_FORCEDISABLED; TRUE turns the window's minimise, restore, show and hide
     // animations off.
     const BOOL off = TRUE;
-    if (set) set(h, 3, &off, sizeof off);
+    return set && SUCCEEDED(set(h, 3, &off, sizeof off));
 }
 
 }  // namespace
@@ -1245,7 +1251,11 @@ bool window_unlisted() {
     // Read once: the player's environment does not change while it runs, and only "1" turns it on.
     static const bool unlisted = [] {
         const char* value = std::getenv("PLAYER_WINDOW_UNLISTED");
-        return value && std::strcmp(value, "1") == 0;
+        const bool on = value && std::strcmp(value, "1") == 0;
+        // Nor any box of Windows' own for a crash or a missing disk, from here on (main asks first thing): a test's
+        // crash is in its log and its exit code, and Windows' "stopped working" box would be on the person's desktop.
+        if (on) SetErrorMode(GetErrorMode() | SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+        return on;
     }();
     return unlisted;
 }
@@ -1292,9 +1302,11 @@ bool open_window(const std::string& title) {
         return false;
     }
     if (window_unlisted()) {
-        // Nor any animation of its own, then said in the log, which a test's run reads to know the switch took.
-        no_transitions(g_frame);
-        jvm::log("player: the window is on no taskbar and in no Alt+Tab, with no animation (a test's, PLAYER_WINDOW_UNLISTED, extended style %08lx)",
+        // Nor any animation of its own where Windows allows, then said in the log, which a test's run reads to know the
+        // switch took.
+        const bool still = no_transitions(g_frame);
+        jvm::log("player: the window is on no taskbar and in no Alt+Tab, %s (a test's, PLAYER_WINDOW_UNLISTED, extended style %08lx)",
+                 still ? "with no animation" : "its animations as Windows has them",
                  static_cast<unsigned long>(GetWindowLongW(g_frame, GWL_EXSTYLE)));
     }
     jvm::log("player: the window has a title bar and a frame, no buttons of its own (style %08lx)",

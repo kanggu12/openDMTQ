@@ -155,8 +155,9 @@ jvm::Object* unity_player();
 // window behind a Surface (0 for anything else); and its events, handled until the window is closed (false then).
 bool open_window(const std::string& title);
 // A test's run that leaves nothing on the desktop of the PC it runs on (window_win32.cpp; PLAYER_WINDOW_UNLISTED=1, which
-// only tests set, read once): the window on no taskbar and in no Alt+Tab or Task View, with no animation of its own, and
-// a reason the player cannot start said in the log alone, with no box.
+// only tests set, read once, first thing in main): the window on no taskbar and in no Alt+Tab or Task View, with no
+// animation of its own and never in full screen; a reason the player cannot start said in its log (or its output before
+// there is a log) with no box, and no box of Windows' own for a crash.
 bool window_unlisted();
 jvm::Object* surface();
 std::uintptr_t window_of(jvm::Object* surface);

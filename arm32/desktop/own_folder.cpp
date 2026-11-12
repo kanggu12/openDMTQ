@@ -318,8 +318,8 @@ void show_error(const std::string& what) {
     jvm::log("player: %s", what.c_str());
 #ifdef _WIN32
     // Only a start by a double click has no console to say it in: a start with arguments (a test, a developer) has its
-    // output, and no box that waits for a click. A test's unlisted run (window_unlisted) has the log, and a box would
-    // be on the desktop it keeps clear.
+    // output, and no box that waits for a click. A test's unlisted run (window_unlisted) has the log, or its output
+    // before there is a log, and a box would be on the desktop it keeps clear.
     if (!g_own_folder || window_unlisted()) return;
     // The launcher's own dialog as a window of its own (error_box_win32.cpp): what happened in the user's language, the
     // reason as the log has it, and where the log is when it has one yet.
