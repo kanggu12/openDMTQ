@@ -133,9 +133,8 @@ window.layoutAudit = function layoutAudit() {
     }
   }
 
-  // Boxes side by side: same top, same bottom. Not the song catalog's tiles (style.css .songs): each is as tall as its own
-  // words, so that one long title leaves no hole in the tiles beside it; its jackets and titles still start on one line.
-  for (const parent of document.querySelectorAll('.two, .three, .home-lists, .tiles, .dash-grid, .podium, .thumbs, .past-list, .stats, .steps, .chapters, .watch')) {
+  // Boxes side by side: same top, same bottom (the song catalog's tiles too: a title keeps to two lines, style.css .song .t).
+  for (const parent of document.querySelectorAll('.two, .three, .home-lists, .tiles, .dash-grid, .podium, .songs, .thumbs, .past-list, .stats, .steps, .chapters, .watch')) {
     if (!seen(parent) || parent.matches('.podium, .watch')) continue;
     const kids = [...parent.children].filter(seen);
     const lines = new Map();

@@ -208,5 +208,5 @@ What a release publishes:
 | The player for Windows alone | `opendmtq-player-windows.zip` |
 
 A release names itself by its number (`0.2.0`): the Windows bundle, the one-command install and the Helm chart. A copy
-from a clone names itself by the date and commit of its code (`2026.11.07-62ce933`). The site shows it beside its logo,
-and the admin pages on their Status page.
+from a clone names itself the same at a release's tag, and past it by that release and its commit (`0.9.3-d5e201c`),
+with Docker and without. The site shows it beside its logo, and the admin pages on their Status page.
