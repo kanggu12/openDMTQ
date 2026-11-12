@@ -605,7 +605,8 @@ tr.row-bad { background: color-mix(in srgb, var(--bad) 9%, transparent); }
 tr.row-warn { background: color-mix(in srgb, var(--warn) 6%, transparent); }
 .sub-kind { color: var(--ash); white-space: nowrap; }
 .play-grade > span { display: inline-flex; align-items: center; gap: 6px; min-width: 62px; white-space: nowrap; }
-.log-who .link-btn { font-family: var(--mono); font-size: var(--t-xs); font-weight: 500; color: var(--chalk); }
+/* An address to narrow the list by: a target a finger can press (24 px), in the list's small mono size. */
+.log-who .link-btn { min-height: 24px; font-family: var(--mono); font-size: var(--t-xs); font-weight: 500; color: var(--chalk); }
 .changes { list-style: none; margin: 0; padding: 0; }
 /* When, what, on what: three columns, so that the eye can run down each. On a phone what it was on goes under the rest. */
 .changes li { display: grid; grid-template-columns: 9.5em minmax(0, 15em) minmax(0, 1fr) minmax(0, 9em); align-items: baseline; gap: 4px 12px; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.075); font-size: var(--t-sm); }
