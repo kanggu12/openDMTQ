@@ -356,6 +356,9 @@ class ScrollArea(tk.Frame):
         root = self._root()
         root.tk.call("bind", root._w, "<FocusIn>", "+" + self._focus_line)
         self.bind("<Destroy>", lambda e: e.widget is self and self._focus_gone(), add="+")
+        # A shorter page's second look goes with the area: its timer would call a command that went with it.
+        self.bind("<Destroy>", lambda e: e.widget is self and self._shrink_job is not None
+                  and self.after_cancel(self._shrink_job), add="+")
 
     def _bar_set(self, first, last):
         """Show the scroll bar only when the content is taller than the area, in the room the strip keeps for it; tell
