@@ -192,6 +192,32 @@ function watch(page, url) {
   return faults;
 }
 
+// The owner's pages give a screen one primary button: two that one screen holds at once, on an admin page, are a finding
+// (two-primaries), wherever on the page they are. A far one on a long page is no second on this screen. Only what can be
+// pressed counts: a disabled one is drawn plain.
+function twoPrimaries(page) {
+  return page.evaluate(() => {
+    if (!location.pathname.startsWith('/opendmtq/admin')) return [];
+    const shown = [...document.querySelectorAll('.btn-primary')].filter(b => {
+      const s = getComputedStyle(b), r = b.getBoundingClientRect();
+      return !b.disabled && s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0;
+    }).map(b => {
+      const r = b.getBoundingClientRect();
+      return { words: b.textContent.trim().replace(/\s+/g, ' ').slice(0, 30), top: r.top + scrollY, bottom: r.bottom + scrollY };
+    });
+    const found = [];
+    for (let i = 0; i < shown.length; i++) {
+      for (let j = i + 1; j < shown.length; j++) {
+        // Both within one screen's height: a screen can show them together.
+        if (Math.max(shown[i].bottom, shown[j].bottom) - Math.min(shown[i].top, shown[j].top) <= innerHeight) {
+          found.push({ kind: 'two-primaries', at: `${shown[i].words} + ${shown[j].words}`, detail: `${innerWidth}x${innerHeight}` });
+        }
+      }
+    }
+    return found;
+  });
+}
+
 // The checker on the page as it is now.
 async function audit(page) {
   // What moves as a page arrives (style.css, "motion": bars filling, the player's row glowing) is measured where it
@@ -225,7 +251,8 @@ async function sweep(contexts, pages, widths, langs = ['en', 'ko']) {
         }
         if (options.settle) await pause(options.settle);
         if (status !== (options.status || 200)) faults.push(`status ${status}, expected ${options.status || 200}`);
-        const items = await audit(page);
+        // The layout, and on the owner's pages one primary button to a screen.
+        const items = [...await audit(page), ...await twoPrimaries(page)];
         for (const f of faults) items.push({ kind: 'page-fault', at: f, detail: '' });
         for (const f of items) {
           const key = `${f.kind} | ${name} | ${f.at} | ${f.detail}`;
@@ -281,12 +308,24 @@ async function self(contexts) {
   for (const kind of ['clipped', 'sticks-out', 'overlap', 'rows', 'columns', 'past-screen', 'page-wide', 'covered', 'contrast', 'default-control', 'no-style', 'small-target', 'broken-image', 'side-scroll', 'broken-word', 'split-sentence']) {
     check(`the checker sees ${kind}`, kinds.has(kind));
   }
+  // And two primary buttons on one screen of an owner's page (its address makes it one), not one of them far down the
+  // page, nor one that cannot be pressed.
+  const owner = await contexts.anon.newPage();
+  await owner.setViewport({ width: 800, height: 600 });
+  await owner.goto(`${A}/login`, { waitUntil: 'domcontentloaded' });
+  const planted = async html => { await owner.setContent(html); return (await twoPrimaries(owner)).length; };
+  const together = await planted('<button class="btn btn-primary">One</button><button class="btn btn-primary">Two</button>');
+  const apart = await planted('<button class="btn btn-primary">One</button><div style="height:1200px"></div><button class="btn btn-primary">Two</button>');
+  const waiting = await planted('<button class="btn btn-primary">One</button><button class="btn btn-primary" disabled>Two</button>');
+  check('the checker sees two-primaries', together === 1 && apart === 0 && waiting === 0, `${together} ${apart} ${waiting}`);
+  await owner.close();
 }
 
 const visible = (page, selector) => page.$eval(selector, e => !e.hidden && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0).catch(() => false);
 const textOf = (page, selector) => page.$eval(selector, e => e.textContent).catch(() => '');
 const noFindings = async (page, name) => {
-  const items = await audit(page);
+  // The layout, and on the owner's pages one primary button to a screen, in whatever state the steps left the page.
+  const items = [...await audit(page), ...await twoPrimaries(page)];
   check(`${name}: nothing wrong with the layout`, items.length === 0, items.slice(0, 6).map(f => `${f.kind} ${f.at} ${f.detail}`.slice(0, 140)).join(' ; '));
 };
 
