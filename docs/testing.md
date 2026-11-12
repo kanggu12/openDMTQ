@@ -132,6 +132,7 @@ In `tests/ui/run.sh` a real browser then takes the server through a life, in sta
 | `self` | | One planted fault of each kind (`defects.html`): a checker that stopped seeing something must not pass as a page without faults |
 | `empty` | Nothing on the server | Every page, at a phone's and a laptop's width, in both languages |
 | `full` | Players, plays, recordings, an app | Every page, at 360, 744, 1024, 1280 and 1920, in both languages |
+| `keys` | The same, two players playing with the keyboard (`run.sh` writes what the database holds of their plays and bests) | Every keyboard mark of the site and the admin pages against the database: there where a keyboard play made the score, with how many beside a total, nowhere else; beside what it marks, at a phone's and a laptop's width, in both languages |
 | `air` | Two players broadcasting | The video playing; the pages that change |
 | `maint` | Maintenance on, by the owner's form, with a long message | Every page that shows the notice; then off again |
 | `flows` | | What people do: language, sign-in, searches, the replay player on a laptop and a phone, the owner's forms |

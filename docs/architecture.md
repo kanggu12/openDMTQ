@@ -154,6 +154,12 @@ What the replies rely on, as the client behaves:
   result no play gives (a count of notes below 0, above 10,000 or not a whole number, no notes at all, a player id
   without an account, a chart no song of the server has) answers `SVC.05008` and is not stored. A hidden song's charts
   are the server's: a play finished while the owner hid its song is kept.
+- **The keyboard's mark.** The PC client's player adds the header `X-OpenDMTQ-Keys: 1` to a save when a lane key was
+  pressed during that song, and nothing otherwise; a phone never sends it. Such a play is marked: `keys` is 1 on its
+  `PlayLog` row, and on the player's `Play` row when the play sets the best score there. A new best by touch sets it back
+  to 0, and a worse play or a tie leaves it as the play that set the best left it. Only the value 1 marks a play. The
+  game's replies and its rankings are the same with or without it: the site and the admin pages show the mark, and the
+  rankings are one for touch and keys.
 - **Everyone has everything.** Level 99, 999,999 MAX POINT, every song from 1 to the highest id, every item. No quests,
   no coupons (every code is invalid, in the client's own popup), no terms popup.
 
@@ -166,7 +172,9 @@ for the site's This month tab and the months before it, which are the game's own
 check account is never ranked. A month's board (TOTAL and the LINE tabs) and the site's totals are worked out once and
 kept in the server's run folder with the number of `BoardStamp`, which triggers raise at every change of `PlayLog`, `Play`
 and `Member`, whoever makes it; while the number stays, a look at a ranking reads what was kept (on a million plays,
-1 ms against 100), and the first look after a change works it out again. A restore on the admin pages, which the
+1 ms against 100), and the first look after a change works it out again. The site's keyboard counts beside a total and a
+month's score are kept the same way, read from indexes of the keyboard's rows alone (`Play_keys`, `PlayLog_keys`). A
+restore on the admin pages, which the
 server runs through, moves the number past every one the live database had used, so that nothing kept before it is
 taken for the restored data's. What saves and rankings need of the song list (each chart's line and difficulty, the
 charts of a line and of a song) is kept the same way, as a PHP file named after the list's file and made from that very
@@ -311,10 +319,12 @@ picture and overlay work, is in [the PC client](windows-player.md#how-it-works).
 `server/entrypoint.sh` (the image) and `host/opendmtq_host` (a host install) do the same before Apache starts:
 
 - `server/game/bin/setup-db.php` prepares the database: a new one gets the game's two tables (`Member`, `Play`); every
-  start adds what later versions need (`PlayLog`, `AchievementDate`, `LiveSwitch`, `LiveSetting`, `SiteUser`, `ApiToken`, the indexes), merges a
-  player's duplicate score rows on one chart (the best of each), caps scores a forged result left out of range, stores
-  players' names that are no UTF-8 as UTF-8 (read as CP949 where they are that, else with U+FFFD in place of each bad
-  byte), and deletes plays older than a year. It picks the journal mode the disk allows.
+  start adds what later versions need (`PlayLog`, `AchievementDate`, `LiveSwitch`, `LiveSetting`, `SiteUser`,
+  `ApiToken`, the indexes, the keyboard's column `keys` on `Play` and `PlayLog` with 0 in every older row: where it
+  cannot be added the server does not start, as every save would fail), merges a player's duplicate score rows on one
+  chart (the best of each), caps scores a forged result left out of range, stores players' names that are no UTF-8 as
+  UTF-8 (read as CP949 where they are that, else with U+FFFD in place of each bad byte), and deletes plays older than a
+  year. It picks the journal mode the disk allows.
 - The live broadcasts' window (`data/state/live`) starts empty; the recordings stay.
 - The key that signs the site's sign-in cookie (`data/state/download.key`) is made once.
 - A small process keeps one database handle open while the server runs, so that closing a request's handle does not fold
@@ -357,6 +367,7 @@ erDiagram
     CHAR isAllCombo
     CHAR isPerfectPlay
     INTEGER judgement "accuracy in tenths of a percent"
+    INTEGER keys "1: the play that set the score used the keyboard"
   }
   PlayLog {
     INTEGER id PK
@@ -367,6 +378,7 @@ erDiagram
     INTEGER judgement
     INTEGER is_record
     INTEGER played_at
+    INTEGER keys "1: played with the keyboard"
   }
   AchievementDate {
     INTEGER user_id PK
@@ -409,8 +421,8 @@ erDiagram
 | Table | Holds |
 |---|---|
 | `Member` | One row per account and phone: the player's ids, the phone's device id, the name, the equipped items |
-| `Play` | Each player's best on each chart (one row, `Play_one` keeps it so) |
-| `PlayLog` | Every saved play, a year of them: the monthly rankings, the site's recent plays and new records |
+| `Play` | Each player's best on each chart (one row, `Play_one` keeps it so), with the keyboard's mark of the play that set its score |
+| `PlayLog` | Every saved play, a year of them: the monthly rankings, the site's recent plays and new records; whether each was played with the keyboard |
 | `AchievementDate` | When each player earned each achievement |
 | `BoardStamp` | The rankings' change number, one row: what the kept boards were worked out at |
 | `LiveSwitch` | The live view's switch per player, the upload token, who is in a song |
@@ -418,7 +430,7 @@ erDiagram
 | `ApiToken` | The API's tokens, made on the admin pages: a hash of each, and the admin it belongs to |
 
 `Member` and `Play` keep the names and types of the tables earlier DMTQ servers used, so their databases open
-unchanged. The
+unchanged; `Play`'s one column more, `keys`, comes last, with 0 for every row that was there. The
 database runs in SQLite's write-ahead mode where the disk allows it, tried first on a scratch file in the same folder:
 a disk that cannot do it (a Windows drive under WSL, some network disks) stays in the older mode, which is slower.
 `dmtq.db3-wal` and `dmtq.db3-shm` belong to it: copy the database with `./opendmtq backup` or the admin pages, never by
