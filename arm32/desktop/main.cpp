@@ -42,6 +42,17 @@
 
 namespace player {
 
+#ifdef _WIN32
+// A computer with two GPUs (most gaming laptops: an integrated one and a fast one) runs a program on the integrated one
+// unless the program asks otherwise. NVIDIA's and AMD's drivers read these two exports of the program itself, at its
+// start, and put its Direct3D (ANGLE's, under the game's OpenGL ES) on the fast GPU. A computer with one GPU reads
+// nothing from them.
+extern "C" {
+__declspec(dllexport) unsigned long NvOptimusEnablement = 1;
+__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+#endif
+
 namespace {
 
 // Whether the guest's names are fenced in (guest_paths.h): on Windows, where the app is a server's and the player is
