@@ -3,6 +3,7 @@
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -553,7 +554,8 @@ class MessageTest(unittest.TestCase):
         program = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "opendmtq")
         shown = subprocess.run([sys.executable, program, "--help"], capture_output=True, text=True, timeout=60)
         self.assertEqual(shown.returncode, 0, shown.stderr)
-        listed, _, after = shown.stdout.partition("options:")
+        # The list ends at argparse's heading of the options: "options:" from Python 3.10, "optional arguments:" before.
+        listed, after = re.split(r"\n(?:options|optional arguments):\n", shown.stdout, maxsplit=1)
         self.assertIn("    setup ", listed)
         self.assertNotIn("deploy", listed)
         self.assertIn("for a live server's maintainers", after)
