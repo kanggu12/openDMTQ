@@ -318,7 +318,7 @@ Refusals:
 
 ### App
 
-The App page: the app on offer, its builds, the way friends get it.
+The App page: the app on offer, its builds, the way players get it.
 
 | Route | Scope | What it does |
 |:---|:---:|:---|
@@ -331,7 +331,7 @@ The App page: the app on offer, its builds, the way friends get it.
 | [`GET /builds/{file}/download`](#get-buildsfiledownload) | read | One build's APK. |
 | [`DELETE /builds/{file}`](#delete-buildsfile) | write | Deletes a build. |
 | [`POST /builds/prune`](#post-buildsprune) | write | Deletes every build but the one the site offers. |
-| [`GET /invite`](#get-invite) | read | The download page by the address all phones use, as the message to a friend has it. |
+| [`GET /invite`](#get-invite) | read | The download page by the address all phones use, as the message to a new player has it. |
 | [`GET /invite/qr`](#get-inviteqr) | read | The download page's QR code. |
 
 #### `GET /app`
@@ -441,7 +441,7 @@ Refusals:
 
 #### `GET /invite`
 
-The download page by the address all phones use, as the message to a friend has it.
+The download page by the address all phones use, as the message to a new player has it.
 
 Answer: `200` with [Invite](#invite).
 
@@ -1894,7 +1894,7 @@ What was deleted.
 
 #### Invite
 
-Where friends get the app.
+Where players get the app.
 
 - `url` (string): The download page by the address all phones use.
 - `qr` (boolean): True when its QR code is there (GET /invite/qr).

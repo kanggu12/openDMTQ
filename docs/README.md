@@ -12,7 +12,7 @@ to run a server, and [Questions and answers](faq.md) covers what people ask firs
 | Guide | For |
 | :--- | :--- |
 | [Installing](install.md) | Each system step by step, the phones and PCs, everyday use, updates, backups and moving to another computer, the `.env` settings |
-| [Questions and answers](faq.md) | What it needs, which phones, playing with friends, what leaves your computer |
+| [Questions and answers](faq.md) | What it needs, which phones, playing from outside your home, what leaves your computer |
 | [The game's files](game-files.md) | What your APK, client data and song data have to be, the forms they come in, how to check them |
 | [The site and the admin pages](admin.md) | The setup in the browser, the players' site, building the app, players, accounts, recordings, backups, the maintenance notice |
 | [The API](api.md) | All the admin pages show and do, and what the players' site shows, as JSON |

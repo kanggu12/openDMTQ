@@ -32,7 +32,7 @@ server takes about 170 MB, and two cores serve hundreds of requests a second
 ([measured](../README.md#fast-on-little-hardware)). Disk: about 1 GB, plus the songs.
 [What it runs on](install.md#what-it-runs-on) has the details and the phones.
 
-**Can friends outside my home play?**
+**Can players outside my home play?**
 Yes, with a host name and one forwarded port: [Playing from outside your home](internet.md).
 
 **How do I make backups?**
@@ -46,7 +46,7 @@ Docker, `git pull`, then `./opendmtq up`; `./opendmtq runtime` also brings the n
 
 ## Playing
 
-**What do my friends have to do?**
+**What do other players have to do?**
 Open the address you give them, sign in with the account you made for them, tap **Download app (.apk)** and install it.
 Nothing else on the phone changes: no DNS, no proxy, no certificate.
 

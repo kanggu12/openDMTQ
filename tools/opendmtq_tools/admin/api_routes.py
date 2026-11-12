@@ -255,7 +255,7 @@ SHAPES = {
     "BuildAnswer": Shape("A build.", [Field("build", "Build", "The build.")]),
     "Pruned": Shape("What a prune removed.", [Field("deleted", "integer", "Builds deleted."), Field("freed", "integer", "Bytes freed.")]),
     "Deleted": Shape("What was deleted.", [Field("deleted", "string", "Its name or id.")]),
-    "Invite": Shape("Where friends get the app.", [
+    "Invite": Shape("Where players get the app.", [
         Field("url", "string", "The download page by the address all phones use."),
         Field("qr", "boolean", "True when its QR code is there (GET /invite/qr).")]),
     # The Songs and Maintenance pages.
@@ -642,7 +642,7 @@ SHAPES = {
 TAGS = [
     ("Status", "The status page: the game server, the numbers, the machine."),
     ("Jobs", "Work that runs in the background: app builds, imports, restores."),
-    ("App", "The App page: the app on offer, its builds, the way friends get it."),
+    ("App", "The App page: the app on offer, its builds, the way players get it."),
     ("Songs", "The Songs page."),
     ("Maintenance", "The Maintenance page: the notice, and stopping the server."),
     ("Players", "The Players page."),
@@ -710,7 +710,7 @@ ROUTES = [
           errors=[(404, "build_not_found", "No such build."), (409, "on_offer", "It is the one the site offers.")]),
     Route("POST", "/builds/prune", "write", "builds_prune", "App", "Deletes every build but the one the site offers.", answer="Pruned",
           errors=[(409, "build_running", "A build runs."), (409, "offer_unknown", "It cannot be told which build is on offer.")]),
-    Route("GET", "/invite", "read", "invite_get", "App", "The download page by the address all phones use, as the message to a friend has it.",
+    Route("GET", "/invite", "read", "invite_get", "App", "The download page by the address all phones use, as the message to a new player has it.",
           answer="Invite"),
     Route("GET", "/invite/qr", "read", "invite_qr", "App", "The download page's QR code.", download="image/svg+xml",
           errors=[(404, "not_found", "No QR code yet: the builder makes it with the app.")]),
