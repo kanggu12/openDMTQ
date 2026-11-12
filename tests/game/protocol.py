@@ -318,6 +318,14 @@ status, _, body = post("/DMQ/rpc", json.dumps({"id": 1, "method": "x", "params":
 check("a JSON object instead of a list answers each of its places without an id", status == 200
       and [r["id"] for r in json.loads(body)] == [None, None, None])
 check("an empty body answers an empty list", post("/DMQ/rpc", b"", {})[2] == b"[]")
+# One request holds at most 64 calls (the game's largest batch has 14): one with more is refused whole before any call
+# runs, and a body above 2 MB (the Helm chart's router's limit too) before PHP reads it.
+status, reply = rpc([("service.getInfo", [])] * 64, signed=False)
+check("a request of 64 calls is answered whole", status == 200 and len(reply) == 64 and all(r["error"] is None for r in reply))
+status, reply = rpc([("service.getInfo", [])] * 65, signed=False)
+check("a request of 65 calls is refused whole, before any runs", status == 413 and reply == [])
+status, _, _ = post("/DMQ/rpc", b"[" + b" " * (2 * 1024 * 1024) + b"]", {"Content-Type": "application/json"})
+check("a body above 2 MB is refused before the game server reads it", status == 413, status)
 check("a coupon is never valid, in the client's own words", one("shop.useCoupon", [int(guid), "X"])[0]["error_Invalid"] is True)
 check("the in-game item upgrade answers neither result nor error", one("shop.upgradeInGameItem", [int(guid), "FP", 10]) == (None, None))
 

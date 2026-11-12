@@ -133,6 +133,22 @@ else
   echo "FAIL the song list's index is not kept, or does not follow a new list: $index"
   failed=1
 fi
+# A request that read the list before the tools put a new one in its place makes the index from the list it then finds,
+# never from the one it read first: an index made from the old list under the new list's name would stay in use until the
+# list changed again. The first PHP process reads the list, sees it replaced, then asks; the second is the next request.
+# shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
+raced=$(docker exec "$NAME" sh -c '
+  d=$(mktemp -d) && mkdir -p "$d/custom" "$d/run" && export OPENDMTQ_CUSTOM="$d/custom" OPENDMTQ_RUN="$d/run" LIST_DIR="$d/custom"
+  echo "[{\"song_id\":2,\"song_patterns\":[{\"pattern_id\":11,\"line\":3,\"signature\":0},{\"pattern_id\":12,\"line\":4,\"signature\":1}]}]" > "$d/custom/songList.json"
+  echo "[{\"song_id\":2,\"song_patterns\":[{\"pattern_id\":11,\"line\":3,\"signature\":0}]},{\"song_id\":7,\"song_patterns\":[{\"pattern_id\":21,\"line\":3,\"signature\":2}]}]" > "$d/new.json"
+  php -r "require \"/opt/opendmtq/game/src/rpc.php\"; odq_songs(); rename(getenv(\"LIST_DIR\") . \"/../new.json\", odq_song_list_path()); echo json_encode(array_keys(odq_chart_kinds())), \" \";"
+  php -r "require \"/opt/opendmtq/game/src/rpc.php\"; echo json_encode(array_keys(odq_chart_kinds()));"; rm -rf "$d"' 2>&1) || true
+if [ "$raced" = '[11,21] [11,21]' ]; then
+  echo "PASS a request that read the list before a new one took its place makes the index from the new list"
+else
+  echo "FAIL a request that read the list before a new one took its place made the index from the old one: $raced"
+  failed=1
+fi
 # A month's board worked out once is kept with the rankings' change number and served again while the number stays; any
 # change of the log, the bests or the players raises it (the triggers of setup-db.php, whoever writes), and the next look
 # works the board out again. On the server's own database and run folder.
