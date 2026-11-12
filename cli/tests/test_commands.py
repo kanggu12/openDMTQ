@@ -3,6 +3,8 @@
 import io
 import json
 import os
+import subprocess
+import sys
 import time
 import unittest
 from unittest import mock
@@ -533,6 +535,22 @@ class MessageTest(unittest.TestCase):
                                  sb.output())
             self.assertEqual(sb.output().count(wanted), 3, sb.output())
             self.assertEqual(sb.output().count("/opendmtq/admin/"), 3, sb.output())
+
+    def test_help_keeps_deploy_out_of_the_newcomers_list(self):
+        # deploy is a maintainer's command for a live server: under a heading of its own after the list, and it still
+        # answers, with its own help.
+        # As a person runs it: the command line's own program, in a process of its own.
+        program = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "opendmtq")
+        shown = subprocess.run([sys.executable, program, "--help"], capture_output=True, text=True, timeout=60)
+        self.assertEqual(shown.returncode, 0, shown.stderr)
+        listed, _, after = shown.stdout.partition("options:")
+        self.assertIn("    setup ", listed)
+        self.assertNotIn("deploy", listed)
+        self.assertIn("for a live server's maintainers", after)
+        self.assertIn("  deploy    put this commit on the live server", after)
+        shown = subprocess.run([sys.executable, program, "deploy", "--help"], capture_output=True, text=True, timeout=60)
+        self.assertEqual(shown.returncode, 0, shown.stderr)
+        self.assertIn("--no-gates", shown.stdout)
 
     def test_setup_firewall_hint_names_the_port(self):
         with Sandbox("PUBLIC_HOST=192.168.0.10:8080\nLISTEN_PORT=8080\n") as sb:

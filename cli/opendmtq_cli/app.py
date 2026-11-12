@@ -873,8 +873,14 @@ On the phone ({where}):
 def main(argv=None):
     # Our lines and docker's output interleave in the right order even when piped.
     sys.stdout.reconfigure(line_buffering=True)
+    # The epilog as written, its lines kept: deploy, a maintainer's command for a live server, under a heading of its own
+    # there rather than in the list a newcomer reads.
     ap = argparse.ArgumentParser(prog="opendmtq", description="Run a DJMAX Technika Q server for phones on your network.",
-                                 epilog="New here? Run ./opendmtq setup. It finds the game files and does the rest.")
+                                 formatter_class=argparse.RawDescriptionHelpFormatter,
+                                 epilog="New here? Run ./opendmtq setup. It finds the game files and does the rest.\n\n"
+                                        "for a live server's maintainers (docs/testing.md, \"A deploy\"):\n"
+                                        "  deploy    put this commit on the live server: only if its tests passed, not\n"
+                                        "            during a song, with a backup first")
     sub = ap.add_subparsers(dest="command", metavar="<command>")
 
     p = sub.add_parser("setup", help="first run, or re-run any time: address, files, server, APK, firewall, check")
@@ -895,7 +901,9 @@ def main(argv=None):
     p.set_defaults(fn=cmd_import)
 
     sub.add_parser("up", help="start (or update) the server").set_defaults(fn=cmd_up)
-    p = sub.add_parser("deploy", help="put this commit on the live server: only if its tests passed, not during a song, with a backup first")
+    # No help here: under the epilog's heading, out of the list (argparse lists the commands that have one).
+    p = sub.add_parser("deploy", description="Put this commit on the live server: only if its tests passed, not during a song, "
+                                             "with a backup first.")
     p.add_argument("--now", action="store_true", help="go ahead although someone is in a song")
     p.add_argument("--no-gates", action="store_true", help="go ahead without asking whether this commit passed its tests")
     p.set_defaults(fn=cmd_deploy)
