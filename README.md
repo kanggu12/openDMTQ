@@ -26,13 +26,14 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/game-pc.jpg" alt="The game on a Windows PC through OpenDMTQ's player: notes and the judgment line over the song's blurred video, OpenDMTQ's bar of frosted glass across the top, its FPS counter at 240" width="100%">
-  <br><sub>The game on a PC through OpenDMTQ's player, with its glass bar and FPS counter. The song's video is blurred here.</sub>
+  <img src="docs/images/game-pc.jpg" alt="The game running in the OpenDMTQ PC client on Windows: notes and the judgment line over the song's blurred video, the client's overlay bar across the top and its FPS counter at 240" width="100%">
+  <br><sub>The game in the OpenDMTQ PC client on Windows, with its overlay bar and FPS counter (the song's video is blurred here).</sub>
 </p>
 
-The official service of **DJMAX Technika Q**, the Android rhythm game, ended in 2019. OpenDMTQ is an open-source
-project that brings its online side back on a computer of your own. The server builds a copy of your APK that talks to
-it: phones install that copy from the server's web page, and Windows PCs play the same app through OpenDMTQ's PC client.
+The official online service of **DJMAX Technika Q**, the Android rhythm game, ended in 2019. OpenDMTQ is an open-source
+project that brings its online features back, on a server you run yourself. The server patches your copy of the game's
+Android app (APK) to connect to it: phones install the patched app from the server's web page, and Windows PCs run the
+same app in the OpenDMTQ PC client.
 
 > [!IMPORTANT]
 > **No game files are included.** You need your own copy of the game's Android app and its client data, and its song
@@ -41,7 +42,7 @@ it: phones install that copy from the server's web page, and Windows PCs play th
 
 | Play | Host a server | Contribute |
 | :--- | :--- | :--- |
-| Phones install the app from the server's page, 64-bit-only ones too; Windows PCs, the PC client. [Playing on a server](docs/play.md) | Your own copy of the game's files, then one download or one command. [Quick start](#quick-start) | No game files needed: the tests make their own. [Where to start](#contribute) |
+| Install the app on an Android phone from the server's page (64-bit-only phones included), or the PC client on Windows. [Playing on a server](docs/play.md) | Bring your own copy of the game's files, then run one download or one command. [Quick start](#quick-start) | No game files needed: the tests use stand-ins. [Where to start](#contribute) |
 
 ## How it works
 
@@ -49,9 +50,9 @@ it: phones install that copy from the server's web page, and Windows PCs play th
   <img src="docs/images/diagram-architecture.svg" alt="How OpenDMTQ fits together: phones, PCs and browsers reach the server's one port, which sends each path to the game server, the game's files, live broadcasts, the players' site or the admin pages; the setup imports your game files and the app builder patches your APK" width="100%">
 </p>
 
-The app sends the game's four official hosts to one address, where a single server answers the game, its login, its
-downloads and the website. The game server is OpenDMTQ's own code ([architecture](docs/architecture.md)). Accounts,
-scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#privacy)).
+The patched app points the game's four official hosts at your server, which answers the game, its login, its downloads
+and the website from one address. The game server is OpenDMTQ's own code ([architecture](docs/architecture.md)).
+Accounts, scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#privacy)).
 
 ## Quick start
 
@@ -126,45 +127,40 @@ On a server someone runs, with the account its owner made for you ([playing on a
 ## Features
 
 - **Nothing to set on a phone.** No hosts file, proxy app or certificate: one app from the server's page.
-- **The game's online side.** Accounts, scores, the monthly and per-song rankings, achievements and the maintenance
-  notice.
+- **The game's online features.** Accounts, scores, monthly and per-song rankings, achievements and maintenance
+  notices.
 - **Your own songs.** Add songs as packages or hide others; phones get what changed at their next start.
-- **Admin pages and an API.** A setup in the browser, the app, songs, players, accounts, broadcasts and their
-  recordings, backups; all of it as JSON too ([the API](docs/api.md)).
+- **Admin pages and an HTTP API.** A setup wizard in the browser, the app, songs, players, accounts, broadcasts and
+  recordings, and backups, all also available as JSON ([the API](docs/api.md)).
 - **No internet needed** once the files are in ([without internet](docs/closed-network.md)).
 
-### On a PC too
+### The PC client
 
-The site offers an installer for Windows set up for the server. Its launcher signs in and keeps the game up to date;
-its player runs the game through OpenDMTQ's runtime on Direct3D 11, each frame on a refresh of the display (240 a
-second at 240 Hz, none late in 480), with AMD FSR 1 or NVIDIA NIS upscaling, CMAA 2 or SMAA, and a bar of frosted glass
-that slides down from the top edge ([the PC client](docs/windows-player.md)).
+The server's site offers a Windows installer set up for that server. The launcher signs in and keeps the game up to
+date, the game runs at the display's refresh rate (up to 240 Hz), and an overlay bar with minimise, full screen and quit
+slides down from the top edge ([the PC client](docs/windows-player.md)).
 
 <p align="center">
-  <img src="docs/images/overlay-bar.webp" alt="The handle at the game's top centre lights, and the bar of frosted glass slides down with minimise, full screen and the X, then back up" width="100%">
+  <img src="docs/images/overlay-bar.webp" alt="The handle at the top centre of the game lights up, and the overlay bar slides down with minimise, full screen and quit, then back up" width="100%">
 </p>
 
 <p align="center">
   <img src="docs/images/client-play.png" alt="The launcher's PLAY page: the server and the sign-in, the ready check, how to play, the last game, and PLAY" width="100%">
 </p>
 
-<p align="center">
-  <img src="docs/images/fig-picture-passes.svg" alt="The game's close button from a run for each setting, enlarged: steps without anti-aliasing, smoothed by SMAA and CMAA 2, upscaled by AMD FSR 1 from 67 %" width="100%">
-</p>
-
-### Newer phones too
+### Newer phones
 
 The game has only 32-bit code, which newer phones (Pixel 7 and later, Galaxy S24 and later) cannot install. OpenDMTQ
-puts its own runtime in the app: it translates the game's code as it runs, and keeps the panel's full refresh rate.
+adds its own runtime to the app: it translates the game's code as it runs, at the display's full refresh rate.
 
 <p align="center">
   <img src="docs/images/chart-phones.svg" alt="A 32-bit game at 120 frames a second on a Galaxy S26 Ultra, a phone with no 32-bit support: 1.4 of each frame's 8.3 milliseconds at work, and no frame late, with or without a live broadcast" width="100%">
 </p>
 
-### A site for players
+### The players' site
 
-Rankings, songs, profiles, and live broadcasts of players in a song with their recordings (off until you turn them
-on), in English and Korean; and the admin pages beside it.
+Rankings, songs, player profiles and live broadcasts of players in a song, with recordings (off until you turn them
+on), in English and Korean, beside the admin pages.
 
 <p align="center">
   <img src="docs/images/screens.webp" alt="The site's home page, rankings and live page, and the admin pages' App page, with made-up players and songs" width="100%">
@@ -172,7 +168,7 @@ on), in English and Korean; and the admin pages beside it.
 
 ### Fast on little hardware
 
-Plain PHP on SQLite, with no database server to look after. Two cores answer hundreds of the game's requests a second
+Plain PHP and SQLite, with no database server to run. Two CPU cores handle hundreds of game requests per second
 ([how it was measured](docs/testing.md#measurements)).
 
 <p align="center">
@@ -185,7 +181,7 @@ Plain PHP on SQLite, with no database server to look after. Two cores answer hun
 |---|---|
 | **Playing** | |
 | [Playing on a server](docs/play.md) | The app on Android phones and tablets: signing in, installing, updates, broadcasting, which devices |
-| [The PC client](docs/windows-player.md) | Playing on a Windows PC: the installer, the launcher, the picture and the sound |
+| [The PC client](docs/windows-player.md) | Playing on a Windows PC: the installer, the launcher, controls, graphics and sound |
 | **Running a server** | |
 | [Installing](docs/install.md) | Each system step by step, everyday use, updates and backups, what it runs on |
 | [The game's files](docs/game-files.md) | What the app, the client data and the song data have to be |
@@ -203,19 +199,19 @@ Plain PHP on SQLite, with no database server to look after. Two cores answer hun
 
 ## Contribute
 
-OpenDMTQ is MIT licensed and built in the open: its own game server, site, app patcher, runtime and PC client, with
-every change checked by the tests in this repository before it reaches a server.
+OpenDMTQ is MIT licensed and developed in the open: its own game server, site, app patcher, runtime and PC client,
+with every change checked by the tests in this repository.
 
 - **Report a bug or ask for a feature** in [Issues](https://github.com/kanggu12/openDMTQ/issues/new/choose).
-- **Change the code.** None of the game's files are needed: the tests make stand-ins of their own.
-  [CONTRIBUTING.md](CONTRIBUTING.md) has each part, its code and its tests; [the architecture](docs/architecture.md),
-  how they work together.
+- **Change the code.** None of the game's files are needed: the tests use stand-ins of their own.
+  [CONTRIBUTING.md](CONTRIBUTING.md) describes each part, its code and its tests, and
+  [the architecture guide](docs/architecture.md) how they fit together.
 - **See what changed** in [CHANGELOG.md](CHANGELOG.md), and report security problems through
   [SECURITY.md](.github/SECURITY.md).
 
 ## Credits and license
 
-Earlier DMTQ servers showed what the game asks for. The web pages follow the look of the DJMAX Technika "Platinum Crew"
+Earlier DMTQ servers documented what the game requests. The web pages follow the look of the DJMAX Technika "Platinum Crew"
 site with original artwork and fonts cut down from Saira and Pretendard; live video plays with hls.js; the runtime is
 built on Dynarmic.
 
