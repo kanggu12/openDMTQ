@@ -48,7 +48,7 @@ page_header(t('dl.title'), 'download', $start ? '1;url=/apk' : ($building ? '20'
         <?php if ($start): ?>
           <p class="done" role="status"><?= t('dl.starting') ?></p>
         <?php endif; ?>
-        <a class="button" href="/apk"><?= t('dl.button') ?></a>
+        <a class="button get" href="/apk"><?= t('dl.button') ?></a>
         <p class="meta"><?= t('dl.meta', ['size' => number_format($apk['size'] / 1048576, 1), 'date' => substr($apk['built_at'], 0, 10)]) ?></p>
       <?php endif; ?>
       <?php // Before anyone signs in for it too, and as plain as the rest of the page: this is what decides whether to go on. ?>
@@ -108,7 +108,7 @@ page_header(t('dl.title'), 'download', $start ? '1;url=/apk' : ($building ? '20'
     <?php // A computer plays too: the same app, through the PC client, which this download sets up for this server. ?>
     <section class="card" id="computer">
       <h2><?= t('pc.title') ?></h2>
-      <a class="button" href="/windows"><?= t('pc.button') ?></a>
+      <a class="button get" href="/windows"><?= t('pc.button') ?></a>
       <?php /* The version when the installer came with one (a release's); a copy put there by hand has its size only. */ ?>
       <?php $win_version = (string)($win['version'] ?? ''); $win_mb = number_format($win['size'] / 1048576, 1); ?>
       <p class="meta"><?= $win_version !== '' ? t('pc.meta', ['size' => $win_mb, 'version' => $win_version]) : t('pc.meta_size', ['size' => $win_mb]) ?></p>

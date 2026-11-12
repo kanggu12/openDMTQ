@@ -939,7 +939,8 @@ function open_in_browser(string $app, string $path): string
     if (on_ios() && $app !== 'KakaoTalk' && $app !== 'LINE') {
         return '<p class="meta">' . t('inapp.ios', ['app' => $name]) . '</p>';
     }
-    return '<a class="button" href="' . h($href) . '">' . t('inapp.button') . '</a>'
+    // As big as the download it stands in for (.button.get).
+    return '<a class="button get" href="' . h($href) . '">' . t('inapp.button') . '</a>'
         . '<p class="meta">' . t('inapp.text', ['app' => $name])
         . (strpos($href, 'intent:') === 0 ? ' ' . t('inapp.menu') : '')
         . '</p>';

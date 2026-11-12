@@ -479,6 +479,10 @@ code { font-family: var(--mono); font-size: var(--t-xs); background: rgba(255, 2
   clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
   transition: filter var(--quick), transform var(--quick);
 }
+/* A download (the app's, the installer's, and where a messenger's own browser stands in its way, the way out of it): one
+   size and one face wherever it stands, wide enough for the longest of their words in both languages, and across a
+   phone. */
+.button.get { width: min(100%, 360px); min-height: 54px; font-size: var(--t-xl); }
 .button:hover { filter: brightness(1.09); }
 .button:active { transform: translateY(1px); filter: brightness(0.97); }
 /* Sent, the answer on its way. */
@@ -883,9 +887,9 @@ td.actions { width: 1%; text-align: right; }
 @media (min-width: 834px) { .stage h2 { font-size: clamp(20px, 2.4vw, 25px); } }
 .stage .lead { margin: 0 0 18px; color: #d7dde4; font-size: var(--t-lg); }
 .stage-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
-.stage-acts .button { width: auto; min-width: 230px; }
-/* The way to the broadcasts, beside the download and as big: the live section's red, dark while nobody is on air so that the
-   download stays the first thing to press, lit with a beating light and the count while someone is. */
+/* The way to the broadcasts, beside the download and as tall: quiet metal while nobody is on air, so that the download
+   stays the first thing to press; the live section's red, with a beating light and the count, only while someone is (red
+   means on air on every page). */
 .watch-live {
   display: inline-flex;
   align-items: center;
@@ -1206,7 +1210,6 @@ table.plays td.when { width: 6.5em; color: var(--ash); font-size: var(--t-sm); }
 
 .install-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 32px; align-items: start; }
 .install-main { min-width: 0; }
-.install .button { max-width: 460px; min-height: 60px; font-size: 21px; }
 /* Android only, said as plainly as the button is. */
 .for-android { margin: 12px 0 0; font-size: var(--t-md); color: var(--chalk); }
 /* Three steps in order, big numbers: this one really is a sequence. Grouped by the space between them, with no box each. */

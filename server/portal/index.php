@@ -72,7 +72,7 @@ ob_start();
       <?php // The app in one press when there is one to give, its size and date under it and the steps a press away.
             // Watching works on any phone or computer: lit, with the count, while someone is on air (thumbs.js keeps it so). ?>
       <div class="stage-acts">
-        <a class="button get-app" href="<?= $ready ? '/apk' : 'download.php' ?>"<?= hidden_on_ios() ?>><?= t('dl.button') ?></a>
+        <a class="button get get-app" href="<?= $ready ? '/apk' : 'download.php' ?>"<?= hidden_on_ios() ?>><?= t('dl.button') ?></a>
         <?php // Live while someone is on air, the broadcasts otherwise; nothing at all with neither (the box under it says so),
               // nor with broadcasts off for the server. ?>
         <?php if ($casting): ?>
