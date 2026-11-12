@@ -264,8 +264,8 @@ for (const table of document.querySelectorAll('table.sortable')) {
   try { kept = JSON.parse(sessionStorage.getItem(sortKey)); } catch (_) { /* No storage here. */ }
   heads.forEach((th, col) => {
     if (!th.dataset.sort) return;
+    // A key can sort it too; its look (admin.css) is the markup's, there from the start.
     th.tabIndex = 0;
-    th.classList.add('can-sort');
     const go = () => {
       const down = th.getAttribute('aria-sort') !== 'descending';
       for (const other of heads) other.removeAttribute('aria-sort');

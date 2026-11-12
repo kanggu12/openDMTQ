@@ -627,16 +627,18 @@ tr.row-warn { background: color-mix(in srgb, var(--warn) 6%, transparent); }
 .player-last { white-space: nowrap; font-size: var(--t-sm); color: var(--ash); }
 .player-last .spark, .player-last .daycells { margin-right: 8px; }
 .list-search { margin-bottom: 12px; }
-th.can-sort { cursor: pointer; user-select: none; }
-th.can-sort:hover { color: var(--chalk); }
+/* A heading that sorts (data-sort in the page) says so from the page's first drawing, not once its script has come: a
+   mark that came later widened its column and moved the rows under it. */
+table.sortable th[data-sort] { cursor: pointer; user-select: none; }
+table.sortable th[data-sort]:hover { color: var(--chalk); }
 /* A heading that sorts says so before the first press. */
-th.can-sort:not([aria-sort])::after { content: " \2195"; opacity: 0.45; }
+table.sortable th[data-sort]:not([aria-sort])::after { content: " \2195"; opacity: 0.45; }
 th[aria-sort="descending"]::after { content: " \25BE"; color: var(--accent); }
 th[aria-sort="ascending"]::after { content: " \25B4"; color: var(--accent); }
 /* Over figures (right-aligned) the arrow hangs past the word's end, in the cell's padding, so that the word ends where
    the figures do. */
-th.r.can-sort, th.rank.can-sort { position: relative; }
-th.r.can-sort::after, th.rank.can-sort::after { position: absolute; margin-left: 3px; }
+table.sortable :is(th.r, th.rank)[data-sort] { position: relative; }
+table.sortable :is(th.r, th.rank)[data-sort]::after { position: absolute; margin-left: 3px; }
 
 /* Backups: whether the daily one is on, with its light. */
 /* The light on the words' first line (its foot on their baseline), not centred on all of them when they wrap. */
