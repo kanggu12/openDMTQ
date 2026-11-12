@@ -12,6 +12,7 @@ stand-in files of their own.
 | Python | The admin pages and the tools, `tools/opendmtq_tools/`; the PC client, `client/` |
 | Kubernetes or Docker | `deploy/helm/`, `compose.yaml` |
 | C++ and Android | The runtime for newer phones, `arm32/` |
+| C++ and Windows | The player for Windows, its picture and its overlay, `arm32/desktop/` |
 
 ## Before you start
 
@@ -23,35 +24,23 @@ stand-in files of their own.
 
 ## Where the code is
 
+OpenDMTQ is a server for the game (Apache with PHP), a players' site, admin pages and tools in plain Python, an app
+patcher, a runtime that runs the game's 32-bit code on 64-bit-only phones, and a PC client for Windows:
+
+<p align="center">
+  <img src="docs/images/diagram-architecture.svg" alt="How OpenDMTQ fits together: phones, PCs and browsers reach the server's one public port, where site.conf sends each path to the game server, the game's files, live broadcasts, the players' site or the admin pages, which keep their data in data/. The setup imports the owner's game files, and the app builder patches the owner's APK for this server" width="100%">
+</p>
+
+[The parts](docs/architecture.md#the-parts) in the architecture guide name each part's code, where to start reading
+and what checks it; the rest of that guide says how the parts work together, and the quirks of the client the replies
+depend on. The folders, and the way a request takes through them:
+
 <p align="center">
   <img src="docs/images/code-map.svg" alt="The map of the code. A phone's app sends the game's requests to server/edge, the one public port, then server/apache's site.conf sends each path on: the game's requests to server/game (index.php, then src/rpc.php, and src/platform.php for the platform's login), the live view's uploads to server/game/live, the site's pages to server/portal. On a Windows PC, the launcher in client/ gets the server's app from server/portal (client.php, /apk) and starts the player in arm32/desktop, which sends the game's requests as a phone's app does. Players, scores and accounts are in data/state/dmtq.db3. tools/opendmtq_tools holds the admin pages with the setup, the import, the app builder and the song list; opendmtq with cli/ runs them with Docker, host/ without containers" width="100%">
 </p>
 
-| Path | What it is | Start reading at |
-|---|---|---|
-| `server/game/` | The game server: every request of the game and of its platform SDK | `index.php`, then `src/rpc.php` (`odq_methods`) |
-| `server/portal/` | The players' site: rankings, songs, players, the app download, the live broadcasts | `lib.php`, then the page you change |
-| `server/apache/` | Apache's configuration: its listeners, and which path goes to which file or program | `site.conf` |
-| `server/edge/` | The edge proxy (nginx) with Docker Compose: one public port for plain HTTP and HTTPS | `nginx.conf` |
-| `server/entrypoint.sh` | The server image's start: the database, the settings, then Apache | the file, top to bottom |
-| `tools/opendmtq_tools/` | The tools, plain Python: the import (`importer.py`), the app builder and patcher (`builder.py`, `patch_apk.py`), the song list (`songs.py`), the ready-made runtime for newer phones (`runtime.py`) | the tool you change |
-| `tools/opendmtq_tools/admin/` | The admin pages, a module per page: `status.py`, `apps.py`, `song_pages.py`, `players.py`, `accounts.py`, `recordings.py`, `backups.py`, `logs.py`, `setup.py`. What they share is in `core.py` (settings, language, database) and `auth.py` (sign-in). Their API is `api.py`, its routes in `api_routes.py` ([docs/api.md](docs/api.md)) | the page you change, then `core.py` |
-| `opendmtq`, `cli/` | `./opendmtq` with Docker Compose: setup, import, deploy, checks, backups. `install.sh` puts it on the PATH and, with `--service`, starts the server at boot; `firewall.ps1` lets phones reach a server in WSL | `opendmtq_cli/app.py` (`main`) |
-| `host/` | The same server without containers: `get.sh` and `install.sh` for Linux and macOS, `windows/` for the Windows bundle, and the program itself, a package in layers (`paths`, `settings`, `apache`, `server`, `commands`, `setup`) | `opendmtq_host/server.py` (`Server`) |
-| `arm32/` | The runtime that runs the 32-bit game on 64-bit-only phones, and the live broadcast's capture | [arm32/README.md](arm32/README.md) |
-| `client/` | The PC client for Windows: the launcher (Python and Tk), its installer and their tests. The player it starts is in `arm32/desktop/` | [client/README.md](client/README.md) |
-| `deploy/helm/` | The Helm chart for Kubernetes | `values.yaml` |
-| `tests/` | The tests beyond unit tests: the contract, the pages, an upgrade, the live server, the host install, the Windows bundle | [docs/testing.md](docs/testing.md) |
-
-A request finds its way like this:
-
-<p align="center">
-  <img src="docs/images/fig-request-routing.svg" alt="How a request is answered. A file of the game (/DMQ/Songs, /DMQ/Patterns, /viewImg, /patch, /static) is served from the admin pages' overlay in data/custom/web, else from the imported content, else gets Apache's short 404. Other paths: the game's RPC, SDK and window go to server/game/index.php, /inspection/status.json to the overlay's notice while one is on, /live/ to server/game/live; OpenDMTQ's own: /opendmtq/admin to the admin pages, /opendmtq/, /apk, /thumbs and /ca.crt to server/portal, / to a redirect to /opendmtq/, anything else to the site's 404 page" width="100%">
-</p>
-
-[docs/architecture.md](docs/architecture.md) explains how the parts work together, and the quirks of the client the
-replies depend on. Apache listens on more than one port. The guides call each one a door (the public one, and with
-Docker Compose two that only the edge proxy reaches).
+Apache listens on more than one port. The guides call each one a door (the public one, and with Docker Compose two that
+only the edge proxy reaches).
 
 ## Your first change
 
