@@ -10,9 +10,11 @@ $plays = [];
 if ($db) {
     $charts = charts();
     // Players who have a record on each chart, counted by guid like the rest of the portal: Play's
-    // user_id is the guid, and PLAYER_ROWS already leaves the check account out.
-    foreach (rows($db, "SELECT p.pattern_id, COUNT(*) AS n FROM Play p WHERE p.user_id IN (SELECT guid FROM (" . PLAYER_ROWS . "))
-                         GROUP BY p.pattern_id", [':check' => CHECK_UDID]) as $r) {
+    // user_id is the guid, and PLAYER_ROWS already leaves the check account out. Kept while nothing in the log, the bests
+    // or the players changes (odq_kept()): every look at the list would count all the bests again.
+    $counts = odq_kept($db, 'site chart records', fn() => rows($db, "SELECT p.pattern_id, COUNT(*) AS n FROM Play p
+                         WHERE p.user_id IN (SELECT guid FROM (" . PLAYER_ROWS . ")) GROUP BY p.pattern_id", [':check' => CHECK_UDID]));
+    foreach ($counts as $r) {
         $sid = $charts[(int)$r['pattern_id']][0] ?? 0;
         $plays[$sid] = ($plays[$sid] ?? 0) + (int)$r['n'];
     }

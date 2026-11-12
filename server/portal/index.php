@@ -35,12 +35,7 @@ $failed = (!$apk || $stale) && build_failed();
 $building = (!$apk || $stale) && build_state() === 'building';
 // PlayLog.user_id is the player's guid: one name per player, however many phones (PLAYER_ROWS). As many as go well beside
 // the list of players, which is short on a server with few.
-$records = ($db && has_playlog($db)) ? rows($db,
-    "SELECT l.*, m.nickname, m.guid AS mid,
-            (SELECT MAX(p.score) FROM PlayLog p WHERE p.user_id = l.user_id AND p.pattern_id = l.pattern_id
-              AND (p.played_at < l.played_at OR (p.played_at = l.played_at AND p.id < l.id))) AS before
-       FROM PlayLog l JOIN (" . PLAYER_ROWS . ") m ON m.guid = l.user_id
-      WHERE l.is_record = 1 ORDER BY l.played_at DESC, l.id DESC LIMIT :shown",
+$records = ($db && has_playlog($db)) ? rows($db, recent_records_sql(),
     [':check' => CHECK_UDID, ':shown' => max(3, min(6, (int)round(count($ranked) * 0.8)))]) : [];
 
 // Players on air now: their own section above everything else, only then.

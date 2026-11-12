@@ -987,6 +987,16 @@ class RestoreSchemaTest(unittest.TestCase):
                              [(1, 300, "A", "Y", 900), (2, 50, "C", "N", 700)])
             names = {r[0] for r in con.execute("SELECT name FROM sqlite_master")}
             self.assertLessEqual({"PlayLog", "Play_one", "Play_board", "LiveSwitch", "LiveSetting", "AchievementDate"}, names)
+            # The indexes a save, the home page and the rankings read from, and the rankings' change number with its
+            # triggers: what the server's start makes (setup-db.php), so that the boards it keeps are worked out again.
+            self.assertLessEqual({"PlayLog_clears", "Play_held", "PlayLog_records", "BoardStamp"}, names)
+            self.assertEqual({f"{t}_stamp_{c}" for t in ("PlayLog", "Play", "Member") for c in ("insert", "update", "delete")},
+                             {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type = 'trigger'")})
+            # One row, raised by a change.
+            was = con.execute("SELECT n FROM BoardStamp").fetchall()
+            self.assertEqual(len(was), 1)
+            con.execute("UPDATE Play SET score = score")
+            self.assertGreater(con.execute("SELECT n FROM BoardStamp").fetchone()[0], was[0][0])
             self.assertEqual(con.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             con.close()
 

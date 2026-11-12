@@ -11,6 +11,19 @@ require_once __DIR__ . '/../game/src/ranking.php';
 // The game's check account (./opendmtq check logs in with it): never listed as a player, as it is never ranked.
 const CHECK_UDID = OPENDMTQ_CHECK_UDID;
 
+/* The home page's newest records (:shown of them, players with an account only, :check binding PLAYER_ROWS), each with
+   the player's best on that chart before it: the newest rows with is_record from their own index (PlayLog_records,
+   server/game/bin/setup-db.php), not the whole log read back from its newest play. tests/game/protocol.sh checks the plan
+   SQLite makes of it. */
+function recent_records_sql(): string
+{
+    return "SELECT l.*, m.nickname, m.guid AS mid,
+            (SELECT MAX(p.score) FROM PlayLog p WHERE p.user_id = l.user_id AND p.pattern_id = l.pattern_id
+              AND (p.played_at < l.played_at OR (p.played_at = l.played_at AND p.id < l.id))) AS before
+       FROM PlayLog l JOIN (" . PLAYER_ROWS . ") m ON m.guid = l.user_id
+      WHERE l.is_record = 1 ORDER BY l.played_at DESC, l.id DESC LIMIT :shown";
+}
+
 /* In place of a list of players or records while db() has no database (a damaged or unreadable
    file): saying nobody played yet would be wrong. */
 function no_rankings(): string
@@ -61,15 +74,38 @@ const PLAYER_FIGURES = "COUNT(p.pattern_id) AS charts,
 const PLAYER_TOTALS = "SELECT p.user_id, SUM(" . SCORE_SQL . ") AS total FROM Play p
           WHERE p.user_id IN (SELECT guid FROM (" . PLAYER_ROWS . ")) GROUP BY p.user_id";
 
+/* Every player's figures in Play by guid (PLAYER_FIGURES' columns), worked out once and kept while nothing in the log, the
+   bests or the players changes (odq_kept() in server/game/src/ranking.php): a look at the rankings costs no more than
+   reading them. */
+function play_figures(SQLite3 $db): array
+{
+    return odq_kept($db, 'site figures', function () use ($db) {
+        $figures = [];
+        foreach (rows($db, "SELECT p.user_id, " . PLAYER_FIGURES . " FROM Play p GROUP BY p.user_id") as $row) {
+            $figures[(int)$row['user_id']] = $row;
+        }
+        return $figures;
+    });
+}
+
+/* Each player's total (PLAYER_TOTALS) by guid, players with an account only, kept as play_figures() is. */
+function play_totals(SQLite3 $db): array
+{
+    return odq_kept($db, 'site totals', function () use ($db) {
+        $totals = [];
+        foreach (rows($db, PLAYER_TOTALS, [':check' => CHECK_UDID]) as $row) {
+            $totals[(int)$row['user_id']] = (int)$row['total'];
+        }
+        return $totals;
+    });
+}
+
 /* Every player with ranking figures, best total first. Best score per chart is what counts. The
    id is the player's guid (for most players also their Member id), as player.php takes it. Scores are
    added up first and matched to names here: the same join in SQL took twice as long. */
 function players(SQLite3 $db): array
 {
-    $figures = [];
-    foreach (rows($db, "SELECT p.user_id, " . PLAYER_FIGURES . " FROM Play p GROUP BY p.user_id") as $row) {
-        $figures[(int)$row['user_id']] = $row;
-    }
+    $figures = play_figures($db);
     // What a player who has not played shows.
     $none = ['charts' => 0, 'total' => 0, 's_count' => 0, 'ac' => 0, 'perfect' => 0, 'avg_judgement' => 0];
     $rows = [];
@@ -148,13 +184,25 @@ function past_months(SQLite3 $db, int $count = 6): array
 /* The best players who have played, in the order of players(): id, name and total only. */
 function top_players(SQLite3 $db, int $limit): array
 {
-    $rows = rows($db,
-        "SELECT m.guid AS id, m.nickname, a.total FROM (" . PLAYER_TOTALS . ") a
-           JOIN (" . PLAYER_ROWS . ") m ON m.guid = a.user_id
-          ORDER BY a.total DESC, m.guid ASC LIMIT :limit",
-        [':check' => CHECK_UDID, ':limit' => $limit]);
-    foreach ($rows as &$row) {
+    // Highest total first, the older account on a tie, as players() and the in-game rankings.
+    $totals = play_totals($db);
+    $order = array_keys($totals);
+    usort($order, fn($a, $b) => [$totals[$b], $a] <=> [$totals[$a], $b]);
+    $first = array_slice($order, 0, max(0, $limit));
+    // Their names as they are now: one row per player (PLAYER_ROWS), read for these alone.
+    $names = [];
+    foreach (rows($db, PLAYER_ROWS, [':check' => CHECK_UDID]) as $row) {
+        $names[(int)$row['guid']] = $row['nickname'];
+    }
+    $rows = [];
+    foreach ($first as $guid) {
+        // A player whose account went since the totals were kept is left out, as the join left them out.
+        if (!array_key_exists($guid, $names)) {
+            continue;
+        }
+        $row = ['id' => $guid, 'nickname' => $names[$guid], 'total' => $totals[$guid]];
         $row['name'] = player_name($row);
+        $rows[] = $row;
     }
     return $rows;
 }
@@ -179,9 +227,12 @@ function player_figures(SQLite3 $db, int $guid): ?array
     $row['rank'] = null;
     if ($row['charts'] > 0) {
         // Those ahead of them: a higher total, or the same total and a lower id.
-        $ahead = rows($db, "SELECT COUNT(*) AS n FROM (" . PLAYER_TOTALS . ") WHERE total > :total OR (total = :total AND user_id < :guid)",
-            [':check' => CHECK_UDID, ':total' => (int)$row['total'], ':guid' => $guid]);
-        $row['rank'] = (int)($ahead[0]['n'] ?? 0) + 1;
+        $total = (int)$row['total'];
+        $ahead = 0;
+        foreach (play_totals($db) as $other => $their) {
+            $ahead += ($their > $total || ($their === $total && $other < $guid)) ? 1 : 0;
+        }
+        $row['rank'] = $ahead + 1;
     }
     return $row;
 }

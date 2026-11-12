@@ -98,6 +98,47 @@ else
   echo "$plan" | sed 's/^/  /'
   failed=1
 fi
+# The home page's newest records come from the index of the record rows alone (PlayLog_records), in its order: never the
+# whole log read back from its newest play (2.4 s a page on a million plays that were seldom records).
+# shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
+plan=$(docker exec "$NAME" php -r '
+  require "/opt/opendmtq/portal/ranking_lib.php";
+  $r = odq_db()->query("EXPLAIN QUERY PLAN " . recent_records_sql());
+  while ($r && ($row = $r->fetchArray(SQLITE3_ASSOC))) {
+      echo $row["detail"], "\n";
+  }' 2>&1) || true
+if grep -q '^SCAN l USING INDEX PlayLog_records$' <<<"$plan"; then
+  echo "PASS the home page's newest records come from the index of record rows"
+else
+  echo "FAIL the home page's newest records read the log otherwise:"
+  echo "$plan" | sed 's/^/  /'
+  failed=1
+fi
+# A month's board worked out once is kept with the rankings' change number and served again while the number stays; any
+# change of the log, the bests or the players raises it (the triggers of setup-db.php, whoever writes), and the next look
+# works the board out again. On the server's own database and run folder.
+# shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
+kept=$(docker exec "$NAME" php -r '
+  require "/opt/opendmtq/game/src/rpc.php";
+  $db = odq_db();
+  $file = odq_run_dir() . "/boards/" . md5("month " . json_encode([odq_month_start(), PHP_INT_MAX, NULL])) . ".kept";
+  $first = odq_board(NULL);
+  $one = odq_board_kept($file);
+  $was = odq_board_stamp($db);
+  // A change of a player that changes nothing in it still counts as one: the number goes up.
+  $db->exec("UPDATE Member SET nickname = nickname WHERE rowid = (SELECT MIN(rowid) FROM Member)");
+  $raised = odq_board_stamp($db) > $was;
+  $second = odq_board(NULL);
+  $two = odq_board_kept($file);
+  echo ($one !== null && $one[0] === $was && $one[1] === $first) ? "kept " : "not-kept ";
+  echo $raised ? "raised " : "not-raised ";
+  echo ($two !== null && $two[0] > $one[0] && $two[1] === $second) ? "again" : "not-again";' 2>&1) || true
+if [ "$kept" = "kept raised again" ]; then
+  echo "PASS a month's board is kept until the log, the bests or the players change, then worked out again"
+else
+  echo "FAIL a month's board is not kept, or not worked out again after a change: $kept"
+  failed=1
+fi
 # The folder of the built apps that a deployment names (the Helm chart: OPENDMTQ_APK_OUT, APK_DIR in charts from before
 # 2026-11) wins over the image's own default, or the site would find no app there.
 for var in OPENDMTQ_APK_OUT APK_DIR; do

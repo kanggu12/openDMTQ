@@ -152,6 +152,23 @@ $db->exec('CREATE INDEX IF NOT EXISTS PlayLog_clears ON PlayLog (user_id, patter
 $db->exec('CREATE INDEX IF NOT EXISTS Play_held ON Play (user_id, pattern_id, score, grade, isAllCombo, isPerfectPlay)');
 $db->exec('CREATE INDEX IF NOT EXISTS Member_id ON Member (id)');
 $db->exec('CREATE INDEX IF NOT EXISTS Member_udid ON Member (udid)');
+// The home page's newest records: the few newest rows with is_record from an index of those rows alone. Without it the
+// page read the log back from its newest play until it had found them, all of it on a server whose plays were seldom
+// records (2.4 s a page on a million plays, against 0.06).
+$db->exec('CREATE INDEX IF NOT EXISTS PlayLog_records ON PlayLog (played_at, id) WHERE is_record = 1');
+// The rankings' change number: one row, raised by these triggers at every change of the play log, the best scores and
+// the players, whoever makes it (a save, the admin pages, a start's repairs). A month's board worked out once is kept
+// with the number it was worked out at (src/ranking.php, odq_month_board()) and served again while the number stays,
+// which spares adding up every play of the month at each look at a ranking. The same statements as BOARD_STAMP in the
+// admin pages (backups.py), which a restored database gets.
+$db->exec('CREATE TABLE IF NOT EXISTS BoardStamp (n INTEGER NOT NULL)');
+$db->exec('INSERT INTO BoardStamp (n) SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM BoardStamp)');
+foreach (['PlayLog', 'Play', 'Member'] as $table) {
+    foreach (['INSERT', 'UPDATE', 'DELETE'] as $change) {
+        $db->exec("CREATE TRIGGER IF NOT EXISTS {$table}_stamp_" . strtolower($change)
+            . " AFTER $change ON $table BEGIN UPDATE BoardStamp SET n = n + 1; END");
+    }
+}
 // The live view: the switch per player (the admin writes it), the upload key of the phone, the notice waiting
 // to be shown, and whether the player is in a song (the game's requests keep that, src/live.php). The same
 // statement as LIVE_TABLE in the admin pages.

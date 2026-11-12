@@ -53,6 +53,81 @@ function odq_month_board(SQLite3 $db, int $since, int $until, ?array $patterns):
     if ($patterns !== NULL && !$patterns) {
         return [];
     }
+    // A song's line has a few charts and costs little; a month's whole board or a line's adds up the month's every play.
+    if ($patterns !== NULL && count($patterns) < 50) {
+        return odq_month_board_made($db, $since, $until, $patterns);
+    }
+    return odq_kept($db, 'month ' . json_encode([$since, $until, $patterns]),
+        fn() => odq_month_board_made($db, $since, $until, $patterns));
+}
+
+/*
+ * What $make works out from the play log, the bests and the players, kept in the server's run folder by $name (a RAM disk
+ * in the container) with the rankings' change number it was worked out at, and served again while that number stays:
+ * a month's board, the site's totals. Without the number (a database restored from before it, until the server's next
+ * start) it is worked out each time, as before. One request works it out again; others asking meanwhile wait for it and
+ * take what it kept when that is as new as what they found, so that a request after a save always sees the save.
+ */
+function odq_kept(SQLite3 $db, string $name, callable $make)
+{
+    $stamp = odq_board_stamp($db);
+    if ($stamp === null) {
+        return $make();
+    }
+    $file = odq_run_dir() . '/boards/' . md5($name) . '.kept';
+    // Kept at this number or a later one: nothing in the log, the bests or the players has changed since.
+    $kept = odq_board_kept($file);
+    if ($kept !== null && $kept[0] >= $stamp) {
+        return $kept[1];
+    }
+    @mkdir(dirname($file), 0700, true);
+    $lock = @fopen($file . '.lock', 'c');
+    if ($lock) {
+        flock($lock, LOCK_EX);
+    }
+    try {
+        $kept = odq_board_kept($file);
+        if ($kept !== null && $kept[0] >= $stamp) {
+            return $kept[1];
+        }
+        // The number first: what $make reads is at least as new as it, so it is kept under it.
+        $now = odq_board_stamp($db) ?? $stamp;
+        $value = $make();
+        // Written whole under another name, then put in place: a reader never sees half of it.
+        $part = $file . '.' . getmypid();
+        if (@file_put_contents($part, serialize([$now, $value])) === false || !@rename($part, $file)) {
+            @unlink($part);
+        }
+        return $value;
+    } finally {
+        if ($lock) {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+}
+
+/*
+ * The rankings' change number (BoardStamp, raised by triggers at every change of the play log, the bests and the
+ * players; setup-db.php), or null without the table.
+ */
+function odq_board_stamp(SQLite3 $db): ?int
+{
+    $n = @$db->querySingle('SELECT n FROM BoardStamp');
+    return ($n === null || $n === false) ? null : (int)$n;
+}
+
+/* What is kept in $file: [the change number it was worked out at, the value], or null when there is none or it is not one. */
+function odq_board_kept(string $file): ?array
+{
+    $raw = @file_get_contents($file);
+    $kept = $raw === false ? false : @unserialize($raw, ['allowed_classes' => false]);
+    return is_array($kept) && isset($kept[0], $kept[1]) && is_int($kept[0]) && is_array($kept[1]) ? $kept : null;
+}
+
+/* A month's board as odq_month_board() returns it, worked out from the log now. */
+function odq_month_board_made(SQLite3 $db, int $since, int $until, ?array $patterns): array
+{
     $q = $db->prepare(odq_month_board_sql($patterns));
     // A database problem (or one older than the play log) ranks nobody rather than breaking the reply.
     if (!$q) {

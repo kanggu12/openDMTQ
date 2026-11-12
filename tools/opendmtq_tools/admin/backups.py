@@ -50,6 +50,15 @@ DROP TABLE PlayMerged;"""
 ACHIEVEMENT_TABLE = """CREATE TABLE IF NOT EXISTS AchievementDate (user_id INTEGER NOT NULL, achievement_id INTEGER NOT NULL,
         earned_at INTEGER NOT NULL, PRIMARY KEY (user_id, achievement_id))"""
 
+# The rankings' change number and its triggers, as the server makes them at its start (server/game/bin/setup-db.php, the
+# same statements): a restored database gets them with SCHEMA, so that the boards the server keeps (src/ranking.php)
+# are worked out again after any change made to it.
+BOARD_STAMP = "CREATE TABLE IF NOT EXISTS BoardStamp (n INTEGER NOT NULL);\n" \
+    "INSERT INTO BoardStamp (n) SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM BoardStamp);\n" + "".join(
+        f"CREATE TRIGGER IF NOT EXISTS {table}_stamp_{change.lower()} AFTER {change} ON {table} "
+        "BEGIN UPDATE BoardStamp SET n = n + 1; END;\n"
+        for table in ("PlayLog", "Play", "Member") for change in ("INSERT", "UPDATE", "DELETE"))
+
 SCHEMA = """CREATE TABLE IF NOT EXISTS PlayLog (id INTEGER PRIMARY KEY, user_id INTEGER, pattern_id INTEGER,
         score INTEGER, grade TEXT, judgement INTEGER, is_record INTEGER, played_at INTEGER);
 CREATE INDEX IF NOT EXISTS PlayLog_time ON PlayLog (played_at);
@@ -57,6 +66,7 @@ CREATE INDEX IF NOT EXISTS PlayLog_board ON PlayLog (user_id, played_at, pattern
 DROP INDEX IF EXISTS PlayLog_user;
 CREATE INDEX IF NOT EXISTS PlayLog_chart ON PlayLog (pattern_id, played_at);
 CREATE INDEX IF NOT EXISTS PlayLog_clears ON PlayLog (user_id, pattern_id, grade);
+CREATE INDEX IF NOT EXISTS PlayLog_records ON PlayLog (played_at, id) WHERE is_record = 1;
 CREATE INDEX IF NOT EXISTS Play_held ON Play (user_id, pattern_id, score, grade, isAllCombo, isPerfectPlay);
 CREATE INDEX IF NOT EXISTS Play_pattern ON Play (pattern_id, score);
 CREATE UNIQUE INDEX IF NOT EXISTS Play_one ON Play (pattern_id, user_id);
@@ -64,7 +74,7 @@ CREATE INDEX IF NOT EXISTS Play_board ON Play (user_id, pattern_id, score);
 DROP INDEX IF EXISTS Play_user;
 CREATE INDEX IF NOT EXISTS Member_id ON Member (id);
 CREATE INDEX IF NOT EXISTS Member_udid ON Member (udid);
-""" + auth.ACCOUNT_TABLE + ";\n" + ACHIEVEMENT_TABLE + ";"
+""" + auth.ACCOUNT_TABLE + ";\n" + ACHIEVEMENT_TABLE + ";\n" + BOARD_STAMP
 
 
 def backup_files():

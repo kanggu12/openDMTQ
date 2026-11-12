@@ -129,7 +129,10 @@ anew then. TOTAL sums every chart, the 2/3/4 LINE tabs the charts of that line, 
 that line (all difficulties). A player's own best (MAX SCORE, NEW RECORD) and the web rankings keep every month, but
 for the site's This month tab and the months before it, which are the game's own board of each month
 (`odq_month_board()`, with the site's read-only database handle). Ties go to the older account, and the server's own
-check account is never ranked.
+check account is never ranked. A month's board (TOTAL and the LINE tabs) and the site's totals are worked out once and
+kept in the server's run folder with the number of `BoardStamp`, which triggers raise at every change of `PlayLog`, `Play`
+and `Member`, whoever makes it; while the number stays, a look at a ranking reads what was kept (on a million plays,
+1 ms against 100), and the first look after a change works it out again.
 
 The achievements on MY PAGE come from what the server knows (level 99 and 999,999 MAX POINT for every player, the best
 scores, the play log), and each keeps the date it was earned on: the save that earns one stores it in
@@ -354,6 +357,7 @@ erDiagram
 | `Play` | Each player's best on each chart (one row, `Play_one` keeps it so) |
 | `PlayLog` | Every saved play, a year of them: the monthly rankings, the site's recent plays and new records |
 | `AchievementDate` | When each player earned each achievement |
+| `BoardStamp` | The rankings' change number, one row: what the kept boards were worked out at |
 | `LiveSwitch` | The live view's switch per player, the upload token, who is in a song |
 | `SiteUser` | The site's accounts, made on the admin pages |
 | `ApiToken` | The API's tokens, made on the admin pages: a hash of each, and the admin it belongs to |
