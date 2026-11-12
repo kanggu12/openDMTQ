@@ -154,6 +154,10 @@ jvm::Object* unity_player();
 // The window (window_x11.cpp, window_win32.cpp): opened at the App's size; the android.view.Surface that names it; the
 // window behind a Surface (0 for anything else); and its events, handled until the window is closed (false then).
 bool open_window(const std::string& title);
+// A test's run that leaves nothing on the desktop of the PC it runs on (window_win32.cpp; PLAYER_WINDOW_UNLISTED=1, which
+// only tests set, read once): the window on no taskbar and in no Alt+Tab or Task View, with no animation of its own, and
+// a reason the player cannot start said in the log alone, with no box.
+bool window_unlisted();
 jvm::Object* surface();
 std::uintptr_t window_of(jvm::Object* surface);
 bool pump_window();

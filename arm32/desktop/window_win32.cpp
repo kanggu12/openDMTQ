@@ -41,6 +41,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <cwchar>
 #include <chrono>
@@ -184,9 +185,13 @@ SIZE frame_size(int w, int h) {
     static HMODULE user = GetModuleHandleW(L"user32.dll");
     static auto for_dpi = reinterpret_cast<ForDpi>(user ? GetProcAddress(user, "AdjustWindowRectExForDpi") : nullptr);
     const DWORD style = static_cast<DWORD>(GetWindowLongW(g_frame, GWL_STYLE));
+    // A tool window's title bar is a shorter one (a test's unlisted window, window_unlisted): that style is asked about
+    // too, so that its game's area is the size asked for as well. A player's window never has it, and its frame is the
+    // size it always was.
+    const DWORD ex = static_cast<DWORD>(GetWindowLongW(g_frame, GWL_EXSTYLE)) & WS_EX_TOOLWINDOW;
     const UINT dpi = window_dpi(g_frame);
-    if (for_dpi && dpi) for_dpi(&r, style, FALSE, 0, dpi);
-    else AdjustWindowRectEx(&r, style, FALSE, 0);
+    if (for_dpi && dpi) for_dpi(&r, style, FALSE, ex, dpi);
+    else AdjustWindowRectEx(&r, style, FALSE, ex);
     return SIZE{r.right - r.left, r.bottom - r.top};
 }
 
@@ -1218,7 +1223,32 @@ LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     return DefWindowProcW(h, msg, w, l);
 }
 
+// A test's window with no animation of its own (window_unlisted), should a check minimise or restore it: DWM's
+// transitions off for it (DWMWA_TRANSITIONS_FORCEDISABLED). dwmapi is looked up in System32 rather than linked, as for the
+// title bar. Best effort: a Windows without the call has the window animate as any other.
+void no_transitions(HWND h) {
+    using SetAttribute = HRESULT(WINAPI*)(HWND, DWORD, LPCVOID, DWORD);
+    // The call once, from System32's dwmapi.dll.
+    static const SetAttribute set = [] {
+        HMODULE dwm = LoadLibraryExW(L"dwmapi.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+        return dwm ? reinterpret_cast<SetAttribute>(GetProcAddress(dwm, "DwmSetWindowAttribute")) : nullptr;
+    }();
+    // Attribute 3 is DWMWA_TRANSITIONS_FORCEDISABLED; TRUE turns the window's minimise, restore, show and hide
+    // animations off.
+    const BOOL off = TRUE;
+    if (set) set(h, 3, &off, sizeof off);
+}
+
 }  // namespace
+
+bool window_unlisted() {
+    // Read once: the player's environment does not change while it runs, and only "1" turns it on.
+    static const bool unlisted = [] {
+        const char* value = std::getenv("PLAYER_WINDOW_UNLISTED");
+        return value && std::strcmp(value, "1") == 0;
+    }();
+    return unlisted;
+}
 
 bool open_window(const std::string& title) {
     // The screen's own pixels on every monitor: Windows 10's per-monitor awareness, where it has it.
@@ -1250,13 +1280,22 @@ bool open_window(const std::string& title) {
     int n = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
     std::wstring wtitle(static_cast<std::size_t>(n > 0 ? n - 1 : 0), L'\0');
     if (n > 1) MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wtitle.data(), n);
+    // A test's unlisted window (window_unlisted) is a tool window: Windows gives one no taskbar button and no place in
+    // Alt+Tab or Task View. A player's window has no extended style.
+    const DWORD ex = window_unlisted() ? WS_EX_TOOLWINDOW : 0;
     // Made hidden, where Windows places a new window (or where the program that started this one asked), and sized for
     // its display before it shows.
-    g_frame = CreateWindowExW(0, frame.lpszClassName, wtitle.c_str(), kWindowStyle | WS_CLIPCHILDREN, CW_USEDEFAULT, CW_USEDEFAULT,
+    g_frame = CreateWindowExW(ex, frame.lpszClassName, wtitle.c_str(), kWindowStyle | WS_CLIPCHILDREN, CW_USEDEFAULT, CW_USEDEFAULT,
                               app().width, app().height, nullptr, nullptr, instance, nullptr);
     if (!g_frame) {
         jvm::log("player: cannot make a window (error %lu)", GetLastError());
         return false;
+    }
+    if (window_unlisted()) {
+        // Nor any animation of its own, then said in the log, which a test's run reads to know the switch took.
+        no_transitions(g_frame);
+        jvm::log("player: the window is on no taskbar and in no Alt+Tab, with no animation (a test's, PLAYER_WINDOW_UNLISTED, extended style %08lx)",
+                 static_cast<unsigned long>(GetWindowLongW(g_frame, GWL_EXSTYLE)));
     }
     jvm::log("player: the window has a title bar and a frame, no buttons of its own (style %08lx)",
              static_cast<unsigned long>(GetWindowLongW(g_frame, GWL_STYLE)));
@@ -1330,7 +1369,8 @@ bool open_window(const std::string& title) {
     watch_display(false);
     std::thread(refresh_loop).detach();
     // A test's run on a person's screen (PLAYER_WINDOW_AT=x,y): the window there, shown without taking the focus from
-    // what the person is doing.
+    // what the person is doing. At a place off every monitor and unlisted (window_unlisted), nothing of it is on the
+    // person's desktop.
     int show = SW_SHOW;
     if (const char* at = std::getenv("PLAYER_WINDOW_AT")) {
         int x = 0, y = 0;
