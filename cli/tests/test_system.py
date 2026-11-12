@@ -91,6 +91,23 @@ class NoInternetBuildTest(unittest.TestCase):
         compose.assert_not_called()
         self.assertIn("docker load", err.getvalue())
 
+    def test_the_first_builds_notice_is_said_once(self):
+        # A first setup builds the tools image (for the import) and the server's after it (for up): both are a first
+        # build, shown as one, and the notice that it takes minutes was said twice.
+        built = subprocess.CompletedProcess([], 0, "", "")
+        out = io.StringIO()
+        # No .env (no image named in it), and docker knowing neither image: the real notice, not the sandbox's stand-in.
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(system, "ENV_FILE", os.path.join(d, ".env")), \
+                mock.patch.object(system, "compose", return_value=built) as compose, \
+                mock.patch("subprocess.run", return_value=subprocess.CompletedProcess([], 1)), \
+                mock.patch.object(system, "_first_build_said", False), contextlib.redirect_stdout(out):
+            system.build("tools", profile="tools")
+            system.build("server", "builder", "admin")
+        self.assertEqual(out.getvalue().count("First run: building"), 1, out.getvalue())
+        # Both builds still show their output, as a first build does (no --quiet).
+        self.assertEqual([c.args for c in compose.call_args_list],
+                         [("--profile", "tools", "build", "tools"), ("build", "server", "builder", "admin")])
+
     def test_no_images_is_a_failure_that_names_the_internet(self):
         with mock.patch("sys.stderr", io.StringIO()) as err, self.assertRaises(SystemExit):
             self.build(images_here=False)

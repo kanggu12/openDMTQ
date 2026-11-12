@@ -625,7 +625,10 @@ def patch_assets(root, code=None):
         if code is not None:
             kept = [e for e in edits if all(not e[1].startswith(at) or need in code for at, need in ASSET_NEEDS.items())]
             if len(kept) < len(edits):
-                log(f"  screens   {name}: {len(edits) - len(kept)} edits left out, with the code edit they go with")
+                gone = len(edits) - len(kept)
+                # The words for one when one is left out.
+                log(f"  screens   {name}: {gone} {'edit' if gone == 1 else 'edits'} left out, with the code edit "
+                    f"{'it goes' if gone == 1 else 'they go'} with")
             edits = kept
         if not edits:
             continue
@@ -638,7 +641,7 @@ def patch_assets(root, code=None):
             continue
         with open(path, "wb") as f:
             f.write(data)
-        log(f"  screens   {name}: {len(edits)} edits")
+        log(f"  screens   {name}: {len(edits)} {'edit' if len(edits) == 1 else 'edits'}")
 
 
 def patch_metadata(path, host):

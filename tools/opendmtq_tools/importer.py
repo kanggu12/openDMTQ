@@ -42,6 +42,9 @@ from .patch_apk import describe, inspect, sha256
 
 # What to read and where data/ is: compose's mount points, or a host install's own folders.
 IN = os.environ.get("OPENDMTQ_IMPORT_IN", "/in")
+# The folder the import reads as its owner knows it, for what the import says: the PC's own path, which the command line
+# passes for the container's /in; on a host install IN is that path already. In a container without it: from /in on.
+SHOWN = os.environ.get("IMPORT_SHOWN") or ("" if IN == "/in" else IN)
 DATA = os.environ.get("OPENDMTQ_DATA", "/data")
 # The client data and the song data: the game host's folder, with the client's patch folder in it. An old server kept
 # a song list beside that folder; the list is optional (made from the game's own tables without it).
@@ -570,14 +573,19 @@ def collect(root, dest, parts, song_list=None, replaced=None, top=None):
     return counts
 
 
+def count(n, one, many=None):
+    """A number with its word, the word for one when it is 1: "1 song", "2 songs"."""
+    return f"{n} {one if n == 1 else (many or one + 's')}"
+
+
 def report(parts, counts):
     """One line for what came in."""
     what = []
     if "game" in parts:
         what.append("client data")
     if "songs" in parts:
-        what.append(f"{counts['songs']} songs, {counts['charts']} charts")
-    log(f"  {' and '.join(what)} ({counts['files']} other files) -> data/content")
+        what.append(f"{count(counts['songs'], 'song')}, {count(counts['charts'], 'chart')}")
+    log(f"  {' and '.join(what)} ({count(counts['files'], 'other file')}) -> data/content")
 
 
 def install_content(built):
@@ -616,11 +624,18 @@ def replaced_by(kind, has_jackets):
     return None
 
 
+def shown(path):
+    """A folder the import reads, as its owner knows it: by the PC's own path under the folder chosen (SHOWN for IN), from
+    data/ on for one inside it, else as it is."""
+    where = SHOWN + path[len(IN):] if path.startswith(IN) else path[len(DATA):] if path.startswith(DATA) else path
+    # The folder chosen itself, in a container that was not told its path: the top of what it reads.
+    return where or "/"
+
+
 def import_folder(path, host, parts, kind=WHOLE):
     """Import the given parts from the folder host (the game host's, the patch folder alone, or the songs alone: kind),
     found at path."""
-    where = path[len(IN):] if path.startswith(IN) else path[len(DATA):] if path.startswith(DATA) else path
-    log(f"{named(parts)}: folder {where or '/'}")
+    log(f"{named(parts)}: folder {shown(path)}")
     view = viewimg_of(host)
     replaced = replaced_by(kind, bool(view) and os.path.isdir(os.path.join(view, "eye")))
     built = os.path.join(DATA, "content.new")

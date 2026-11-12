@@ -228,6 +228,8 @@ services:
     environment:
       # Which files of the folder to take (setup passes the files its search matched).
       IMPORT_ONLY: ${IMPORT_ONLY:-}
+      # The folder mounted at /in as this PC names it, for what the import says it read.
+      IMPORT_SHOWN: ${IMPORT_SHOWN:-}
       # The client data (yes unless told), the song data (only when asked: ./opendmtq import --songs).
       IMPORT_GAME: ${IMPORT_GAME:-yes}
       IMPORT_SONGS: ${IMPORT_SONGS:-no}

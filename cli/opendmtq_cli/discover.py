@@ -157,6 +157,11 @@ def find():
             hits = matches(folder)
             if hits:
                 found.append((folder, hits))
+    # A folder found again inside one that lists it whole (Downloads with DMTQ in it, DMTQ with the game host's folder
+    # alone): the same files, which the import of the one around it reads. Not a second place to choose from.
+    listed = {os.path.join(folder, hit) for folder, hits in found for hit in hits}
+    found = [(folder, hits) for folder, hits in found
+             if not (folder in listed and len(hits) == 1 and os.path.isdir(os.path.join(folder, hits[0])))]
 
     def has_client(hits):
         return any(h.lower().endswith(APPS) for h in hits)

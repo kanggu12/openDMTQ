@@ -141,6 +141,22 @@ class FindTest(unittest.TestCase):
             self.assertEqual(found[0], (whole, ["game.apk", "files"]))
             self.assertIn((desktop, ["technika-1.apk", "technika-2.apk"]), found)
 
+    def test_a_folder_found_again_inside_the_one_that_lists_it_is_one_place(self):
+        # Downloads with the client and a DMTQ folder, DMTQ with the game host's folder alone: DMTQ was found again,
+        # one folder down, with nothing but what Downloads' import reads in it, and setup asked which of the two.
+        with tempfile.TemporaryDirectory() as d:
+            downloads = os.path.join(d, "Downloads")
+            dmtq = os.path.join(downloads, "DMTQ")
+            os.makedirs(os.path.join(dmtq, discover.HOST, discover.PATCH_DIR))
+            os.makedirs(os.path.join(dmtq, discover.HOST, "DMQ"))
+            touch(downloads, "game.apk")
+            with mock.patch.object(discover, "candidate_dirs", lambda: [downloads]):
+                self.assertEqual(discover.find(), [(downloads, ["game.apk", "DMTQ"])])
+            # With a file of its own beside (an archive the import of Downloads would not open): two places still.
+            touch(dmtq, "dmtq-songs.7z")
+            with mock.patch.object(discover, "candidate_dirs", lambda: [downloads]):
+                self.assertEqual(sorted(folder for folder, _ in discover.find()), [downloads, dmtq])
+
     def test_whole_server_files_come_before_the_patch_folder_alone(self):
         with tempfile.TemporaryDirectory() as d:
             # A client and the patch folder copied out in Downloads; a client and the whole files' archive on the Desktop.

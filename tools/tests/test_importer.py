@@ -227,6 +227,30 @@ class LinksTest(unittest.TestCase):
         self.assertIn("web/DMQ/Songs/2/2.fpk", content_files(self.data))
 
 
+class ShownTest(unittest.TestCase):
+    def test_a_folder_is_said_by_the_pcs_own_path(self):
+        # In the container the folder chosen is /in: the command line names its path on the PC, which the import says
+        # (it said "folder /DMTQ"); a host install reads the PC's folder itself.
+        with mock.patch.multiple(importer, IN="/in", DATA="/data", SHOWN="/home/me/Downloads"):
+            self.assertEqual(importer.shown("/in/DMTQ"), "/home/me/Downloads/DMTQ")
+            self.assertEqual(importer.shown("/in"), "/home/me/Downloads")
+            self.assertEqual(importer.shown("/data/server"), "/server")
+        with mock.patch.multiple(importer, IN="/home/me/Downloads", SHOWN="/home/me/Downloads"):
+            self.assertEqual(importer.shown("/home/me/Downloads/DMTQ"), "/home/me/Downloads/DMTQ")
+        # A container told nothing: from /in on, as before.
+        with mock.patch.multiple(importer, IN="/in", SHOWN=""):
+            self.assertEqual(importer.shown("/in/DMTQ"), "/DMTQ")
+            self.assertEqual(importer.shown("/in"), "/")
+
+    def test_the_count_takes_the_words_for_one(self):
+        said = []
+        with mock.patch.object(importer, "log", said.append):
+            importer.report({"game", "songs"}, {"songs": 1, "charts": 1, "files": 1})
+            importer.report({"game", "songs"}, {"songs": 30, "charts": 270, "files": 400})
+        self.assertEqual(said, ["  client data and 1 song, 1 chart (1 other file) -> data/content",
+                                "  client data and 30 songs, 270 charts (400 other files) -> data/content"])
+
+
 class OnlyTest(unittest.TestCase):
     def run_main(self, only, environ=None):
         """importer.main over a folder with three downloads; returns (exit code, files it considered, parts asked)."""

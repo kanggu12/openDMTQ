@@ -704,6 +704,8 @@ class ScreenEditTest(unittest.TestCase):
             said = " ".join(str(c) for c in log.call_args_list)
             self.assertIn("skipped not-there", said)
             self.assertIn("skipped other", said)
+            # One edit is said as one.
+            self.assertIn("screen: 1 edit'", said)
 
     def test_every_screen_edit_is_written_correctly(self):
         for name, edits in patch_apk.ASSET_EDITS.items():

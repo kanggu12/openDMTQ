@@ -47,6 +47,11 @@ def step(msg):
     print(_c("1", f"\n== {msg}"))
 
 
+def count(n, one, many=None):
+    """A number with its word, the word for one when it is 1: "1 file", "2 files"."""
+    return f"{n} {one if n == 1 else (many or one + 's')}"
+
+
 def die(msg, code=1):
     print(_c("31", f"error: {msg}"), file=sys.stderr)
     raise SystemExit(code)
@@ -208,11 +213,19 @@ def image_names():
             values.get("OPENDMTQ_TOOLS_IMAGE") or f"{project()}-tools:local"]
 
 
+_first_build_said = False
+
+
 def first_build_notice():
-    """Say so before the first image build, which takes a few minutes with no other output."""
+    """Say so before the first image build, which takes a few minutes with no other output. True while an image is still
+    to be built for the first time; the words once per command, which builds the tools image first and the server's
+    after."""
+    global _first_build_said
     r = subprocess.run(["docker", "image", "inspect", *image_names()], capture_output=True)
     if r.returncode != 0:
-        print("  First run: building the server and tools images. This takes a few minutes.", flush=True)
+        if not _first_build_said:
+            print("  First run: building the server and tools images. This takes a few minutes.", flush=True)
+            _first_build_said = True
         return True
     return False
 

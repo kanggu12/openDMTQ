@@ -7,7 +7,7 @@ import sys
 import time
 
 from . import backup, checks, discover, env, system
-from .system import DATA, ENV_FILE, ROOT, die, ok, step, warn
+from .system import DATA, ENV_FILE, ROOT, count, die, ok, step, warn
 
 
 def require_host():
@@ -428,6 +428,8 @@ def cmd_import(args):
         # A single file is imported by mounting its folder and naming the file. So is the songs' folder itself (DMQ):
         # the jackets (viewImg) and the song list (_info) are beside it, in the folder mounted.
         extra.update({"IMPORT_FROM": os.path.dirname(os.path.normpath(src)), "IMPORT_ONLY": os.path.basename(os.path.normpath(src))})
+    # What it says it reads, by the path on this PC: the container sees the folder as /in (IMPORT_SHOWN, importer.py).
+    extra["IMPORT_SHOWN"] = extra["IMPORT_FROM"]
     # In its own service: 7-Zip opens the owner's archives there, out of sight of the keys, the
     # backups, the database and what phones download (compose.yaml, service "importer").
     r = system.tool("importer", extra_env=extra, as_invoker=True, service="importer")
@@ -792,7 +794,7 @@ def cmd_setup(args):
         if len(found) > 1 and sys.stdin.isatty():
             print("  Game files found in more than one place:")
             for i, (folder, hits) in enumerate(found, 1):
-                print(f"    {i}. {folder}  ({len(hits)} files)")
+                print(f"    {i}. {folder}  ({count(len(hits), 'file')})")
             pick = input("  Use which? [1] ").strip() or "1"
             if not pick.isdigit() or not 1 <= int(pick) <= len(found):
                 die("no folder chosen")
@@ -808,9 +810,9 @@ def cmd_setup(args):
         die("still missing the client data or the base APK after the import (see above)"
             + ("; if they are in another folder, pass it: ./opendmtq setup --from <folder>" if names else ""))
     ok("client data and base APK present")
-    count = song_count()
-    if count:
-        ok(f"{count} songs")
+    songs_in = song_count()
+    if songs_in:
+        ok(count(songs_in, "song"))
     else:
         warn("no songs yet: the game starts with an empty song list. Add them with "
              "./opendmtq import --songs <folder with your game files>, or one by one on the admin pages")
