@@ -21,6 +21,8 @@
   {% if windows %}<p class="meta">{{ t('app.windows', size=windows.size|human) }}</p>{% endif %}
   {% endif %}
   <p class="meta">{{ t('app.offer_rule', host=public_host) }}</p>
+  {# Where its name comes from and where it is changed, as this install changes it. #}
+  <p class="meta">{{ t('app.name_k8s') if kubernetes else t('app.name_host') if host_install else t('app.name_docker') }}</p>
   <div class="btn-line">
     {# data-again: a build that fails gives the button back, with its own word (data-label), for another try. #}
     <form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="host" value="{{ public_host }}"><button class="btn btn-primary" data-again data-label="{{ tp('app.rebuild') if offer else tp('app.build') }}" {% if running %}disabled{% endif %}>{{ t('app.building') if running else (t('app.rebuild') if offer else t('app.build')) }}</button></form>
