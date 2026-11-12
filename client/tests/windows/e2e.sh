@@ -201,9 +201,10 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   [ \"\${down_steps:-0}\" -ge 6 ] && [ \"\${up_steps:-0}\" -ge 6 ] \
     || { echo \"FAIL: the bar did not slide by steps (\${down_steps:-0} down, \${up_steps:-0} up)\"; exit 1; }
   echo \"the bar slid down in \$down_steps steps and back up in \$up_steps\"
-  # The handle's place at the game's top centre, a box 44 by 10 2 below its top edge at 720 lines and 10 around it (the
-  # tab drawn there hangs inside it): the pointer resting on it brings the bar down; a click on its place, the pointer
-  # away at once, reaches the game; the game's window keeps the keyboard throughout.
+  # The handle's reach at the game's top centre (overlay_scale.h: along its line in the header's top 5 rows at 720 lines,
+  # and within 12 of the centre down to its tab's foot lit, 23; the tab drawn there hangs inside it): the pointer resting
+  # on it 7 below the top edge brings the bar down; a click on its place, the pointer away at once, reaches the game; the
+  # game's window keeps the keyboard throughout.
   eval \$(xdotool getwindowgeometry --shell \"\$game\")
   moves=\$(focus_moves)
   xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5

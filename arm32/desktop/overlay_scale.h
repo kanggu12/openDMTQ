@@ -59,9 +59,10 @@ inline float handle_scale_for(int area_w, int area_h) {
 
 // The handle's tab at 720 lines: 25.6 wide where it hangs from the game's top edge, its sides leaning in 0.268 a pixel
 // down as the game's own tabs' do (15 degrees), 18.5 high and 23 with the pointer on it; the line it hangs from (its
-// rail) 2 high with a line of shade under it. As large as the game's header leaves room for (below).
+// rail) 2 high with a line of shade under it, 88 wide (112 with the pointer on it). As large as the game's header
+// leaves room for (below).
 constexpr float kTabTop = 25.6f, kTabTall = 18.5f, kTabTallLit = 23, kTabLean = 0.268f;
-constexpr float kRailTall = 2, kRailShade = 1;
+constexpr float kRailTall = 2, kRailShade = 1, kRailWide = 88, kRailWideLit = 112;
 
 // The rail's rows and the rows of the shade under it, in pixels at the handle's `scale`: whole, so that both stay
 // crisp; the rail at least one, the shade none where less than half a pixel of it is left (the smallest windows).
@@ -82,5 +83,28 @@ constexpr float tab_half(float depth) { return kTabTop / 2 - depth * kTabLean; }
 // them at rest, 23 with the pointer on it); the line goes on below the tab's foot. The checks hold the handle clear of
 // the buttons and the words; they say nothing of the divider.
 constexpr float kHeaderFreeRows = 5, kHeaderFreeHalf = 12;
+
+// ---- the handle's reach
+
+// Where the pointer lights the handle and, resting there, brings the bar down (the game's very top edge brings it across
+// the whole width besides: overlay_win32.cpp). It keeps to the same room as the handle's picture, at the handle's own
+// scale, which is the scale of the game's header: in the header's rows above its buttons, along the rail as wide as the
+// rail at rest; below them, within the room the header's buttons and words leave beside the centre, down to the foot of
+// the tab with the pointer on it. So the tab as drawn hangs inside it at rest and lit, and no place in it is on one of
+// the header's buttons or words at any size or shape; the divider at the very centre is under it, as it is under the tab.
+// The pointer's place is a point at whole pixels of the game's area, x from its left, y from its top, as Windows and the
+// game's own buttons take it.
+inline bool in_handle_reach(int x, int y, int area_w, int area_h) {
+    // The handle's scale: the game's header's at this size and shape, with no floor.
+    const float k = handle_scale_for(area_w, area_h);
+    // How far the place is from the area's middle across, either way.
+    const float across = std::fabs(static_cast<float>(x) - static_cast<float>(area_w) / 2);
+    // Above the game's area: none of it.
+    if (y < 0) return false;
+    // In the header's rows above its buttons: as wide as the rail at rest.
+    if (static_cast<float>(y) < kHeaderFreeRows * k) return across <= kRailWide / 2 * k;
+    // Below them: within the room beside the centre, down to the lit tab's foot.
+    return static_cast<float>(y) < kTabTallLit * k && across <= kHeaderFreeHalf * k;
+}
 
 }  // namespace player::overlay

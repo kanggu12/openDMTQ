@@ -552,15 +552,13 @@ int chip_at(int x, int y) {
 
 // ---- the handle's size and place (both threads)
 
-// Where the pointer rests on the handle, at 720 lines: a box 44 by 10, 2 below the game's top edge, centred, and 10
-// more on either side and below it (a small target, easy to reach: the tab as drawn hangs inside it, and its rail's
-// ends beyond it lie on the game's top edge, where a resting pointer brings the bar as well).
-constexpr float kHandleW = 44, kHandleH = 10, kHandleTop = 2, kHandleReach = 10;
-// The handle as drawn, at 720 lines (overlay_scale.h has its tab's sizes, which a check holds to the game's header):
-// its rail 88 wide (112 with the pointer on it), fading out over three tenths of its length toward either end as the
-// bar's own foot line does; the tab's foot corners rounded 3.6 and its outline 2 wide; in the tab a chevron pointing
-// down, 12.6 wide and 5.9 deep, its top 5.4 below the edge (8.4 with the pointer on it: pulled down), 2.5 thick.
-constexpr float kRailWide = 88, kRailWideLit = 112, kRailFade = 0.3f;
+// The handle as drawn, at 720 lines (overlay_scale.h has its tab's and its rail's sizes, which checks hold to the game's
+// header, and the reach a resting pointer brings the bar from, which keeps to the same room: the tab as drawn hangs
+// inside it at rest and lit, and the ends of the rail lit beyond it lie on the game's top edge, where a resting pointer
+// brings the bar as well): its rail fading out over three tenths of its length toward either end as the bar's own foot
+// line does; the tab's foot corners rounded 3.6 and its outline 2 wide; in the tab a chevron pointing down, 12.6 wide
+// and 5.9 deep, its top 5.4 below the edge (8.4 with the pointer on it: pulled down), 2.5 thick.
+constexpr float kRailFade = 0.3f;
 constexpr float kTabRound = 3.6f, kTabEdge = 2;
 constexpr float kChevWide = 12.6f, kChevDeep = 5.9f, kChevTop = 5.4f, kChevTopLit = 8.4f, kChevStroke = 2.5f;
 // How strong each part is: the tab's charcoal glass at 78 % with a little light at its top that is gone by its foot;
@@ -574,19 +572,9 @@ float handle_scale() { return handle_scale_for(area_w(), area_h()); }
 // A length of the handle's at 720 lines as pixels at its scale, unrounded.
 float hpx(float at720) { return at720 * handle_scale(); }
 
-// The box the pointer rests on, in the game's area.
-RectF handle_pill() {
-    const float w = fpx(kHandleW), h = fpx(kHandleH);
-    return RectF(std::floor((static_cast<float>(area_w()) - w) / 2), fpx(kHandleTop), std::round(w), std::round(h));
-}
-
-// Whether (x, y) of the game's area is on the handle, as the pointer rests there: its box and its reach, from the top.
-bool on_handle(int x, int y) {
-    const RectF pill = handle_pill();
-    const float reach = fpx(kHandleReach);
-    return static_cast<float>(x) >= pill.X - reach && static_cast<float>(x) < pill.X + pill.Width + reach && y >= 0 &&
-           static_cast<float>(y) < pill.Y + pill.Height + reach;
-}
+// Whether (x, y) of the game's area is on the handle, as the pointer rests there: its reach (overlay_scale.h), at the
+// handle's own scale for the game's area now.
+bool on_handle(int x, int y) { return in_handle_reach(x, y, area_w(), area_h()); }
 
 // ---- the frame counter's look (the painter's)
 
@@ -3775,8 +3763,18 @@ void test_save(const std::wstring& prefix, const std::wstring& frame_png, bool w
         // Each at its own place: lit, its window is wider (its rail is longer) and deeper.
         layout_line(layout, lit ? "handle-lit" : "handle", got.x, got.y, got.picture.get());
         if (lit) continue;
-        const RectF pill = handle_pill();
-        if (layout) std::fprintf(layout, "handle-pill %.0f %.0f %.0f %.0f\n", pill.X, pill.Y, pill.Width, pill.Height);
+        // The reach a resting pointer lights it from, a row at a time: the row, its first place and its last (its rows
+        // run from the top edge down without a gap, so the first row with none ends it).
+        for (int y = 0; layout; ++y) {
+            int first = -1, last = -1;
+            for (int x = 0; x < area_w(); ++x) {
+                if (!in_handle_reach(x, y, area_w(), area_h())) continue;
+                if (first < 0) first = x;
+                last = x;
+            }
+            if (first < 0) break;
+            std::fprintf(layout, "handle-reach %d %d %d\n", y, first, last);
+        }
     }
     // The question: each choice of the keys, the pointer on each button and on the thin X, each button held; over the
     // dimmed game (the dim saved once, the card's window over it for each look).

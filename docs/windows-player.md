@@ -104,12 +104,14 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   enough to cover the game's own X at the top right of its song and music screens whole.
 - **The handle**: the game's green line along its top edge at the centre, with a small tab of glass hanging from it in
   the lean of the game's own tabs and a chevron pointing down in the tab, says that the bar comes down from here; with
-  the pointer on it the line and the chevron turn lime and the tab grows deeper. The pointer resting on it, or just
-  around it, brings the bar down: the handle goes down with the bar's foot and fades, and comes back up with it. It is
-  as large as the game's own header leaves room for at its top centre (26 by 19 pixels in a 1280x720 game, in
-  proportion to that header in a game of any other size or shape), so it covers none of the game's words or buttons
-  on any screen. It shows once the game's picture is up, and goes while the bar is down, while a notice or the
-  question is up and while the game holds still.
+  the pointer on it the line and the chevron turn lime and the tab grows deeper. The pointer resting on it brings the
+  bar down: on its line, on its tab, or beside the tab within the room the header leaves there (12 pixels either side
+  of the centre in a 1280x720 game, down to the deeper tab's foot); the handle goes down with the bar's foot and fades,
+  and comes back up with it. The handle and the place the pointer rests on are as large as the game's own header
+  leaves room for at its top centre (the handle 26 by 19 pixels in a 1280x720 game; both in proportion to that header
+  in a game of any other size or shape), so neither covers any of the game's words or buttons on any screen. It shows
+  once the game's picture is up, and goes while the bar is down, while a notice or the question is up and while the
+  game holds still.
 - **Quitting**: the X asks first, in a glass card over the game dimmed and blurred behind it: **Keep playing** as the
   launcher's main button, or **Quit the game** as its secondary, red under the pointer; so a click by mistake does not
   end a song. Its buttons too act only when let go where they were pressed; Left, Right and Tab move the choice (marked

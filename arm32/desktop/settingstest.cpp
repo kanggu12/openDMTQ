@@ -4,10 +4,10 @@
 // defaults. Then the numbers of the frame counter that one of the settings shows (frame_rate.cpp): its looks at the
 // count of frames through the game's start, a stretch with no frame, frames again and a hold. Then the size the overlay
 // over the game is drawn at and the smallest game area the window holds (overlay_scale.h), over Windows' scales and the
-// game's sizes, with the size of the overlay's handle, which keeps clear of the game's header at every size. Then the
-// overlay's bar on its way down and up (overlay_motion.h): its pace, a turn back midway, Windows' animations off, the
-// rows of it in sight, and the handle and the pieces at the top that move with it. Prints ALL CHECKS PASSED when every
-// check held.
+// game's sizes, with the size of the overlay's handle and the reach a resting pointer brings the bar from, which keep
+// clear of the game's buttons and words in its header at every size. Then the overlay's bar on its way down and up
+// (overlay_motion.h): its pace, a turn back midway, Windows' animations off, the rows of it in sight, and the handle and
+// the pieces at the top that move with it. Prints ALL CHECKS PASSED when every check held.
 #include "frame_rate.h"
 #include "overlay_motion.h"
 #include "overlay_scale.h"
@@ -321,6 +321,82 @@ void handle_size_checks() {
           "the rail 2 rows and its shade 1 at 720 lines, 6 and 3 at 4K, the shade none in the smallest window");
 }
 
+// The handle's reach (overlay_scale.h), where the pointer lights it and, resting there, brings the bar: over the same
+// areas as the handle's size, against the game's header at each, and against the handle as drawn, at rest and lit.
+void handle_reach_checks() {
+    using player::overlay::handle_scale_for;
+    using player::overlay::in_handle_reach;
+    using player::overlay::kHeaderFreeHalf;
+    using player::overlay::kHeaderFreeRows;
+    using player::overlay::kLeastAreaH;
+    using player::overlay::kLeastAreaW;
+    using player::overlay::kRailWide;
+    using player::overlay::kTabTall;
+    using player::overlay::kTabTallLit;
+    using player::overlay::tab_half;
+    // The reach in a 1280x720 area, a row at a time: its first place and its last (none: -1).
+    auto row = [](int y, int& first, int& last) {
+        first = last = -1;
+        for (int x = 0; x < 1280; ++x) {
+            if (!in_handle_reach(x, y, 1280, 720)) continue;
+            if (first < 0) first = x;
+            last = x;
+        }
+    };
+    int f0 = 0, l0 = 0, f4 = 0, l4 = 0, f5 = 0, l5 = 0, f22 = 0, l22 = 0, f23 = 0, l23 = 0;
+    row(0, f0, l0);
+    row(4, f4, l4);
+    row(5, f5, l5);
+    row(22, f22, l22);
+    row(23, f23, l23);
+    // At 1280x720: the rail at rest spans 596 to 684 in the header's five rows above its buttons; below them its SKIN
+    // button ends at 627 and its words start at 674, and the tab lit ends at row 22.
+    check(f0 == 596 && l0 == 684 && f4 == 596 && l4 == 684 && f5 == 628 && l5 == 652 && f22 == 628 && l22 == 652 && f23 == -1,
+          "at 1280x720 the reach is 596 to 684 in the header's rows 0 to 4, 628 to 652 from row 5 to the lit tab's last row 22, none below");
+    // Every area the window can hold from 270 lines to 4K, 4:3 to 21:9 (the handle's checks' own), each place near the
+    // top centre: where the reach is, against the header at that size, and against the handle drawn at its scale.
+    bool clear = true, holds_tab = true, holds_rail = true, no_deeper = true;
+    const float shapes[] = {4.0f / 3.0f, 16.0f / 10.0f, 16.0f / 9.0f, 21.0f / 9.0f};
+    for (const float shape : shapes) {
+        for (int h = kLeastAreaH; h <= 2160; ++h) {
+            // The area's width in this shape, never under the smallest the window holds.
+            const int w = std::max(kLeastAreaW, static_cast<int>(std::lround(static_cast<float>(h) * shape)));
+            // The game's header at this size, as measured on its frames: its layout fitted into the area.
+            const float header = std::min(static_cast<float>(w) / 1280.0f, static_cast<float>(h) / 720.0f);
+            const float middle = static_cast<float>(w) / 2;
+            // Its rows above its buttons, and the room its buttons and words leave either side of the centre below them.
+            const float rows = kHeaderFreeRows * header, half = kHeaderFreeHalf * header;
+            // The handle as drawn here.
+            const float k = handle_scale_for(w, h);
+            // Every place within 60 of the centre across and 40 down at 720 lines, wider than any reach there could be.
+            const int x0 = static_cast<int>(std::floor(middle - 60 * header)), x1 = static_cast<int>(std::ceil(middle + 60 * header));
+            const int y1 = static_cast<int>(std::ceil(40 * header));
+            for (int y = 0; y <= y1; ++y) {
+                for (int x = x0; x <= x1; ++x) {
+                    const float across = std::fabs(static_cast<float>(x) - middle);
+                    const bool in = in_handle_reach(x, y, w, h);
+                    // In the reach: in the header's rows above its buttons along the rail at rest, or below them within the
+                    // room beside the centre; never on a button or a word of the header's.
+                    if (in && !(static_cast<float>(y) < rows ? across <= kRailWide / 2 * header : across <= half)) clear = false;
+                    // Nowhere at or below the lit tab's foot: a pointer resting under the handle is the game's.
+                    if (in && static_cast<float>(y) >= kTabTallLit * k) no_deeper = false;
+                    // The rail at rest, along the top edge: the pointer on it lights the handle.
+                    if (static_cast<float>(y) < kHeaderFreeRows * k && across <= kRailWide / 2 * k && !in) holds_rail = false;
+                    // The tab at rest and lit, every place of it (its sides leaning in from its top, 0.268 a row).
+                    for (const float tall : {kTabTall, kTabTallLit}) {
+                        if (static_cast<float>(y) < tall * k && across <= tab_half(static_cast<float>(y) / k) * k && !in) holds_tab = false;
+                    }
+                }
+            }
+        }
+    }
+    check(clear, "every area from 270 to 2160 lines, 4:3 to 21:9: the handle's reach is along the rail in the header's rows above its buttons and "
+                 "within the room its buttons and words leave beside the centre below them");
+    check(holds_tab, "there the tab as drawn, at rest and lit, is inside the reach");
+    check(holds_rail, "and the rail at rest along the top edge");
+    check(no_deeper, "and the reach goes no lower than the lit tab's foot");
+}
+
 // The bar's way down and up (overlay_motion.h): its pace, its times, a turn back midway, Windows' animations off; the
 // rows of it in sight; the handle's part; the pieces at the top.
 void overlay_motion_checks() {
@@ -590,8 +666,9 @@ int main() {
     frame_counter_checks();
     // The overlay's scale and the smallest game area.
     overlay_scale_checks();
-    // The handle's size, and the bar's way down and up.
+    // The handle's size and its reach, and the bar's way down and up.
     handle_size_checks();
+    handle_reach_checks();
     overlay_motion_checks();
     if (g_failed) {
         std::printf("%d of %d checks FAILED\n", g_failed, g_checks);
