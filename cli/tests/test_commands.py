@@ -188,6 +188,18 @@ class SetupTest(unittest.TestCase):
             self.assertEqual(extra["IMPORT_FROM"], folder)
             self.assertEqual(extra["IMPORT_ONLY"].split("/"), ["game.apk", "dmtq-files.rar"])
 
+    def test_nothing_found_says_the_names_it_takes(self):
+        # An archive whose name has none of the game's words (game-files.7z) is passed over: the message says what the
+        # search takes, and where more is said, instead of only that nothing was found.
+        with Sandbox() as sb, mock.patch.object(discover, "find", return_value=[]):
+            code, _ = self.setup(sb, no_firewall=True)
+            self.assertEqual(code, 1)
+            self.assertIn("names contain dmtq, djmax or technika", sb.output())
+            self.assertIn("./opendmtq setup --from <folder>", sb.output())
+            self.assertIn('docs/troubleshooting.md, "Setup cannot find the game files"', sb.output())
+            # Nothing was imported.
+            self.assertEqual(sb.tool_calls, [])
+
     def test_firewall_trouble_does_not_stop_setup(self):
         # sudo resets PATH, so powershell.exe may not be found; the rest of setup still applies.
         with Sandbox(wsl=True) as sb:

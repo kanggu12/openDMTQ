@@ -15,8 +15,10 @@ All four run the same server. Phones join over the same Wi-Fi, or over the inter
 - **The song data**, if you want the songs: the `DMQ` folder with their music and charts, and `viewImg` for the
   jackets. It can come with the client data or later on its own.
 
-The setup says what each file is before it imports anything. [The game's files](game-files.md) has every form it
-accepts.
+The setup finds them in Downloads or on the Desktop by their names: an archive or an app with `dmtq`, `djmax` or
+`technika` in its name, and a folder by what is in it. Files of other names, or in another place: pick their folder in
+the setup's picker, or `./opendmtq setup --from <folder>` with Docker. The setup says what each file is before it imports
+anything. [The game's files](game-files.md) has every form it accepts.
 
 <p align="center">
   <img src="images/setup.jpg" alt="The setup in the browser: the game's Android app, the client data and the song data found in Downloads, each labeled with what it is, with a button to import them" width="100%">

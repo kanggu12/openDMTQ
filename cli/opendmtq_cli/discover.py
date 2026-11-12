@@ -136,6 +136,14 @@ def matches(folder):
     return apks + archives + trees
 
 
+def not_found():
+    """Why the search found nothing, in words for the command line: where it looked and the names it takes."""
+    # The words as a list in a sentence: "dmtq, djmax or technika".
+    words = ", ".join(GAME_WORDS[:-1]) + " or " + GAME_WORDS[-1]
+    return (f"no game files found in this folder, Downloads or on the Desktop (one folder down in each). The search takes "
+            f"archives and apps whose names contain {words}, and unpacked folders by what is in them")
+
+
 def find():
     """Folders holding game files, best first: [(folder, [names in it])]."""
     found = []

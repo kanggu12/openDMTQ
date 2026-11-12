@@ -779,8 +779,9 @@ def cmd_setup(args):
         # Nothing imported yet and no folder given: look where downloads usually land.
         found = discover.find()
         if not found:
-            die("game files not found in Downloads or on the Desktop (docs/install.md, \"What you need\", says which); "
-                "put them there, or run: ./opendmtq setup --from <folder>")
+            # Where it looked and the names it takes: a file of another name was there, maybe.
+            die(f"{discover.not_found()}. Put one of those words in the file's name, or run: ./opendmtq setup "
+                "--from <folder> (docs/troubleshooting.md, \"Setup cannot find the game files\")")
         source, names = found[0]
         if len(found) > 1 and sys.stdin.isatty():
             print("  Game files found in more than one place:")

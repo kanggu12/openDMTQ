@@ -50,8 +50,10 @@ def find_files(given):
             if answer and os.path.exists(answer):
                 return os.path.abspath(answer), None
             say("That folder was not found. Drag it onto this window again, then press Enter:")
+    # Where it looked and the names it takes, on Linux and macOS: a file of another name was there, maybe.
     die("no game files: drag their folder onto OpenDMTQ.exe, or put it in Downloads, then start OpenDMTQ.exe again"
-        if WINDOWS else "no game files: pass their folder with --from <folder> (README: What you need)")
+        if WINDOWS else f"{discover.not_found()}. Put one of those words in the file's name, or pass its folder with "
+        "--from <folder> (docs/troubleshooting.md, \"Setup cannot find the game files\")")
 
 
 def ask_songs(args):
