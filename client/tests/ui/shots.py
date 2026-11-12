@@ -243,6 +243,8 @@ def typed_address_check(app, out, name, problems, site_url):
 def guide_check(app, site, out, tag, problems):
     """The first-start guide, step by step, as a person goes through it: the server the installer brought answers,
     the sign-in form is filled in, the download runs, then the screen and sound and the ready check."""
+    import tkinter as tk
+
     from opendmtq_client import guide as guide_module
     guide = app.guide
     w = app.words
@@ -282,8 +284,20 @@ def guide_check(app, site, out, tag, problems):
             settle(app)
         seen = shot(app.root, out, name)
         measure(app, name, problems)
+        if key == "sound":
+            # The volume first, whole in view without scrolling, at every size down to the smallest window.
+            area = guide.body
+            slider = next((x for x in widgets_of(area.inner) if isinstance(x, widgets.Slider)), None)
+            top, bottom = area.canvas.winfo_rooty(), area.canvas.winfo_rooty() + area.canvas.winfo_height()
+            if (slider is None or area.canvas.canvasy(0) != 0 or slider.winfo_rooty() < top
+                    or slider.winfo_rooty() + slider.winfo_height() > bottom):
+                problems.append("%s: the volume is not in view without scrolling" % name)
         if key == "stage":
             slab_check(app.root, guide.play_slab, seen, name, problems)
+            # PLAY is the way on from the last step: no Skip beside it.
+            if any(isinstance(x, tk.Label) and x.cget("text") == app.words("guide.skip") and x.winfo_ismapped()
+                   for x in widgets_of(app.root)):
+                problems.append("%s: Skip beside PLAY on the last step" % name)
         if not guide.next_button.enabled:
             problems.append("%s: Next stays off on the %s step" % (tag, key))
     return guide

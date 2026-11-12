@@ -392,7 +392,7 @@ TEXT = {
     "guide.download.text": ("The server builds it for its own address, the same one its phones install. It comes once, and again only when the server has a newer one.",
                             "서버가 자기 주소로 만든 것으로, 휴대폰이 설치하는 것과 같습니다. 한 번 받고, 서버에 새 버전이 있을 때만 다시 받습니다."),
     "guide.sound.name": ("SOUND CHECK", "SOUND CHECK"),
-    "guide.sound.title": ("Screen and sound", "화면과 소리"),
+    "guide.sound.title": ("Sound and screen", "소리와 화면"),
     "guide.stage.name": ("STAGE START", "STAGE START"),
     "guide.stage.title": ("Ready for stage 1", "1스테이지 준비 끝"),
     "guide.stage.text": ("PLAY starts the game with these settings. The launcher waits while you play.",

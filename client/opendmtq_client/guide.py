@@ -1,7 +1,7 @@
 """The first-start guide: six steps from nothing to the first song, one question each.
 
 POWER ON (language, what is needed), SERVER (the server's address, or the one the installer brought), LOG IN (the ID and
-password its owner made), DOWNLOAD (that server's app), SOUND CHECK (screen and sound), STAGE START (the ready check,
+password its owner made), DOWNLOAD (that server's app), SOUND CHECK (sound and screen), STAGE START (the ready check,
 then PLAY). Every choice is the same setting the launcher's pages show, so the guide never knows anything the pages do
 not.
 """
@@ -56,10 +56,10 @@ class Guide:
         self.play_slab = widgets.PlaySlab(bar, ui, w("bottom.play"), self.next)
         self.back_button = widgets.Button(bar, ui, w("guide.back"), self.back)
         self.back_button.pack(side="right", padx=(0, px(10)))
-        # Leaving the guide for the launcher: a quiet link before Back, which the keyboard reaches too.
-        skip = widgets.link(bar, ui, w("guide.skip"), lambda: self.finish(play=False), fg=theme.MUTED,
-                            font=app.fonts.small, chevron=False)
-        skip.pack(side="right", padx=(0, px(18)))
+        # Leaving the guide for the launcher: a quiet link before Back, which the keyboard reaches too (packed by show(),
+        # which leaves it out on the last step, where PLAY is the way on and the setting up is done).
+        self.skip = skip = widgets.link(bar, ui, w("guide.skip"), lambda: self.finish(play=False), fg=theme.MUTED,
+                                        font=app.fonts.small, chevron=False)
         # The step's page: its name as the page's title over the site's field, its question under it.
         self.body = app.make_page(root, self.header)
         # Tab goes as the window reads: the page first, then the bar, left to right (Skip, Back, Next or PLAY). Tk's
@@ -93,13 +93,17 @@ class Guide:
                                if w.language == "en" else w("guide.step", n=index + 1, total=len(STEPS)))
         self.back_button.enable(index > 0)
         last = index == len(STEPS) - 1
-        # Next on every step but the last, where the big PLAY takes its place.
+        # Next on every step but the last, where the big PLAY takes its place; Skip on every step but the last too, as
+        # the last one sets nothing up that Skip would leave undone.
         if last:
             self.next_button.pack_forget()
             self.play_slab.pack(side="right", before=self.back_button)
+            self.skip.pack_forget()
         else:
             self.play_slab.pack_forget()
             self.next_button.pack(side="right", before=self.back_button)
+            # Left of Back, with the room the bar keeps before it.
+            self.skip.pack(side="right", padx=(0, self.app.ui.px(18)), after=self.back_button)
         self._update_next()
         self.body.to_top()
 
@@ -216,10 +220,11 @@ class Guide:
 
     def _sound(self, parent):
         app, px = self.app, self.app.ui.px
-        # The same rows as the Screen and Sound pages, the ones a first start needs.
-        pages.screen_rows(app, parent, self.redraw, full=False)
-        tk.Frame(parent, bg=theme.BG, height=px(pages.CARD_GAP)).pack(fill="x")
+        # The same rows as the Sound and Screen pages, the ones a first start needs: the volume first, in view without
+        # scrolling in the smallest window, the picture's rows under it.
         pages.sound_rows(app, parent, self.redraw, full=False)
+        tk.Frame(parent, bg=theme.BG, height=px(pages.CARD_GAP)).pack(fill="x")
+        pages.screen_rows(app, parent, self.redraw, full=False)
 
     # ------------------------------------------------------------------------- 6 STAGE START
 
