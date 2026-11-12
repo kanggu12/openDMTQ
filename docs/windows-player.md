@@ -77,7 +77,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | The mouse wheel | Scrolls what is under the pointer, as a finger's drag; with Shift, across |
 | A pen | One finger |
 | Esc | The phone's Back key: pauses a song, closes what is open |
-| The keyboard | Text where the game asks for it (Enter ends it, Esc cancels it), Hangul too |
+| The keyboard | Text where the game asks for it, the text it opens with taken as selected: the first key types over it, Backspace clears it, an arrow keeps it (Enter ends it, Esc cancels it); Hangul too |
 | The touch keyboard | Comes up when a touch opens the game's text, and types into it |
 | The pointer resting at the game's top edge, or on the handle at its top centre | The bar: minimise, full screen, and the X that quits after asking |
 | Alt+F4 | Nothing: the bar's X quits |

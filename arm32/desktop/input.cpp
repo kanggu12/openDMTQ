@@ -7,6 +7,8 @@
 #include "player.h"
 
 #include "host.h"
+// The rules of the text the keyboard types into the game's soft keyboard.
+#include "typed_text.h"
 
 #include <algorithm>
 
@@ -407,17 +409,17 @@ void frame_shown(std::uint64_t n) {
 // ---------------------------------------------------------------------------------------------------------------------
 // The soft keyboard: Unity asks for one with showSoftInput and hears the text through nativeSetInputString (as it
 // changes, and when done) and nativeSoftInputClosed, on its main thread, as UnityPlayer.reportSoftInputStr sends them.
-// Here the computer's keyboard types into it: Enter is done, Escape cancels. A check sets PLAYER_TEXT to have it filled
-// in and done half a second after it opens.
+// Here the computer's keyboard types into it: Enter is done, Escape cancels. The text the game opens it with is taken as
+// a desktop field has its text when it opens, all of it selected (typed_text.h): a name typed over the game's own default
+// name is the name alone. A check sets PLAYER_TEXT to have it filled in and done half a second after it opens.
 
 namespace {
 
 std::mutex g_text_lock;
 bool g_typing = false;
-std::string g_text;
-// What an input method is still composing (a Hangul syllable before it is done), shown to the game after the text, as
-// a phone's text field holds its composing text.
-std::string g_composing;
+// The text typed, with what an input method is still composing (a Hangul syllable before it is done) shown to the game
+// after it, as a phone's text field holds its composing text.
+TypedText g_typed;
 
 // reportSoftInputStr(text, close ? 1 : 0, canceled), on the Unity main thread. The close goes a tenth of a second after
 // the text: the game's text field takes the keyboard's text only while the keyboard is open, as a phone's keyboard reports
@@ -453,8 +455,8 @@ void finish(bool canceled) {
         std::lock_guard<std::mutex> l(g_text_lock);
         if (!g_typing) return;
         g_typing = false;
-        text = g_text + g_composing;
-        g_composing.clear();
+        text = g_typed.shown();
+        g_typed.composing.clear();
     }
     report(text, true, canceled);
     soft_keyboard(false);
@@ -472,8 +474,8 @@ void type_text(const std::string& utf8) {
     {
         std::lock_guard<std::mutex> l(g_text_lock);
         if (!g_typing) return;
-        g_text += utf8;
-        now = g_text + g_composing;
+        g_typed.type(utf8);
+        now = g_typed.shown();
     }
     report(now, false, false);
 }
@@ -482,9 +484,8 @@ void type_composing(const std::string& utf8) {
     std::string now;
     {
         std::lock_guard<std::mutex> l(g_text_lock);
-        if (!g_typing || g_composing == utf8) return;
-        g_composing = utf8;
-        now = g_text + g_composing;
+        if (!g_typing || !g_typed.compose(utf8)) return;
+        now = g_typed.shown();
     }
     report(now, false, false);
 }
@@ -492,16 +493,18 @@ void type_composing(const std::string& utf8) {
 void type_key(int key) {
     if (key == kKeyEnter) return finish(false);
     if (key == kKeyEscape) return finish(true);
-    if (key != kKeyBackspace) return;
     std::string now;
     {
         std::lock_guard<std::mutex> l(g_text_lock);
-        if (!g_typing || g_text.empty()) return;
-        // One character back, whatever its UTF-8 length (an input method takes back its own composing ones).
-        std::size_t cut = g_text.size() - 1;
-        while (cut > 0 && (static_cast<unsigned char>(g_text[cut]) & 0xc0) == 0x80) --cut;
-        g_text.erase(cut);
-        now = g_text + g_composing;
+        if (!g_typing) return;
+        // An arrow, Home or End: nothing changes for the game (an input method takes back its own composing ones with
+        // Backspace before it comes here).
+        if (key == kKeyMove) {
+            g_typed.move();
+            return;
+        }
+        if ((key != kKeyBackspace && key != kKeyDelete) || !g_typed.erase(key == kKeyBackspace)) return;
+        now = g_typed.shown();
     }
     report(now, false, false);
 }
@@ -513,8 +516,8 @@ void define_input() {
         {
             std::lock_guard<std::mutex> l(g_text_lock);
             g_typing = true;
-            g_text = c.str(0);
-            g_composing.clear();
+            // What the game opened with, selected whole, as a desktop field opens with its text.
+            g_typed.open(c.str(0));
         }
         jvm::log("player: the game asks for text (the keyboard types; Enter is done, Escape cancels)");
         soft_keyboard(true);
@@ -525,7 +528,7 @@ void define_input() {
                 [text] {
                     {
                         std::lock_guard<std::mutex> l(g_text_lock);
-                        g_text = text;
+                        g_typed.text = text;
                     }
                     jvm::log("player: typed \"%s\"", text.c_str());
                     finish(false);
@@ -544,7 +547,7 @@ void define_input() {
     });
     p.method("setSoftInputStr", "(Ljava/lang/String;)V", [](Call& c) {
         std::lock_guard<std::mutex> l(g_text_lock);
-        if (g_typing && c.l(0)) g_text = c.str(0);
+        if (g_typing && c.l(0)) g_typed.text = c.str(0);
         return Value();
     });
 }

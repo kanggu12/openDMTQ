@@ -826,6 +826,9 @@ bool ask_key(WPARAM w, LPARAM l) {
 // The edit control's own window procedure, which edit_proc hands on to.
 WNDPROC g_edit_default = nullptr;
 
+// Whether a key moves a text field's caret: an arrow, Home or End.
+bool moves_caret(WPARAM vk) { return vk == VK_LEFT || vk == VK_RIGHT || vk == VK_UP || vk == VK_DOWN || vk == VK_HOME || vk == VK_END; }
+
 // The text field's keys and characters while the game asks for text: to the game's text as the frame's would go; the
 // rest (an input method composing, a touch keyboard's own keys) as an edit control has them.
 LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
@@ -871,8 +874,13 @@ LRESULT CALLBACK edit_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         if (w == VK_RETURN) type_key(kKeyEnter);
         else if (w == VK_ESCAPE) type_key(kKeyEscape);
         else if (w == VK_BACK) type_key(kKeyBackspace);
-        // The rest as an edit control has them (F11 among them: nothing, as over the game).
-        else break;
+        else if (w == VK_DELETE) type_key(kKeyDelete);
+        // The rest as an edit control has them (F11 among them: nothing, as over the game); a key that moves the caret
+        // first says so, the text the game opened with no longer being selected.
+        else {
+            if (moves_caret(w)) type_key(kKeyMove);
+            break;
+        }
         return 0;
     case WM_SYSKEYDOWN:
         // Alt+Enter while the game asks for text: nothing, as over the game (full screen is the bar's button); its
@@ -1027,6 +1035,8 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             if (w == VK_RETURN) type_key(kKeyEnter);
             else if (w == VK_ESCAPE) type_key(kKeyEscape);
             else if (w == VK_BACK) type_key(kKeyBackspace);
+            else if (w == VK_DELETE) type_key(kKeyDelete);
+            else if (moves_caret(w)) type_key(kKeyMove);
             return 0;
         }
         // Esc: the Back key when it comes up.

@@ -7,11 +7,13 @@
 // game's sizes, with the size of the overlay's handle and the reach a resting pointer brings the bar from, which keep
 // clear of the game's buttons and words in its header at every size. Then the overlay's bar on its way down and up
 // (overlay_motion.h): its pace, a turn back midway, Windows' animations off, the rows of it in sight, and the handle and
-// the pieces at the top that move with it. Prints ALL CHECKS PASSED when every check held.
+// the pieces at the top that move with it. And the text the keyboard types into the game's soft keyboard
+// (typed_text.h): the text the game opens it with taken as selected. Prints ALL CHECKS PASSED when every check held.
 #include "frame_rate.h"
 #include "overlay_motion.h"
 #include "overlay_scale.h"
 #include "player.h"
+#include "typed_text.h"
 
 #include <cmath>
 
@@ -259,6 +261,51 @@ void overlay_scale_checks() {
     }
     check(roomy, "every area at 100 % to 300 %: the overlay's 720-line layout has 960x540 of room (958 across at the narrowest)");
     check(own, "every area above the floor's reach: the game's own scale, its height over 720");
+}
+
+// The text the keyboard types into the game's soft keyboard (typed_text.h): the text the game opens it with taken as
+// selected, as a desktop field opens with its text.
+void typed_text_checks() {
+    using player::TypedText;
+    // A typed name over the game's own text: the name alone.
+    TypedText t;
+    t.open("Player1");
+    t.type("A");
+    t.type("B");
+    check(t.shown() == "AB", "a name typed over the text the game opened with is the name alone");
+    // Eight Backspaces, then a name and Enter's character left out (Enter ends it): the name, whatever the text's length.
+    t.open("Player1");
+    for (int i = 0; i < 8; ++i) t.erase(true);
+    t.type("Tester");
+    check(t.shown() == "Tester", "Backspace eight times, then a name: that name");
+    // Backspace once over the selected text: all of it goes; Delete likewise; Backspace after that takes one character.
+    t.open("Player1");
+    check(t.erase(true) && t.shown().empty(), "Backspace over the selected text takes all of it away");
+    t.open("Player1");
+    check(t.erase(false) && t.shown().empty(), "Delete over the selected text takes all of it away");
+    t.open("Player1");
+    t.move();
+    check(!t.erase(false) && t.shown() == "Player1", "Delete with the caret at the end takes nothing");
+    check(t.erase(true) && t.shown() == "Player", "after an arrow, Backspace takes back one character");
+    // An arrow, Home or End first: the text stays, and what is typed after is added at its end.
+    t.open("Player1");
+    t.move();
+    t.type("AB");
+    check(t.shown() == "Player1AB", "after an arrow, a name is added at the end of the text");
+    // Enter at once keeps the text the game opened with.
+    t.open("Player1");
+    check(t.shown() == "Player1", "Enter at once keeps the text the game opened with");
+    // An input method's first syllable takes the selected text's place; its finished text is then added.
+    t.open("Player1");
+    check(t.compose("\xea\xb0\x80") && t.shown() == "\xea\xb0\x80", "an input method's first syllable takes the selected text's place");
+    t.compose("");
+    t.type("\xea\xb0\x80");
+    check(t.shown() == "\xea\xb0\x80", "and the syllable it finishes is the text");
+    check(t.erase(true) && t.shown().empty(), "Backspace takes a Hangul syllable back whole, all its bytes");
+    // No text to start with: nothing selected, typing adds.
+    t.open("");
+    t.type("x");
+    check(t.shown() == "x", "a keyboard opened with no text types as it goes");
 }
 
 // The handle's size (overlay_scale.h): the game's own scale exactly, and clear of the game's header at every size.
@@ -666,6 +713,8 @@ int main() {
     frame_counter_checks();
     // The overlay's scale and the smallest game area.
     overlay_scale_checks();
+    // The text the keyboard types into the game's soft keyboard.
+    typed_text_checks();
     // The handle's size and its reach, and the bar's way down and up.
     handle_size_checks();
     handle_reach_checks();

@@ -299,8 +299,10 @@ void key(int code, bool down, int repeat, int unicode);
 constexpr int kKeycodeBack = 4, kKeycode0 = 7, kKeycodeDpadUp = 19, kKeycodeDpadDown = 20, kKeycodeDpadLeft = 21,
               kKeycodeDpadRight = 22, kKeycodeA = 29, kKeycodeTab = 61, kKeycodeSpace = 62, kKeycodeEnter = 66, kKeycodeDel = 67,
               kKeycodePageUp = 92, kKeycodePageDown = 93, kKeycodeForwardDel = 112, kKeycodeHome = 122, kKeycodeEnd = 123;
-// The soft keyboard (input.cpp): whether the game asked for text, the text the keyboard types, and its keys.
-constexpr int kKeyEnter = 1, kKeyEscape = 2, kKeyBackspace = 3;
+// The soft keyboard (input.cpp): whether the game asked for text, the text the keyboard types, and its keys: Enter,
+// Escape, Backspace, Delete, and an arrow, Home or End (the caret moved: the text the game opened with is no longer
+// selected).
+constexpr int kKeyEnter = 1, kKeyEscape = 2, kKeyBackspace = 3, kKeyDelete = 4, kKeyMove = 5;
 bool typing();
 void type_text(const std::string& utf8);
 // What an input method is composing now ("" when nothing): shown to the game after the text, as on a phone.
