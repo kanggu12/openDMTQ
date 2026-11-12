@@ -7,6 +7,12 @@
 <link rel="icon" href="/opendmtq/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/opendmtq/style.css">
 <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+{# The faces the top of the page draws with, asked for with the stylesheet (the site's own, first_fonts() in lib.php):
+   they come in time to be used, and a face that does not is left out for this page (font-display: optional) rather than
+   moving it later. The Hangul half of the text face on a page in Korean; the figures' face where someone is signed in. #}
+{% for font in ['dmtq-text-2-latin', 'dmtq-wide-italic-800', 'dmtq-wide-700'] + (['dmtq-text-2-hangul'] if lang == 'ko' else []) + (['dmtq-condensed-700', 'dmtq-condensed-800'] if session.get('ok') else []) %}
+<link rel="preload" href="/opendmtq/fonts/{{ font }}.woff2" as="font" type="font/woff2" crossorigin>
+{% endfor %}
 {# A page just arriving: its meters and charts fill in once (admin.css and style.css, "motion"). The class goes after
    1.6 s, so that what the page redraws later (the status tiles every 30 s) stays still. Here, not in admin.js: it must be
    on before the page is first drawn. #}

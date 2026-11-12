@@ -604,6 +604,11 @@ function page_header(string $title, string $active = '', string $refresh = '', s
     // The icon and the stylesheet by their versions (asset_url()): kept a year, and new with an upgrade's pages.
     echo '<link rel="icon" href="' . asset_url('favicon.svg') . '" type="image/svg+xml">';
     echo '<link rel="stylesheet" href="' . asset_url('style.css') . '">';
+    // The faces the top of the page draws with, asked for with the stylesheet: they come in time to be used, and a face
+    // that does not is left out for this page (font-display: optional, style.css) rather than moving it later.
+    foreach (first_fonts($inside) as $font) {
+        echo '<link rel="preload" href="/opendmtq/fonts/' . $font . '" as="font" type="font/woff2" crossorigin>';
+    }
     // A page just arriving: what it measures fills in once and the player's own row glows once (style.css,
     // "motion"). The class goes after 1.6 s, so that nothing the page redraws later moves again.
     echo '<script>document.documentElement.classList.add("arriving");setTimeout(()=>document.documentElement.classList.remove("arriving"),1600)</script></head>';
@@ -622,6 +627,19 @@ function page_header(string $title, string $active = '', string $refresh = '', s
     }
     // The page's name as its top heading, for screen readers and outlines; what shows is the masthead or the stage.
     echo '<h1 class="page-title">' . h($title) . '</h1>' . $stage . '<main class="wrap">';
+}
+
+/* The font files a page draws its first screen with (style.css's @font-face): the text face's Latin half, and its Hangul
+   half on a page in Korean (an English page asks for it only for a Korean name in it); the wordmark's face and the
+   language keys'. Signed in ($inside): the menu's face and the figures' too. Their names are their versions: kept a
+   year. */
+function first_fonts(bool $inside): array
+{
+    $fonts = ['dmtq-text-2-latin.woff2', 'dmtq-wide-italic-800.woff2', 'dmtq-wide-700.woff2'];
+    if (lang() === 'ko') {
+        $fonts[] = 'dmtq-text-2-hangul.woff2';
+    }
+    return $inside ? array_merge($fonts, ['dmtq-wide-800.woff2', 'dmtq-condensed-700.woff2', 'dmtq-condensed-800.woff2']) : $fonts;
 }
 
 /* A section's name at the head of its page, in the game's way, with one plain sentence beside it. The word is what the

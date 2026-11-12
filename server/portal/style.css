@@ -8,15 +8,18 @@
    syllables, Latin and punctuation, so that a page reads the same on every device; a rarer syllable in a name falls back
    to the device's font. The text face is in two files by script, each with the characters it has as its unicode-range:
    a browser fetches the Hangul one (411 KB) only for a page with Korean on it, so that the sign-in, every visitor's first
-   page, comes with 33 KB of it in English instead of 444. */
-@font-face { font-family: "DMTQ Condensed"; font-weight: 500; font-display: swap; src: url(fonts/dmtq-condensed-500.woff2) format("woff2"); }
-@font-face { font-family: "DMTQ Condensed"; font-weight: 700; font-display: swap; src: url(fonts/dmtq-condensed-700.woff2) format("woff2"); }
-@font-face { font-family: "DMTQ Condensed"; font-weight: 800; font-display: swap; src: url(fonts/dmtq-condensed-800.woff2) format("woff2"); }
-@font-face { font-family: "DMTQ Wide"; font-weight: 700; font-display: swap; src: url(fonts/dmtq-wide-700.woff2) format("woff2"); }
-@font-face { font-family: "DMTQ Wide"; font-weight: 800; font-display: swap; src: url(fonts/dmtq-wide-800.woff2) format("woff2"); }
-@font-face { font-family: "DMTQ Wide"; font-weight: 800; font-style: italic; font-display: swap; src: url(fonts/dmtq-wide-italic-800.woff2) format("woff2"); }
-@font-face { font-family: "DMTQ Text"; font-weight: 45 930; font-display: swap; src: url(fonts/dmtq-text-2-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+2010-203A, U+20A9, U+20AC, U+2122, U+2190-2193, U+2212, U+25A0-25CF, U+2605-2606; }
-@font-face { font-family: "DMTQ Text"; font-weight: 45 930; font-display: swap; src: url(fonts/dmtq-text-2-hangul.woff2) format("woff2"); unicode-range: U+3000-3011, U+3131-318D, U+AC00-D7A3; }
+   page, comes with 33 KB of it in English instead of 444. Optional, not swap: a face not there within a moment of the
+   first text is left out for that page and used from the next one on, rather than swapped in later, which moved
+   everything under it (the admin pages' Players list jumped 22 px on every load). The pages ask for the faces their top
+   draws with at once, beside this sheet (preload in lib.php and the admin's base.html), so that they are there in time. */
+@font-face { font-family: "DMTQ Condensed"; font-weight: 500; font-display: optional; src: url(fonts/dmtq-condensed-500.woff2) format("woff2"); }
+@font-face { font-family: "DMTQ Condensed"; font-weight: 700; font-display: optional; src: url(fonts/dmtq-condensed-700.woff2) format("woff2"); }
+@font-face { font-family: "DMTQ Condensed"; font-weight: 800; font-display: optional; src: url(fonts/dmtq-condensed-800.woff2) format("woff2"); }
+@font-face { font-family: "DMTQ Wide"; font-weight: 700; font-display: optional; src: url(fonts/dmtq-wide-700.woff2) format("woff2"); }
+@font-face { font-family: "DMTQ Wide"; font-weight: 800; font-display: optional; src: url(fonts/dmtq-wide-800.woff2) format("woff2"); }
+@font-face { font-family: "DMTQ Wide"; font-weight: 800; font-style: italic; font-display: optional; src: url(fonts/dmtq-wide-italic-800.woff2) format("woff2"); }
+@font-face { font-family: "DMTQ Text"; font-weight: 45 930; font-display: optional; src: url(fonts/dmtq-text-2-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+2010-203A, U+20A9, U+20AC, U+2122, U+2190-2193, U+2212, U+25A0-25CF, U+2605-2606; }
+@font-face { font-family: "DMTQ Text"; font-weight: 45 930; font-display: optional; src: url(fonts/dmtq-text-2-hangul.woff2) format("woff2"); unicode-range: U+3000-3011, U+3131-318D, U+AC00-D7A3; }
 
 :root {
   color-scheme: dark;
