@@ -905,23 +905,17 @@ td.actions { width: 1%; text-align: right; }
   background: linear-gradient(180deg, #4c2129 0%, #36171e 100%);
   box-shadow: inset 0 0 0 1px rgba(255, 95, 114, 0.4);
   clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
-  transition: filter var(--quick), transform var(--quick);
+  transition: filter var(--quick), transform var(--quick), background-color var(--quick);
 }
-/* The ring follows the cut corners: the inset ring alone stops where a cut begins, so a stroke is laid across each cut
-   corner's square, just inside the cut (as on the podium's own card). Not when lit, which has no ring. */
-.watch-live:not(.on) {
-  background:
-    linear-gradient(to top left, transparent calc(50% - 1px), rgba(255, 95, 114, 0.4) calc(50% - 1px) 50%, transparent 50%) top left / 14px 14px no-repeat,
-    linear-gradient(to bottom right, transparent calc(50% - 1px), rgba(255, 95, 114, 0.4) calc(50% - 1px) 50%, transparent 50%) bottom right / 14px 14px no-repeat,
-    linear-gradient(180deg, #4c2129 0%, #36171e 100%);
-}
-.watch-live:hover { filter: brightness(1.2); }
+.watch-live:not(.on):hover { background: #414b57; }
+.watch-live.on:hover { filter: brightness(1.2); }
 .watch-live:active { transform: translateY(1px); }
 .watch-live:focus-visible { outline: 2px solid #fff; outline-offset: -6px; }
-.watch-live i { width: 10px; height: 10px; border-radius: 50%; background: #ff5f72; opacity: 0.55; }
+/* The light is the live one: off air, there is none. */
+.watch-live i { display: none; width: 10px; height: 10px; border-radius: 50%; }
 .watch-live.on { color: #2b0409; background: linear-gradient(180deg, #ffa3ae 0%, #ff5f72 55%, #d9384d 100%); box-shadow: none; }
-.watch-live.on i { background: #2b0409; opacity: 1; animation: live-pulse 1.4s ease-in-out infinite; }
-.watch-count { min-width: 1.7em; padding: 3px 6px; font: 800 14px/1 var(--display); font-variant-numeric: tabular-nums; text-align: center; color: #fff; background: #2b0409; }
+.watch-live.on i { display: block; background: #2b0409; animation: live-pulse 1.4s ease-in-out infinite; }
+.watch-count { min-width: 1.7em; padding: 3px 6px; font: 800 var(--t-md)/1 var(--display); font-variant-numeric: tabular-nums; text-align: center; color: #fff; background: #2b0409; }
 /* The app's size and date under the buttons, and the way to the steps; or why there is no app yet. */
 .stage-meta { margin: 12px 0 0; color: #d7dde4; }
 /* The way to the broadcasts says what is there: live while someone is on air, the broadcasts otherwise. */
