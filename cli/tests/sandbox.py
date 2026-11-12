@@ -176,8 +176,9 @@ class Sandbox:
         for prefix, result in self.programs.items():
             if tuple(cmd[:len(prefix)]) == prefix:
                 return result
-        # This copy's version, for the pages: no git checkout in a test's folder.
-        if cmd[:1] == ["git"] and "log" in cmd:
+        # This copy's version, for the pages (system.code_version: its commit, its release's tag): no git checkout in a
+        # test's folder.
+        if cmd[:1] == ["git"] and ("log" in cmd or "rev-parse" in cmd):
             return done(1)
         raise AssertionError(f"a test ran an unexpected program: {cmd}")
 

@@ -345,7 +345,7 @@ class FilesOnThisPcTest(unittest.TestCase):
             self.assertIn("This folder holds the song data.", inst.page(BASE + "/setup?step=files&dir="
                                                                          + inst.path("home/Downloads/DMTQ/songs")))
             self.assertEqual(setup.what_words(setup.what_is(inst.path("home/Downloads/DMTQ/songs"))),
-                             "Song data alone: 1 songs")
+                             "Song data alone: 1 song")
 
     def test_the_search_asks_each_folder_once(self):
         # The setup searches the home folders at each look at the page: each folder costs one question.
