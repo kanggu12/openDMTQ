@@ -6,6 +6,14 @@ one of fixes, changes and smaller additions raises the patch number. Each releas
 
 ## [Unreleased]
 
+### Fixed
+
+- The game server: a save and a ranking no longer read the whole song list at each request; two processor cores now take
+  671 saves a second, against 536.
+- The server: with many clients asking back to back at once, a player's own request waited for a free worker for
+  seconds. A kept connection now carries 25 requests: with 150 such connections a player's save waits 0.9 s at the
+  median, against 4 to 6.
+
 ## [0.9.4] - 2026-11-12
 
 ### Changed
