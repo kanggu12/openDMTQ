@@ -54,7 +54,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | Setting | Values (the default first) | On the page |
 | :--- | :--- | :--- |
 | `display` | `fullscreen`, `window` | Mode |
-| `window` | `auto` (fitted to the display), `1280x720`, `1600x900`, `1920x1080`, `2560x1440`, `3840x2160`, or any `WIDTHxHEIGHT` from 480x270 that fits the main display with room for the window's title bar and the taskbar, as the page offers them | Window size |
+| `window` | `auto` (fitted to the display), `1280x720`, `1600x900`, `1920x1080`, `2560x1440`, `3840x2160`, or any `WIDTHxHEIGHT` from 480x270 at Windows' scale (720x405 at 150 %) that fits the main display with room for the window's title bar and the taskbar, as the page offers them | Window size |
 | `vsync` | `on`, `off` | VSync |
 | `fps` | `auto` (the display's rate), `30`, `60`, `120`, `144`, `165`, `180`, `240`, `360`, `unlimited` | Frame limit |
 | `show_fps` | `off`, `on` (a corner's name, as `fps_position` takes it, is on in that corner) | FPS counter |
@@ -105,12 +105,18 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   launcher's main button, or **Quit the game** as its secondary, red under the pointer; so a click by mistake does not
   end a song. Its buttons too act only when let go where they were pressed; Left, Right and Tab move the choice (marked
   with the launcher's cyan keyboard ring), Enter takes it and Esc keeps playing. The card keeps within three quarters
-  of the game's width, so a small window on a display at 150 % or 200 % gets a card in proportion to the game. The
-  taskbar's Close window asks the same. The game holds still while it asks, as a phone's game does when its owner
-  leaves it and as it does minimised: a song stops where it was, with the game's own pause screen after.
+  of the game's width and nine tenths of its height. The taskbar's Close window asks the same; on a minimised game it
+  first brings the window back and lets the game draw itself again, so that the question stands over the game. The game
+  holds still while it asks, as a phone's game does when its owner leaves it and as it does minimised: a song stops
+  where it was, with the game's own pause screen after.
 - **The window**: the game has a title bar to move it by and a frame to size it by, dark as the launcher's header (on
   Windows 11 in its very colours; Windows 10 dark where it can), and no buttons of its own: it is minimised, put in
   full screen and quit from the bar. A double click on the title bar does nothing.
+- **Its size**: every piece is drawn at the game's own scale, as the game's words and buttons are (its area's height
+  over 720 lines: 1.5 at 1080 lines, 3 at 4K), whatever Windows' scale is, so a small window gets small pieces and a
+  display at 150 % has them cover no more of the game than at 100 %. They are never drawn below half their 720-line
+  size at Windows' scale, so the bar's buttons stay large enough to hit; the smallest game area, 480x270 at Windows'
+  scale, leaves them room. The pointer keeps Windows' own size.
 - **Nothing of it is in the game's way**: the notice, the FPS counter and the handle let every click through to the
   game, and no piece takes the keyboard from the game's window (each is a window that never takes the focus; a click on
   the bar or the question gives the keyboard back to the game).
@@ -121,11 +127,11 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   notice's foot. Their words keep 4.5:1 against the light behind them: where the game is light under the words, the
   tint deepens there. With none of them up, the glass costs the game nothing. The words are set in Pretendard, titles
   and buttons bold, which the player carries in its `fonts` folder with the launcher's wide face. The wordmark is a
-  picture for each scale from 100 % to 400 %, drawn by the launcher's own code (`arm32/desktop/assets/make_wordmark.py`)
-  and carried in the player's `images` folder: at those scales it is drawn pixel for pixel, between them the next
-  larger is drawn down.
+  picture for each of the overlay's scales from 1 to 4, drawn by the launcher's own code
+  (`arm32/desktop/assets/make_wordmark.py`) and carried in the player's `images` folder: at those scales it is drawn
+  pixel for pixel, between them the next larger is drawn down, and below 1 the first one is.
 - **The pointer** over the game is a dart in the logo's look: a chrome left face and a lime right face with a dark rim.
-  While the button is down it is all lime and a little smaller. It is sized for the display's scaling.
+  While the button is down it is all lime and a little smaller. It is sized for Windows' scale, as Windows' own is.
 - **A touch screen** is the player's first input, as a phone's screen is the game's. Windows' own touch feedback stays
   off the game (no circles under the fingers, no square for a press and hold, no right click for it), and in full screen
   a finger that comes in from the screen's edge stays the game's instead of opening Windows' panels. Each touch reaches
