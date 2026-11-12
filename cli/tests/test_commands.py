@@ -200,6 +200,19 @@ class SetupTest(unittest.TestCase):
             # Nothing was imported.
             self.assertEqual(sb.tool_calls, [])
 
+    def test_the_end_says_what_happens_and_the_certificate_only_on_the_internet(self):
+        # What happens, not what to keep from doing: an update over the app keeps the device's account. The browser's
+        # word about the server's own certificate only where the site is on HTTPS, a server set up for the internet.
+        for text, internet in (("PUBLIC_HOST=192.168.0.10\n", False), (EXPOSED, True)):
+            with self.subTest(internet=internet), Sandbox(text) as sb:
+                game_data(sb)
+                code, _ = self.setup(sb, no_firewall=True)
+                self.assertEqual(code, 0, sb.output())
+                self.assertIn("Later updates install over this one, which keeps the device's account.", sb.output())
+                self.assertNotIn("uninstall", sb.output())
+                self.assertNotIn("go on past", sb.output())
+                self.assertEqual("own certificate, which browsers warn about once" in sb.output(), internet, sb.output())
+
     def test_firewall_trouble_does_not_stop_setup(self):
         # sudo resets PATH, so powershell.exe may not be found; the rest of setup still applies.
         with Sandbox(wsl=True) as sb:
