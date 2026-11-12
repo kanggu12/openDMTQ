@@ -39,12 +39,14 @@ closed); while a game runs it installs nothing and ends with 3.
 **PLAY** asks the server for a newer app first and downloads it when there is one; when the server cannot be asked, the
 game starts with the app this PC has. The checks ask the server too: one that does not answer is said on the **Play** and
 **Help** pages and does not stop **PLAY**. The launcher updates itself from the project's releases: **Launcher**, **Check for
-updates**. Without internet, the installer from the server's **Download** page updates it instead, once the server has
-a newer one; the servers and the settings stay. While the game runs the launcher steps aside, and comes back when the
+updates**. It also looks once at each start, in the background for 10 seconds at most: a newer version is said on the
+**Launcher** page and in the line at the window's foot, each with **Update to** that version; nothing is installed by
+itself, and without internet nothing is said. Without internet, the installer from the server's **Download** page
+updates it instead, once the server has a newer one; the servers and the settings stay. While the game runs the launcher steps aside, and comes back when the
 game ends.
 
 `OpenDMTQ-cmd.exe`, in `%LOCALAPPDATA%\OpenDMTQ.Client\current`, does the same from the command line: `--status`
-(exit 0 when PLAY can go), `--server URL`, `--sign-in ID` (the password from standard input), `--sign-out`, `--app`,
+(exit 0 when PLAY can go; its last line is the launcher's version, and a newer one when there is), `--server URL`, `--sign-in ID` (the password from standard input), `--sign-out`, `--app`,
 `--set NAME=VALUE`, `--audio-devices`, `--language en|ko|system`, `--guide`, `--skip-guide` (the guide's **Skip**: the
 window opens on its pages), `--servers` (the servers it knows, as **Online** lists them), `--open-log player|launcher`, `--play`,
 `--update`, `--forget URL`, `--reset`, `--repair`, `--clear-game-data` and `--uninstall [--delete-data]`, with `--yes`

@@ -953,6 +953,9 @@ def build_about(app, parent):
         if result.kind == "available":
             main_button(app, slot, w("about.update_now", v=result.version), lambda: update(result)).pack(
                 anchor="w", pady=(ui.px(10), 0))
+            if app.update_found is None or app.update_found.version != result.version:
+                # Found by this press: the status line says it too, as it says the one the start found.
+                app.update_on_offer(result)
 
     def update(result):
         if not maintenance.update_launcher(app, result):
@@ -961,6 +964,11 @@ def build_about(app, parent):
 
     widgets.Button(box, ui, w("about.check"), check).pack(side="left", padx=(ui.px(16), 0))
     result.pack(fill="x")
+    if app.update_found is not None:
+        # The look at the start found a newer launcher: its answer and its update are here without a press.
+        answer.pack(fill="x", pady=(ui.px(10), 0))
+        slot.pack(fill="x")
+        show(app.update_found)
     card = _card(parent, ui, w("about.guide"))
 
     def rerun():

@@ -876,6 +876,93 @@ def dialogs_check(app, out, tag, problems):
         problems.append("%s: Esc closed the update under way" % tag)
     dialog.close(None)
     update_failures_check(app, out, tag, problems)
+    update_on_offer_check(app, out, tag, problems)
+
+
+def update_on_offer_check(app, out, tag, problems):
+    """The look for a newer launcher at the start, with no press: a look that fails (no network) or finds the launcher
+    up to date says nothing; one that finds a newer one says it on the status line with its update while PLAY is ready,
+    and the Launcher page shows its answer and its Update button without Check for updates. The link does what the
+    page's button does (maintenance.update_launcher). A stand-in for Velopack's module answers."""
+    import types
+    from unittest import mock
+
+    from opendmtq_client import __version__, actions, maintenance, updates
+    w = app.words
+    # What the stand-in feed says: "fail" (no network), None (up to date) or a version on offer.
+    feed = {"says": "fail"}
+
+    class Manager:
+        """Velopack's UpdateManager as far as the look uses it."""
+
+        def __init__(self, source):
+            self.source = source
+
+        def get_current_version(self):
+            return __version__
+
+        def check_for_updates(self):
+            if feed["says"] == "fail":
+                raise RuntimeError("Network error: Http error: io: Nonauthoritative host not found. (os error 11002)")
+            if feed["says"] is None:
+                return None
+            return types.SimpleNamespace(TargetFullRelease=types.SimpleNamespace(Version=feed["says"]))
+
+    velopack = types.SimpleNamespace(UpdateManager=Manager, GithubSource=lambda *a: a[0])
+    # The run's own window size again (the dialogs' check made it the smallest), and PLAY ready, as a player who starts
+    # the launcher finds it: signed in again on the stand-in server, the line kept from the checks before given way.
+    app.root.geometry("%s+0+0" % tag.split("-", 1)[1])
+    if not app.state.signed_in():
+        actions.sign_in(app.state, stub.ACCOUNT, stub.PASSWORD)
+        app.state.save()
+    app.user_acted()
+    app.update_found = None
+    with mock.patch.dict(sys.modules, {"velopack": velopack}), \
+            mock.patch.object(updates, "UPDATE_SOURCE", "http://updates.test/"):
+        for says in ("fail", None):
+            feed["says"] = says
+            app.go("play")
+            app.refresh_checks(force=True)
+            settle(app)
+            app.look_for_update()
+            wait_out(app.root, 1.0)
+            settle(app)
+            if app.update_found is not None or app.status_text != w("status.ready") or app.status_link.winfo_manager():
+                problems.append("%s: a look at the start that %s said %r" % (
+                    tag, "failed" if says else "found nothing newer", app.status_text))
+        feed["says"] = "9.9.9"
+        app.look_for_update()
+        end = time.time() + 5
+        while app.update_found is None and time.time() < end:
+            app.root.update()
+            time.sleep(0.02)
+        settle(app)
+        shot(app.root, out, "%s_play-update" % tag)
+        measure(app, "%s_play-update" % tag, problems)
+        play_fits(app, "%s_play-update" % tag, tag, problems)
+        link = app.status_link.cget("text") if app.status_link.winfo_manager() else None
+        if app.status_text != w("about.available", v="9.9.9") or not (link or "").startswith(
+                w("about.update_now", v="9.9.9")):
+            problems.append("%s: a newer launcher at the start made the status line say %r, its link %r"
+                            % (tag, app.status_text, link))
+        # The link starts the Launcher page's own update, and nothing else does.
+        pressed = []
+        with mock.patch.object(maintenance, "update_launcher", lambda app_, result: pressed.append(result.version)):
+            if app.status_link.odq_action:
+                app.status_link.odq_action()
+        if pressed != ["9.9.9"]:
+            problems.append("%s: the status line's update started %r" % (tag, pressed))
+        app.go("about")
+        settle(app)
+        shot(app.root, out, "%s_about-update" % tag)
+        measure(app, "%s_about-update" % tag, problems)
+        try:
+            button(app, w("about.update_now", v="9.9.9"))
+        except AssertionError:
+            problems.append("%s: the Launcher page shows no update for the newer launcher found at the start" % tag)
+    app.update_found = None
+    app.go("play")
+    settle(app)
 
 
 def update_failures_check(app, out, tag, problems):

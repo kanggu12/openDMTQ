@@ -273,6 +273,36 @@ class CommandLine(Folder):
         self.assertEqual(code, 0, said)
         self.assertIn("[warn] server:", said)
 
+    def test_status_says_a_newer_launcher_on_offer(self):
+        # The window's look at its start, from the command line: the launcher's version, and a newer one when the
+        # release feed has it; without a network, after a failure or past the time limit, the version alone. The exit
+        # code stays PLAY's.
+        import time
+        from opendmtq_client import __version__, updates
+        self.run_main(["--server", self.site.url])
+        offer = updates.Result("available", version="9.9.9")
+        with mock.patch.object(updates, "check", return_value=offer):
+            code, said = self.run_main(["--status"])
+        self.assertEqual(code, 1, said)
+        self.assertIn("launcher: %s; OpenDMTQ 9.9.9 is available (--update)\n" % __version__, said)
+        with mock.patch.object(updates, "check", return_value=updates.Result("failed", error="Network error: io")):
+            code, said = self.run_main(["--status"])
+        self.assertIn("launcher: %s\n" % __version__, said)
+        self.assertNotIn("available", said)
+        self.assertNotIn("Network error", said)
+
+        def slow():
+            # A feed that answers long after the limit (a network that drops what it is sent).
+            time.sleep(3)
+            return offer
+
+        with mock.patch.object(updates, "check", side_effect=slow), mock.patch.object(updates, "START_LIMIT", 0.3):
+            started = time.monotonic()
+            code, said = self.run_main(["--status"])
+        self.assertLess(time.monotonic() - started, 2.5)
+        self.assertIn("launcher: %s\n" % __version__, said)
+        self.assertNotIn("available", said)
+
     def test_the_servers_it_knows_and_the_guide_skipped(self):
         # Online's list of servers and the guide's "Skip: I set it up myself", from the command line: a PC set up with
         # --server, --sign-in and --app opens on PLAY with --skip-guide.

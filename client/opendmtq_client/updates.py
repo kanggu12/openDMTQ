@@ -9,8 +9,14 @@ its place, for trying a feed out. Every call here may be slow (network), so the 
 
 import logging
 import os
+import threading
+import time
 
 log = logging.getLogger("opendmtq_client")
+
+# How long the look for a newer launcher at each start waits for the release feed, in seconds: past it the launcher
+# says nothing, as it says nothing offline. Velopack's GitHub source takes no time limit of its own.
+START_LIMIT = 10
 
 SOURCE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "update-source.txt")
 
@@ -83,6 +89,36 @@ def check():
         # failure by its kind.
         log.warning("could not check for updates: %s", text)
         return Result("failed", error=text)
+
+
+class Look:
+    """The look for a newer launcher that each start makes (the window's, --status's): check() on a thread of its own,
+    started at once, so that what the start does meanwhile waits for nothing. Nothing is downloaded or installed."""
+
+    def __init__(self, limit=None):
+        # The time it may take (START_LIMIT, read now), counted from now: a start that asks for the answer later waits
+        # only for what is left.
+        self.started, self.limit = time.monotonic(), START_LIMIT if limit is None else limit
+        self._result, self._done = None, threading.Event()
+        threading.Thread(target=self._look, daemon=True, name="update-look").start()
+
+    def _look(self):
+        try:
+            self._result = check()
+        finally:
+            # Answered, whatever the answer: newer() stops waiting.
+            self._done.set()
+
+    def newer(self):
+        """The newer version on offer (check()'s result, kind "available"), or None for anything else: up to date, no
+        network, a failure, a launcher not installed, or no answer within the time limit (the look goes on, and its
+        late answer is dropped)."""
+        left = self.limit - (time.monotonic() - self.started)
+        if not self._done.wait(max(0.0, left)):
+            log.info("no answer about updates within %d s at the start: nothing said", self.limit)
+            return None
+        result = self._result
+        return result if result is not None and result.kind == "available" else None
 
 
 def apply(result):

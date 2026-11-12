@@ -276,8 +276,9 @@ class StatusLine(Folder):
         app = types.SimpleNamespace(state=state, checks=checks, busy=False, download=None, session=None,
                                     words=i18n.Words("en"), status_message=None, status_tone="normal",
                                     status_action=None, status_transient=False, status_sticky=False,
-                                    _paint_status=lambda: None)
-        for name in ("set_status", "user_acted", "_say_state", "ready", "busy_now", "_game_open", "server_answers"):
+                                    update_found=None, _paint_status=lambda: None)
+        for name in ("set_status", "user_acted", "_say_state", "ready", "busy_now", "_game_open", "server_answers",
+                     "update_on_offer", "update_now"):
             setattr(app, name, getattr(launcher.LauncherApp, name).__get__(app))
         # The line's words as the window draws them (a property of the window's class).
         app.text = lambda: launcher.LauncherApp.status_text.fget(app)
@@ -317,6 +318,26 @@ class StatusLine(Folder):
         app.set_status(i18n.Said("status.app_check"), "normal")
         app._say_state()
         self.assertEqual(app.status_message.key, "status.app_check")
+
+    def test_a_newer_launcher_is_said_while_play_is_ready(self):
+        # The look at the start found one: the line says it, with its update, in PLAY's ready state; a state to fix and
+        # a kept outcome come first, and it comes back once they give way.
+        from opendmtq_client import actions, i18n, updates
+        state = st.LauncherState()
+        state.add_server("http://stand.in", "Stand-in")
+        app = self.window(state, [actions.Check("server", True, "Stand-in")])
+        app.set_status(i18n.Said("status.ended", time=i18n.span(130)), "ok", sticky=True)
+        app.update_on_offer(updates.Result("available", version="9.9.9"))
+        self.assertEqual(app.text(), "The game closed after 2 min.")
+        app.user_acted()
+        self.assertEqual(app.text(), "OpenDMTQ 9.9.9 is available.")
+        words, action = app.status_action
+        self.assertEqual(app.words.say(words), "Update to 9.9.9")
+        # Something to fix first: said instead, the update waiting for PLAY to be ready again.
+        app.checks = [actions.Check("app", False, "none on this PC", page="online")]
+        app._say_state()
+        self.assertEqual(app.status_message.key, "status.fix_first")
+        self.assertIsNone(app.status_action)
 
     def test_a_kept_line_says_itself_again_in_the_new_language(self):
         # The window switched to Korean redraws its line from what it kept, not from the English sentence it showed.

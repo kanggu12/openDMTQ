@@ -77,6 +77,7 @@ class LauncherApp:
         #                                 yet (None: the field shows the server in use); kept over the page's redraws
         self.main_buttons = []          # the page's main-action buttons (pages.main_button): lime while PLAY is not
         self.server_reached = None      # the ready check's last answer from the server: {"url", "reached", "at"}
+        self.update_found = None        # a newer launcher the look at the start found (updates.Result), or None
         self.pumps = 0                  # turns of the task pump, for the slower look for an installer's server
         self._setup_fonts()
         self._size_window()
@@ -89,6 +90,8 @@ class LauncherApp:
         self.root.after(50, self._pump)
         self.show()
         self._update_outcome()
+        # Once a start: whether a newer launcher is on offer, said on the Launcher page and the status line when it is.
+        self.look_for_update()
 
     # --------------------------------------------------------------------------------------- frame
 
@@ -210,6 +213,12 @@ class LauncherApp:
         elif not self.server_answers():
             # Ready all the same: PLAY starts the app this PC has, which may be older than the server's.
             self.set_status(i18n.Said("status.server_down"), "warn")
+        elif self.update_found is not None:
+            # Ready, with a newer launcher on offer: said with its update, as the Launcher page's button does it. PLAY
+            # lit at the foot says that it is ready.
+            v = self.update_found.version
+            self.set_status(i18n.Said("about.available", v=v), "normal",
+                            action=(i18n.Said("about.update_now", v=v), self.update_now))
         else:
             # Ready: nothing more to say, whatever the line said before (a passing note, an outcome given way).
             self.set_status(i18n.Said("status.ready"), "normal")
@@ -422,6 +431,46 @@ class LauncherApp:
         self.set_status(i18n.Said("status.signed_out"), "warn", sticky=True)
         self.refresh_checks()
         self._paint_play()
+
+    def look_for_update(self):
+        """The look for a newer launcher at the start (updates.Look): on a worker thread, with its time limit. A newer one
+        is said on the Launcher page and the status line, with its update; anything else (no network, a failure, no
+        answer in time) says nothing. Nothing is installed by itself."""
+        from opendmtq_client import updates
+
+        def work():
+            found = updates.Look().newer()
+            if found is not None:
+                self.post(lambda: self._update_on_offer(found))
+
+        threading.Thread(target=work, daemon=True, name="update-look").start()
+
+    def _update_on_offer(self, result):
+        """A newer launcher is on offer, found at the start: the Launcher page, on show, draws its answer and its update;
+        the status line says it (update_on_offer)."""
+        from opendmtq_client import __version__, pages, updates
+        log.info("OpenDMTQ %s is available (this is %s)", result.version, updates.current_version() or __version__)
+        self.update_on_offer(result)
+        if self.guide is None and self.page == "about":
+            pages.redraw_in_place(self, "about")
+
+    def update_on_offer(self, result):
+        """Keep a newer launcher on offer (found at the start or by the Launcher page's Check for updates): the status
+        line says it, with its update, whenever PLAY is ready (_say_state)."""
+        self.update_found = result
+        self._say_state()
+
+    def update_now(self):
+        """The status line's Update to vX: the Launcher page's own update (maintenance.update_launcher), refused while a
+        game runs, as the page refuses it."""
+        from opendmtq_client import maintenance
+        if self.update_found is None:
+            # The link goes with the notice: without an update on offer there is none to press.
+            return
+        self.user_acted()
+        if not maintenance.update_launcher(self, self.update_found):
+            # A game from this window or from the command line: the update replaces the player's files under it.
+            self.set_status(i18n.Said("about.update_busy"), "warn")
 
     def _update_outcome(self):
         """Say whether the update handed to Velopack at the last close went in (a silent update says nothing)."""

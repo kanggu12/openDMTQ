@@ -1,7 +1,8 @@
 """Start the launcher, or do one of its jobs from the command line.
 
   OpenDMTQ.exe                          the launcher window (the first-start guide the first time)
-  OpenDMTQ.exe --status                 print the server, the sign-in, the app and the ready check (exit 0: PLAY can go)
+  OpenDMTQ.exe --status                 print the server, the sign-in, the app, the ready check and a newer launcher on
+                                        offer (exit 0: PLAY can go)
   OpenDMTQ.exe --server URL             connect to a server and play on it from now on
   OpenDMTQ.exe --sign-in ID             sign in to the server (the password from standard input, or asked for)
   OpenDMTQ.exe --sign-out               forget the sign-in
@@ -330,7 +331,11 @@ def _uninstall(delete_data, yes):
 
 
 def _status(state):
-    """--status: where PLAY plays, what it has, and the ready check; 0 when PLAY can go."""
+    """--status: where PLAY plays, what it has, the ready check, and the launcher with a newer one on offer (the window's
+    look at its start, with the same time limit); 0 when PLAY can go."""
+    from opendmtq_client import updates
+    # Started first, so that it asks the release feed while the server is asked: the two waits overlap.
+    look = updates.Look()
     server = state.server()
     if server is None:
         _say("server: none (connect with --server URL)")
@@ -352,6 +357,11 @@ def _status(state):
     for c in checks:
         mark = "ok  " if c.ok else ("play" if c.play_fixes else "todo" if c.blocks else "warn")
         _say("  [%s] %s: %s" % (mark, c.key, c.detail))
+    # The launcher's version, and a newer one when the look found it (nothing more without a network or an answer in
+    # time); it changes nothing of the exit code, which is about PLAY.
+    newer = look.newer()
+    this = updates.current_version() or __version__
+    _say("launcher: %s" % this + ("; OpenDMTQ %s is available (--update)" % newer.version if newer else ""))
     return 0 if actions.can_play(checks) else 1
 
 
@@ -426,7 +436,8 @@ def _play(state):
 def parse(argv):
     p = argparse.ArgumentParser(prog="OpenDMTQ", description="The OpenDMTQ launcher for PCs.")
     p.add_argument("--version", action="version", version="OpenDMTQ " + __version__)
-    p.add_argument("--status", action="store_true", help="print the server, the sign-in, the app and the ready check")
+    p.add_argument("--status", action="store_true",
+                   help="print the server, the sign-in, the app, the ready check and a newer launcher on offer")
     p.add_argument("--server", metavar="URL", help="connect to the server at this address and play on it")
     p.add_argument("--sign-in", metavar="ID", help="sign in to the server (the password from standard input)")
     p.add_argument("--sign-out", action="store_true", help="forget the sign-in")
