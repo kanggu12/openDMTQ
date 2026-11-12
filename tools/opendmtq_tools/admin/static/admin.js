@@ -506,10 +506,22 @@ for (const el of document.querySelectorAll('[data-reload]')) setTimeout(() => lo
 })();
 
 // Back to a page whose form was sent (the busy button's part above kept where it was): the same search, the same place in
-// the list. Last, once the lists above can narrow to a search.
+// the list. Last, once the lists above can narrow to a search. A page that answers with what it shows only once (a new
+// password, a new token: data-once) shows that instead, wherever the form was sent from.
 (() => {
   const back = JSON.parse(sessionStorage.getItem('odq-back') || 'null');
   sessionStorage.removeItem('odq-back');
+  const once = document.querySelector('[data-once]');
+  if (once) {
+    // Its top just under the bar where the bar stays on the screen (wider screens); on a phone the bar scrolls away.
+    const bar = document.querySelector('.bar');
+    const cover = bar && getComputedStyle(bar).position === 'sticky' ? bar.offsetHeight : 0;
+    // A little room above it, so that its edge and heading read as the top of what is on the screen.
+    scrollTo(0, Math.max(0, once.getBoundingClientRect().top + scrollY - cover - 14));
+    // The focus on it too, already in place: the next Tab reaches its copy button, and a screen reader says its heading.
+    once.focus({ preventScroll: true });
+    return;
+  }
   if (!back || back.path !== location.pathname) return;
   const search = document.querySelector('input[type=search]');
   if (search && back.q) { search.value = back.q; search.dispatchEvent(new Event('input')); }

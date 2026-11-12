@@ -144,9 +144,10 @@
 </section>
 
 {% elif step == 'players' %}
+{# The account just made, with what to send, once: in view with the focus whatever the form's place (data-once, admin.js). #}
 {% if made %}
-<section class="card account-made">
-  <h2>{{ t('setup.made_title', name=made.name) }}</h2>
+<section class="card account-made" data-once tabindex="-1" aria-labelledby="made-title">
+  <h2 id="made-title">{{ t('setup.made_title', name=made.name) }}</h2>
   <p class="meta">{{ t('acc.once') }}</p>
   <dl class="account-keys">
     <div><dt>{{ t('acc.id') }}</dt><dd>{{ made.name }}</dd></div>

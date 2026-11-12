@@ -920,6 +920,38 @@ async function adminFlows(contexts) {
   check('switched off, the account is signed out', new URL(friend.url()).pathname === '/opendmtq/login.php', friend.url());
   await theirs.close();
 
+  // What shows once comes into view, with the focus, wherever its form was: Make token at the page's foot, and a row's New
+  // password down the list. The page used to come back where it was, the panel above, off the screen. At a laptop's screen
+  // and a phone's; the new password for an account of this check's own (dmtq's is the one every stage signs in with).
+  await page.goto(`${A}/accounts`, { waitUntil: 'domcontentloaded' });
+  await page.type('.account-form input[name=name]', 'inview');
+  await press(page, '.account-form button');
+  // The panel against the screen, and whether it has the focus.
+  const panelAt = p => p.$eval('section.account-made', e => {
+    const r = e.getBoundingClientRect();
+    return { top: Math.round(r.top), bottom: Math.round(r.bottom), screen: innerHeight, focused: document.activeElement === e };
+  }).catch(() => null);
+  const outOfView = [];
+  for (const [size, width, height] of [['laptop', 1366, 768], ['phone', 390, 844]]) {
+    const p = await contexts.signed.newPage();
+    await p.setViewport({ width, height, isMobile: width < 500, hasTouch: width < 500 });
+    await p.goto(`${A}/accounts`, { waitUntil: 'domcontentloaded' });
+    await p.$eval('#tokens input[name=token_name]', e => e.scrollIntoView({ block: 'center' }));
+    await p.type('#tokens input[name=token_name]', `in view ${size}`);
+    await press(p, '#tokens form button');
+    const token = await panelAt(p);
+    const row = 'table.accounts form:has(input[name=action][value=password]):has(input[name=name][value="inview"]) button';
+    await p.$eval(row, e => e.scrollIntoView({ block: 'center' }));
+    await pressAndConfirm(p, row);
+    const password = await panelAt(p);
+    for (const [what, at] of [['Make token', token], ['New password', password]]) {
+      if (!at || at.top < 0 || at.bottom > at.screen || !at.focused) outOfView.push(`${what} at ${size}: ${JSON.stringify(at)}`);
+    }
+    await p.close();
+  }
+  check('what shows once is in view with the focus after Make token and New password, on a laptop and a phone', outOfView.length === 0,
+    outOfView.join('; '));
+
   // The accounts' buttons stand in the same columns in every row: a button whose word depends on the account (Disable or
   // Enable, Give or Remove admin rights) is as wide as its other word too. Now with an admin, a player and a switched-off
   // account, at the narrowest tablet, a tablet on its side, both sides of the width where the buttons leave the row,

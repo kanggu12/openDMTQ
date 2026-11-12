@@ -1,9 +1,10 @@
 {% extends "base.html" %}{% block title %}{{ t('acc.title') }}{% endblock %}
 {% block body %}
-{# Just made, or a new password: what to send, once. The page after this one no longer has it. #}
+{# Just made, or a new password: what to send, once. The page after this one no longer has it. Brought into view with the
+   focus wherever the form was sent from (data-once, admin.js): at the foot of a long list it would be off the screen. #}
 {% if shown %}
-<section class="card account-made">
-  <h2>{{ t(shown.word, name=shown.name) }}</h2>
+<section class="card account-made" data-once tabindex="-1" aria-labelledby="shown-title">
+  <h2 id="shown-title">{{ t(shown.word, name=shown.name) }}</h2>
   <p class="meta">{{ t('acc.once') }}{% if shown.word == 'acc.new_done' %} {{ t('acc.ended') }}{% endif %}</p>
   <dl class="account-keys">
     <div><dt>{{ t('acc.id') }}</dt><dd>{{ shown.name }}</dd></div>
@@ -13,10 +14,11 @@
   <div class="btn-line"><button type="button" class="btn btn-primary" data-copy="#account-message" data-done="{{ t('copy.done') }}" data-fail="{{ t('copy.failed') }}">{{ t('invite.copy') }}</button></div>
 </section>
 {% endif %}
-{# An API token just made: the token itself, once, as a new password is. The server keeps only its hash. #}
+{# An API token just made: the token itself, once, as a new password is. The server keeps only its hash. Its form is at
+   the page's foot: the page comes back with this in view (data-once, admin.js). #}
 {% if shown_token %}
-<section class="card account-made">
-  <h2>{{ t('tok.made', name=shown_token.name) }}</h2>
+<section class="card account-made" data-once tabindex="-1" aria-labelledby="token-title">
+  <h2 id="token-title">{{ t('tok.made', name=shown_token.name) }}</h2>
   <p class="meta">{{ t('tok.once') }}</p>
   <dl class="account-keys">
     <div><dt>{{ t('tok.value') }}</dt><dd><code id="token-secret">{{ shown_token.token }}</code></dd></div>
