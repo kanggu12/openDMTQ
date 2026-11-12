@@ -545,7 +545,10 @@ def _remove_later(copy):
     if sys.platform != "win32" or not named or os.path.dirname(os.path.realpath(copy)) != temp:
         # A launcher run any other way never deletes the folder it runs from.
         return
-    # choice waits 3 s, then rmdir takes the copy whole.
-    command = 'choice /C Y /N /D Y /T 3 & rmdir /s /q "%s"' % copy
-    subprocess.Popen(["cmd.exe", "/C", command], cwd=temp, close_fds=True, creationflags=DETACHED,
+    # choice waits 3 s, then rmdir takes the copy whole. One command line as Windows hands it to the command processor:
+    # given as a list, Python would quote the line whole and write its inner quotes as \", which cmd.exe reads as part
+    # of the folder's name (under Wine the copy stayed).
+    command = 'cmd.exe /C choice /C Y /N /D Y /T 3 & rmdir /s /q "%s"' % copy
+    log.info("the card's copy goes in a few seconds: %s", copy)
+    subprocess.Popen(command, cwd=temp, close_fds=True, creationflags=DETACHED,
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
