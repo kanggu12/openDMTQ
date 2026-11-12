@@ -7,7 +7,8 @@
   OpenDMTQ.exe --sign-in ID             sign in to the server (the password from standard input, or asked for)
   OpenDMTQ.exe --sign-out               forget the sign-in
   OpenDMTQ.exe --app                    download the server's app, or a newer one
-  OpenDMTQ.exe --set name=value ...     change a PC setting (values.py names them)
+  OpenDMTQ.exe --set name=value ...     change a PC setting (values.py names them; keyboard play's keys as
+                                        keys_3line="D F J")
   OpenDMTQ.exe --audio-devices          list the sound devices the player can play on
   OpenDMTQ.exe --language en|ko|system  the launcher's language (system: Windows' display language)
   OpenDMTQ.exe --guide                  open the first-start guide again at the next start of the window
@@ -477,7 +478,10 @@ def parse(argv):
     p.add_argument("--app", action="store_true", help="download the server's app, or a newer one")
     p.add_argument("--set", metavar="NAME=VALUE", action="append", default=[],
                    help="change a PC setting: " + ", ".join(choices.NAMES) + " (show_fps=on|off; fps_position=top_left|"
-                        "top_right|bottom_left|bottom_right, the counter's corner, bottom_right unless chosen)")
+                        "top_right|bottom_left|bottom_right, the counter's corner, bottom_right unless chosen; "
+                        "keyboard=on|off, keyboard play; keys_2line=\"F J\", keys_3line=\"D F J\", keys_4line=\"D F J K\": "
+                        "the lanes from the top apart by spaces, a lane's keys one or two joined by /, each named as "
+                        "the US layout's key at its place)")
     p.add_argument("--audio-devices", action="store_true", help="list the sound devices the player can play on")
     p.add_argument("--language", choices=st.LANGUAGES + ("system",),
                    help="the launcher's language (system: Windows' display language)")

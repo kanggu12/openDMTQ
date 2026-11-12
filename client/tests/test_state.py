@@ -37,6 +37,23 @@ class State(Folder):
         self.assertEqual(again.server()["name"], "A server")
         self.assertTrue(again.signed_in())
 
+    def test_keyboard_play_kept_and_read_again(self):
+        # Kept as chosen, in the names the player takes; a file from before keyboard play has its defaults; a value
+        # edited by hand that no lane takes keeps that setting's default, the others as they were.
+        s = st.LauncherState()
+        s.set_value("keys_3line", "s/d f j")
+        s.set_value("keyboard", "off")
+        s.save()
+        again = st.LauncherState.load()
+        self.assertEqual((again.values["keys_3line"], again.values["keyboard"]), ("S/D F J", "off"))
+        self.assertTrue({"keys_3line", "keyboard"} <= again.chosen)
+        for written, read in (({"volume": 40}, ("on", "F J", "D F J K")),
+                              ({"keys_2line": "F F", "keys_4line": "Q W E R"}, ("on", "F J", "Q W E R"))):
+            with open(st.LauncherState.path(), "w", encoding="utf-8") as f:
+                json.dump({"version": 1, "values": written}, f)
+            values = st.LauncherState.load().values
+            self.assertEqual((values["keyboard"], values["keys_2line"], values["keys_4line"]), read, written)
+
     def test_the_counters_corner_from_before_0_9_3(self):
         # A launcher before 0.9.3 wrote its default corner, the top left, whether or not the player chose it: read as no
         # choice, the bottom right now. Another corner was the player's choice and stays.

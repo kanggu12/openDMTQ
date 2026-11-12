@@ -1,5 +1,6 @@
-"""The PC settings the launcher offers for the picture and the sound: each one's choices and default, and the settings
-file the player reads at a start (player --settings FILE; arm32/desktop/settings.cpp reads the same keys).
+"""The PC settings the launcher offers for the picture, the sound and keyboard play: each one's choices and default,
+and the settings file the player reads at a start (player --settings FILE; arm32/desktop/settings.cpp reads the same
+keys).
 
 A phone's app sets these for itself; on a PC they are the player's to apply, chosen here before PLAY.
 """
@@ -39,6 +40,34 @@ OLD_FPS_POSITION = "top_left"
 AUDIO_MODE = ("shared", "exclusive")
 # How much sound is kept ahead of the device: less latency, or fewer breaks on a busy PC.
 AUDIO_BUFFER = ("low", "normal", "safe")
+# Keyboard play: the lanes' keys play a song's lanes, or play nothing (the mouse and a touch screen play either way).
+KEYBOARD = ("on", "off")
+# Each LINE mode's keys, by its setting's name, and how many lanes the mode has (the game's rows, counted from the top).
+LANES = {"keys_2line": 2, "keys_3line": 3, "keys_4line": 4}
+# The most keys one lane takes: its key, and a second one beside it.
+LANE_KEYS = 2
+# The keys a lane takes, each by its place on the keyboard: the name of the US layout's key at that place (the name the
+# settings file, --set and the Controls page use), its scan code (set 1, as Windows' key messages carry it and as Linux
+# numbers the main block's keys; the player binds the place by it, so another layout plays the same places), and what
+# the US layout prints there (the Controls page shows another layout's print beside the name when it differs).
+KEYS = tuple((letter, scan, letter.lower()) for row, first in (("QWERTYUIOP", 0x10), ("ASDFGHJKL", 0x1E),
+                                                               ("ZXCVBNM", 0x2C))
+             for scan, letter in enumerate(row, first)) + tuple(
+    (digit, scan, digit) for scan, digit in enumerate("1234567890", 0x02)) + (
+    ("Space", 0x39, " "), ("Semicolon", 0x27, ";"), ("Quote", 0x28, "'"), ("Comma", 0x33, ","), ("Period", 0x34, "."),
+    ("Slash", 0x35, "/"), ("LeftBracket", 0x1A, "["), ("RightBracket", 0x1B, "]"), ("Backslash", 0x2B, "\\"),
+    ("Minus", 0x0C, "-"), ("Equals", 0x0D, "="), ("Grave", 0x29, "`"))
+# The names alone, in that order (the words that list them say A to Z, 0 to 9, then the rest).
+KEY_NAMES = tuple(name for name, _scan, _print in KEYS)
+# A name to its place, and a place back to its name.
+SCAN = {name: scan for name, scan, _print in KEYS}
+BY_SCAN = {scan: name for name, scan, _print in KEYS}
+# A name to what the US layout prints at its place.
+US_PRINT = {name: printed for name, _scan, printed in KEYS}
+# A name as typed in any case ("leftbracket", "SPACE") to the name as the player takes it.
+_BY_FOLDED = {name.lower(): name for name in KEY_NAMES}
+# The names as one refusal lists them: the letters and the digits as ranges, then the others by name.
+_LISTED = "A to Z, 0 to 9, " + ", ".join(name for name in KEY_NAMES if len(name) > 1)
 
 # Every setting and its default. Full screen first: the game is made for a phone's whole screen, and a touch screen
 # plays best over all of it.
@@ -56,18 +85,24 @@ DEFAULTS = {
     "audio_mode": "shared",
     "audio_buffer": "normal",
     "volume": 100,
+    # Keyboard play on, each lane on the home row's keys under the index and middle fingers, the lanes from the top
+    # from left to right on the keyboard.
+    "keyboard": "on",
+    "keys_2line": "F J",
+    "keys_3line": "D F J",
+    "keys_4line": "D F J K",
 }
-# The order the settings file lists them in, the player's own order. The counter's corner is no key of the player's:
-# show_fps carries it there (off, or the corner it is on in).
+# The order the settings file lists them in, the player's own order: the picture's, the sound's, then keyboard play's.
+# The counter's corner is no key of the player's: show_fps carries it there (off, or the corner it is on in).
 ORDER = ("display", "window", "vsync", "fps", "render_scale", "upscaler", "anti_aliasing", "show_fps", "audio_device",
-         "audio_mode", "audio_buffer", "volume")
+         "audio_mode", "audio_buffer", "volume", "keyboard") + tuple(LANES)
 # Every setting the launcher keeps, in the order it lists them (--set, --status): the player's, the counter's corner
 # after the counter.
 NAMES = ORDER[:ORDER.index("show_fps") + 1] + ("fps_position",) + ORDER[ORDER.index("show_fps") + 1:]
 # The choices of each setting that has a fixed list.
 CHOICES = {"display": DISPLAY, "vsync": VSYNC, "fps": FPS, "render_scale": RENDER_SCALE, "upscaler": UPSCALER,
            "anti_aliasing": ANTI_ALIASING, "show_fps": SHOW_FPS, "fps_position": FPS_POSITION, "audio_mode": AUDIO_MODE,
-           "audio_buffer": AUDIO_BUFFER}
+           "audio_buffer": AUDIO_BUFFER, "keyboard": KEYBOARD}
 # A window size the player takes (its own bounds: 480x270 to 16384 a side). 480x270 is also the smallest area its window
 # holds at 100 %; at Windows' scale it is that many of Windows' own pixels (smallest_on).
 SIZE = re.compile(r"^(\d{3,5})x(\d{3,5})$")
@@ -119,7 +154,93 @@ def _one(name, value):
             raise ChoiceError("audio_device cannot be %r: it is default or a device id" % (value,), "error.choice", name=name,
                               value=value)
         return text
+    if name in LANES:
+        # The lanes' keys checked as the Controls page checks them, kept as the player names them.
+        return lanes_text(lanes_of(name, value))
     raise ChoiceError("there is no setting %r" % (name,), "error.no_setting", name=name)
+
+
+def mode(name):
+    """A keys setting's LINE mode as the game names it: keys_3line -> "3 LINE"."""
+    return "%d LINE" % LANES[name]
+
+
+def key_name(text):
+    """A key's name typed in any case ("leftbracket") as the player takes it ("LeftBracket"); None for one it does not
+    take."""
+    return _BY_FOLDED.get(str(text).lower())
+
+
+def lanes_of(name, value):
+    """A keys setting's value ("D/E F J") as its lanes from the top, each a tuple of its key names as the player takes
+    them ((("D", "E"), ("F",), ("J",))). ChoiceError when it is not the mode's lanes (as many as the mode has, each
+    one key or two joined by /), names a key no lane takes, or has a key twice."""
+    text = str(value)
+    # Lanes apart by spaces, any number of them (a hand-made line), none at either end.
+    parts = text.split()
+    count = LANES[name]
+    if len(parts) != count:
+        raise ChoiceError("%s cannot be %r: it is %d lanes from the top, apart by spaces, each one key or two joined by /"
+                          % (name, text, count), "error.keys.lanes", name=name, value=text, mode=mode(name), n=count)
+    lanes, seen = [], {}
+    for number, part in enumerate(parts, 1):
+        found = part.split("/")
+        # One key or two, and no empty name between, before or after a /.
+        if not 1 <= len(found) <= LANE_KEYS or not all(found):
+            raise ChoiceError("%s cannot be %r: a lane has one key or two, joined by /" % (name, text),
+                              "error.keys.lane", name=name, value=text, lane=number)
+        lane = []
+        for typed in found:
+            key = key_name(typed)
+            if key is None:
+                raise ChoiceError("%s cannot be %r: %s is no key a lane takes (%s)" % (name, text, typed, _LISTED),
+                                  "error.keys.name", name=name, value=text, keyname=typed)
+            if key in lane:
+                # The same key twice in one lane: the second would add nothing.
+                raise ChoiceError("%s cannot be %r: %s is in lane %d twice" % (name, text, key, number),
+                                  "error.keys.twice_in_lane", name=name, value=text, keyname=key, lane=number)
+            if key in seen:
+                # One key, one lane: a press must say which lane it plays.
+                raise ChoiceError("%s cannot be %r: %s is in lane %d and lane %d" % (name, text, key, seen[key], number),
+                                  "error.keys.twice", name=name, value=text, keyname=key, first=seen[key], second=number)
+            seen[key] = number
+            lane.append(key)
+        lanes.append(tuple(lane))
+    return tuple(lanes)
+
+
+def lanes_text(lanes):
+    """Lanes as the settings file and --set write them: each lane's keys joined by /, the lanes apart by one space."""
+    return " ".join("/".join(lane) for lane in lanes)
+
+
+def with_key(name, lanes, lane, slot, key):
+    """The lanes with `key` in box `slot` (0 for a lane's key, 1 for its second) of lane `lane` (0 for the top), as the
+    Controls page sets it from a key pressed; slot 1 of a lane with one key adds its second. ChoiceError when another
+    box of the mode plays that key already: the page refuses it in words and nothing changes."""
+    for number, keys in enumerate(lanes):
+        for place, other in enumerate(keys):
+            if other == key and (number, place) != (lane, slot):
+                raise ChoiceError("%s already plays lane %d of %s" % (key, number + 1, mode(name)), "error.keys.taken",
+                                  keyname=key, lane=number + 1, mode=mode(name))
+    changed = list(lanes[lane])
+    if slot < len(changed):
+        # The box had a key: the new one in its place.
+        changed[slot] = key
+    else:
+        # The empty box after a lane's key: a second key added.
+        changed.append(key)
+    return tuple(tuple(changed) if number == lane else keys for number, keys in enumerate(lanes))
+
+
+def without_key(name, lanes, lane, slot):
+    """The lanes with the key of box `slot` of lane `lane` taken away (the Controls page's Delete): the other key of the
+    lane plays it alone. ChoiceError for a lane's only key: a lane keeps one at least."""
+    if len(lanes[lane]) < 2:
+        raise ChoiceError("lane %d of %s keeps one key at least" % (lane + 1, mode(name)), "error.keys.one",
+                          lane=lane + 1, mode=mode(name))
+    kept = tuple(key for place, key in enumerate(lanes[lane]) if place != slot)
+    return tuple(kept if number == lane else keys for number, keys in enumerate(lanes))
 
 
 def normalize(values, strict=True):

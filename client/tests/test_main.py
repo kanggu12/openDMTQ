@@ -112,6 +112,38 @@ class CommandLine(Folder):
         self.assertEqual(code, 2)
         self.assertEqual(st.LauncherState.load().values["fps_position"], "top_right")
 
+    def test_keyboard_play_and_the_lanes_keys(self):
+        # Keyboard play and each LINE mode's keys by --set, checked as the Controls page checks them: the names kept as
+        # the player takes them, a refusal said with its reason and that setting left as it was; --status lists them,
+        # and PLAY's settings file carries them.
+        code, said = self.run_main(["--set", "keyboard=off", "--set", "keys_2line=f/g j", "--set", "keys_4line=1 2 3 4"])
+        self.assertEqual(code, 0, said)
+        for line in ("keyboard=off", "keys_2line=F/G J", "keys_4line=1 2 3 4"):
+            self.assertIn(line, said)
+        values = st.LauncherState.load().values
+        self.assertEqual((values["keyboard"], values["keys_2line"], values["keys_4line"]), ("off", "F/G J", "1 2 3 4"))
+        # A key in two lanes, a key no lane takes, a lane short: each refused with why, nothing of it kept.
+        for value, why in (("D F F", "F is in lane 2 and lane 3"), ("D F Enter", "Enter is no key a lane takes"),
+                           ("D F", "3 lanes")):
+            code, said = self.run_main(["--set", "keys_3line=" + value])
+            self.assertEqual(code, 2, said)
+            self.assertIn(why, said)
+            self.assertNotIn("Traceback", said)
+            self.assertEqual(st.LauncherState.load().values["keys_3line"], "D F J")
+        code, said = self.run_main(["--set", "keyboard=maybe"])
+        self.assertEqual(code, 2, said)
+        code, said = self.run_main(["--status"])
+        self.assertIn("keyboard=off, keys_2line=F/G J, keys_3line=D F J, keys_4line=1 2 3 4", said)
+        # PLAY writes them for the player, after the sound's.
+        code, said = self.run_main(["--server", self.site.url, "--sign-in", stub.ACCOUNT, "--set", "keyboard=on"],
+                                   stdin=stub.PASSWORD + "\n")
+        self.assertEqual(code, 0, said)
+        code, said = self.run_main(["--play"])
+        self.assertEqual(code, 0, said)
+        lines = self.started()["settings"].splitlines()
+        self.assertEqual(lines[lines.index("volume=100") + 1:lines.index("volume=100") + 5],
+                         ["keyboard=on", "keys_2line=F/G J", "keys_3line=D F J", "keys_4line=1 2 3 4"])
+
     def test_audio_devices(self):
         code, said = self.run_main(["--audio-devices"])
         self.assertEqual(code, 0)
@@ -370,7 +402,8 @@ class CommandLine(Folder):
         out = io.StringIO()
         with contextlib.redirect_stdout(out), self.assertRaises(SystemExit):
             main.parse(["--help"])
-        for name in ("vsync", "fps", "render_scale", "upscaler", "anti_aliasing", "show_fps", "fps_position", "audio_device"):
+        for name in ("vsync", "fps", "render_scale", "upscaler", "anti_aliasing", "show_fps", "fps_position", "audio_device",
+                     "keyboard", "keys_2line", "keys_3line", "keys_4line"):
             self.assertIn(name, out.getvalue())
 
     def test_a_worker_threads_error_goes_to_the_log(self):
