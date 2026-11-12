@@ -742,7 +742,7 @@ check("delete all of a player's, none running", "deleted" in rec_post(action=f"d
 big = 188 * 3800  # about 0.7 MB
 rec_post(action="limits", cap_gb="0.001", days="30", confirmed="1")
 check("the limits are saved", 'name="cap_gb" type="number" min="0.001" step="any" value="0.001"' in admin_page("/opendmtq/admin/recordings"))
-check("nonsense limits are refused", "Size must be" in rec_post(action="limits", cap_gb="-1", days="30") and "Size must be" in rec_post(action="limits", cap_gb="1", days="x"))
+check("nonsense limits are refused", "0.001 or more" in rec_post(action="limits", cap_gb="-1", days="30") and "0.001 or more" in rec_post(action="limits", cap_gb="1", days="x"))
 broadcast([0, segment(0, big)])
 oldest = new_since([])
 time.sleep(1.1)
