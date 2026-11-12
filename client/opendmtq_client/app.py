@@ -455,6 +455,8 @@ class LauncherApp:
         title, description = pages.heading(self, page)
         self.body.set_heading(title, description)
         pages.BUILDERS[page](self, content)
+        # One column for the names of the page's settings, its cards' and both languages' widest (Help, Screen, Sound).
+        widgets.fit_names(content, self.ui, pages.rows_that_come(page))
         self.body.to_top()
 
     # ------------------------------------------------------------------------------ background

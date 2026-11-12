@@ -88,6 +88,9 @@ class Guide:
         content = tk.Frame(self.body.inner, bg=theme.BG)
         content.pack(fill="both", expand=True)
         getattr(self, "_" + key)(content)
+        # One column for the names of the step's settings, as a page has (pages.ROWS_THAT_COME names the guide's own as
+        # "guide:<step>", apart from the pages' names).
+        widgets.fit_names(content, app.ui, pages.rows_that_come("guide:" + key))
         self.header.set_step(index)
         self.counter.configure(text=w("guide.step", n=index + 1, total=len(STEPS)).upper()
                                if w.language == "en" else w("guide.step", n=index + 1, total=len(STEPS)))

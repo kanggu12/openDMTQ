@@ -1067,19 +1067,28 @@ class Select(ttk.Combobox):
         self.command(self.options[self.current()][0])
 
 
-# The width of a setting's name column, in logical pixels: the longest names of the Screen and Sound pages and a gap.
-LABEL_COLUMN = 150
+# The room between a setting's name and its control, in logical pixels.
+LABEL_GAP = 18
+
+
+def name_width(ui, names):
+    """How wide a column of setting names must be for `names`: the widest of them in the names' font, and the room after
+    it. Measured, never a number fixed for one system's font: Windows draws Pretendard wider than Linux does."""
+    return max(ui.fonts.body_bold.measure(name) for name in names) + ui.px(LABEL_GAP)
 
 
 def setting_row(parent, ui, title, control_factory, hint=None, bg=None):
-    """A setting: its name on the left, the control on the right of it, the hint underneath."""
+    """A setting: its name on the left, the control on the right of it, the hint underneath. The page fits one column
+    for its rows' names afterwards (fit_names); until then the row's own name sets it."""
+    from opendmtq_client import i18n
     bg = bg or parent.cget("bg")
     row = tk.Frame(parent, bg=bg)
     row.columnconfigure(1, weight=1)
-    # One width for every row's name, so the controls of a page start on one line (a longer name still fits).
-    row.columnconfigure(0, minsize=ui.px(LABEL_COLUMN))
+    # The name in each language the launcher speaks: the page's layout is the same in both, whichever is on show.
+    row.odq_names = i18n.every_language(title)
+    row.columnconfigure(0, minsize=name_width(ui, row.odq_names))
     tk.Label(row, text=title, font=ui.fonts.body_bold, fg=theme.TEXT, bg=bg, anchor="w",
-             width=0).grid(row=0, column=0, sticky="w", padx=(0, ui.px(18)))
+             width=0).grid(row=0, column=0, sticky="w", padx=(0, ui.px(LABEL_GAP)))
     control = control_factory(row)
     # Every control's visible left edge on one line: a switch, a row of tabs and a slider keep room for the keyboard's
     # ring (and the switch for its halo) before what shows, so the others are set in by as much.
@@ -1091,6 +1100,27 @@ def setting_row(parent, ui, title, control_factory, hint=None, bg=None):
         hint_label.grid(row=1, column=0, columnspan=2, sticky="w", pady=(ui.px(4), 0))
     row.control, row.hint = control, hint_label
     return row
+
+
+def fit_names(container, ui, more=()):
+    """One column for the names of every setting row under `container` (a page, or a step of the guide), as wide as the
+    widest of them in either language and of `more` (the names of rows a choice brings or takes on that page, counted
+    whether shown or not), so that the controls of a page start on one line and stay there as rows come and go. Returns
+    the column's width (0 for a page without settings)."""
+    rows, found = [], [container]
+    # Every widget under the container, without recursion (cards, their bodies, the rows in them).
+    while found:
+        widget = found.pop()
+        if hasattr(widget, "odq_names"):
+            rows.append(widget)
+        found.extend(widget.winfo_children())
+    names = [name for row in rows for name in row.odq_names] + list(more)
+    if not names:
+        return 0
+    width = name_width(ui, names)
+    for row in rows:
+        row.columnconfigure(0, minsize=width)
+    return width
 
 
 class Card(tk.Frame):

@@ -92,7 +92,8 @@ def main():
     # reaches past where the pill starts.
     app.changed("render_scale", "75")
     app.changed("vsync", "off")
-    for page in ("screen", "sound", "help"):
+
+    def controls_from_one_line(page, said):
         app.nav_go(page)
         shots.settle(app, 6, until=lambda: app.devices is not None)
         shots.settle(app)
@@ -123,7 +124,21 @@ def main():
             edges.append((seen, control.winfo_class()))
         found = [e[0] for e in edges if e[0] is not None]
         if len(found) < 3 or len(found) != len(edges) or max(found) - min(found) > 1:
-            problems.append("%s: the controls show from %r" % (page, sorted(set(edges))))
+            problems.append("%s%s: the controls show from %r" % (page, said, sorted(set(edges))))
+
+    for page in ("screen", "sound", "help"):
+        controls_from_one_line(page, "")
+    # The same with the names drawn wider, as Windows draws Pretendard (its Help's Servers and settings is 135 px where
+    # Linux makes it about 128): a column fitted to the names still lines the controls up, where a width fixed for one
+    # system's font let the widest name push its control out of the line (Start over 3 px right of the others).
+    bold = app.fonts.body_bold
+    size = int(bold.cget("size"))
+    bold.configure(size=size + 1)
+    try:
+        for page in ("screen", "sound", "help"):
+            controls_from_one_line(page, " with wider names")
+    finally:
+        bold.configure(size=size)
     for job in app.root.tk.splitlist(app.root.tk.call("after", "info")):
         app.root.after_cancel(job)
     app.root.destroy()

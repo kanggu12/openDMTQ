@@ -609,6 +609,17 @@ class Words:
         return sentences(self(key, **kw), self.fault(failure, network))
 
 
+def every_language(text):
+    """A text in every language the launcher speaks: the words of each entry whose English or Korean words are `text` (a
+    setting's name, shown in one language while the page keeps room for both), or the text alone when none is."""
+    found = {text}
+    for en, ko in TEXT.values():
+        if text in (en, ko):
+            # A Korean entry left empty falls back to the English words (Words): only the words a page can show.
+            found.update(words for words in (en, ko) if words)
+    return sorted(found)
+
+
 def sentences(*parts):
     """Sentences joined by a space, the empty ones left out."""
     return " ".join(p for p in parts if p)

@@ -51,6 +51,21 @@ def _card(parent, ui, title, last=False):
 # The gap between two cards (the site's --gap is 20 px; the window is smaller than a page).
 CARD_GAP = 16
 
+# The names of the setting rows a choice or the PC brings to a page or takes from it (a window's size, the counter's
+# corner, the upscaler; the game's log once the game has run, Repair and Uninstall in an installed launcher): counted in
+# the page's names' column whether shown or not (widgets.fit_names), so that none of them moves the controls when it comes.
+ROWS_THAT_COME = {
+    "screen": ("screen.size", "screen.counter.position", "screen.upscaler"),
+    "help": ("help.player_log", "help.repair.row", "help.uninstall.row"),
+    # The guide's SOUND CHECK: the Screen page's first rows, the counter's corner among them.
+    "guide:sound": ("screen.counter.position",),
+}
+
+
+def rows_that_come(page):
+    """The names of ROWS_THAT_COME[page] in both languages, for widgets.fit_names."""
+    return [words for key in ROWS_THAT_COME.get(page, ()) for words in i18n.TEXT[key] if words]
+
 
 def _columns(parent, ui, weights=(3, 2)):
     """Cards side by side: a frame for each column, as wide as its share of the row less the gaps. The shares come from
