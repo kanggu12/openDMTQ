@@ -1663,6 +1663,10 @@ bool g_bar_by_touch = false;
 // The chip the mouse's button (or a finger) went down on: it acts only when let go on the same chip, and looks pressed
 // while it is held there.
 int g_bar_pressed = kNone;
+// Where the bar stood when the button went down: the rows of its picture its way had cut then. The pointer is read
+// against that place until the button comes up, so that a chip pressed while the bar slides (its way moves it some 30
+// rows in a tenth of a second early on) acts when let go where it was pressed, as at rest.
+int g_bar_press_cut = 0;
 // The pointer at the top edge or on the handle waits this long before the bar comes, and brings it only if it is still
 // there: a pointer on its way to the window's title bar above, or flicked past the edge mid-song, brings nothing.
 constexpr UINT_PTR kBarEdgeTimer = 4;
@@ -2017,8 +2021,9 @@ void rest_cancel() {
     }
 }
 
-// The chip under a point of the bar's window as it is shown now: its picture's rows start `cut` above the window's.
-int bar_chip_at(LPARAM l) { return chip_at(static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l)) + g_bar.cut); }
+// The chip under a point of the bar's window with the bar where `cut` says: its picture's rows start that many above the
+// window's (g_bar.cut: as it is shown now; g_bar_press_cut: as it stood when the button went down).
+int bar_chip_at(LPARAM l, int cut) { return chip_at(static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l)) + cut); }
 
 LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     // Gone up while the window was minimised: Windows does not bring its last picture back over the game.
@@ -2056,8 +2061,9 @@ LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     case WM_MOUSEMOVE: {
         // A mouse's own move: the pointer is the mouse's again (a finger's moves are Windows' copies, marked).
         if (!from_touch()) g_bar_by_touch = false;
-        // The chip under the pointer lights up (where the bar's way has it now).
-        const int now = bar_chip_at(l);
+        // The chip under the pointer lights up (where the bar's way has it now); while the button is held, where the bar
+        // stood when it went down, so that the chip held stays sunk under a still pointer as the bar slides on.
+        const int now = bar_chip_at(l, g_bar_pressed != kNone ? g_bar_press_cut : g_bar.cut);
         if (now != g_bar_hover) {
             g_bar_hover = now;
             bar_frame();
@@ -2069,8 +2075,10 @@ LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     case WM_LBUTTONDOWN:
         // On its way up for the question: its chips no longer take a press.
         if (asking()) return 0;
-        // Held on a chip: it looks pressed, and the bar keeps the mouse until it is let go.
-        g_bar_pressed = bar_chip_at(l);
+        // Held on a chip: it looks pressed, and the bar keeps the mouse until it is let go. The bar's place now kept: the
+        // release is read against it, wherever the bar's way takes it meanwhile.
+        g_bar_press_cut = g_bar.cut;
+        g_bar_pressed = bar_chip_at(l, g_bar_press_cut);
         g_bar_hover = g_bar_pressed;
         SetCapture(h);
         bar_frame();
@@ -2084,10 +2092,14 @@ LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         }
         return 0;
     case WM_LBUTTONUP: {
-        const int chip_now = bar_chip_at(l);
         // Only a chip let go of where it was pressed acts: a press slid off it, or onto it from elsewhere, does nothing.
+        // Read against the bar's place at the press: a chip pressed as the bar slides, the pointer still, is let go on
+        // it, though the way has moved it from under the pointer since.
         const int pressed = g_bar_pressed;
+        const int chip_now = bar_chip_at(l, g_bar_press_cut);
         g_bar_pressed = kNone;
+        // From now on the pointer is read where the bar is: the chip under it now lights.
+        g_bar_hover = bar_chip_at(l, g_bar.cut);
         if (GetCapture() == h) ReleaseCapture();
         bar_frame();
         // A finger's tap: the bar stays for the finger's time after it, not while Windows' parked pointer sits there.

@@ -10,7 +10,8 @@
 #      edge switching to a window and back; in the window, no buttons of its own, and the bar's minimise (the game held
 #      still) and the taskbar's restore (the game going on, no bar by itself), then a minimise with the bar down and a
 #      restore as Windows makes them, the window's pop-ups hidden and shown again (the bar stays gone); the bar's X
-#      asking (the game held still), Keep playing, then the X and Quit the game, the launcher back
+#      pressed while the bar slides down (it asks all the same); the bar's X asking (the game held still), Keep playing,
+#      then the X and Quit the game, the launcher back
 #   5. Repair from the command line: a file of the player and one of the launcher put back as they were installed
 #   6. Clear game data: the id alone stays; the FPS counter switched on from the command line (the launcher's window
 #      closed for it, then opened again), and the game starts again with the same id and gets to its menu, the counter
@@ -308,6 +309,27 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
     [ \"\$(said_count 'player: the bar comes down')\" = \"\$downs\" ] || { echo 'FAIL: the bar came down by itself after the restore'; exit 1; }
     echo 'minimised with the bar down and back, its pop-ups hidden and shown again as Windows does: the bar stayed gone'
   done
+  # A chip pressed while the bar slides down, the pointer still, and let go 90 ms later: by then the bar's way has moved
+  # the chip from under the pointer, and the click still acts (its press and its release are read where the bar was at
+  # the press). The X here: its question comes, and Esc keeps playing. taskbar.c presses and lets go as a mouse does once
+  # half the chip is in sight with the way still going, the pointer resting at the top edge over it meanwhile; a way
+  # Wine stepped past that place is tried again, up to three times.
+  eval \$(xdotool getwindowgeometry --shell \"\$game\")
+  asked=\$(said_count 'player: glass: the question over'); resumed=\$(said_count 'player: the game goes on')
+  chip_x=\$((WIDTH - \$(opx 16) - \$(opx 40) / 2)); chip_top=\$(( (\$(opx 74) - \$(opx 40)) / 2 ))
+  for try in 1 2 3; do
+    xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 1.5
+    ( wine /out/taskbar.exe slide-click \$chip_x \$chip_top \$(opx 40) \$((\$(opx 74) + \$(opx 28))) > /out/slide-click.txt 2>&1 & )
+    sleep 1.5; xdotool mousemove \$((X + chip_x)) \$Y
+    wait_for 6 'grep -q \"pressed\\|missed\" /out/slide-click.txt' || true
+    grep -q missed /out/slide-click.txt || break
+  done
+  wait_for 10 '[ \"\$(said_count \"player: glass: the question over\")\" -gt \"\$asked\" ]' \\
+    || { snap slide-click; echo \"FAIL: the X pressed as the bar slid down did not ask: \$(tr -d '\\r' < /out/slide-click.txt)\"; exit 1; }
+  echo \"the X pressed as the bar slid down asked: \$(tr -d '\\r' < /out/slide-click.txt)\"
+  xdotool key Escape
+  wait_for 10 '[ \"\$(said_count \"player: the game goes on\")\" -gt \"\$resumed\" ]' || { echo 'FAIL: Esc on the question did not let the game go on'; exit 1; }
+  xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 2
   # The X asks first, and the game holds still while it asks.
   bar_chip 0; snap bar-quit
   xdotool click 1; sleep 2; snap quit-asked

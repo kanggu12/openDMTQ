@@ -11,6 +11,18 @@
 //                         Windows did not hide answers it by staying as it is)
 //   taskbar.exe shown CLASS  whether the player's window of that class (the overlay's OpenDMTQBar, OpenDMTQBarHandle,
 //                         ...) is on the screen: "shown", "hidden", or "none" when there is no such window
+//   taskbar.exe slide-click X TOP SIZE FULL
+//                         a click on a chip of the overlay's bar while the bar slides down, as a mouse makes it, the
+//                         pointer still: the button pressed on the chip where it is in sight then and let go 90 ms
+//                         later at the same place, by which time the bar's way has moved the chip on. X is the chip's
+//                         middle across the bar's window, TOP its top row in the bar's picture, SIZE its height, FULL
+//                         the picture's rows (the bar and its shadow's room): the window shows the picture without its
+//                         top rows on the way, so the rows it lacks say where the chip is. The bar must be coming down
+//                         when it is run. It presses once the chip is in sight while the bar still has half a chip's
+//                         height or more of its way to go, a fifth of the chip's height under the top of its part in
+//                         sight: on the chip still should a step of the bar come before the press is read, and off it
+//                         once the bar is down, so that only a release read where the bar was at the press acts. It says
+//                         what it did; "missed" when it never saw the bar there (a step of Wine's may jump past it).
 //   taskbar.exe buttons   the buttons Windows draws on the window's title bar, from its style: "none" without a system
 //                         menu, else each of minimise, maximise and close it has
 //
@@ -18,6 +30,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 // The player's window, which the pop-ups to show again belong to (EnumWindows passes it through).
@@ -70,6 +83,43 @@ int main(int argc, char** argv) {
     if (strcmp(argv[1], "shown") == 0 && argc >= 3) {
         HWND window = window_of(argv[2]);
         printf("%s\n", !window ? "none" : IsWindowVisible(window) ? "shown" : "hidden");
+        return 0;
+    }
+    if (strcmp(argv[1], "slide-click") == 0 && argc >= 6) {
+        const int x = atoi(argv[2]), top = atoi(argv[3]), size = atoi(argv[4]), full = atoi(argv[5]);
+        HWND bar = window_of("OpenDMTQBar");
+        if (!bar) {
+            printf("no bar\n");
+            return 0;
+        }
+        // The bar's window looked at every millisecond for 5 s: shown, with the rows of its picture it lacks (cut) few
+        // enough to show more of the chip than the press's place, and no fewer than half the chip's height, the way still
+        // to go.
+        const int below = size / 5;
+        for (int waited = 0; waited < 5000; ++waited) {
+            RECT r;
+            if (IsWindowVisible(bar) && GetWindowRect(bar, &r)) {
+                const int cut = full - (int)(r.bottom - r.top);
+                if (cut < size / 2) {
+                    printf("missed: the bar was %d rows from down when it was first seen with the chip in sight\n", cut);
+                    return 0;
+                }
+                if (cut < top + size - below) {
+                    // A fifth of the chip's height under its first row in sight, in the bar's window.
+                    const int y = (cut > top ? 0 : top - cut) + below;
+                    PostMessageW(bar, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM(x, y));
+                    Sleep(90);
+                    PostMessageW(bar, WM_LBUTTONUP, 0, MAKELPARAM(x, y));
+                    // Where the bar was at the release, for the log of the test.
+                    GetWindowRect(bar, &r);
+                    printf("pressed at %d,%d with %d rows of the bar's picture cut, let go there 90 ms later with %d cut\n", x, y, cut,
+                           full - (int)(r.bottom - r.top));
+                    return 0;
+                }
+            }
+            Sleep(1);
+        }
+        printf("missed: no bar came down in 5 s\n");
         return 0;
     }
     const LONG style = GetWindowLongW(frame, GWL_STYLE);
