@@ -10,7 +10,7 @@ sound up for the PC, and starts the game. The game then plays against the server
 ## For players
 
 1. On the server's site, sign in and open **Download**. Under **On a computer (Windows)**, choose **Download the
-   installer for Windows**. The file it gives, `OpenDMTQ-Setup-<address>.exe`, is set up for that server.
+   installer (.exe)**. The file it gives, `OpenDMTQ-Setup-<address>.exe`, is set up for that server.
 2. Run it and choose **Install**. It installs for your Windows user, with shortcuts on the desktop and in the Start
    menu and no administrator rights, and starts the launcher. If Windows says it protected your PC from an unknown app: **More info**, then **Run
    anyway**. The installer is not signed by a publisher Windows knows. Windows 11's Smart App Control, when it is on,
