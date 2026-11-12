@@ -29,6 +29,11 @@ RUN tar -xJf /tmp/7z.tar.xz -C /usr/local/bin 7zz \
 
 # The tool package, installed where the system Python finds it even in isolated mode.
 COPY opendmtq_tools /usr/lib/python3/dist-packages/opendmtq_tools
+# The release this image is (release.yml passes it), for the version the admin pages show when nothing else names one: a
+# plain docker run. The command line and the Helm chart pass their own (OPENDMTQ_VERSION), which wins. Empty for an image
+# built here. After the package, so that a new number rebuilds no layer above.
+ARG OPENDMTQ_VERSION=
+ENV OPENDMTQ_VERSION=${OPENDMTQ_VERSION}
 # -I keeps Python from importing anything from the mounted, untrusted folders.
 # The CLI passes the module to run: opendmtq_tools.patch_apk, .importer or .qr.
 ENTRYPOINT ["python3", "-I", "-m"]

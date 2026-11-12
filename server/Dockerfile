@@ -54,6 +54,12 @@ COPY game /opt/opendmtq/game
 COPY entrypoint.sh /opt/opendmtq/
 RUN chmod 0755 /opt/opendmtq/entrypoint.sh && mkdir -p /opt/opendmtq/game/public
 
+# The release this image is (release.yml passes it), for the version the site shows when nothing else names one: a plain
+# docker run. The command line and the Helm chart pass their own (OPENDMTQ_VERSION), which wins. Empty for an image built
+# here. Last, so that a new number rebuilds no layer above.
+ARG OPENDMTQ_VERSION=
+ENV OPENDMTQ_VERSION=${OPENDMTQ_VERSION}
+
 # Runs as www-data by default; compose and Kubernetes may pick another uid, which also works.
 USER www-data
 EXPOSE 8080

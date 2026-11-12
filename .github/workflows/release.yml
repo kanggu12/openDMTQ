@@ -132,6 +132,8 @@ jobs:
             ${{ steps.names.outputs.registry }}/opendmtq-server:${{ steps.names.outputs.version }}
             ${{ steps.names.outputs.registry }}/opendmtq-server:latest
           labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          # The release's number in the image, for the version its pages show when it runs on its own (docker run).
+          build-args: OPENDMTQ_VERSION=${{ steps.names.outputs.version }}
           cache-from: type=gha,scope=server
           cache-to: type=gha,mode=max,scope=server
 
@@ -145,6 +147,8 @@ jobs:
             ${{ steps.names.outputs.registry }}/opendmtq-tools:${{ steps.names.outputs.version }}
             ${{ steps.names.outputs.registry }}/opendmtq-tools:latest
           labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          # The release's number in the image, for the version its pages show when it runs on its own (docker run).
+          build-args: OPENDMTQ_VERSION=${{ steps.names.outputs.version }}
           cache-from: type=gha,scope=tools
           cache-to: type=gha,mode=max,scope=tools
 
