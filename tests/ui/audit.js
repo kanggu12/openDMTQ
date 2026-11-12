@@ -826,9 +826,14 @@ async function keyboardMarks(contexts) {
     });
   }
   const thisMonth = monthKeys(monthStart(0), Number.MAX_SAFE_INTEGER);
-  let pastNamed = 0;
+  // Months named, and month scores that should carry the mark among those looked at: the seed's keyboard plays go back weeks,
+  // so there are some (this month's alone can have none in a month's first hours).
+  let pastNamed = 0, monthMarks = 0;
   await look('rankings-month', `${P}/ranking.php?sort=month`, (seen, lang, at) => {
-    for (const r of seen.ranked) same(`${at} ${r.who}`, r.mark, thisMonth[r.who] || null, lang);
+    for (const r of seen.ranked) {
+      same(`${at} ${r.who}`, r.mark, thisMonth[r.who] || null, lang);
+      monthMarks += thisMonth[r.who] ? 1 : 0;
+    }
     // The months before with plays, newest first, as the page lists them; each by its name in English.
     const months = [];
     for (let back = 1; back <= 6; back++) {
@@ -839,11 +844,14 @@ async function keyboardMarks(contexts) {
       const name = new Date(monthStart(back) * 1000).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
       if (lang === 'en' && m.name !== name) wrong.push(`${at} month ${i}: ${m.name}, wanted ${name}`);
       pastNamed++;
-      for (const r of m.top) same(`${at} ${m.name} ${r.who}`, r.mark, counts[r.who] || null, lang);
+      for (const r of m.top) {
+        same(`${at} ${m.name} ${r.who}`, r.mark, counts[r.who] || null, lang);
+        monthMarks += counts[r.who] ? 1 : 0;
+      }
     });
   });
   check("the rankings mark each total, this month's score and each past month's score that counts bests a keyboard play set, with how many",
-    wrong.length === ranks && pastNamed > 0 && Object.keys(thisMonth).length > 0, wrong.slice(ranks, ranks + 6).join(' ; ') + ` ${pastNamed} ${JSON.stringify(thisMonth)}`);
+    wrong.length === ranks && pastNamed > 0 && monthMarks > 0, wrong.slice(ranks, ranks + 6).join(' ; ') + ` ${pastNamed} months, ${monthMarks} marks`);
   // Nowhere else: pages that show no scores have no mark.
   const nowhere = wrong.length;
   for (const [name, url] of [['songs', `${P}/songs.php`], ['live', `${P}/live.php`], ['download', `${P}/download.php`]]) {
