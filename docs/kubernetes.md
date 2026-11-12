@@ -140,8 +140,43 @@ Requirements:
   address phones can reach: an IPv4 address or a host name, on the router Service's port (80 unless
   `router.service.port` says otherwise).
 
+The claim `opendmtq-data` below, made and filled from the computer where `./opendmtq import [--songs] <folder>` made
+`data/`: a pod that runs as the chart's pods do (uid 33) holds the claim while `content/` and `apk/base/` go in, then
+goes. Size it for the game files with room for the apps and the backups (`content/` is 4 to 5 GB with every song).
+
 ```sh
 kubectl create namespace opendmtq
+kubectl -n opendmtq apply -f - <<'EOF'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: opendmtq-data}
+spec:
+  accessModes: [ReadWriteMany]
+  resources: {requests: {storage: 20Gi}}
+---
+apiVersion: v1
+kind: Pod
+metadata: {name: opendmtq-fill}
+spec:
+  securityContext: {runAsUser: 33, runAsGroup: 33, fsGroup: 33}
+  containers:
+    - name: fill
+      image: busybox:1.36
+      command: [sleep, "3600"]
+      volumeMounts: [{name: data, mountPath: /data}]
+  volumes:
+    - name: data
+      persistentVolumeClaim: {claimName: opendmtq-data}
+EOF
+kubectl -n opendmtq wait --for=condition=Ready pod/opendmtq-fill --timeout=5m
+tar -C data -cf - content apk/base | kubectl -n opendmtq exec -i opendmtq-fill -- tar -xf - -C /data
+kubectl -n opendmtq exec opendmtq-fill -- ls /data /data/apk/base
+kubectl -n opendmtq delete pod opendmtq-fill
+```
+
+Then the database's storage and the chart:
+
+```sh
 kubectl -n opendmtq create secret generic opendmtq-s3 \
   --from-literal=LITESTREAM_ACCESS_KEY_ID=... --from-literal=LITESTREAM_SECRET_ACCESS_KEY=...
 
