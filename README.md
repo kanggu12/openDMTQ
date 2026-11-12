@@ -19,23 +19,39 @@
 
 <p align="center">
   <a href="#quick-start">Quick start</a> &nbsp;|&nbsp;
+  <a href="#how-it-works">How it works</a> &nbsp;|&nbsp;
   <a href="#features">Features</a> &nbsp;|&nbsp;
   <a href="#guides">Guides</a> &nbsp;|&nbsp;
-  <a href="#open-source">Open source</a>
+  <a href="#contribute">Contribute</a>
 </p>
 
 <p align="center">
-  <img src="docs/images/screens.png" alt="The site's home page, rankings, live view and admin pages, with made-up players" width="100%">
+  <img src="docs/images/game-pc.jpg" alt="The game on a Windows PC through OpenDMTQ's player: notes and the judgment line over the song's blurred video, OpenDMTQ's bar of frosted glass across the top, its FPS counter at 240" width="100%">
+  <br><sub>The game on a PC through OpenDMTQ's player, with its glass bar and FPS counter. The song's video is blurred here.</sub>
 </p>
 
 The official service of **DJMAX Technika Q**, the Android rhythm game, ended in 2019. OpenDMTQ is an open-source
 project that brings its online side back on a computer of your own. The server builds a copy of your APK that talks to
-it, and phones install that copy from the server's web page.
+it: phones install that copy from the server's web page, and Windows PCs play the same app through OpenDMTQ's PC client.
 
 > [!IMPORTANT]
 > **No game files are included.** You need your own copy of the game's Android app and its client data, and its song
 > data for the songs. Please use only files you have the right to use. OpenDMTQ is an unofficial, non-commercial
 > project, not affiliated with or endorsed by NEOWIZ.
+
+| Play | Host a server | Contribute |
+| :--- | :--- | :--- |
+| Phones install the app from your server's page, 64-bit-only ones too; Windows PCs, the [PC client](docs/windows-player.md). | Your own copy of the game's files, then one download or one command. [Quick start](#quick-start) | No game files needed: the tests make their own. [Where to start](#contribute) |
+
+## How it works
+
+<p align="center">
+  <img src="docs/images/diagram-architecture.svg" alt="How OpenDMTQ fits together: phones, PCs and browsers reach the server's one port, which sends each path to the game server, the game's files, live broadcasts, the players' site or the admin pages; the setup imports your game files and the app builder patches your APK" width="100%">
+</p>
+
+The app sends the game's four official hosts to one address, where a single server answers the game, its login, its
+downloads and the website. The game server is OpenDMTQ's own code ([architecture](docs/architecture.md)). Accounts,
+scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#privacy)).
 
 ## Quick start
 
@@ -98,16 +114,29 @@ installer from the same page.
 - **Nothing to set on a phone.** No hosts file, proxy app or certificate: one app from the server's page.
 - **The game's online side.** Accounts, scores, the monthly and per-song rankings, achievements and the maintenance
   notice.
-- **A site for players.** Rankings, songs, profiles, and live broadcasts of players in a song with their recordings
-  (off until you turn them on), in English and Korean.
-- **Admin pages.** A setup in the browser, the app, songs, players, accounts, broadcasts and their recordings, backups.
 - **Your own songs.** Add songs as packages or hide others; phones get what changed at their next start.
-- **Newer phones too.** Phones without 32-bit support run the game through OpenDMTQ's runtime
-  ([below](#newer-phones-too)).
-- **On a PC too.** The site offers an installer for Windows set up for the server: its launcher signs in, downloads the
-  game and keeps it up to date, and sets the picture and the sound up for the PC, from VSync to the sound device
-  ([the PC client](docs/windows-player.md)).
+- **Admin pages and an API.** A setup in the browser, the app, songs, players, accounts, broadcasts and their
+  recordings, backups; all of it as JSON too ([the API](docs/api.md)).
 - **No internet needed** once the files are in ([without internet](docs/closed-network.md)).
+
+### On a PC too
+
+The site offers an installer for Windows set up for the server. Its launcher signs in and keeps the game up to date;
+its player runs the game through OpenDMTQ's runtime on Direct3D 11, each frame on a refresh of the display (240 a
+second at 240 Hz, none late in 480), with AMD FSR 1 or NVIDIA NIS upscaling, CMAA 2 or SMAA, and a bar of frosted glass
+that slides down from the top edge ([the PC client](docs/windows-player.md)).
+
+<p align="center">
+  <img src="docs/images/overlay-bar.webp" alt="The handle at the game's top centre lights, and the bar of frosted glass slides down with minimise, full screen and the X, then back up" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/images/client-play.png" alt="The launcher's PLAY page: the server and the sign-in, the ready check, how to play, the last game, and PLAY" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/images/fig-picture-passes.svg" alt="The game's close button from a run for each setting, enlarged: steps without anti-aliasing, smoothed by SMAA and CMAA 2, upscaled by AMD FSR 1 from 67 %" width="100%">
+</p>
 
 ### Newer phones too
 
@@ -115,7 +144,16 @@ The game has only 32-bit code, which newer phones (Pixel 7 and later, Galaxy S24
 puts its own runtime in the app: it translates the game's code as it runs, and keeps the panel's full refresh rate.
 
 <p align="center">
-  <img src="docs/images/chart-phones.svg" alt="A 32-bit game at 120 frames a second on a Galaxy S26 Ultra, a phone with no 32-bit support. Of each frame's 8.3 milliseconds the game's thread works 1.4 and waits 6.9. No frame was late: 0 of 237 per two seconds, with and without a live broadcast. A broadcast takes the processor from 125 percent of one core to 130 to 133 percent" width="100%">
+  <img src="docs/images/chart-phones.svg" alt="A 32-bit game at 120 frames a second on a Galaxy S26 Ultra, a phone with no 32-bit support: 1.4 of each frame's 8.3 milliseconds at work, and no frame late, with or without a live broadcast" width="100%">
+</p>
+
+### A site for players
+
+Rankings, songs, profiles, and live broadcasts of players in a song with their recordings (off until you turn them
+on), in English and Korean; and the admin pages beside it.
+
+<p align="center">
+  <img src="docs/images/screens.webp" alt="The site's home page, rankings and live page, and the admin pages' App page, with made-up players and songs" width="100%">
 </p>
 
 ### Fast on little hardware
@@ -124,18 +162,8 @@ Plain PHP on SQLite, with no database server to look after. Two cores answer hun
 ([how it was measured](docs/testing.md#measurements)).
 
 <p align="center">
-  <img src="docs/images/chart-requests.svg" alt="The game's requests with eight phones at once, on two processor cores and a million saved plays. Half of the answers within: sign-in 2.4 milliseconds, ranking of every chart 2.5 (kept until the next play; the first look after one took 103), ranking of one song 6.8, the song list 8.5, saving a play 18.3. Answers a second: 3,086, 2,907, 975, 818 and 393" width="100%">
+  <img src="docs/images/chart-requests.svg" alt="The game's requests on two cores with eight phones and a million plays: half of the answers within 2.4 milliseconds for a sign-in, 2.5 for every chart's ranking, 6.8 for one song's, 8.5 for the song list and 18.3 for saving a play" width="100%">
 </p>
-
-## How it works
-
-<p align="center">
-  <img src="docs/images/diagram-pieces.svg" alt="Your APK, client data and song data are imported by the setup into the OpenDMTQ server on your PC. The server answers the game, builds the app from your APK, and serves the players' site, live broadcasts and the admin pages. Phones get the app from the site and play; browsers see rankings and broadcasts; you set it up and run it on the admin pages" width="100%">
-</p>
-
-The app sends the game's four official hosts to one address, where a single server answers the game, its login, its
-downloads and the website. The game server is OpenDMTQ's own code ([architecture](docs/architecture.md)). Accounts,
-scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#privacy)).
 
 ## Guides
 
@@ -155,14 +183,15 @@ scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#pr
 | [Troubleshooting](docs/troubleshooting.md) | When something does not work |
 | [Architecture](docs/architecture.md) · [Testing](docs/testing.md) | How it is built and checked |
 
-## Open source
+## Contribute
 
-OpenDMTQ is MIT licensed and built in the open: its own game server, site, app patcher and runtime, with every change
-checked by the tests in this repository before it reaches a server.
+OpenDMTQ is MIT licensed and built in the open: its own game server, site, app patcher, runtime and PC client, with
+every change checked by the tests in this repository before it reaches a server.
 
 - **Report a bug or ask for a feature** in [Issues](https://github.com/kanggu12/openDMTQ/issues/new/choose).
 - **Change the code.** None of the game's files are needed: the tests make stand-ins of their own.
-  [CONTRIBUTING.md](CONTRIBUTING.md) has a map of the code and how a change goes in.
+  [CONTRIBUTING.md](CONTRIBUTING.md) has each part, its code and its tests; [the architecture](docs/architecture.md),
+  how they work together.
 - **See what changed** in [CHANGELOG.md](CHANGELOG.md), and report security problems through
   [SECURITY.md](.github/SECURITY.md).
 
