@@ -6,6 +6,8 @@ one of fixes, changes and smaller additions raises the patch number. Each releas
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-11-13
+
 ### Changed
 
 - The player for Windows: typing in the game's text fields, such as a new player's name, replaces the text they open
@@ -713,7 +715,8 @@ one of fixes, changes and smaller additions raises the patch number. Each releas
 - Four ways to run it: the Windows bundle, one command on Linux or macOS, Docker Compose, and a Helm chart for
   Kubernetes.
 
-[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.9.5...HEAD
+[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.9.6...HEAD
+[0.9.6]: https://github.com/kanggu12/openDMTQ/compare/v0.9.5...v0.9.6
 [0.9.5]: https://github.com/kanggu12/openDMTQ/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/kanggu12/openDMTQ/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/kanggu12/openDMTQ/compare/v0.9.2...v0.9.3
