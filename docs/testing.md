@@ -33,7 +33,7 @@ both.
 | Broadcast requests | A phone's and the player's requests to the server, on stand-in servers: each within its deadline whether the server answers a byte at a time, not at all or takes no body, or the name's lookup does not answer; an answer too long as none; the server's answer read as meant and odd JSON as nothing; the ids that go in a URL; the upload queue and the quality steps the uploads take (`arm32/tests/host/live_net_test.cpp`); the same test built for Windows, under Wine on the sockets the player for Windows uses (`arm32/test_windows.sh`) | see `ci.yml` | CI | no |
 | Frame limits | Which displays and frame limits keep every frame of the player for Windows on the same number of refreshes, and which go by the clock; by the clock, each frame one frame's time after the last whatever the game's limiter does, and no burst after a late one (`arm32/tests/host/pacing_math_test.cpp`) | see `ci.yml` | CI | no |
 | Following the display | The frame rate's steps with a display and a game the test plays: a computer's 240 Hz display keeping every refresh with a fifth of its frames late, to every second refresh after three windows with more than a quarter late, every refresh again 5 s later, back down in the first window of a try that falls short and 10 s before the next, a computer that makes 130 frames a second settling at 120 between tries a minute apart at most; vsync off at its limit; a phone's 120 Hz panel to 90, 72 and 60, one that stays at 120 Hz to 60; the heat's step every half minute (`arm32/tests/host/follow_test.cpp`) | see `ci.yml` | CI | no |
-| Contract | Every reply of the game server the client depends on, its quirks, a save under a held lock, players' names that are no UTF-8, and not one PHP warning | `tests/game/protocol.sh` (`protocol.py`, `lock.php`, `names.php`) | CI, `qa.sh` | no |
+| Contract | Every reply of the game server the client depends on, its quirks, a save under a held lock, players' names that are no UTF-8, the keyboard's mark a save keeps, and not one PHP warning | `tests/game/protocol.sh` (`protocol.py`, `lock.php`, `names.php`, `keys.php`) | CI, `qa.sh` | no |
 | Pages | All pages at five screen widths in both languages, empty and full, on air, under maintenance and with broadcasts off; the replay player and the owner's forms | `tests/ui/run.sh` | CI, `qa.sh` | no |
 | Upgrade | The last release's images used as people use them (players and plays, a site account, an API token, the recordings' limits, a broadcast with its recording, a backup), then this tree's images on the same data: nothing lost, every route of the API and what it answers, the backup restored; then the same from this tree's own images, as a restart | `tests/upgrade/run.sh` (`FROM=<version>` for another release) | CI, `qa.sh` | no |
 | Server | The real game files: every request the game makes, broadcasts, recordings, sign-ins | `tests/live/run.sh` (`BROWSER=1` adds a real video) | `qa.sh` | yes |
@@ -123,7 +123,9 @@ game code or data is in them.
 reads and each quirk it depends on (an empty news list closes the game, for one). Each check names the client
 behaviour it protects. A new method of the game server gets its checks there. `protocol.sh` gives that server the song
 list the tools write once the owner hides a song, the last stand-in song hidden: a play of a hidden song's chart is kept,
-one of a chart no song has is not.
+one of a chart no song has is not. Inside the running server it then saves plays with the PC client's keyboard header
+and without it (`tests/game/keys.php`) and reads what the database kept of each, and starts a database from before the
+keyboard's mark.
 
 In `tests/ui/run.sh` a real browser then takes the server through a life, in stages (`tests/ui/audit.js`):
 
