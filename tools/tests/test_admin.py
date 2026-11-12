@@ -1011,6 +1011,38 @@ class RestoreSchemaTest(unittest.TestCase):
             self.assertEqual(con.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             con.close()
 
+    def test_a_restore_moves_the_change_number_past_the_live_ones(self):
+        # The server keeps each ranking with the change number it was worked out at, and takes it while the number in the
+        # database is not higher (src/ranking.php, odq_kept()). A backup's number is an older, lower one: restored as it
+        # was, it let the server go on showing the boards it kept before the restore, players the backup never had
+        # among them, until the number climbed past theirs.
+        with Install() as inst:
+            snap = inst.path("old.db3")
+            old_game_database(snap, [])
+            # The backup's number, made as the server makes it (with today's tables), low as an older database's is.
+            with sqlite3.connect(snap) as con:
+                admin.backups.bring_schema_up_to_date(con)
+                con.execute("UPDATE BoardStamp SET n = 16")
+            with tarfile.open(inst.path("backups/opendmtq-20200101-000000-manual.tar.gz"), "w:gz") as tar:
+                tar.add(snap, arcname="dmtq.db3")
+            # The live database, further on: boards kept at numbers up to 128.
+            old_game_database(admin.core.DB, [])
+            with sqlite3.connect(admin.core.DB) as con:
+                admin.backups.bring_schema_up_to_date(con)
+                con.execute("UPDATE BoardStamp SET n = 128")
+            inst.sign_in()
+            inst.client.get("/opendmtq/admin/backups")
+            with inst.client.session_transaction(path="/opendmtq/admin/") as sess:
+                token = sess["csrf"]
+            r = inst.client.post("/opendmtq/admin/backups/opendmtq-20200101-000000-manual.tar.gz",
+                                 data={"csrf": token, "action": "restore"})
+            self.assertEqual(r.status_code, 302)
+            with sqlite3.connect(admin.core.DB) as con:
+                now = con.execute("SELECT n FROM BoardStamp").fetchall()
+            # One row, past every number the live database had used, by more than a restore's time of saves.
+            self.assertEqual(len(now), 1)
+            self.assertGreater(now[0][0], 128 + 1000)
+
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class BackupFailureTest(unittest.TestCase):

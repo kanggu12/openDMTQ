@@ -413,6 +413,31 @@ def delete(name):
     changed("backup_action:delete", name)
 
 
+# How far a restore moves the rankings' change number past the live database's: more saves than a server takes in the time
+# a restore takes, so that nothing the server kept before the restore, nor kept from the live database while the restore
+# ran, has a number as high as the restored database's.
+STAMP_MARGIN = 1_000_000
+
+
+def board_stamp(con):
+    """The rankings' change number in con (BoardStamp), 0 for a database without one."""
+    try:
+        row = con.execute("SELECT n FROM BoardStamp").fetchone()
+    except sqlite3.OperationalError:
+        # An older database, before the table: no number yet.
+        return 0
+    # The table without its row counts as 0, as the server's start makes the row with 0.
+    return int(row[0]) if row and row[0] is not None else 0
+
+
+def move_board_stamp(copy, live):
+    """The restored copy's change number set past every number the live database has used. The server keeps each
+    ranking with the number it was worked out at and takes it while the database's number is not higher
+    (server/game/src/ranking.php, odq_kept()): the backup's own number, lower, let it go on showing the boards of before
+    the restore. The copy has the table already: check_restorable() brought it up to date."""
+    copy.execute("UPDATE BoardStamp SET n = MAX(n, ?) + ?", (live, STAMP_MARGIN))
+
+
 def swap_in(restored):
     """The restored database in the live one's place. SQLite's online backup copies it into the live one, so the server
     keeps running and sees the restored data on its next request."""
@@ -464,8 +489,11 @@ def restore_backup(name, path):
             # old password, nor end an account made since.
             with tokens.LOCK:
                 switches, settings, kept_tokens, kept_accounts = [], [], [], []
+                # The live database's rankings' change number (0 when it is set aside as damaged and cannot be read).
+                live_stamp = 0
                 if not kept:
                     with db() as con:
+                        live_stamp = board_stamp(con)
                         con.execute(recordings.LIVE_TABLE)
                         switches = con.execute("SELECT * FROM LiveSwitch").fetchall()
                         settings = sorted(recordings.setting_rows(con).items())
@@ -485,6 +513,9 @@ def restore_backup(name, path):
                         # backup's accounts come with it then, or a move to a new PC would leave every player out.
                         if kept_accounts:
                             auth.put_accounts(copy, kept_accounts)
+                        # Past the live number before the copy goes live: from the server's first look at it, no board
+                        # it kept before is taken for the restored data's.
+                        move_board_stamp(copy, live_stamp)
                 finally:
                     copy.close()
                 swap_in(restored)
