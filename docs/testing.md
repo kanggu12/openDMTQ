@@ -61,23 +61,24 @@ desktop: no window, no taskbar button, no animation, no sound.
 
 ### Under Wine
 
-`arm32/test_windows.sh` and `client/tests/windows/e2e.sh` run in containers, and every window they open is on the
-container's own virtual screen (Xvfb), which nothing shows. The game's frames are drawn there by Mesa's llvmpipe on the
-CPU, as on CI's machines. On WSL 2 with a graphics card, `OPENDMTQ_WINE_GPU=1 client/tests/windows/e2e.sh ...` draws
+`arm32/test_windows.sh` and `client/tests/windows/e2e.sh` run in containers. The first one's programs open no window;
+every window the second opens is on the container's own virtual screen (Xvfb), which nothing shows. The game's frames
+are drawn there by Mesa's llvmpipe on the CPU, as on CI's machines. On WSL 2 with a graphics card, `OPENDMTQ_WINE_GPU=1 client/tests/windows/e2e.sh ...` draws
 them on the card instead (`arm32/wine_gpu.sh`):
 
 - The player is a 64-bit program, so Wine's 64-bit side and Mesa's 64-bit d3d12 driver are all it needs; that driver
   hands its calls to the card through WSL's `/dev/dxg`. Debian 12's own Mesa (22.3) has it without
   `ARB_polygon_offset_clamp`, on which Wine's Direct3D offers no more than feature level 9_3 and ANGLE finds no Direct3D
   11 device: the game would draw nothing. `arm32/wine-gpu.Dockerfile` is the player's Wine image with Mesa 25 from
-  Debian's backports, built the first time (a minute); the two images differ in Mesa alone.
-- The container gets WSL's GPU read only: `/dev/dxg`, `/usr/lib/wsl/lib` and `/usr/lib/wsl/drivers`, with
+  Debian's backports, built at each run from Docker's cache (a minute the first time); the two images differ in Mesa
+  (with what Mesa 25 needs from the backports) and in `glxinfo`.
+- The container gets WSL's GPU device `/dev/dxg`, and `/usr/lib/wsl/lib` and `/usr/lib/wsl/drivers` read only, with
   `LD_LIBRARY_PATH=/usr/lib/wsl/lib` and `GALLIUM_DRIVER=d3d12` as WSLg sets them, and no core dumps (WSL would copy
   each into Windows' temporary folder). Each frame is drawn on the card and read back to the virtual screen.
-- Once the game is at its menu the run fails unless the player's own process holds WSL's `libd3d12` in its memory and
-  `/dev/dxg` open, so a GPU run that fell back to the CPU never passes. The player's `drawn by` line names Wine's
-  stand-in for the card (an NVIDIA GeForce GTX 470) on either renderer; the run says the container's OpenGL renderer
-  beside it (`D3D12 (<the card>)`).
+- Once the game is at its menu the run fails unless the container's OpenGL is D3D12 and the player's own process holds
+  WSL's `libd3d12` in its memory and `/dev/dxg` open, with none of llvmpipe's drawing threads: a GPU run that fell back
+  to the CPU does not pass. The player's `drawn by` line names Wine's stand-in for the card (an NVIDIA GeForce GTX 470)
+  on either renderer; the run says the container's OpenGL renderer beside it (`D3D12 (<the card>)`).
 - What it changes is the test machine's load: the game takes one to one and a half cores instead of six to eight, and
   anti-aliasing no longer costs it frames. Its numbers are still Wine's (Direct3D 11 becomes OpenGL, then D3D12, and each
   frame is copied back to the virtual screen), and the GPU timers the player's stats read come back as zero through that
@@ -95,7 +96,8 @@ away as a trojan); the player's own switches tap, type and save frames inside it
 
 - `PLAYER_WINDOW_AT=10000,10000`: the window at a place no monitor has, shown without taking the focus;
 - `PLAYER_WINDOW_UNLISTED=1`: a tool window, which Windows gives no taskbar button and no place in Alt+Tab or Task View,
-  with DWM's animations off for it, and a reason the player cannot start said in its log alone, with no box. The
+  with DWM's animations off for it and never in full screen (which would cover a monitor); a reason the player cannot
+  start said in its log (or its output before there is a log) with no box, and no box of Windows' own for a crash. The
   pop-ups over the game are owned tool windows already. The PC client never sets it;
 - `--seconds N`, so that the player ends by itself, and a PC settings file with a window (full screen covers a monitor)
   and the volume at 0.
