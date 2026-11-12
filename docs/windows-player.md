@@ -30,7 +30,7 @@ closed); while a game runs it installs nothing and ends with 3.
 | :--- | :--- |
 | **Play** | The server and the account, the checks before a start (the player, the server, the sign-in, the app), how to play, the last play, and **PLAY** |
 | **Screen** | Full screen or a window, the window's size, VSync, the frame limit, the FPS counter and its position, the render scale and its upscaler, anti-aliasing |
-| **Sound** | The volume, the device, shared or the device alone, the buffer |
+| **Sound** | The volume, the device, **Shared** or **Exclusive**, the buffer |
 | **Controls** | What the touch screen, the mouse and the keyboard do |
 | **Online** | The servers, the sign-in, the app on this PC and a check for a newer one |
 | **Help** | The checks, what to try when something does not work, the logs, and repairing, clearing, starting over and uninstalling |
@@ -63,7 +63,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
 | `upscaler` | `bilinear`, `fsr1`, `nis` | Upscaler, below 100 % |
 | `anti_aliasing` | `off`, `cmaa2`, `smaa` | Anti-aliasing |
 | `audio_device` | `default` (Windows' default output), or a device's id from `--audio-devices` | Device |
-| `audio_mode` | `shared`, `exclusive` (the device alone) | Mode |
+| `audio_mode` | `shared`, `exclusive` | Mode |
 | `audio_buffer` | `normal`, `low`, `safe` | Buffer |
 | `volume` | `100`, or any number from 0 to 100 | Volume |
 | `language` | `system` (Windows' display language), `en`, `ko`: the same as `--language` | Language, on the **Launcher** page; the game and what the player draws over it speak it too |
@@ -214,9 +214,9 @@ within 4.5 ms of their time; no limit, 733 to 965.
 ### The sound
 
 - **The device:** Windows' default output, which the game follows when Windows changes it mid-game, or one chosen.
-- **Shared or the device alone.** Shared plays alongside other programs' sound. The device alone (WASAPI's exclusive
-  mode) has the least delay, with buffers of the device's own period (3 ms on a device that has it); other programs are
-  silent meanwhile, and the sound is shared when Windows does not allow it.
+- **Shared or Exclusive.** Shared plays alongside other programs' sound. Exclusive (WASAPI's exclusive mode) takes the
+  device for the game alone and has the least delay, with buffers of the device's own period (3 ms on a device that
+  has it); other programs are silent meanwhile, and the sound is shared when Windows does not allow it.
 - **The buffer:** low (Windows' low-latency mode, where the device has a shorter period than its standard one), normal,
   or safe for a busy PC.
 - **The volume** of the game, 0 to 100. Windows' own volume still applies.
@@ -334,4 +334,4 @@ server's app, `--settings` the file).
 - **The videos are black and silent:** see the Media Feature Pack above.
 - **It cannot reach the server:** the PC has to reach the server's address, as a phone does: on the same network, or
   over the internet when the server is set up for it ([playing from outside your home](internet.md)).
-- **The sound breaks up:** choose the **Safe** buffer on the **Sound** page, or shared instead of the device alone.
+- **The sound breaks up:** choose the **Safe** buffer on the **Sound** page, or **Shared** instead of **Exclusive**.
