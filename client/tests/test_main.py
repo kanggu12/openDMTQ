@@ -312,6 +312,15 @@ class CommandLine(Folder):
         with mock.patch.object(displays, "main_display", return_value={"width": 0, "height": 0, "hz": None}):
             code, said = self.run_main(["--set", "window=3840x2160"])
             self.assertEqual(code, 0, said)
+        # Smaller than the game's window holds at Windows' scale on the display (300 % on a 4K one: 1440 x 810): refused
+        # with its own words and nothing changed, as the Screen page leaves it out.
+        with mock.patch.object(displays, "main_display", return_value={"width": 3840, "height": 2160, "hz": 60, "scale": 3.0}):
+            code, said = self.run_main(["--set", "window=1280x720", "--set", "volume=30"])
+            self.assertEqual(code, 2)
+            self.assertIn("the game's window is at least 1440 x 810 on this display", said)
+            self.assertEqual(st.LauncherState.load().values["volume"], 100)
+            code, said = self.run_main(["--set", "window=1600x900"])
+            self.assertEqual(code, 0, said)
 
     def test_language_as_a_setting(self):
         # --set language=... is --language's other spelling, as the settings' table lists it: the same three values,

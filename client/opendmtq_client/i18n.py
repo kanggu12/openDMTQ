@@ -479,6 +479,8 @@ TEXT = {
     "error.no_setting": ("there is no setting {name}", "없는 설정입니다: {name}"),
     "error.window.too_big": ("{size} does not fit this {w} × {h} display with the window's title bar and the taskbar.",
                              "제목 표시줄과 작업 표시줄까지 이 모니터({w} × {h})에 들어가지 않는 크기입니다: {size}"),
+    "error.window.too_small": ("{size} is smaller than the game's window can be on this display ({least}).",
+                               "이 모니터에서 게임 창이 될 수 있는 가장 작은 크기({least})보다 작습니다: {size}"),
     "error.server.empty": ("Type the server's address.", "서버 주소를 입력하세요."),
     "error.server.address": ("{address} is not an address.", "주소로 읽을 수 없습니다: {address}"),
     "error.server.unreachable": ("Cannot reach {base}.", "{base}에 연결할 수 없습니다."),

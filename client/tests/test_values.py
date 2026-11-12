@@ -89,6 +89,29 @@ class Values(unittest.TestCase):
         self.assertEqual(choices.size_of("1280x720"), (1280, 720))
         self.assertIsNone(choices.size_of("auto"))
 
+    def test_window_sizes_at_windows_scale(self):
+        # The smallest game area the player's window holds is 480x270 at Windows' scale (arm32/desktop/overlay_scale.h):
+        # whole pixels, never fewer than the scale gives (270 at 125 % is 338).
+        for scale, least in ((1.0, (480, 270)), (1.25, (600, 338)), (1.5, (720, 405)), (2.0, (960, 540)), (3.0, (1440, 810))):
+            self.assertEqual(choices.smallest_on({"scale": scale}), least, scale)
+        # No scale known: 100 %.
+        self.assertEqual(choices.smallest_on({}), (480, 270))
+        # A 4K display at 300 %: 1280x720 would open at 1440x810, so the Screen page leaves it out and --set refuses it;
+        # the next size up and fitted stay.
+        uhd = {"width": 3840, "height": 2160, "hz": 60, "scale": 3.0}
+        self.assertTrue(choices.too_small("1280x720", uhd))
+        self.assertFalse(choices.fits("1280x720", uhd))
+        self.assertTrue(choices.fits("1600x900", uhd))
+        self.assertTrue(choices.fits("auto", uhd))
+        self.assertFalse(choices.too_small("auto", uhd))
+        # At 200 % no size the page lists is too small (the smallest there is 960x540); 3840x2160 still goes for want of
+        # room for the title bar.
+        self.assertFalse(any(choices.too_small(s, dict(uhd, scale=2.0)) for s in choices.WINDOW_SIZES))
+        self.assertFalse(choices.fits("3840x2160", dict(uhd, scale=2.0)))
+        # The display's size unknown: the smallest is still the scale's.
+        self.assertFalse(choices.fits("1280x720", {"width": 0, "height": 0, "scale": 3.0}))
+        self.assertTrue(choices.fits("3840x2160", {"width": 0, "height": 0, "scale": 3.0}))
+
     def test_vsync_pacing_is_the_players(self):
         # The refreshes a frame stays for with VSync, as the player's pacing_math.h has them (its own test's cases):
         # every refresh without a limit or at the rate and above, a whole fraction near the limit, else by the clock.

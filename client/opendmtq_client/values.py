@@ -4,12 +4,13 @@ file the player reads at a start (player --settings FILE; arm32/desktop/settings
 A phone's app sets these for itself; on a PC they are the player's to apply, chosen here before PLAY.
 """
 
+import math
 import re
 
 # The game's area: the whole display it is on, or a window.
 DISPLAY = ("fullscreen", "window")
 # The game's area in a window: fitted to the display, or one of these sizes (the launcher leaves out the ones larger
-# than the display).
+# than the display, or smaller than the game's window holds at Windows' scale there).
 WINDOW_SIZES = ("auto", "1280x720", "1600x900", "1920x1080", "2560x1440", "3840x2160")
 # Frames on the display's refreshes, or as soon as they are drawn.
 VSYNC = ("on", "off")
@@ -67,7 +68,8 @@ NAMES = ORDER[:ORDER.index("show_fps") + 1] + ("fps_position",) + ORDER[ORDER.in
 CHOICES = {"display": DISPLAY, "vsync": VSYNC, "fps": FPS, "render_scale": RENDER_SCALE, "upscaler": UPSCALER,
            "anti_aliasing": ANTI_ALIASING, "show_fps": SHOW_FPS, "fps_position": FPS_POSITION, "audio_mode": AUDIO_MODE,
            "audio_buffer": AUDIO_BUFFER}
-# A window size the player takes (its own bounds: 480x270, the smallest area its window holds, to 16384 a side).
+# A window size the player takes (its own bounds: 480x270 to 16384 a side). 480x270 is also the smallest area its window
+# holds at 100 %; at Windows' scale it is that many of Windows' own pixels (smallest_on).
 SIZE = re.compile(r"^(\d{3,5})x(\d{3,5})$")
 SMALLEST = (480, 270)
 
@@ -159,12 +161,35 @@ def size_of(text):
 WINDOW_ROOM = 80
 
 
-def fits(size, display):
-    """Whether a window size ("1920x1080", or "auto") fits `display` ({"width", "height"}, displays.main_display) with
-    room for the window's title bar and the taskbar: the Screen page leaves out the sizes that do not, and --set window=
-    refuses them. True for auto, and for any size while the display's size is not known."""
+def smallest_on(display):
+    """The smallest game area the player's window holds on `display` ({"scale"}, displays.main_display): 480x270 at
+    Windows' scale there (720x405 at 150 %), as the player has it (arm32/desktop/overlay_scale.h, at_scale)."""
+    scale = float(display.get("scale") or 1.0)
+    # Whole pixels and never fewer than the scale gives; a hair over a whole number is that number, as the player's.
+    return tuple(int(math.ceil(side * scale - 0.001)) for side in SMALLEST)
+
+
+def too_small(size, display):
+    """Whether a window size ("1920x1080") is smaller than the game's window holds on `display`: the player would open
+    it at its smallest instead. False for auto."""
     found = size_of(size)
-    if found is None or not display.get("width") or not display.get("height"):
+    if found is None:
+        return False
+    least = smallest_on(display)
+    return found[0] < least[0] or found[1] < least[1]
+
+
+def fits(size, display):
+    """Whether a window size ("1920x1080", or "auto") fits `display` ({"width", "height", "scale"},
+    displays.main_display): no smaller than the game's window holds at Windows' scale there, and no larger than the
+    display with room for the window's title bar and the taskbar. The Screen page leaves out the sizes that do not, and
+    --set window= refuses them. True for auto; while the display's size is not known, only the smallest is checked."""
+    found = size_of(size)
+    if found is None:
+        return True
+    if too_small(size, display):
+        return False
+    if not display.get("width") or not display.get("height"):
         return True
     return found[0] <= display["width"] and found[1] + WINDOW_ROOM <= display["height"]
 

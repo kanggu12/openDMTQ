@@ -572,15 +572,22 @@ def _language_set(args):
 
 
 def _window_fits(args):
-    """--set window=WxH refused for a size the Screen page leaves out: larger than the main display with room for the
-    window's title bar and the taskbar (values.fits, the page's own check). Checked before anything is changed."""
+    """--set window=WxH refused for a size the Screen page leaves out: smaller than the game's window holds at Windows'
+    scale on the main display, or larger than it with room for the window's title bar and the taskbar (values.fits, the
+    page's own check). Checked before anything is changed."""
     from opendmtq_client import displays
     for item in args.set:
         name, _, value = item.partition("=")
         if name.strip() != "window":
             continue
         display = displays.main_display()
-        if not choices.fits(value.strip().lower(), display):
+        size = value.strip().lower()
+        if choices.too_small(size, display):
+            # Smaller than the game's window holds at Windows' scale on this display: the player would open it larger.
+            least = "%d x %d" % choices.smallest_on(display)
+            raise choices.ChoiceError("window cannot be %s: the game's window is at least %s on this display"
+                                      % (value.strip(), least), "error.window.too_small", size=value.strip(), least=least)
+        if not choices.fits(size, display):
             raise choices.ChoiceError("window cannot be %s: it does not fit this %d x %d display with the window's title "
                                       "bar and the taskbar" % (value.strip(), display["width"], display["height"]),
                                       "error.window.too_big", size=value.strip(), w=display["width"],
