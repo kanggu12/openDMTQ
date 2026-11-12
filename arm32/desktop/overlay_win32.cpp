@@ -569,7 +569,7 @@ constexpr float kTabGlass = 0.78f, kTabSheen = 0.06f, kHandleLine = 0.95f, kRail
 constexpr float kHandleRoom = 4;
 
 // The handle's own scale: the game's exactly, with no floor (overlay_scale.h says why).
-float handle_scale() { return handle_scale_for(area_h()); }
+float handle_scale() { return handle_scale_for(area_w(), area_h()); }
 // A length of the handle's at 720 lines as pixels at its scale, unrounded.
 float hpx(float at720) { return at720 * handle_scale(); }
 

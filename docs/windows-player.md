@@ -106,8 +106,9 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   the pointer on it the line and the chevron turn lime and the tab grows deeper. The pointer resting on it, or just
   around it, brings the bar down: the handle goes down with the bar's foot and fades, and comes back up with it. It is
   as large as the game's own header leaves room for at its top centre (26 by 19 pixels in a 1280x720 game, in
-  proportion in any other), so it covers none of the game's words or buttons on any screen. It shows once the game's
-  picture is up, and goes while the bar is down, while a notice or the question is up and while the game holds still.
+  proportion to that header in a game of any other size or shape), so it covers none of the game's words or buttons
+  on any screen. It shows once the game's picture is up, and goes while the bar is down, while a notice or the
+  question is up and while the game holds still.
 - **Quitting**: the X asks first, in a glass card over the game dimmed and blurred behind it: **Keep playing** as the
   launcher's main button, or **Quit the game** as its secondary, red under the pointer; so a click by mistake does not
   end a song. Its buttons too act only when let go where they were pressed; Left, Right and Tab move the choice (marked
@@ -124,7 +125,7 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   display at 150 % has them cover no more of the game than at 100 %. They are never drawn below half their 720-line
   size at Windows' scale, so the bar's buttons stay large enough to hit; the smallest game area, 480x270 at Windows'
   scale, leaves them room. The handle alone, which is never pressed, keeps the game's own scale in a window of any
-  size. The pointer keeps Windows' own size.
+  size and shape. The pointer keeps Windows' own size.
 - **Nothing of it is in the game's way**: the notice, the FPS counter and the handle let every click through to the
   game, and no piece takes the keyboard from the game's window (each is a window that never takes the focus; a click on
   the bar or the question gives the keyboard back to the game).

@@ -43,11 +43,19 @@ inline int at_scale(int logical, float dpi) {
 
 // ---- the handle
 
+// The width the game lays its screens out for, beside its 720 lines.
+constexpr float kGameWide = 1280;
+
 // The handle at the game's top centre is the one piece of the overlay that is never pressed (the pointer rests on it,
 // and its reach is larger than its picture), so it needs no least size to be hit: it is drawn at the game's own scale
-// exactly, its area's height over 720, whatever Windows' scale. It then keeps its proportion to the game's own header
-// in a window of any size, and what it clears at 720 lines it clears everywhere.
-inline float handle_scale_for(int area_h) { return static_cast<float>(area_h) / kGameLines; }
+// exactly, whatever Windows' scale. That is the scale the game fits its 1280 by 720 layout into its area at (measured
+// on its frames at 4:3, 16:10, 16:9 and 21:9): its height over 720 in an area of 16:9 or wider, where the header's
+// middle stays at the centre, and its width over 1280 in a narrower one, where the whole header is smaller than the
+// height alone says. The handle then keeps its proportion to the game's own header in a window of any size and shape,
+// and what it clears at 1280x720 it clears everywhere.
+inline float handle_scale_for(int area_w, int area_h) {
+    return std::min(static_cast<float>(area_w) / kGameWide, static_cast<float>(area_h) / kGameLines);
+}
 
 // The handle's tab at 720 lines: 25.6 wide where it hangs from the game's top edge, its sides leaning in 0.268 a pixel
 // down as the game's own tabs' do (15 degrees), 18.5 high and 23 with the pointer on it; the line it hangs from (its
