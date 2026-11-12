@@ -24,9 +24,11 @@ are stored. The times are printed for each round.
 
 Usage: python3 tests/load/load.py SITE_URL                      the rounds
        python3 tests/load/load.py SITE_URL seed COUNT FILE      COUNT players through the game's logins: "guid udid" lines
+       python3 tests/load/load.py SITE_URL requests             the game's requests one kind at a time, as the README's
+                                                                chart shows them (docs/testing.md, Measurements)
 Environment: PLAYERS (8), PHASE_S (60), SONG_S (3), FLOOD (24), BROADCASTERS (2), VIEWERS (30), SEGMENT_KB (500),
 TIMEOUT_S (15), SEEDED (the seed step's file, at least PLAYERS + 1 + BROADCASTERS players), VIEWER (ID:password of a
-site account), HEAVY_CMD, MEM_CMD, CRASH_CMD, CHECK_CMD, FULL_SITE, FULL_FILL_CMD, FULL_FREE_CMD, FULL_CHECK_CMD (run.sh
+site account), REQUEST_S (6, each kind's seconds in the requests mode), HEAVY_CMD, MEM_CMD, CRASH_CMD, CHECK_CMD, FULL_SITE, FULL_FILL_CMD, FULL_FREE_CMD, FULL_CHECK_CMD (run.sh
 sets them), OUT (a folder for results.json).
 """
 
@@ -64,6 +66,8 @@ VIEWERS = int(os.environ.get("VIEWERS", "30"))
 SEGMENT_KB = int(os.environ.get("SEGMENT_KB", "500"))
 # How long a request may take before it counts as unanswered.
 TIMEOUT_S = float(os.environ.get("TIMEOUT_S", "15"))
+# How long each kind of request is sent in the requests mode.
+REQUEST_S = float(os.environ.get("REQUEST_S", "6"))
 # Where results.json goes, if anywhere.
 OUT = os.environ.get("OUT", "")
 # What run.sh gives for the rounds that reach past HTTP: a command printing the server's memory in use (Docker's own
@@ -520,6 +524,84 @@ def full_round():
     return out
 
 
+def requests_round(made, charts):
+    """The game's requests one kind at a time, as the README's chart shows them: PLAYERS phones, each a player of its
+    own, send one kind back to back for REQUEST_S seconds. Returns {kind: {n, per_s, p50_ms, p95_ms, ends}}, printed
+    too, and how long the first look at the ranking of every chart takes after a play (that board is kept until the next
+    play, so the looks of a round with no play in it all read what the first one kept)."""
+    players = made[:PLAYERS]
+
+    def token_of(udid):
+        # The platform login's token, which the game login takes.
+        _, raw = Conn().post("/api/accounts/v3/global/login_dmq", urllib.parse.urlencode({"udid": udid}).encode(),
+                             {"Content-Type": "application/x-www-form-urlencoded"})
+        return json.loads(raw)["value"]["access_token"]
+
+    tokens = {g: token_of(u) for g, u in players}
+
+    def login(conn, g):
+        st, r, took = rpc(conn, "user.loginV2", [tokens[g], " ", "", "1.3.5", "ANDROID", "KR"])
+        return answered(st, r), took
+
+    def song_list(conn, g):
+        st, r, took = rpc(conn, "game.getSongList", [])
+        return answered(st, r), took
+
+    def save_a_play(conn, g):
+        # The game's two requests at a song's end: the result, then the player's rank on the song.
+        song, line, pattern = random.choice(charts)
+        st, r, took = save(conn, g, pattern)
+        st2, r2, took2 = rpc(conn, "game.getLineScoreMyRankWithNext", [g, song, line])
+        end = outcome(st, r)
+        return (end if end != "stored" else answered(st2, r2)), took + took2
+
+    def every_chart(conn, g):
+        st, r, took = rpc(conn, "game.getLineTopRankWithLevel", [0, 1, 50, [g]])
+        return answered(st, r), took
+
+    def one_song(conn, g):
+        song, line, _ = random.choice(charts)
+        st, r, took = rpc(conn, "game.getLineScoreRangeWithLevel", [song, line, 1, 50])
+        return answered(st, r), took
+
+    out = {}
+    for name, one in (("login", login), ("song list", song_list), ("save a play", save_a_play),
+                      ("ranking, all charts", every_chart), ("ranking, one song", one_song)):
+        stop, tally = threading.Event(), Tally()
+
+        def phone(g, one=one, stop=stop, tally=tally):
+            # One phone: this kind of request back to back over one kept connection.
+            conn = Conn()
+            while not stop.is_set():
+                try:
+                    end, took = one(conn, g)
+                    tally.add(end, took)
+                except Exception:
+                    tally.add("no answer")
+
+        threads = [threading.Thread(target=phone, args=(g,)) for g, _ in players]
+        t0 = time.time()
+        for t in threads:
+            t.start()
+        time.sleep(REQUEST_S)
+        stop.set()
+        for t in threads:
+            t.join()
+        s = tally.summary(time.time() - t0)
+        out[name] = {"n": s["n"], "per_s": s["per_s"], "p50_ms": s["p50_ms"], "p95_ms": s["p95_ms"], "ends": s["ends"]}
+        print(f"  {name}: {json.dumps(out[name])}")
+        sys.stdout.flush()
+    # The first look at the ranking of every chart after a play: ten plays, each followed by one look.
+    conn, g = Conn(), players[0][0]
+    first = []
+    for _ in range(10):
+        save(conn, g, random.choice(charts)[2])
+        first.append(rpc(conn, "game.getLineTopRankWithLevel", [0, 1, 50, [g]])[2])
+    out["ranking, all charts, first look after a play"] = {"p50_ms": round(sorted(first)[5] * 1000, 1)}
+    print(f"  ranking, all charts, first look after a play: {json.dumps(out['ranking, all charts, first look after a play'])}")
+    return out
+
+
 def seed(count, path):
     """`count` players made through the game's own logins, eight at a time: "guid udid" lines in `path`."""
     from concurrent.futures import ThreadPoolExecutor
@@ -556,6 +638,17 @@ def main():
         for i in range(need):
             udid = f"load-{i}-{random.randrange(10**9)}"
             made.append((new_player(udid), udid))
+    # The requests mode: each kind on its own, with these players, and nothing else.
+    if len(sys.argv) > 2 and sys.argv[2] == "requests":
+        print(f"players {PLAYERS}, charts {len(charts)}, {REQUEST_S:.0f} s a kind")
+        kinds = requests_round(made, charts)
+        if OUT:
+            with open(os.path.join(OUT, "requests.json"), "w") as f:
+                json.dump(kinds, f, indent=2)
+        # Every request answered (a save stored), or the figures are of something else.
+        wrong = {k: v["ends"] for k, v in kinds.items() if "ends" in v and set(v["ends"]) - {"answered", "stored"}}
+        print("FAIL some requests were not answered: " + json.dumps(wrong) if wrong else "PASS every request of every kind answered")
+        return 1 if wrong else 0
     players = [g for g, _ in made[:PLAYERS]]
     flooder = made[PLAYERS][0]
     casters = made[PLAYERS + 1:need]

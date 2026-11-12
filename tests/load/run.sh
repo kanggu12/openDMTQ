@@ -8,6 +8,8 @@
 # Usage: tests/load/run.sh [OUT_DIR]
 # Environment: CORES (the two cores; default the machine's last two), SEED_PLAYERS (300), SEED_PLAYS (1000000),
 # NO_BUILD=1 (the images already tagged loadtest), SITE_PORT (18611), and load.py's own (PLAYERS, PHASE_S, ...).
+# REQUESTS=1 measures the game's requests one kind at a time on that server instead of the rounds (the README's chart
+# of them; docs/testing.md, Measurements): OUT_DIR/requests.json.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -90,6 +92,12 @@ python3 "$ROOT/tests/load/load.py" "http://127.0.0.1:$SITE_PORT" seed "$SEED_PLA
 docker exec -i "$SITE" php -d memory_limit=512M -- "$SEED_PLAYS" < "$ROOT/tests/load/seed.php"
 # The site account the viewers sign in with, made as the Accounts page makes one.
 docker exec "$ADMIN" python3 -c 'import sys; from opendmtq_tools.admin import auth; sys.exit(0 if auth.account_create("loadviewer", "load-viewer-pass") else 1)'
+
+# The game's requests one kind at a time, when asked for: the figures of the README's chart, and nothing else.
+if [ -n "${REQUESTS:-}" ]; then
+  SEEDED="$DATA/state/load-guids.txt" OUT="$OUT" python3 "$ROOT/tests/load/load.py" "http://127.0.0.1:$SITE_PORT" requests | tee "$OUT/requests.txt"
+  exit "${PIPESTATUS[0]}"
+fi
 
 # The rounds; the heavy one runs heavy.sh with what it needs to reach the containers.
 export ADMIN BUILDER CORES HOST DATA TAG
