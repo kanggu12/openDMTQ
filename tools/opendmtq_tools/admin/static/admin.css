@@ -524,6 +524,9 @@ table.players tbody tr:nth-last-child(-n+2):not(:first-child):not(:nth-child(2))
 .account-keys dd { margin: 0; font: 700 20px/1.3 var(--text-face); color: #fff; overflow-wrap: anywhere; }
 .account-keys code { font: inherit; letter-spacing: 0.04em; }
 .account-made .invite-box { margin: 0; }
+/* What shows once takes the focus when its page comes (admin.js, data-once): for the next Tab and a screen reader, not for
+   the eye, which the panel's place at the top of the screen already leads. No frame of the browser's around the card. */
+[data-once]:focus { outline: none; }
 .account-state { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
 /* The accounts' table: an ID never split; on a phone the four buttons one above another, across the row (four side by
    side would cut Remove admin rights). */

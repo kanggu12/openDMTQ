@@ -516,8 +516,11 @@ for (const el of document.querySelectorAll('[data-reload]')) setTimeout(() => lo
     // Its top just under the bar where the bar stays on the screen (wider screens); on a phone the bar scrolls away.
     const bar = document.querySelector('.bar');
     const cover = bar && getComputedStyle(bar).position === 'sticky' ? bar.offsetHeight : 0;
-    // A little room above it, so that its edge and heading read as the top of what is on the screen.
-    scrollTo(0, Math.max(0, once.getBoundingClientRect().top + scrollY - cover - 14));
+    // Where the page arrives (its top), it may be whole on the screen already, under the bar and the menu: then the page
+    // stays there. Otherwise its top comes up, with a little room above it, so that its edge and heading read as the top
+    // of what is on the screen.
+    const at = once.getBoundingClientRect();
+    if (at.top < cover || at.bottom > innerHeight) scrollTo(0, Math.max(0, at.top + scrollY - cover - 14));
     // The focus on it too, already in place: the next Tab reaches its copy button, and a screen reader says its heading.
     once.focus({ preventScroll: true });
     return;
