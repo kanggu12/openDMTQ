@@ -22,9 +22,10 @@
   {% else %}
   <a class="stat" href="{{ url_for('recordings_page') }}"><span class="lbl">{{ t('dash.live') }}</span><span class="num{% if counts and counts.live %} livec{% endif %}">{{ counts.live if counts else '?' }}</span><span class="tile-sub">{{ t('dash.recordings_n', n=recordings) }}</span></a>
   {% endif %}
-  {# Free, as the tile says: the bar is the free part of the disk, red with the figure when little is left. #}
+  {# Free, as the tile says; the bar fills with what is used, as Resources' Disk below and every meter here do, red with the
+     figure when little is left. #}
   {% set used = 100 * (usage.total - usage.free) / usage.total %}
-  <a class="stat" href="{{ url_for('recordings_page') }}"><span class="lbl">{{ t('dash.disk') }}</span><span class="num{% if used > 90 %} badc{% endif %}">{{ usage.free|human }}</span><span class="tile-meter{% if used > 90 %} over{% endif %}"><span style="width: {{ 100 - used }}%"></span></span><span class="tile-sub">{{ t('dash.of_total', total=usage.total|human) }}</span></a>
+  <a class="stat" href="{{ url_for('recordings_page') }}"><span class="lbl">{{ t('dash.disk') }}</span><span class="num{% if used > 90 %} badc{% endif %}">{{ usage.free|human }}</span><span class="tile-meter{% if used > 90 %} over{% endif %}"><span style="width: {{ used }}%"></span></span><span class="tile-sub">{{ t('dash.of_total', total=usage.total|human) }}</span></a>
   <a class="stat" href="{{ url_for('backups_page') }}"><span class="lbl">{{ t('dash.backups') }}</span><span class="num{% if not last_backup or backup_old %} warnc{% endif %}">{{ backup_ago or t('dash.never') }}</span><span class="tile-sub file-name">{{ last_backup or t('dash.no_backup') }}</span></a>
   <a class="stat" href="{{ url_for('app_page') }}"><span class="lbl">{{ t('dash.app') }}</span><span class="num{% if build_failed or app_other_host %} badc{% elif not build %} warnc{% endif %}">{{ build.built_at[:10] if build else t('dash.never') }}</span><span class="tile-sub">{% if app_other_host %}{{ t('dash.app_other_short') }}{% elif build %}{{ build.size|human }}{% if build.runtime %} · arm32{% endif %}{% else %}{{ t('dash.no_app') }}{% endif %}</span></a>
   <a class="stat" href="{{ url_for('maintenance_page') }}"><span class="lbl">{{ t('dash.maintenance') }}</span><span class="num{% if maintenance %} warnc{% endif %}">{{ t('mark.on') if maintenance else t('state.off') }}</span><span class="tile-sub">{{ t('dash.maint_on') if maintenance else t('dash.maint_off') if server_ok else t('dash.maint_down') }}</span></a>
@@ -119,7 +120,8 @@
       <tr><td>{{ t('app.built') }}</td><td>{{ build.built_at[:16].replace('T', ' ') }}</td></tr>
       <tr><td>{{ t('dash.runtime') }}</td><td>{{ build.runtime or t('app.no_runtime') }}</td></tr>
       {% endif %}
-      {% if version %}<tr><td>{{ t('dash.version') }}</td><td><code>{{ version }}</code></td></tr>{% endif %}
+      {# In the runtime's form above: v, the release, and what follows it. #}
+      {% if version %}<tr><td>{{ t('dash.version') }}</td><td>v{{ version }}</td></tr>{% endif %}
     </tbody></table>
     {% if not build %}<p class="empty">{{ t('dash.no_app') }}</p>{% endif %}
     <div class="btn-line">

@@ -1472,14 +1472,16 @@ class DiskPartsTest(unittest.TestCase):
                 with open(inst.path(rel), "wb") as f:
                     f.write(b"x" * n)
             parts = {"game": [("content/web/patch/data.lz4", 7000), ("content/songs.json", 300), ("apk/base/client.apk", 5000)],
-                     "recordings": [("state/live-rec/7/1798000000/0.ts", 4000), ("state/live-rec/limits.json", 30)],
+                     # The recordings alone: the owner's limits beside them are no recording (the Broadcasts page
+                     # said 0 B where the status page said 26 B), and go with the rest.
+                     "recordings": [("state/live-rec/7/1798000000/0.ts", 4000)],
                      "builds": [("apk/out/OpenDMTQ-a.apk", 3000), ("apk/out/OpenDMTQ-Setup.exe", 2000), ("apk/out/latest.json", 90),
                                 ("apk/arm32/libarm32.so", 1500), ("apk/keystore/opendmtq.jks", 40), ("apk/OpenDMTQ-Setup.exe", 2000)],
                      "backups": [("backups/opendmtq-2026-11-12.tar.gz", 900)],
                      "db": [("state/dmtq.db3", 800), ("state/dmtq.db3-wal", 80)],
                      "songs": [("custom/songs/1001/song.fpk", 600)],
                      "rest": [("state/logs/access.log", 200), ("state/admin-settings.json", 20), ("custom/thumbs/a.jpg", 70),
-                              ("custom/songList.json", 50), ("https/ca.crt", 10)]}
+                              ("custom/songList.json", 50), ("https/ca.crt", 10), ("state/live-rec/limits.json", 30)]}
             for part, files in parts.items():
                 for rel, n in files:
                     put(rel, n)

@@ -112,7 +112,7 @@ class SegmentsTest(unittest.TestCase):
         self.assertIn("None", html)
 
     def test_every_block_colour_gets_words_that_can_be_read(self):
-        for colour in charts.PARTS + (charts.QUIET,) + GRADE_COLOURS:
+        for colour in charts.PARTS + charts.LIGHTS + (charts.QUIET,) + GRADE_COLOURS:
             ratio = contrast(charts.ink_on(colour), colour)
             self.assertGreaterEqual(ratio, 4.5, f"{colour}: {ratio:.1f}")
 

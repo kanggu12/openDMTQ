@@ -15,6 +15,10 @@ QUIET = "#46505b"
 # OpenDMTQ's own part of a whole: the console's light (its section colour, style.css), the brightest of the three.
 OURS = "#dfe5eb"
 OTHER = "#7b8794"
+# OpenDMTQ's own parts at their own scale: plain light as the other meters, no hue (on these pages colour marks a state),
+# each a step darker than the one before, from OURS to OTHER, so that neighbours part and the legend's keys say which is
+# which. Dark words read on every step (4.5 to 1 at least: tests/test_charts.py).
+LIGHTS = ("#dfe5eb", "#ced5dc", "#bec6ce", "#adb6c0", "#9ca6b1", "#8c97a2", "#7b8794")
 # The drawing space of a chart over time: as wide as this, 100 high, and this much of the height kept free over the top guide.
 PLOT_WIDTH = 720
 PLOT_HEAD = 6

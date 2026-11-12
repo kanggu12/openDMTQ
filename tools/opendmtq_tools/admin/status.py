@@ -104,18 +104,25 @@ def disk_counts():
     size = lambda path, skip=(): insights.folder_size(path, device=disk, seen=linked, skip=skip)
     db_files = [core.DB + end for end in ("", "-wal", "-shm")]
     rec, base, added = recordings.rec_root(), os.path.join(core.APK, "base"), os.path.join(songs.CUSTOM, "songs")
+    # The recordings themselves: a folder per player, named by their number (recordings.folder_number). The owner's limits
+    # (limits.json) and anything else in that folder are no recording: they go with the rest, as the Broadcasts page counts.
+    try:
+        players = [os.path.join(rec, name) for name in os.listdir(rec) if recordings.folder_number(name) is not None]
+    except OSError:
+        players = []
     fresh = {"at": time.time(),
              # The imported client data and song data, and the game's client the app is built from.
              "game": size(songs.CONTENT) + size(base),
-             "recordings": size(rec),
+             "recordings": sum(size(folder) for folder in players),
              # data/apk but the client: the apps for players, the installer for Windows, the runtime for newer phones,
              # the signing key.
              "builds": size(core.APK, skip=[base]),
              "backups": size(core.BACKUPS),
              "db": sum(size(f) for f in db_files),
              "songs": size(added),
-             # The state folder's and the custom folder's rest, and the certificate.
-             "rest": size(state, skip=[rec] + db_files) + size(songs.CUSTOM, skip=[added]) + size(HTTPS),
+             # The state folder's and the custom folder's rest (the recordings' folder but the recordings), and the
+             # certificate.
+             "rest": size(state, skip=players + db_files) + size(songs.CUSTOM, skip=[added]) + size(HTTPS),
              # How many recordings: reading each one is the slow part, done here with the rest.
              "recording_count": recordings.rec_totals()[0]}
     _disk_cache.update(fresh)
@@ -429,9 +436,9 @@ def dashboard():
     own_total = sum(p[1] for p in own)
     disk_chart = charts.segments([(tp("disk.ours"), own_total, human(own_total))] + disk[len(OWN_PARTS):], tp("dash.c_disk"),
                                  colours=[charts.OURS, charts.OTHER, charts.QUIET])
-    # A colour for each named part, and the rest in the panel's quiet grey: it is no one thing.
+    # Each part a step of the plain light, the rest the last step: no hue, as the other meters (colour marks a state).
     disk_own = charts.segments(own, tp("dash.c_disk_own", size=human(own_total)),
-                               colours=list(charts.PARTS[:len(OWN_PARTS) - 1]) + [charts.OTHER]) if own_total else ""
+                               colours=list(charts.LIGHTS[:len(OWN_PARTS)])) if own_total else ""
     # The button is for the owner, from where this page was opened; the message is for a friend, who needs the address all
     # phones use (localhost or a link without a host is no use to them).
     invite_url = f"{core.public_url()}/opendmtq/download.php"
