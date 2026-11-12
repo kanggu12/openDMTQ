@@ -38,7 +38,8 @@ Later
   OpenDMTQ.exe status, OpenDMTQ.exe apk or OpenDMTQ.exe --help. OpenDMTQ.exe import --check <folder> says what each file
   in a folder is, and imports nothing.
 - The admin password is in the file .env in this folder; open it with Notepad.
-- Your data (players, scores, recordings, the app's signing key) is in the data folder: back it up from the admin pages.
+- Your data (players, scores, recordings, the app's signing key) is in the data folder. The admin pages' backups hold all
+  of it but the recordings.
 
 Guides, and where to report a problem: https://github.com/kanggu12/openDMTQ
 

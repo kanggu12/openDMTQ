@@ -71,8 +71,9 @@ warn about an app it does not know. It is the game's own app, with the server's 
 phones.
 
 **The game shows no songs.**
-The song list is empty until the songs are imported: on the admin pages, **Songs**, **Choose the folder**, then the
-client data and the song data together, or the `DMQ` folder alone, with **Import the songs too** ticked.
+The song list is empty until the songs are imported. On Windows and a host install: on the admin pages, **Songs**,
+**Choose the folder**, then the client data and the song data together, or the `DMQ` folder alone, with **Import the songs
+too** ticked. With Docker, as its Songs page says: `./opendmtq import --songs <folder>` on the server PC.
 
 ## Privacy
 

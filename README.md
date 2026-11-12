@@ -7,7 +7,7 @@
 
 <p align="center">
   <b>An open-source server for DJMAX Technika Q, on your own computer.</b><br>
-  Logins, scores, rankings and live broadcasts for you and your friends, with nothing to set on a phone.
+  Logins, scores, rankings and live broadcasts, with nothing to set on a phone.
 </p>
 
 <p align="center">
@@ -30,7 +30,7 @@
 
 The official service of **DJMAX Technika Q**, the Android rhythm game, ended in 2019. OpenDMTQ is an open-source
 project that brings its online side back on a computer of your own. The server builds a copy of your APK that talks to
-it, and your friends install that copy from the server's web page.
+it, and phones install that copy from the server's web page.
 
 > [!IMPORTANT]
 > **No game files are included.** You need your own copy of the game's Android app and its client data, and its song
@@ -143,7 +143,7 @@ scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#pr
 |---|---|
 | [Installing](docs/install.md) | Each system step by step, the phones and PCs, everyday use, updates and backups, what it runs on |
 | [The game's files](docs/game-files.md) | What the app, the client data and the song data have to be |
-| [Questions and answers](docs/faq.md) | What it needs, which phones, playing with friends, privacy |
+| [Questions and answers](docs/faq.md) | What it needs, which phones, players outside the home, privacy |
 | [The site and the admin pages](docs/admin.md) | The setup, the app, songs, players, backups |
 | [The API](docs/api.md) | All the admin pages show and do, and what the players' site shows, as JSON |
 | [The PC client](docs/windows-player.md) | Playing on a Windows PC: the installer, the launcher, the picture and the sound |
