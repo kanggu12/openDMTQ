@@ -55,10 +55,11 @@ scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#pr
 
 ## Quick start
 
-You need your own copy of the game's Android app (`.apk`) and its client data, and its song data for the songs:
-[what each has to be](docs/game-files.md).
-Phones play on Android, on the same Wi-Fi as the server or [over the internet](docs/internet.md);
-[iPhones cannot](docs/game-files.md#iphones). The setup says what each file is before it imports anything.
+### Host a server
+
+You need your own copy of the game's Android app (`.apk`) and its client data, and its song data for the songs
+([what each has to be](docs/game-files.md)). The setup finds them in Downloads or on the Desktop by a name with `dmtq`,
+`djmax` or `technika` in it, or in a folder you pick, and says what each one is before it imports anything.
 
 <p align="center">
   <img src="docs/images/setup.jpg" alt="The setup in the browser: the game's Android app, the client data and the song data found in Downloads, each labeled with what it is, with a button to import them" width="100%">
@@ -73,16 +74,18 @@ tar.exe -xf OpenDMTQ-windows.zip
 start .\OpenDMTQ\OpenDMTQ.exe
 ```
 
-The server runs while its window is open. When Windows Firewall asks, allow it on private networks, and set your Wi-Fi
-to Private if it is public.
+The server starts, and the setup opens in the browser once it answers. The server runs while its window is open. When
+Windows Firewall asks, allow it on private networks, and set your Wi-Fi to Private if it is public.
 
-**Debian, Ubuntu or macOS (Homebrew):**
+**Debian, Ubuntu, or a Mac with Homebrew**, as your own user, not root (it asks for your password to install packages):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/main/host/get.sh | sh
 ```
 
-**Docker:**
+It installs into `~/openDMTQ` and opens the setup in the browser; without a screen it prints the setup's address.
+
+**Docker** on Linux, macOS, or Windows with WSL, with Docker 23 or newer and Compose, Python 3.9 or newer and git:
 
 ```sh
 git clone https://github.com/kanggu12/openDMTQ.git
@@ -90,15 +93,23 @@ cd openDMTQ
 ./opendmtq setup
 ```
 
+Files in another place: `./opendmtq setup --from <folder>`. It ends with the admin pages' address (`./opendmtq status`
+shows it again), where each player's account is made, under **Accounts**.
+
 **Kubernetes:** the Helm chart, with a volume for the game files and S3 storage:
 [install on a cluster](docs/kubernetes.md#install-on-a-cluster).
 
-In the browser on Windows, Linux and macOS, the setup takes you through your files, the address, the players' accounts
-and the app. With Docker it runs in the terminal, and the accounts are made on the admin pages, under **Accounts**. On
-each Android phone, open the address the setup shows, sign in and install the app; on a Windows PC, download the
-installer from the same page ([playing on a server](docs/play.md)).
-
+The setup then asks for the address phones use and an account for each player, and builds the app.
 [Installing, step by step](docs/install.md).
+
+### Play
+
+On a server someone runs, with the account its owner made for you ([playing on a server](docs/play.md)):
+
+- **Android phone:** open the address the owner gives you, sign in and install the app. On the same Wi-Fi as the server,
+  or [over the internet](docs/internet.md) when the owner sets that up; [iPhones cannot](docs/game-files.md#iphones).
+- **Windows PC:** on the same page, download the installer for Windows. Its launcher signs in and keeps the game up to
+  date ([the PC client](docs/windows-player.md)).
 
 ### What it runs on
 

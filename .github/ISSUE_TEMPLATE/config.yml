@@ -5,5 +5,5 @@ contact_links:
     url: https://github.com/kanggu12/openDMTQ/security
     about: Report it privately on the Security tab (SECURITY.md).
   - name: Setting up a server
-    url: https://github.com/kanggu12/openDMTQ/blob/main/docs/troubleshooting.md
+    url: https://github.com/kanggu12/openDMTQ/blob/main/docs/troubleshooting.md#for-server-owners
     about: Most problems with a first setup are answered here.
