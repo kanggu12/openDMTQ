@@ -486,6 +486,8 @@ table.players tbody tr:nth-last-child(-n+2):not(:first-child):not(:nth-child(2))
 .invite-in { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; }
 .invite-box { height: auto; min-height: 124px; padding: 9px 12px; font-size: var(--t-sm); line-height: 1.5; resize: none; overflow-wrap: anywhere; }
 .invite .meta { margin: 0 0 8px; }
+/* An empty list's line under its words: how it fills, a little apart. */
+.empty .meta { margin-top: 6px; }
 .invite-qr { margin: 0; text-align: center; }
 .invite-qr img { display: block; width: 124px; height: 124px; padding: 6px; background: #fff; }
 .invite-qr figcaption { max-width: 124px; margin-top: 6px; font-size: var(--t-xs); color: var(--ash); }

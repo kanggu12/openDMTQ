@@ -720,6 +720,7 @@ STRINGS = {
         # Players.
         "players.title": "Players",
         "players.none": "No players yet.",
+        "players.none_how": "A player shows here after their first game start. Their account is made on the <a href=\"{accounts}\">Accounts</a> page, and the app is on the site's <a href=\"{download}\">Download</a> page.",
         "players.th_name": "Name",
         "players.th_charts": "Charts",
         "players.th_total": "Total",
@@ -1549,6 +1550,7 @@ STRINGS = {
         "song.not_added": "추가한 곡만 제거할 수 있습니다. 기본 곡은 숨기세요",
         "players.title": "플레이어",
         "players.none": "아직 플레이어가 없습니다.",
+        "players.none_how": "플레이어는 게임을 처음 시작하면 여기에 나옵니다. 계정은 <a href=\"{accounts}\">계정</a> 페이지에서 만들고, 앱은 사이트의 <a href=\"{download}\">내려받기</a> 페이지에 있습니다.",
         "players.th_name": "이름",
         "players.th_charts": "차트",
         "players.th_total": "총점",

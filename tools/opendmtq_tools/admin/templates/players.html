@@ -1,10 +1,11 @@
 {% extends "base.html" %}{% block title %}{{ t('players.title') }}{% endblock %}
 {% block body %}
 <section class="card">
-  {# Nobody yet: the heading and that one line, with nothing about switches or a file of a list there is not. #}
+  {# Nobody yet: the heading and that one line, with nothing about switches or a file of a list there is not; under it, when
+     a player comes to be listed, and the two pages on the way: their account, and the app on the site's Download page. #}
   {% if not players %}
   <h2>{{ t('players.title') }}</h2>
-  <p class="empty">{{ t('players.none') }}</p>
+  <div class="empty"><p>{{ t('players.none') }}</p><p class="meta">{{ t('players.none_how', accounts=url_for('accounts_page'), download=public_url ~ '/opendmtq/download.php') }}</p></div>
   {% else %}
   <h2>{{ t('players.title') }} <span class="meta-inline" id="player-count">{{ players|length }}</span><a class="more" href="{{ url_for('players_page', csv=1) }}">{{ t('players.csv') }}</a></h2>
   {# Said once, above the switches it is about. #}
