@@ -5,7 +5,7 @@
   color-scheme: dark;
   --field: #11151a; --deck: #1a1f25; --deck-top: #21272e; --rail: #272e36; --rail-up: #323a44; --seam: #3a434d;
   --chalk: #eef2f6; --ash: #aeb8c3; --ok: #8cf23d; --warn: #ffcf3d; --bad: #ff5f72; --cyan: #6fd6ff;
-  --accent: #dfe5eb; --accent-ink: #11151a;
+  --accent: #6fd6ff; --accent-ink: #04202e;
   --display: system-ui, sans-serif; --wide: system-ui, sans-serif; --text-face: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", sans-serif; --mono: ui-monospace, Menlo, Consolas, monospace;
   --pad: 20px; --ctl: 42px; --ctl-sm: 34px; --quick: 0.14s;
   /* The site's type scale (style.css), which admin.css sizes its texts by. */

@@ -89,13 +89,13 @@
 :is(.lead, .meta, .note, .for-android) { text-wrap: pretty; }
 /* The blur itself where there is power and a mouse: on phones the glass keeps its look without the cost of redrawing. */
 @media (hover: hover) and (min-width: 721px) { :root { --glass-blur: blur(14px) saturate(1.35); } }
-/* The game's scene titles: rankings violet, songs in the timeline's blue, live in red. The console has no colour of its
-   own, the text's light: its colours are the states' (ok, warning, wrong, on air), and amber beside the warning's yellow
-   read as one more warning on every meter, bar and key. */
+/* The game's scene titles: rankings violet, songs in the timeline's blue, live in red; the console in the cyan of the
+   site's focus ring, for its keys, links and what is picked. Not amber: beside the warning's yellow it read as one more
+   warning on every meter, bar and key. Its meters, bars and charts are in the text's light (admin.css). */
 body[data-section="ranking"] { --accent: #c491ff; --accent-ink: #1b0a34; }
 body[data-section="songs"] { --accent: #6fd6ff; --accent-ink: #04202e; }
 body[data-section="live"] { --accent: #ff5f72; --accent-ink: #2b0409; }
-body[data-section="admin"] { --accent: #dfe5eb; --accent-ink: #11151a; }
+body[data-section="admin"] { --accent: #6fd6ff; --accent-ink: #04202e; }
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }

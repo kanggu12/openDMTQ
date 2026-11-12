@@ -1,6 +1,10 @@
 /* The console: the public site's look and controls (style.css), plus what only these pages have: the page row, messages,
    the log view, the status tiles and the lists' tighter rows. */
 
+/* What a meter, a bar or a chart draws an amount with: the text's light, no colour of its own. A state's colour only where
+   it shows one (a meter nearly full in red), and the console's cyan only for keys, links and what is picked. */
+body[data-section="admin"] { --mark: #bfc8d2; }
+
 /* One row of pages on the bar; it scrolls sideways where it does not fit. Every page in the page's language. */
 .nav.pages { overflow-x: auto; scrollbar-width: none; }
 .nav.pages::-webkit-scrollbar { display: none; }
@@ -46,7 +50,7 @@
 
 /* Build output and the request log. Long lines wrap at spaces first, and only a long piece without any (a path, a user
    agent) breaks where it must. */
-.log { background: #0b0e12; color: #cfe8c8; padding: 12px; margin: 14px 0 0; max-height: 460px; overflow: auto; font: var(--t-xs)/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; border-top: 2px solid var(--accent); }
+.log { background: #0b0e12; color: #cfe8c8; padding: 12px; margin: 14px 0 0; max-height: 460px; overflow: auto; font: var(--t-xs)/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; border-top: 2px solid var(--mark); }
 .log.done { border-top-color: var(--ok); }
 .log.failed { border-top-color: var(--bad); }
 /* The request log: one block per request with a faint rule between, so a request that wraps over several lines on a
@@ -105,7 +109,7 @@ tr.dim td:not(.actions) { opacity: 0.6; }
 
 /* Recordings: the disk against the limit. */
 .rec-meter { height: 8px; margin: 8px 0 14px; background: var(--rail); }
-.rec-meter span { display: block; height: 100%; background: var(--accent); }
+.rec-meter span { display: block; height: 100%; background: var(--mark); }
 /* Some use, however little: a sliver that can be seen. */
 .rec-meter span.some { min-width: 3px; }
 /* The app on offer: its icon, then its name, file, figures and state, each on a line of its own. */
@@ -133,12 +137,12 @@ td.song-plays { width: 11em; }
 .plays-cell { display: grid; min-width: 8em; }
 .song-plays .plays-n { font: 700 var(--t-lg)/1 var(--display); font-variant-numeric: tabular-nums; color: #fff; }
 .song-plays .plays-bar { display: block; height: 4px; margin: 5px 0 4px; background: var(--rail); }
-.song-plays .plays-bar i { display: block; height: 100%; background: var(--accent); }
+.song-plays .plays-bar i { display: block; height: 100%; background: var(--mark); }
 .song-plays .plays-none { color: var(--ash); }
 /* The daily backups kept, as their seven places: the date and size in a filled one, the empty ones the rail's colour. */
 .bak-slots { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; max-width: 760px; margin: 14px 0 0; padding: 0; list-style: none; }
 .bak-slots li { display: grid; align-content: center; gap: 2px; min-height: 46px; padding: 6px 8px; background: var(--rail); outline: none; }
-.bak-slots li.full { background: color-mix(in srgb, var(--accent) 22%, var(--rail)); box-shadow: inset 0 -3px 0 var(--accent); }
+.bak-slots li.full { background: color-mix(in srgb, var(--mark) 22%, var(--rail)); box-shadow: inset 0 -3px 0 var(--mark); }
 .bak-slots li:focus-visible { box-shadow: 0 0 0 2px #fff; }
 .bak-slots b { font: 700 var(--t-md)/1 var(--display); font-variant-numeric: tabular-nums; color: #fff; }
 .bak-slots span { font-size: var(--t-2xs); color: var(--chalk); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -212,7 +216,7 @@ a.stat:hover { filter: brightness(1.16); }
 :lang(ko) .tiles .num { font-size: 27px; font-family: var(--display), var(--text-face); }
 .tile-sub { color: var(--ash); font-size: var(--t-xs); line-height: 1.35; overflow-wrap: anywhere; }
 .tile-meter { display: block; height: 5px; margin: 3px 0 2px; background: #0e1216; }
-.tile-meter span { display: block; height: 100%; background: var(--accent); }
+.tile-meter span { display: block; height: 100%; background: var(--mark); }
 .tile-meter.over span { background: var(--bad); }
 main.wrap { gap: 14px; }
 @media (max-width: 860px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -363,10 +367,10 @@ table.players tbody tr:nth-last-child(-n+2):not(:first-child):not(:nth-child(2))
 .res-chart { display: flex; flex-direction: column; min-width: 0; }
 .res-chart h3, .resources > h3 { margin: 0 0 8px; font-size: var(--t-sm); color: var(--chalk); }
 .res-chart .chart { grid-template-rows: minmax(110px, 1fr) auto; }
-.chart-svg .area { fill: color-mix(in srgb, var(--accent) 16%, transparent); }
-.chart-svg .line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
+.chart-svg .area { fill: color-mix(in srgb, var(--mark) 16%, transparent); }
+.chart-svg .line { fill: none; stroke: var(--mark); stroke-width: 2; stroke-linejoin: round; }
 .meter { position: relative; display: block; height: 6px; background: var(--rail); }
-.meter i { position: absolute; inset: 0 auto 0 0; min-width: 2px; background: var(--accent); }
+.meter i { position: absolute; inset: 0 auto 0 0; min-width: 2px; background: var(--mark); }
 .meter.high i { background: var(--bad); }
 .strip { display: grid; grid-template-columns: repeat(var(--cells), minmax(0, 1fr)); gap: 2px; }
 .strip i { display: block; height: 22px; background: var(--rail); }
@@ -380,11 +384,11 @@ table.players tbody tr:nth-last-child(-n+2):not(:first-child):not(:nth-child(2))
 /* A player's last fourteen days, one cell a day, on one scale for the whole list. */
 .daycells { display: inline-grid; grid-template-columns: repeat(14, 8px); gap: 2px; vertical-align: middle; }
 .daycells i { display: block; height: 16px; background: var(--rail); }
-.daycells i.c1 { background: color-mix(in srgb, var(--accent) 24%, var(--rail)); }
-.daycells i.c2 { background: color-mix(in srgb, var(--accent) 45%, var(--rail)); }
-.daycells i.c3 { background: color-mix(in srgb, var(--accent) 68%, var(--rail)); }
-.daycells i.c4 { background: color-mix(in srgb, var(--accent) 85%, var(--rail)); }
-.daycells i.c5 { background: var(--accent); }
+.daycells i.c1 { background: color-mix(in srgb, var(--mark) 24%, var(--rail)); }
+.daycells i.c2 { background: color-mix(in srgb, var(--mark) 45%, var(--rail)); }
+.daycells i.c3 { background: color-mix(in srgb, var(--mark) 68%, var(--rail)); }
+.daycells i.c4 { background: color-mix(in srgb, var(--mark) 85%, var(--rail)); }
+.daycells i.c5 { background: var(--mark); }
 .three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .three > * { min-width: 0; }
 @media (max-width: 860px) { .three { grid-template-columns: minmax(0, 1fr); } }
@@ -408,7 +412,7 @@ table.players tbody tr:nth-last-child(-n+2):not(:first-child):not(:nth-child(2))
 .chart-svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; overflow: visible; }
 .chart-svg .grid { stroke: rgba(255, 255, 255, 0.08); stroke-width: 1; }
 .chart-svg .floor { stroke: rgba(255, 255, 255, 0.22); stroke-width: 1; }
-.chart-svg .bar { fill: var(--accent); }
+.chart-svg .bar { fill: var(--mark); }
 .chart-svg .bar-quiet { fill: #5d6875; }
 .chart-svg .bar-bad { fill: var(--bad); }
 .chart-svg .hit { fill: transparent; cursor: default; outline: none; }
@@ -420,11 +424,11 @@ table.players tbody tr:nth-last-child(-n+2):not(:first-child):not(:nth-child(2))
 .heat-hour { text-align: left; font-variant-numeric: tabular-nums; }
 .heat-day { align-self: center; }
 .heat i { display: block; height: 18px; background: var(--rail); }
-.heat i.c1 { background: color-mix(in srgb, var(--accent) 24%, var(--rail)); }
-.heat i.c2 { background: color-mix(in srgb, var(--accent) 45%, var(--rail)); }
-.heat i.c3 { background: color-mix(in srgb, var(--accent) 68%, var(--rail)); }
-.heat i.c4 { background: color-mix(in srgb, var(--accent) 85%, var(--rail)); }
-.heat i.c5 { background: var(--accent); }
+.heat i.c1 { background: color-mix(in srgb, var(--mark) 24%, var(--rail)); }
+.heat i.c2 { background: color-mix(in srgb, var(--mark) 45%, var(--rail)); }
+.heat i.c3 { background: color-mix(in srgb, var(--mark) 68%, var(--rail)); }
+.heat i.c4 { background: color-mix(in srgb, var(--mark) 85%, var(--rail)); }
+.heat i.c5 { background: var(--mark); }
 .heat i:hover { box-shadow: 0 0 0 1px #fff; }
 @media (max-width: 520px) { .heat { gap: 2px; } .heat i { height: 15px; } }
 /* The hours' numbers run on over the empty columns next to them, in one line. */
@@ -432,11 +436,11 @@ table.players tbody tr:nth-last-child(-n+2):not(:first-child):not(:nth-child(2))
 .heat-key { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 8px; font-size: var(--t-xs); color: var(--ash); }
 .heat-steps { display: flex; gap: 2px; }
 .heat-steps span, .heat-steps .k0 { width: 13px; height: 13px; background: var(--rail); }
-.heat-steps .k1 { background: color-mix(in srgb, var(--accent) 24%, var(--rail)); }
-.heat-steps .k2 { background: color-mix(in srgb, var(--accent) 45%, var(--rail)); }
-.heat-steps .k3 { background: color-mix(in srgb, var(--accent) 68%, var(--rail)); }
-.heat-steps .k4 { background: color-mix(in srgb, var(--accent) 85%, var(--rail)); }
-.heat-steps .k5 { background: var(--accent); }
+.heat-steps .k1 { background: color-mix(in srgb, var(--mark) 24%, var(--rail)); }
+.heat-steps .k2 { background: color-mix(in srgb, var(--mark) 45%, var(--rail)); }
+.heat-steps .k3 { background: color-mix(in srgb, var(--mark) 68%, var(--rail)); }
+.heat-steps .k4 { background: color-mix(in srgb, var(--mark) 85%, var(--rail)); }
+.heat-steps .k5 { background: var(--mark); }
 
 /* One whole in parts: tall blocks with their share, a legend naming them. */
 .segbar { display: flex; gap: 2px; height: 28px; margin-bottom: 10px; }
@@ -458,14 +462,14 @@ table.players tbody tr:nth-last-child(-n+2):not(:first-child):not(:nth-child(2))
 .ranked-name a { color: var(--chalk); text-decoration: none; }
 .ranked-name a:hover { color: var(--accent); }
 .ranked b { font: 700 var(--t-lg)/1.2 var(--display); font-variant-numeric: tabular-nums; }
-.ranked i { grid-column: 1 / -1; display: block; height: 4px; background: var(--accent); }
+.ranked i { grid-column: 1 / -1; display: block; height: 4px; background: var(--mark); }
 
 /* The small line in a tile or a list's row. */
 .spark { display: inline-block; flex: none; width: 84px; height: 24px; vertical-align: middle; overflow: visible; }
-.spark polyline { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+.spark polyline { fill: none; stroke: var(--mark); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
 .spark line { stroke: var(--seam); stroke-width: 1; }
-.spark circle { fill: var(--accent); }
-.spark-area { fill: color-mix(in srgb, var(--accent) 12%, transparent); stroke: none; }
+.spark circle { fill: var(--mark); }
+.spark-area { fill: color-mix(in srgb, var(--mark) 12%, transparent); stroke: none; }
 .tile-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 /* A tile on a phone is too narrow for the line and its words side by side. */
 @media (max-width: 520px) { .tile-row { flex-direction: column; align-items: flex-start; gap: 2px; } }
