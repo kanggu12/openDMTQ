@@ -16,7 +16,7 @@ on. The server's owner runs it and makes your account.
 | | Minimum | Recommended |
 | :--- | :--- | :--- |
 | **Phones** | Android 5.0 | Android 8 or newer to broadcast |
-| **PCs** | The PC client: 64-bit Windows 10 or 11 on an x64 processor (Intel or AMD), a graphics card with Direct3D 11, 1 GB of free memory, 390 MB of disk | A touch screen, for several fingers at once |
+| **PCs** | The PC client: 64-bit Windows 10 or 11, or Linux with Wine 11, on an x64 processor (Intel or AMD); a graphics card with Direct3D 11, 1 GB of free memory, 390 MB of disk | A touch screen, to play with your fingers; the keyboard plays without one |
 
 - **Android phones and tablets** play, the newer ones without 32-bit support too (Pixel 7 and later, Galaxy S24 and
   later, Galaxy Tab S10 and later, Galaxy Z Fold6 and Flip6 and later, and others with a Snapdragon 8 Gen 3, Exynos

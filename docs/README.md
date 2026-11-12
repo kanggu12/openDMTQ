@@ -15,7 +15,7 @@ quick start for each way to run a server, and [Questions and answers](faq.md) co
 | Guide | For |
 | :--- | :--- |
 | [Playing on a server](play.md) | Players: the app from the server's site on an Android phone or tablet, signing in, updates, broadcasting, which devices, what to tell the server's owner |
-| [The PC client](windows-player.md) | Playing on a Windows PC: the installer from the site, the launcher, the controls and the bar over the game, the picture and the sound settings, broadcasting, what it needs and keeps |
+| [The PC client](windows-player.md) | Playing on a Windows PC, or on Linux under Wine: the installer from the site, the launcher, keyboard play and the other controls, the bar over the game, the picture and the sound settings, broadcasting, what it needs and keeps |
 | [Troubleshooting for players](troubleshooting.md#for-players) | What a phone or a PC can check when the site, the app or the game does not work |
 
 <a id="running-a-server"></a>
