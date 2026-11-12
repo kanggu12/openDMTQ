@@ -183,11 +183,15 @@ then restart.
 | **Server** | 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker; 2 GB of memory | 2 cores, 4 GB |
 | **Disk** | 1 GB without the songs | 7 GB with every song |
 | **Phones** | Android 5.0 | Android 8 or newer to broadcast |
-| **PCs** | 64-bit Windows 10 or 11 on an x64 processor, Direct3D 11, 390 MB of disk | A touch screen |
+| **PCs** | 64-bit Windows 10 or 11 on an x64 processor, a graphics card with Direct3D 11, 1 GB of free memory, 390 MB of disk | A touch screen |
 
 At rest the server takes about 170 MB of memory, and up to 1.6 GB for half a minute while it builds the app. The client
 data takes about 120 MB and the song data 4.5 GB; each app build about 110 MB, the last ten kept. Broadcast recordings
 take up to 20 GB more.
+
+The PC client's game takes about 1 GB of memory and 190 to 450 MB on the graphics card. Measured on a Ryzen 9 9950X with
+an RTX 4090 that stayed at its idle clock (225 to 590 MHz), at 240 frames a second from 1920x1080 to 3840x2160: a frame
+took the graphics card 0.2 to 1.0 ms (the most at 3840x2160 with CMAA 2) and the game's main thread 1.5 to 3.4 ms.
 
 Tested on Windows Server 2022 and Wine, Debian 12, Ubuntu 24.04, Docker on Linux and a three-node Kubernetes cluster,
 with a Galaxy S26 Ultra (Android 17, no 32-bit support) and the Android 11 emulator.

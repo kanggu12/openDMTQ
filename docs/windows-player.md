@@ -244,7 +244,9 @@ title says so alone), and says where it can be watched.
 
 ### What it needs, and what it keeps
 
-- **What it needs:** 64-bit Windows 10 or 11 on an x64 PC (Intel or AMD), and a graphics card with Direct3D 11. About
+- **What it needs:** 64-bit Windows 10 or 11 on an x64 PC (Intel or AMD), a graphics card with Direct3D 11 and about
+  1 GB of free memory for the game, which takes 190 to 450 MB on the graphics card (measured costs:
+  [what it runs on](install.md#what-it-runs-on)). About
   390 MB of disk to start: the program about 125 MB with the package **Repair** takes its files from, each server's app
   about 110 MB, the app's libraries about 40 MB, and
   the game's data 111 MB after a first start and one song, more with each song it downloads. The installer itself is
