@@ -15,8 +15,8 @@ Admin pages, ID {{ .Values.admin.user | default "admin" }}; the password:
   https://{{ .Values.publicHost }}{{ if not (contains ":" .Values.publicHost) }}:80{{ end }}/opendmtq/admin/
 {{- else if eq (include "opendmtq.adminOnPublicPort" .) "yes" }}
   http://{{ .Values.publicHost }}/opendmtq/admin/
-  This is plain HTTP: the password crosses the network in clear. router.tls.secretName adds HTTPS;
-  admin.onPublicPort=no keeps the pages off the router; the way below always works.
+  Plain HTTP through the router; router.tls.secretName adds HTTPS, admin.onPublicPort=no keeps the pages off the
+  router, and the way below works either way.
 {{- else }}
   Not through the router (admin.onPublicPort; router.tls.secretName adds HTTPS).
 {{- end }}

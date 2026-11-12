@@ -494,7 +494,8 @@ def cmd_host(args):
     if env.is_wsl() and new_port != port:
         open_firewall(new_port, internet=False, replaces=port)
     if moved:
-        print("\nInstall the new APK over the old one (do not uninstall first: the device may get a new account).")
+        # What happens to the phones: the new app goes over theirs, which keeps each device's account.
+        print("\nPhones install the new app over the old one, which keeps each device's account.")
 
 
 def cmd_name(args):
@@ -514,7 +515,8 @@ def cmd_name(args):
     if system.container_state() == "running":
         restart_server()
     cmd_apk(args)
-    print("\nInstall the new APK over the old one (do not uninstall first: the device may get a new account).")
+    # What happens to the phones: the new app goes over theirs, which keeps each device's account.
+    print("\nPhones install the new app over the old one, which keeps each device's account.")
 
 
 def cmd_check(args):
@@ -672,7 +674,7 @@ def cmd_expose(args):
                   "With chained routers, add the rule on each one (docs/internet.md).")
         print("\nCheck from outside: ./opendmtq doctor")
     if built:
-        print("Phones install the new app over the old one (do not uninstall it).")
+        print("Phones install the new app over the old one, which keeps each device's account.")
 
 
 def cmd_runtime(args):
@@ -845,17 +847,21 @@ def cmd_setup(args):
     if failures:
         die(f"{failures} check(s) failed above")
 
-    where = "same Wi-Fi" if env.is_lan_only(host) else "anywhere"
+    lan = env.is_lan_only(host)
+    where = "same Wi-Fi" if lan else "anywhere"
+    # Only a server set up for the internet sends the browser to HTTPS, and only there does the browser ask about the
+    # server's own certificate: what it shows then, said where it applies.
+    https = "" if lan else (f"\n     The page opens on HTTPS with the server's own certificate, which browsers warn about once (a phone "
+                            f"that installs http://{host}/ca.crt does not).")
     print(f"""
 Done. The site and the app download open to accounts you make: on the admin pages, under Accounts, make one for
 each player. The admin pages: {admin_sign_in(env.load(ENV_FILE))}
 
 On the phone ({where}):
-  1. Open  http://{host}/  in the browser, or scan the code below, and sign in.
+  1. Open  http://{host}/  in the browser, or scan the code below, and sign in.{https}
   2. Tap "Download app (.apk)" and install it (allow installs from the browser when asked).
      Other servers' apps and the original game can stay installed next to it.
-     Later updates install over this one: do not uninstall it first, the device may get a new account.
-     Over the internet the page opens on HTTPS with the server's own certificate: the browser warns, go on past it.
+     Later updates install over this one, which keeps the device's account.
   3. Start the game.
 """)
     system.tool("qr", f"http://{host}/")
