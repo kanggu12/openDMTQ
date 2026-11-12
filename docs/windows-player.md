@@ -98,9 +98,9 @@ it keeps are refused. `--set` takes the settings of the **Screen** and **Sound**
   raised, sunk while held): **minimise** and **full screen** (or back to a window) as secondary buttons, quiet metal
   with a lighter plate under the pointer, and the **X** that quits as the main button, in the launcher's lime from the
   start so that it is seen at once. A button acts only when let go where it was pressed. Minimise holds the game still,
-  and the taskbar brings it back. The broadcast notice and an FPS counter in a top corner move down with the bar's
-  foot and back up with it. It is tall enough to cover the game's own X at the top right of its song and music screens
-  whole.
+  and the taskbar brings it back with the bar up (nothing of what was over the game comes back that is not wanted there
+  then). The broadcast notice and an FPS counter in a top corner move down with the bar's foot and back up with it. It
+  is tall enough to cover the game's own X at the top right of its song and music screens whole.
 - **The handle**: the game's green line along its top edge at the centre, with a small tab of glass hanging from it in
   the lean of the game's own tabs and a chevron pointing down in the tab, says that the bar comes down from here; with
   the pointer on it the line and the chevron turn lime and the tab grows deeper. The pointer resting on it, or just

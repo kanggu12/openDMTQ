@@ -1593,6 +1593,16 @@ void hide(Shown& s) {
     s.cut = 0;
 }
 
+// Whether a message is Windows showing a piece's window again by itself, for a piece the overlay does not have up: such
+// a showing is refused (its window procedure answers it without passing it on). Windows hides an owner's pop-ups itself
+// when the owner is minimised, and when it comes back it shows again those it hid (WM_SHOWWINDOW with SW_PARENTOPENING,
+// which DefWindowProc acts on). A piece put away meanwhile (the bar, the counter and the handle as the game is minimised,
+// a notice whose time ran out) was already hidden then, so its own SW_HIDE changed nothing and Windows still meant to show
+// it: its last picture came back over the game while the overlay held it gone, and the bar's chips let clicks through to
+// the game's own X under them. Wine hides nothing at a minimise, so only Windows itself showed it. A piece that is up
+// comes back as Windows brings it; one that is not stays hidden until the overlay shows it.
+bool system_reshow(const Shown& s, UINT msg, WPARAM w, LPARAM l) { return msg == WM_SHOWWINDOW && w && l == SW_PARENTOPENING && !s.up; }
+
 // Whether the piece's picture may go on the screen: one is there, with the frame behind it, or the render thread cannot
 // read the frame here, or the piece has waited for one long enough.
 bool ready(const Shown& s) {
@@ -2011,6 +2021,8 @@ void rest_cancel() {
 int bar_chip_at(LPARAM l) { return chip_at(static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l)) + g_bar.cut); }
 
 LRESULT CALLBACK bar_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
+    // Gone up while the window was minimised: Windows does not bring its last picture back over the game.
+    if (system_reshow(g_bar, msg, w, l)) return 0;
     switch (msg) {
     case WM_TIMER:
         if (w == kBarTimer) bar_frame();
@@ -2249,6 +2261,8 @@ void answer(bool quit) {
 }
 
 LRESULT CALLBACK ask_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
+    // As every piece: only a card still asked comes back with the window.
+    if (system_reshow(g_ask, msg, w, l)) return 0;
     const int x = static_cast<short>(LOWORD(l)), y = static_cast<short>(HIWORD(l));
     switch (msg) {
     case WM_MOUSEMOVE: {
@@ -2396,6 +2410,8 @@ void fps_look_now() {
 }
 
 LRESULT CALLBACK fps_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
+    // Hidden while the game was held for the minimise: Windows does not bring back its old numbers.
+    if (system_reshow(g_fps, msg, w, l)) return 0;
     if (msg == WM_TIMER && w == kFpsTimer) {
         fps_look_now();
         return 0;
@@ -2505,6 +2521,8 @@ void notice_frame() {
 }
 
 LRESULT CALLBACK notice_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
+    // Faded while the window was minimised: Windows does not bring it back.
+    if (system_reshow(g_notice, msg, w, l)) return 0;
     if (msg == WM_TIMER && w == kNoticeTimer) {
         notice_frame();
         return 0;
@@ -2609,6 +2627,8 @@ void handle_update() {
 }
 
 LRESULT CALLBACK handle_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
+    // Hidden while the game was held for the minimise: Windows does not bring it back before the overlay does.
+    if (system_reshow(g_handle, msg, w, l)) return 0;
     // Clicks go through it to the game; the game's window hears the pointer resting on it.
     if (msg == WM_NCHITTEST) return HTTRANSPARENT;
     // Lit: whether the pointer is still on it.

@@ -8,8 +8,9 @@
 #      game's picture first shows, and back up, by steps; the handle at the game's top centre (the pointer resting on it
 #      brings the bar, a click on its place reaches the game, the game's window keeps the keyboard); the bar at its top
 #      edge switching to a window and back; in the window, no buttons of its own, and the bar's minimise (the game held
-#      still) and the taskbar's restore (the game going on, no bar by itself); the bar's X asking (the game held still),
-#      Keep playing, then the X and Quit the game, the launcher back
+#      still) and the taskbar's restore (the game going on, no bar by itself), then a minimise with the bar down and a
+#      restore as Windows makes them, the window's pop-ups hidden and shown again (the bar stays gone); the bar's X
+#      asking (the game held still), Keep playing, then the X and Quit the game, the launcher back
 #   5. Repair from the command line: a file of the player and one of the launcher put back as they were installed
 #   6. Clear game data: the id alone stays; the FPS counter switched on from the command line (the launcher's window
 #      closed for it, then opened again), and the game starts again with the same id and gets to its menu, the counter
@@ -289,6 +290,23 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
     sleep 3.5; snap restored
     [ \"\$(said_count 'player: the bar comes down')\" = \"\$downs\" ] || { snap bar-after-restore; echo 'FAIL: the bar came down by itself after the restore'; exit 1; }
     echo 'back from the taskbar: the game went on, and the bar did not come by itself'
+    # Windows hides the pop-ups a window owns when the window is minimised and shows them again when it is back,
+    # whatever the program did with them meanwhile; Wine does neither, so taskbar.c does both, around a minimise and a
+    # restore made as the taskbar makes them. Minimised with the bar down, the bar goes up; back, its last picture must
+    # not be over the game (the overlay holds it gone: a click on its X there would reach the game's own X).
+    mins=\$(said_count 'player: minimised'); backs=\$(said_count 'player: back from minimised'); ups=\$(bar_ups)
+    bar_chip 2; downs=\$(said_count 'player: the bar comes down')
+    [ \"\$(wine /out/taskbar.exe shown OpenDMTQBar 2>/dev/null | tr -d '\\r')\" = shown ] || { snap bar-not-down; echo 'FAIL: the bar did not come down at the top edge'; exit 1; }
+    wine /out/taskbar.exe minimise >/dev/null 2>&1
+    wait_for 10 '[ \"\$(said_count \"player: minimised\")\" -gt \"\$mins\" ]' || { snap not-minimised-2; echo \"FAIL: the taskbar's minimise did not minimise the window\"; exit 1; }
+    wait_for 10 '[ \"\$(bar_ups)\" -gt \"\$ups\" ]' || { echo 'FAIL: minimised with the bar down, the bar did not go up'; exit 1; }
+    xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 1
+    wine /out/taskbar.exe restore >/dev/null 2>&1
+    wait_for 10 '[ \"\$(said_count \"player: back from minimised\")\" -gt \"\$backs\" ]' || { snap not-restored-2; echo \"FAIL: the taskbar's restore did not bring the window back\"; exit 1; }
+    sleep 1; snap restored-bar-gone
+    [ \"\$(wine /out/taskbar.exe shown OpenDMTQBar 2>/dev/null | tr -d '\\r')\" = hidden ] || { echo \"FAIL: back from minimised, the bar's last picture was over the game again (Windows showed the window's pop-ups again)\"; exit 1; }
+    [ \"\$(said_count 'player: the bar comes down')\" = \"\$downs\" ] || { echo 'FAIL: the bar came down by itself after the restore'; exit 1; }
+    echo 'minimised with the bar down and back, its pop-ups hidden and shown again as Windows does: the bar stayed gone'
   done
   # The X asks first, and the game holds still while it asks.
   bar_chip 0; snap bar-quit
