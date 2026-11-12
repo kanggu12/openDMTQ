@@ -975,12 +975,6 @@ void make_passes(const Gl& g, Passes& p, EGLContext context) {
     }
     arm32::log("player: picture: the passes' programs made in %lld ms on the render thread",
                static_cast<long long>((now_ns() - began) / 1000000));
-    // What draws the game, once per context: on Windows ANGLE names the graphics card and Direct3D under it, so that a
-    // log shows the game on the computer's fast GPU (an integrated one, or Microsoft's software renderer, would show here).
-    auto get_string = reinterpret_cast<const GLubyte* (*)(GLenum)>(arm32::gl_proc("glGetString"));
-    const auto* renderer = get_string ? reinterpret_cast<const char*>(get_string(GL_RENDERER)) : nullptr;
-    const auto* version = get_string ? reinterpret_cast<const char*>(get_string(GL_VERSION)) : nullptr;
-    arm32::log("player: picture: drawn by %s, %s", renderer ? renderer : "an unnamed renderer", version ? version : "no version");
 }
 
 // A full-screen draw of `program` into `fbo` (0: the window's own) of `w` x `h`.

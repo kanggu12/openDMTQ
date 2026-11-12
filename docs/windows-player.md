@@ -288,8 +288,9 @@ carries it, and the launcher trusts it for that server alone, beside Windows' ow
 The player runs the game's own 32-bit Android code, as the app does on phones that cannot run 32-bit apps: the
 [arm32 runtime](../arm32/README.md) translates the game's ARM code (Dynarmic), and a small layer gives it Linux's system
 calls on Windows. In place of Android's Java side, the player has its own stand-in for the classes the game calls. The
-game draws with OpenGL ES, which ANGLE runs on Direct3D 11, on the fast GPU of a computer with two (as most gaming
-laptops have; the log names the GPU that draws it); its sound goes out through WASAPI, and its videos are
+game draws with OpenGL ES, which ANGLE runs on Direct3D 11; on a computer with two GPUs (most gaming laptops) the
+player asks NVIDIA's and AMD's drivers for the fast one, and its log names the GPU that draws the game at its first
+frame. Its sound goes out through WASAPI, and its videos are
 decoded by Media Foundation. Its requests to the server go out as a phone's do, asking for the server's answers
 compressed, which makes its lists of songs and scores many times smaller on the way. The bar, its handle, the question
 before quitting, the notice, the FPS counter and the pointer are drawn by the player over the game's window, each a

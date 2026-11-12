@@ -191,7 +191,16 @@ void live_frame(EGLDisplay display, EGLSurface surface) {
     g_shown_ns.store(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(),
                      std::memory_order_relaxed);
     std::uint64_t n = g_shown.fetch_add(1, std::memory_order_release) + 1;
-    if (n == 1) log("player: the game's first frame");
+    if (n == 1) {
+        log("player: the game's first frame");
+        // What draws it, with the game's context current as at every swap: on Windows ANGLE names the graphics card and
+        // the Direct3D under it, so that a log shows the game on the computer's fast GPU (an integrated one, or
+        // Microsoft's software renderer, would be named here). At the first frame, whatever the picture's settings.
+        auto get_string = reinterpret_cast<const GLubyte* (*)(GLenum)>(arm32::gl_proc("glGetString"));
+        const auto* renderer = get_string ? reinterpret_cast<const char*>(get_string(GL_RENDERER)) : nullptr;
+        const auto* version = get_string ? reinterpret_cast<const char*>(get_string(GL_VERSION)) : nullptr;
+        log("player: drawn by %s, %s", renderer ? renderer : "an unnamed renderer", version ? version : "no version");
+    }
     if (g_stats) present_stats(display, surface);
     // What the glass's reads cost this thread, every five seconds while any glass was up.
     if (g_stats) glass_stats();
