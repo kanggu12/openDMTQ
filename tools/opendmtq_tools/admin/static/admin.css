@@ -2,7 +2,7 @@
    the log view, the status tiles and the lists' tighter rows. */
 
 /* What a meter, a bar or a chart draws an amount with: the text's light, no colour of its own. A state's colour only where
-   it shows one (a meter nearly full in red), and the console's cyan only for keys, links and what is picked. */
+   it shows one (a meter nearly full in red), and the console's amber only for keys, links and what is picked. */
 body[data-section="admin"] { --mark: #bfc8d2; }
 
 /* One row of pages on the bar; it scrolls sideways where it does not fit. Every page in the page's language. */
