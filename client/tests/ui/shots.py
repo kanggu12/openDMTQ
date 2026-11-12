@@ -333,6 +333,37 @@ def slab_check(root, slab, picture, name, problems):
         problems.append("%s: PLAY's slab sits in a frame of another colour than its bar's: %r" % (name, others))
 
 
+def play_fits(app, name, tag, problems):
+    """The PLAY page in the state on show, at its top, at the window's own size and larger: every button and link of it
+    in view without scrolling (at 1180x760 in English, Check again and Open the game log once went half under the
+    bottom bar after a game that closed by itself). At the smallest window, 960x640, the Last game card begins at the
+    bar with the page's cards as they are, so the page scrolls for its button there."""
+    import tkinter as tk
+    area = app.body
+    c = area.canvas
+    area.to_top()
+    app.root.update()
+    # The window's height in logical pixels, as it is now (a check before may have made it the smallest).
+    if app.root.winfo_height() / app.ui.scale < 700:
+        return
+    top, bottom = c.winfo_rooty(), c.winfo_rooty() + c.winfo_height()
+    actions = 0
+    for widget in widgets_of(area.inner):
+        if not widget.winfo_ismapped():
+            continue
+        # A button, or words that do something (a link: the pointer's hand over it, widgets.link).
+        if not (isinstance(widget, widgets.Button) or
+                (isinstance(widget, tk.Label) and str(widget.cget("cursor")) == "hand2")):
+            continue
+        actions += 1
+        if widget.winfo_rooty() < top or widget.winfo_rooty() + widget.winfo_height() > bottom:
+            words = getattr(widget, "words", None) or widget.cget("text")
+            problems.append("%s: %r is out of view until the page scrolls" % (name, words))
+    if not actions:
+        # The check looked at something: PLAY has Check again at least.
+        problems.append("%s: no button on the PLAY page to look at" % name)
+
+
 def wheel_check(app, problems):
     """The wheel over a drop-down scrolls the page and leaves the setting as it was (Tk's own drop-down bindings would
     step its value and say it was chosen)."""
@@ -439,6 +470,7 @@ def pages_check(app, out, tag, problems):
         measure(app, name, problems)
         if page == "play":
             slab_check(app.root, app.play_button, seen, name, problems)
+            play_fits(app, name, tag, problems)
         if page == "screen":
             # After its shot: the wheel scrolls the page (the header turns into the dark bar).
             wheel_check(app, problems)
@@ -682,6 +714,8 @@ def variants_check(app, site, out, tag, problems):
         settle(app)
         shot(app.root, out, "%s_%s-signed-out" % (tag, page))
         measure(app, "%s_%s-signed-out" % (tag, page), problems)
+        if page == "play":
+            play_fits(app, "%s_play-signed-out" % tag, tag, problems)
     # A game that closed by itself.
     app.state.last_session = {"seconds": 754, "exit_code": 3221225477, "crashed": True}
     app.set_status(w("status.crashed"), "bad", action=(w("status.open_log"), app.open_player_log))
@@ -689,6 +723,29 @@ def variants_check(app, site, out, tag, problems):
     settle(app)
     shot(app.root, out, tag + "_play-crashed")
     measure(app, tag + "_play-crashed", problems)
+    play_fits(app, tag + "_play-crashed", tag, problems)
+    # The same with the sign-in that still holds, as most players find the page after such a game: the server's name,
+    # its address and the line of its account, Sign in gone; then a game that could not start at all.
+    from opendmtq_client import actions as acts
+    acts.sign_in(app.state, stub.ACCOUNT, stub.PASSWORD)
+    app.state.save()
+    app.go("play")
+    settle(app)
+    shot(app.root, out, tag + "_play-crashed-signed-in")
+    measure(app, tag + "_play-crashed-signed-in", problems)
+    play_fits(app, tag + "_play-crashed-signed-in", tag, problems)
+    app.state.last_session = {"seconds": 2, "exit_code": 1, "failed_start": True}
+    app.set_status(w("status.failed_start"), "bad", action=(w("status.open_log"), app.open_player_log))
+    app.go("play")
+    settle(app)
+    shot(app.root, out, tag + "_play-failed-start")
+    measure(app, tag + "_play-failed-start", problems)
+    play_fits(app, tag + "_play-failed-start", tag, problems)
+    # Signed out again, and the game that closed by itself, for what follows (an installer's server, a server without a
+    # name of its own).
+    app.state.forget_sign_in()
+    app.state.last_session = {"seconds": 754, "exit_code": 3221225477, "crashed": True}
+    app.state.save()
     # A server an installer leaves while the window is open: the window takes it within a few seconds and says so.
     from opendmtq_client import preset
     before = app.state.current
@@ -698,6 +755,7 @@ def variants_check(app, site, out, tag, problems):
     settle(app)
     shot(app.root, out, tag + "_play-preset")
     measure(app, tag + "_play-preset", problems)
+    play_fits(app, tag + "_play-preset", tag, problems)
     if app.state.server("http://192.0.2.20:8790") is None or w("status.preset", name="Club") != app.status_text:
         problems.append("%s: the window did not take the installer's server (%r)" % (tag, app.status_text))
     # The same server again (an installer from the site of the server in use, "Open OpenDMTQ"): taken, and as nothing
@@ -742,6 +800,7 @@ def unnamed_check(app, out, tag, problems):
             if page == "play":
                 shot(app.root, out, "%s_play-unnamed" % tag)
                 measure(app, "%s_play-unnamed" % tag, problems)
+                play_fits(app, "%s_play-unnamed" % tag, tag, problems)
     finally:
         server["name"] = name
         app.state.save()

@@ -129,18 +129,15 @@ def build_play(app, parent):
     ui, w = app.ui, app.words
     _server_card(app, parent)
     left, right = _columns(parent, ui)
-    # Left: the ready check, filled in when the worker thread finishes it, as tall as the column so that the row's
-    # cards end on one line; Check again stands at its foot, so the room the column gives it lies between the rows and
-    # their button instead of under everything.
+    # Left: the ready check, filled in when the worker thread finishes it, as tall as its rows. Check again stands at its
+    # title's right end, as on Help: stretched to the right column's height, the card left its button at its foot under
+    # room it did not use, and under the bottom bar at the window's own size (client/tests/ui/shots.py, play_fits).
     ready = widgets.Card(left, ui, w("play.ready"))
-    ready.pack(fill="both", expand=True)
-    foot = tk.Frame(ready.body, bg=theme.PANEL)
-    foot.pack(side="bottom", fill="x", pady=(ui.px(16), 0))
-    widgets.Button(foot, ui, w("help.recheck"), lambda: app.refresh_checks(force=True)).pack(anchor="w")
+    ready.pack(fill="x", anchor="n")
+    widgets.Button(ready.head, ui, w("help.recheck"), lambda: app.refresh_checks(force=True)).pack(side="right")
     app.check_box = tk.Frame(ready.body, bg=theme.PANEL)
     app.check_box.pack(fill="x")
-    # Right: how to play, and how the last game went, the last as tall as what is left of the column (when the ready
-    # check is the taller), its button at its foot.
+    # Right: how to play, and how the last game went, the last as tall as what is left of the column.
     how = _card(right, ui, w("play.how"))
     for i, key in enumerate(("play.how.1", "play.how.2", "play.how.3")):
         if i:
@@ -150,9 +147,9 @@ def build_play(app, parent):
     last.pack(fill="both", expand=True)
     record = app.state.last_session or {}
     if record.get("crashed") or record.get("failed_start"):
-        # The reason is in the player's log: one press away from where it says the game stopped.
-        widgets.Button(last.body, ui, w("status.open_log"), app.open_player_log).pack(side="bottom", anchor="w",
-                                                                                      pady=(ui.px(12), 0))
+        # The reason is in the player's log: one press away, on the card's own line at its title's right end (as Help
+        # has Check again), never at a foot that the bottom bar can cover.
+        widgets.Button(last.head, ui, w("status.open_log"), app.open_player_log).pack(side="right")
     widgets.label(last.body, ui, _last_session(app), fg=theme.MUTED, wrap_margin=0).pack(fill="x")
     # Made again each time the page shows: a sign-in can have ended, or an app come, since the last one. Until it
     # comes back, the box says it is being made.
