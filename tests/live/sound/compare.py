@@ -18,8 +18,9 @@ STEP = 240
 SILENT = 30
 # A block this much alike is the same sound: decoding differences are far smaller, and any real fault far larger.
 SAME = 0.97
-# The last moments of the capture hold the browser closing, not the playback.
-TAIL = RATE
+# The last moments of the capture hold the browser closing, not the playback: on a busy machine the close took longer than
+# a second, and the silence after it was read as a hole in the playback.
+TAIL = 3 * RATE
 
 
 def load(path):
