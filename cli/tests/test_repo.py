@@ -465,6 +465,38 @@ class HostVersionTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             self.assertEqual(self.version(d), "")
 
+    def test_a_copy_without_git_shows_the_release_it_names(self):
+        # A release's source archive, GitHub's Download ZIP, the copy carried to a closed network: no .git, and the pages
+        # show the release its chart names, as host/get.sh writes it to a release's VERSION. The same with git missing.
+        from opendmtq_cli import system
+
+        def no_checkout(cmd, *args, **kwargs):
+            # git as it answers outside a checkout.
+            return subprocess.CompletedProcess(cmd, 128, "", "fatal: not a git repository\n")
+
+        def no_git(cmd, *args, **kwargs):
+            # No git on the PATH at all.
+            raise FileNotFoundError(cmd[0])
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, "deploy", "helm", "opendmtq"))
+            with open(os.path.join(d, "deploy", "helm", "opendmtq", "Chart.yaml"), "w", encoding="utf-8") as f:
+                f.write('apiVersion: v2\nversion: 0.9.6\nappVersion: "0.9.6"\n')
+            for answer in (no_checkout, no_git):
+                with self.subTest(answer.__name__), mock.patch.object(system, "ROOT", d), \
+                        mock.patch.object(system.subprocess, "run", answer):
+                    self.assertEqual(system.code_version(), "0.9.6")
+                # The host install's own, for the same files.
+                with self.subTest("host " + answer.__name__), mock.patch.object(self.folders.subprocess, "run", answer):
+                    self.assertEqual(self.version(d), "0.9.6")
+            # And what compose passes to the containers, from which the pages read it.
+            with mock.patch.object(system, "ROOT", d), mock.patch.object(system, "ENV_FILE", os.path.join(d, ".env")), \
+                    mock.patch.object(system.subprocess, "run", no_checkout):
+                self.assertEqual(system.compose_env()["OPENDMTQ_VERSION"], "0.9.6")
+        # A copy that names no release either: none, as before.
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(system, "ROOT", d), \
+                mock.patch.object(system.subprocess, "run", no_checkout):
+            self.assertEqual(system.code_version(), "")
+
 
 class LineEndingTest(unittest.TestCase):
     def test_scripts_keep_lf_on_every_checkout(self):

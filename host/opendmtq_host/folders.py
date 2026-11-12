@@ -105,8 +105,9 @@ def tools_env(values, found):
 def version():
     """The version the pages show: a release's number from the VERSION file (the Windows bundle's, or the one the
     one-command install writes, "0.2.0"), else a clone's as with Docker (the command line's system.code_version()): the
-    release at its tag ("0.9.3"), past it the release and the commit ("0.9.3-16e0b56"). The pages put a v before the first
-    part and keep what follows the first dash for the pointer, so this is never git describe's "v0.2.0-3-g655895c"."""
+    release at its tag ("0.9.3"), past it the release and the commit ("0.9.3-16e0b56"); a copy with no git, the release
+    alone, as Docker shows it too. The pages put a v before the first part and keep what follows the first dash for the
+    pointer, so this is never git describe's "v0.2.0-3-g655895c"."""
     try:
         with open(os.path.join(APP, "VERSION"), encoding="utf-8") as f:
             return f.read().strip()
@@ -120,9 +121,6 @@ def version():
         except (OSError, subprocess.SubprocessError):
             return ""
         return r.stdout.strip() if r.returncode == 0 else ""
-    commit = git_says("rev-parse", "--short=7", "HEAD")
-    if not commit:
-        return ""
     # The release the tree names: its Helm chart's appVersion, which each release sets.
     release = ""
     try:
@@ -130,6 +128,10 @@ def version():
             release = next((line.split(":", 1)[1].strip().strip('"') for line in f if line.startswith("appVersion:")), "")
     except OSError:
         pass
+    commit = git_says("rev-parse", "--short=7", "HEAD")
+    # No commit to name (no .git, or no git to ask): the release alone, or none for a tree that names none.
+    if not commit:
+        return release
     # A tree from before its chart named the release: the date and commit of its code.
     if not release:
         return git_says("log", "-1", "--format=%cd-%h", "--date=format:%Y.%m.%d")

@@ -127,7 +127,8 @@ def code_version():
     """This copy's version as the pages show it, the same for the same code however it was installed (the host install's
     folders.version(), the Windows bundle's build.sh): the release at its tag ("0.9.3"), past it the release and the
     commit ("0.9.3-16e0b56"), which the pages show as v0.9.3 with the commit under the pointer. The release is the one the
-    tree names (release_of()). Empty when it is no git checkout (a download of the files): the pages then just show none."""
+    tree names (release_of()). A copy with no git (a release's source archive, GitHub's Download ZIP, the one carried to a
+    closed network) is the release it names, as host/get.sh writes it to a release's VERSION; '' when it names none."""
     def git_says(*args):
         # One line from git, or '' when it fails or this is no checkout.
         try:
@@ -137,7 +138,8 @@ def code_version():
         return r.stdout.strip() if r.returncode == 0 else ""
     commit = git_says("rev-parse", "--short=7", "HEAD")
     if not commit:
-        return ""
+        # No commit to name (no .git, or no git to ask): the release alone, which the tree's chart names.
+        return release_of(ROOT)
     release = release_of(ROOT)
     # A tree from before its chart named the release: the date and commit of its code, as such trees always said.
     if not release:
