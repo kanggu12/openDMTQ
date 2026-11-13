@@ -480,7 +480,7 @@ def parse(argv):
                    help="change a PC setting: " + ", ".join(choices.NAMES) + " (show_fps=on|off; fps_position=top_left|"
                         "top_right|bottom_left|bottom_right, the counter's corner, bottom_right unless chosen; "
                         "keyboard=on|off, keyboard play; keys_2line=\"F J\", keys_3line=\"D F J\", keys_4line=\"D F J K\": "
-                        "the lanes from the top apart by spaces, a lane's keys one or two joined by /, each named as "
+                        "the lanes from the top separated by spaces, a lane's keys one or two joined by /, each named as "
                         "the US layout's key at its place)")
     p.add_argument("--audio-devices", action="store_true", help="list the sound devices the player can play on")
     p.add_argument("--language", choices=st.LANGUAGES + ("system",),

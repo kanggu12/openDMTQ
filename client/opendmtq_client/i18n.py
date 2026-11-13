@@ -215,10 +215,14 @@ TEXT = {
     "controls.keys.wait.delete": ("Delete takes it away.", "Delete를 누르면 이 키를 뺍니다."),
     "controls.keys.wait.second": ("Press a second key for lane {lane} of {mode}. Esc adds none.",
                                   "{mode} {lane}번 줄에 더할 두 번째 키를 누르세요. Esc를 누르면 더하지 않습니다."),
-    "controls.keys.cannot": ("{keyname} cannot play a lane: letters, digits, Space and the punctuation keys can.",
-                             "{keyname} 키로는 줄을 칠 수 없습니다. 글자, 숫자, Space, 문장 부호 키로 칩니다."),
-    "controls.keys.cannot.any": ("This key cannot play a lane: letters, digits, Space and the punctuation keys can.",
-                                 "이 키로는 줄을 칠 수 없습니다. 글자, 숫자, Space, 문장 부호 키로 칩니다."),
+    "controls.keys.cannot": ("{keyname} cannot play a lane. Lanes take the letters, the digits above them, Space and "
+                             "the signs a US keyboard has around the letters.",
+                             "{keyname} 키로는 줄을 칠 수 없습니다. 줄에는 글자 키, 그 위의 숫자 키, Space, 미국 자판에서 "
+                             "글자 키 둘레에 있는 기호 키를 씁니다."),
+    "controls.keys.cannot.any": ("This key cannot play a lane. Lanes take the letters, the digits above them, Space and "
+                                 "the signs a US keyboard has around the letters.",
+                                 "이 키로는 줄을 칠 수 없습니다. 줄에는 글자 키, 그 위의 숫자 키, Space, 미국 자판에서 "
+                                 "글자 키 둘레에 있는 기호 키를 씁니다."),
     "controls.mouse": ("Mouse", "마우스"),
     "controls.click": ("Click: a tap, on a note or a button.", "클릭: 노트나 버튼을 터치합니다."),
     "controls.drag": ("Drag: a slide, and the song list moves with it.", "끌기: 슬라이드이며, 곡 목록도 따라 움직입니다."),
@@ -519,9 +523,9 @@ TEXT = {
     "fault.denied": ("Windows refused access to a file.", "Windows가 파일 접근을 거부했습니다."),
     "error.choice": ("{name} cannot be {value}", "{name}: 쓸 수 없는 값입니다({value})."),
     "error.no_setting": ("there is no setting {name}", "없는 설정입니다: {name}"),
-    "error.keys.lanes": ("{mode} has {n} lanes from the top, apart by spaces, each one key or two joined by /.",
-                         "{mode}에는 위에서부터 줄이 {n}개 있습니다. 줄은 띄어 쓰고, 줄마다 키 하나나 / 로 이은 키 둘을 씁니다."),
-    "error.keys.lane": ("Lane {lane} has one key, or two joined by /.", "{lane}번 줄에는 키 하나나 / 로 이은 키 둘을 씁니다."),
+    "error.keys.lanes": ("{mode} has {n} lanes from the top, separated by spaces, each one key or two joined by /.",
+                         "{mode}에는 위에서부터 줄이 {n}개 있습니다. 줄은 띄어 쓰고, 줄마다 키 하나나 /로 이은 키 둘을 씁니다."),
+    "error.keys.lane": ("Lane {lane} has one key, or two joined by /.", "{lane}번 줄에는 키 하나나 /로 이은 키 둘을 씁니다."),
     "error.keys.name": ("{keyname} is no key a lane takes: A to Z, 0 to 9, Space, Semicolon, Quote, Comma, Period, Slash, "
                         "LeftBracket, RightBracket, Backslash, Minus, Equals or Grave.",
                         "{keyname}: 줄에 쓸 수 없는 키입니다. A~Z, 0~9, Space, Semicolon, Quote, Comma, Period, Slash, "

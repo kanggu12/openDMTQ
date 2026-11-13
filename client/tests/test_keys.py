@@ -221,6 +221,8 @@ class Presses(unittest.TestCase):
         # nor a space.
         self.assertEqual(keys.beside("Semicolon", ";"), ";")
         self.assertEqual(keys.beside("Q", "a"), "A")
+        # A German layout's ß at the US Minus place: its capital is two letters (SS), so the character as it prints.
+        self.assertEqual(keys.beside("Minus", "ß"), "ß")
         self.assertIsNone(keys.beside("F", "f"))
         self.assertIsNone(keys.beside("Space", " "))
         self.assertIsNone(keys.beside("F", None))
@@ -230,8 +232,174 @@ class Presses(unittest.TestCase):
         # The keys a person reaches for first, named as their caps name them; another sign as it prints; else none.
         for keysym, char, said in (("Return", "\r", "Enter"), ("KP_Enter", "\r", "Enter"), ("Shift_L", "", "Shift"),
                                    ("Control_R", "", "Ctrl"), ("Alt_L", "", "Alt"), ("Up", "", "↑"), ("F5", "", "F5"),
-                                   ("KP_1", "1", "Num 1"), ("less", "<", "<"), ("Hangul", "", None)):
+                                   ("KP_1", "1", "Num 1"), ("less", "<", "<"), ("Hangul", "", None),
+                                   ("BackSpace", "\x08", "Backspace")):
             self.assertEqual(keys.label(press(0, keysym, char)), said, keysym)
+
+
+class Wording(unittest.TestCase):
+    def test_a_refusal_says_which_keys_a_lane_takes(self):
+        # Refused keys are among them no more: the numpad's digits are not the digits above the letters, and the ISO
+        # key left of Z or a Japanese keyboard's yen is no sign a US keyboard has around the letters.
+        for key in ("controls.keys.cannot", "controls.keys.cannot.any"):
+            en, ko = i18n.TEXT[key]
+            self.assertIn("the digits above them", en, key)
+            self.assertIn("a US keyboard has around the letters", en, key)
+            self.assertNotIn("punctuation keys can", en, key)
+            self.assertIn("그 위의 숫자 키", ko, key)
+            self.assertIn("미국 자판", ko, key)
+
+    def test_lanes_are_separated_by_spaces(self):
+        # One wording for the lanes' value wherever it is said: --help, the refusal of --set, the window's words.
+        import contextlib
+        import io
+        from opendmtq_client import main
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), self.assertRaises(SystemExit):
+            main.parse(["--help"])
+        # argparse breaks --help's lines wherever they fit: one line again before it is read.
+        parser_help = " ".join(out.getvalue().split())
+        for text in (parser_help, str(refused("keys_3line", "D F")), i18n.TEXT["error.keys.lanes"][0]):
+            self.assertIn("separated by spaces", text)
+            self.assertNotIn("apart by spaces", text)
+
+
+class Table(unittest.TestCase):
+    """The Controls page's table of lanes (pages.LaneKeys) with no window: its boxes, its line and the page's redraw
+    stood in for, the keys as a press hands them over on X11 (Linux's key numbers plus 8)."""
+
+    def setUp(self):
+        from opendmtq_client import pages
+        self.pages = pages
+        # The page drawn again in place after a key goes in: nothing to draw here.
+        self.redraw = mock.patch.object(pages, "redraw_in_place")
+        self.redraw.start()
+        # The launcher's state as the table reads it, and its changes kept to look at.
+        self.values = choices.normalize({"keys_3line": "D/E F J"})
+        app = types.SimpleNamespace(state=types.SimpleNamespace(values=self.values), key_prints={}, key_held=None,
+                                    changed=mock.Mock())
+        self.app = app
+        table = pages.LaneKeys.__new__(pages.LaneKeys)
+        table.app, table.w, table.waiting, table.typing = app, i18n.Words("en"), None, []
+        table.hint = "hint"
+        # The line under the table: what it says, last first.
+        self.said = []
+        table.line = types.SimpleNamespace(winfo_exists=lambda: True,
+                                           configure=lambda **kw: self.said.append(kw["text"]))
+        self.table = table
+
+    def tearDown(self):
+        self.redraw.stop()
+
+    def box(self, slot=0, key="D"):
+        """3 LINE's top lane's box `slot`, with `key` in it, in a window whose toplevel is window 0x101."""
+        box = types.SimpleNamespace(odq_where=("keys_3line", 0, slot), key=key, waiting=False)
+        box.focus_set = lambda: None
+        box.winfo_exists = lambda: True
+        box.set_waiting = lambda on: setattr(box, "waiting", on)
+        box.winfo_toplevel = lambda: types.SimpleNamespace(winfo_id=lambda: 0x101)
+        return box
+
+    def test_a_held_space_counts_once(self):
+        # Space makes the box wait; Windows repeats it while it is held, with no release: the repeats take nothing
+        # (they took Space at once, then waited and took again, over and over). After its release Space goes in.
+        box = self.box()
+        with mock.patch.object(keys.sys, "platform", "linux"):
+            self.assertEqual(self.table.pressed(box, press(65, "space", " ")), "break")
+            self.assertTrue(box.waiting)
+            for _ in range(5):
+                self.table.pressed(box, press(65, "space", " "))
+            self.app.changed.assert_not_called()
+            self.assertTrue(box.waiting)
+            self.table.released(press(65, "space"))
+            self.table.pressed(box, press(65, "space", " "))
+        self.app.changed.assert_called_once_with("keys_3line", "Space/E F J")
+
+    def test_a_held_enter_leaves_the_prompt(self):
+        # Enter makes the box wait; its repeats are not refused as a key no lane takes: the line still says what the
+        # box waits for.
+        box = self.box()
+        with mock.patch.object(keys.sys, "platform", "linux"):
+            self.table.pressed(box, press(36, "Return", "\r"))
+            prompt = self.said[-1]
+            for _ in range(3):
+                self.table.pressed(box, press(36, "Return", "\r"))
+        self.assertEqual(self.said[-1], prompt)
+        self.assertIn("Press a key for lane 1 of 3 LINE", prompt)
+
+    def test_a_key_that_went_in_is_not_taken_again_while_held(self):
+        # K pressed on a waiting box goes in; held, its repeats reach the page drawn again (the same box, by the
+        # keyboard): they are left out until K is let go.
+        box = self.box()
+        self.table.wait(box)
+        with mock.patch.object(keys.sys, "platform", "linux"):
+            self.table.pressed(box, press(45, "k", "k"))
+            self.assertEqual(self.app.key_held, 45)
+            self.table.wait(box)
+            self.table.pressed(box, press(45, "k", "k"))
+        self.app.changed.assert_called_once_with("keys_3line", "K/E F J")
+
+    def test_only_delete_takes_a_key_away(self):
+        # Backspace was never asked for: it is refused by its name as any key no lane takes, and the lane keeps both
+        # its keys. Delete takes the box's key away.
+        box = self.box(slot=1, key="E")
+        self.table.wait(box)
+        with mock.patch.object(keys.sys, "platform", "linux"):
+            self.table.pressed(box, press(22, "BackSpace", "\x08"))
+            self.app.changed.assert_not_called()
+            self.assertTrue(self.said[-1].startswith("Backspace cannot play a lane."))
+            self.table.pressed(box, press(119, "Delete"))
+        self.app.changed.assert_called_once_with("keys_3line", "D F J")
+
+    def test_the_input_method_is_off_on_the_window_that_gets_the_keys(self):
+        # On Windows Tk gives the keyboard to the toplevel: its input context is the one a waiting box takes away (a
+        # Korean input method in Hangul mode turned the keys into its own), and gives back when the wait ends, so that
+        # a text field types Korean again. Mocked imm32: the calls, by window.
+        calls = []
+        imm = types.SimpleNamespace(
+            ImmAssociateContext=lambda hwnd, himc: calls.append(("off", hwnd.value, himc)),
+            ImmAssociateContextEx=lambda hwnd, himc, flags: calls.append(("back", hwnd.value, flags)))
+        user32 = types.SimpleNamespace(GetFocus=lambda: 0x101)
+        with mock.patch.object(keys.sys, "platform", "win32"), mock.patch.object(keys, "_imm32", lambda: imm), \
+                mock.patch.object(keys, "_user32", lambda: user32):
+            box = self.box()
+            self.table.wait(box)
+            self.assertEqual(calls, [("off", 0x101, None)])
+            # Box to box: still one wait, the input method stays off.
+            self.table.wait(self.box(slot=1, key="E"))
+            self.assertEqual(len(calls), 1)
+            # Esc, Tab, a click elsewhere: the wait ends, the toplevel has its input method again.
+            self.table.stop()
+            self.assertEqual(calls[-1], ("back", 0x101, keys.IACE_DEFAULT))
+            # A key that went in ends it too, before the page is drawn again; and Reset keys.
+            self.table.wait(box)
+            self.table.change("keys_3line", lambda: (("Q", "E"), ("F",), ("J",)))
+            self.assertEqual(calls[-1], ("back", 0x101, keys.IACE_DEFAULT))
+            self.table.wait(box)
+            self.table.reset()
+            self.assertEqual(calls[-1], ("back", 0x101, keys.IACE_DEFAULT))
+        # Off and back the same number of times: nothing left off.
+        self.assertEqual(sum(1 for c in calls if c[0] == "off"), sum(1 for c in calls if c[0] == "back"))
+
+    def test_another_focused_window_goes_off_too(self):
+        # Where Windows says another window has the keyboard (Tk's frame around the toplevel), it goes off as well,
+        # each once, and both come back.
+        calls = []
+        imm = types.SimpleNamespace(
+            ImmAssociateContext=lambda hwnd, himc: calls.append(("off", hwnd.value)),
+            ImmAssociateContextEx=lambda hwnd, himc, flags: calls.append(("back", hwnd.value)))
+        user32 = types.SimpleNamespace(GetFocus=lambda: 0x202)
+        with mock.patch.object(keys.sys, "platform", "win32"), mock.patch.object(keys, "_imm32", lambda: imm), \
+                mock.patch.object(keys, "_user32", lambda: user32):
+            self.table.wait(self.box())
+            self.table.stop()
+        self.assertEqual(calls, [("off", 0x101), ("off", 0x202), ("back", 0x101), ("back", 0x202)])
+
+    def test_nothing_of_windows_elsewhere(self):
+        # Linux (the tests, a developer's PC): no input method to turn off, nothing asked.
+        with mock.patch.object(keys.sys, "platform", "linux"):
+            self.assertEqual(keys.typing_off(self.box()), [])
+            keys.typing_back([0x101])
 
 
 if __name__ == "__main__":

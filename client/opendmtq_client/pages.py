@@ -547,9 +547,11 @@ class LaneKeys:
 
     A click on a box (or Enter or Space on it) makes it wait for a key; the key pressed goes in by its place on the
     keyboard (keys.place_of), unless the mode plays it in another box, or no lane takes it: refused in words on the line
-    under the table, and the box waits on. Esc keeps what was there, Delete takes away a key the lane has a second of,
-    Tab goes on to the next control, a click on the waiting box stops the wait. A key taken is saved at once and the
-    page drawn again in place, the keyboard on the same box. Reset keys, at the card's title, puts the defaults back."""
+    under the table, and the box waits on. Esc keeps what was there, Delete removes one of a lane's two keys, Tab goes
+    on to the next control, a click on the waiting box stops the wait. A key taken is saved at once and the page drawn
+    again in place, the keyboard on the same box. Reset keys, at the card's title, puts the defaults back. While a box
+    waits, Windows' input method is off on the window that gets the keys (keys.typing_off), and a key held down counts
+    once: its repeats count from its release on."""
 
     # The room between two modes' columns, between a lane's two boxes, and above and under each lane (logical pixels).
     COLUMN_GAP, BOX_GAP, LANE_GAP = 24, 6, 3
@@ -560,12 +562,16 @@ class LaneKeys:
         values = app.state.values
         # The box that waits for a key, or None.
         self.waiting = None
+        # The windows whose input method is off while a box waits (keys.typing_off), given back when the wait ends.
+        self.typing = []
         # A plain button, as Check again is on the PLAY page: the screen's lime action stays PLAY's.
         self.reset_button = widgets.Button(card.head, ui, w("controls.keys.reset"), self.reset)
         self.reset_button.pack(side="right")
         widgets.divider(card.body, ui)
         table = tk.Frame(card.body, bg=theme.PANEL)
         table.pack(anchor="w")
+        # The page going (another page, a language, the window closing) ends a wait as well: the input method comes back.
+        table.bind("<Destroy>", lambda e: self.typing_back() if e.widget is table else None)
         # Each mode's name over its column, as the game's tabs name it, in the launcher's wide face for English names.
         for column, name in enumerate(choices.LANES, 1):
             tk.Label(table, text=choices.mode(name), font=ui.fonts.step, fg=theme.MUTED, bg=theme.PANEL).grid(
@@ -593,9 +599,9 @@ class LaneKeys:
                     box.odq_where = (name, lane, slot)
                     box.bind("<Button-1>", lambda e, b=box: self.clicked(b))
                     box.bind("<KeyPress>", lambda e, b=box: self.pressed(b, e))
+                    # A held key's release: its next press counts again (pressed() leaves its repeats out).
+                    box.bind("<KeyRelease>", self.released)
                     box.bind("<FocusOut>", lambda e, b=box: self.left(b))
-                    # The input method kept away: a key in Hangul mode still comes with its place.
-                    keys.no_typing(box)
         # What to do, said under the table; what a box waits for, or why a key was refused, said in its place. The
         # line about the grey prints only while a box shows one.
         self.hint = i18n.sentences(w("controls.keys.hint"), w("controls.keys.hint.print") if shown else "")
@@ -633,15 +639,29 @@ class LaneKeys:
             self.waiting.set_waiting(False)
         self.waiting = box
         box.focus_set()
+        if not self.typing:
+            # The input method off on the window that gets the keys, once for the whole wait (box to box included).
+            self.typing = keys.typing_off(box)
         box.set_waiting(True)
         self.say(self.prompt(box), theme.TEXT)
+
+    def typing_back(self):
+        """The input method back on the windows a wait took it from: the wait is over."""
+        windows, self.typing = self.typing, []
+        keys.typing_back(windows)
 
     def stop(self):
         """No box waits any more: the line says what to do again."""
         box, self.waiting = self.waiting, None
+        self.typing_back()
         if box is not None and box.winfo_exists():
             box.set_waiting(False)
         self.say(self.hint, theme.MUTED)
+
+    def released(self, event):
+        """A key let go: the key held down since it started a wait or went in counts again at its next press."""
+        if event.keycode == self.app.key_held:
+            self.app.key_held = None
 
     def clicked(self, box):
         """A click: the box waits for a key, or a waiting box stops."""
@@ -657,10 +677,18 @@ class LaneKeys:
 
     def pressed(self, box, event):
         """A key pressed on a box: Enter or Space makes a box wait, as a button is pressed; on a waiting box, the key
-        for it. "break" for a key the box took, so that nothing else of the window acts on it."""
+        for it. "break" for a key the box took, so that nothing else of the window acts on it. A key held down counts
+        once: Windows repeats its press with no release, and its repeats would take it, or refuse it, at once."""
+        if event.keycode == self.app.key_held:
+            # The repeat of the key that started the wait or just went in: left out until it is let go.
+            return "break"
+        # Another key pressed: whatever was held is over, even when its release went to another window.
+        self.app.key_held = None
         if self.waiting is not box:
             if event.keysym in ("Return", "KP_Enter", "space"):
                 self.wait(box)
+                # Held, its repeats would take Space, or refuse Enter, in the box it just made wait.
+                self.app.key_held = event.keycode
                 return "break"
             # Tab and the rest go their way.
             return None
@@ -673,7 +701,8 @@ class LaneKeys:
             return "break"
         name, lane, slot = box.odq_where
         lanes = choices.lanes_of(name, self.app.state.values[name])
-        if event.keysym in ("BackSpace", "Delete"):
+        if event.keysym == "Delete":
+            # Delete alone takes a key away (Backspace is refused by its name, as any key no lane takes).
             if box.key is None:
                 # The empty box has nothing to take away: it stops waiting.
                 self.stop()
@@ -689,30 +718,37 @@ class LaneKeys:
         if event.char:
             # What this PC's layout printed there, for the box to show where Windows cannot be asked (keys.printed).
             self.app.key_prints[key] = event.char
-        self.change(name, lambda: choices.with_key(name, lanes, lane, slot, key), took=(lane, slot, key))
+        if self.change(name, lambda: choices.with_key(name, lanes, lane, slot, key), took=(lane, slot, key)):
+            # In: held down, its repeats would make the same box wait and take it again, over and over.
+            self.app.key_held = event.keycode
         return "break"
 
     def change(self, name, make, took=None):
         """The lanes `make()` gives saved, and the page drawn again in place with the keyboard on the same box; when it
         refuses (a key another lane plays, a lane's only key), its words on the line, the box still waiting. `took` is
-        (lane, box, key) for a key pressed, said in the log once it is in."""
+        (lane, box, key) for a key pressed, said in the log once it is in. True once the change is saved."""
         try:
             lanes = make()
         except choices.ChoiceError as e:
             self.say(self.w.error(e), theme.WARN)
-            return
+            return False
         if took is not None:
             # The key by its place and what this PC prints there: what a player chose, as the window showed it.
             lane, slot, key = took
             log.info("keyboard play: %s lane %d box %d took %s (%r on this keyboard)", choices.mode(name), lane + 1,
                      slot + 1, key, keys.printed(key, self.app.key_prints))
         self.waiting = None
+        # The wait is over: the input method back before the page is drawn again.
+        self.typing_back()
         self.app.changed(name, choices.lanes_text(lanes))
         redraw_in_place(self.app, "controls")
+        return True
 
     def reset(self):
         """Reset keys: each mode's default keys back, saved; the page drawn again in place."""
         self.waiting = None
+        # A box that waited stops with the page: the input method back.
+        self.typing_back()
         for name in choices.LANES:
             if self.app.state.values[name] != choices.DEFAULTS[name]:
                 self.app.changed(name, choices.DEFAULTS[name])

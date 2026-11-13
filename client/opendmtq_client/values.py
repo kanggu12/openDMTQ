@@ -176,12 +176,13 @@ def lanes_of(name, value):
     them ((("D", "E"), ("F",), ("J",))). ChoiceError when it is not the mode's lanes (as many as the mode has, each
     one key or two joined by /), names a key no lane takes, or has a key twice."""
     text = str(value)
-    # Lanes apart by spaces, any number of them (a hand-made line), none at either end.
+    # Lanes separated by spaces, any number of them (a hand-made line), none at either end.
     parts = text.split()
     count = LANES[name]
     if len(parts) != count:
-        raise ChoiceError("%s cannot be %r: it is %d lanes from the top, apart by spaces, each one key or two joined by /"
-                          % (name, text, count), "error.keys.lanes", name=name, value=text, mode=mode(name), n=count)
+        raise ChoiceError("%s cannot be %r: it is %d lanes from the top, separated by spaces, each one key or two "
+                          "joined by /" % (name, text, count), "error.keys.lanes", name=name, value=text, mode=mode(name),
+                          n=count)
     lanes, seen = [], {}
     for number, part in enumerate(parts, 1):
         found = part.split("/")

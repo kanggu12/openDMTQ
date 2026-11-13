@@ -65,6 +65,8 @@ class LauncherApp:
         self.devices = None             # the sound devices the player lists (None: not asked yet)
         self.key_prints = {}            # what Tk said each place pressed on the Controls page prints, by its key's name
         #                                 (keys.printed: the boxes show it in grey where Windows' layout cannot be asked)
+        self.key_held = None            # the key code of a key held down on the Controls page since it started a wait or
+        #                                 went in: its repeats are left out until it is let go (pages.LaneKeys.pressed)
         self.download = None            # the app's download under way: {"done", "total", "cancel"}
         self.download_bar = None        # the page's progress bar for it, while one is on show
         self.download_error = None      # (i18n.Said, tone): how the last download ended badly (the page shows it)

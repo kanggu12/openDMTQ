@@ -203,6 +203,13 @@ class Wording(unittest.TestCase):
 
 
 class KoreanParticles(unittest.TestCase):
+    def test_a_particle_after_a_sign_a_letter_or_a_digit_is_attached(self):
+        # "/로 이은", "PLAY를", "2 LINE에서", "{name}에서": a particle goes against what it follows, with no space, as
+        # Korean writes it after Latin letters, digits and signs ("/ 로" read as a stray word).
+        particle = re.compile(r"[/A-Za-z0-9}] (로|으로|를|을|와|과|에서|에게|에|은|는|이|가)(?=[ .,)]|$)")
+        for key, (_en, ko) in i18n.TEXT.items():
+            self.assertIsNone(particle.search(ko), key)
+
     def test_no_mechanical_particles(self):
         # "(으)로", "을(를)" and the like read as a form being filled in: the words are put so that none is needed.
         for key, (_en, ko) in i18n.TEXT.items():

@@ -25,8 +25,10 @@ WORDS = {
     "Super_R": "Windows", "Win_L": "Windows", "Win_R": "Windows", "Caps_Lock": "Caps Lock", "Num_Lock": "Num Lock",
     "Scroll_Lock": "Scroll Lock", "Insert": "Insert", "Home": "Home", "End": "End", "Prior": "Page Up",
     "Next": "Page Down", "Up": "↑", "Down": "↓", "Left": "←", "Right": "→", "Menu": "Menu",
-    "App": "Menu", "Pause": "Pause", "Print": "Print Screen",
+    "App": "Menu", "Pause": "Pause", "Print": "Print Screen", "BackSpace": "Backspace",
 }
+# ImmAssociateContextEx's flag that gives a window its own default input context back (typing_back).
+IACE_DEFAULT = 0x10
 
 
 def _user32():
@@ -97,7 +99,9 @@ def beside(name, print_):
     the name, a space, or a character that does not print."""
     if not print_ or len(print_) != 1 or not print_.isprintable() or print_.isspace():
         return None
-    shown = print_.upper()
+    capital = print_.upper()
+    # A capital of more than one character (ß's is SS) is no key's cap: the character as the layout prints it.
+    shown = capital if len(capital) == 1 else print_
     return None if shown == name.upper() else shown
 
 
@@ -121,19 +125,53 @@ def label(event):
     return None
 
 
-def no_typing(widget):
-    """Keep Windows' input method (the Korean, Japanese or Chinese one) away from `widget`: with it on, a key in Hangul
-    mode reaches the window as the input method's key (VK_PROCESSKEY), with no place to read from it. A box that waits
-    for a key never takes text. Nothing off Windows."""
+def _imm32():
+    """Windows' imm32, where a window's input context (the Korean, Japanese or Chinese input method) is set."""
+    import ctypes
+    return ctypes.windll.imm32
+
+
+def typing_off(widget):
+    """Turn Windows' input method off on the windows that get the keys while `widget` has Tk's focus, so that a key in
+    Hangul mode (or Hiragana) comes as itself, with its place, not as the input method's key (VK_PROCESSKEY, keycode 229,
+    no place to read). Tk gives the keyboard to the toplevel (its focus calls Windows' SetFocus on the toplevel's window,
+    never on the widget's own), so the toplevel's input context is the one to take away; the window Windows says has
+    the keyboard is taken too when it is another. Returns the windows turned off, for typing_back; none off Windows."""
     if sys.platform != "win32":
+        return []
+    windows = []
+    try:
+        import ctypes
+        imm, user32 = _imm32(), _user32()
+        # Each call's types: a window's handle and an input context's handle in, the old context's handle out.
+        imm.ImmAssociateContext.argtypes = (ctypes.c_void_p, ctypes.c_void_p)
+        imm.ImmAssociateContext.restype = ctypes.c_void_p
+        user32.GetFocus.restype = ctypes.c_void_p
+        # The toplevel Tk focuses, then the window with the keyboard now, if it is another (Tk's frame around it).
+        for hwnd in (widget.winfo_toplevel().winfo_id(), user32.GetFocus()):
+            if hwnd and hwnd not in windows:
+                # No input context: the keys reach the window as they are pressed.
+                imm.ImmAssociateContext(ctypes.c_void_p(hwnd), None)
+                windows.append(hwnd)
+    except (AttributeError, OSError):
+        # A Windows without input methods: the keys come as they are already.
+        pass
+    return windows
+
+
+def typing_back(windows):
+    """Give `windows` (typing_off's) their own input context back, so that a text field of the window (the Online
+    page's ID) types Korean again once no box waits. Nothing off Windows or for no windows."""
+    if sys.platform != "win32" or not windows:
         return
     try:
         import ctypes
-        imm = ctypes.windll.imm32
-        imm.ImmAssociateContext.argtypes, imm.ImmAssociateContext.restype = (ctypes.c_void_p, ctypes.c_void_p), \
-            ctypes.c_void_p
-        # No input context for the widget's own window, which has the keyboard while the box waits.
-        imm.ImmAssociateContext(ctypes.c_void_p(widget.winfo_id()), None)
+        imm = _imm32()
+        # A window's handle, no context of the caller's, and the flag that puts the window's default one back.
+        imm.ImmAssociateContextEx.argtypes = (ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint)
+        imm.ImmAssociateContextEx.restype = ctypes.c_int
+        for hwnd in windows:
+            imm.ImmAssociateContextEx(ctypes.c_void_p(hwnd), None, IACE_DEFAULT)
     except (AttributeError, OSError):
-        # A Windows without input methods: the keys come as they are.
+        # As typing_off: nothing was taken away there.
         pass
