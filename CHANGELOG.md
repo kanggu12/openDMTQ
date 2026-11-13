@@ -6,6 +6,64 @@ one of fixes, changes and smaller additions raises the patch number. Each releas
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-13
+
+### Added
+
+- Keyboard play in the PC client. While a song is played, each lane is a key, F J in 2 LINE, D F J in 3 LINE and
+  D F J K in 4 LINE from the top, read by the key's place on the keyboard, so that any layout plays the same places; a
+  lane can have two keys, to alternate on quick notes. Each press lands where the game judges the lane's next note, and
+  the game judges it as it judges a finger: taps and chain points a press each, holds and drags held (the press follows
+  a drag's curve), repeat notes a press for each point. The keys play only during a song, never while the game asks for
+  text, and let go when the window loses the keyboard or is minimised, the song pauses or the question before quitting
+  comes. A player that does not find the game's input where it expects it leaves keyboard play off and says why in its
+  log.
+- The launcher sets keyboard play on its Controls page: on or off, and the keys of each lane of 2, 3 and 4 LINE from
+  the top, with a second key for a lane if wanted. A key goes in by its place on the keyboard, named as the US layout's
+  key there, with what the PC's own layout prints there beside it; a key another lane of the same LINE plays, or one no
+  lane takes, is refused in words, and Reset keys puts the defaults back. `--set keyboard=` and `--set keys_2line=` to
+  `keys_4line=` do the same from the command line, and `--status` lists them.
+- A score played with the keyboard is marked. The player's save says so (`X-OpenDMTQ-Keys: 1`); the game server marks
+  the play and the best score it sets (a new best by touch clears the mark); the site shows a small keyboard before
+  such scores (a song's leaderboard, a player's plays and best records, the home page's newest records) and, with how
+  many, beside the totals on the rankings and the home page. The API says `keys` on every play and best it lists and
+  `keys_charts` beside every total; the admin pages' Status and Plays mark such scores, and the plays file has a keys
+  column. The rankings stay one for touch and keys, and the game's own replies do not change.
+- The PC client's guide says how it runs on Linux under Wine, as the tests run it for every release.
+- Checks: `PLAYER_KEYS` takes keys by their place on the keyboard, at a song's own time and from a file;
+  `PLAYER_TRACE_KEYS=1` logs keyboard play's presses and the game's judgment of a song's notes by type.
+
+### Changed
+
+- The launcher's first start: each step's title is its question ("Which server?", "Who plays?"), in Korean too, and
+  while Next waits, a line at the foot of the step says what for. The last step shows how to play, with the keys.
+- The launcher's PLAY page: How to play starts with keyboard play's keys, or that it is off, with a link to Controls;
+  a ready-check row's link is named after the page it opens, and what will change is a ring; the ready check is as tall
+  as its column again.
+- The launcher's words: in Korean a log is 로그 and play records stay 기록; outcomes are sentences; the game is open in
+  every message; the window an error ends in opens the log's folder; the dialogs over Repair and Delete all say what
+  comes of the work. The logo, the Launcher page and the command line show one version, the installed one.
+- The player for Windows: the bar waits while a lane key is down, as it does for a finger on the game.
+- The host install: `./opendmtq status` says the phone app waits for the game files before they are in, where it said
+  the app's build had failed.
+- The guides: the README opens with the players' site, then a quick start for playing and one for hosting, the
+  system's figure and the guides by reader, shorter; players have a guide of their own (a phone, a PC), and the install
+  guide, troubleshooting and the questions and answers have a part for players and one for server owners.
+- The player for Windows: the bar's X stands as far in from the bar's right end as the wordmark from its left, so that
+  the bar's two ends match.
+- The PC client's guide: its pictures of the game again, from a song played with the keyboard on Windows (4 LINE HARD,
+  ALL COMBO, 99.1 %), with the bar's new ends.
+
+### Fixed
+
+- The player for Windows: the FPS counter keeps to the game's own buttons in every shape of window. At 21:9 the
+  counter at the top left lay on a song's pause button; at 16:10 and 4:3 the counter at the bottom right was drawn
+  larger than the game's buttons beside it and covered more of the result's SELECT MUSIC (at 4:3, 49 % of it, now 29 %).
+- The launcher's window could open partly under the taskbar on a laptop at 150 % (1920x1080) or at 1366x768, with the
+  strip that holds PLAY under it: it opens inside the work area, its title bar counted.
+- `--set` with several items kept the ones before a refused one: every item is checked before any is applied.
+- The PC client's guide said Esc pauses a song: in a song it does nothing, and the game's pause button pauses.
+
 ## [0.9.6] - 2026-11-13
 
 ### Changed
@@ -715,7 +773,8 @@ one of fixes, changes and smaller additions raises the patch number. Each releas
 - Four ways to run it: the Windows bundle, one command on Linux or macOS, Docker Compose, and a Helm chart for
   Kubernetes.
 
-[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.9.6...HEAD
+[Unreleased]: https://github.com/kanggu12/openDMTQ/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/kanggu12/openDMTQ/compare/v0.9.6...v0.10.0
 [0.9.6]: https://github.com/kanggu12/openDMTQ/compare/v0.9.5...v0.9.6
 [0.9.5]: https://github.com/kanggu12/openDMTQ/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/kanggu12/openDMTQ/compare/v0.9.3...v0.9.4
