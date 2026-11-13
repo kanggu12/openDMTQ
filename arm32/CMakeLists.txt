@@ -160,7 +160,7 @@ if(NOT ANDROID)
   set(ARM32_GEN_DIR "" CACHE PATH "Folder with the generated bridge sources")
   add_executable(player desktop/main.cpp desktop/logd.cpp desktop/java_lang.cpp desktop/threads.cpp desktop/android_os.cpp desktop/unity.cpp
                  desktop/android_app.cpp desktop/audio.cpp desktop/mixer.cpp ${PLAYER_OUTPUT} desktop/media.cpp desktop/mp4.cpp desktop/decoder.cpp
-                 ${PLAYER_DECODER} desktop/sdk.cpp desktop/web.cpp desktop/http.cpp desktop/pmangplus.cpp desktop/input.cpp desktop/ndk.cpp ${PLAYER_WINDOW} desktop/frames.cpp
+                 ${PLAYER_DECODER} desktop/sdk.cpp desktop/web.cpp desktop/http.cpp desktop/pmangplus.cpp desktop/input.cpp desktop/keyplay.cpp desktop/ndk.cpp ${PLAYER_WINDOW} desktop/frames.cpp
                  desktop/own_folder.cpp desktop/settings.cpp desktop/live_desktop.cpp ${PLAYER_LIVE} desktop/glass_capture.cpp src/live_net.cpp src/live_ts.cpp src/live_sps.cpp
                  src/jni_bridge.cpp ${ARM32_JNI_ENTRY} src/android_bridge.cpp src/egl_bridge.cpp src/gl_special.cpp src/offscreen.cpp ${ARM32_GEN_DIR}/gl_thunks.cpp
                  desktop/post_pass.cpp desktop/cmaa2.cpp src/opensl_bridge.cpp src/pacing.cpp src/follow.cpp src/window_rate.cpp src/tweaks.cpp)

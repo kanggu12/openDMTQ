@@ -19,9 +19,14 @@
 // the UI thread takes each event as it comes. The keyboard types into the soft keyboard while the
 // game asks for text, through a text field of the window's that it focuses meanwhile (Windows' touch keyboard offers
 // itself there on a PC without a keyboard); otherwise its keys are the phone's, Escape the Back key (it pauses a song and
-// closes what is open). No key switches full screen or quits: full screen is the overlay's bar's button (or the
-// launcher's Screen page before a start), quitting the bar's X, which asks first; F11, Alt+Enter and Alt+F4 do nothing.
+// closes what is open). While a song is being played, the lane keys of keyboard play are its lanes' instead (keyplay.cpp),
+// by their places on the keyboard whatever the layout, and every one lets go when the window loses the keyboard, is
+// minimised, or the question before quitting comes. No key switches full screen or quits: full screen is the overlay's
+// bar's button (or the launcher's Screen page before a start), quitting the bar's X, which asks first; F11, Alt+Enter and
+// Alt+F4 do nothing.
 #include "player.h"
+
+#include "keyplay.h"
 
 #include "overlay_scale.h"
 #include "overlay_win32.h"
@@ -46,6 +51,8 @@
 #include <cwchar>
 #include <chrono>
 #include <cstdlib>
+#include <fstream>
+#include <iterator>
 #include <map>
 #include <set>
 #include <string>
@@ -129,6 +136,20 @@ UINT32 g_edge_finger = 0;
 // The touch screen's fingers and the pens on the game now, by their ids: with the mouse's button, whether anything is
 // down on the game, which the overlay hears of with each press and release (no bar from the top while one is).
 std::set<UINT32> g_contacts;
+// Whether anything is down on the game: the mouse's button, a finger or a pen, or a lane key of keyboard play. The
+// overlay's bar waits while it is (overlay::game_pressed).
+bool anything_down() { return g_pressed || !g_contacts.empty() || keyplay_any_down(); }
+// A key's place on the keyboard from its message: the scan code and the extended flag Windows gives with it (bits 16 to
+// 24), or, for a key that a program sent with none, the place where the keyboard layout has its virtual key.
+void key_place(WPARAM vk, LPARAM l, unsigned& scan, bool& extended) {
+    scan = static_cast<unsigned>((l >> 16) & 0xff);
+    extended = ((l >> 24) & 1) != 0;
+    if (scan) return;
+    // The extended keys come with Windows' E0 (or E1) before their scan code.
+    const UINT place = MapVirtualKeyW(static_cast<UINT>(vk), MAPVK_VK_TO_VSC_EX);
+    scan = place & 0xff;
+    extended = (place & 0xff00) == 0xe000 || (place & 0xff00) == 0xe100;
+}
 POINT g_edge_from{};
 // When it came down, for the tap's own time if it is one.
 std::int64_t g_edge_time = 0;
@@ -526,6 +547,8 @@ int phone_key(WPARAM vk, int& unicode) {
 
 // Every key still held, lifted: the window lost the keyboard, and would not see them go up.
 void lift_keys() {
+    // The lane keys of keyboard play too: a key held on another program's window plays no lane.
+    keyplay_let_go("the window lost the keyboard");
     for (auto& [vk, repeat] : g_keys_down) {
         int unicode = 0;
         if (int code = phone_key(vk, unicode)) key(code, false, 0, unicode);
@@ -672,11 +695,29 @@ void ime_cancel(HWND h) {
 // key at a time, \uXXXX for a character cmd's own set would not carry and \b for Backspace; ime=... the same, each
 // character composed and finished by the input method of the text field. Nothing goes through Windows' own input, and
 // the keys reach the window while the game is held still (the planned taps follow the game's frames, which stop then).
+// Keys by their place on the keyboard, as keyboard play takes them (keyboard_play.h's names, A to Z, 0 to 9, Space,
+// Semicolon and the rest, or a scan code as 0x21): key=NAME[/hold_ms] down then up, keydown=NAME and keyup=NAME only
+// the one, each posted with its scan code and the virtual key the keyboard layout has there, to the window with the
+// keyboard. Those can go at a song's own time too, "@song+seconds:key=F/120", the seconds of the song's clock as the
+// game judges its notes by, in each song played: keyboard play sends them at the first frame at or past their time
+// (without it, they go nowhere). A list too long for a command line comes from a file: PLAYER_KEYS=file:PATH, the same
+// items, one a line or separated by ';'.
 void plan_keys() {
     const char* list = std::getenv("PLAYER_KEYS");
     if (!list || !*list) return;
-    // What a press is: a key, a click, text, the window's close, or the overlay's bar as a finger brings it.
-    enum class Kind { key, click, text, ime, close, bar };
+    // The items, as given or from the file named.
+    std::string items = list;
+    if (items.rfind("file:", 0) == 0) {
+        std::ifstream in(utf8_path(items.substr(5)), std::ios::binary);
+        if (!in) {
+            jvm::log("player: PLAYER_KEYS: no file %s", items.c_str() + 5);
+            return;
+        }
+        items.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    // What a press is: a key, a click, text, the window's close, the overlay's bar as a finger brings it, or a key by its
+    // place (down and up, down only, up only).
+    enum class Kind { key, click, text, ime, close, bar, place, place_down, place_up };
     struct Press {
         double at;
         Kind kind;
@@ -686,11 +727,19 @@ void plan_keys() {
         std::string name;
         float x, y;
         std::wstring text;
+        unsigned scan;
     };
     std::vector<Press> presses;
-    for (const char* p = list; *p == '@';) {
+    // The keys at songs' times, for keyboard play to send.
+    std::vector<SongKey> song_keys;
+    for (const char* p = items.c_str();;) {
+        // Between items: their ';', and a file's line ends and spaces.
+        while (*p == ';' || *p == '\n' || *p == '\r' || *p == ' ' || *p == '\t') ++p;
+        if (*p != '@') break;
+        // At a song's time, or at seconds from the window's first showing.
+        const bool at_song = std::strncmp(p + 1, "song+", 5) == 0;
         char* end = nullptr;
-        const double at = std::strtod(p + 1, &end);
+        const double at = std::strtod(p + 1 + (at_song ? 5 : 0), &end);
         if (*end != ':') break;
         const char* name = end + 1;
         const char* stop = name;
@@ -698,27 +747,52 @@ void plan_keys() {
         const bool is_text = std::strncmp(name, "text=", 5) == 0 || std::strncmp(name, "ime=", 4) == 0;
         // ime= is text the input method composes: the same reading after its shorter name.
         const bool is_ime = std::strncmp(name, "ime=", 4) == 0;
-        while (*stop && *stop != ';' && (is_text || *stop != '/')) ++stop;
+        while (*stop && *stop != ';' && *stop != '\n' && *stop != '\r' && (is_text || *stop != '/')) ++stop;
         const std::string key(name, static_cast<std::size_t>(stop - name));
         int hold = 50;
         if (*stop == '/') hold = static_cast<int>(std::strtol(stop + 1, const_cast<char**>(&stop), 10));
+        // A key by its place: its name's scan code, or the scan code itself in hex.
+        const bool by_place = key.rfind("key=", 0) == 0 || key.rfind("keydown=", 0) == 0 || key.rfind("keyup=", 0) == 0;
+        if (by_place) {
+            const std::string place = key.substr(key.find('=') + 1);
+            unsigned scan = keys::scan_of(place);
+            if (!scan && place.rfind("0x", 0) == 0) scan = static_cast<unsigned>(std::strtoul(place.c_str() + 2, nullptr, 16)) & 0xff;
+            const Kind kind = key[3] == '=' ? Kind::place : key[3] == 'd' ? Kind::place_down : Kind::place_up;
+            if (!scan) {
+                jvm::log("player: PLAYER_KEYS: no key \"%s\"", key.c_str());
+            } else if (at_song) {
+                // At the song's time: down, and up after its hold, in the song's own clock.
+                if (kind != Kind::place_up) song_keys.push_back({at * 1000.0, scan, true});
+                if (kind != Kind::place_down) song_keys.push_back({at * 1000.0 + (kind == Kind::place ? hold : 0), scan, false});
+            } else {
+                presses.push_back({at, kind, 0, false, hold, key, 0, 0, {}, scan});
+            }
+            p = *stop == ';' ? stop + 1 : stop;
+            continue;
+        }
+        // Only keys by their place go at a song's time.
+        if (at_song) {
+            jvm::log("player: PLAYER_KEYS: \"%s\" cannot go at a song's time (only key=, keydown= and keyup= do)", key.c_str());
+            p = *stop == ';' ? stop + 1 : stop;
+            continue;
+        }
         // Each name's key and whether Alt is held with it. F11, Alt+Enter and Alt+F4 do nothing in the window: they stay
         // here so that a check can press them and see that nothing happens.
         static const std::map<std::string, std::pair<UINT, bool>> names = {
             {"esc", {VK_ESCAPE, false}}, {"enter", {VK_RETURN, false}}, {"space", {VK_SPACE, false}}, {"up", {VK_UP, false}},
             {"down", {VK_DOWN, false}}, {"f11", {VK_F11, false}}, {"alt+enter", {VK_RETURN, true}}, {"alt+f4", {VK_F4, true}}};
         if (auto it = names.find(key); it != names.end()) {
-            presses.push_back({at, Kind::key, it->second.first, it->second.second, hold, key, 0, 0, {}});
+            presses.push_back({at, Kind::key, it->second.first, it->second.second, hold, key, 0, 0, {}, 0});
         } else if (key == "close") {
             // The window's own close, as its X or the taskbar's Close sends it.
-            presses.push_back({at, Kind::close, 0, false, hold, key, 0, 0, {}});
+            presses.push_back({at, Kind::close, 0, false, hold, key, 0, 0, {}, 0});
         } else if (key == "bar") {
             // The overlay's bar, as a finger drawn down from the game's top edge brings it: down for its 4 s, then up.
-            presses.push_back({at, Kind::bar, 0, false, hold, key, 0, 0, {}});
+            presses.push_back({at, Kind::bar, 0, false, hold, key, 0, 0, {}, 0});
         } else if (key.rfind("click=", 0) == 0) {
             // x,y in the game's pixels, as PLAYER_TAPS takes them.
             float x = 0, y = 0;
-            if (std::sscanf(key.c_str() + 6, "%f,%f", &x, &y) == 2) presses.push_back({at, Kind::click, 0, false, hold, key, x, y, {}});
+            if (std::sscanf(key.c_str() + 6, "%f,%f", &x, &y) == 2) presses.push_back({at, Kind::click, 0, false, hold, key, x, y, {}, 0});
             else jvm::log("player: PLAYER_KEYS: no click in \"%s\"", key.c_str());
         } else if (is_text) {
             // UTF-8 as given, with \uXXXX read as the character it names.
@@ -742,7 +816,7 @@ void plan_keys() {
             const int n = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, nullptr, 0);
             std::wstring wide(static_cast<std::size_t>(n > 0 ? n - 1 : 0), L'\0');
             if (n > 1) MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, wide.data(), n);
-            presses.push_back({at, is_ime ? Kind::ime : Kind::text, 0, false, hold, (is_ime ? "composed \"" : "text \"") + utf8 + "\"", 0, 0, wide});
+            presses.push_back({at, is_ime ? Kind::ime : Kind::text, 0, false, hold, (is_ime ? "composed \"" : "text \"") + utf8 + "\"", 0, 0, wide, 0});
         } else {
             // A name it does not know: said, and the rest still read.
             jvm::log("player: PLAYER_KEYS: no key \"%s\"", key.c_str());
@@ -750,6 +824,12 @@ void plan_keys() {
         p = *stop == ';' ? stop + 1 : stop;
     }
     std::sort(presses.begin(), presses.end(), [](const Press& a, const Press& b) { return a.at < b.at; });
+    if (!song_keys.empty()) {
+        // Sent by keyboard play at each song's frames; with it off, nothing would send them.
+        if (settings().keyboard) jvm::log("player: PLAYER_KEYS: %zu key events at songs' times, for keyboard play to send", song_keys.size());
+        else jvm::log("player: PLAYER_KEYS: %zu key events at songs' times go nowhere: keyboard play is off", song_keys.size());
+        keyplay_song_keys(std::move(song_keys));
+    }
     std::thread([presses] {
         const auto start = std::chrono::steady_clock::now();
         for (const Press& k : presses) {
@@ -762,6 +842,14 @@ void plan_keys() {
                 PostMessageW(g_window, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM(cx, cy));
                 std::this_thread::sleep_for(std::chrono::milliseconds(k.hold));
                 PostMessageW(g_window, WM_LBUTTONUP, 0, MAKELPARAM(cx, cy));
+                continue;
+            }
+            if (k.kind == Kind::place || k.kind == Kind::place_down || k.kind == Kind::place_up) {
+                // A key by its place: down, then up after its hold, or only the one.
+                jvm::log("player: %.1f s: %s", k.at, k.name.c_str());
+                if (k.kind != Kind::place_up) keyplay_post_key(k.scan, true);
+                if (k.kind == Kind::place) std::this_thread::sleep_for(std::chrono::milliseconds(k.hold));
+                if (k.kind != Kind::place_down) keyplay_post_key(k.scan, false);
                 continue;
             }
             if (k.kind == Kind::close) {
@@ -941,6 +1029,8 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             // Said in the log, which the end-to-end test reads (the bar's minimise, the taskbar's restore).
             if (!g_minimised) jvm::log("player: minimised");
             g_minimised = true;
+            // The lane keys of keyboard play let go at once: a key held as the window goes plays no lane after.
+            keyplay_let_go("the window was minimised");
             overlay::minimised(true);
             return 0;
         }
@@ -1020,10 +1110,20 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         // Text while the game asks for it: printable characters only; the keys that end or edit it come as keys.
         if (typing() && w >= 0x20 && !overlay::asking()) typed(static_cast<wchar_t>(w));
         return 0;
-    case WM_SYSKEYUP:
+    case WM_SYSKEYUP: {
+        // A lane key coming up while Alt is held (it went down without): the lane lets go all the same, and the overlay
+        // hears whether anything is still down on the game.
+        unsigned scan = 0;
+        bool extended = false;
+        key_place(w, l, scan, extended);
+        if (keyplay_key(scan, extended, false, false)) {
+            overlay::game_pressed(anything_down());
+            return 0;
+        }
         // F10's coming up: no menu mode either.
         if (w == VK_F10) return 0;
         break;
+    }
     case WM_SYSKEYDOWN:
         // F10 alone would put the window in Windows' menu mode, which eats the next key (a note): nothing.
         if (w == VK_F10) return 0;
@@ -1049,6 +1149,19 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             else if (w == VK_DELETE) type_key(kKeyDelete);
             else if (moves_caret(w)) type_key(kKeyMove);
             return 0;
+        }
+        // A lane key while a song is being played (keyplay.cpp): by its place on the keyboard, the lane's and never the
+        // game's then (a press, its repeats while held, or a key held through a let go, which plays no more). A key that
+        // went down as the game's before the song stays the game's until it comes up.
+        if (!g_keys_down.count(w)) {
+            unsigned scan = 0;
+            bool extended = false;
+            key_place(w, l, scan, extended);
+            if (keyplay_key(scan, extended, true, (l & (1L << 30)) != 0)) {
+                // The game is being played: the overlay's bar waits, as for a finger on it.
+                overlay::game_pressed(anything_down());
+                return 0;
+            }
         }
         // Esc: the Back key when it comes up.
         if (w == VK_ESCAPE) {
@@ -1087,7 +1200,15 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             return 0;
         }
         auto it = g_keys_down.find(w);
-        if (it == g_keys_down.end()) return 0;
+        if (it == g_keys_down.end()) {
+            // Not the game's: a lane key coming up lets its lane go (keyplay.cpp), and the overlay hears whether
+            // anything is still down on the game.
+            unsigned scan = 0;
+            bool extended = false;
+            key_place(w, l, scan, extended);
+            if (keyplay_key(scan, extended, false, false)) overlay::game_pressed(anything_down());
+            return 0;
+        }
         g_keys_down.erase(it);
         int unicode = 0;
         if (int code = phone_key(w, unicode)) key(code, false, 0, unicode);
@@ -1139,7 +1260,8 @@ LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     case WM_LBUTTONUP:
         if (g_pressed) {
             g_pressed = false;
-            overlay::game_pressed(!g_contacts.empty());
+            // Still down: another finger, a pen, or a lane key of keyboard play.
+            overlay::game_pressed(anything_down());
             SetCursor(overlay::cursor(false));
             ReleaseCapture();
             if (trace_input()) jvm::log("player: input: the mouse's button up on the game at %d,%d", static_cast<short>(LOWORD(l)), static_cast<short>(HIWORD(l)));
@@ -1150,7 +1272,8 @@ LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         // The mouse taken away while pressed (another window, a system dialog): the finger lifts where it was last.
         if (g_pressed && reinterpret_cast<HWND>(l) != h) {
             g_pressed = false;
-            overlay::game_pressed(!g_contacts.empty());
+            // Still down: another finger, a pen, or a lane key of keyboard play.
+            overlay::game_pressed(anything_down());
             touch(3, 0, 0);
         }
         return 0;
@@ -1175,7 +1298,8 @@ LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
             overlay::game_pressed(true);
         } else if (msg == WM_POINTERUP) {
             g_contacts.erase(id);
-            overlay::game_pressed(g_pressed || !g_contacts.empty());
+            // Still down: the mouse's finger, another, or a lane key of keyboard play.
+            overlay::game_pressed(anything_down());
         }
         if (msg == WM_POINTERDOWN && g_edge_finger && id != g_edge_finger) {
             // Another finger while one waits at the edge: that one plays after all, from where and when it came down.
@@ -1205,7 +1329,7 @@ LRESULT CALLBACK game_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
     }
     case WM_POINTERCAPTURECHANGED:
         // The finger gone from the game either way.
-        if (g_contacts.erase(GET_POINTERID_WPARAM(w))) overlay::game_pressed(g_pressed || !g_contacts.empty());
+        if (g_contacts.erase(GET_POINTERID_WPARAM(w))) overlay::game_pressed(anything_down());
         if (GET_POINTERID_WPARAM(w) == g_edge_finger) {
             g_edge_finger = 0;
             return 0;
@@ -1246,6 +1370,26 @@ bool no_transitions(HWND h) {
 }
 
 }  // namespace
+
+void keyplay_post_key(unsigned scan, bool down) {
+    if (!g_frame) return;
+    // As Windows sends a key: the virtual key the keyboard layout has at that place, the scan code in bits 16 to 23, and
+    // coming up bits 30 and 31 too.
+    const UINT vk = MapVirtualKeyW(scan & 0xff, MAPVK_VSC_TO_VK);
+    LPARAM l = 1 | (static_cast<LPARAM>(scan & 0xff) << 16);
+    if (!down) l |= (1L << 30) | static_cast<LPARAM>(1UL << 31);
+    // To the window with the keyboard on the game's UI thread (the text field while the game asks for text), as a key
+    // typed goes; the frame when none of them has it (a window shown without the focus).
+    GUITHREADINFO gui{};
+    gui.cbSize = sizeof gui;
+    const HWND to = GetGUIThreadInfo(GetWindowThreadProcessId(g_frame, nullptr), &gui) && gui.hwndFocus ? gui.hwndFocus : g_frame;
+    PostMessageW(to, down ? WM_KEYDOWN : WM_KEYUP, vk, l);
+}
+
+void keyplay_released() {
+    // On the UI thread, after a let go: the overlay's bar waits only while something is still down on the game.
+    if (g_frame) overlay::game_pressed(anything_down());
+}
 
 bool window_unlisted() {
     // Read once: the player's environment does not change while it runs, and only "1" turns it on.
@@ -1351,7 +1495,11 @@ bool open_window(const std::string& title) {
         pause_game(held);
         // The broadcast holds too: what viewers see stops with the game, and starts again with it.
         arm32::desktop_live_paused(held);
+        // And keyboard play: no lane key plays while the game is held, and what was held lets go.
+        keyplay_hold(held);
     };
+    // The question before quitting coming: the lane keys let go at once, before the game is held for it.
+    hooks.question = [] { keyplay_let_go("the question before quitting came"); };
     hooks.log = [](const char* line) { jvm::log("%s", line); };
     // The count of frames shown, for the frame counter and the game's first picture.
     hooks.frames = [] {
@@ -1465,6 +1613,8 @@ void soft_keyboard(bool open) {
     main_looper().post([open] {
         if (!g_edit || !g_frame) return;
         if (open) {
+            // The keys type from now on: a lane key held lets go (keyboard play), and none plays while the field is open.
+            keyplay_let_go("the game asks for text");
             SetWindowTextW(g_edit, L"");
             SetFocus(g_edit);
             // Asked by a touch: the touch keyboard comes up for it.

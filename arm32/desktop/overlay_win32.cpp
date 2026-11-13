@@ -3315,6 +3315,8 @@ bool asking() { return g_ask.window && g_asking; }
 void ask_quit() {
     if (!g_ask.window || g_asking) return;
     g_asking = true;
+    // The keys pressed on the game let go now, while the game may still go on for a few frames before it is held.
+    if (g_hooks.question) g_hooks.question();
     // Keep playing chosen first, so that Enter at once goes on; nothing lit until the pointer moves over it.
     g_choice = kKeep;
     g_ask_hover = kNone;

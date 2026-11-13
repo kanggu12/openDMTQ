@@ -23,6 +23,9 @@ struct Hooks {
     bool (*fullscreen)() = nullptr;
     // The game held still (true: a question is up, or the window is minimised) or let go on (false).
     void (*hold)(bool) = nullptr;
+    // The question before quitting is coming (the game is held once its picture is made): what is pressed on the game
+    // by keys lets go at once (keyboard play's lane keys).
+    void (*question)() = nullptr;
     // A line for the player's log.
     void (*log)(const char* line) = nullptr;
     // The count of frames shown and when the last was (player::frames_shown): the frame counter's numbers, and the

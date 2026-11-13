@@ -19,6 +19,7 @@
 #include "guest.h"
 #include "host.h"
 #include "jni_bridge.h"
+#include "keyplay.h"
 #include "mixer.h"
 #include "pacing.h"
 #include "player.h"
@@ -143,6 +144,8 @@ bool load_library(const std::string& guest_path) {
     }
     // The tweaks set the game's fields through libil2cpp, which loads this way (UnityPlayer.loadLibrary).
     tweaks_library_loaded(guest_path.substr(guest_path.rfind('/') + 1), h);
+    // Keyboard play reaches the game's input through it too (keyplay.cpp).
+    player::keyplay_library_loaded(guest_path.substr(guest_path.rfind('/') + 1), h);
     // The natives it exports by name first; its JNI_OnLoad registers its own after, and they win.
     jni_bind_exports(&jvm::attach().jni, h, host_of(guest_path));
     gaddr onload = g.dlsym(h, "JNI_OnLoad");
@@ -416,6 +419,8 @@ int main(int argc, char** argv) {
     }
     // The packer's field settings for the game (its frame cap), from its file among the libraries.
     tweaks_load(a.host_libs);
+    // Keyboard play looks for the game's input at the native render calls, on Unity's main thread (keyplay.cpp).
+    g_render_hook = &player::keyplay_render;
     // UnityPlayer's static initializer: System.loadLibrary("main").
     if (!player::load_library(a.lib_dir + "/libmain.so")) {
         player::show_error("cannot load the app's libmain.so");

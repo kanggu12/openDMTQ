@@ -191,7 +191,12 @@ void tweaks_library_loaded(const std::string& name, gaddr handle) {
     if (name == "libil2cpp.so") g_il2cpp = handle;
 }
 
+// None unless a host sets one (tweaks.h).
+void (*g_render_hook)(Thread&) = nullptr;
+
 void tweaks_render(Thread& th) {
+    // The host's own work first: it needs no tweaks to run.
+    if (g_render_hook) g_render_hook(th);
     if (g_tweaks.empty() || !g_il2cpp) return;
     // The game's frame target every 10th render call (it changes as the game idles), the tweaks
     // every 120th: twice a second at 60 fps, once at 120.
