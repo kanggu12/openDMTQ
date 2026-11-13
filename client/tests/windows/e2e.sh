@@ -192,11 +192,11 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   # and the X again with Quit the game ends the game, and the launcher comes back. The overlay's sizes are the game's at
   # 720 lines, times the game's height over 720 (Wine is at 96 dpi): 1.5 in full screen here (1920x1080), 1.125 in the
   # window (1440x810), each length rounded as the player rounds it (opx below). The bar is 74 high and shows for a
-  # pointer that rests 150 ms within 4 of the top (y 0 here, for a second); its chips are 40 square, 16 in from the
+  # pointer that rests 150 ms within 4 of the top (y 0 here, for a second); its chips are 40 square, 22 in from the
   # right end and 10 apart, centred in its height (the card within three quarters of the game's width, which neither size
   # reaches). The question's card is 520 wide and 228 high, centred, its two buttons 210 by 48 with 16 between, centred,
-  # their top 36 + 28 + 10 + 12 + 20 + 34 = 140 below the card's. In full screen: the X's centre 24 + 30 = 54 in from the
-  # right and 25 + 30 = 55 down, the full screen chip's 24 + 60 + 15 + 30 = 129 in; the card 780 by 342 at y 369, its
+  # their top 36 + 28 + 10 + 12 + 20 + 34 = 140 below the card's. In full screen: the X's centre 33 + 30 = 63 in from the
+  # right and 25 + 30 = 55 down, the full screen chip's 33 + 60 + 15 + 30 = 138 in; the card 780 by 342 at y 369, its
   # buttons centred at y 369 + 210 + 36 = 615, Keep playing at x 633 + 157 = 790 (the middle less 170) and Quit the game
   # at 1129 (the middle and 169). Wine's window for the game is its client area (no window manager draws a frame), so
   # its geometry is the game's area, in a window as in full screen.
@@ -265,7 +265,7 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   # The bar's chip (0 the X, 1 full screen, 2 minimise): its centre's distance from the right end and from the top.
   bar_chip() {
     eval \$(xdotool getwindowgeometry --shell \"\$game\")
-    local size=\$(opx 40) gap=\$(opx 10) margin=\$(opx 16) bar=\$(opx 74)
+    local size=\$(opx 40) gap=\$(opx 10) margin=\$(opx 22) bar=\$(opx 74)
     xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5
     xdotool mousemove \$((X + WIDTH / 2)) \$Y; sleep 1
     xdotool mousemove \$((X + WIDTH - margin - size / 2 - \$1 * (size + gap))) \$((Y + (bar - size) / 2 + size / 2)); sleep 1
@@ -340,7 +340,7 @@ docker run --rm --network "$NET" -v "$OUT:/out" -v "$ACCOUNT_FILE:/account:ro" -
   # Wine stepped past that place is tried again, up to three times.
   eval \$(xdotool getwindowgeometry --shell \"\$game\")
   asked=\$(said_count 'player: glass: the question over'); resumed=\$(said_count 'player: the game goes on')
-  chip_x=\$((WIDTH - \$(opx 16) - \$(opx 40) / 2)); chip_top=\$(( (\$(opx 74) - \$(opx 40)) / 2 ))
+  chip_x=\$((WIDTH - \$(opx 22) - \$(opx 40) / 2)); chip_top=\$(( (\$(opx 74) - \$(opx 40)) / 2 ))
   for try in 1 2 3; do
     xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 1.5
     ( wine /out/taskbar.exe slide-click \$chip_x \$chip_top \$(opx 40) \$((\$(opx 74) + \$(opx 28))) > /out/slide-click.txt 2>&1 & )

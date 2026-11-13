@@ -3,11 +3,14 @@
 // plain arithmetic, apart from any window, so that a check (settingstest.cpp) can take it through Windows' scales and
 // the game's sizes.
 //
-// The game lays itself out for 720 lines and grows with its area, whatever Windows' scale: its words and buttons are 1.5
-// times their 720-line size at 1080 lines and 3 times at 4K. The overlay is drawn at the game's own scale, so that in a
-// small window it is as small as the game's own words, and on a display at 150 % it covers no more of the game than at
-// 100 %. In a very small window its buttons would get too small to hit: it is never drawn below half its 720-line size
-// at Windows' scale, where the bar's 40-pixel buttons are 20 of Windows' own pixels. The pointer keeps Windows' own size.
+// The game lays itself out for 720 lines and grows with its area, whatever Windows' scale: its words and buttons are
+// 1.5 times their 720-line size at 1080 lines and 3 times at 4K. The overlay is drawn at the game's own scale, so that
+// in a small window it is as small as the game's own words, and on a display at 150 % it covers no more of the game
+// than at 100 %. In a very small window its buttons would get too small to hit: it is never drawn below half its
+// 720-line size at Windows' scale, where the bar's 40-pixel buttons are 20 of Windows' own pixels. The pointer keeps
+// Windows' own size. The game stretches its layout to its area's shape (wider than tall at 21:9, narrower at 4:3): the
+// handle and the frame counter, which sit on its own buttons' corners and are never pressed, keep within the narrower
+// of its two scales.
 #pragma once
 
 #include <algorithm>
@@ -48,14 +51,76 @@ constexpr float kGameWide = 1280;
 
 // The handle at the game's top centre is the one piece of the overlay that is never pressed (the pointer rests on it,
 // and its reach is larger than its picture), so it needs no least size to be hit: it is drawn at the game's own scale
-// exactly, whatever Windows' scale. That is the scale the game fits its 1280 by 720 layout into its area at (measured
-// on its frames at 4:3, 16:10, 16:9 and 21:9): its height over 720 in an area of 16:9 or wider, where the header's
-// middle stays at the centre, and its width over 1280 in a narrower one, where the whole header is smaller than the
-// height alone says. The handle then keeps its proportion to the game's own header in a window of any size and shape,
-// and what it clears at 1280x720 it clears everywhere.
+// exactly, whatever Windows' scale. That is the smaller of the two the game stretches its 1280 by 720 layout by
+// (measured on its frames at 4:3, 16:10, 16:9 and 21:9; the frame counter's part below): its height over 720 in an area
+// of 16:9 or wider, where the header's middle stays at the centre, and its width over 1280 in a narrower one, where the
+// header's buttons are narrower than the height alone says. The handle then keeps within the game's own header in a
+// window of any size and shape, and what it clears at 1280x720 it clears everywhere.
 inline float handle_scale_for(int area_w, int area_h) {
     return std::min(static_cast<float>(area_w) / kGameWide, static_cast<float>(area_h) / kGameLines);
 }
+
+// ---- the bar
+
+// The bar at 720 lines: 74 high (the game's own X at the top right of its song and music screens reaches row 70: the
+// bar covers it whole), its three buttons 40 square and 10 apart, centred in its height, the X at its right end; the
+// OpenDMTQ wordmark at its left end. Both ends are kBarEnds in, the wordmark's from the bar's left and the X's from its
+// right, so that the bar's two ends match, as the launcher's header keeps its own two sides.
+constexpr float kBarTall = 74, kChipSize = 40, kChipGap = 10, kBarEnds = 22;
+
+// The left edge of a button on a bar `bar_w` pixels wide at the overlay's `scale` (0 the X, at the right end; 1 full
+// screen, left of it; 2 minimise, left of that), each length rounded to whole pixels as the overlay rounds them.
+inline int chip_left(int which, int bar_w, float scale) {
+    // The button's size, the gap between two and the bar's end, each whole.
+    const int size = static_cast<int>(std::lround(kChipSize * scale)), gap = static_cast<int>(std::lround(kChipGap * scale));
+    const int end = static_cast<int>(std::lround(kBarEnds * scale));
+    return bar_w - end - size - which * (size + gap);
+}
+
+// The wordmark's left edge at the overlay's `scale`, as GDI+ draws it (on a whole pixel where its picture is drawn at
+// its own size).
+inline float wordmark_left(float scale) { return kBarEnds * scale; }
+
+// ---- the frame counter
+
+// The game stretches its 1280 by 720 layout over its area: across by its width over 1280, down by its height over 720
+// (measured on its frames at 4:3, 16:10, 16:9 and 21:9: its pause button, its X and its result's buttons are as wide as
+// the width says and as tall as the height says, so at 21:9 they are wider than tall and at 4:3 narrower). The
+// overlay's scale is the height's, which keeps the bar as tall as the game's top row it covers in every shape. The
+// frame counter, which is never pressed and sits on the game's own corner, is drawn at the smaller of the two, as the
+// handle is: in an area narrower than 16:9 it is no wider beside the game's buttons there than at 16:9 (at 1920x1200 at
+// 1.5, not 1.67, and at 1024x768 at 0.8, not 1.07), and at 16:9 and wider it is at the overlay's own scale. Never below
+// the overlay's floor, half of Windows' scale, so that its words stay as legible as the rest of the overlay's in a
+// small window.
+inline float counter_scale_for(int area_w, int area_h, float dpi) {
+    // The game's narrower scale, at least the floor.
+    return std::max(handle_scale_for(area_w, area_h), kLeastScale * dpi);
+}
+
+// The right edge of the game's pause button in a song, at 720 lines: the button spans 13 to 72 from the left, measured
+// on the game's frames.
+constexpr float kPauseRight = 73;
+
+// The pause button's right edge in an area `area_w` pixels wide: stretched across with the game's layout (73 at 1280
+// wide, 109.5 at 1920 whatever the height, 58.4 at 1024x768, 143.7 at 2520x1080), not grown with its height.
+inline float pause_right(int area_w) { return kPauseRight * static_cast<float>(area_w) / kGameWide; }
+
+// Where the counter's glass goes, chip_w by chip_h, in its corner (1 top left, 2 top right, 3 bottom left, 4 bottom
+// right) of an area of area_w by area_h, `inset` in from the area's edges (8 at 720 lines, at the counter's own scale);
+// at the top left `inset` right of the game's pause button instead, so that it covers nothing a song uses; in a top
+// corner below `top_room` (the bar's room while it is down).
+struct CounterAt {
+    int x, y;
+};
+inline CounterAt counter_at(int corner, int area_w, int area_h, int inset, int chip_w, int chip_h, int top_room) {
+    // Which sides of the area the corner touches.
+    const bool right = corner == 2 || corner == 4, bottom = corner == 3 || corner == 4;
+    // The top left: beside the pause button's right edge, rounded to a whole pixel.
+    const int left = corner == 1 ? static_cast<int>(std::lround(pause_right(area_w))) + inset : inset;
+    return CounterAt{right ? area_w - inset - chip_w : left, bottom ? area_h - inset - chip_h : inset + top_room};
+}
+
+// ---- the handle's tab
 
 // The handle's tab at 720 lines: 25.6 wide where it hangs from the game's top edge, its sides leaning in 0.268 a pixel
 // down as the game's own tabs' do (15 degrees), 18.5 high and 23 with the pointer on it; the line it hangs from (its

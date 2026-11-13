@@ -5,13 +5,15 @@
 // count of frames through the game's start, a stretch with no frame, frames again and a hold. Then the size the overlay
 // over the game is drawn at and the smallest game area the window holds (overlay_scale.h), over Windows' scales and the
 // game's sizes, with the size of the overlay's handle and the reach a resting pointer brings the bar from, which keep
-// clear of the game's buttons and words in its header at every size. Then the overlay's bar on its way down and up
-// (overlay_motion.h): its pace, a turn back midway, Windows' animations off, the rows of it in sight, and the handle and
-// the pieces at the top that move with it. And the text the keyboard types into the game's soft keyboard
-// (typed_text.h): the text the game opens it with taken as selected. And keyboard play's rules (keyboard_play.h): the
-// lane keys' names and places, each mode's lanes from the settings file (one or two keys a lane, a value it cannot read
-// keeping the default), the lane a key plays, a press, its repeats and every key let go, when the lane keys play at all,
-// and which request of the game's saves a play. Prints ALL CHECKS PASSED when every check held.
+// clear of the game's buttons and words in its header at every size, the bar's two ends, and the frame counter's scale
+// and place against the game's own buttons in each shape (the pause button, the result's SELECT MUSIC). Then the
+// overlay's bar on its way down and up (overlay_motion.h): its pace, a turn back midway, Windows' animations off, the
+// rows of it in sight, and the handle and the pieces at the top that move with it. And the text the keyboard types into the game's soft
+// keyboard (typed_text.h): the text the game opens it with taken as selected. And keyboard play's rules
+// (keyboard_play.h): the lane keys' names and places, each mode's lanes from the settings file (one or two keys a lane,
+// a value it cannot read keeping the default), the lane a key plays, a press, its repeats and every key let go, when
+// the lane keys play at all, and which request of the game's saves a play. Prints ALL CHECKS PASSED when every check
+// held.
 #include "frame_rate.h"
 #include "keyboard_play.h"
 #include "overlay_motion.h"
@@ -446,6 +448,112 @@ void handle_reach_checks() {
     check(holds_tab, "there the tab as drawn, at rest and lit, is inside the reach");
     check(holds_rail, "and the rail at rest along the top edge");
     check(no_deeper, "and the reach goes no lower than the lit tab's foot");
+}
+
+// The bar's two ends (overlay_scale.h): the X as far in from the bar's right end as the wordmark from its left, at every
+// scale the overlay is drawn at, and its buttons clear of the wordmark in the smallest area.
+void bar_checks() {
+    using player::overlay::chip_left;
+    using player::overlay::kBarEnds;
+    using player::overlay::kChipSize;
+    using player::overlay::wordmark_left;
+    // At each scale, on a bar as wide as a 16:9 area of that scale (and one wider): the X's right edge from the bar's
+    // right end against the wordmark's left edge from its left, the pixel each is rounded to apart.
+    bool ends_match = true;
+    for (const float s : {0.5f, 0.75f, 1.0f, 1.0667f, 1.125f, 1.5f, 1.6667f, 2.0f, 2.2222f, 3.0f}) {
+        for (const int w : {static_cast<int>(std::lround(1280 * s)), static_cast<int>(std::lround(1680 * s))}) {
+            const int x_end = w - (chip_left(0, w, s) + static_cast<int>(std::lround(kChipSize * s)));
+            if (std::fabs(static_cast<float>(x_end) - wordmark_left(s)) > 0.5f) {
+                ends_match = false;
+                std::printf("  at scale %.4f, %d wide: the X ends %d in from the bar's right end, the wordmark starts %.1f in\n", static_cast<double>(s), w, x_end,
+                            static_cast<double>(wordmark_left(s)));
+            }
+        }
+    }
+    check(ends_match, "the bar's X ends as far in from its right end as the wordmark starts from its left, at every scale");
+    check(kBarEnds == 22.0f, "both 22 in at 720 lines, as the wordmark always was");
+    // The smallest area at the least scale (480x270 at 100 %, at 0.5): minimise, the third button from the right, starts
+    // well right of the wordmark's end (its picture 101 wide at 720 lines).
+    check(static_cast<float>(chip_left(2, 480, 0.5f)) > wordmark_left(0.5f) + 101 * 0.5f + 100, "in the smallest area the buttons keep clear of the wordmark");
+}
+
+// The frame counter's scale and place (overlay_scale.h), against the game's own buttons as measured on its frames in
+// each shape: the game stretches its layout across by its width over 1280 and down by its height over 720.
+void counter_checks() {
+    using player::overlay::counter_at;
+    using player::overlay::counter_scale_for;
+    using player::overlay::CounterAt;
+    using player::overlay::kLeastAreaH;
+    using player::overlay::kLeastAreaW;
+    using player::overlay::scale_for;
+    // The counter's glass at 720 lines (fps_metrics: room for three digits and "99.9 ms" in Pretendard), and its inset.
+    constexpr float kChipW = 88, kChipH = 44, kInset = 8;
+    // At 16:9 and wider: the overlay's own scale, its height over 720.
+    check(counter_scale_for(1280, 720, 1.0f) == 1.0f && counter_scale_for(1920, 1080, 1.0f) == 1.5f && counter_scale_for(3840, 2160, 1.0f) == 3.0f,
+          "the counter at 1280x720, 1920x1080 and 4K: the overlay's own scale, 1, 1.5 and 3");
+    check(counter_scale_for(2520, 1080, 1.0f) == 1.5f && counter_scale_for(3360, 1440, 1.0f) == 2.0f,
+          "the counter at 21:9: its height's scale, as the rest of the overlay");
+    // Narrower than 16:9: the game's width over 1280, not its height over 720.
+    check(counter_scale_for(1920, 1200, 1.0f) == 1.5f && counter_scale_for(2560, 1600, 1.0f) == 2.0f,
+          "the counter at 16:10 (1920x1200, 2560x1600): the game's width over 1280, 1.5 and 2, not the height's 1.67 and 2.22");
+    check(counter_scale_for(1024, 768, 1.0f) == 0.8f, "the counter at 4:3 (1024x768): the game's width over 1280, 0.8, not the height's 1.07");
+    // The floor: half of Windows' scale, as the overlay's.
+    check(counter_scale_for(1024, 768, 2.0f) == 1.0f && counter_scale_for(480, 270, 1.0f) == 0.5f,
+          "the counter keeps the overlay's floor: 1024x768 at 200 % at 1, the smallest area at 100 % at 0.5");
+    // Every area the window holds, 4:3 to 21:9, at every scale: never larger than the rest of the overlay.
+    bool never_larger = true;
+    for (int dpi : {96, 144, 192, 288}) {
+        const float s = static_cast<float>(dpi) / 96.0f;
+        for (const float shape : {4.0f / 3.0f, 16.0f / 10.0f, 16.0f / 9.0f, 21.0f / 9.0f}) {
+            for (int h = kLeastAreaH; h <= 2160; ++h) {
+                const int w = std::max(kLeastAreaW, static_cast<int>(std::lround(static_cast<float>(h) * shape)));
+                never_larger = never_larger && counter_scale_for(w, h, s) <= scale_for(h, s);
+            }
+        }
+    }
+    check(never_larger, "every area from 270 to 2160 lines, 4:3 to 21:9, at 100 to 300 %: the counter never larger than the rest of the overlay");
+    // The game's pause button in a song, as measured on its frames: its right edge (its last column, plus one) at
+    // 1280x720, 1920x1080, 1920x1200 (16:10), 1024x768 (4:3) and 2520x1080 (the 21:9 area of a 2560x1080 window).
+    struct Pause {
+        int w, h, right;
+    };
+    bool beside = true;
+    for (const Pause& p : {Pause{1280, 720, 73}, Pause{1920, 1080, 109}, Pause{1920, 1200, 109}, Pause{1024, 768, 58}, Pause{2520, 1080, 144}}) {
+        // The counter laid out as the overlay lays it at the top left: its inset and glass at its own scale.
+        const float k = counter_scale_for(p.w, p.h, 1.0f);
+        const int inset = static_cast<int>(std::lround(kInset * k));
+        const CounterAt at = counter_at(1, p.w, p.h, inset, static_cast<int>(std::ceil(kChipW * k)), static_cast<int>(std::ceil(kChipH * k)), 0);
+        // Its gap from the button: its inset, give or take the pixel the button's edge is rounded to.
+        const int gap = at.x - p.right;
+        if (gap < inset - 1 || gap > inset + 1) {
+            beside = false;
+            std::printf("  the counter at the top left of %dx%d starts at %d, %d from the pause button's right edge (%d), not %d\n", p.w, p.h, at.x, gap, p.right,
+                        inset);
+        }
+    }
+    check(beside, "the counter at the top left stands its inset right of the game's pause button at 16:9, 16:10, 4:3 and 21:9, never on it");
+    // The result's SELECT MUSIC at the bottom right, as measured on the game's frames (its right edge, its top and its
+    // foot): the counter at the bottom right covers no more of it in another shape than at 16:9, as a share of the
+    // counter.
+    struct Button {
+        int w, h, right, top, foot;
+    };
+    auto covered = [&](const Button& b) {
+        const float k = counter_scale_for(b.w, b.h, 1.0f);
+        const int inset = static_cast<int>(std::lround(kInset * k));
+        const int cw = static_cast<int>(std::ceil(kChipW * k)), ch = static_cast<int>(std::ceil(kChipH * k));
+        const CounterAt at = counter_at(4, b.w, b.h, inset, cw, ch, 0);
+        // The part of the counter's glass left of the button's right edge and between its top and its foot.
+        const int across = std::max(0, std::min(b.right - at.x, cw)), down = std::max(0, std::min(at.y + ch, b.foot) - std::max(at.y, b.top));
+        return static_cast<float>(across * down) / static_cast<float>(cw * ch);
+    };
+    const float at_16_9 = covered(Button{1920, 1080, 1848, 946, 1048});
+    const float at_16_10 = std::max(covered(Button{1920, 1200, 1848, 1051, 1164}), covered(Button{2560, 1600, 2464, 1402, 1552}));
+    const float at_4_3 = covered(Button{1024, 768, 986, 673, 745});
+    if (at_16_10 > at_16_9 || at_4_3 > at_16_9) {
+        std::printf("  the counter over SELECT MUSIC: %.1f %% of it at 16:9, %.1f %% at 16:10, %.1f %% at 4:3\n", 100 * at_16_9, 100 * at_16_10, 100 * at_4_3);
+    }
+    check(at_16_10 <= at_16_9 && at_4_3 <= at_16_9, "the counter at the bottom right covers no more of the result's SELECT MUSIC at 16:10 and 4:3 than at 16:9");
 }
 
 // The bar's way down and up (overlay_motion.h): its pace, its times, a turn back midway, Windows' animations off; the
@@ -893,6 +1001,9 @@ int main() {
     // The handle's size and its reach, and the bar's way down and up.
     handle_size_checks();
     handle_reach_checks();
+    // The bar's two ends, and the frame counter's scale and place against the game's buttons in each shape.
+    bar_checks();
+    counter_checks();
     overlay_motion_checks();
     // Keyboard play's rules.
     keyboard_play_checks();

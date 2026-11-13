@@ -237,9 +237,12 @@ off, says why in its log, and the game plays by touch as before.
   second, twice a second. It sits at the bottom right, 8 pixels in at 720 lines, where it covers the least of the
   game's labels and buttons: only the end of the result's SELECT MUSIC and of the download list's DOWNLOAD, and the
   loading screen's version (the bottom left would cover the music list's grid button whole; the top is the bar's). In
-  a song it sits over the play field's corner. **Position** moves it to another corner, kept while the counter is off.
-  A top left set by a launcher before 0.9.3, which wrote it whether chosen or not, reads as the default; another corner
-  set then stays. It counts the frames the player shows: a steady 60 reads 60, and only a whole second without a frame
+  a song it sits over the play field's corner. **Position** moves it to another corner, kept while the counter is off;
+  at the top left it stands 8 pixels right of a song's pause button. The game stretches its screens to the window's
+  shape (at 21:9 its buttons are wider than tall, at 4:3 narrower), and the counter keeps to its buttons' narrower side:
+  in a window narrower than 16:9 it is a little smaller, so that it covers no more of them there than at 16:9. A top
+  left set by a launcher before 0.9.3, which wrote it whether chosen or not, reads as the default; another corner set
+  then stays. It counts the frames the player shows: a steady 60 reads 60, and only a whole second without a frame
   reads 0. It shows from the game's first frame and hides while the game holds still. Drawn apart from the game's
   picture, it costs the game nothing, and the broadcast does not show it.
 - **The render scale** draws the game at a share of the window's pixels (100 % down to 50 %), stretched to fill it:
@@ -369,8 +372,10 @@ server's app, `--settings` the file).
   over 720 lines: 1.5 at 1080 lines, 3 at 4K), whatever Windows' scale is, so a small window gets small pieces and a
   display at 150 % has them cover no more of the game than at 100 %. They are never drawn below half their 720-line
   size at Windows' scale, so the bar's buttons stay large enough to hit; the smallest game area, 480x270 at Windows'
-  scale, leaves them room. The handle alone, which is never pressed, keeps the game's own scale in a window of any
-  size and shape. The pointer keeps Windows' own size.
+  scale, leaves them room. The game stretches its screens to its area's shape, across by its width over 1280 and down
+  by its height over 720: the bar keeps the height's scale, as tall as the game's top row it covers; the handle and the
+  FPS counter, which are never pressed and sit on the game's own corners, keep the narrower of the two, the handle in a
+  window of any size and shape, the counter never below the others' floor. The pointer keeps Windows' own size.
 - **Nothing of it is in the game's way**: the notice, the FPS counter and the handle let every click through to the
   game, and no piece takes the keyboard from the game's window (each is a window that never takes the focus; a click on
   the bar or the question gives the keyboard back to the game).

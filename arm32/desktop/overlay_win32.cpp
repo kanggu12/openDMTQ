@@ -52,7 +52,8 @@
 // - The cursor: a dart in the logo's chrome and lime, all lime while the mouse's finger is down on the game.
 // - The frame counter: when the PC's settings ask for it, a small glass box like the game's Q and MAX box, at the bottom
 //   right, where it covers the fewest of the game's own labels and buttons, unless another corner is chosen (at the top
-//   left, beside a song's pause button), 8 pixels in at 720 lines: FPS in the game's lime, the frames a second in white
+//   left, beside a song's pause button), 8 pixels in at 720 lines, at the smaller of the two scales the game stretches
+//   its layout by (overlay_scale.h), as the handle is: FPS in the game's lime, the frames a second in white
 //   and the mean frame time under them, over the last second, from the count of frames shown that the player keeps
 //   anyway (frames.cpp; frame_rate.h says how it reads it). The whole of it faint
 //   (its window at 62 % opacity), so the game shows through. Hidden until the game's first frame and while the game is
@@ -220,6 +221,18 @@ struct AskScale {
     ~AskScale() { t_scale_cap = before; }
     AskScale(const AskScale&) = delete;
     AskScale& operator=(const AskScale&) = delete;
+};
+
+// The frame counter at its own scale while it is laid out and drawn: the smaller of the two the game stretches its
+// layout by, never below the overlay's floor (overlay_scale.h's counter_scale_for), which is never above the overlay's
+// own, so a cap gives it exactly. The notice, which keeps clear of a counter in a top corner, lays that counter out
+// under it too.
+struct CounterScale {
+    float before;
+    CounterScale() : before(t_scale_cap) { t_scale_cap = counter_scale_for(area_w(), area_h(), dpi_scale()); }
+    ~CounterScale() { t_scale_cap = before; }
+    CounterScale(const CounterScale&) = delete;
+    CounterScale& operator=(const CounterScale&) = delete;
 };
 // A length of the game's at 720 lines as pixels at the overlay's scale, whole (edges on whole pixels stay sharp). Every
 // size of the overlay goes through here.
@@ -519,13 +532,13 @@ constexpr int kNone = -1, kQuitChip = 0, kScreenChip = 1, kMinChip = 2;
 // place they had and are moved with it.
 bool g_bar_room = false;
 
-// The bar's height, the chips' size, the gap between them and their room from the bar's right end, at this scale. 74
-// at 720 lines: the game's own X at the top right of its song and music screens reaches row 70 (its soft edge, measured
-// on the game's frames), and the bar covers it whole with 4 to spare.
-int bar_height() { return px(74); }
-int chip_size() { return px(40); }
-int chip_gap() { return px(10); }
-int chip_margin() { return px(16); }
+// The bar's height, the chips' size, the gap between them and their room from the bar's right end, at this scale
+// (overlay_scale.h's bar: 74 at 720 lines, as the game's own X at the top right of its song and music screens reaches
+// row 70, its soft edge, measured on the game's frames, and the bar covers it whole with 4 to spare; the X as far in
+// from the bar's right end as the wordmark from its left).
+int bar_height() { return px(kBarTall); }
+int chip_size() { return px(kChipSize); }
+int chip_gap() { return px(kChipGap); }
 
 // The room the bar takes at the top of the game's area once it is down (0 once it is up): what sits at the top is
 // placed under it rather than being covered. The painter's view says it for the picture it draws.
@@ -538,7 +551,8 @@ int top_room() {
 // that; each centred in the bar's height.
 RectF chip_rect(int which, int w) {
     const float size = static_cast<float>(chip_size());
-    const float x = static_cast<float>(w - chip_margin() - chip_size() - which * (chip_size() + chip_gap()));
+    // Across: overlay_scale.h's arithmetic, which a check holds to the wordmark's end; down, in the bar's middle.
+    const float x = static_cast<float>(chip_left(which, w, scale()));
     return RectF(x, static_cast<float>((bar_height() - chip_size()) / 2), size, size);
 }
 
@@ -603,22 +617,18 @@ FpsMetrics fps_metrics() {
     return m;
 }
 
-// The right edge of the game's pause button in a song, at 720 lines: the button spans 13 to 72 from the left (measured
-// on the game's frames), at the game's own scale (its height over 720), whatever Windows' scale.
-constexpr float kPauseRight = 73;
-
 // The counter's glass's top left in its corner (Settings::ShowFps's order: 1 top left, 2 top right, 3 bottom left, 4
 // bottom right, its own place), 8 pixels in at 720 lines; top left, 8 pixels right of the game's pause button, so that
 // it covers nothing a song uses; in a top corner, under the bar while that is down. At the bottom right, 8 in from the
 // right and the foot, it covers the fewest of the game's labels and buttons: none on most of its screens, the end of
 // the result's SELECT MUSIC and of the download list's DOWNLOAD, and the loading screen's version (measured on the
-// game's frames at 720 and 1080 lines: 9 of 37; the bottom left 13, its music list's grid button whole).
+// game's frames at 720 and 1080 lines: 9 of 37; the bottom left 13, its music list's grid button whole). The pause
+// button is as wide as the game's width says in every shape (overlay_scale.h's counter_at), so beside it the counter
+// keeps its 8 at 21:9, where the height's scale would put it on the button, and at 4:3. Laid out at the counter's own
+// scale (CounterScale), as its look is.
 POINT fps_place(int corner, int chip_w, int chip_h) {
-    const int in = px(8);
-    const bool right = corner == 2 || corner == 4, bottom = corner == 3 || corner == 4;
-    const float game = static_cast<float>(area_h()) / 720.0f;
-    const int left = corner == 1 ? static_cast<int>(std::lround(kPauseRight * game)) + in : in;
-    return POINT{right ? area_w() - in - chip_w : left, bottom ? area_h() - in - chip_h : in + top_room()};
+    const CounterAt at = counter_at(corner, area_w(), area_h(), px(8), chip_w, chip_h, top_room());
+    return POINT{at.x, at.y};
 }
 
 // A piece's window around its glass at (gx, gy) of gw by gh: the shadow's room on every side, within the game's area.
@@ -735,10 +745,11 @@ void minimise_icon(Graphics& g, Pen& line, float cx, float cy) {
 }
 
 // The bar's name: the OpenDMTQ wordmark as the launcher's header draws it (OPEN over its lime line, DMTQ in chrome with
-// the Q lit; its pictures beside the player, overlay_glass.h's wordmark), 22 in from the bar's left end at 720 lines and
-// centred in its height as the header centres its own; drawn down with GDI+'s finest filter from the picture of the
-// next larger scale when there is none of this one. Where the pictures are not there, "OPEN DMTQ" in the launcher's
-// wordmark face, spaced out as its header spaces OPEN. Where it went, for its zone.
+// the Q lit; its pictures beside the player, overlay_glass.h's wordmark), 22 in from the bar's left end at 720 lines,
+// as far as the X from its right end (overlay_scale.h's kBarEnds), and centred in its height as the header centres its
+// own; drawn down with GDI+'s finest filter from the picture of the next larger scale when there is none of this one.
+// Where the pictures are not there, "OPEN DMTQ" in the launcher's wordmark face, spaced out as its header spaces OPEN.
+// Where it went, for its zone.
 RectF bar_name(Graphics& g, float h) {
     float drawn_for = 0;
     if (Bitmap* mark = wordmark(scale(), drawn_for)) {
@@ -746,7 +757,7 @@ RectF bar_name(Graphics& g, float h) {
         const auto pw = static_cast<float>(mark->GetWidth()), ph = static_cast<float>(mark->GetHeight());
         // At its own size, on whole pixels: the picture's pixels as they are, nothing filtered.
         const bool own = std::fabs(k - 1.0f) < 0.001f;
-        float x0 = fpx(22), y = (h - ph * k) / 2;
+        float x0 = wordmark_left(scale()), y = (h - ph * k) / 2;
         if (own) {
             x0 = std::round(x0);
             y = std::round(y);
@@ -766,7 +777,7 @@ RectF bar_name(Graphics& g, float h) {
     const float spacing = size * 0.2f;
     auto f = wide_font(size);
     const float line = measure(L"O", *f).Height;
-    const float x0 = fpx(22), y = (h - line) / 2;
+    const float x0 = wordmark_left(scale()), y = (h - line) / 2;
     float x = x0;
     for (std::size_t i = 0; i < name.size(); ++i) {
         const std::wstring letter(1, name[i]);
@@ -979,8 +990,14 @@ void notice_look(Paint& p, const std::string& text, bool live, int corner) {
     const int aw = area_w();
     float beside = pad + badge_w + gap + after + 2 * px(kRoomSide);
     if (corner == 1 || corner == 2) {
-        const FpsMetrics m = fps_metrics();
-        const POINT at = fps_place(corner, static_cast<int>(m.w), static_cast<int>(m.h));
+        // The counter's size and place as it is drawn, at its own scale; the notice's own lengths at the overlay's.
+        FpsMetrics m{};
+        POINT at{};
+        {
+            const CounterScale own;
+            m = fps_metrics();
+            at = fps_place(corner, static_cast<int>(m.w), static_cast<int>(m.h));
+        }
         // How far in from its side the counter reaches, on both sides, with a gap.
         const float reach = corner == 1 ? static_cast<float>(at.x) + m.w : static_cast<float>(aw - at.x);
         beside = std::max(beside, pad + badge_w + gap + after + 2.0f * (reach + fpx(8)));
@@ -1342,9 +1359,10 @@ Painted paint_notice(const Order& o, Paint& p) {
     return made;
 }
 
-// The counter's picture for an order.
+// The counter's picture for an order, at its own scale: its look, and its glass's blur over the frame behind.
 Painted paint_counter(const Order& o, Paint& p) {
     const Drawing d(o.view);
+    const CounterScale own;
     if (p.made_for != o.key) {
         fps_look(p, o.fps, o.ms, o.corner);
         p.made_for = o.key;
