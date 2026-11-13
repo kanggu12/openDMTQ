@@ -53,7 +53,8 @@ With the account the server's owner made for you:
 1. On an **Android phone**, open the server's address (or scan its QR code) and sign in.
 2. Tap **Download app (.apk)** and install it: the game, connected to that server. 64-bit-only phones play too;
    [iPhones cannot](docs/game-files.md#iphones).
-3. On a **Windows PC**, take the installer from the same page. Its launcher signs in and keeps the game up to date.
+3. On a **Windows PC** (or Linux, under Wine), take the installer from the same page. Its launcher signs in and keeps
+   the game up to date.
 
 **[The players' guide](docs/play.md)**
 
@@ -124,9 +125,10 @@ players sign in and get the app.
 
 ### The PC client
 
-A Windows installer from the server's site, set up for that server. Its launcher signs in and keeps the game up to
-date; the game runs at the display's refresh rate (up to 240 Hz), with an overlay bar for minimise, full screen and
-quit ([the PC client](docs/windows-player.md)).
+A Windows installer from the server's site, set up for that server, which runs on Linux under Wine too. Its launcher
+signs in and keeps the game up to date. The game runs at the display's refresh rate (up to 240 Hz) and plays with the
+keyboard (the keys you choose for each lane) or a touch screen; an overlay bar has minimise, full screen and quit
+([the PC client](docs/windows-player.md)).
 
 <p align="center">
   <img src="docs/images/client-play.png" alt="The launcher's PLAY page: the server and the sign-in, the ready check, how to play, the last game, and PLAY" width="100%">
@@ -165,8 +167,9 @@ Accounts, scores and recordings stay in `data/` on your computer ([privacy](docs
 - **The server:** 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker, with 2 GB of memory (2 cores and
   4 GB recommended) and 1 GB of disk, 7 GB with every song.
 - **Phones:** Android 5.0 or newer, 8 or newer to broadcast.
-- **PCs:** the PC client on 64-bit Windows 10 or 11 with an x64 processor (Intel or AMD), a graphics card with
-  Direct3D 11, 1 GB of free memory and 390 MB of disk; a touch screen plays with several fingers at once.
+- **PCs:** the PC client on 64-bit Windows 10 or 11, or Linux with Wine 11, with an x64 processor (Intel or AMD), a
+  graphics card with Direct3D 11, 1 GB of free memory and 390 MB of disk; the keyboard plays the lanes, and a touch
+  screen plays with several fingers at once.
 
 ## Guides
 
