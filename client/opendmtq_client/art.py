@@ -343,11 +343,19 @@ def _whole(width, height, scale, accent, offset, top_h):
 
 def page_title(text, scale=1.0, size=42, accent=theme.OK):
     """A page's name as the site's masthead sets it: the leaning wide face, white at its top into the accent at its
-    foot (#fff 8 %, the accent 72 %, over a 1.08 line). Returns an RGBA picture and its baseline."""
+    foot (#fff 8 %, the accent 72 %, over a 1.08 line). A title with Hangul in it (the guide's questions in Korean) is
+    set in Pretendard Bold, which has it, leant as the wide face leans. Returns an RGBA picture and its baseline."""
     k = SS
     t = size * scale * k
-    font = ImageFont.truetype(theme.WIDE_ITALIC_FILE, max(1, int(round(t))))
-    asc, desc = 1.135, 0.439
+    # The wide face has no Hangul (the syllables 가 to 힣): a Korean title takes Pretendard Bold for all of it, its Latin
+    # letters too.
+    hangul = any("가" <= ch <= "힣" for ch in text)
+    if hangul:
+        # Hangul stands taller than the wide face's capitals at one size: a little smaller, the same height on the page.
+        t = t * 0.86
+    font = ImageFont.truetype(theme.HANGUL_TITLE_FILE if hangul else theme.WIDE_ITALIC_FILE, max(1, int(round(t))))
+    # Each face's ascent and descent in ems, which place the baseline in the 1.08 line.
+    asc, desc = (1.0, 0.3) if hangul else (1.135, 0.439)
     line = 1.08 * t
     base = (line - (asc + desc) * t) / 2 + asc * t
     # Room after the last letter for its lean and the 0.12 em the site keeps, and under the line for nothing.
@@ -358,6 +366,13 @@ def page_title(text, scale=1.0, size=42, accent=theme.OK):
     for ch in text:
         ImageDraw.Draw(letters).text((x, base), ch, font=font, fill=255, anchor="ls")
         x += font.getlength(ch) - 0.012 * t
+    if hangul:
+        # Pretendard stands upright: sheared as the wide face leans (its top a fifth of its height to the right), the
+        # picture wider by that much so that the last letter's top keeps its room.
+        lean = 0.2
+        letters = letters.transform((width + int(lean * height), height), Image.AFFINE,
+                                    (1, lean, -lean * height, 0, 1, 0), resample=Image.BICUBIC)
+        width = letters.width
     colour = _vertical((width, height), ((0.0, "#ffffff"), (0.08, "#ffffff"), (0.72, accent), (1.0, accent)),
                        span=height).convert("RGBA")
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))

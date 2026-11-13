@@ -15,6 +15,17 @@ STEPS = ("power", "server", "login", "download", "sound", "stage")
 # The few words each step says under its question, in the page's heading.
 LEADS = {"power": "guide.power.text", "server": "guide.server.text", "login": "guide.login.text",
          "download": "guide.download.text", "stage": "guide.stage.text"}
+# What Next waits for on the steps that make it wait, said while it does (waits_for).
+NEEDS = {"server": "guide.need.server", "login": "guide.need.login", "download": "guide.need.download"}
+
+
+def waits_for(step, can, busy=False):
+    """The words' key of the line that says what Next waits for on `step`, or None: none once Next can go on (`can`),
+    none while the step's own work is under way (`busy`: a server being asked, the app downloading), whose card says
+    what it is doing, and none on a step that never makes Next wait."""
+    if can or busy:
+        return None
+    return NEEDS.get(step)
 
 
 class Guide:
@@ -60,7 +71,7 @@ class Guide:
         # show(), which leaves it out on the last step, where PLAY is the way on and the setting up is done).
         self.skip = skip = widgets.link(bar, ui, w("guide.skip"), lambda: self.finish(play=False), fg=theme.MUTED,
                                         font=app.fonts.small, chevron=False)
-        # The step's page: its name as the page's title over the site's field, its question under it.
+        # The step's page: its question as the page's title over the site's field, its few words under it.
         self.body = app.make_page(root, self.header)
         # Tab goes as the window reads: the page first, then the bar, left to right (Skip, Back, Next or PLAY). Tk's
         # Tab follows each parent's stacking order, the order its children were made in until one is raised.
@@ -80,14 +91,16 @@ class Guide:
         # A progress bar of the page that went: the download's progress waits for the next one.
         app.download_bar = None
         key = STEPS[index]
-        # The step's name as the page's title, in English as the site's titles; its question and its few words under it.
-        question, lead = w("guide.%s.title" % key), LEADS.get(key)
-        if lead:
-            question += (" " if question.endswith(("?", ".", "!")) else ". ") + w(lead)
-        self.body.set_heading(w("guide.%s.name" % key), question)
+        # The step's question as the page's title, in the player's language (the strip above names the step), and its
+        # few words under it.
+        lead = LEADS.get(key)
+        self.body.set_heading(w("guide.%s.title" % key), w(lead) if lead else "")
         content = tk.Frame(self.body.inner, bg=theme.BG)
         content.pack(fill="both", expand=True)
         getattr(self, "_" + key)(content)
+        # What Next waits for, at the foot of the step's last card (packed by _update_next while it waits).
+        cards = [child for child in content.winfo_children() if isinstance(child, widgets.Card)]
+        self.need = widgets.label(cards[-1].body, app.ui, "", fg=theme.MUTED, wrap_margin=0) if cards else None
         # One column for the names of the step's settings, as a page has (pages.ROWS_THAT_COME names the guide's own as
         # "guide:<step>", apart from the pages' names).
         widgets.fit_names(content, app.ui, pages.rows_that_come("guide:" + key))
@@ -134,6 +147,17 @@ class Guide:
     def _update_next(self):
         can = self._can_go_on()
         self.next_button.enable(can)
+        # The line under the step's card: what Next waits for while it waits, nothing once it can go on.
+        key = STEPS[self.index]
+        busy = self.checking if key == "server" else (self.app.download is not None if key == "download" else False)
+        need = waits_for(key, can, busy)
+        line = getattr(self, "need", None)
+        if line is not None and line.winfo_exists():
+            if need:
+                line.configure(text=self.app.words(need))
+                line.pack(fill="x", pady=(self.app.ui.px(12), 0))
+            else:
+                line.pack_forget()
         # The last step's PLAY lit when the ready check lets it go, dark and still otherwise.
         self.play_slab.set("ready" if can else "waiting")
 
