@@ -26,8 +26,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/game-pc.jpg" alt="The game running in the OpenDMTQ PC client on Windows: notes and the judgment line over the song's blurred video, the client's overlay bar across the top and its FPS counter at 240" width="100%">
-  <br><sub>The game in the OpenDMTQ PC client on Windows, with its overlay bar and FPS counter (the song's video is blurred here).</sub>
+  <img src="docs/images/screens.webp" alt="The players' site and the admin pages, with made-up players and songs: the home page with the app's download and who is on air, the rankings, a player's live broadcast, and the admin pages' App page" width="100%">
 </p>
 
 The official online service of **DJMAX Technika Q**, the Android rhythm game, ended in 2019. OpenDMTQ is an open-source
@@ -122,6 +121,16 @@ cd openDMTQ
   recordings, and backups, all also available as JSON ([the API](docs/api.md)).
 - **No internet needed** once the files are in ([without internet](docs/closed-network.md)).
 
+### The players' site
+
+The server's own site, the one at the top of this page: rankings, songs, player profiles and live broadcasts of players
+in a song, with recordings (off until you turn them on), in English and Korean, beside the admin pages. On a phone it is
+where players sign in and get the app.
+
+<p align="center">
+  <img src="docs/images/site-phone.webp" alt="The players' site on an Android phone: the sign-in page with an ID and a password typed in, and the Download page with Download app (.apk), the app's size and date, and the steps to download, install and play it" width="640">
+</p>
+
 ### The PC client
 
 The server's site offers a Windows installer set up for that server. The launcher signs in and keeps the game up to
@@ -143,15 +152,6 @@ adds its own runtime to the app: it translates the game's code as it runs, at th
 
 <p align="center">
   <img src="docs/images/chart-phones.svg" alt="A 32-bit game at 120 frames a second on a Galaxy S26 Ultra, a phone with no 32-bit support: 1.4 of each frame's 8.3 milliseconds at work, and no frame late, with or without a live broadcast" width="100%">
-</p>
-
-### The players' site
-
-Rankings, songs, player profiles and live broadcasts of players in a song, with recordings (off until you turn them
-on), in English and Korean, beside the admin pages.
-
-<p align="center">
-  <img src="docs/images/screens.webp" alt="The site's home page, rankings and live page, and the admin pages' App page, with made-up players and songs" width="100%">
 </p>
 
 ### Fast on little hardware
