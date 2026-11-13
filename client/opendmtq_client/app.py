@@ -106,11 +106,14 @@ class LauncherApp:
         widgets.style_ttk(self.ui)
 
     def _size_window(self):
-        """1180x760 at 100 % scaling, never more than 92 % of the screen, centred."""
+        """1180x760 at 100 % scaling, never more than 92 % of the room windows have (on Windows the work area: the
+        screen less the taskbar, the title bar counted too), centred across it and a third of the way down."""
+        from opendmtq_client.window_room import title_bar_height, window_box, work_area
         px = self.ui.px
-        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
-        w, h = min(px(1180), int(sw * 0.92)), min(px(760), int(sh * 0.92))
-        self.root.geometry("%dx%d+%d+%d" % (w, h, (sw - w) // 2, max(0, (sh - h) // 3)))
+        # The box in the work area, so that the strip with PLAY at the window's foot never sits under the taskbar.
+        w, h, x, y = window_box(work_area(self.root), title_bar_height(), px(1180), px(760))
+        self.root.geometry("%dx%d+%d+%d" % (w, h, x, y))
+        # The smallest size the pages are made for, or the window's own when the room is smaller still.
         self.root.minsize(min(px(960), w), min(px(640), h))
 
     def show(self):
