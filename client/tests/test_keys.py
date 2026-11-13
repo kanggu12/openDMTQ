@@ -1,6 +1,8 @@
 """Keyboard play's settings: the lanes' keys of each LINE mode as the launcher keeps them and writes them for the
 player, the checks the Controls page and --set share, and a key's place read from a press in the window."""
 
+import os
+import re
 import types
 import unittest
 from unittest import mock
@@ -8,10 +10,19 @@ from unittest import mock
 from opendmtq_client import i18n, keys
 from opendmtq_client import values as choices
 
-# The contract with the player (arm32/desktop/settings.cpp reads it): each key by the US layout's key at its place.
-CONTRACT = tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ") + tuple("0123456789") + (
-    "Space", "Semicolon", "Quote", "Comma", "Period", "Slash", "LeftBracket", "RightBracket", "Backslash", "Minus",
-    "Equals", "Grave")
+# The player's own table of the keys a lane can have, each name with its place (arm32/desktop/keyboard_play.h, kNames):
+# the contract the launcher writes to, read from the player's source so that a change on one side alone fails here.
+KEYBOARD_PLAY_H = os.path.join(os.path.dirname(__file__), "..", "..", "arm32", "desktop", "keyboard_play.h")
+
+
+def players_keys():
+    """kNames as {name: scan code}, read from the player's header."""
+    with open(KEYBOARD_PLAY_H, encoding="utf-8") as f:
+        source = f.read()
+    # The table from its opening brace to its end, each entry {"Name", 0xNN}.
+    table = source[source.index("kNames[] = {"):]
+    table = table[:table.index("};")]
+    return {name: int(scan, 16) for name, scan in re.findall(r'\{"([^"]+)", (0x[0-9a-fA-F]+)\}', table)}
 
 
 def refused(name, value):
@@ -25,10 +36,14 @@ def refused(name, value):
 
 class Contract(unittest.TestCase):
     def test_the_names_are_the_players(self):
-        # Every name the player takes, and no other: the launcher writes no key the player cannot bind.
-        self.assertEqual(sorted(choices.KEY_NAMES), sorted(CONTRACT))
+        # Every name the player takes, at the same place, and no other: the launcher writes no key the player cannot
+        # bind, and a key the Controls page reads by its place is the one the player binds there.
+        players = players_keys()
+        # The table was read whole: the 48 keys the player has today.
+        self.assertEqual(len(players), 48)
+        self.assertEqual(dict(choices.SCAN), players)
         # One place a name, one name a place.
-        self.assertEqual(len(set(choices.SCAN.values())), len(CONTRACT))
+        self.assertEqual(len(set(choices.SCAN.values())), len(players))
 
     def test_each_name_is_its_place_on_the_us_layout(self):
         # Set 1 scan codes, as Windows gives them in a key's message and as Linux numbers its keys: the rows of a US

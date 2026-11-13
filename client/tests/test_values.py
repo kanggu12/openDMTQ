@@ -162,15 +162,10 @@ class Values(unittest.TestCase):
         """Each key the launcher writes, and each fixed value it offers, is one the player's reader takes."""
         with open(SETTINGS_CPP, encoding="utf-8") as f:
             source = f.read()
-        # Keyboard play's keys are the player's from the reader that has keyboard play (it names "keyboard"): a reader
-        # from before it logs them and leaves them out, as it does any key it does not know, and these four are then
-        # all the launcher writes that it does not take.
-        later = ("keyboard",) + tuple(choices.LANES)
-        reads_keys = '"keyboard"' in source
+        # Every key, keyboard play's four too: the player's reader takes each by its name (settings.cpp, key == "...").
+        # A reader that left one out would log it and play without it, so none is let off.
         for name in choices.ORDER:
-            if name in later and not reads_keys:
-                continue
-            self.assertIn('"%s"' % name if name in later else 'key == "%s"' % name, source, name)
+            self.assertIn('key == "%s"' % name, source, name)
         for name, offered in choices.CHOICES.items():
             for value in offered:
                 if name in ("fps", "render_scale") and value not in ("auto", "unlimited"):
