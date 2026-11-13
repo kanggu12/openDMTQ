@@ -122,7 +122,7 @@ of a line is checked before any is applied, so one the launcher does not take ch
 | The mouse's left button | One finger on the screen: tap, hold and drag |
 | The mouse wheel | Scrolls what is under the pointer, as a finger's drag; with Shift, across |
 | A pen | One finger |
-| Esc | The phone's Back key: pauses a song, closes what is open |
+| Esc | The phone's Back key: closes what is open; in a song it does nothing, and the game's pause button pauses |
 | The lane keys, while a song is played | [Keyboard play](#keyboard-play): each lane of the song a key, F J in 2 LINE, D F J in 3 LINE and D F J K in 4 LINE from the top lane, each press where the game judges the lane's next note |
 | The keyboard | Text where the game asks for it, the text it opens with taken as selected: the first key types over it, Backspace clears it, an arrow keeps it (Enter ends it, Esc cancels it); Hangul too |
 | The touch keyboard | Comes up when a touch opens the game's text, and types into it |
