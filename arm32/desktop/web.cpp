@@ -5,6 +5,8 @@
 #include "player.h"
 
 #include "http.h"
+// The mark of a keyboard play on the request that saves it.
+#include "keyplay.h"
 
 #include <algorithm>
 #include <cctype>
@@ -138,7 +140,11 @@ void www_run(jvm::Env& e, Www& w) {
         int status = 0;
         std::string reason;
         std::vector<std::pair<std::string, std::string>> headers;
-        if (!parse_url(url, u, f) || !http.send(w.has_post ? "POST" : "GET", u, w.headers, w.post, 0, f) || !http.head(status, reason, headers, f)) return error(f.text);
+        // The game's headers, with the mark of a keyboard play when this request saves one (keyplay.cpp): on each hop.
+        const char* method = w.has_post ? "POST" : "GET";
+        std::vector<std::pair<std::string, std::string>> sent = w.headers;
+        keyplay_mark_save(method, w.post, sent);
+        if (!parse_url(url, u, f) || !http.send(method, u, sent, w.post, 0, f) || !http.head(status, reason, headers, f)) return error(f.text);
         if (status == 301 || status == 302) {
             auto loc = std::find_if(headers.begin(), headers.end(), [](auto& h) { return strcasecmp(h.first.c_str(), "Location") == 0; });
             if (loc != headers.end()) {
@@ -220,7 +226,10 @@ void uwr_run(jvm::Env& e, WebRequest& r) {
     int status = 0;
     std::string reason;
     std::vector<std::pair<std::string, std::string>> headers;
-    if (!parse_url(r.url, u, f) || !http.send(r.method, u, r.headers, body, r.timeout_ms, f) || !http.head(status, reason, headers, f)) return error(f);
+    // The game's headers, with the mark of a keyboard play when this request saves one (keyplay.cpp).
+    std::vector<std::pair<std::string, std::string>> sent = r.headers;
+    keyplay_mark_save(r.method, body, sent);
+    if (!parse_url(r.url, u, f) || !http.send(r.method, u, sent, body, r.timeout_ms, f) || !http.head(status, reason, headers, f)) return error(f);
     e.call_static(c, "responseCodeCallback", "(JI)V", {p, Value::I(status)});
     e.call_static(c, "headerCallback", "(JLjava/lang/String;Ljava/lang/String;)V", {p, Value(jvm::string("Status")), Value(jvm::string(http.status_line()))});
     for (auto& [k, v] : headers) e.call_static(c, "headerCallback", "(JLjava/lang/String;Ljava/lang/String;)V", {p, Value(jvm::string(k)), Value(jvm::string(v))});
