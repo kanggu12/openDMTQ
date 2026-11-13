@@ -39,6 +39,8 @@ $value = function (array $p) use ($sort, $month): string {
 // The signed-in account's own player, when linked: their place is marked wherever it shows.
 $me = site_me();
 $podium = array_slice($players, 0, 3);
+// The podium's keyboard count goes with a score it counts: the total's bests, or this month's.
+$podium_keys = $sort === 'total' || $month;
 $rest = array_slice($players, 3);
 $first_rank = 4;
 
@@ -58,10 +60,12 @@ page_header(t('rank.title'), 'ranking');
     <div class="podium" style="--places:<?= count($podium) ?>">
       <?php foreach ($podium as $i => $p): ?>
         <?php // The whole box leads to the player (the name's link stretches over it); a LIVE mark leads to their broadcast. The
-              // keyboard's mark goes beside the name here: a phone's narrow box has no room for it beside the big score. ?>
+              // keyboard's mark goes beside the name here: a phone's narrow box has no room for it beside the big score. Only
+              // where that score is what it counts (Total score, This month): the other tabs' podium shows S grades, perfect
+              // plays or charts, which it does not count. ?>
         <div class="pod <?= ['first', 'second', 'third'][$i] ?><?= (int)$p['id'] === $me ? ' me' : '' ?>">
           <span class="pod-place place-<?= $i + 1 ?>"><?= $i + 1 ?></span>
-          <span class="pod-who"><a class="pod-name" href="player.php?id=<?= (int)$p['id'] ?>"><?= h($p['name']) ?></a><?= keys_count_mark((int)$p['keys']) ?><?= live_mark($db, (int)$p['id']) ?></span>
+          <span class="pod-who"><a class="pod-name" href="player.php?id=<?= (int)$p['id'] ?>"><?= h($p['name']) ?></a><?= $podium_keys ? keys_count_mark((int)$p['keys']) : '' ?><?= live_mark($db, (int)$p['id']) ?></span>
           <span class="pod-score"><?= $value($p) ?></span>
           <span class="pod-sub"><?= $sorts[$sort] ?></span>
         </div>

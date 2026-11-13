@@ -664,7 +664,7 @@ async function portalFlows(contexts) {
 // fourth play). Held to what the database says (run.sh writes it to keys.json beside the report): each play and best a keyboard
 // play made has the mark before its score, and no other; each total, month's score and past month's score that counts such
 // bests has it with how many, worked out here from the plays themselves. Both languages, a phone's width and a laptop's.
-const KEY_WORDS = { en: ['Keyboard play', n => (n === 1 ? 'Includes 1 keyboard play' : `Includes ${n} keyboard plays`)],
+const KEY_WORDS = { en: ['Keyboard play', n => (n === 1 ? 'Includes 1 keyboard record' : `Includes ${n} keyboard records`)],
   ko: ['키보드 플레이', n => `키보드 플레이 기록 ${n}개 포함`] };
 async function keyboardMarks(contexts) {
   const truth = JSON.parse(fs.readFileSync(path.join(OUT, 'keys.json'), 'utf8'));
@@ -691,7 +691,8 @@ async function keyboardMarks(contexts) {
   check('the stand-in players include keyboard plays and bests, and plays by touch', plays.some(p => p[5]) && plays.some(p => !p[5])
     && bests.some(b => b[3]) && bests.some(b => !b[3]) && !allTime[1], JSON.stringify(allTime));
   const wrong = [], hidden = [], shot = [], layout = [];
-  let viewsSeen = 0;
+  // Views looked at, and marks whose place was measured: a measure of no mark at all would pass without seeing one.
+  let viewsSeen = 0, marksPlaced = 0;
   // Every mark of a page with what it stands for: its row's key (player, chart, score as the row shows them) and its words.
   const read = page => page.evaluate(() => {
     const num = el => Number((el && el.textContent || '').replace(/[^0-9]/g, '')) || 0;
@@ -726,7 +727,7 @@ async function keyboardMarks(contexts) {
         score: num(l.querySelector('.feed-score > span:last-child')), mark: mark(l.querySelector('.feed-score')) })),
       top: rows('.feed.ranks li').map(l => ({ who: id(l.querySelector('.who a'), 'id'), mark: mark(l) })),
       // The rankings: the podium and the table (player, mark), and each month before (its name, its first three).
-      ranked: [...rows('.podium .pod').map(p => ({ who: id(p.querySelector('.pod-name'), 'id'), mark: mark(p.querySelector('.pod-who')) })),
+      ranked: [...rows('.podium .pod').map(p => ({ who: id(p.querySelector('.pod-name'), 'id'), mark: mark(p.querySelector('.pod-who')), pod: true })),
         ...rows('table.board tbody tr').map(r => ({ who: id(r.querySelector('td.name a'), 'id'), mark: mark(r) }))],
       months: rows('.past-month').map(m => ({ name: m.querySelector('h3').textContent.trim(),
         top: [...m.querySelectorAll('.past-top li')].map(l => ({ who: id(l.querySelector('a'), 'id'), mark: mark(l.querySelector('b')) })) })),
@@ -756,6 +757,8 @@ async function keyboardMarks(contexts) {
       const before = wrong.length;
       judge(seen, lang, `${name} ${lang}${width}`);
       for (const p of seen.placed) if (!p.ok) hidden.push(`${name} ${lang}${width}: ${p.at}`);
+      // Counted, so that the check of their places knows it measured some.
+      marksPlaced += seen.placed.length;
       // The views with marks, for people to look at.
       if (seen.all) {
         await page.screenshot({ path: path.join(OUT, 'shots', `keys-${name}-${lang}-${width}.jpg`), type: 'jpeg', quality: 80, fullPage: true });
@@ -820,9 +823,22 @@ async function keyboardMarks(contexts) {
     wrong.length === home, wrong.slice(home, home + 6).join(' ; '));
   // The rankings: every tab of totals, this month (the month's own bests), and the months before.
   const ranks = wrong.length;
+  // The podium of a tab that ranks another figure (S grades) shows that figure, which the count does not describe: no mark
+  // there, for a player whose total has keyboard bests too (podiumKeys counts those, so that the look sees one at least).
+  const podium = [];
+  let podiumKeys = 0;
   for (const sort of ['total', 's_count']) {
     await look(`rankings-${sort}`, `${P}/ranking.php?sort=${sort}`, (seen, lang, at) => {
-      for (const r of seen.ranked) same(`${at} ${r.who}`, r.mark, allTime[r.who] || null, lang);
+      for (const r of seen.ranked) {
+        // The total's count: on every row of the table, and on the podium of the Total score tab.
+        if (!r.pod || sort === 'total') {
+          same(`${at} ${r.who}`, r.mark, allTime[r.who] || null, lang);
+          continue;
+        }
+        // On the S grades tab's podium: none, whatever the total counts.
+        podiumKeys += allTime[r.who] ? 1 : 0;
+        if (r.mark) podium.push(`${at} podium ${r.who}: ${JSON.stringify(r.mark)}`);
+      }
     });
   }
   const thisMonth = monthKeys(monthStart(0), Number.MAX_SAFE_INTEGER);
@@ -852,17 +868,24 @@ async function keyboardMarks(contexts) {
   });
   check("the rankings mark each total, this month's score and each past month's score that counts bests a keyboard play set, with how many",
     wrong.length === ranks && pastNamed > 0 && monthMarks > 0, wrong.slice(ranks, ranks + 6).join(' ; ') + ` ${pastNamed} months, ${monthMarks} marks`);
-  // Nowhere else: pages that show no scores have no mark.
+  check("the podium has the keyboard's count on the Total score and This month tabs alone, none beside S grades",
+    podium.length === 0 && podiumKeys > 0, podium.slice(0, 6).join(' ; ') + ` (${podiumKeys} podium places with keyboard bests)`);
+  // Nowhere else: pages that show no scores have no mark. The home page, looked at the same way, must have some: a look that
+  // finds no mark anywhere would pass these pages without seeing anything.
   const nowhere = wrong.length;
-  for (const [name, url] of [['songs', `${P}/songs.php`], ['live', `${P}/live.php`], ['download', `${P}/download.php`]]) {
+  let control = 0;
+  for (const [name, url] of [['songs', `${P}/songs.php`], ['live', `${P}/live.php`], ['download', `${P}/download.php`], ['home', `${P}/`]]) {
     const page = await contexts.signed.newPage();
     await page.setViewport({ width: 1280, height: 900 });
     await page.goto(url, { waitUntil: 'networkidle2' });
     const n = await page.$$eval('.keys-mark', ms => ms.length);
-    if (n) wrong.push(`${name}: ${n} marks`);
+    // The home page is the look's control; every other page must have none.
+    if (name === 'home') control = n;
+    else if (n) wrong.push(`${name}: ${n} marks`);
     await page.close();
   }
-  check('pages that show no score have no keyboard mark', wrong.length === nowhere, wrong.slice(nowhere).join(' ; '));
+  check('pages that show no score have no keyboard mark', wrong.length === nowhere && control > 0,
+    wrong.slice(nowhere).join(' ; ') + ` (the home page, looked at the same way: ${control} marks)`);
   // The admin pages: the status page's newest plays and the Plays tab, by the player and the score of each row.
   const owner = wrong.length;
   let adminRows = 0;
@@ -881,8 +904,8 @@ async function keyboardMarks(contexts) {
   }
   check("the admin pages mark the plays a keyboard play made, on the status page and the Plays tab", wrong.length === owner && adminRows > 20,
     wrong.slice(owner, owner + 6).join(' ; ') + ` (${adminRows} rows)`);
-  check("every keyboard mark stands beside what it marks, on its line, whole and on the screen, at a phone's width too", hidden.length === 0,
-    hidden.slice(0, 8).join(' ; '));
+  check("every keyboard mark stands beside what it marks, on its line, whole and on the screen, at a phone's width too",
+    hidden.length === 0 && marksPlaced > 0, hidden.slice(0, 8).join(' ; ') + ` (${marksPlaced} marks measured)`);
   check(`the pages with keyboard marks: nothing wrong with the layout (${viewsSeen} views)`, layout.length === 0 && viewsSeen >= 30,
     layout.slice(0, 8).join(' ; '));
   console.log(`  pictures: ${shot.join(', ')}`);
