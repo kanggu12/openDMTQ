@@ -40,8 +40,6 @@ same app in the OpenDMTQ PC client.
 
 ## Quick start
 
-Two ways to begin, each complete on its own: playing on a server, and running one.
-
 <table>
 <tr>
 <th width="50%" align="left">Play</th>
@@ -52,24 +50,22 @@ Two ways to begin, each complete on its own: playing on a server, and running on
 
 With the account the server's owner made for you:
 
-1. On an **Android phone**, open the address the owner gives you (or scan their QR code) and sign in.
-2. Tap **Download app (.apk)** and install it. The app is the game, connected to that server; 64-bit-only phones play
-   too. [iPhones cannot](docs/game-files.md#iphones).
-3. On a **Windows PC**, download the installer for Windows from the same page instead. Its launcher signs in and keeps
-   the game up to date.
+1. On an **Android phone**, open the server's address (or scan its QR code) and sign in.
+2. Tap **Download app (.apk)** and install it: the game, connected to that server. 64-bit-only phones play too;
+   [iPhones cannot](docs/game-files.md#iphones).
+3. On a **Windows PC**, take the installer from the same page. Its launcher signs in and keeps the game up to date.
 
 **[The players' guide](docs/play.md)**
 
 </td>
 <td valign="top">
 
-With your own copy of the game's Android app, its client data, and its song data for the songs
-([what they are](docs/game-files.md)):
+With your own copy of the game's Android app, its client data and its song data ([what they are](docs/game-files.md)):
 
-1. Start the server with the commands below for your system.
-2. The setup opens in the browser. It finds your files in Downloads or on the Desktop, says what each one is, asks for
-   the address phones use and an account for each player, and builds the app.
-3. Give each player the address and their account: the setup makes the message to send.
+1. Start the server with the commands below.
+2. The setup opens in the browser. It finds your files, asks for the address phones use and an account for each
+   player, and builds the app.
+3. Send each player the message the setup makes, with the address and their account.
 
 **[The server guide](docs/install.md)**
 
@@ -77,12 +73,7 @@ With your own copy of the game's Android app, its client data, and its song data
 </tr>
 </table>
 
-<p align="center">
-  <img src="docs/images/setup.jpg" alt="The setup in the browser: the game's Android app, the client data and the song data found in Downloads, each labeled with what it is, with a button to import them" width="100%">
-</p>
-
-**Windows 10 or 11**, in Windows PowerShell. The setup opens in the browser once the server answers; the server runs
-while its window is open, and Windows Firewall asks to allow it on private networks:
+**Windows 10 or 11**, in PowerShell (the server runs while its window is open):
 
 ```powershell
 cd ~
@@ -91,15 +82,14 @@ tar.exe -xf OpenDMTQ-windows.zip
 start .\OpenDMTQ\OpenDMTQ.exe
 ```
 
-**Debian, Ubuntu, or a Mac with Homebrew**, as your own user, not root (it asks for your password to install packages;
-without a screen it prints the setup's address):
+**Debian, Ubuntu, or a Mac with Homebrew**, as your own user, not root:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/main/host/get.sh | sh
 ```
 
-**Docker** on Linux, macOS, or Windows with WSL, with Docker 23 or newer and Compose, Python 3.9 or newer and git. Files
-in another place: `./opendmtq setup --from <folder>`; it ends with the admin pages' address, where accounts are made:
+**Docker**, with Docker 23 or newer and Compose, Python 3.9 or newer and git (or **Kubernetes**, with
+[the Helm chart](docs/kubernetes.md#install-on-a-cluster)):
 
 ```sh
 git clone https://github.com/kanggu12/openDMTQ.git
@@ -107,8 +97,9 @@ cd openDMTQ
 ./opendmtq setup
 ```
 
-**Kubernetes:** the Helm chart, with a volume for the game files and S3 storage:
-[install on a cluster](docs/kubernetes.md#install-on-a-cluster).
+<p align="center">
+  <img src="docs/images/setup.jpg" alt="The setup in the browser: the game's Android app, the client data and the song data found in Downloads, each labeled with what it is, with a button to import them" width="100%">
+</p>
 
 ## What it does
 
@@ -116,29 +107,26 @@ cd openDMTQ
 - **The game's online features.** Accounts, scores, monthly and per-song rankings, achievements and maintenance
   notices.
 - **Your own songs.** Add songs as packages or hide others; phones get what changed at their next start.
-- **Admin pages and an HTTP API.** A setup wizard in the browser, the app, songs, players, accounts, broadcasts and
-  recordings, and backups, all also available as JSON ([the API](docs/api.md)).
+- **Admin pages and an HTTP API.** The setup, the app, songs, players, accounts, broadcasts and backups in the browser,
+  all also as JSON ([the API](docs/api.md)).
 - **No internet needed** once the files are in ([without internet](docs/closed-network.md)).
+- **Tested before every release** on the real game files, on Windows, Debian, Ubuntu and Docker, and the PC client
+  under Wine and on Windows itself ([testing](docs/testing.md)).
 
 ### The players' site
 
-The server's own site, the one at the top of this page: rankings, songs, player profiles and live broadcasts of players
-in a song, with recordings (off until you turn them on), in English and Korean, beside the admin pages. On a phone it is
-where players sign in and get the app.
+Rankings, songs, player profiles and live broadcasts with recordings, in English and Korean. On a phone, it is where
+players sign in and get the app.
 
 <p align="center">
-  <img src="docs/images/site-phone.webp" alt="The players' site on an Android phone: the sign-in page with an ID and a password typed in, and the Download page with Download app (.apk), the app's size and date, and the steps to download, install and play it" width="640">
+  <img src="docs/images/site-phone.webp" alt="The players' site on an Android phone: the sign-in page with an ID and a password typed in, and the Download page with Download app (.apk), the app's size and date, and the steps to download, install and play it" width="560">
 </p>
 
 ### The PC client
 
-The server's site offers a Windows installer set up for that server. The launcher signs in and keeps the game up to
-date, the game runs at the display's refresh rate (up to 240 Hz), and an overlay bar with minimise, full screen and quit
-slides down from the top edge ([the PC client](docs/windows-player.md)).
-
-<p align="center">
-  <img src="docs/images/overlay-bar.webp" alt="The handle at the top centre of the game lights up, and the overlay bar slides down with minimise, full screen and quit, then back up" width="100%">
-</p>
+A Windows installer from the server's site, set up for that server. Its launcher signs in and keeps the game up to
+date; the game runs at the display's refresh rate (up to 240 Hz), with an overlay bar for minimise, full screen and
+quit ([the PC client](docs/windows-player.md)).
 
 <p align="center">
   <img src="docs/images/client-play.png" alt="The launcher's PLAY page: the server and the sign-in, the ready check, how to play, the last game, and PLAY" width="100%">
@@ -147,7 +135,7 @@ slides down from the top edge ([the PC client](docs/windows-player.md)).
 ### Newer phones
 
 The game has only 32-bit code, which newer phones (Pixel 7 and later, Galaxy S24 and later) cannot install. OpenDMTQ
-adds its own runtime to the app: it translates the game's code as it runs, at the display's full refresh rate.
+adds its own runtime to the app, which translates the game's code as it runs, at the display's full refresh rate.
 
 <p align="center">
   <img src="docs/images/chart-phones.svg" alt="A 32-bit game at 120 frames a second on a Galaxy S26 Ultra, a phone with no 32-bit support: 1.4 of each frame's 8.3 milliseconds at work, and no frame late, with or without a live broadcast" width="100%">
@@ -155,20 +143,12 @@ adds its own runtime to the app: it translates the game's code as it runs, at th
 
 ### Fast on little hardware
 
-Plain PHP and SQLite, with no database server to run. Two CPU cores handle hundreds of game requests per second
+Plain PHP and SQLite, with no database server to run. Two CPU cores answer hundreds of game requests a second
 ([how it was measured](docs/testing.md#measurements)).
 
 <p align="center">
   <img src="docs/images/chart-requests.svg" alt="The game's requests on two cores with eight phones and a million plays: half of the answers within 2.4 milliseconds for a sign-in, 2.5 for every chart's ranking, 6.8 for one song's, 8.5 for the song list and 18.3 for saving a play" width="100%">
 </p>
-
-### Where things stand
-
-- **Plays:** Android phones and tablets, 64-bit-only ones included, and Windows PCs through the PC client, with the
-  game's online features, the players' site, live broadcasts and the admin pages.
-- **Does not play:** iPhones and iPads, which cannot run the game's Android app ([why](docs/game-files.md#iphones)).
-- **Tested** before every release on the real game files, under Wine and on Windows itself, on Debian and Ubuntu and
-  with Docker ([testing](docs/testing.md)).
 
 ## How it works
 
@@ -182,48 +162,22 @@ Accounts, scores and recordings stay in `data/` on your computer ([privacy](docs
 
 ## What it runs on
 
-| Server | Minimum | Recommended |
-| :--- | :--- | :--- |
-| **Computer** | 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker; 2 GB of memory | 2 cores, 4 GB |
-| **Disk** | 1 GB without the songs | 7 GB with every song |
-
-| Clients | Minimum | Recommended |
-| :--- | :--- | :--- |
-| **Phones** | Android 5.0 | Android 8 or newer to broadcast |
-| **PCs** | The PC client: 64-bit Windows 10 or 11 on an x64 processor (Intel or AMD), a graphics card with Direct3D 11, 1 GB of free memory, 390 MB of disk | A touch screen, for several fingers at once |
+- **The server:** 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker, with 2 GB of memory (2 cores and
+  4 GB recommended) and 1 GB of disk, 7 GB with every song.
+- **Phones:** Android 5.0 or newer, 8 or newer to broadcast.
+- **PCs:** the PC client on 64-bit Windows 10 or 11 with an x64 processor (Intel or AMD), a graphics card with
+  Direct3D 11, 1 GB of free memory and 390 MB of disk; a touch screen plays with several fingers at once.
 
 ## Guides
 
-### For players
-
-| Guide | What it covers |
-| :--- | :--- |
-| [Playing on a server](docs/play.md) | The app on Android phones and tablets: signing in, installing, updates, broadcasting, which devices |
-| [The PC client](docs/windows-player.md) | Playing on a Windows PC: the installer, the launcher, controls, graphics and sound |
-| [Troubleshooting](docs/troubleshooting.md#for-players) | When the app or the PC client does not work |
-
-### For server owners
-
-| Guide | What it covers |
-| :--- | :--- |
-| [Installing](docs/install.md) | Each system step by step, everyday use, updates and backups |
-| [The game's files](docs/game-files.md) | What the app, the client data and the song data have to be |
-| [The site and the admin pages](docs/admin.md) | The setup, the app, songs, players, backups |
-| [Songs](docs/songs.md) | Importing songs, adding your own |
-| [Playing from outside your home](docs/internet.md) | A host name, one forwarded port, HTTPS |
-| [Live broadcasts](docs/live.md) | Broadcasts of players in a song, recordings |
-| [Kubernetes](docs/kubernetes.md) | The Helm chart, failover, backups to S3 |
-| [Without internet](docs/closed-network.md) | A server and phones on a closed network |
-| [The API](docs/api.md) | All the admin pages show and do, and what the players' site shows, as JSON |
-| [Troubleshooting](docs/troubleshooting.md#for-server-owners) · [Questions and answers](docs/faq.md) | When something does not work; what people ask first |
-
-### For contributors
-
-| Guide | What it covers |
-| :--- | :--- |
-| [Contributing](CONTRIBUTING.md) | Where the code is, how to build and test each part, and how a change reaches a release; no game files needed |
-| [Architecture](docs/architecture.md) | How the parts fit together, each part's code and how it is checked |
-| [Testing](docs/testing.md) · [Test cases](docs/test-cases.md) | What runs before a change reaches a release, and every case |
+- **For players:** [playing on a server](docs/play.md) · [the PC client](docs/windows-player.md) ·
+  [troubleshooting](docs/troubleshooting.md#for-players)
+- **For server owners:** [installing](docs/install.md) · [the game's files](docs/game-files.md) ·
+  [the site and the admin pages](docs/admin.md) · [songs](docs/songs.md) · [playing from outside your home](docs/internet.md) ·
+  [live broadcasts](docs/live.md) · [Kubernetes](docs/kubernetes.md) · [without internet](docs/closed-network.md) ·
+  [the API](docs/api.md) · [troubleshooting](docs/troubleshooting.md#for-server-owners) · [questions and answers](docs/faq.md)
+- **For contributors:** [contributing](CONTRIBUTING.md) · [architecture](docs/architecture.md) ·
+  [testing](docs/testing.md) · [test cases](docs/test-cases.md)
 
 Report a bug or ask for a feature in [Issues](https://github.com/kanggu12/openDMTQ/issues/new/choose); see what changed
 in [CHANGELOG.md](CHANGELOG.md), and report security problems through [SECURITY.md](.github/SECURITY.md).
