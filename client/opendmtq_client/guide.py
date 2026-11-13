@@ -2,8 +2,9 @@
 
 POWER ON (language, what is needed), SERVER (the server's address, or the one the installer brought), SIGN IN (the ID
 and password its owner made), DOWNLOAD (that server's app), SOUND CHECK (sound and screen), STAGE START (the ready
-check, then PLAY). Every choice is the same setting the launcher's pages show, so the guide never knows anything the
-pages do not.
+check and how to play, then PLAY). Each step's question is its page's title, its few words under it, and the step's
+name stays in the strip across the header; while Next waits, a line at the foot of the step's card says for what.
+Every choice is the same setting the launcher's pages show, so the guide never knows anything the pages do not.
 """
 
 import tkinter as tk
@@ -257,11 +258,15 @@ class Guide:
 
     def _stage(self, parent):
         app, ui, w = self.app, self.app.ui, self.app.words
-        card = pages._card(parent, ui, w("play.ready"), last=True)
+        card = pages._card(parent, ui, w("play.ready"))
         app.check_box = tk.Frame(card.body, bg=theme.PANEL)
         app.check_box.pack(fill="x")
         app.refresh_checks()
         pages.refresh_checks(app)
+        # How to play, as the PLAY page has it, before the first song: the keys, and how to leave the game, which starts
+        # in full screen with no buttons of Windows'. No link: the guide has no menu to go to.
+        how = pages._card(parent, ui, w("play.how"), last=True)
+        pages.how_to_play(app, how.body, link=False)
 
     def checks_changed(self):
         """The ready check came back (app._checked): the last step's PLAY follows it."""

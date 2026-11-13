@@ -138,12 +138,9 @@ def build_play(app, parent):
     widgets.Button(ready.head, ui, w("help.recheck"), lambda: app.refresh_checks(force=True)).pack(side="right")
     app.check_box = tk.Frame(ready.body, bg=theme.PANEL)
     app.check_box.pack(fill="x")
-    # Right: how to play, and how the last game went, the last as tall as what is left of the column.
+    # Right: how to play, keyboard play first, and how the last game went, the last as tall as what is left of the column.
     how = _card(right, ui, w("play.how"))
-    for i, key in enumerate(("play.how.1", "play.how.2", "play.how.3")):
-        if i:
-            widgets.divider(how.body, ui, pady=8)
-        widgets.label(how.body, ui, w(key), wrap_margin=0).pack(fill="x")
+    how_to_play(app, how.body)
     last = widgets.Card(right, ui, w("play.last"))
     last.pack(fill="both", expand=True)
     record = app.state.last_session or {}
@@ -156,6 +153,42 @@ def build_play(app, parent):
     # comes back, the box says it is being made.
     app.refresh_checks()
     refresh_checks(app)
+
+
+# How to play's lines after keyboard play's: the touch screen, the mouse, then Esc and leaving the game by the bar.
+HOW_TO_PLAY = ("play.how.1", "play.how.2", "play.how.3")
+
+
+def keys_line(w, values):
+    """How to play's first line, keyboard play as the settings have it now (the Controls page or --set): each LINE
+    mode's keys from its top lane ("F J in 2 LINE, ..."), a lane's second key after a /, or that it is off."""
+    if values["keyboard"] != "on":
+        # Off: the line says so, and the link beside it leads where it is turned on.
+        return w("play.how.keys.off")
+    # Each mode in the game's own order (2, 3, then 4 LINE), with its lanes as the settings file writes them.
+    modes = [w("play.how.keys.mode", keys=values[name], mode=choices.mode(name)) for name in choices.LANES]
+    return w("play.how.keys", lanes=", ".join(modes))
+
+
+def how_to_play(app, body, link=True):
+    """How to play's lines in a card's body, on PLAY and on the guide's STAGE START: keyboard play first, as the settings
+    have it, with the Controls page one press away (`link`; the guide has no menu to go to), then HOW_TO_PLAY's."""
+    ui, w = app.ui, app.words
+    # Keyboard play's line, its link at the right end as Help's lines have theirs.
+    line = tk.Frame(body, bg=theme.PANEL)
+    line.pack(fill="x")
+    beside = ()
+    if link:
+        # The page the keys are set on, by the menu's own name, reached by the mouse or the keyboard.
+        to = widgets.link(line, ui, TITLES["controls"], lambda: app.nav_go("controls"))
+        to.pack(side="right", anchor="n")
+        beside = (to,)
+    widgets.label(line, ui, keys_line(w, app.state.values), wrap_margin=12, beside=beside).pack(side="left", fill="x")
+    for key in HOW_TO_PLAY:
+        # One line each, split by the card's faint lines, a little closer than before: with keyboard play's line on top,
+        # the card and Last game under it still end above the bottom bar at the window's own size (shots.py, play_fits).
+        widgets.divider(body, ui, pady=5)
+        widgets.label(body, ui, w(key), wrap_margin=0).pack(fill="x")
 
 
 def _last_session(app):
@@ -185,33 +218,55 @@ def refresh_checks(app):
         widgets.label(box, ui, "...", fg=theme.MUTED).pack(anchor="w")
         return
     from opendmtq_client import installed
+    # Asked once for every row: whether this launcher was installed, so that its player can be put back by Repair.
+    root = installed.root()
     for i, check in enumerate(checks):
         if i:
             widgets.divider(box, ui, pady=9)
-        name, value, action, fix = w("check." + check.key), None, None, w("play.fix")
-        if not check.ok and check.key == "player" and installed.root():
-            # The player comes with the launcher: the installed one puts it back from its package.
-            state, fix, action = "bad", w("check.player.repair"), lambda: maintenance.repair_program(app)
-        elif not check.ok and check.key == "player":
-            # A copied folder: installing brings the player back, and no page here can.
-            state, value = "bad", w("check.player.missing")
-        elif check.ok:
-            state = "ok"
-            # What it is about, which a player wants to confirm: the server, the account, the app's date. The PLAY
-            # page's server card above already names the server and the account.
-            about = ("app",) if app.page == "play" and app.guide is None else ("server", "account", "app")
-            if check.key in about:
-                value = check.detail
-        elif check.play_fixes:
-            # PLAY does these by itself; the row only says it will.
-            state, value = "change", w("play.will_get")
-        elif not check.blocks and check.key == "server":
-            # The server does not answer: nothing to fix on this PC, and PLAY still plays this PC's app.
-            state, value = "change", w("check.server.down")
-        else:
-            state = "bad" if check.key in actions.BLOCKING else "change"
-            action = (lambda p=check.page: app.nav_go(p)) if check.page and app.guide is None else None
-        widgets.check_line(box, ui, state, name, fix if action else None, action, value=value).pack(fill="x")
+        row = check_row(check, w, on_play=app.page == "play" and app.guide is None, in_guide=app.guide is not None,
+                        installed=bool(root))
+        # The row's way on: Repair runs here, a page name opens that page (none in the guide, which has no menu).
+        action = None
+        if row["go"] == "repair":
+            # Repair runs on the click, under its own dialog.
+            action = lambda: maintenance.repair_program(app)
+        elif row["go"]:
+            # The page it names, as the menu would open it.
+            action = lambda p=row["go"]: app.nav_go(p)
+        widgets.check_line(box, ui, row["state"], w("check." + check.key), row["link"], action,
+                           value=row["value"]).pack(fill="x")
+
+
+def check_row(check, w, on_play=False, in_guide=False, installed=False):
+    """How a ready-check row says one check: {"state": "ok", "change" or "bad", "value": words at the right end or None,
+    "link": the link's words or None, "go": "repair", a page's name or None}. A link is named after where it leads, as
+    Help's lines name their pages: the page's name in the menu ("ONLINE ›"), or Repair, which runs at once."""
+    row = {"state": "ok", "value": None, "link": None, "go": None}
+    if not check.ok and check.key == "player" and installed:
+        # The player comes with the launcher: the installed one puts it back from its package, at once.
+        row.update(state="bad", link=w("check.player.repair"), go="repair")
+    elif not check.ok and check.key == "player":
+        # A copied folder: installing brings the player back, and no page here can.
+        row.update(state="bad", value=w("check.player.missing"))
+    elif check.ok:
+        # What it is about, which a player wants to confirm: the server, the account, the app's date. The PLAY page's
+        # server card above already names the server and the account.
+        about = ("app",) if on_play else ("server", "account", "app")
+        if check.key in about:
+            row["value"] = check.detail
+    elif check.play_fixes:
+        # PLAY does these by itself; the row only says it will.
+        row.update(state="change", value=w("play.will_get"))
+    elif not check.blocks and check.key == "server":
+        # The server does not answer: nothing to fix on this PC, and PLAY still plays this PC's app.
+        row.update(state="change", value=w("check.server.down"))
+    else:
+        # What stops PLAY is a problem; the rest will change once the player sees to it.
+        row["state"] = "bad" if check.key in actions.BLOCKING else "change"
+        if check.page and not in_guide:
+            # The page that sees to it, by the menu's own name; the guide has no menu to go to, so no link there.
+            row.update(link=TITLES[check.page], go=check.page)
+    return row
 
 
 # -------------------------------------------------------------------------------------------- Screen

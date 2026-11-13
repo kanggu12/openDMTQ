@@ -134,6 +134,13 @@ class CommandLine(Folder):
         self.assertEqual(code, 2, said)
         code, said = self.run_main(["--status"])
         self.assertIn("keyboard=off, keys_2line=F/G J, keys_3line=D F J, keys_4line=1 2 3 4", said)
+        # The PLAY page's How to play says what --set left: off, then the keys once it is on again.
+        from opendmtq_client import i18n, pages
+        self.assertEqual(pages.keys_line(i18n.Words("en"), st.LauncherState.load().values), "Keyboard play is off.")
+        code, said = self.run_main(["--set", "keyboard=on"])
+        self.assertEqual(code, 0, said)
+        self.assertEqual(pages.keys_line(i18n.Words("en"), st.LauncherState.load().values),
+                         "Keys play the lanes from the top: F/G J in 2 LINE, D F J in 3 LINE, 1 2 3 4 in 4 LINE.")
         # PLAY writes them for the player, after the sound's.
         code, said = self.run_main(["--server", self.site.url, "--sign-in", stub.ACCOUNT, "--set", "keyboard=on"],
                                    stdin=stub.PASSWORD + "\n")

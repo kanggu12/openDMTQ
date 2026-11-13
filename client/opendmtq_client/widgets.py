@@ -720,10 +720,10 @@ def divider(parent, ui, bg=theme.DIVIDER, pady=12):
     return line
 
 
-def lamp(parent, ui, colour, bg=theme.PANEL):
-    """A state's small light with its glow (art.lamp), as a label."""
+def lamp(parent, ui, colour, bg=theme.PANEL, hollow=False):
+    """A state's small light with its glow (art.lamp), as a label; `hollow` draws it as a ring."""
     from PIL import ImageTk
-    picture = art.lamp(colour, ui.scale, bg=bg)
+    picture = art.lamp(colour, ui.scale, bg=bg, hollow=hollow)
     image = ImageTk.PhotoImage(picture, master=parent)
     light = tk.Label(parent, image=image, bg=bg, bd=0)
     # Kept on the label: Tk drops a picture the moment Python forgets it. A dialog draws the window from it.
@@ -1194,11 +1194,12 @@ class Card(tk.Frame):
 
 
 def check_line(parent, ui, state, text, action_text=None, action=None, bg=theme.PANEL, value=None):
-    """A ready-check row as the site's state rows: a small lamp (lime fine, yellow will change, red a problem), the
-    words, and at the right end the value or the way to fix it."""
+    """A ready-check row as the site's state rows: a small lamp (a lime dot fine, a yellow ring will change, a red dot a
+    problem), the words, and at the right end the value or the way to fix it."""
     row = tk.Frame(parent, bg=bg)
     colour = {"ok": theme.OK, "change": theme.WARN, "bad": theme.BAD}[state]
-    light = lamp(row, ui, colour, bg=bg)
+    # What will change is a ring, so that it is told from what is fine by its shape too, not by its colour alone.
+    light = lamp(row, ui, colour, bg=bg, hollow=state == "change")
     light.pack(side="left", anchor="n", pady=(ui.px(1), 0))
     beside = [light]
     if action_text and action:

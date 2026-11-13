@@ -397,9 +397,10 @@ def numeral(text, colour, scale=1.0, size=34, bg=theme.BG):
     return img.resize((max(1, width // k), max(1, height // k)), Image.LANCZOS)
 
 
-def lamp(colour, scale=1.0, bg=None):
+def lamp(colour, scale=1.0, bg=None, hollow=False):
     """A state's small light, as the site's (.state i): a 7 px dot with a soft glow of its colour around it. On `bg`
-    when given (an opaque picture), else on nothing."""
+    when given (an opaque picture), else on nothing. `hollow`: a ring with half the glow, for what will change rather
+    than what is fine or wrong, so that the shape says it as well as the colour."""
     d = 7 * scale
     reach = 7 * scale
     size = int(math.ceil(d + 2 * reach))
@@ -410,6 +411,12 @@ def lamp(colour, scale=1.0, bg=None):
     glow = glow.filter(ImageFilter.GaussianBlur(reach * k / 2.5)).resize((size, size), Image.LANCZOS)
     dot = Image.new("L", (size * k, size * k), 0)
     ImageDraw.Draw(dot).ellipse([c - d * k / 2, c - d * k / 2, c + d * k / 2, c + d * k / 2], fill=255)
+    if hollow:
+        # The dot's middle taken out, a ring 1.6 px thick at 100 % left; its glow halved, so that it reads quieter
+        # than a lit dot beside it.
+        r = d * k / 2 - 1.6 * scale * k
+        ImageDraw.Draw(dot).ellipse([c - r, c - r, c + r, c + r], fill=0)
+        glow = glow.point(lambda v: v // 2)
     dot = dot.resize((size, size), Image.LANCZOS)
     img = Image.new("RGBA", (size, size), _rgb(bg) + (255,) if bg else (0, 0, 0, 0))
     img.paste(_rgb(colour) + (255,), (0, 0), glow)
