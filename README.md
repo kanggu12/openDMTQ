@@ -21,7 +21,6 @@
   <a href="#quick-start">Quick start</a> &nbsp;|&nbsp;
   <a href="#what-it-does">What it does</a> &nbsp;|&nbsp;
   <a href="#how-it-works">How it works</a> &nbsp;|&nbsp;
-  <a href="#for-contributors">For contributors</a> &nbsp;|&nbsp;
   <a href="#guides">Guides</a>
 </p>
 
@@ -181,25 +180,6 @@ The patched app points the game's four official hosts at your server, which answ
 and the website from one address. The game server is OpenDMTQ's own code ([architecture](docs/architecture.md)).
 Accounts, scores and recordings stay in `data/` on your computer ([privacy](docs/faq.md#privacy)).
 
-## For contributors
-
-OpenDMTQ is MIT licensed and developed in the open. None of the game's files are needed to work on it: the tests use
-stand-ins of their own. [CONTRIBUTING.md](CONTRIBUTING.md) describes how to build and test each part, and
-[the architecture guide](docs/architecture.md) how they fit together.
-
-| Path | What it is |
-| :--- | :--- |
-| `server/game/` | The game server: the game's requests, its login, saves and rankings (PHP on SQLite) |
-| `server/portal/` | The players' site: rankings, songs, profiles, live broadcasts |
-| `tools/opendmtq_tools/` | The admin pages and their API, the setup, the importer and the app builder (Python) |
-| `arm32/` | The runtime that runs the game's 32-bit code on phones and PCs, and the PC client's player (C++) |
-| `client/` | The PC client's launcher and installer (Python) |
-| `cli/`, `host/`, `deploy/` | The command line, the host install and the Windows bundle, the Helm chart |
-| `tests/` | The suites: the game server's contract, the pages, upgrades, load, the PC client under Wine |
-
-Report a bug or ask for a feature in [Issues](https://github.com/kanggu12/openDMTQ/issues/new/choose); see what changed
-in [CHANGELOG.md](CHANGELOG.md), and report security problems through [SECURITY.md](.github/SECURITY.md).
-
 ## What it runs on
 
 | Server | Minimum | Recommended |
@@ -241,8 +221,12 @@ in [CHANGELOG.md](CHANGELOG.md), and report security problems through [SECURITY.
 
 | Guide | What it covers |
 | :--- | :--- |
+| [Contributing](CONTRIBUTING.md) | Where the code is, how to build and test each part, and how a change reaches a release; no game files needed |
 | [Architecture](docs/architecture.md) | How the parts fit together, each part's code and how it is checked |
 | [Testing](docs/testing.md) · [Test cases](docs/test-cases.md) | What runs before a change reaches a release, and every case |
+
+Report a bug or ask for a feature in [Issues](https://github.com/kanggu12/openDMTQ/issues/new/choose); see what changed
+in [CHANGELOG.md](CHANGELOG.md), and report security problems through [SECURITY.md](.github/SECURITY.md).
 
 ## Credits and license
 
