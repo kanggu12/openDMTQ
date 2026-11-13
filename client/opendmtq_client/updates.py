@@ -64,6 +64,16 @@ def current_version():
         return None
 
 
+def shown_version():
+    """The version the launcher shows, beside the logo, on the Launcher page and on the command line: the installed one,
+    else the code's own (a run from source or from a copied folder). One source for all of them, so that after an
+    update none of them says an older number than the others."""
+    # Imported here: the package's __init__ reads the version once, and this module is imported by it indirectly.
+    from opendmtq_client import __version__
+    # Velopack's installed version first: what the installer put in and the updates moved on.
+    return current_version() or __version__
+
+
 def check():
     """Ask the release feed whether a newer version exists."""
     try:

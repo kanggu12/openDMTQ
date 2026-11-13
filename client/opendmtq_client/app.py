@@ -11,7 +11,7 @@ import queue
 import threading
 import tkinter as tk
 
-from opendmtq_client import __version__, actions, art, i18n, player, safety, theme, widgets
+from opendmtq_client import actions, art, i18n, player, safety, theme, widgets
 from opendmtq_client import server as srv
 from opendmtq_client import state as st
 
@@ -181,8 +181,10 @@ class LauncherApp:
     def make_header(self, parent, nav=(), on_nav=None, link=None, steps=()):
         """The bar across the window's top, as the site's (widgets.Header): the wordmark with PC after it and the
         version beside it (art.brand), then the menu; the guide's has its steps under them instead."""
-        header = widgets.Header(parent, self.ui, art.brand(self.scale, "v" + __version__), nav=nav, on_nav=on_nav,
-                                link=link, steps=steps)
+        from opendmtq_client import updates
+        # The version the Launcher page shows too: the installed one, else the code's (updates.shown_version).
+        header = widgets.Header(parent, self.ui, art.brand(self.scale, "v" + updates.shown_version()), nav=nav,
+                                on_nav=on_nav, link=link, steps=steps)
         header.pack(side="top", fill="x")
         return header
 
@@ -453,8 +455,8 @@ class LauncherApp:
     def _update_on_offer(self, result):
         """A newer launcher is on offer, found at the start: the Launcher page, on show, draws its answer and its update;
         the status line says it (update_on_offer)."""
-        from opendmtq_client import __version__, pages, updates
-        log.info("OpenDMTQ %s is available (this is %s)", result.version, updates.current_version() or __version__)
+        from opendmtq_client import pages, updates
+        log.info("OpenDMTQ %s is available (this is %s)", result.version, updates.shown_version())
         self.update_on_offer(result)
         if self.guide is None and self.page == "about":
             pages.redraw_in_place(self, "about")

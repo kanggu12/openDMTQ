@@ -230,11 +230,11 @@ def _update(yes):
     if result.kind != "available":
         said = {"not_installed": "Updates work in the launcher installed by OpenDMTQ-Setup.exe.",
                 "no_source": "No update address is set for this build.",
-                "uptodate": "This is the newest version (%s)." % (updates.current_version() or __version__),
+                "uptodate": "This is the newest version (%s)." % updates.shown_version(),
                 "failed": w.failed("about.update_failed", result.error)}
         _say(said.get(result.kind, result.kind), error=result.kind == "failed")
         return 0 if result.kind == "uptodate" else 2
-    _say("OpenDMTQ %s is available (this is %s)." % (result.version, updates.current_version() or __version__))
+    _say("OpenDMTQ %s is available (this is %s)." % (result.version, updates.shown_version()))
     from opendmtq_client import playing
     if playing.running():
         # The update replaces the player's files: a game playing from them would lose them mid-song.
@@ -394,7 +394,7 @@ def _status(state):
     # The launcher's version, and a newer one when the look found it (nothing more without a network or an answer in
     # time); it changes nothing of the exit code, which is about PLAY.
     newer = look.newer()
-    this = updates.current_version() or __version__
+    this = updates.shown_version()
     _say("launcher: %s" % this + ("; OpenDMTQ %s is available (--update)" % newer.version if newer else ""))
     return 0 if actions.can_play(checks) else 1
 

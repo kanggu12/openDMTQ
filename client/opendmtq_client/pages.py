@@ -1165,8 +1165,8 @@ def build_about(app, parent):
                         lambda p: widgets.Segmented(p, ui, language_options(app), app.state.picked_language or "system",
                                                     app.set_language)).pack(fill="x")
     card = _card(parent, ui, w("about.updates"))
-    from opendmtq_client import __version__
-    version = updates.current_version() or __version__
+    # The version the header shows beside the logo too: the installed one, else the code's.
+    version = updates.shown_version()
     box = tk.Frame(card.body, bg=theme.PANEL)
     box.pack(fill="x")
     widgets.label(box, ui, w("about.version", v=version), font=ui.fonts.body_bold).pack(side="left")
