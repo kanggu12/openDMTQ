@@ -4,6 +4,8 @@
 
 #include "guest_paths.h"
 #include "jvm.h"
+// Keyboard play's lanes, which the settings name (keyboard_play.h).
+#include "keyboard_play.h"
 
 #include <algorithm>
 #include <atomic>
@@ -77,6 +79,13 @@ struct Settings {
     // The language the game and the player's own words speak, as the launcher chose it ("en", "ko"); "" for the
     // computer's (host_locale), as when the launcher follows Windows' display language.
     std::string language;
+    // Keyboard play (keyplay.cpp): while a song is played, the lane keys play its lanes, a key or two a lane, each
+    // press at the place the game judges; off, every key is the game's as it was.
+    bool keyboard = true;
+    // Each mode's lane keys from the top lane, 2 LINE first (keyboard_play.h): F J, D F J and D F J K unless chosen.
+    keys::Lanes lanes[3] = {keys::default_lanes(2), keys::default_lanes(3), keys::default_lanes(4)};
+    // The lanes of the mode with `count` of them (2 to 4); none for another.
+    keys::Lanes lanes_of(int count) const { return count >= 2 && count <= 4 ? lanes[count - 2] : keys::Lanes{}; }
 };
 Settings& settings();
 

@@ -8,8 +8,12 @@
 // clear of the game's buttons and words in its header at every size. Then the overlay's bar on its way down and up
 // (overlay_motion.h): its pace, a turn back midway, Windows' animations off, the rows of it in sight, and the handle and
 // the pieces at the top that move with it. And the text the keyboard types into the game's soft keyboard
-// (typed_text.h): the text the game opens it with taken as selected. Prints ALL CHECKS PASSED when every check held.
+// (typed_text.h): the text the game opens it with taken as selected. And keyboard play's rules (keyboard_play.h): the
+// lane keys' names and places, each mode's lanes from the settings file (one or two keys a lane, a value it cannot read
+// keeping the default), the lane a key plays, a press, its repeats and every key let go, when the lane keys play at all,
+// and which request of the game's saves a play. Prints ALL CHECKS PASSED when every check held.
 #include "frame_rate.h"
+#include "keyboard_play.h"
 #include "overlay_motion.h"
 #include "overlay_scale.h"
 #include "player.h"
@@ -589,6 +593,152 @@ void overlay_motion_checks() {
     check(own + height + piece_down(43, height) == own + piece_down(43, 0), "and on the way up it is where the piece placed for no bar would be");
 }
 
+// Keyboard play's rules apart from the settings file (keyboard_play.h): the names and their places, a mode's lanes, the
+// lane a key plays, the lane keys' state through presses, repeats and let goes, when the lane keys play, and which request
+// saves a play.
+void keyboard_play_checks() {
+    namespace keys = player::keys;
+    // Every name the settings file takes, at the place a US layout has that key (set 1 scan codes), written out here
+    // apart from the header's table: a name that moved or went would read as another key.
+    struct Place {
+        const char* name;
+        unsigned scan;
+    };
+    const Place places[] = {{"A", 0x1e}, {"B", 0x30}, {"C", 0x2e}, {"D", 0x20}, {"E", 0x12}, {"F", 0x21}, {"G", 0x22}, {"H", 0x23}, {"I", 0x17},
+                            {"J", 0x24}, {"K", 0x25}, {"L", 0x26}, {"M", 0x32}, {"N", 0x31}, {"O", 0x18}, {"P", 0x19}, {"Q", 0x10}, {"R", 0x13},
+                            {"S", 0x1f}, {"T", 0x14}, {"U", 0x16}, {"V", 0x2f}, {"W", 0x11}, {"X", 0x2d}, {"Y", 0x15}, {"Z", 0x2c}, {"1", 0x02},
+                            {"2", 0x03}, {"3", 0x04}, {"4", 0x05}, {"5", 0x06}, {"6", 0x07}, {"7", 0x08}, {"8", 0x09}, {"9", 0x0a}, {"0", 0x0b},
+                            {"Space", 0x39}, {"Semicolon", 0x27}, {"Quote", 0x28}, {"Comma", 0x33}, {"Period", 0x34}, {"Slash", 0x35},
+                            {"LeftBracket", 0x1a}, {"RightBracket", 0x1b}, {"Backslash", 0x2b}, {"Minus", 0x0c}, {"Equals", 0x0d},
+                            {"Grave", 0x29}};
+    bool every_place = true, every_case = true, every_name_back = true;
+    for (const Place& p : places) {
+        every_place = every_place && keys::scan_of(p.name) == p.scan;
+        // In lower case, as the settings file's values reach the reader, and in capitals, as a hand-made file may have it.
+        std::string lower = p.name, upper = p.name;
+        for (char& c : lower) c = c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
+        for (char& c : upper) c = c >= 'a' && c <= 'z' ? static_cast<char>(c - 'a' + 'A') : c;
+        every_case = every_case && keys::scan_of(lower) == p.scan && keys::scan_of(upper) == p.scan;
+        every_name_back = every_name_back && std::string(keys::name_of(p.scan)) == p.name;
+    }
+    check(every_place, "every lane key's name is the place of that key on a US layout (A to Z, 0 to 9, Space and the punctuation keys)");
+    check(every_case, "a lane key's name is read in any case");
+    check(every_name_back, "each place gives its name back, for the log and the launcher");
+    check(sizeof keys::kNames / sizeof keys::kNames[0] == sizeof places / sizeof places[0], "no lane key's name beyond these 48");
+    check(keys::scan_of("Escape") == 0 && keys::scan_of("Esc") == 0 && keys::scan_of("Enter") == 0 && keys::scan_of("") == 0 &&
+              keys::scan_of("FF") == 0 && keys::scan_of("Spac") == 0,
+          "Escape, Enter, an empty name, a doubled letter and a name cut short are no lane key's");
+    // The defaults: the home row on a US layout.
+    check(keys::text(keys::default_lanes(2)) == "F J" && keys::text(keys::default_lanes(3)) == "D F J" && keys::text(keys::default_lanes(4)) == "D F J K",
+          "the default lanes are F J, D F J and D F J K");
+    // A mode's lanes: one or two keys a lane, spaces between them in any number, tabs too.
+    keys::Lanes lanes;
+    std::string why;
+    check(keys::parse("s/d f j k/l", 4, lanes, why) && lanes.count == 4 && lanes.scan[0][0] == 0x1f && lanes.scan[0][1] == 0x20 &&
+              lanes.scan[1][0] == 0x21 && lanes.scan[1][1] == 0 && lanes.scan[3][0] == 0x25 && lanes.scan[3][1] == 0x26,
+          "a lane's two keys joined by '/', the second 0 where a lane has one");
+    check(keys::text(lanes) == "S/D F J K/L", "a mode's lanes are written back with each name in its own capitals");
+    check(keys::parse("  Semicolon\t \tSpace ", 2, lanes, why) && keys::text(lanes) == "Semicolon Space", "spaces and tabs around and between the lanes");
+    // What a mode's value cannot be, each with why.
+    check(!keys::parse("D F", 3, lanes, why) && why.find("3 lanes") != std::string::npos, "3 LINE with two lanes is refused, saying why");
+    check(!keys::parse("D F J", 2, lanes, why), "2 LINE with three lanes is refused");
+    check(!keys::parse("", 2, lanes, why), "an empty value is refused");
+    check(!keys::parse("F/G/H J", 2, lanes, why) && why.find("more than two") != std::string::npos, "a lane of three keys is refused");
+    check(!keys::parse("F/ J", 2, lanes, why) && !keys::parse("/F J", 2, lanes, why) && !keys::parse("F//G J", 2, lanes, why),
+          "a '/' with no key beside it is refused");
+    check(!keys::parse("F Enter", 2, lanes, why) && why.find("Enter") != std::string::npos, "a name of no lane key is refused, naming it");
+    check(!keys::parse("F F", 2, lanes, why) && !keys::parse("D/F F J", 3, lanes, why) && !keys::parse("F/f J", 2, lanes, why),
+          "a key in two places, in two lanes or twice in one, is refused");
+    check(!keys::parse("D F J K", 5, lanes, why) && !keys::parse("D", 1, lanes, why), "no mode but 2, 3 and 4 lanes");
+    // The lane a key plays: by its place alone.
+    const keys::Lanes four = keys::default_lanes(4);
+    int slot = -1;
+    check(keys::lane_of(four, 0x20, false, slot) == 0 && slot == 0 && keys::lane_of(four, 0x21, false, slot) == 1 &&
+              keys::lane_of(four, 0x24, false, slot) == 2 && keys::lane_of(four, 0x25, false, slot) == 3,
+          "D, F, J and K play 4 LINE's lanes from the top");
+    check(keys::lane_of(keys::default_lanes(2), 0x20, false, slot) == -1 && keys::lane_of(four, 0x1e, false, slot) == -1 && slot == -1,
+          "a key of no lane in the mode plays none");
+    check(keys::parse("s/d f j k/l", 4, lanes, why) && keys::lane_of(lanes, 0x20, false, slot) == 0 && slot == 1 &&
+              keys::lane_of(lanes, 0x26, false, slot) == 3 && slot == 1,
+          "a lane's second key plays that lane, as its second");
+    check(keys::parse("F Slash", 2, lanes, why) && keys::lane_of(lanes, 0x35, false, slot) == 1 && keys::lane_of(lanes, 0x35, true, slot) == -1,
+          "the number pad's / (the extended 0x35) is not the Slash key");
+    check(keys::lane_of(four, 0, false, slot) == -1, "a key with no scan code plays no lane");
+    // The lane keys' state: presses, repeats, let goes.
+    {
+        keys::LaneState s;
+        check(s.down(1, 0, false) && s.is_down(1, 0) && s.presses(1, 0) == 1, "a key down is a press, and down");
+        check(!s.down(1, 0, true) && s.presses(1, 0) == 1, "its repeats while held are the same press");
+        check(s.up(1, 0) && !s.is_down(1, 0) && !s.up(1, 0), "up, it lets its lane go, once");
+        check(s.down(1, 0, false) && s.presses(1, 0) == 2, "down again, a new press");
+        s.up(1, 0);
+        // Two keys of one lane: each a press, the lane down while either is.
+        check(s.down(2, 0, false) && s.down(2, 1, false) && s.presses(2, 0) == 1 && s.presses(2, 1) == 1, "a lane's two keys each press");
+        s.up(2, 0);
+        check(s.any_down() && s.is_down(2, 1), "the lane stays pressed while its other key is down");
+        s.up(2, 1);
+        check(!s.any_down(), "nothing down once both are up");
+        // A tap shorter than a frame: counted, though already up when the frame looks.
+        const unsigned before = s.presses(0, 0);
+        s.down(0, 0, false);
+        s.up(0, 0);
+        check(s.presses(0, 0) == before + 1 && !s.is_down(0, 0), "a tap shorter than a frame is still one press for the next frame");
+        // Every key let go at once: the window lost the keyboard, the song paused, the game held, the question.
+        s.down(0, 0, false);
+        s.down(3, 1, false);
+        const unsigned epoch = s.epoch();
+        check(s.let_go() == 2 && !s.any_down() && s.epoch() == epoch + 1, "a let go lifts every key that was down, and says how many");
+        // A key held through it: Windows goes on repeating it, which presses nothing, until it comes up and down again.
+        check(!s.down(0, 0, true) && !s.is_down(0, 0) && s.presses(0, 0) == before + 2, "a key held through a let go presses nothing as it repeats");
+        check(!s.up(0, 0), "and coming up after it, it lets nothing go");
+        check(s.down(0, 0, false) && s.presses(0, 0) == before + 3, "pressed again after that, it plays");
+        check(s.let_go() == 1 && s.let_go() == 0, "a let go with nothing down lifts nothing");
+        check(!s.down(4, 0, false) && !s.down(0, 2, false) && !s.down(-1, 0, false) && !s.up(4, 0), "no lane past the fourth, no key past a lane's second");
+    }
+    // When the lane keys play a song's lanes; any one thing missing, and every key is the game's.
+    keys::When w;
+    w.keyboard = w.hooked = w.playing = true;
+    w.since_frame_ms = 16;
+    check(keys::lanes_play(w), "the lane keys play while a song is being played, keyboard play on and the game's input hooked");
+    {
+        keys::When off = w;
+        off.keyboard = false;
+        check(!keys::lanes_play(off), "not with keyboard play off (keyboard=off)");
+        off = w;
+        off.hooked = false;
+        check(!keys::lanes_play(off), "not when the game's input is not where expected (the hook stayed out)");
+        off = w;
+        off.playing = false;
+        check(!keys::lanes_play(off), "not when no song is being played (a menu, the song paused, stopped or at its end)");
+        off = w;
+        off.since_frame_ms = keys::kSongFrameMs;
+        check(keys::lanes_play(off), "a song whose last frame was a second ago still plays");
+        off.since_frame_ms = keys::kSongFrameMs + 1;
+        check(!keys::lanes_play(off), "not when the song's frames stopped coming for over a second");
+        off = w;
+        off.held = true;
+        check(!keys::lanes_play(off), "not while the game is held still (the question before quitting, minimised)");
+        off = w;
+        off.typing = true;
+        check(!keys::lanes_play(off), "not while the game asks for text (its name field types letters)");
+    }
+    // The request that saves a play.
+    const std::string save = R"([{"id":0,"method":"game.savePlayResult","params":[1,15,[0,0,279],279,0,[0,0,0],[0,0,0],"t"]}])";
+    check(keys::saves_play("POST", save), "the game's RPC with game.savePlayResult saves a play");
+    check(keys::saves_play("POST", R"([ { "id" : 3 , "method" : "game.getUserInfo" , "params" : [ ] } , { "method" :
+"game.savePlayResult", "params": [] } ])"),
+          "among other calls, with JSON's spaces and line ends");
+    check(keys::saves_play("POST", R"([{"method":"game.savePlayResult","params":[]}])"), "a method's name as JSON escapes it");
+    check(!keys::saves_play("POST", R"([{"id":0,"method":"game.savePlayResultFailLog","params":[1,15,"t",0]}])"),
+          "game.savePlayResultFailLog, which keeps nothing, saves no play");
+    check(!keys::saves_play("GET", save), "a GET saves no play");
+    check(!keys::saves_play("POST", R"([{"id":0,"method":"game.getUserInfo","params":["game.savePlayResult"]}])"),
+          "the name in another string is no call");
+    check(!keys::saves_play("POST", R"({"x":"method","y":"game.savePlayResult"})"), "\"method\" as a value is no key");
+    check(!keys::saves_play("POST", R"({"method":7,"params":"game.savePlayResult"})"), "a method that is no string calls nothing");
+    check(!keys::saves_play("POST", R"([{"method":"game.savePl)") && !keys::saves_play("POST", ""), "a body cut short or empty saves nothing");
+}
+
 }  // namespace
 
 int main() {
@@ -692,6 +842,29 @@ int main() {
     read(path, "volume=40\nlanguage = ko\r\nlanguage=xx\n");
     check(player::settings_language(path) == "ko", "the language read early: spaces and CR LF, another after it left out");
     check(player::settings_language("no-such-settings-file.txt").empty(), "no file names no language");
+    // Keyboard play: on by default with each mode's default keys; off; each mode's keys chosen, one or two a lane, in any
+    // case; a value it cannot read keeping that mode's default, and the other keys of the file still read.
+    {
+        const player::Settings fresh;
+        check(fresh.keyboard && player::keys::text(fresh.lanes[0]) == "F J" && player::keys::text(fresh.lanes[1]) == "D F J" &&
+                  player::keys::text(fresh.lanes[2]) == "D F J K",
+              "keyboard play is on by default, with F J, D F J and D F J K");
+        const player::Settings& none = read(path, "volume=80\n");
+        check(none.keyboard && player::keys::text(none.lanes_of(3)) == "D F J", "a file without its keys keeps keyboard play on with the default keys");
+        check(!read(path, "keyboard=off\n").keyboard && read(path, "keyboard=on\n").keyboard, "keyboard=off turns keyboard play off, keyboard=on on");
+        check(read(path, "keyboard=maybe\n").keyboard && !read(path, "keyboard=OFF\n").keyboard, "keyboard=maybe keeps it on; OFF in capitals is off");
+        const player::Settings& chosen = read(path, "keys_2line=A L\nkeys_3line=s/d f j/k\nKEYS_4LINE=z x PERIOD slash\n");
+        check(player::keys::text(chosen.lanes[0]) == "A L", "keys_2line=A L is 2 LINE's lanes");
+        check(player::keys::text(chosen.lanes[1]) == "S/D F J/K", "keys_3line with two keys on a lane, in lower case");
+        check(player::keys::text(chosen.lanes[2]) == "Z X Period Slash", "keys_4line's key and names in capitals");
+        const player::Settings& bad = read(path, "keys_2line=F\nkeys_3line=D F Enter\nkeys_4line=D F J K L\nkeys_5line=A B C D E\nvolume=70\n");
+        check(player::keys::text(bad.lanes[0]) == "F J" && player::keys::text(bad.lanes[1]) == "D F J" && player::keys::text(bad.lanes[2]) == "D F J K",
+              "a mode's value it cannot read (too few lanes, a name of no key, too many) keeps that mode's default");
+        check(bad.volume == 70 && bad.keyboard, "and the file's other keys are still read");
+        const player::Settings& mixed = read(path, "keys_2line=Q P\nkeys_3line=D D J\nkeys_4line=1 2 3 4\n");
+        check(player::keys::text(mixed.lanes[0]) == "Q P" && player::keys::text(mixed.lanes[1]) == "D F J" && player::keys::text(mixed.lanes[2]) == "1 2 3 4",
+              "a key in two places keeps its mode's default, the modes around it read");
+    }
     // The size the game draws at for a render scale: the area's shape kept in whole steps where it has them.
     auto drawn = [](int w, int h, int scale, int ew, int eh) {
         const player::DrawSize d = player::draw_size(w, h, scale);
@@ -719,6 +892,8 @@ int main() {
     handle_size_checks();
     handle_reach_checks();
     overlay_motion_checks();
+    // Keyboard play's rules.
+    keyboard_play_checks();
     if (g_failed) {
         std::printf("%d of %d checks FAILED\n", g_failed, g_checks);
         return 1;

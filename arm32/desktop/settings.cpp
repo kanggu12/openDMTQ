@@ -32,6 +32,15 @@
 //   volume        0..100                     the game's sound, in percent (a number out of it held to it)
 //   language      en | ko                    the language the launcher chose for the game and the player's own words, in
 //                                            place of the computer's (host_locale); none: the computer's
+//   keyboard      on | off                   keyboard play: while a song is played, its lanes' keys play them, each press
+//                                            where the game judges it (keyplay.cpp); off, every key is the game's as it
+//                                            was
+//   keys_2line    <lanes>                    the keys of a mode's lanes (2, 3 and 4 LINE), from the top, separated by
+//   keys_3line                               spaces; a lane's keys joined by / (one or two, to alternate on quick
+//   keys_4line                               notes); each key by the name of the key a US layout has at its place: A to
+//                                            Z, 0 to 9, Space, Semicolon, Quote, Comma, Period, Slash, LeftBracket,
+//                                            RightBracket, Backslash, Minus, Equals, Grave. Played by that place on any
+//                                            layout. F J, D F J and D F J K unless chosen (keyboard_play.h)
 //
 // On Linux, a developer's player, the window takes only its size (it reads no display timing and has no full screen),
 // and the sound server picks the device and shares it: the buffer and the volume apply.
@@ -188,6 +197,22 @@ bool load_settings(const std::string& path) {
             // The launcher's languages; another keeps the computer's (host_locale).
             ok = value == "en" || value == "ko";
             if (ok) s.language = value;
+        } else if (key == "keyboard") {
+            // Keyboard play on or off.
+            ok = value == "on" || value == "off";
+            if (ok) s.keyboard = value == "on";
+        } else if (key == "keys_2line" || key == "keys_3line" || key == "keys_4line") {
+            // The mode by the digit in its key; its lanes as written (the names are read in any case), so that the log
+            // names a key it does not know as it was written.
+            const int count = key[5] - '0';
+            keys::Lanes lanes;
+            std::string why;
+            if (!keys::parse(raw, count, lanes, why)) {
+                // As written, with why: a person who edits the file sees what to change. The mode's default stays.
+                jvm::log("player: settings: %s=%s cannot be read (%s): the default stays", key.c_str(), raw.c_str(), why.c_str());
+                continue;
+            }
+            s.lanes[count - 2] = lanes;
         } else {
             jvm::log("player: settings: %s is no setting of this player's: left out", key.c_str());
             continue;
@@ -209,6 +234,13 @@ bool load_settings(const std::string& path) {
              s.audio_buffer == 0 ? "a low" : s.audio_buffer == 1 ? "a normal" : "a safe", s.volume);
     // The language on a line of its own: the launcher's when it chose one, else the computer's.
     jvm::log("player: settings: language %s", s.language.empty() ? "the computer's" : s.language.c_str());
+    // Keyboard play on a line of its own too: each mode's keys as the file names them, or off.
+    if (s.keyboard) {
+        jvm::log("player: settings: keyboard play on: 2 LINE %s, 3 LINE %s, 4 LINE %s", keys::text(s.lanes[0]).c_str(), keys::text(s.lanes[1]).c_str(),
+                 keys::text(s.lanes[2]).c_str());
+    } else {
+        jvm::log("player: settings: keyboard play off: every key is the game's");
+    }
     return true;
 }
 
