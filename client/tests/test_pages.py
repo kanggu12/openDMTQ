@@ -97,8 +97,9 @@ class KeysLine(unittest.TestCase):
                 self.assertNotIn(pages.TITLES["controls"], pages.keys_line(w, values))
 
     def test_how_to_play_goes_on_as_before(self):
-        # After the keys: the touch screen, the mouse, then Esc and the bar's X, on PLAY and on STAGE START alike.
-        self.assertEqual(pages.HOW_TO_PLAY, ("play.how.1", "play.how.2", "play.how.3"))
+        # After the keys: the touch screen and the mouse in one line, then Esc and the bar's X, on PLAY and on STAGE
+        # START alike.
+        self.assertEqual(pages.HOW_TO_PLAY, ("play.how.1", "play.how.3"))
 
 
 if __name__ == "__main__":

@@ -155,8 +155,9 @@ def build_play(app, parent):
     refresh_checks(app)
 
 
-# How to play's lines after keyboard play's: the touch screen, the mouse, then Esc and leaving the game by the bar.
-HOW_TO_PLAY = ("play.how.1", "play.how.2", "play.how.3")
+# How to play's lines after keyboard play's: the touch screen and the mouse in one, so that the card and Last game
+# under it end above the bottom bar at the window's own size, then Esc and leaving the game by the bar.
+HOW_TO_PLAY = ("play.how.1", "play.how.3")
 
 
 def keys_line(w, values):

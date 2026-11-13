@@ -99,9 +99,9 @@ def beside(name, print_):
     the name, a space, or a character that does not print."""
     if not print_ or len(print_) != 1 or not print_.isprintable() or print_.isspace():
         return None
-    capital = print_.upper()
-    # A capital of more than one character (ß's is SS) is no key's cap: the character as the layout prints it.
-    shown = capital if len(capital) == 1 else print_
+    # The letters a to z in capitals, as their caps print them; any other character as the layout prints it: ß, whose
+    # capital is two letters (SS), and é or à, which a French layout's caps print small.
+    shown = print_.upper() if "a" <= print_ <= "z" else print_
     return None if shown == name.upper() else shown
 
 

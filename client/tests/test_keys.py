@@ -238,6 +238,8 @@ class Presses(unittest.TestCase):
         self.assertEqual(keys.beside("Q", "a"), "A")
         # A German layout's ß at the US Minus place: its capital is two letters (SS), so the character as it prints.
         self.assertEqual(keys.beside("Minus", "ß"), "ß")
+        # A French layout's é at the US 2's place, small as its cap prints it, not É.
+        self.assertEqual(keys.beside("2", "é"), "é")
         self.assertIsNone(keys.beside("F", "f"))
         self.assertIsNone(keys.beside("Space", " "))
         self.assertIsNone(keys.beside("F", None))
