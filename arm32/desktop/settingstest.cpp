@@ -728,7 +728,9 @@ void keyboard_play_checks() {
     check(keys::saves_play("POST", R"([ { "id" : 3 , "method" : "game.getUserInfo" , "params" : [ ] } , { "method" :
 "game.savePlayResult", "params": [] } ])"),
           "among other calls, with JSON's spaces and line ends");
-    check(keys::saves_play("POST", R"([{"method":"game.savePlayResult","params":[]}])"), "a method's name as JSON escapes it");
+    check(keys::saves_play("POST", R"([{"method":"game.save\u0050layResult","params":[]}])"), "a method's name as JSON escapes it");
+    check(keys::saves_play("POST", R"([{"\u006dethod":"game\u002esavePlayResult","params":[]}])"),
+          "a key and a dot as JSON escapes them");
     check(!keys::saves_play("POST", R"([{"id":0,"method":"game.savePlayResultFailLog","params":[1,15,"t",0]}])"),
           "game.savePlayResultFailLog, which keeps nothing, saves no play");
     check(!keys::saves_play("GET", save), "a GET saves no play");
