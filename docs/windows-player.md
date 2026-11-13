@@ -18,7 +18,8 @@ then plays against the server as it does on a phone.
    app: **More info**, then **Run anyway**. The installer is not signed by a publisher Windows knows. Windows 11's
    Smart App Control, when it is on, blocks unsigned programs, this one among them, and has no **Run anyway**.
 3. The launcher's first start walks through the server (already filled in), the sign-in with your site ID, the app's
-   download, the picture and the sound, then **PLAY**.
+   download, the picture and the sound, then the ready check and how to play, and **PLAY**. Each step asks its
+   question at the top; while **Next** waits, a line under the step says for what.
 
 The installer from the project's [releases](https://github.com/kanggu12/openDMTQ/releases/latest) (`OpenDMTQ-Setup.exe`)
 is the same program without a server: its first start asks for the server's address. One launcher keeps several
@@ -50,11 +51,11 @@ Not tried yet: a Linux desktop's own graphics driver and sound, touch screens, a
 
 ## The launcher
 
-![The launcher's PLAY page: the server and the sign-in, the ready check, how to play, the last game, and PLAY](images/client-play.png)
+![The launcher's PLAY page: the server and the sign-in, the ready check, how to play with keyboard play's keys first, the last game, and PLAY](images/client-play.png)
 
 | Page | What it has |
 | :--- | :--- |
-| **Play** | The server and the account, the checks before a start (the player, the server, the sign-in, the app), how to play, the last play, and **PLAY** |
+| **Play** | The server and the account, the checks before a start (the player, the server, the sign-in, the app), one that is not fine with a link to the page that sees to it, how to play (keyboard play's keys first, or that it is off, with **CONTROLS** beside them), the last play, and **PLAY** |
 | **Screen** | Full screen or a window, the window's size, VSync, the frame limit, the FPS counter and its position, the render scale and its upscaler, anti-aliasing |
 | **Sound** | The volume, the device, **Shared** or **Exclusive**, the buffer |
 | **Controls** | Keyboard play: on or off, and the keys of each lane of 2, 3 and 4 LINE; what the touch screen, the mouse and the keyboard do |
@@ -75,10 +76,11 @@ game ends.
 lanes of 2, 3 and 4 LINE from the top, each with a box for its key and one for a second key: click a box (or Tab to it
 and press Enter), then press the key. The key goes in by its place on the keyboard, and is named as the US layout's key
 at that place (`Semicolon` for the key right of L), so another layout plays the same places; in grey beside the name,
-what the PC's own layout prints there when it says more (`;`, or `Ö` on a German keyboard). A key that another lane of
-the same LINE plays already, or one no lane takes (Enter, the arrows, the numpad, Shift), is refused in words under the
-table, and the box waits for another. Esc keeps the key that was there, Delete takes away a key the lane has a second
-of, and **Reset keys** puts back F J, D F J and D F J K. The game reads the keys at the next **PLAY**.
+what the PC's own layout prints there when it says more (`;`, or `Ö` on a German keyboard). A key another lane, or the
+same lane, already plays, or one no lane takes (Enter, the arrows, the numpad, Shift, Backspace), is refused in words
+under the table, and the box waits for another. Esc keeps the key that was there, Delete removes one of a lane's two
+keys, and **Reset keys** puts back F J, D F J and D F J K. A key held down counts once, and while a box waits a Korean
+or Japanese input method is off, so that a letter goes in by its place. The game reads the keys at the next **PLAY**.
 
 ### The command line
 
@@ -88,7 +90,8 @@ of, and **Reset keys** puts back F J, D F J and D F J K. The game reads the keys
 window opens on its pages), `--servers` (the servers it knows, as **Online** lists them), `--open-log player|launcher`, `--play`,
 `--update`, `--forget URL`, `--reset`, `--repair`, `--clear-game-data` and `--uninstall [--delete-data]`, with `--yes`
 to answer their questions (`--help` lists them all). While the launcher's window is open, the flags that change what
-it keeps are refused. `--set` takes the settings of the **Screen**, **Sound** and **Controls** pages:
+it keeps are refused. `--set` takes the settings of the **Screen**, **Sound** and **Controls** pages; every `--set`
+of a line is checked before any is applied, so one the launcher does not take changes none of them:
 
 | Setting | Values (the default first) | On the page |
 | :--- | :--- | :--- |
@@ -331,7 +334,9 @@ title says so alone), and says where it can be watched.
 - **The launcher says the server runs an older OpenDMTQ:** the PC client needs a server of 0.8 or newer.
 - **The player is missing or a file of the program is damaged:** **Help**, **Repair** puts the program's files back
   from the package it was installed from.
-- **The installer says a game is going on:** finish it and close the game; installing replaces the player it plays in.
+- **The installer says the game is open:** finish it and close the game; installing replaces the player it plays in.
+- **The launcher stopped with an error:** its window says what happened and where its log is; **Open the log folder**
+  opens the folder.
 - **The sign-in is refused:** the ID and password are the site's. Too many wrong passwords make the server wait a while
   before the next try.
 - **Windows blocks it with no Run anyway:** Smart App Control is on (step 2 above).
