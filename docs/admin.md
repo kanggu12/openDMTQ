@@ -25,9 +25,12 @@ admin pages, where the owner sets up and runs the server. What players do on the
 
 A score played with the keyboard of the PC client's player has a small keyboard before it wherever the site shows it: on
 a song's leaderboards, a player's recent plays and best records, and the home page's newest records (Keyboard play when
-the pointer rests on it). A total, a month's score or a past month's score that counts such best scores has the same
-mark, whose words say how many (on the podium it follows the name), and a player's page counts them beside the grades.
-The rankings are one for touch and keys.
+the pointer rests on it). On a best record the mark is the score's: the play that set that score was played with the
+keyboard. The grade, the accuracy and the AC and PP marks beside it follow their own rules (the best accuracy, and a mark
+once any play earned it), whichever way those plays were made. A total on the rankings and on the home page, a month's
+score or a past month's score that counts such best scores has the same mark, whose words say how many (on the podium of
+the Total score and This month tabs it follows the name, beside the score it counts), and a player's page counts them
+beside the grades. The rankings are one for touch and keys.
 
 The game's own table keeps only each player's best result per chart. The game server also writes every saved play to
 a `PlayLog` table (score, grade and accuracy of that play, whether it beat the player's best, and whether it was played

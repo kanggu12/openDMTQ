@@ -157,9 +157,11 @@ What the replies rely on, as the client behaves:
 - **The keyboard's mark.** The PC client's player adds the header `X-OpenDMTQ-Keys: 1` to a save when a lane key was
   pressed during that song, and nothing otherwise; a phone never sends it. Such a play is marked: `keys` is 1 on its
   `PlayLog` row, and on the player's `Play` row when the play sets the best score there. A new best by touch sets it back
-  to 0, and a worse play or a tie leaves it as the play that set the best left it. Only the value 1 marks a play. The
-  game's replies and its rankings are the same with or without it: the site and the admin pages show the mark, and the
-  rankings are one for touch and keys.
+  to 0, and a worse play or a tie leaves it as the play that set the best left it. Only the value 1 marks a play. On
+  `Play` the mark is the best score's: it says how the play that set the score was made. The rest of that row follows its
+  own rules, whichever way their plays were made: the grade and the accuracy follow the best accuracy, and the AC and PP
+  marks stay once any play earned them. The game's replies and its rankings are the same with or without the header: the
+  site and the admin pages show the mark, and the rankings are one for touch and keys.
 - **Everyone has everything.** Level 99, 999,999 MAX POINT, every song from 1 to the highest id, every item. No quests,
   no coupons (every code is invalid, in the client's own popup), no terms popup.
 

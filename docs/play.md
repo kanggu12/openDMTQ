@@ -61,8 +61,8 @@ The PC client plays the same app on Windows:
 The launcher keeps the game up to date. [The PC client](windows-player.md) has the rest: the launcher's pages, the
 controls, the picture and the sound, what it keeps, and how it runs on Linux under Wine.
 
-On the site, a small keyboard beside a score marks a song played with the PC's keys, and beside a total says how many
-such scores it counts; the rankings are one for touch and keys.
+On the site, a small keyboard beside a score marks one played with the PC's keys (on a best record, the play that set
+that score), and beside a total says how many such scores it counts; the rankings are one for touch and keys.
 
 ## Updates and other devices
 
