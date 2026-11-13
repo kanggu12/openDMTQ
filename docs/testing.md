@@ -124,8 +124,8 @@ reads and each quirk it depends on (an empty news list closes the game, for one)
 behaviour it protects. A new method of the game server gets its checks there. `protocol.sh` gives that server the song
 list the tools write once the owner hides a song, the last stand-in song hidden: a play of a hidden song's chart is kept,
 one of a chart no song has is not. Inside the running server it then saves plays with the PC client's keyboard header
-and without it (`tests/game/keys.php`) and reads what the database kept of each, and starts a database from before the
-keyboard's mark.
+and without it (`tests/game/keys.php`): the game's replies, rankings and own scores the same, what the database kept of
+each told apart; and it starts a database from before the keyboard's mark.
 
 In `tests/ui/run.sh` a real browser then takes the server through a life, in stages (`tests/ui/audit.js`):
 
