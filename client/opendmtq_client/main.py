@@ -653,6 +653,18 @@ def _window_fits(args):
                                       h=display["height"])
 
 
+def _check_settings(state, args):
+    """Every --set checked before any is applied, as window= is (_window_fits): one the launcher does not take, wherever
+    it stands in the line, refuses them all, and nothing of them is kept. Each is checked over the ones before it, as
+    they would be applied (a corner given as show_fps's value moves fps_position with it)."""
+    trial = dict(state.values)
+    for item in args.set:
+        name, _, value = item.partition("=")
+        trial[name.strip()] = value.strip()
+        # As state.set_value checks it: the whole set normalized, a ChoiceError for the value it does not take.
+        trial = choices.normalize(trial)
+
+
 def _servers(state):
     """--servers: every server this launcher knows, as Online lists them, the one PLAY plays on first and marked *."""
     if not state.servers:
@@ -668,6 +680,8 @@ def _run(state, args, jobs):
         return _update(args.yes)
     _language_set(args)
     _window_fits(args)
+    # Every --set checked here, before anything of the line is changed.
+    _check_settings(state, args)
     if args.reset:
         # Every server's app goes: refused while a game plays from one, as the window's Start over is.
         if _started_meanwhile():

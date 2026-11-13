@@ -630,6 +630,24 @@ class Maintenance(Folder):
         self.assertEqual(code, 2)
         self.assertIn("installed by OpenDMTQ-Setup.exe", said)
 
+    def test_a_bad_setting_anywhere_changes_none(self):
+        # Every --set is checked before any is applied, as window= is: a refusal in the second leaves the first as it
+        # was, and nothing is said as changed.
+        code, said = self.run_main(["--set", "keys_4line=1 2 3 4", "--set", "keys_2line=F F"])
+        self.assertEqual(code, 2, said)
+        values = st.LauncherState.load().values
+        self.assertEqual((values["keys_4line"], values["keys_2line"]), ("D F J K", "F J"))
+        self.assertNotIn("keys_4line=1 2 3 4", said)
+        # The same for the picture's and the sound's settings before a bad one.
+        code, said = self.run_main(["--set", "volume=40", "--set", "fps=12"])
+        self.assertEqual(code, 2, said)
+        self.assertEqual(st.LauncherState.load().values["volume"], 100)
+        # All good: all applied, in order.
+        code, said = self.run_main(["--set", "volume=40", "--set", "keys_2line=d k"])
+        self.assertEqual(code, 0, said)
+        values = st.LauncherState.load().values
+        self.assertEqual((values["volume"], values["keys_2line"]), (40, "D K"))
+
     def test_they_run_on_their_own(self):
         for args in (["--repair", "--status"], ["--uninstall", "--clear-game-data"], ["--delete-data"]):
             with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
