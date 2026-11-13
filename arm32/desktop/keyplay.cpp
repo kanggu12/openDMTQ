@@ -114,8 +114,9 @@ constexpr std::uint32_t kDrag = 4;
 // press further from every note than these is judged against none, so a lane's next note is the first one inside them.
 constexpr std::int64_t kEarlyMs = 294, kLateMs = 126;
 // The keys of keyboard play's presses, as the game tells its fingers apart: far above Unity's finger numbers. Each lane's
-// two keys have two numbers each, used in turn, so that a key let go and pressed again between two frames is a new
-// finger for the game (a press that came in), as a finger lifted and put down again is.
+// two keys have two numbers each, used in turn at each fresh press, so that a key let go and pressed again between two
+// frames (even twice, in a long frame) is a new finger for the game (a press that came in), as a finger lifted and put
+// down again is.
 constexpr int kKeyBase = 0x4b00;
 // A check's trace (PLAYER_TRACE_KEYS=1): each lane key's press with the note it aims at, and at a song's end the game's
 // own judgement of its notes by type, in the log. Read once.
@@ -204,6 +205,9 @@ struct Finger {
     std::uint32_t drag_tick = 0;
     // Whether it pressed in the last frame (a check's trace says when it stops).
     bool pressing = false;
+    // Which of the key's two finger numbers it presses with: the other one at each fresh press, whatever the count of
+    // presses between two frames was.
+    int which = 0;
 };
 // The play being played (on the game's thread only).
 struct Play {
@@ -233,6 +237,8 @@ Play g_play;
 struct Cost {
     std::vector<float> game, ours;
     long long since = 0;
+    // The last frame's time: a gap of a second (a pause, a song's end, the next song) starts the five seconds again.
+    long long last = 0;
     // This frame's time in sending a check's keys (PLAYER_KEYS at song times), which is the check's and not keyboard
     // play's: under Wine each key sent takes a trip through its server.
     float posting_us = 0;
@@ -267,7 +273,10 @@ void finish(Play& p, const char* how) {
     p.ended = true;
     const std::string why = std::string("the song ") + how;
     keyplay_let_go(why.c_str());
-    jvm::log("player: keyboard play: %s, with %u presses of the lane keys%s", why.c_str(), p.presses, p.presses ? "" : " (its save is a touch play's)");
+    // A song that ended with no lane key pressed saves as a touch play's; one over or left saves nothing to say so of.
+    const bool saves = std::string(how) == "ended";
+    jvm::log("player: keyboard play: %s, with %u presses of the lane keys%s", why.c_str(), p.presses,
+             p.presses || !saves ? "" : " (its save is a touch play's)");
     if (!trace_keys()) return;
     // The game's judgement of every note, by type: how many, at MAX 100, lower, BREAK, and none yet (left before it).
     struct Count {
@@ -419,6 +428,8 @@ void frame(Thread& t, gaddr self, gaddr player) {
                 aim(t, player, p, l, now, tick, taken, f);
                 taken = f.target;
                 ++p.presses;
+                // The other finger number: the game sees the last one lifted and this one come in, a new press.
+                f.which ^= 1;
                 if (trace_keys()) {
                     // The press and what it aims at: the note's type and time, or none near.
                     if (f.target) {
@@ -442,7 +453,7 @@ void frame(Thread& t, gaddr self, gaddr player) {
             // A drag on its way: the press goes along its curve, as the game draws and judges it.
             if (f.drag && f.target && tick >= f.drag_tick) drag_pos(t, player, f.target, f.x, f.y);
             // The press, as DMQInput.OnUpdate makes one for a finger: touch type 0, the key's number, the place.
-            const std::uint32_t key = static_cast<std::uint32_t>(kKeyBase + (l * 2 + k) * 2 + static_cast<int>(presses & 1));
+            const std::uint32_t key = static_cast<std::uint32_t>(kKeyBase + (l * 2 + k) * 2 + f.which);
             t.call(g_set_press, {g_scratch + 16, self, player, 0, key, bits(f.x), bits(f.y), 0});
             f.pressing = true;
         }
@@ -451,9 +462,16 @@ void frame(Thread& t, gaddr self, gaddr player) {
 
 // With stats on: one frame's costs, and every five seconds their mean, 99th percentile and most, over a song's frames.
 void note_cost(float game_us, float ours_us) {
+    const long long now = steady_ms();
+    // After a gap of a second or more the frames before it are left out, so that a line covers frames played together.
+    if (g_cost.last && now - g_cost.last > 1000) {
+        g_cost.game.clear();
+        g_cost.ours.clear();
+        g_cost.since = 0;
+    }
+    g_cost.last = now;
     g_cost.game.push_back(game_us);
     g_cost.ours.push_back(ours_us);
-    const long long now = steady_ms();
     if (!g_cost.since) g_cost.since = now;
     if (now - g_cost.since < 5000) return;
     auto line = [](std::vector<float>& v, float& mean, float& p99, float& most) {

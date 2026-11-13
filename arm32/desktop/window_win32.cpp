@@ -14,16 +14,16 @@
 // another display or a display's mode changes.
 //
 // Input: a touch screen's fingers (several at once, through the pointer messages, with the time the screen saw each), a
-// pen and the mouse's left button are the game's fingers, and the wheel a finger's drag that scrolls. Windows' own touch
-// feedback and gestures stay out of the game's way (no circles, no press-and-hold, no edge swipes in full screen), and
-// the UI thread takes each event as it comes. The keyboard types into the soft keyboard while the
-// game asks for text, through a text field of the window's that it focuses meanwhile (Windows' touch keyboard offers
-// itself there on a PC without a keyboard); otherwise its keys are the phone's, Escape the Back key (it pauses a song and
-// closes what is open). While a song is being played, the lane keys of keyboard play are its lanes' instead (keyplay.cpp),
-// by their places on the keyboard whatever the layout, and every one lets go when the window loses the keyboard, is
-// minimised, or the question before quitting comes. No key switches full screen or quits: full screen is the overlay's
-// bar's button (or the launcher's Screen page before a start), quitting the bar's X, which asks first; F11, Alt+Enter and
-// Alt+F4 do nothing.
+// pen and the mouse's left button are the game's fingers, and the wheel a finger's drag that scrolls. Windows' own
+// touch feedback and gestures stay out of the game's way (no circles, no press-and-hold, no edge swipes in full
+// screen), and the UI thread takes each event as it comes. The keyboard types into the soft keyboard while the game
+// asks for text, through a text field of the window's that it focuses meanwhile (Windows' touch keyboard offers itself
+// there on a PC without a keyboard); otherwise its keys are the phone's, Escape the Back key (it closes what is open;
+// in a song the game does nothing with it, and its own pause button pauses). While a song is being played, the lane
+// keys of keyboard play are its lanes' instead (keyplay.cpp), by their places on the keyboard whatever the layout, and
+// every one lets go when the window loses the keyboard, is minimised, or the question before quitting comes. No key
+// switches full screen or quits: full screen is the overlay's bar's button (or the launcher's Screen page before a
+// start), quitting the bar's X, which asks first; F11, Alt+Enter and Alt+F4 do nothing.
 #include "player.h"
 
 #include "keyplay.h"
@@ -1132,6 +1132,20 @@ LRESULT CALLBACK frame_proc(HWND h, UINT msg, WPARAM w, LPARAM l) {
         // Alt+Enter: nothing either, though many Windows games switch with it: full screen is the bar's button, which
         // nobody presses by mistake mid-song. Its character makes no beep (WM_SYSCHAR above).
         if (w == VK_RETURN && (HIWORD(l) & KF_ALTDOWN)) return 0;
+        // A lane key while Alt is held (Windows then sends every key as a system key): the lane's in a song, as it is
+        // without Alt and with Shift or Ctrl, so that a thumb resting on Alt loses no notes. Not while the question is
+        // up or the game asks for text, which take keys first as WM_KEYDOWN has it; a key that went down as the game's
+        // stays the game's.
+        if (!overlay::asking() && !typing() && !g_keys_down.count(w)) {
+            unsigned scan = 0;
+            bool extended = false;
+            key_place(w, l, scan, extended);
+            if (keyplay_key(scan, extended, true, (l & (1L << 30)) != 0)) {
+                // The game is being played: the overlay's bar waits, as for a finger on it.
+                overlay::game_pressed(anything_down());
+                return 0;
+            }
+        }
         break;
     case WM_KEYDOWN: {
         // A check's planned key: how long it waited for this thread, which stamps it for the game below.
