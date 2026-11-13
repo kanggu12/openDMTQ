@@ -93,44 +93,64 @@ function play_figures(SQLite3 $db): array
    that a server where nobody plays with the keyboard reads nothing for it. tests/game/protocol.sh checks the plan. */
 const KEYS_BESTS = "SELECT p.user_id, COUNT(*) AS n FROM Play p WHERE p.keys = 1 GROUP BY p.user_id";
 
-/* For one month's board (from :since to before :until), how many of the charts it counts had a keyboard play as each
-   player's best that month: the month's top score on the chart, the play that got there first (as a best row keeps the
-   play that set it), capped as the board caps it. Only the charts a player played with the keyboard that month are looked
-   at, from the index of the keyboard's plays (PlayLog_keys); each one's best from that player's plays of that chart
-   (PlayLog_clears): the + before the times keeps SQLite from reading the whole chart's month instead (PlayLog_chart), every
-   player's plays of it. tests/game/protocol.sh checks the plan SQLite makes of it. */
-const MONTH_KEYS = "SELECT k.user_id, COUNT(*) AS n FROM (
-        SELECT DISTINCT l.user_id, l.pattern_id FROM PlayLog l
-         WHERE l.keys = 1 AND l.played_at >= :since AND l.played_at < :until) k
-     WHERE (SELECT b.keys FROM PlayLog b
-             WHERE b.user_id = k.user_id AND b.pattern_id = k.pattern_id AND +b.played_at >= :since AND +b.played_at < :until
-             ORDER BY MIN(MAX(b.score, 0), 2147483647) DESC, b.played_at, b.id LIMIT 1) = 1
-     GROUP BY k.user_id";
+/* Whether anybody played with the keyboard in one month (from :since to before :until), as found: one look at the index of
+   the keyboard's plays (PlayLog_keys), so that a month nobody played with the keyboard costs nothing more.
+   tests/game/protocol.sh checks the plan SQLite makes of it. */
+const KEYS_IN_MONTH = "SELECT EXISTS (SELECT 1 FROM PlayLog l WHERE l.keys = 1 AND l.played_at >= :since AND l.played_at < :until) AS found";
 
-/* Players' counts by guid from one of the two statements above, kept by $name while nothing in the log, the bests or the
-   players changes (odq_kept()), as the totals beside them are. Players with none are left out. */
-function keys_counts(SQLite3 $db, string $name, string $sql, array $params = []): array
+/* For one month's board (from :since to before :until) and the players asked for (:players, a JSON list of guids: the
+   board's players, or only those a page shows of it), how many of the charts it counts had a keyboard play as each one's
+   best that month: the month's top score on the chart, the play that got there first (as a best row keeps the play that
+   set it), capped as the board caps it. One read of those players' plays of that month, from the index the board reads
+   (PlayLog_board), each chart's plays put in that order and the first one taken. tests/game/protocol.sh checks the plan
+   SQLite makes of it. */
+const MONTH_KEYS = "SELECT best.user_id, COUNT(*) AS n FROM (
+        SELECT l.user_id, l.keys, ROW_NUMBER() OVER (PARTITION BY l.user_id, l.pattern_id
+                                                  ORDER BY MIN(MAX(l.score, 0), 2147483647) DESC, l.played_at, l.id) AS place
+          FROM PlayLog l
+         WHERE l.user_id IN (SELECT value FROM json_each(:players)) AND l.played_at >= :since AND l.played_at < :until) best
+     WHERE best.place = 1 AND best.keys = 1
+     GROUP BY best.user_id";
+
+/* Players' counts by guid from KEYS_BESTS or MONTH_KEYS (user_id, n) with what it binds, players with none left out. */
+function counts_by_guid(SQLite3 $db, string $sql, array $params = []): array
 {
-    return odq_kept($db, $name, function () use ($db, $sql, $params) {
-        $counts = [];
-        foreach (rows($db, $sql, $params) as $row) {
-            $counts[(int)$row['user_id']] = (int)$row['n'];
-        }
-        return $counts;
-    });
+    $counts = [];
+    // One row per player who has any.
+    foreach (rows($db, $sql, $params) as $row) {
+        $counts[(int)$row['user_id']] = (int)$row['n'];
+    }
+    return $counts;
 }
 
-/* How many of each player's bests a keyboard play set, by guid (KEYS_BESTS): what the totals of every month count. */
+/* How many of each player's bests a keyboard play set, by guid (KEYS_BESTS): what the totals of every month count. Kept while
+   nothing in the log, the bests or the players changes (odq_kept()), as the totals beside them are. */
 function keys_bests(SQLite3 $db): array
 {
-    return keys_counts($db, 'site keys', KEYS_BESTS);
+    return odq_kept($db, 'site keys', fn() => counts_by_guid($db, KEYS_BESTS));
 }
 
 /* How many of the charts of each player's month (from $since to before $until) had a keyboard play as its best, by guid
-   (MONTH_KEYS): what a month's score counts. */
-function month_keys(SQLite3 $db, int $since, int $until): array
+   (MONTH_KEYS): what a month's score counts. Only for $players, the guids a page shows of that month's board (a month
+   before shows its first three): theirs are the only plays read. Kept as keys_bests() is, by the month and the players. */
+function month_keys(SQLite3 $db, int $since, int $until, array $players): array
 {
-    return keys_counts($db, 'month keys ' . json_encode([$since, $until]), MONTH_KEYS, [':since' => $since, ':until' => $until]);
+    // Nobody to count: nothing to read.
+    if (!$players) {
+        return [];
+    }
+    // The players as the statement takes them: a JSON list of their guids, whole numbers only.
+    $list = json_encode(array_map('intval', array_values($players)));
+    return odq_kept($db, 'month keys ' . json_encode([$since, $until, $list]), function () use ($db, $since, $until, $list) {
+        // The month's bounds, as both statements take them.
+        $bounds = [':since' => $since, ':until' => $until];
+        // A month nobody played with the keyboard: that one look, and nothing more is read.
+        if (!(int)(rows($db, KEYS_IN_MONTH, $bounds)[0]['found'] ?? 0)) {
+            return [];
+        }
+        // Each player's count from their plays of the month alone.
+        return counts_by_guid($db, MONTH_KEYS, $bounds + [':players' => $list]);
+    });
 }
 
 /* Each player's total (PLAYER_TOTALS) by guid, players with an account only, kept as play_figures() is. */
@@ -190,12 +210,17 @@ function month_name(int $at): string
 }
 
 /* The players of one month (from $since to before $until), best first: the game's own board of that month, every chart
-   (odq_month_board()), so that the site ranks a month as the game does, with the names as every page shows them.
-   id, name, score, charts, and keys: how many of those charts had a keyboard play as the month's best. */
-function month_players(SQLite3 $db, int $since, int $until): array
+   (odq_month_board()), so that the site ranks a month as the game does, with the names as every page shows them; the
+   first $shown of them only when a page shows no more (null: all of them). id, name, score, charts, and keys: how many of
+   those charts had a keyboard play as the month's best. */
+function month_players(SQLite3 $db, int $since, int $until, ?int $shown = null): array
 {
     // The site's own read-only handle: the board only reads.
     $board = odq_month_board($db, $since, $until, NULL);
+    // Only those the page shows: what follows is worked out for them alone.
+    if ($shown !== null) {
+        $board = array_slice($board, 0, $shown);
+    }
     // Nobody played that month: no names to look up.
     if (!$board) {
         return [];
@@ -205,8 +230,9 @@ function month_players(SQLite3 $db, int $since, int $until): array
     foreach (rows($db, PLAYER_ROWS, [':check' => CHECK_UDID]) as $m) {
         $names[(int)$m['guid']] = $m['nickname'];
     }
-    // How many of the charts each one's score counts had a keyboard play as that month's best: the mark beside the score.
-    $keys = month_keys($db, $since, $until);
+    // How many of the charts each one's score counts had a keyboard play as that month's best: the mark beside the score,
+    // from the plays of these players alone.
+    $keys = month_keys($db, $since, $until, array_column($board, 0));
     $rows = [];
     foreach ($board as [$guid, $score, $charts]) {
         $row = ['id' => $guid, 'nickname' => $names[$guid] ?? '', 'score' => $score, 'charts' => $charts, 'keys' => $keys[$guid] ?? 0];
@@ -223,7 +249,8 @@ function past_months(SQLite3 $db, int $count = 6): array
 {
     $out = [];
     for ($back = 1; $back <= $count; $back++) {
-        $top = array_slice(month_players($db, odq_month_start($back), odq_month_start($back - 1)), 0, 3);
+        // Its first three alone: their marks are worked out from their own plays of that month.
+        $top = month_players($db, odq_month_start($back), odq_month_start($back - 1), 3);
         if ($top) {
             $out[] = [month_name(odq_month_start($back)), $top];
         }

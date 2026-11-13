@@ -173,12 +173,14 @@ check account is never ranked. A month's board (TOTAL and the LINE tabs) and the
 kept in the server's run folder with the number of `BoardStamp`, which triggers raise at every change of `PlayLog`, `Play`
 and `Member`, whoever makes it; while the number stays, a look at a ranking reads what was kept (on a million plays,
 1 ms against 100), and the first look after a change works it out again. The site's keyboard counts beside a total and a
-month's score are kept the same way, read from indexes of the keyboard's rows alone (`Play_keys`, `PlayLog_keys`). A
-restore on the admin pages, which the
-server runs through, moves the number past every one the live database had used, so that nothing kept before it is
-taken for the restored data's. What saves and rankings need of the song list (each chart's line and difficulty, the
-charts of a line and of a song) is kept the same way, as a PHP file named after the list's file and made from that very
-file, so that only the song list's own request decodes its 200 KB.
+month's score are kept the same way. The count beside a total comes from the index of the bests a keyboard play set
+alone (`Play_keys`). The count beside a month's score starts with one look at the index of the keyboard's plays
+(`PlayLog_keys`), and a month nobody played with the keyboard ends there; otherwise it reads that month's plays of the
+players the page shows (the board's, or the first three of a month before) once, through the board's own index
+(`PlayLog_board`). A restore on the admin pages, which the server runs through, moves the number past every one the live
+database had used, so that nothing kept before it is taken for the restored data's. What saves and rankings need of the
+song list (each chart's line and difficulty, the charts of a line and of a song) is kept the same way, as a PHP file named
+after the list's file and made from that very file, so that only the song list's own request decodes its 200 KB.
 
 The achievements on MY PAGE come from what the server knows (level 99 and 999,999 MAX POINT for every player, the best
 scores, the play log), and each keeps the date it was earned on: the save that earns one stores it in

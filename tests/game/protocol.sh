@@ -118,25 +118,50 @@ else
   echo "$plan" | sed 's/^/  /'
   failed=1
 fi
-# The site's keyboard marks beside a total and a month's score count what keyboard plays set from indexes of the keyboard's
-# rows alone (Play_keys, PlayLog_keys; setup-db.php), each month's chart from that player's own plays of it (PlayLog_clears):
-# a server where few play with the keyboard reads few rows for them, and none of the rest of the log.
+# The site's keyboard counts beside a total and a month's score (setup-db.php's indexes): the bests a keyboard play set from
+# the index of those bests alone (Play_keys); a month first from one look at the index of the keyboard's plays (PlayLog_keys),
+# then, only when there are some, from the plays of that month of the players asked for (the board's, or the first three of a
+# month before) through the board's own index (PlayLog_board), never the whole log.
 # shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
 plan=$(docker exec "$NAME" php -r '
   require "/opt/opendmtq/portal/ranking_lib.php";
-  foreach (["bests" => KEYS_BESTS, "month" => MONTH_KEYS] as $what => $sql) {
+  foreach (["bests" => KEYS_BESTS, "any" => KEYS_IN_MONTH, "month" => MONTH_KEYS] as $what => $sql) {
       $r = odq_db()->query("EXPLAIN QUERY PLAN " . $sql);
       while ($r && ($row = $r->fetchArray(SQLITE3_ASSOC))) {
           echo $what, ": ", $row["detail"], "\n";
       }
   }' 2>&1) || true
 if grep -qx 'bests: SCAN p USING COVERING INDEX Play_keys' <<<"$plan" \
-  && grep -qx 'month: SEARCH l USING COVERING INDEX PlayLog_keys (played_at>? AND played_at<?)' <<<"$plan" \
-  && grep -qx 'month: SEARCH b USING INDEX PlayLog_clears (user_id=? AND pattern_id=?)' <<<"$plan" && ! grep -q 'SCAN [lb]\b' <<<"$plan"; then
-  echo "PASS the site's keyboard marks read the keyboard's bests and plays from their own indexes"
+  && grep -qx 'any: SEARCH l USING COVERING INDEX PlayLog_keys (played_at>? AND played_at<?)' <<<"$plan" \
+  && grep -qx 'month: SEARCH l USING INDEX PlayLog_board (user_id=? AND played_at>? AND played_at<?)' <<<"$plan" \
+  && ! grep -q 'SCAN l\b' <<<"$plan"; then
+  echo "PASS the site's keyboard counts read the keyboard's bests from their own index, and a month's from the asked players' plays of that month alone"
 else
-  echo "FAIL the site's keyboard marks read more than the keyboard's rows:"
+  echo "FAIL the site's keyboard counts read more than they need:"
   echo "$plan" | sed 's/^/  /'
+  failed=1
+fi
+# A month nobody played with the keyboard costs that one look: the site's own count (month_keys(), on the site's read-only
+# handle) reads the mark and the time of the play log, and the statement that reads its scores is not even made. An
+# authorizer sees every column each statement reads as SQLite makes it.
+# shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
+looked=$(docker exec "$NAME" php -r '
+  require "/opt/opendmtq/portal/lib.php";
+  $db = new SQLite3(DB, SQLITE3_OPEN_READONLY);
+  $read = [];
+  $db->setAuthorizer(function (int $action, ...$what) use (&$read) {
+      if ($action === SQLite3::READ) {
+          $read[$what[0] . "." . $what[1]] = true;
+      }
+      return SQLite3::OK;
+  });
+  $counts = month_keys($db, gmmktime(0, 0, 0, 1, 1, 2001), gmmktime(0, 0, 0, 2, 1, 2001), [1, 2]);
+  ksort($read);
+  echo json_encode($counts), " ", implode(" ", array_keys($read));' 2>&1) || true
+if [ "$looked" = "[] BoardStamp.n PlayLog.keys PlayLog.played_at" ]; then
+  echo "PASS a month nobody played with the keyboard costs one look at the keyboard's plays, none of its scores read"
+else
+  echo "FAIL a month nobody played with the keyboard reads more than one look: $looked"
   failed=1
 fi
 # What saves and rankings need of the song list (every chart's line and difficulty, the charts of a line and of a song)

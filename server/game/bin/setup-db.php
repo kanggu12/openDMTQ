@@ -190,8 +190,10 @@ $db->exec('CREATE INDEX IF NOT EXISTS Member_udid ON Member (udid)');
 // records (2.4 s a page on a million plays, against 0.06).
 $db->exec('CREATE INDEX IF NOT EXISTS PlayLog_records ON PlayLog (played_at, id) WHERE is_record = 1');
 // The site's keyboard marks on the rankings (portal/ranking_lib.php): how many of each player's bests a keyboard play set,
-// and which charts each player played with the keyboard in a month. From indexes of the keyboard's rows alone, which a
-// save by touch never writes to: the rankings read no more than the keyboard's plays and bests.
+// and whether anybody played with the keyboard in a month, the one look a month nobody did costs. From indexes of the
+// keyboard's rows alone, which a save by touch never writes to: on a server where nobody plays with the keyboard the rankings
+// read nothing more for it. A month with keyboard plays then reads the month's plays of the players a page shows, through
+// PlayLog_board.
 $db->exec('CREATE INDEX IF NOT EXISTS Play_keys ON Play (user_id) WHERE keys = 1');
 $db->exec('CREATE INDEX IF NOT EXISTS PlayLog_keys ON PlayLog (played_at, user_id, pattern_id) WHERE keys = 1');
 // The rankings' change number: one row, raised by these triggers at every change of the play log, the best scores and

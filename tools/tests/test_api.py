@@ -1434,6 +1434,44 @@ class KeysTest(unittest.TestCase):
             month = {p["name"]: p["keys_charts"] for p in inst.ask("GET", "/site/rankings/month").get_json()["items"]}
             self.assertEqual(month, {"Sena": 1, "Yuna": 1})
 
+    def test_a_month_nobody_played_with_the_keyboard_costs_one_look(self):
+        # A server where nobody plays with the keyboard pays nothing more for a month's counts: one look at the index of the
+        # keyboard's plays finds none, and the statement that reads the month's scores is not even made. An authorizer sees
+        # every column a statement reads as SQLite makes the statement.
+        with Server():
+            con = sqlite3.connect(admin.core.DB)
+            read = set()
+
+            def note(action, table, column, *_):
+                # Each column read, by its table.
+                if action == sqlite3.SQLITE_READ:
+                    read.add(f"{table}.{column}")
+                return sqlite3.SQLITE_OK
+
+            con.set_authorizer(note)
+            counts = admin.site.month_keys(con, admin.site.month_start(), 2 ** 63 - 1, [7, 8])
+            con.close()
+            self.assertEqual(counts, {})
+            # Of the play log, the mark and the time alone: the look, and no score.
+            self.assertEqual(sorted(c for c in read if c.startswith("PlayLog.")), ["PlayLog.keys", "PlayLog.played_at"])
+
+    def test_a_month_before_counts_its_first_three_alone(self):
+        # The months before show their first three: their counts are asked for them alone, and come from their own plays of
+        # that month. Four players played last month, each a best with the keyboard there; the fourth is not asked about.
+        with Server() as inst:
+            member_rows(admin.core.DB, [(10, "Riku", "phone-d")])
+            last = admin.site.month_start(1)
+            with sqlite3.connect(admin.core.DB) as con:
+                con.execute("DELETE FROM PlayLog")
+                con.executemany("INSERT INTO PlayLog (user_id, pattern_id, score, grade, judgement, is_record, played_at, keys) VALUES (?, 11, ?, 'A', 900, 1, ?, 1)",
+                                [(7, 900, last + 60), (8, 800, last + 120), (9, 700, last + 180), (10, 600, last + 240)])
+            # Every month's count as it is asked for: the month's start and the players.
+            with mock.patch.object(admin.site, "month_keys", wraps=admin.site.month_keys) as asked:
+                answer = inst.ask("GET", "/site/rankings/month").get_json()
+            players = {c.args[1]: sorted(c.args[3]) for c in asked.call_args_list}
+            self.assertEqual(players[last], [7, 8, 9])
+            self.assertEqual([(p["id"], p["keys_charts"]) for p in answer["past_months"][0]["top"]], [(7, 1), (8, 1), (9, 1)])
+
     def test_a_database_the_server_has_not_brought_up_to_date_says_none_were(self):
         # The admin service can be up before the server after an upgrade: the database has no keyboard's column yet (the
         # server's start adds it). Every answer comes as before, every play and best by touch.
@@ -2175,13 +2213,14 @@ class SameQueriesAsTheSiteTest(unittest.TestCase):
         php = php.replace(taken, f"const SCORE_SQL = '{GAME_SCORE_SQL}';")
         ours = {"PLAYER_ROWS": admin.core.PLAYER_ROWS, "SCORE_SQL": admin.site.SCORE_SQL,
                 "PLAYER_FIGURES": admin.site.PLAYER_FIGURES, "PLAYER_TOTALS": admin.site.PLAYER_TOTALS,
-                # The keyboard's counts beside a total and a month's score.
-                "KEYS_BESTS": admin.site.KEYS_BESTS, "MONTH_KEYS": admin.site.MONTH_KEYS}
+                # The keyboard's counts beside a total and a month's score, and the month's first look.
+                "KEYS_BESTS": admin.site.KEYS_BESTS, "KEYS_IN_MONTH": admin.site.KEYS_IN_MONTH, "MONTH_KEYS": admin.site.MONTH_KEYS}
         for name, query in ours.items():
             # Each on its own: a change to one the others take in shows in all of them.
             with self.subTest(name):
-                # PHP binds the check account and a month's bounds by name (:check, :since, :until), Python by place (?).
-                theirs = re.sub(r":(?:check|since|until)\b", "?", php_constant(php, name))
+                # PHP binds the check account, a month's bounds and the players asked for by name (:check, :since, :until,
+                # :players), Python by place (?).
+                theirs = re.sub(r":(?:check|since|until|players)\b", "?", php_constant(php, name))
                 self.assertEqual(self.same(query), self.same(theirs))
 
     def test_the_games_score_cap_is_the_one_read_above(self):

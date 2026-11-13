@@ -35,17 +35,22 @@ PLAYER_TOTALS = f"""SELECT p.user_id, SUM({SCORE_SQL}) AS total FROM Play p
 # alone (Play_keys, server/game/bin/setup-db.php).
 KEYS_BESTS = "SELECT p.user_id, COUNT(*) AS n FROM Play p WHERE p.keys = 1 GROUP BY p.user_id"
 
-# For one month's board (from the first ? to before the second, both twice), how many of the charts it counts had a keyboard
-# play as each player's best that month: the month's top score on the chart, the play that got there first (MONTH_KEYS in
-# ranking_lib.php, which binds :since and :until by name). The + before the times: each chart's best from that player's
-# plays of it (PlayLog_clears), not from the whole chart's month.
-MONTH_KEYS = """SELECT k.user_id, COUNT(*) AS n FROM (
-        SELECT DISTINCT l.user_id, l.pattern_id FROM PlayLog l
-         WHERE l.keys = 1 AND l.played_at >= ? AND l.played_at < ?) k
-     WHERE (SELECT b.keys FROM PlayLog b
-             WHERE b.user_id = k.user_id AND b.pattern_id = k.pattern_id AND +b.played_at >= ? AND +b.played_at < ?
-             ORDER BY MIN(MAX(b.score, 0), 2147483647) DESC, b.played_at, b.id LIMIT 1) = 1
-     GROUP BY k.user_id"""
+# Whether anybody played with the keyboard in one month (from the first ? to before the second), as found: one look at the
+# index of the keyboard's plays (PlayLog_keys), so that a month nobody played with the keyboard costs nothing more
+# (KEYS_IN_MONTH in ranking_lib.php, which binds :since and :until by name).
+KEYS_IN_MONTH = "SELECT EXISTS (SELECT 1 FROM PlayLog l WHERE l.keys = 1 AND l.played_at >= ? AND l.played_at < ?) AS found"
+
+# For one month's board and the players asked for (a JSON list of guids, then the month from the second ? to before the
+# third), how many of the charts it counts had a keyboard play as each one's best that month: the month's top score on the
+# chart, the play that got there first (MONTH_KEYS in ranking_lib.php, which binds :players, :since and :until by name).
+# One read of those players' plays of that month, from the index the board reads (PlayLog_board).
+MONTH_KEYS = """SELECT best.user_id, COUNT(*) AS n FROM (
+        SELECT l.user_id, l.keys, ROW_NUMBER() OVER (PARTITION BY l.user_id, l.pattern_id
+                                                  ORDER BY MIN(MAX(l.score, 0), 2147483647) DESC, l.played_at, l.id) AS place
+          FROM PlayLog l
+         WHERE l.user_id IN (SELECT value FROM json_each(?)) AND l.played_at >= ? AND l.played_at < ?) best
+     WHERE best.place = 1 AND best.keys = 1
+     GROUP BY best.user_id"""
 
 # The orders the rankings page has, by its tabs: total best score (the default), this month, S grades, perfect plays,
 # charts played.
@@ -168,10 +173,22 @@ def keys_bests(con):
     return keys_counts(con, KEYS_BESTS)
 
 
-def month_keys(con, since, until):
+def month_keys(con, since, until, players):
     """How many of the charts of each player's month (from since to before until) had a keyboard play as its best, by guid
-    (MONTH_KEYS)."""
-    return keys_counts(con, MONTH_KEYS, (since, until, since, until))
+    (MONTH_KEYS), for players alone: the guids a list shows of that month's board (a month before shows its first three),
+    whose plays are the only ones read. A month nobody played with the keyboard costs one look (KEYS_IN_MONTH)."""
+    # Nobody to count: nothing to read.
+    if not players:
+        return {}
+    try:
+        # A month nobody played with the keyboard: that one look, and nothing more is read.
+        if not con.execute(KEYS_IN_MONTH, (since, until)).fetchone()[0]:
+            return {}
+    except sqlite3.OperationalError:
+        # A database the game server has not brought up to date has no keyboard's column: every play there is by touch.
+        return {}
+    # Each player's count from their plays of the month alone, the players as a JSON list of their guids.
+    return keys_counts(con, MONTH_KEYS, (json.dumps([int(p) for p in players]), since, until))
 
 
 def _figures(row, keys=0):
@@ -220,10 +237,11 @@ def month_start(back=0):
     return calendar.timegm((year, month, 1, 0, 0, 0))
 
 
-def month_players(con, since, until):
+def month_players(con, since, until, shown=None):
     """The players of one month, best first, as the game ranks them: the sum of each one's best score per chart in that
     month from the play log, the older account first on a tie (month_players() in ranking_lib.php, the game's odq_month_board()),
-    and how many of those charts had a keyboard play as that month's best."""
+    and how many of those charts had a keyboard play as that month's best. The first shown of them only when a list shows
+    no more (None: all of them)."""
     rows = con.execute(
         f"""SELECT m.guid AS id, m.nickname, b.score, b.charts FROM (
                 SELECT guid, SUM(best) AS score, COUNT(*) AS charts FROM (
@@ -232,7 +250,11 @@ def month_players(con, since, until):
                  GROUP BY guid) b
               JOIN ({core.PLAYER_ROWS}) m ON m.guid = b.guid
              ORDER BY b.score DESC, m.guid ASC""", (since, until, core.CHECK_UDID)).fetchall()
-    keys = month_keys(con, since, until)
+    # Only those the list shows: what follows is worked out for them alone.
+    if shown is not None:
+        rows = rows[:shown]
+    # How many of the charts each one's score counts had a keyboard play as that month's best, from their own plays alone.
+    keys = month_keys(con, since, until, [int(r["id"]) for r in rows])
     return [{"id": int(r["id"]), "name": player_name(r["nickname"], r["id"]), "score": int(r["score"]), "charts": int(r["charts"]),
              "keys_charts": keys.get(int(r["id"]), 0)} for r in rows]
 
@@ -245,7 +267,8 @@ def rankings(con, sort):
         listed = month_players(con, month_start(), 2 ** 63 - 1) if playlog else []
         past = []
         for back in range(1, 7):
-            top = month_players(con, month_start(back), month_start(back - 1))[:3] if playlog else []
+            # Its first three alone: their marks are worked out from their own plays of that month.
+            top = month_players(con, month_start(back), month_start(back - 1), 3) if playlog else []
             if top:
                 start = datetime.datetime.fromtimestamp(month_start(back), datetime.timezone.utc)
                 past.append({"month": start.strftime("%Y-%m"), "start": month_start(back), "end": month_start(back - 1), "top": top})
