@@ -12,8 +12,18 @@ void tweaks_load(const std::string& lib_dir);
 void tweaks_library_loaded(const std::string& name, gaddr handle);
 // Called on Unity's main thread before each native render call; applies the tweaks when due.
 void tweaks_render(Thread& thread);
-// Set by a host with more to do on Unity's main thread at each native render call (the desktop player's keyboard play,
-// which reaches the game through libil2cpp as the tweaks do): called first, whether or not there are tweaks.
-extern void (*g_render_hook)(Thread& thread);
 
 }  // namespace arm32
+
+// The desktop player's own work on Unity's main thread at each native render call (keyboard play, which reaches the game
+// through libil2cpp as the tweaks do), set by that host and called first, whether or not there are tweaks. A phone's
+// runtime has no such host: its build leaves the hook out and keeps every line of this file and tweaks.cpp where it
+// was, so that its library is the same as before and a server keeps the app it made with it.
+#ifndef __ANDROID__
+namespace arm32 {
+extern void (*g_render_hook)(Thread& thread);
+}  // namespace arm32
+#define ARM32_RENDER_HOOK(th) if (::arm32::g_render_hook) ::arm32::g_render_hook(th);
+#else
+#define ARM32_RENDER_HOOK(th)
+#endif

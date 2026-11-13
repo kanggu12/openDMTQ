@@ -191,12 +191,7 @@ void tweaks_library_loaded(const std::string& name, gaddr handle) {
     if (name == "libil2cpp.so") g_il2cpp = handle;
 }
 
-// None unless a host sets one (tweaks.h).
-void (*g_render_hook)(Thread&) = nullptr;
-
-void tweaks_render(Thread& th) {
-    // The host's own work first: it needs no tweaks to run.
-    if (g_render_hook) g_render_hook(th);
+void tweaks_render(Thread& th) { ARM32_RENDER_HOOK(th)
     if (g_tweaks.empty() || !g_il2cpp) return;
     // The game's frame target every 10th render call (it changes as the game idles), the tweaks
     // every 120th: twice a second at 60 fps, once at 120.
@@ -250,3 +245,10 @@ void tweaks_render(Thread& th) {
 }
 
 }  // namespace arm32
+
+#ifndef __ANDROID__
+namespace arm32 {
+// None unless a host sets one (tweaks.h); left out of a phone's build, as is its call in tweaks_render.
+void (*g_render_hook)(Thread&) = nullptr;
+}  // namespace arm32
+#endif
