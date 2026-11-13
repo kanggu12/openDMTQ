@@ -105,10 +105,10 @@ it keeps are refused. `--set` takes the settings of the **Screen**, **Sound** an
 | `audio_mode` | `shared`, `exclusive` | Mode |
 | `audio_buffer` | `normal`, `low`, `safe` | Buffer |
 | `volume` | `100`, or any number from 0 to 100 | Volume |
-| `keyboard` | `on`, `off` | Play with keys |
-| `keys_2line` | `"F J"`: the lanes from the top apart by spaces, a lane's keys one or two joined by `/` (`"F/G J"`), each named as the US layout's key at its place: `A` to `Z`, `0` to `9`, `Space`, `Semicolon`, `Quote`, `Comma`, `Period`, `Slash`, `LeftBracket`, `RightBracket`, `Backslash`, `Minus`, `Equals`, `Grave`; a key in two lanes refused | 2 LINE's lanes |
-| `keys_3line` | `"D F J"`, three lanes as `keys_2line` has two | 3 LINE's lanes |
-| `keys_4line` | `"D F J K"`, four lanes as `keys_2line` has two | 4 LINE's lanes |
+| `keyboard` | `on`, `off` | [Keyboard play](#keyboard-play), on the **Controls** page |
+| `keys_2line` | `"F J"`: two lanes from the top separated by spaces, each lane one key or two joined by `/` (`"F/D J/K"`), each key by the name of the key a US layout has at that place: `A` to `Z`, `0` to `9`, `Space`, `Semicolon`, `Quote`, `Comma`, `Period`, `Slash`, `LeftBracket`, `RightBracket`, `Backslash`, `Minus`, `Equals`, `Grave`; a key in two lanes is refused | 2 LINE's keys, on the **Controls** page |
+| `keys_3line` | `"D F J"`, or three lanes in the same way | 3 LINE's keys |
+| `keys_4line` | `"D F J K"`, or four lanes in the same way | 4 LINE's keys |
 | `language` | `system` (Windows' display language), `en`, `ko`: the same as `--language` | Language, on the **Launcher** page; the game and what the player draws over it speak it too |
 
 ## In the game
@@ -120,6 +120,7 @@ it keeps are refused. `--set` takes the settings of the **Screen**, **Sound** an
 | The mouse wheel | Scrolls what is under the pointer, as a finger's drag; with Shift, across |
 | A pen | One finger |
 | Esc | The phone's Back key: pauses a song, closes what is open |
+| The lane keys, while a song is played | [Keyboard play](#keyboard-play): each lane of the song a key, F J in 2 LINE, D F J in 3 LINE and D F J K in 4 LINE from the top lane, each press where the game judges the lane's next note |
 | The keyboard | Text where the game asks for it, the text it opens with taken as selected: the first key types over it, Backspace clears it, an arrow keeps it (Enter ends it, Esc cancels it); Hangul too |
 | The touch keyboard | Comes up when a touch opens the game's text, and types into it |
 | The pointer resting at the game's top edge, or on the handle at its top centre | The bar: minimise, full screen, and the X that quits after asking |
@@ -182,6 +183,32 @@ The pieces over the game, how large they are drawn and how their glass is made: 
 <p align="center">
   <img src="images/game-pc-quit.jpg" alt="The question before quitting: a card of frosted glass over the game, dimmed and blurred behind it, Quit the game? with Keep playing as the main button, ringed by the keyboard's choice, and Quit the game beside it" width="100%">
 </p>
+
+### <a id="keyboard-play"></a>Keyboard play
+
+While a song is played, each of its lanes is a key: **F J** in 2 LINE, **D F J** in 3 LINE and **D F J K** in 4 LINE, from
+the top lane down. A key plays its lane wherever the note is along it: the player puts the press at the place the game
+judges the lane's next note, and the game judges it as it judges a finger, with its own timing, combo and score.
+
+- **Taps and chain points:** a press each, as the note meets the judgment line.
+- **Holds:** the key held down to the hold's end; let go early, the hold breaks, as when a finger lifts.
+- **Drags:** the key held down; the press follows the drag's curve.
+- **Repeat notes:** a press for each of their points.
+- **The keys are places on the keyboard,** named after a US keyboard's keys: on another layout the same places play
+  (AZERTY's, a Korean or a Japanese keyboard's). Each mode's keys are set on the launcher's **Controls** page, or with
+  `--set` (`keys_3line`, above); a lane can have two keys, to alternate on quick notes (`S/D F J/K`).
+- **Only while a song is played:** in the menus every key is the game's as before, and while the game asks for text (a
+  new player's name) the keys type. Every lane key lets go when the window loses the keyboard or is minimised, when the
+  song pauses (the game's pause button at its top left) and when the question before quitting comes; a key held
+  through that plays again once it is let go and pressed again. Esc stays the Back key, and no other key does anything
+  new.
+- **The bar** waits while a lane key is down, as it does for a finger on the game.
+- **A mark on the site:** a play that a lane key pressed is saved with a mark, which the server keeps with the play; its
+  site shows a keyboard beside that play, so that keyboard plays and touch plays are told apart.
+- **Off:** `keyboard=off` (the **Controls** page's switch) leaves every key the game's.
+
+A player that does not find the game's input where it expects it (another version of the game) leaves keyboard play
+off, says why in its log, and the game plays by touch as before.
 
 ## The picture
 
@@ -375,6 +402,20 @@ With the player's stats on (`ARM32_STATS=1`), every 5 seconds a `stats: picture`
 on the render thread and on the graphics card (by `EXT_disjoint_timer_query`, which ANGLE has; with its timestamps the
 game's own time on the graphics card too), the swap's whole cost, and how often the game made its context current. `PLAYER_OFFSCREEN=1` has the frames drawn offscreen with no pass at all (a plain copy), to
 measure the redirection by itself.
+
+### Keyboard play's presses
+
+The game takes a touch screen's fingers once a frame, in its own input update, and judges the presses against its notes
+in the same frame. [Keyboard play](#keyboard-play) takes that update's place in the game's table of methods: the game's
+own update runs first, as always, then each lane key that is down gives the game one press, at the place the game will
+judge the lane's next note (a repeat point at its group's first note, a drag along its curve), or where the judgment
+line crosses the lane when no note is near. Three more of the game's methods say when a play starts and when its song
+pauses or stops. The player first finds these methods and the fields it reads by their names and checks each against
+the place it was written for; when one differs, keyboard play stays off and the log says which. With the stats on, a
+`stats: keyboard play` line every 5 seconds gives what the presses took a frame beside the game's own input update: on
+Windows 2 to 6 microseconds a frame on average and 10 to 19 at the 99th percentile, the game's own update 2 to 3; under
+Wine 3 to 8 and 22 to 36. `PLAYER_TRACE_KEYS=1` logs each press and the note it aims at, and at a song's end how the
+game judged its notes by type.
 
 ## For server owners
 
