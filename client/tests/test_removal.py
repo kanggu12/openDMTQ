@@ -444,7 +444,7 @@ class WindowFlow(Folder):
 
         with mock.patch.object(dialogs, "choose", return_value="all"), mock.patch.object(dialogs, "tell", tell), \
                 mock.patch.object(maintenance, "_in_background",
-                                  lambda app, words, job, then: then(job(), None)), \
+                                  lambda app, words, job, then, detail=None: then(job(), None)), \
                 mock.patch.object(removal, "uninstall", side_effect=OSError("Update.exe did not start")):
             maintenance.uninstall_program(app)
         self.assertEqual(said, [app.words("help.uninstall.failed")])
@@ -484,8 +484,8 @@ class WindowFlow(Folder):
                                     page="online", set_status=lambda *a, **k: None)
         jobs, asked = [], []
 
-        def background(app, words, job, then):
-            # Run at once, in order, each job named as the dialog over it would be shown.
+        def background(app, words, job, then, detail=None):
+            # Run at once, in order, each job named as the dialog over it would be shown (with its line, if any).
             jobs.append(job.__name__)
             then(job(), None)
 

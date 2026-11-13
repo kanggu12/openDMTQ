@@ -664,3 +664,25 @@ class Stopped(unittest.TestCase):
             stopped.run(lambda: sys.exit(2), lambda: "launcher.log")
         show.assert_not_called()
         self.assertEqual(stopped.run(lambda: 0, lambda: "launcher.log"), 0)
+
+    def test_the_stopped_window_opens_the_logs_folder(self):
+        # The launcher is gone, so Help's Open is out of reach: the window has Open the log folder, quiet, then Close,
+        # lit (one lime button), which Enter and the window's X answer.
+        from opendmtq_client import actions, dialogs, i18n, stopped
+        w = i18n.Words("en")
+        kind, _title, _message, _detail, buttons, default, cancel = stopped.dialog(w, OSError("x"), "C:\\logs\\l.log")
+        self.assertEqual(kind, "error")
+        self.assertEqual(buttons, [("Open the log folder", "logs", "neutral"), ("Close", "close", "home")])
+        self.assertEqual((buttons[default][1], cancel), ("close", "close"))
+        # Where finding the log failed too ("?"), Close alone: no folder to open.
+        self.assertEqual([b[1] for b in stopped.dialog(w, OSError("x"), "?")[4]], ["close"])
+        # The answer opens the folder the log is in, and nothing else.
+        with mock.patch.object(dialogs, "standalone", return_value="logs"), \
+                mock.patch.object(actions, "open_folder") as opened:
+            stopped.show(OSError("x"), os.path.join("logs", "launcher.log"))
+        opened.assert_called_once_with("logs")
+        # Close opens nothing.
+        with mock.patch.object(dialogs, "standalone", return_value="close"), \
+                mock.patch.object(actions, "open_folder") as opened:
+            stopped.show(OSError("x"), os.path.join("logs", "launcher.log"))
+        opened.assert_not_called()

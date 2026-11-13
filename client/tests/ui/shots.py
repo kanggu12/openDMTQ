@@ -1423,9 +1423,11 @@ def maintenance_check(app, out, tag, problems):
                    lambda d: click_button(d, 1), problems)
     if "dialog" not in failed or not app.root.winfo_exists():
         problems.append("%s: an uninstaller that did not start was not said" % tag)
-    # The work under way, as the dialogs show it.
+    # The work under way, as the dialogs show it, with the line under it that says what comes of it.
+    from opendmtq_client import maintenance as tools
     for key in ("help.repair.working", "help.uninstall.working", "help.counting"):
-        dialog = dialogs.Dialog(app.root, app.ui, "info", w(key), w(key), progress=True)
+        detail = w(tools.WORKING_DETAIL[key]) if key in tools.WORKING_DETAIL else None
+        dialog = dialogs.Dialog(app.root, app.ui, "info", w(key), w(key), detail=detail, progress=True)
         wait_out(app.root, 0.6)
         shot(app.root, out, "%s_dialog-%s" % (tag, key.replace(".", "-")))
         problems.extend("%s_dialog-%s: %s" % (tag, key, p) for p in dialog.layout_problems())
@@ -1465,13 +1467,13 @@ def maintenance_check(app, out, tag, problems):
 
 def stopped_check(out, tag, lang, problems):
     """The window an error nobody expected ends in (stopped.py), with a long path in it."""
-    from opendmtq_client import dialogs, i18n
+    from opendmtq_client import dialogs, i18n, stopped
     w = i18n.Words(lang)
     error = OSError(28, "No space left on device", "C:\\Users\\player\\AppData\\Local\\OpenDMTQ\\client\\settings.json")
-    root, dialog = dialogs.window("error", w("stopped.title"), w("stopped.message"),
-                                  w("stopped.detail", error=w.error(error),
-                                    path="C:\\Users\\player\\AppData\\Local\\OpenDMTQ\\client\\logs\\launcher.log"),
-                                  [(w("start.close"), "close", "home")], 0, "close", language=lang)
+    # The window stopped.show opens, its buttons too (Open the log folder, then Close).
+    root, dialog = dialogs.window(*stopped.dialog(w, error,
+                                                  "C:\\Users\\player\\AppData\\Local\\OpenDMTQ\\client\\logs\\launcher.log"),
+                                  language=lang)
     wait_out(root, 1.0)
     shot(root, out, "%s_stopped" % tag)
     problems.extend("%s_stopped: %s" % (tag, p) for p in dialog.layout_problems())

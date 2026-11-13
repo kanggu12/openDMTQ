@@ -15,10 +15,17 @@ from opendmtq_client import actions, dialogs, i18n, updates
 log = logging.getLogger("opendmtq_client")
 
 
-def _in_background(app, message, job, then):
-    """Run job() on a worker thread under a dialog that says what is under way, then then(result, error) on the
-    window's thread with the dialog gone. The window is not closed meanwhile: the work would stop half done."""
-    app.dialog = dialogs.Dialog(app.root, app.ui, "info", message, message, progress=True)
+# The line under a dialog at work, by its title's words: what comes of the work (a count has none). The UI checks draw
+# these dialogs from it as well.
+WORKING_DETAIL = {"help.repair.working": "help.repair.working.detail",
+                  "help.uninstall.working": "help.uninstall.working.detail"}
+
+
+def _in_background(app, message, job, then, detail=None):
+    """Run job() on a worker thread under a dialog that says what is under way (and, with `detail`, what comes of it),
+    then then(result, error) on the window's thread with the dialog gone. The window is not closed meanwhile: the work
+    would stop half done."""
+    app.dialog = dialogs.Dialog(app.root, app.ui, "info", message, message, detail=detail, progress=True)
     app.keep_open = True
 
     def work():
@@ -91,7 +98,8 @@ def repair_program(app):
         # The player may be back.
         app.refresh_checks()
 
-    _in_background(app, w("help.repair.working"), repair.run, done)
+    # What the check puts back, said under it while it works.
+    _in_background(app, w("help.repair.working"), repair.run, done, detail=w(WORKING_DETAIL["help.repair.working"]))
 
 
 def clear_game_data(app):
@@ -180,7 +188,9 @@ def uninstall_program(app):
             app.state.save()
             start()
         elif choice == "all":
-            _in_background(app, w("help.uninstall.working"), removal.delete_everything, deleted)
+            # What follows the deleting: the launcher closes and the uninstaller takes the program.
+            _in_background(app, w("help.uninstall.working"), removal.delete_everything, deleted,
+                           detail=w(WORKING_DETAIL["help.uninstall.working"]))
 
     # What Delete all would free, counted on a worker thread first (the games' folders may hold thousands of files).
     _in_background(app, w("help.counting"), removal.everything_size, counted)

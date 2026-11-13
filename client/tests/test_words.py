@@ -169,6 +169,14 @@ class Wording(unittest.TestCase):
             for text in pair:
                 self.assertIsNone(re.search(r"[0-9}](KB|MB|GB|Hz|fps)\b", text), (key, text))
 
+    def test_a_log_is_a_log_and_records_are_records(self):
+        # Korean says 로그 for a log and keeps 기록 for play records: "게임 로그 열기" opens a log, "기록은 서버에 그대로
+        # 있습니다" is about the player's records, and one word for both read as the same thing.
+        for key, (en, ko) in i18n.TEXT.items():
+            if re.search(r"\blogs?\b", en):
+                self.assertIn("로그", ko, key)
+                self.assertNotIn("기록", ko, key)
+
     def test_one_word_for_signing_in(self):
         # Sign in on every button, card and step: never "log in" beside it (Korean says 로그인 for both).
         for key, (en, _ko) in i18n.TEXT.items():
