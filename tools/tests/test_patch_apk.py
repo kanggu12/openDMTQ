@@ -617,6 +617,50 @@ class CodeEditTest(unittest.TestCase):
                     self.assertEqual(f.read(), after, version)
                 self.assertIn(f"the edit ({version})", log.call_args_list[-1].args[0])
 
+    def test_the_music_list_keeps_its_page_after_a_download(self):
+        # 1.3.4's UpdateSongList ends by turning the music list to its first page, wherever the song it looked for is: the
+        # edit hands SetPlaySongPage that song's page and List.get_Item the page SetPlaySongPage set, and changes nothing
+        # else there. Each word decoded as the processor reads it, so that a wrong register or offset shows.
+        versions = dict(patch_apk.IL2CPP_EDITS)["the music list stays at its page after a download"]
+        (_, old, new), = versions["1.3.4"]
+        before, after = arm_words(old), arm_words(new)
+        # Four instructions change; the method's calls, branches and returns stay as they were.
+        self.assertEqual([i for i, (a, b) in enumerate(zip(before, after)) if a != b], [0, 4, 10, 12])
+        # The groups from the frame into r4 (sp + 4) become the method's closure (sp + 0x10).
+        self.assertEqual(ldr_fields(before[0]), (4, SP, 0x4))
+        self.assertEqual(ldr_fields(after[0]), (4, SP, 0x10))
+        # The first page (mov r1, #0) becomes the closure's initialPageIdx, the page of the song it found.
+        self.assertEqual(before[4], MOV_R1_0)
+        self.assertEqual(ldr_fields(after[4]), (1, 4, 0x8))
+        # The first group (mov r1, #0) becomes currentPage, at 0x2c of the page the method runs on (sl).
+        self.assertEqual(before[10], MOV_R1_0)
+        self.assertEqual(ldr_fields(after[10]), (1, SL, 0x2C))
+        # The groups from r4 (mov r0, r4) become the groups from the frame, where r4 had them from.
+        self.assertEqual(before[12], 0xE1A00004)
+        self.assertEqual(ldr_fields(after[12]), (0, SP, 0x4))
+        # 1.3.5 keeps the page in its own code: its parts only read that code and write it back as it is.
+        self.assertTrue(versions["1.3.5"])
+        for _, read, written in versions["1.3.5"]:
+            self.assertEqual(read, written)
+
+
+# Registers by number, as an ARM instruction names them, and mov r1, #0 as the processor reads it.
+SP, SL = 13, 10
+MOV_R1_0 = 0xE3A01000
+
+
+def arm_words(code):
+    """The ARM instructions of a piece of code, each a 32-bit word in the processor's (little-endian) order."""
+    return [int.from_bytes(code[i:i + 4], "little") for i in range(0, len(code), 4)]
+
+
+def ldr_fields(word):
+    """(rd, rn, offset) of LDR rd, [rn, #offset] (always, an immediate offset added, no write-back), else None."""
+    # The condition (always), the kind (a word loaded with an immediate offset, added, before the access, no write-back).
+    if word & 0xFFF00000 != 0xE5900000:
+        return None
+    return (word >> 12) & 0xF, (word >> 16) & 0xF, word & 0xFFF
+
 
 def settings_file(objects):
     """A Unity 5.6 asset file holding objects of other kinds than screens: [(Unity class number, its bytes)]."""

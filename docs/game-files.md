@@ -21,10 +21,10 @@ The game's Android client as an APK, under any file name. These work:
 - **Inside something else**: a `.zip`, `.7z` or `.rar`, or an APK bundle (`.xapk`, `.apks`). The import takes the app
   out and leaves the bundle's split parts.
 
-OpenDMTQ also tidies a few of the game's screens: no notice at every start, no question before the first download,
-the shop opening on its MAX tab, the panel's own resolution, menus kept at full frame rate when left alone. These fixes
-fit versions 1.3.5 and 1.3.4, original or changed for another server, and both were played through on an emulator.
-Another version plays the same, with those screens as the game had them.
+OpenDMTQ also tidies a few of the game's screens: no notice at every start, no question before the first download, the
+shop opening on its MAX tab, the panel's own resolution, menus kept at full frame rate when left alone, the music list
+kept at its page after a download. These fixes fit versions 1.3.5 and 1.3.4, original or changed for another server, and
+both were played through on an emulator. Another version plays the same, with those screens as the game had them.
 
 These do not work:
 

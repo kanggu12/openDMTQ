@@ -29,7 +29,7 @@ import zipfile
 from . import axml, filelock, il2cpp, pack_arm64, qr, unity_assets
 
 # Tool version stamped into the manifest, so a portal can tell which patcher made an APK.
-VERSION = "1.11.0"
+VERSION = "1.12.0"
 # data/apk: base/ in, out/ and keystore/ written. The image mounts it at /apk; a host install names it.
 APK_DIR = os.environ.get("OPENDMTQ_APK", "/apk")
 # The command that imports on this install, for the messages that name it: the Windows bundle's program (the only one
@@ -393,6 +393,26 @@ def _menu_rate(room, back, slot):
     return _KEEP_MENU_RATE + arm_branch(room + 0x34, back) + ((slot - (room + 8 + 8)) & 0xFFFFFFFF).to_bytes(4, "little")
 
 
+# The music list's page edit (IL2CPP_EDITS): the end of SelectPlaySongPage.UpdateSongList in 1.3.4, from +0x570, where
+# the count of the list's pages is back, to the read of its page groups. As the game has it: the groups into r4 (from the
+# method's frame, sp + 4); fewer than one page, return; this; the first page; SetPlaySongPage; the GOT's List.get_Item for
+# the groups (four instructions); the first group; that method's information; the groups.
+_LIST_END = bytes.fromhex(
+    "04409de5 010050e3 0f0000ba 0a00a0e1 0010a0e3 390800eb f8009fe5 f8109fe5 00008fe0 000091e7 0010a0e3 002090e5 0400a0e1")
+# The same with four words changed. r4 gets the method's closure instead (sp + 0x10, <UpdateSongList>c__AnonStorey5),
+# whose initialPageIdx (at 8) is the page of the song the rebuild looked for and found, 0 when it looked for none or did
+# not find it; SetPlaySongPage gets that page in place of the first; List.get_Item gets currentPage (at 0x2c of the
+# page, sl), which SetPlaySongPage has just set to that page within the list's pages; and the groups are read from the
+# frame where r4 had them from. Nothing else of the method moves.
+_LIST_END_KEPT = bytes.fromhex(
+    "10409de5 010050e3 0f0000ba 0a00a0e1 081094e5 390800eb f8009fe5 f8109fe5 00008fe0 000091e7 2c109ae5 002090e5 04009de5")
+# 1.3.5's own UpdateSongList keeps the page by itself: r4 set to 1 at the end of the part that looks for the song
+# (+0x3a8), and its end returns before SetPlaySongPage(0) while r4 is set or there are no pages (+0x574: mov r1, #0;
+# cmp r0, #1; movwlt r1, #1; orrs r0, r4, r1; beq to the turn to the first page).
+_LIST_FLAG_135 = bytes.fromhex("0140a0e3")
+_LIST_END_135 = bytes.fromhex("0010a0e3 010050e3 011000b3 010094e1 0100000a")
+
+
 # Code edits in the game's libil2cpp.so: (what it does, {client version: [(offset, bytes there now, bytes to write)]}).
 # All the parts of an edit apply together, in the first version whose bytes are all there; a client whose bytes differ in
 # every version keeps that screen as it was. A client changed for another server has the code of its version: the address
@@ -463,6 +483,18 @@ IL2CPP_EDITS = [
                    "a0539fe5 00008fe0 000085e0 5201d0e5 000050e3"
                    "0800001a 8c039fe5 8c139fe5 00608fe0 060091e7"
                    "000090e5 749214eb 060085e0 0110a0e3 5211c0e5"), _menu_rate(0xB4BFA0, 0x1047704, 0x1461F70))],
+    }),
+    # Songs downloaded from the music list (ticked, then DOWNLOAD; or a song's own download) left the list at its first
+    # page, wherever the player was. At the download's end the game remembers the first song of the page the player is
+    # at and builds the list again from what is on the device (SelectPlaySongPage.UpdateSongList): the rebuild finds
+    # that song and turns the list to its page, then turned it to the first page every time (SetPlaySongPage(0) with
+    # OnPlaySongCenter of the first page's group); currentPage still held the player's page, so that turn moved the
+    # list. Its end now goes to the page of the song it found (_LIST_END_KEPT), and to the first page as before when it
+    # looked for none: a filter or a sort still opens the list at its start. 1.3.5 keeps the page in its own code: its
+    # part only reads that code and writes it back as it is.
+    ("the music list stays at its page after a download", {
+        "1.3.4": [(0xD290D4, _LIST_END, _LIST_END_KEPT)],
+        "1.3.5": [(0xC2612C, _LIST_FLAG_135, _LIST_FLAG_135), (0xC262F8, _LIST_END_135, _LIST_END_135)],
     }),
 ]
 

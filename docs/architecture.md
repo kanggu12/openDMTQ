@@ -314,11 +314,13 @@ fetches the images of its screens from the server), so the server reports itself
   Games screens (`PPImpl$19`). It no longer asks Google Play for the local prices of the paid items at every start
   (`PPImpl`, `getPriceLocalization`). The clipboard is left alone (`ExternalSDK`, `GetClipboard` and `SetClipboard`):
   at every sign-in the game read it for a token the old Kakao edition left there, then emptied it.
-- **Game code** (`lib/armeabi-v7a/libil2cpp.so`, `IL2CPP_EDITS`, with the bytes of clients 1.3.5 and 1.3.4): the
-  main menu goes past the event notice popup. The question before the first start's data download answers itself. The
-  shop opens on its MAX tab, as its Q tab is gone. A menu left alone keeps its frame rate instead of stepping down to
-  18 fps. The game draws at the panel's own resolution. In a client of another version an edit whose bytes differ is
-  left out whole, with the screen edits that go with it (`ASSET_NEEDS`: the shop keeps its Q tab while it opens on it).
+- **Game code** (`lib/armeabi-v7a/libil2cpp.so`, `IL2CPP_EDITS`, with the bytes of clients 1.3.5 and 1.3.4): the main
+  menu goes past the event notice popup. The question before the first start's data download answers itself. The shop
+  opens on its MAX tab, as its Q tab is gone. A menu left alone keeps its frame rate instead of stepping down to 18 fps.
+  The game draws at the panel's own resolution. After songs are downloaded from the music list, the list stays at the
+  page it was on: 1.3.4 built it again at that page, then turned it to its first page; 1.3.5 keeps the page in its own
+  code, which its part only checks. In a client of another version an edit whose bytes differ is left out whole, with
+  the screen edits that go with it (`ASSET_NEEDS`: the shop keeps its Q tab while it opens on it).
 - **Project settings** (`assets/bin/Data/globalgamemanagers`, `SETTING_EDITS`): a 32-bit screen in place of a 16-bit
   one, and textures at full size in place of half, each found in its object (PlayerSettings, QualitySettings) wherever
   the file has it.

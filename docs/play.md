@@ -45,9 +45,11 @@ on. The server's owner runs it and makes your account.
 5. Start the game: the app is named **TECHNIKA Q** with the server's name in brackets. At its first start it asks for
    storage access, then downloads the game's data from the server, about 44 MB.
 
-Songs download the first time you play them. The app is the game's own Android app with the server's address in it,
-so nothing else on the phone changes: no DNS, proxy or certificate. The same site has the rankings, the songs, each
-player's page and the broadcasts, in English and Korean (**KOR** / **ENG** at the top).
+Songs download before you first play them: in the music list, tap a song that is not downloaded yet, tick any others (or
+the whole page with **Select ALL**) and tap **DOWNLOAD**. The list stays at the page you were on. The app is the game's
+own Android app with the server's address in it, so nothing else on the phone changes: no DNS, proxy or certificate. The
+same site has the rankings, the songs, each player's page and the broadcasts, in English and Korean (**KOR** / **ENG**
+at the top).
 
 A line under the site's top bar is a notice from the server's owner, on every page while it is up. Its **×** closes it
 until your next visit; new words from the owner show again.
