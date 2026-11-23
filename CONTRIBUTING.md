@@ -71,8 +71,8 @@ KEEP=1 tests/ui/run.sh         # the site at http://127.0.0.1:18801/ (site accou
 KEEP=1 tests/game/protocol.sh  # the game server alone, at http://127.0.0.1:18701/
 ```
 
-They need Docker on Linux (or Docker Engine in WSL 2), Python 3, `curl` and GNU coreutils (on a Mac: `brew install
-coreutils`). The first run builds both images and pulls a headless Chromium and ffmpeg: some minutes.
+They need Docker on Linux (or Docker Engine in WSL 2), Python 3, `curl` and GNU coreutils (on a Mac:
+`brew install coreutils`). The first run builds both images and pulls a headless Chromium and ffmpeg: some minutes.
 
 ## Run the tests
 
