@@ -7,7 +7,7 @@ another program has it, and keeps everything of yours in its `data` folder. Each
 | Way | Runs on | Needs |
 | :--- | :--- | :--- |
 | [Windows](#windows) | 64-bit Windows 10 or 11 | Nothing else: the release's zip brings what the server runs |
-| [Linux or macOS](#linux-or-macos) | Debian 12, Ubuntu 24.04, or macOS with [Homebrew](https://brew.sh) | `sudo`, which installs Apache, PHP, Java and Python from the system's packages |
+| [Linux or macOS](#linux-or-macos) | Debian 12, Ubuntu 24.04, or macOS with [Homebrew](https://brew.sh) | Nothing else: it installs Apache, PHP, Java and Python from apt (asking for `sudo`) or Homebrew |
 | [Docker](#docker) | Linux, or Windows with WSL 2 | Docker 23 or newer with Compose, Python 3.9 or newer, and git |
 | [Kubernetes](#kubernetes) | A cluster | Helm, a volume with the game's files, and S3-compatible storage |
 
@@ -90,8 +90,8 @@ curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/v0.11.2/host/get.
 
 1. It downloads the latest release of OpenDMTQ into `~/openDMTQ` (`OPENDMTQ_DIR=<folder>` before `sh` chooses
    another).
-2. It installs Apache, PHP, Java and Python from the system's packages, asking for your password (`sudo`) to do so, and
-   puts the `opendmtq` command on your PATH.
+2. It installs Apache, PHP, Java and Python from the system's packages, apt's (asking for your password, `sudo`) or
+   Homebrew's, and puts the `opendmtq` command on your PATH.
 3. It starts the server and opens the same setup as on Windows in the browser; on a computer without a screen it prints
    the setup's address instead.
 
