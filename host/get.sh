@@ -1,11 +1,12 @@
 #!/bin/sh
-# From nothing to the setup with one command, on Debian, Ubuntu, or macOS with Homebrew:
+# From nothing to the setup with one command, on Debian, Ubuntu, or macOS with Homebrew, as the README's quick start
+# gives it, this script taken from a release's tag (the one from main does the same):
 #
-#   curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/main/host/get.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/v<version>/host/get.sh | sh
 #
-# Puts OpenDMTQ in ~/openDMTQ (OPENDMTQ_DIR says where), installs what the server needs without containers
-# (host/install.sh), and opens the setup in the browser. Run again, it updates that folder: the settings and the data
-# in it stay. Docker's way is the README's "With Docker".
+# Puts the latest release of OpenDMTQ in ~/openDMTQ (OPENDMTQ_DIR says where), installs what the server needs without
+# containers (host/install.sh), and opens the setup in the browser. Run again, it updates that folder to the latest
+# release: the settings and the data in it stay. Docker's way is the install guide's (docs/install.md, Docker).
 #
 # All of it is in functions, called on the last line: a shell reads a script from a pipe as it goes, so nothing runs from
 # a download cut short, and nothing here may read this shell's own input, which is the script.
