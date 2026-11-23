@@ -47,7 +47,7 @@ For each file it finds, the setup says what it is and whether it can be used, be
 line, `./opendmtq import --check <folder>` says the same.
 
 **Do I need to know how to program, or use a command line?**
-No. On Windows you paste five lines into PowerShell, and the rest happens in the browser. On Linux or macOS one command
+No. On Windows you paste four lines into PowerShell, and the rest happens in the browser. On Linux or macOS one command
 starts the same setup.
 
 **Does the computer have to stay on?**
@@ -85,9 +85,10 @@ them and restores them ([backups and a new computer](install.md#backups-and-a-ne
 
 **What happens to the data if I update OpenDMTQ?**
 Everything of yours is in the `data` folder and the `.env` file, and an update leaves those alone. On Windows, close the
-server's window and run the same five lines again; on Linux or macOS, the same command ([installing](install.md)). With
-Docker, `git pull`, then `./opendmtq up`; `./opendmtq runtime` also brings the newest runtime for newer phones. The PC
-clients that play on the server then update to its version from the server itself.
+server's window and run the newer release's four lines, as the [quick start](../README.md#quick-start) has them; on
+Linux or macOS, the same command again ([installing](install.md)). With Docker, `git pull`, then `./opendmtq up`;
+`./opendmtq runtime` also brings the newest runtime for newer phones. The PC clients that play on the server then
+update to its version from the server itself.
 
 **The game shows no songs.** The song list is empty until the songs are imported. On Windows and a host install: on the
 admin pages, **Songs**, **Choose the folder**, then the client data and the song data together, or the `DMQ` folder

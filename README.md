@@ -41,68 +41,46 @@ same app in the OpenDMTQ PC client.
 
 ## Quick start
 
-<table>
-<tr>
-<th width="50%" align="left">Play</th>
-<th width="50%" align="left">Host a server</th>
-</tr>
-<tr>
-<td valign="top">
+### Play
 
-With the account the server's owner made for you:
+With the ID and password the server's owner gives you:
 
-1. On an **Android phone**, open the server's address (or scan its QR code) and sign in.
-2. Tap **Download app (.apk)** and install it: the game, connected to that server. 64-bit-only phones play too;
-   [iPhones cannot](docs/game-files.md#iphones).
-3. On a **Windows PC** (or Linux, under Wine), take the installer from the same page. Its launcher signs in and keeps
-   the game up to date.
+1. On an **Android phone**, open the server's address (or scan its QR code), sign in, and tap **Download app (.apk)**:
+   the game, connected to that server. [iPhones cannot play](docs/game-files.md#iphones).
+2. On a **Windows PC**, take the PC client's installer from the same page. Its launcher signs in and keeps the game up
+   to date.
 
-**[The players' guide](docs/play.md)**
+The rest is in [playing on a server](docs/play.md) and [the PC client](docs/windows-player.md).
 
-</td>
-<td valign="top">
+### Run a server
 
-With your own copy of the game's Android app, its client data and its song data ([what they are](docs/game-files.md)):
-
-1. Start the server with the commands below.
-2. The setup opens in the browser. It finds your files, asks for the address phones use and an account for each
-   player, and builds the app.
-3. Send each player the message the setup makes, with the address and their account.
-
-**[The server guide](docs/install.md)**
-
-</td>
-</tr>
-</table>
-
-**Windows 10 or 11 (x64)**, in PowerShell (the server runs while its window is open):
+With your own copy of the game's Android app, its client data and its song data ([what they are](docs/game-files.md)).
+On **Windows 10 or 11**, in PowerShell (the server then runs while its window is open):
 
 ```powershell
 cd ~
-$v = (curl.exe -fsS -o NUL -w '%{redirect_url}' https://github.com/kanggu12/openDMTQ/releases/latest) -replace '.*/v'
-curl.exe -fLO "https://github.com/kanggu12/openDMTQ/releases/download/v$v/opendmtq-server-$v-windows-x64.zip"
-tar.exe -xf "opendmtq-server-$v-windows-x64.zip"
+curl.exe -fLO https://github.com/kanggu12/openDMTQ/releases/download/v0.11.2/opendmtq-server-0.11.2-windows-x64.zip
+tar.exe -xf opendmtq-server-0.11.2-windows-x64.zip
 start .\OpenDMTQ\OpenDMTQ.exe
 ```
 
-**Debian, Ubuntu, or a Mac with Homebrew**, as your own user, not root:
+On **Debian or Ubuntu**, or a **Mac** with Homebrew, as your own user:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/main/host/get.sh | sh
+curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/v0.11.2/host/get.sh | sh
 ```
 
-**Docker**, with Docker 23 or newer and Compose, Python 3.9 or newer and git (or **Kubernetes**, with
-[the Helm chart](docs/kubernetes.md#install-on-a-cluster)):
+With **Docker** (Compose, Python 3 and git):
 
 ```sh
-git clone https://github.com/kanggu12/openDMTQ.git
-cd openDMTQ
+git clone https://github.com/kanggu12/openDMTQ.git && cd openDMTQ
 ./opendmtq setup
 ```
 
-Every install serves on one port, 8791 unless another program has it: the players' site at `http://<this PC>:8791/` and
-the admin pages at `http://<this PC>:8791/opendmtq/admin/`. The ID `admin` and `ADMIN_PASSWORD` from `.env` sign in to
-both.
+The setup opens in your browser: it finds your files, asks for the address phones use and an account for each player,
+builds the app and gives you the message to send each player. With Docker it runs in the terminal, and the accounts
+are made on the admin pages. [The server guide](docs/install.md) has each way step by step, Kubernetes, updates and
+the server's one port.
 
 <p align="center">
   <img src="docs/images/setup.jpg" alt="The setup in the browser: the game's Android app, the client data and the song data found in Downloads, each labeled with what it is, with a button to import them" width="100%">

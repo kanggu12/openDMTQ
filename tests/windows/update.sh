@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # The update of a Windows bundle of an earlier release to this tree's, under Wine, as its owner does it: the release's
 # OpenDMTQ.exe started once (its first start writes .env: this PC's address on port 80, the password, and in 0.10.0 the
-# admin pages' own port, ADMIN_PORT=8791), its window closed, this tree's bundle unpacked over the folder (the guide's five
-# lines again: .env and data stay), and OpenDMTQ.exe started again. Afterwards the server has left port 80 for the port
+# admin pages' own port, ADMIN_PORT=8791), its window closed, this tree's bundle unpacked over the folder (the guide's four
+# lines of the newer release: .env and data stay), and OpenDMTQ.exe started again. Afterwards the server has left port 80 for the port
 # its admin pages had (8791): the players' site, the admin pages and the API answer there and nothing on port 80, .env
 # names the new address and no longer the admin pages' own port, the window says the move once and names one address,
 # status says it once, the site's download page tells players to install the app for the new address, the app builder
@@ -118,7 +118,7 @@ sleep 3
 
 expect "the release served port 80 (LISTEN_PORT=$port, PUBLIC_HOST=$host)" sh -c "test '$port' = 80 && test '${host#*:}' = '$host'"
 
-# 2. This tree's bundle over it, as the guide's five lines unpack it: its files over the folder's, .env and data kept.
+# 2. This tree's bundle over it, as the guide's four lines unpack it: its files over the folder's, .env and data kept.
 cp -r /new/. "/tmp/Open DMTQ/"
 wine_ready
 expect "after the update OpenDMTQ.exe starts the server again" start /tmp/new.log

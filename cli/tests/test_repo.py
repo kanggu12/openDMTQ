@@ -246,6 +246,18 @@ class DocVersionsTest(unittest.TestCase):
         from pathlib import Path
         self.assertEqual(self.versions.stale(Path(ROOT)), [])
 
+    def test_the_quick_start_downloads_that_release(self):
+        # The quick start's lines name the chart's release, so the check above has lines to check: the Windows server's
+        # zip from the release's own address, and the one-line install's script at the release's tag.
+        from pathlib import Path
+        version = self.versions.chart_version(Path(ROOT))
+        with open(os.path.join(ROOT, "README.md"), encoding="utf-8") as f:
+            quick = f.read().split("\n## Quick start\n", 1)[1].split("\n## ", 1)[0]
+        base = "https://github.com/kanggu12/openDMTQ/releases/download"
+        self.assertIn(f"curl.exe -fLO {base}/v{version}/opendmtq-server-{version}-windows-x64.zip", quick)
+        self.assertIn(f"tar.exe -xf opendmtq-server-{version}-windows-x64.zip", quick)
+        self.assertIn(f"curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/v{version}/host/get.sh | sh", quick)
+
     def test_another_release_or_a_file_it_has_not_is_named_and_written_over(self):
         import tempfile
         old = ("curl.exe -fLO https://github.com/kanggu12/openDMTQ/releases/download/v1.9.0/opendmtq-server-1.9.0-windows-x64.zip\n"

@@ -5,8 +5,9 @@
 # Guides
 
 OpenDMTQ is a server, which its owner runs, and the clients its players play on: the Android app the server builds,
-and the PC client for Windows. Each has its own guides below. New here? The [README](../README.md#quick-start) has the
-quick start for each way to run a server, and [Questions and answers](faq.md) covers what people ask first.
+and the PC client for Windows. Each has its own guides below. New here? The [README's quick start](../README.md#quick-start)
+has the two ways to begin, playing on a server and running one, and [Questions and answers](faq.md) covers what people
+ask first.
 
 <a id="playing"></a>
 

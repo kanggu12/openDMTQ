@@ -1,10 +1,18 @@
 # Installing
 
-For the server's owner: each way to run OpenDMTQ's server, step by step. The [quick start](../README.md#quick-start)
-has the short version of each.
+For the server's owner: each way to run OpenDMTQ's server, step by step, then everyday use, updates, backups and the
+settings. The server answers the game, the players' site, the admin pages and their API on one port, 8791 unless
+another program has it, and keeps everything of yours in its `data` folder. Each way runs the same server:
 
-All four run the same server. Phones join over the same Wi-Fi, or over the internet once the server is
-[reachable from outside](internet.md).
+| Way | Runs on | Needs |
+| :--- | :--- | :--- |
+| [Windows](#windows) | 64-bit Windows 10 or 11 | Nothing else: the release's zip brings what the server runs |
+| [Linux or macOS](#linux-or-macos) | Debian 12, Ubuntu 24.04, or macOS with [Homebrew](https://brew.sh) | `sudo`, which installs Apache, PHP, Java and Python from the system's packages |
+| [Docker](#docker) | Linux, or Windows with WSL 2 | Docker 23 or newer with Compose, Python 3.9 or newer, and git |
+| [Kubernetes](#kubernetes) | A cluster | Helm, a volume with the game's files, and S3-compatible storage |
+
+Phones join over the same Wi-Fi, or over the internet once the server is [reachable from outside](internet.md). What
+the computer needs: [what it runs on](#what-it-runs-on).
 
 ## What you need
 
@@ -28,40 +36,42 @@ imports anything. [The game's files](game-files.md) has every form it accepts.
 
 ## Windows
 
-Windows 10 or 11, x64. Paste into **Windows PowerShell** (the first line finds the latest release's number, which the
-file's name carries):
+On 64-bit Windows 10 or 11, paste into **Windows PowerShell**:
 
 ```powershell
 cd ~
-$v = (curl.exe -fsS -o NUL -w '%{redirect_url}' https://github.com/kanggu12/openDMTQ/releases/latest) -replace '.*/v'
-curl.exe -fLO "https://github.com/kanggu12/openDMTQ/releases/download/v$v/opendmtq-server-$v-windows-x64.zip"
-tar.exe -xf "opendmtq-server-$v-windows-x64.zip"
+curl.exe -fLO https://github.com/kanggu12/openDMTQ/releases/download/v0.11.2/opendmtq-server-0.11.2-windows-x64.zip
+tar.exe -xf opendmtq-server-0.11.2-windows-x64.zip
 start .\OpenDMTQ\OpenDMTQ.exe
 ```
 
-It unpacks to `C:\Users\<you>\OpenDMTQ` and starts the server, and the setup opens in your browser. It finds your
-files in Downloads, on the Desktop or in Documents, or takes the path you paste. It then asks for the address phones
-use and an account for each player, and builds the app.
+1. The server unpacks to `C:\Users\<you>\OpenDMTQ` and starts in a window of its own, and the setup opens in your
+   browser.
+2. The setup finds your files, or takes the folder you give it, and says what each one is before it imports anything.
+   It then asks for the address phones use and an account for each player, builds the app, and gives you the message
+   to send each player.
+3. When **Windows Firewall** asks about Apache, allow it on private networks. If your Wi-Fi is a public network, set it
+   to **Private** in Settings, or phones cannot connect.
 
-- **The server's window says where everything is:** the players' site at `http://<this PC>:8791/`, the admin pages at
-  the same address with `/opendmtq/admin/`, and the owner's ID and password, which sign in to both. The password is
-  kept as `ADMIN_PASSWORD` in the folder's `.env`, which Notepad opens.
+The server's window says where everything is: the players' site, the admin pages at the same address with
+`/opendmtq/admin/`, and the owner's ID and password, which sign in to both. The password is kept as `ADMIN_PASSWORD` in
+the folder's `.env`, which Notepad opens.
 
-- **Windows Firewall** asks about Apache: allow it on private networks. If your Wi-Fi is a public network, set it to
-  **Private** in Settings, or phones cannot connect.
 - **The server runs while its window is open.** To stop it, close the window, or press **Stop the server** on the admin
   pages' **Server** page. To start it again, `start ~\OpenDMTQ\OpenDMTQ.exe`, or double-click it. The same page repairs
   the install, deletes its data, and uninstalls it.
-- **To update**, close its window and run the same five lines again. The new files replace the program's; your `data`
-  folder and `.env` stay.
+- **To update**, close its window and run the four lines of the newer release, as the
+  [quick start](../README.md#quick-start) has them. Its files replace the program's; your `data` folder and `.env`
+  stay.
 
 <details>
-<summary>Without PowerShell</summary>
+<summary>Without PowerShell, and checking the download</summary>
 
 Download `opendmtq-server-<version>-windows-x64.zip` from
 [Releases](https://github.com/kanggu12/openDMTQ/releases/latest) and unpack it to a folder of your own where it can
 write, for example `C:\OpenDMTQ`. Start `OpenDMTQ.exe`. If Windows says it protected your PC, click **More info**, then
-**Run anyway**: OpenDMTQ.exe is not signed by a publisher Windows knows.
+**Run anyway**: OpenDMTQ.exe is not signed by a publisher Windows knows. (A file `curl.exe` downloads is not marked as
+from the internet, so the lines above do not meet that question.)
 
 Each release has `opendmtq-<version>-sha256sums.txt`, the SHA-256 of every file in it, signed by the OpenDMTQ project
 ([a release's files](#a-releases-files)). In PowerShell, compare
@@ -71,16 +81,22 @@ Each release has `opendmtq-<version>-sha256sums.txt`, the SHA-256 of every file 
 
 ## Linux or macOS
 
-Debian, Ubuntu, or a Mac with [Homebrew](https://brew.sh); on another Linux, use Docker:
+On Debian or Ubuntu, or a Mac with [Homebrew](https://brew.sh), as the user who will run the server (not root); on
+another Linux, use [Docker](#docker):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/main/host/get.sh | sh
+curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/v0.11.2/host/get.sh | sh
 ```
 
-It downloads OpenDMTQ into `~/openDMTQ` (`OPENDMTQ_DIR=<folder>` before `sh` chooses another), installs Apache, PHP,
-Java and Python from the system's packages, starts the server and opens the same setup in the browser. It asks for your
-password (sudo) to install packages; without a screen it prints the setup's address instead. Running it again updates
-OpenDMTQ.
+1. It downloads the latest release of OpenDMTQ into `~/openDMTQ` (`OPENDMTQ_DIR=<folder>` before `sh` chooses
+   another).
+2. It installs Apache, PHP, Java and Python from the system's packages, asking for your password (`sudo`) to do so, and
+   puts the `opendmtq` command on your PATH.
+3. It starts the server and opens the same setup as on Windows in the browser; on a computer without a screen it prints
+   the setup's address instead.
+
+Running the line again updates OpenDMTQ to the latest release; `.env` and `data` stay. Everyday commands, in its
+folder:
 
 ```sh
 cd ~/openDMTQ
@@ -92,25 +108,26 @@ cd ~/openDMTQ
 
 ## Docker
 
-Docker 23 or newer with Compose, and Python 3.9 or newer:
+On Linux, or on Windows with WSL 2, with Docker 23 or newer and Compose, Python 3.9 or newer, and git:
 
 ```sh
-git clone https://github.com/kanggu12/openDMTQ.git
-cd openDMTQ
+git clone https://github.com/kanggu12/openDMTQ.git && cd openDMTQ
 ./opendmtq setup
 ```
 
-It finds the game files in Downloads or on the Desktop by a name with `dmtq`, `djmax` or `technika` in it, starts the
-server, builds the app, checks it all and ends with a QR code for phones. Files of another name or in another place:
+The setup runs in the terminal: the address phones use, the game's files (found in Downloads or on the Desktop by a
+name with `dmtq`, `djmax` or `technika` in it), the server and its app, and under WSL the Windows firewall rule for the
+server's port (Windows asks for an administrator once). It checks it all and ends with the server's addresses and a QR
+code for phones. Files of another name or in another place:
 
 ```sh
 ./opendmtq setup --from ~/games/dmtq
 ```
 
-Sign in to the admin pages at the address the setup ends with (`./opendmtq status` shows it again): the server's own
-address with `/opendmtq/admin/`, for example `http://192.168.1.10:8791/opendmtq/admin/`, as `admin` with
-`ADMIN_PASSWORD` from `.env`. The same ID and password sign in to the players' site. Make an account for each player on
-the admin pages' **Accounts** page. To update, `git pull`, then `./opendmtq up`.
+Sign in to the admin pages at the address the setup ends with (`./opendmtq status` shows it again), the server's own
+address with `/opendmtq/admin/`, as `admin` with `ADMIN_PASSWORD` from `.env`; the same ID and password sign in to the
+players' site. Make an account for each player on the admin pages' **Accounts** page. To update, `git pull`, then
+`./opendmtq up`.
 
 ## Kubernetes
 
@@ -130,7 +147,7 @@ Android phone or tablet, or the PC client on a Windows PC: [playing on a server]
 | Start | `OpenDMTQ.exe` | `./opendmtq start` | `./opendmtq up` |
 | Stop | close the window | `./opendmtq stop` | `./opendmtq down` |
 | See the address | the window shows it | `./opendmtq status` | `./opendmtq status` |
-| Update | close the window, then run the [five lines](#windows) again | run the `curl` line again | `git pull`, then `./opendmtq up` |
+| Update | close the window, then run the newer release's [four lines](#windows) | run the `curl` line again | `git pull`, then `./opendmtq up` |
 | Start with the computer | a shortcut in `shell:startup` | `./opendmtq service` | `RESTART=unless-stopped` in `.env`, or `cli/install.sh --service` |
 | Import songs | admin pages, **Songs**, or a folder dropped on `OpenDMTQ.exe` (the game's files in it too) | admin pages, **Songs** | `./opendmtq import --songs <folder>` |
 | Name the app (`TECHNIKA Q (<name>)`) | admin pages, **Server**, **Change the name** (or `OpenDMTQ.exe name <name>`) | `./opendmtq name <name>`, or the same page | `./opendmtq name <name>` |
@@ -214,7 +231,7 @@ then restart.
 ## A release's files
 
 Each release on [Releases](https://github.com/kanggu12/openDMTQ/releases) has these, `<version>` standing for its number
-(`0.11.0`):
+(its tag's, without the `v`):
 
 - `opendmtq-pc-client-<version>-windows-x64-setup.exe`: the PC client's installer, for players. A server hands out the
   same file set up for itself.
@@ -249,9 +266,8 @@ MCowBQYDK2VwAyEAjq2VVRpdXSFtyhLeIBOEZdTPvOxI7CsmEcnkn8R7d9c=
 and in the folder you downloaded to:
 
 ```sh
-v=0.11.0
-openssl pkeyutl -verify -pubin -inkey opendmtq-release.pem -rawin -in opendmtq-$v-sha256sums.txt -sigfile opendmtq-$v-sha256sums.txt.sig
-sha256sum -c --ignore-missing opendmtq-$v-sha256sums.txt
+openssl pkeyutl -verify -pubin -inkey opendmtq-release.pem -rawin -in opendmtq-0.11.2-sha256sums.txt -sigfile opendmtq-0.11.2-sha256sums.txt.sig
+sha256sum -c --ignore-missing opendmtq-0.11.2-sha256sums.txt
 ```
 
 The first says `Signature Verified Successfully`, the second `OK` for each file you have.

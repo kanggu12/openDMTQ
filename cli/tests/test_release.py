@@ -201,10 +201,12 @@ class NamesTest(unittest.TestCase):
                     "OpenDMTQ.Client-1"):
             for guide, body in text.items():
                 self.assertNotIn(old, body, f"{guide} names {old}")
-        # The quick start downloads the server for Windows by the latest release's number, which its name carries.
+        # The quick start and the guide download the server for Windows from the release the chart names, under the name
+        # that release gives it (.github/doc_versions.py keeps the number right at each release).
+        version = re.search(r"^version:\s*(\S+)", read("deploy", "helm", "opendmtq", "Chart.yaml"), re.M).group(1)
+        windows = assets.names(version)["server-windows"]
         for guide in ("README.md", "docs/install.md"):
-            self.assertIn('opendmtq-server-$v-windows-x64.zip"', text[guide])
-            self.assertIn("-replace '.*/v'", text[guide])
+            self.assertIn(f"releases/download/v{version}/{windows}\ntar.exe -xf {windows}\n", text[guide])
         self.assertIn("opendmtq-pc-client-<version>-windows-x64-setup.exe", text["docs/windows-player.md"])
         self.assertIn("opendmtq-<version>-sha256sums.txt", text["docs/install.md"])
 
