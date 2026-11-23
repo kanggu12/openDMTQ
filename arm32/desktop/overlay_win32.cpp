@@ -1230,7 +1230,10 @@ void notice_look(Paint& p, const std::string& text, bool live, int corner, int f
     const std::size_t cut = all.find(L'\n');
     std::wstring title = all.substr(0, cut), detail = cut == std::wstring::npos ? L"" : all.substr(cut + 1);
     auto title_font = font(Weight::kBold, fpx(16), g_korean);
-    auto detail_font = font(Weight::kRegular, fpx(13), g_korean);
+    // Where to watch, in the quiet grey: in SemiBold, as the overlay's values and the frame counter's small words, whose
+    // strokes at 13 keep their colour where regular ones thin out (regular, the line came to 4.4 to 1 over the result's
+    // light frame in the menus and 4.1 in a small window, measured by its strokes; semibold keeps 4.5 and more).
+    auto detail_font = font(Weight::kSemiBold, fpx(13), g_korean);
     auto badge_font = font(Weight::kBold, fpx(11), g_korean);
     const std::wstring badge = L"LIVE";
     // The room inside the card: to the tag, between it and the words, after the words; the tag's own, the game's tag
