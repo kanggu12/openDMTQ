@@ -38,6 +38,12 @@ for the songs. Please use only files you have the right to use. OpenDMTQ does no
 to get them.
 [The game's files](game-files.md) says what each has to be.
 
+**Which way should I run the server?**
+The one for the computer it runs on: on a Windows PC, the server for Windows; on Debian, Ubuntu or a Mac, the one-line
+install; on a Linux server or under WSL, Docker; on a cluster, the Helm chart. All four run the same server
+([installing](install.md) has them side by side). Playing from outside your home needs HTTPS for the site's sign-in,
+which Docker and Kubernetes bring and the other two do not ([playing from outside your home](internet.md)).
+
 **My copy of the app was changed for another server. Does it work?** Yes. The build points every address of the other
 server at yours. A version other than 1.3.5 or 1.3.4 plays the same, with a few of the game's own screens left as they
 were.

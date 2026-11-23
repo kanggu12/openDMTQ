@@ -25,17 +25,17 @@ ask first.
 
 | Guide | For |
 | :--- | :--- |
-| [Installing](install.md) | Each system step by step, the players' accounts, everyday use, the server's one port and moving it, updates, backups and moving to another computer, the `.env` settings, a release's files and their signature, what it runs on |
+| [Installing](install.md) | The four ways side by side, each step by step (Windows, Linux or macOS, Docker, Kubernetes), the players' accounts, everyday use, updates, the server's one port and moving it, backups and moving to another computer, the `.env` settings, a release's files and their signature, what it runs on |
 | [The game's files](game-files.md) | What your APK, client data and song data have to be, the forms they come in, how to check them |
 | [The site and the admin pages](admin.md) | The setup in the browser, the players' site and MY PAGE, building the app, players and each player's game, accounts, recordings, backups, the Notices page (the site's notice, maintenance, Discord and Slack), the Server page (restart, repair, the port, the data, uninstall), the PC client's installer and its updates, Play on this PC |
 | [Songs](songs.md) | Importing the songs, hiding them, adding your own as song packages |
-| [Playing from outside your home](internet.md) | A host name, one forwarded port, HTTPS |
+| [Playing from outside your home](internet.md) | What it needs (a host name, one forwarded port), `expose`, checking it from outside, what is open, HTTPS |
 | [Live broadcasts](live.md) | Turning broadcasts on for the server and its players, recordings, their limits |
-| [Kubernetes](kubernetes.md) | The Helm chart, failover, the database replica |
+| [Kubernetes](kubernetes.md) | Installing the Helm chart, its values, trying it on this computer, how it is built, failover and the database replica, broadcasts, what was measured |
 | [Without internet](closed-network.md) | A server and phones on a network with no way out: what to carry in for each way of running it |
 | [The API](api.md) | All the admin pages show and do, and what the players' site shows, as JSON |
 | [Troubleshooting](troubleshooting.md#for-server-owners) | When a phone cannot connect, the app does not install or build, or the server does not start |
-| [Questions and answers](faq.md) | What it needs, which phones, which port, playing from outside your home, what leaves your computer |
+| [Questions and answers](faq.md) | What it needs, which way to run it, which phones, which port, playing from outside your home, updates, what leaves your computer |
 | [License and notice](notice.md) | What the project is, its license, what it asks of whoever runs a server |
 | [Third-party notices](THIRD_PARTY_NOTICES.md) | The libraries, fonts and programs OpenDMTQ brings with it, and their licenses |
 
