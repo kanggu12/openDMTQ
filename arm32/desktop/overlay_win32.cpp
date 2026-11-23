@@ -713,13 +713,13 @@ void tabular(Graphics& g, const std::wstring& text, const Font& f, float cell, f
     }
 }
 
-// The counter's look for `fps` frames a second and `ms` a frame (fps below 0: not measured yet, dashes) in `corner`, the
-// display at `hz` refreshes a second (0: not known): one of the overlay's cards of glass (the notice's charcoal over the
+// The counter's look for `fps` frames a second and `ms` a frame (fps below 0: not measured yet, dashes) in `corner`, its
+// figure `lit` or not (the looks' CounterLight): one of the overlay's cards of glass (the notice's charcoal over the
 // frame, its light edge and bevel, its small corners), small; on it the frames a second as a figure in the launcher's
 // wide face, lime while they keep the display's rate and white otherwise, FPS after them on their baseline and the frame
 // time under them with ms after it, both in the overlay's quiet grey; the two numbers right-aligned in one column, their
 // units in the next (counter_look.h). Its window's place goes to the paint.
-void fps_look(Paint& p, int fps, float ms, int corner, float hz) {
+void fps_look(Paint& p, int fps, float ms, int corner, bool lit) {
     const CounterFaces faces = counter_faces();
     // The figure's words: its digits, or two dashes before the first measure.
     const std::wstring figure = fps < 0 ? std::wstring(L"--") : std::to_wstring(fps);
@@ -748,7 +748,7 @@ void fps_look(Paint& p, int fps, float ms, int corner, float hz) {
     auto figure_font = wide_font(fpx(kCounterFigure));
     auto small = counter_small();
     // The frames a second: the figure, lime while they keep the display's rate.
-    const Color& figure_colour = counter_lit(fps, hz) ? tone::kLime : tone::kPrimary;
+    const Color& figure_colour = lit ? tone::kLime : tone::kPrimary;
     tabular(*g, figure, *figure_font, faces.figure_cell, glass.X + l.numbers_right, glass.Y + l.figure_base, figure_colour);
     // Its unit after it on the figure's baseline, quiet.
     say(*g, L"FPS", *small, tone::kSecondary, PointF(glass.X + l.units_left, glass.Y + l.figure_base - ascent(*small)));
@@ -1545,12 +1545,12 @@ struct Order {
     int sound_hover = kNoControl, sound_held = kNoControl;
     // The notice's room across: the area's right edge, or the sound panel's left edge less a gap while it is open.
     int free_right = 0;
-    // The notice's words and whether it is live; the counter's corner and its numbers, and the display's refreshes a
-    // second its figure is lit against (0: not known); whether the handle is lit.
+    // The notice's words and whether it is live; the counter's corner and its numbers, and whether its figure is lit (the
+    // looks' CounterLight); whether the handle is lit.
     std::string text;
-    bool live = false, lit = false;
+    bool live = false, lit = false, figure_lit = false;
     int corner = 0, fps = -1;
-    float ms = 0, hz = 0;
+    float ms = 0;
     // The notice's picture where it lies under the question's dim (null: none up), and its place in the game's area.
     std::shared_ptr<Canvas> under;
     int under_x = 0, under_y = 0;
@@ -1639,7 +1639,7 @@ Painted paint_counter(const Order& o, Paint& p) {
     const Drawing d(o.view);
     const CounterScale own;
     if (p.made_for != o.key) {
-        fps_look(p, o.fps, o.ms, o.corner, o.hz);
+        fps_look(p, o.fps, o.ms, o.corner, o.figure_lit);
         p.made_for = o.key;
     }
     paint_draw(p, *o.shots);
@@ -2717,6 +2717,9 @@ Shown g_fps;
 int g_fps_corner = 0;
 FrameRate g_rate;
 Reading g_reading;
+// The figure's light over the looks (counter_look.h's CounterLight), and whether it is lit after the last look.
+CounterLight g_light;
+bool g_lit = false;
 constexpr UINT_PTR kFpsTimer = 3;
 // Twice a second; ten times a second while it waits for a frame or for its first measure after one.
 constexpr UINT kFpsMs = 500, kFpsWaitMs = 100;
@@ -2731,10 +2734,10 @@ float counter_hz() {
 }
 
 // The counter's look as text: its numbers (the time as it shows), whether its figure is lit, its corner, its view.
-std::string fps_key(const View& v, float hz) {
+std::string fps_key(const View& v) {
     char key[112];
     std::snprintf(key, sizeof key, "counter %dx%d %.4f %d %d %d %s %d %d", v.w, v.h, static_cast<double>(v.dpi), v.top_room, g_fps_corner, g_reading.fps,
-                  counter_time(g_reading.fps, g_reading.ms).c_str(), counter_lit(g_reading.fps, hz) ? 1 : 0, v.song ? 1 : 0);
+                  counter_time(g_reading.fps, g_reading.ms).c_str(), g_lit ? 1 : 0, v.song ? 1 : 0);
     return key;
 }
 
@@ -2793,14 +2796,14 @@ void counter_place() {
         glass_wish();
     }
     const View v = view_now();
-    const float hz = counter_hz();
-    const std::string key = fps_key(v, hz);
+    const std::string key = fps_key(v);
     Order o;
     o.view = v;
     o.corner = g_fps_corner;
     o.fps = g_reading.fps;
     o.ms = g_reading.ms;
-    o.hz = hz;
+    // The figure lit as the last looks have it (CounterLight), not as this one alone does.
+    o.figure_lit = g_lit;
     o.key = key;
     order(kCounterPiece, std::move(o));
     g_fps.alpha = kCounterAlpha;
@@ -2818,6 +2821,9 @@ void fps_look_now() {
     // The count, then the moment of the look on the count's own clock (the steady clock frames.cpp stamps frames with).
     const FrameCount count = g_hooks.frames();
     g_reading = g_rate.look(count, now_ns(), g_held || g_minimised_hold);
+    // The figure's light after this look, against the display's rate now (a reading not shown puts it out and starts it
+    // again: after a hold it lights once the frames have kept the rate for its looks again).
+    g_lit = g_light.look(g_reading.shown ? g_reading.fps : -1, counter_hz());
     // Said when it comes up or goes, with why.
     if (g_reading.shown != g_fps_said_up) {
         g_fps_said_up = g_reading.shown;
@@ -4573,7 +4579,8 @@ void test_save(const std::wstring& prefix, const std::wstring& frame_png, bool w
             o.corner = corner;
             o.fps = 240;
             o.ms = 4.2f;
-            o.hz = 240;
+            // Lit, as the looks of a steady 240 on a display at 240 Hz have it.
+            o.figure_lit = counter_lit(240, 240);
             char name[32];
             std::snprintf(name, sizeof name, "fps%d%s", corner, bar ? "-bar" : "");
             o.key = std::string("probe ") + name;
@@ -4611,7 +4618,8 @@ void test_save(const std::wstring& prefix, const std::wstring& frame_png, bool w
         o.corner = 1;
         o.fps = n.fps;
         o.ms = n.ms;
-        o.hz = n.hz;
+        // Lit as the looks of a steady reading have it: the one look's verdict, held.
+        o.figure_lit = counter_lit(n.fps, n.hz);
         o.key = std::string("probe ") + n.name;
         Paint p;
         g_test_texts = &g_test_words;
@@ -4773,7 +4781,7 @@ void test_motion(const std::wstring& prefix, const std::wstring& frame_png) {
     o.key = "probe motion counter";
     o.fps = 240;
     o.ms = 4.2f;
-    o.hz = 240;
+    o.figure_lit = counter_lit(240, 240);
     const Painted counter = paint_counter(o, counter_paint);
     if (!bar.picture || !handle.picture || !lit.picture || !notice.picture || !counter.picture) return;
     FILE* numbers = _wfopen((prefix + L"motion.txt").c_str(), L"w");

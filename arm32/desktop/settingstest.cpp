@@ -33,6 +33,8 @@
 #include <cmath>
 
 #include <cstdio>
+// The counter's looks given one after another to its light (counter_look_checks).
+#include <initializer_list>
 #include <string>
 
 namespace {
@@ -519,8 +521,9 @@ float tabular_width(const std::string& text, float cell, float point) {
 // The frame counter's look (counter_look.h) with its faces as the overlay measures them: its window shown whole, its
 // glass no larger than before, its two numbers right-aligned in one column and their units in the next, its rows on the
 // glass's middle at every scale, the figure the larger, the figure lit (lime) only while the frames keep the display's
-// rate, and the frame time never wider than four digits (WIN-350, WIN-351, WIN-352; main showed it at 62 %, its words
-// then 1.1 to 3.1 to 1 over light frames, its FPS in lime whatever the rate, and 333.3 ms).
+// rate, its colour changing only once a second's looks agree, and the frame time never wider than four digits (WIN-350,
+// WIN-351, WIN-352, WIN-356; main showed it at 62 %, its words then 1.1 to 3.1 to 1 over light frames, its FPS in lime
+// whatever the rate, and 333.3 ms).
 void counter_look_checks() {
     using namespace player::overlay;
     check(kCounterOpacity == 255, "counter: its window shown whole, as the overlay's other pieces, so that its words keep their contrast over the game");
@@ -565,6 +568,49 @@ void counter_look_checks() {
           "counter: lit at 60 and 59 on a display at 60 Hz, not at 58; at 144 on 143.86 Hz, at 165 on 165 Hz");
     check(!counter_lit(60, 240) && !counter_lit(240, 0) && !counter_lit(0, 240) && !counter_lit(-1, 240),
           "counter: not lit at a limit of 60 on 240 Hz, with the display's rate not known, at 0 or before a first measure");
+    // The figure's light over the counter's looks (CounterLight, WIN-356): a light lit first (as many looks at the
+    // display's rate as it takes) or not, given the looks `fps` one after another; how many times its figure changed
+    // colour over them, and whether it is lit after the last.
+    struct Run {
+        int changes;
+        bool lit;
+    };
+    auto run = [](std::initializer_list<int> fps, float hz, bool lit_first) {
+        CounterLight light;
+        const int rate = static_cast<int>(std::lround(hz));
+        for (int i = 0; lit_first && i < kCounterLitLooks; ++i) light.look(rate, hz);
+        Run r{0, light.lit};
+        for (int each : fps) {
+            const bool now = light.look(each, hz);
+            r.changes += now != r.lit ? 1 : 0;
+            r.lit = now;
+        }
+        return r;
+    };
+    // A rate at the edge of the display's, a look at it and a look short of it in turn (at 240 Hz 235 and 234; at 60 Hz 59
+    // and 58; at 30 Hz 29 and 28, as a slow PC under Wine read), and wobbling about it in runs of up to two seconds, from
+    // white and from lime: one colour throughout, where each look alone changed it twice a second and two looks in a row
+    // every second or two.
+    const int edge_240 = run({235, 234, 235, 234, 235, 234, 235, 234, 235, 234}, 240, false).changes + run({234, 235, 234, 235, 234, 235, 234, 235}, 240, true).changes;
+    const int edge_60 = run({59, 58, 59, 58, 59, 58, 59, 58}, 60, false).changes + run({58, 59, 58, 59, 58, 59, 58, 59}, 60, true).changes;
+    const int edge_30 = run({28, 29, 28, 29, 28, 29, 28, 29}, 30, false).changes + run({29, 28, 29, 28, 29, 28}, 30, true).changes;
+    const int wobble = run({29, 29, 28, 28, 28, 29, 29, 29, 29, 28, 28, 29, 28, 28, 28, 28, 29, 29}, 30, false).changes +
+                       run({29, 29, 28, 28, 28, 29, 29, 29, 29, 28, 28, 29, 28, 28, 28, 28, 29, 29}, 30, true).changes;
+    check(edge_240 <= 1 && edge_60 <= 1 && edge_30 <= 1 && wobble <= 1,
+          "counter: a rate at the edge of the display's changes its figure's colour once at most, not at every look");
+    // Lit once six looks in a row (three seconds) keep the rate; not before.
+    check(!run({240, 240, 240, 240, 240}, 240, false).lit && run({240, 240, 240, 240, 240, 240}, 240, false).lit &&
+              run({234, 240, 240, 240, 240, 240, 240}, 240, false).lit && !run({240, 240, 240, 240, 240, 234, 240}, 240, false).lit,
+          "counter: its figure lit once six looks in a row keep the display's rate, not before");
+    // Out once six looks in a row fall short of it (a steady 232 at 240 Hz), or at once at a look clearly below it (200
+    // at 240 Hz, 26 at 30 Hz); five short looks leave it lit.
+    check(run({232, 232, 232, 232, 232}, 240, true).lit && !run({232, 232, 232, 232, 232, 232}, 240, true).lit && !run({200}, 240, true).lit &&
+              !run({26}, 30, true).lit && run({27}, 30, true).lit,
+          "counter: its figure out once six looks fall short of the display's rate, or at once clearly below it");
+    // No reading (a second without a frame, the counter hidden) or no rate known: out, and the count from the start.
+    check(!run({0}, 240, true).lit && !run({0, 240, 240, 240, 240, 240}, 240, true).lit && run({0, 240, 240, 240, 240, 240, 240}, 240, true).lit &&
+              !run({240, 240, 240, 240, 240, 240}, 0, false).lit,
+          "counter: no reading or no rate known puts its figure out and starts its count again");
     // The frame time's words: a tenth under 100 ms, whole from there on; dashes with none to give.
     check(counter_time(240, 4.2f) == "4.2" && counter_time(60, 16.67f) == "16.7" && counter_time(10, 99.94f) == "99.9" && counter_time(10, 99.96f) == "100" &&
               counter_time(3, 333.3f) == "333" && counter_time(1, 1000.0f) == "1000",

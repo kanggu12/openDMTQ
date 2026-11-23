@@ -1,13 +1,14 @@
-// The frame counter's look over the game (overlay_win32.cpp draws it), as plain arithmetic apart from any window, so that
-// a check (settingstest.cpp) can take it through its numbers and sizes: one more of the overlay's cards of glass, its
-// words in the launcher's own forms for a figure. The frames a second as a figure in the launcher's wide face (DMTQ Wide,
-// as its last game's length and its records' scores are set), with their unit after them on the figure's baseline,
-// muted, as the launcher sets a figure's unit; the frame time under them, small and muted, as a figure's second line.
-// The two numbers stand right-aligned in one column and their units in the next, each digit in a cell as wide as the
-// face's widest (the faces' own tabular figures, which GDI+ does not set): nothing moves but the digits as the numbers
-// change. The figure is lime while the frames keep the display's rate (the game's lime marks what is lit), white
-// otherwise; the rest is the overlay's quiet grey. Its window is shown whole, as every other piece of the overlay: its
-// words keep their contrast over any frame of the game, which the glass's tint under them sees to.
+// The frame counter's look over the game (overlay_win32.cpp draws it), as plain arithmetic apart from any window, so
+// that a check (settingstest.cpp) can take it through its numbers and sizes: one more of the overlay's cards of glass,
+// its words in the launcher's own forms for a figure. The frames a second as a figure in the launcher's wide face (DMTQ
+// Wide, as its last game's length and its records' scores are set), with their unit after them on the figure's
+// baseline, muted, as the launcher sets a figure's unit; the frame time under them, small and muted, as a figure's
+// second line. The two numbers stand right-aligned in one column and their units in the next, each digit in a cell as
+// wide as the face's widest (the faces' own tabular figures, which GDI+ does not set): nothing moves but the digits as
+// the numbers change. The figure is lime while the frames keep the display's rate (the game's lime marks what is lit),
+// white otherwise, changing only once three seconds' looks agree; the rest is the overlay's quiet grey. Its window is
+// shown whole, as every other piece of the overlay: its words keep their contrast over any frame of the game, which the
+// glass's tint under them sees to.
 #pragma once
 
 #include <algorithm>
@@ -78,15 +79,61 @@ inline CounterLayout counter_layout(const CounterFaces& f, float k) {
     return l;
 }
 
-// Whether the figure is lit (lime): the frames a second keep the display's rate `hz` (its refreshes a second, 0 when not
-// known), every refresh with a frame of its own, give or take the second's own rounding and a refresh or two in a
-// hundred (at 240 Hz from 235, at 60 Hz from 59). More frames than refreshes, with VSync off, keep it too. Never before
-// a first measure (below 0), at 0, or with the display's rate not known.
+// Whether one look's frames a second keep the display's rate `hz` (its refreshes a second, 0 when not known): every
+// refresh with a frame of its own, give or take the second's own rounding and a refresh or two in a hundred (at 240 Hz
+// from 235, at 60 Hz from 59). More frames than refreshes, with VSync off, keep it too. Never before a first measure
+// (below 0), at 0, or with the display's rate not known. The figure is lit by CounterLight below, over several looks.
 inline bool counter_lit(int fps, float hz) {
     if (fps <= 0 || hz < 1) return false;
     const int rate = static_cast<int>(std::lround(hz));
     return fps >= rate - std::max(1, static_cast<int>(std::lround(rate * 0.02f)));
 }
+
+// Whether one look's frames a second fall clearly below the display's rate: by more than one in twenty, and by three
+// frames at least (at 240 Hz under 228, at 144 under 137, at 60 under 57, at 30 under 27), well past what the second's
+// rounding and a refresh or two missed make. No reading, or no rate known, counts as below it.
+inline bool counter_clearly_short(int fps, float hz) {
+    if (fps <= 0 || hz < 1) return true;
+    const int rate = static_cast<int>(std::lround(hz));
+    return fps < rate - std::max(3, static_cast<int>(std::lround(rate * 0.05f)));
+}
+
+// The looks in a row (the counter looks twice a second, each look the last second's mean) the frames must keep the
+// display's rate for the figure to light, and fall short of it for it to go out: three seconds either way. With frames
+// that keep the rate only now and then (a refresh missed at random, the mean at the edge: 234 or 235 at 240 Hz, 28.8 at
+// 30 Hz), two looks changed the colour every three seconds or so, measured and simulated (20 a minute); six change it
+// every twelve to twenty seconds there (3 to 5 a minute), and it settles on the colour that holds most of the time.
+constexpr int kCounterLitLooks = 6;
+
+// The figure's light (lime) over the counter's looks, one after another: lit once the frames have kept the display's
+// rate for kCounterLitLooks looks in a row; out again once they have fallen short of it for as many, or at once when a
+// look falls clearly below it (a heavy scene shows at the next look). A rate at the edge of the display's (234 and 235
+// at 240 Hz, 28 and 29 at 30 Hz) so keeps one colour instead of changing it at every look, twice a second, and a rate
+// that settles a little under the display's (232 at 240 Hz) does not stay lime. No reading (not measured yet, a second
+// without a frame, the counter hidden) or no rate known puts it out and starts the count again.
+struct CounterLight {
+    bool lit = false;
+    // The looks in a row at the display's rate, and short of it.
+    int kept = 0, short_of = 0;
+    // The next look: its frames a second and the display's rate; whether the figure is lit after it.
+    bool look(int fps, float hz) {
+        // Nothing to light: out, and every count from the start.
+        if (fps <= 0 || hz < 1) {
+            *this = CounterLight{};
+            return lit;
+        }
+        if (counter_lit(fps, hz)) {
+            // At the rate: lit from the last of the looks in a row it takes.
+            short_of = 0;
+            if (++kept >= kCounterLitLooks) lit = true;
+        } else {
+            // Short of it: out after as many looks in a row, or now when clearly below it.
+            kept = 0;
+            if (++short_of >= kCounterLitLooks || counter_clearly_short(fps, hz)) lit = false;
+        }
+        return lit;
+    }
+};
 
 // The frame time as the counter's second row sets its number (its unit is in the units' column): to a tenth of a
 // millisecond under 100 ms (4.2, 16.7), whole from there on (333, 1000: a loading screen's few frames a second), so
