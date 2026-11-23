@@ -496,9 +496,11 @@ void bar_checks() {
 player::overlay::CounterFaces counter_faces_at(float k) {
     player::overlay::CounterFaces f;
     f.figure_cell = 802.0f / 1000.0f * player::overlay::kCounterFigure * k;
-    f.small_cell = 1322.0f / 2048.0f * player::overlay::kCounterSmall * k;
-    f.small_point = 558.0f / 2048.0f * player::overlay::kCounterSmall * k;
-    f.unit_w = 3686.0f / 2048.0f * player::overlay::kCounterSmall * k;
+    // The small face at the size it is drawn at: 11 at 720 lines times the scale, never under its least.
+    const float small = player::overlay::counter_small_px(k);
+    f.small_cell = 1322.0f / 2048.0f * small;
+    f.small_point = 558.0f / 2048.0f * small;
+    f.unit_w = 3686.0f / 2048.0f * small;
     return f;
 }
 
@@ -538,8 +540,13 @@ void counter_look_checks() {
           "counter: the numbers in one column, their units 6 after it in the next, both within the glass's room");
     // The frame time right-aligned on the figure's column, from 1.0 to 1000, never past the column's left edge.
     bool in_column = true;
-    for (const char* time : {"1.0", "4.2", "16.7", "99.9", "333", "1000"}) {
-        in_column = in_column && l.numbers_right - tabular_width(time, f.small_cell, f.small_point) >= kCounterPadX;
+    for (float k : {0.5f, 0.75f, 1.0f, 1.5f, 3.0f}) {
+        // At each scale, its small words at their least size in a small window.
+        const CounterFaces fk = counter_faces_at(k);
+        const CounterLayout lk = counter_layout(fk, k);
+        for (const char* time : {"1.0", "4.2", "16.7", "99.9", "333", "1000"}) {
+            in_column = in_column && lk.numbers_right - tabular_width(time, fk.small_cell, fk.small_point) >= kCounterPadX * k - 0.01f;
+        }
     }
     check(in_column, "counter: the frame time, 1.0 to 1000, stands right-aligned in the figure's column, within it");
     // The figure the larger: its digits half as tall again as the small words' at least.
@@ -552,14 +559,26 @@ void counter_look_checks() {
     // pixels at 3).
     const CounterLayout hundred = counter_layout(counter_faces_at(100), 100);
     const float exact_w = hundred.w / 100, exact_h = hundred.h / 100;
+    // In a small window (the counter at less than 10/11 of its 720 size) its small words stand at their least size, 10
+    // pixels, the figure and the room round them at the counter's scale: the glass that much larger, never smaller than
+    // its proportion (WIN-357; before, 8.25 at three quarters, the frame time's full stop at 2.4 to 1).
+    bool least = kCounterSmallLeast == 10.0f;
     for (float k : {0.5f, 0.6f, 0.75f, 0.8f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 3.0f}) {
         const CounterLayout s = counter_layout(counter_faces_at(k), k);
         const float above = s.figure_base - kCounterFigure * k * kFigureCap, below = s.h - s.small_base;
         middle = middle && std::fabs(above - below) < 0.5f && above >= kCounterPadY * k - 0.5f;
-        proportion = proportion && std::fabs(s.w - exact_w * k) <= 1.0f && std::fabs(s.h - exact_h * k) <= 1.0f;
+        // The small row's digits as tall as the size they are set at: 11 at 720 lines times the scale, 10 at the least.
+        const float small_cap = s.small_base - s.figure_base - kCounterRowGap * k;
+        least = least && std::fabs(small_cap - std::max(kCounterSmall * k, 10.0f) * kSmallCap) < 0.01f;
+        if (kCounterSmall * k >= 10.0f) {
+            proportion = proportion && std::fabs(s.w - exact_w * k) <= 1.0f && std::fabs(s.h - exact_h * k) <= 1.0f;
+        } else {
+            least = least && s.w >= exact_w * k && s.h >= exact_h * k - 0.5f;
+        }
     }
     check(middle, "counter: its two rows on the glass's middle by their ink, 8 at least above and below, at every scale from 0.5 to 3");
-    check(proportion, "counter: its glass in proportion at every scale from 0.5 to 3, within a pixel");
+    check(proportion, "counter: its glass in proportion at every scale where its small words keep its scale (0.91 to 3), within a pixel");
+    check(least, "counter: its small words never under 10 pixels: in a small window that size, its glass that much larger");
     // Lit while the frames keep the display's rate, give or take its second's rounding and two in a hundred; more with
     // VSync off too; never with no rate known, before a measure or at 0.
     check(counter_lit(240, 240) && counter_lit(235, 240) && !counter_lit(234, 240) && !counter_lit(227, 240) && counter_lit(999, 240),
@@ -800,6 +819,59 @@ void menus_place_checks() {
         }
     }
     check(bad == 0, "the counter in every corner and the notice stand on none of the game's own header, buttons and words, in the menus and in a song, at 16:9 and 4:3");
+    // At the counter's least scale, its small words at their least size and its glass that much larger: a 960x540 window
+    // at 100 % (the game at 0.75: its 16:9 frames' own at that scale), in the menus and in a song; the smallest windows at
+    // 150 % (640x360 and 720x405: the game at 0.5 and 0.5625), in a song, the counter waiting in their menus (WIN-357).
+    struct Least {
+        int w, h;
+        float dpi, game;
+        bool menus;
+    };
+    int least_bad = 0;
+    for (const Least& a : {Least{960, 540, 1.0f, 0.75f, true}, Least{640, 360, 1.5f, 0.5f, false}, Least{720, 405, 1.5f, 0.5625f, false}}) {
+        const float k = counter_scale_for(a.w, a.h, a.dpi);
+        const int inset = static_cast<int>(std::lround(kInset * k)), right = static_cast<int>(std::lround(kMenusRight * k));
+        const Glass chip = counter_glass(k);
+        const int bar = static_cast<int>(std::lround(kBarTall * scale_for(a.h, a.dpi)));
+        // A box of the game's 16:9 frames at its scale here, grown to whole pixels.
+        auto at_game = [&](const Rect& r) {
+            return Rect{r.what, static_cast<int>(std::floor(static_cast<float>(r.x0) * a.game)), static_cast<int>(std::floor(static_cast<float>(r.y0) * a.game)),
+                        static_cast<int>(std::ceil(static_cast<float>(r.x1) * a.game)), static_cast<int>(std::ceil(static_cast<float>(r.y1) * a.game))};
+        };
+        for (int corner = 1; corner <= 4; ++corner) {
+            // In the menus where the counter has its place there, with the bar up and down alike.
+            for (const int room : {0, bar}) {
+                if (!a.menus) break;
+                const CounterAt at = counter_at(corner, a.w, a.h, inset, chip.w, chip.h, room, false, bar, right);
+                for (const Rect& r : menus_16_9) {
+                    if (overlaps(at_game(r), at.x, at.y, chip.w, chip.h)) {
+                        ++least_bad;
+                        std::printf("  %dx%d at %.0f %%, the menus, corner %d: the counter (%dx%d) at %d,%d on %s\n", a.w, a.h, 100 * a.dpi, corner, chip.w, chip.h,
+                                    at.x, at.y, r.what);
+                    }
+                }
+                if (at.y < bar || at.x + chip.w > a.w || at.x < 0) {
+                    ++least_bad;
+                    std::printf("  %dx%d at %.0f %%, the menus, corner %d: the counter at %d,%d under the bar or out of the area\n", a.w, a.h, 100 * a.dpi, corner,
+                                at.x, at.y);
+                }
+            }
+            // In a song, the bar up.
+            const CounterAt at = counter_at(corner, a.w, a.h, inset, chip.w, chip.h, 0, true, bar, right);
+            for (const Rect& r : song_16_9) {
+                if (overlaps(at_game(r), at.x, at.y, chip.w, chip.h)) {
+                    ++least_bad;
+                    std::printf("  %dx%d at %.0f %%, a song, corner %d: the counter (%dx%d) at %d,%d on %s\n", a.w, a.h, 100 * a.dpi, corner, chip.w, chip.h, at.x,
+                                at.y, r.what);
+                }
+            }
+            if (at.x < 0 || at.y < 0 || at.x + chip.w > a.w || at.y + chip.h > a.h) {
+                ++least_bad;
+                std::printf("  %dx%d at %.0f %%, a song, corner %d: the counter at %d,%d out of the area\n", a.w, a.h, 100 * a.dpi, corner, at.x, at.y);
+            }
+        }
+    }
+    check(least_bad == 0, "the counter at its least scale, its small words at their least size, stands on none of the game's own in a 960x540 window and in a song in the smallest windows at 150 %");
     // In a song the notice stands 16 under the top (lower by the bar's room while it is down), and keeps clear of the
     // pause screen's Q and MAX: a card centred no wider than the room their left edge leaves on both sides.
     check(notice_top(1280, 720, 16, 8, 0, 74, true) == 16 && notice_top(1280, 720, 16, 8, 74, 74, true) == 90,

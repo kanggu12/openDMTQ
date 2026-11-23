@@ -25,6 +25,13 @@ namespace player::overlay {
 // regular stroke is thinner than a pixel and shows far darker than its grey (the least of the regular strokes' middles
 // 0.27 in relative luminance, the semibold's 0.46, against the grey's own 0.52, measured over the game's frames).
 constexpr float kCounterFigure = 18, kCounterSmall = 11;
+// The least size of the small words, in the window's pixels, whatever the counter's scale: where the counter is drawn at
+// less than its size at 720 lines (a small window: three quarters of it, its small words 8.25), their strokes fall under
+// a pixel and the frame time's full stop, a dot of about one, under 4.5 to 1 however dark the glass under it (2.4,
+// measured). At this size they keep it; the figure and the room round the words keep the counter's scale.
+constexpr float kCounterSmallLeast = 10;
+// The small words' size at the counter's scale `k`, in pixels: 11 at 720 lines times the scale, never under the least.
+inline float counter_small_px(float k) { return std::max(kCounterSmall * k, kCounterSmallLeast); }
 // The heights of the faces' digits as a share of their size, from their files: DMTQ Wide's capitals and digits 688 of
 // its 1000 units, Pretendard's (SemiBold as Regular) 1448 of its 2048. The words stand on the middle of the glass by
 // these (their ink), not by the faces' line boxes, which hold room above and below the digits.
@@ -62,15 +69,18 @@ struct CounterLayout {
     float figure_base = 0, small_base = 0;
 };
 
-// The layout for faces measured at kCounterFigure * k and kCounterSmall * k.
+// The layout for faces measured at kCounterFigure * k and counter_small_px(k).
 inline CounterLayout counter_layout(const CounterFaces& f, float k) {
     CounterLayout l;
-    // Three of the figure's cells make the numbers' column; the units' column is as wide as its widest unit.
-    l.numbers_right = kCounterPadX * k + f.figure_cell * 3;
+    // Three of the figure's cells make the numbers' column, or four of the small face's where those are wider (the frame
+    // time's 1000 at the small words' least size in the smallest windows); the units' column is as wide as its widest
+    // unit.
+    l.numbers_right = kCounterPadX * k + std::max(f.figure_cell * 3, f.small_cell * 4);
     l.units_left = l.numbers_right + kCounterUnitGap * k;
     l.w = std::ceil(l.units_left + f.unit_w + kCounterPadX * k);
-    // The two rows' ink, and the glass that much and its room above and below, to a whole pixel, the ink on its middle.
-    const float figure_cap = kCounterFigure * k * kFigureCap, small_cap = kCounterSmall * k * kSmallCap;
+    // The two rows' ink, and the glass that much and its room above and below, to a whole pixel, the ink on its middle;
+    // the small row's at its own size, its least in a small window.
+    const float figure_cap = kCounterFigure * k * kFigureCap, small_cap = counter_small_px(k) * kSmallCap;
     const float ink = figure_cap + kCounterRowGap * k + small_cap;
     l.h = std::round(ink + 2 * kCounterPadY * k);
     const float top = (l.h - ink) / 2;

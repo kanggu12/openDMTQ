@@ -426,11 +426,12 @@ off, says why in its log, and the game plays by touch as before.
   each song. With keyboard play off the player cannot tell a song from the menus, and the counter stands at the right
   under the game's header throughout. The game stretches its screens to the window's shape (at 21:9 its buttons are
   wider than tall, at 4:3 narrower), and the counter keeps to its buttons' narrower side: in a window narrower than 16:9
-  it is a little smaller, so that it covers no more of them there than at 16:9. A top left set by a launcher before
-  0.9.3, which wrote it whether chosen or not, reads as the default; another corner set then stays. It counts the frames
-  the player shows: a steady 60 reads 60, and only a whole second without a frame reads 0. It shows from the game's
-  first frame and hides while the game holds still. Drawn apart from the game's picture, it costs the game nothing, and
-  the broadcast does not show it.
+  it is a little smaller, so that it covers no more of them there than at 16:9. Its units and frame time are never set
+  smaller than 10 pixels, so that in the smallest windows (a 960x540 window, or 640x360 at 150 %) its card is a little
+  larger than its share. A top left set by a launcher before 0.9.3, which wrote it whether chosen or not, reads as the
+  default; another corner set then stays. It counts the frames the player shows: a steady 60 reads 60, and only a whole
+  second without a frame reads 0. It shows from the game's first frame and hides while the game holds still. Drawn apart
+  from the game's picture, it costs the game nothing, and the broadcast does not show it.
 - **The render scale** draws the game at a share of the window's pixels (100 % down to 50 %), stretched to fill it:
   lighter for the graphics card, and softer. The share keeps the window's shape exactly where its size has fine enough
   steps (1920x1080 is 120 steps of 16x9): 67 % of 1920x1080 is 1280x720, so the game lays itself out as it does at full

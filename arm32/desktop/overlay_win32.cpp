@@ -631,8 +631,8 @@ bool on_handle(int x, int y) { return in_handle_reach(x, y, area_w(), area_h());
 // The counter's faces at this scale (counter_look.h's sizes): the figure in DMTQ Wide, the launcher's figures' face; the
 // units and the frame time in Pretendard SemiBold, as the overlay sets its values (the sound panel's levels): at the
 // overlay's small size a regular stroke is thinner than a pixel and shows darker than its grey (counter_look.h says by
-// how much).
-std::unique_ptr<Font> counter_small() { return font(Weight::kSemiBold, fpx(kCounterSmall), false); }
+// how much); never under their least size in a small window (counter_small_px).
+std::unique_ptr<Font> counter_small() { return font(Weight::kSemiBold, counter_small_px(scale()), false); }
 
 // What those faces measure at this scale, which the counter is laid out by: the widest digit of each (a digit's cell:
 // tabular figures, which GDI+ does not set from the faces' own), the small face's full stop, its wider unit.
