@@ -1,19 +1,20 @@
 // The player's PC settings file (settings.cpp), as the PC client writes it: each key read, a value it cannot read or a
 // key it does not know leaving the default, a volume out of range held to 0 to 100, MSAA of earlier launchers read as
-// CMAA 2, notes, Windows' line ends, a byte order mark and capitals taken in their stride, no file at all the
-// defaults. Then the numbers of the frame counter that one of the settings shows (frame_rate.cpp): its looks at the
-// count of frames through the game's start, a stretch with no frame, frames again and a hold. Then the size the overlay
-// over the game is drawn at and the smallest game area the window holds (overlay_scale.h), over Windows' scales and the
-// game's sizes, with the size of the overlay's handle and the reach a resting pointer brings the bar from, which keep
-// clear of the game's buttons and words in its header at every size, the bar's two ends, and the frame counter's scale
-// and place against the game's own buttons in each shape (the pause button, the result's SELECT MUSIC). Then the
-// overlay's bar on its way down and up (overlay_motion.h): its pace, a turn back midway, Windows' animations off, the
-// rows of it in sight, and the handle and the pieces at the top that move with it. And the text the keyboard types into the game's soft
-// keyboard (typed_text.h): the text the game opens it with taken as selected. And keyboard play's rules
-// (keyboard_play.h): the lane keys' names and places, each mode's lanes from the settings file (one or two keys a lane,
-// a value it cannot read keeping the default), the lane a key plays, a press, its repeats and every key let go, when
-// the lane keys play at all, and which request of the game's saves a play. Prints ALL CHECKS PASSED when every check
-// held.
+// CMAA 2, notes, Windows' line ends, a byte order mark and capitals taken in their stride, no file at all the defaults.
+// Then the numbers of the frame counter that one of the settings shows (frame_rate.cpp): its looks at the count of
+// frames through the game's start, a stretch with no frame, frames again and a hold; and its look (counter_look.h): its
+// glass, its columns and rows at every scale, its figure lit at the display's rate, its frame time's words. Then the
+// size the overlay over the game is drawn at and the smallest game area the window holds (overlay_scale.h), over
+// Windows' scales and the game's sizes, with the size of the overlay's handle and the reach a resting pointer brings
+// the bar from, which keep clear of the game's buttons and words in its header at every size, the bar's two ends, and
+// the frame counter's scale and place against the game's own buttons in each shape (the pause button, the result's
+// SELECT MUSIC). Then the overlay's bar on its way down and up (overlay_motion.h): its pace, a turn back midway,
+// Windows' animations off, the rows of it in sight, and the handle and the pieces at the top that move with it. And the
+// text the keyboard types into the game's soft keyboard (typed_text.h): the text the game opens it with taken as
+// selected. And keyboard play's rules (keyboard_play.h): the lane keys' names and places, each mode's lanes from the
+// settings file (one or two keys a lane, a value it cannot read keeping the default), the lane a key plays, a press,
+// its repeats and every key let go, when the lane keys play at all, and which request of the game's saves a play.
+// Prints ALL CHECKS PASSED when every check held.
 #include "bar_gesture.h"
 #include "frame_rate.h"
 #include "keyboard_play.h"
@@ -21,6 +22,8 @@
 #include "mixer.h"
 #include "overlay_motion.h"
 #include "overlay_scale.h"
+// The frame counter's look: its sizes, its columns, its figure's colour, its frame time's words.
+#include "counter_look.h"
 #include "player.h"
 #include "refresh_meter.h"
 #include "sound_panel.h"
@@ -485,6 +488,90 @@ void bar_checks() {
 
 // The frame counter's scale and place (overlay_scale.h), against the game's own buttons as measured on its frames in
 // each shape: the game stretches its layout across by its width over 1280 and down by its height over 720.
+// The counter's faces as the overlay measures them at scale `k` (1 at 720 lines), read once from their files: DMTQ Wide's
+// widest digit (8) 802 of its 1000 units at 18 px, Pretendard SemiBold's (4) 1322 of its 2048 at 11 px, its full stop
+// 558, and its wider unit, FPS, 3686 (ms 2844).
+player::overlay::CounterFaces counter_faces_at(float k) {
+    player::overlay::CounterFaces f;
+    f.figure_cell = 802.0f / 1000.0f * player::overlay::kCounterFigure * k;
+    f.small_cell = 1322.0f / 2048.0f * player::overlay::kCounterSmall * k;
+    f.small_point = 558.0f / 2048.0f * player::overlay::kCounterSmall * k;
+    f.unit_w = 3686.0f / 2048.0f * player::overlay::kCounterSmall * k;
+    return f;
+}
+
+// The counter's glass at scale `k`, as fps_metrics lays it out: whole pixels.
+struct Glass {
+    int w, h;
+};
+Glass counter_glass(float k) {
+    const player::overlay::CounterLayout l = player::overlay::counter_layout(counter_faces_at(k), k);
+    return Glass{static_cast<int>(l.w), static_cast<int>(l.h)};
+}
+
+// A number's width as the counter sets it: a cell for each digit, its own advance for a full stop or a dash.
+float tabular_width(const std::string& text, float cell, float point) {
+    float w = 0;
+    for (char c : text) w += c >= '0' && c <= '9' ? cell : point;
+    return w;
+}
+
+// The frame counter's look (counter_look.h) with its faces as the overlay measures them: its window shown whole, its
+// glass no larger than before, its two numbers right-aligned in one column and their units in the next, its rows on the
+// glass's middle at every scale, the figure the larger, the figure lit (lime) only while the frames keep the display's
+// rate, and the frame time never wider than four digits (WIN-350, WIN-351, WIN-352; main showed it at 62 %, its words
+// then 1.1 to 3.1 to 1 over light frames, its FPS in lime whatever the rate, and 333.3 ms).
+void counter_look_checks() {
+    using namespace player::overlay;
+    check(kCounterOpacity == 255, "counter: its window shown whole, as the overlay's other pieces, so that its words keep their contrast over the game");
+    const CounterFaces f = counter_faces_at(1);
+    const CounterLayout l = counter_layout(f, 1);
+    // At 720 lines: 10, three of the figure's cells, 6, FPS, 10 across; its two rows' ink and 8 above and below.
+    check(l.w == 90 && l.h == 41, "counter: its glass 90 by 41 at 720 lines");
+    check(l.w * l.h <= 88 * 44, "counter: its glass covers no more of the game than before (88 by 44)");
+    // The figure's column: three cells from the glass's side room; the units 6 after it; the units' column within the room.
+    check(std::fabs(l.numbers_right - (kCounterPadX + 3 * f.figure_cell)) < 0.01f && std::fabs(l.units_left - l.numbers_right - kCounterUnitGap) < 0.01f &&
+              l.units_left + f.unit_w + kCounterPadX <= l.w,
+          "counter: the numbers in one column, their units 6 after it in the next, both within the glass's room");
+    // The frame time right-aligned on the figure's column, from 1.0 to 1000, never past the column's left edge.
+    bool in_column = true;
+    for (const char* time : {"1.0", "4.2", "16.7", "99.9", "333", "1000"}) {
+        in_column = in_column && l.numbers_right - tabular_width(time, f.small_cell, f.small_point) >= kCounterPadX;
+    }
+    check(in_column, "counter: the frame time, 1.0 to 1000, stands right-aligned in the figure's column, within it");
+    // The figure the larger: its digits half as tall again as the small words' at least.
+    check(kCounterFigure * kFigureCap >= 1.5f * kCounterSmall * kSmallCap, "counter: the figure's digits half as tall again as its units' and the frame time's");
+    // The rows on the glass's middle by their ink, and the glass in proportion, at every scale the counter is drawn at.
+    bool middle = true, proportion = true;
+    // Its size at 720 lines before it is made whole pixels, as its size at a hundred times that scale over a hundred
+    // (a pixel's rounding there is a hundredth here): at every scale the glass is that times the scale, to a whole pixel.
+    // The whole 720 size times the scale would count the 720 size's own rounding (up to a pixel) that many times over (2
+    // pixels at 3).
+    const CounterLayout hundred = counter_layout(counter_faces_at(100), 100);
+    const float exact_w = hundred.w / 100, exact_h = hundred.h / 100;
+    for (float k : {0.5f, 0.6f, 0.75f, 0.8f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.25f, 3.0f}) {
+        const CounterLayout s = counter_layout(counter_faces_at(k), k);
+        const float above = s.figure_base - kCounterFigure * k * kFigureCap, below = s.h - s.small_base;
+        middle = middle && std::fabs(above - below) < 0.5f && above >= kCounterPadY * k - 0.5f;
+        proportion = proportion && std::fabs(s.w - exact_w * k) <= 1.0f && std::fabs(s.h - exact_h * k) <= 1.0f;
+    }
+    check(middle, "counter: its two rows on the glass's middle by their ink, 8 at least above and below, at every scale from 0.5 to 3");
+    check(proportion, "counter: its glass in proportion at every scale from 0.5 to 3, within a pixel");
+    // Lit while the frames keep the display's rate, give or take its second's rounding and two in a hundred; more with
+    // VSync off too; never with no rate known, before a measure or at 0.
+    check(counter_lit(240, 240) && counter_lit(235, 240) && !counter_lit(234, 240) && !counter_lit(227, 240) && counter_lit(999, 240),
+          "counter: at 240 Hz its figure lit from 235 frames a second, not at 227, and lit at 999 with VSync off");
+    check(counter_lit(60, 60) && counter_lit(59, 60) && !counter_lit(58, 60) && counter_lit(144, 143.86f) && counter_lit(165, 165.0f),
+          "counter: lit at 60 and 59 on a display at 60 Hz, not at 58; at 144 on 143.86 Hz, at 165 on 165 Hz");
+    check(!counter_lit(60, 240) && !counter_lit(240, 0) && !counter_lit(0, 240) && !counter_lit(-1, 240),
+          "counter: not lit at a limit of 60 on 240 Hz, with the display's rate not known, at 0 or before a first measure");
+    // The frame time's words: a tenth under 100 ms, whole from there on; dashes with none to give.
+    check(counter_time(240, 4.2f) == "4.2" && counter_time(60, 16.67f) == "16.7" && counter_time(10, 99.94f) == "99.9" && counter_time(10, 99.96f) == "100" &&
+              counter_time(3, 333.3f) == "333" && counter_time(1, 1000.0f) == "1000",
+          "counter: the frame time 4.2, 16.7, 99.9, then whole: 100, 333, 1000");
+    check(counter_time(0, 0) == "--" && counter_time(-1, 0) == "--" && counter_time(5, 0) == "--", "counter: no frame time to give: two dashes");
+}
+
 void counter_checks() {
     using player::overlay::counter_at;
     using player::overlay::counter_scale_for;
@@ -492,8 +579,8 @@ void counter_checks() {
     using player::overlay::kLeastAreaH;
     using player::overlay::kLeastAreaW;
     using player::overlay::scale_for;
-    // The counter's glass at 720 lines (fps_metrics: room for three digits and "99.9 ms" in Pretendard), and its inset.
-    constexpr float kChipW = 88, kChipH = 44, kInset = 8;
+    // The counter's inset (its glass's size: counter_glass, as the overlay lays it out at its scale).
+    constexpr float kInset = 8;
     // At 16:9 and wider: the overlay's own scale, its height over 720.
     check(counter_scale_for(1280, 720, 1.0f) == 1.0f && counter_scale_for(1920, 1080, 1.0f) == 1.5f && counter_scale_for(3840, 2160, 1.0f) == 3.0f,
           "the counter at 1280x720, 1920x1080 and 4K: the overlay's own scale, 1, 1.5 and 3");
@@ -529,7 +616,8 @@ void counter_checks() {
         // The counter laid out as the overlay lays it at the top left: its inset and glass at its own scale.
         const float k = counter_scale_for(p.w, p.h, 1.0f);
         const int inset = static_cast<int>(std::lround(kInset * k));
-        const CounterAt at = counter_at(1, p.w, p.h, inset, static_cast<int>(std::ceil(kChipW * k)), static_cast<int>(std::ceil(kChipH * k)), 0);
+        const Glass chip = counter_glass(k);
+        const CounterAt at = counter_at(1, p.w, p.h, inset, chip.w, chip.h, 0);
         // Its gap from the button: its inset, give or take the pixel the button's edge is rounded to.
         const int gap = at.x - p.right;
         if (gap < inset - 1 || gap > inset + 1) {
@@ -548,7 +636,8 @@ void counter_checks() {
     auto covered = [&](const Button& b) {
         const float k = counter_scale_for(b.w, b.h, 1.0f);
         const int inset = static_cast<int>(std::lround(kInset * k));
-        const int cw = static_cast<int>(std::ceil(kChipW * k)), ch = static_cast<int>(std::ceil(kChipH * k));
+        const Glass chip = counter_glass(k);
+        const int cw = chip.w, ch = chip.h;
         const CounterAt at = counter_at(4, b.w, b.h, inset, cw, ch, 0);
         // The part of the counter's glass left of the button's right edge and between its top and its foot.
         const int across = std::max(0, std::min(b.right - at.x, cw)), down = std::max(0, std::min(at.y + ch, b.foot) - std::max(at.y, b.top));
@@ -573,8 +662,8 @@ void counter_checks() {
 // the player's name and level in every menu and the notice on the header's items and RANK).
 void menus_place_checks() {
     using namespace player::overlay;
-    // The counter's glass at 720 lines (fps_metrics), its inset and its room from the right under the header.
-    constexpr float kChipW = 88, kChipH = 44, kInset = 8;
+    // The counter's inset and its room from the right under the header (its glass: counter_glass, at its scale).
+    constexpr float kInset = 8;
     struct Rect {
         const char* what;
         int x0, y0, x1, y1;
@@ -623,7 +712,8 @@ void menus_place_checks() {
     for (const Area& a : areas) {
         const float k = counter_scale_for(a.w, a.h, a.dpi);
         const int inset = static_cast<int>(std::lround(kInset * k)), right = static_cast<int>(std::lround(kMenusRight * k));
-        const int cw = static_cast<int>(std::ceil(kChipW * k)), ch = static_cast<int>(std::ceil(kChipH * k));
+        const Glass chip = counter_glass(k);
+        const int cw = chip.w, ch = chip.h;
         const int bar = static_cast<int>(std::lround(kBarTall * scale_for(a.h, a.dpi)));
         for (int corner = 1; corner <= 4; ++corner) {
             // In the menus, with the bar up and down alike (it never reaches the counter there).
@@ -1708,6 +1798,7 @@ int main() {
     handle_reach_checks();
     // The bar's two ends, and the frame counter's scale and place against the game's buttons in each shape.
     bar_checks();
+    counter_look_checks();
     counter_checks();
     // The counter and the notice against the game's own header, buttons and words, in the menus and in a song.
     menus_place_checks();

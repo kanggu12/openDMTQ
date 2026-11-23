@@ -29,7 +29,8 @@ namespace tone {
 // the worst frame by the tint under them).
 inline const Gdiplus::Color kPrimary(255, 0xF4, 0xF6, 0xF8);
 inline const Gdiplus::Color kSecondary(255, 0xB8, 0xC0, 0xC8);
-// The game's lime: the counter's label and border, the handle's line with the pointer on it.
+// The game's lime: the frame counter's figure while the frames keep the display's rate, the handle's line with the
+// pointer on it.
 inline const Gdiplus::Color kLime(255, 0x8C, 0xF2, 0x3D);
 }  // namespace tone
 
@@ -110,8 +111,7 @@ struct Look {
     // How far beyond its words a deeper tint fades out, in the window's pixels.
     float feather = 10;
     float tint = kTintPiece;
-    // The tint's colour at the glass's top and at its foot (the game's charcoal both, unless a piece takes another, as
-    // the frame counter takes the game's green-black of its Q and MAX box).
+    // The tint's colour at the glass's top and at its foot (the game's charcoal both, unless a piece takes another).
     std::uint8_t tint_top[3] = {kTintR, kTintG, kTintB}, tint_foot[3] = {kTintR, kTintG, kTintB};
     float top = 0, height = 1;
     // What its shape and shadow were made for (shape() makes them again only for another).

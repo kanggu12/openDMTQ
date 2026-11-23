@@ -407,24 +407,28 @@ off, says why in its log, and the game plays by touch as before.
   display); another limit is held by the clock, with each frame still on a refresh (144 on a 240 Hz display).
 - **VSync off:** frames go out as soon as they are drawn, evenly at the limit, which may be above the display's rate, or
   as fast as the PC draws without one. A little less delay, and the picture may tear.
-- **The FPS counter**, off by default, is a small glass box like the game's Q and MAX box, faint so that the game shows
-  through it: FPS in the game's lime, the frames a second in white and the mean frame time under them, over the last
-  second, twice a second. In a song it stands in its corner, 8 pixels in at 720 lines, clear of the song's own
+- **The FPS counter**, off by default, is a small card of the overlay's glass, as the notice is: the frames a second as
+  a figure in the launcher's wide face, FPS after them, and the mean frame time under them with ms after it, over the
+  last second, twice a second. The two numbers stand right-aligned in one column and their units in the next, so that
+  only digits change as they do. The figure is lime while the frames keep the display's rate (a frame for every refresh,
+  give or take two in a hundred: from 235 at 240 Hz, from 59 at 60 Hz) and white below it or where the display's rate is
+  not known; the rest is grey. In a song it stands in its corner, 8 pixels in at 720 lines, clear of the song's own
   controls: at the bottom right by default, over the play field's corner. **Position** moves it to another corner, kept
   while the counter is off: at the top left and the bottom left it stands 8 pixels right of the pause button and the
   column under it, at the top right under the row of the Q and MAX the song's pause screen shows there. In the menus
-  every corner holds something of the game's own on one screen or another (the player's name and level, the music
-  list's tabs and grid button, a song's title and score, SELECT MUSIC, DOWNLOAD), so there it stands at the right under
-  the game's header, whatever its corner: the one place where none of the menu screens has a button or a word, measured
-  on each of them at 16:9, 16:10 and 4:3. In a window wider than 16:9 (the music list shows its next page there) or so
-  small that the counter, at its least size, would not fit that room, it waits in the menus and shows in each song.
-  With keyboard play off the player cannot tell a song from the menus, and the counter stands at the right under the
-  game's header throughout. The game stretches its screens to the window's shape (at 21:9 its buttons are wider than
-  tall, at 4:3 narrower), and the counter keeps to its buttons' narrower side: in a window narrower than 16:9 it is a
-  little smaller, so that it covers no more of them there than at 16:9. A top left set by a launcher before 0.9.3, which
-  wrote it whether chosen or not, reads as the default; another corner set then stays. It counts the frames the player shows: a steady 60 reads 60, and only a whole second without a frame
-  reads 0. It shows from the game's first frame and hides while the game holds still. Drawn apart from the game's
-  picture, it costs the game nothing, and the broadcast does not show it.
+  every corner holds something of the game's own on one screen or another (the player's name and level, the music list's
+  tabs and grid button, a song's title and score, SELECT MUSIC, DOWNLOAD), so there it stands at the right under the
+  game's header, whatever its corner: the one place where none of the menu screens has a button or a word, measured on
+  each of them at 16:9, 16:10 and 4:3. In a window wider than 16:9 (the music list shows its next page there) or so
+  small that the counter, at its least size, would not fit that room, it waits in the menus and shows in each song. With
+  keyboard play off the player cannot tell a song from the menus, and the counter stands at the right under the game's
+  header throughout. The game stretches its screens to the window's shape (at 21:9 its buttons are wider than tall, at
+  4:3 narrower), and the counter keeps to its buttons' narrower side: in a window narrower than 16:9 it is a little
+  smaller, so that it covers no more of them there than at 16:9. A top left set by a launcher before 0.9.3, which wrote
+  it whether chosen or not, reads as the default; another corner set then stays. It counts the frames the player shows:
+  a steady 60 reads 60, and only a whole second without a frame reads 0. It shows from the game's first frame and hides
+  while the game holds still. Drawn apart from the game's picture, it costs the game nothing, and the broadcast does not
+  show it.
 - **The render scale** draws the game at a share of the window's pixels (100 % down to 50 %), stretched to fill it:
   lighter for the graphics card, and softer. The share keeps the window's shape exactly where its size has fine enough
   steps (1920x1080 is 120 steps of 16x9): 67 % of 1920x1080 is 1280x720, so the game lays itself out as it does at full
@@ -635,10 +639,10 @@ server's app, `--settings` the file); the player writes the sound panel's change
   small corners, its bevel (a line of light along the top, of shade along the foot) and its green line along the bar's
   and the notice's foot. Their words keep 4.5:1 against the light behind them: where the game is light under the words,
   the tint deepens there. With none of them up, the glass costs the game nothing. The words are set in Pretendard,
-  titles and buttons bold, which the player carries in its `fonts` folder with the launcher's wide face. The wordmark is
-  a picture for each of the overlay's scales from 1 to 4, drawn by the launcher's own code
-  (`arm32/desktop/assets/make_wordmark.py`) and carried in the player's `images` folder: at those scales it is drawn
-  pixel for pixel, between them the next larger is drawn down, and below 1 the first one is.
+  titles and buttons bold, and the FPS counter's figure in the launcher's wide face, both of which the player carries in
+  its `fonts` folder. The wordmark is a picture for each of the overlay's scales from 1 to 4, drawn by the launcher's
+  own code (`arm32/desktop/assets/make_wordmark.py`) and carried in the player's `images` folder: at those scales it is
+  drawn pixel for pixel, between them the next larger is drawn down, and below 1 the first one is.
 
 The bar, its handle, the sound panel, the question before quitting, the notice, the FPS counter and the pointer are
 drawn by the player over the game's window, each a window of its own whose picture a thread of the overlay's makes on

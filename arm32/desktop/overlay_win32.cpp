@@ -50,14 +50,17 @@
 //   red LIVE tag with a slanted end, as the game's tags, while broadcasting; once the broadcast has ended its title
 //   says so alone, with no tag.
 // - The cursor: a dart in the logo's chrome and lime, all lime while the mouse's finger is down on the game.
-// - The frame counter: when the PC's settings ask for it, a small glass box like the game's Q and MAX box, at the bottom
-//   right, where it covers the fewest of the game's own labels and buttons, unless another corner is chosen (at the top
-//   left, beside a song's pause button), 8 pixels in at 720 lines, at the smaller of the two scales the game stretches
-//   its layout by (overlay_scale.h), as the handle is: FPS in the game's lime, the frames a second in white
-//   and the mean frame time under them, over the last second, from the count of frames shown that the player keeps
-//   anyway (frames.cpp; frame_rate.h says how it reads it). The whole of it faint
-//   (its window at 62 % opacity), so the game shows through. Hidden until the game's first frame and while the game is
-//   held still, never a 0 that the overlay itself caused. It lets clicks through.
+// - The frame counter: when the PC's settings ask for it, one more card of the overlay's glass, small, as the notice's
+//   (its charcoal, its light edge and bevel, its small corners), at the bottom right, where it covers the fewest of the
+//   game's own labels and buttons, unless another corner is chosen (at the top left, beside a song's pause button), 8
+//   pixels in at 720 lines, at the smaller of the two scales the game stretches its layout by (overlay_scale.h), as the
+//   handle is. On it the frames a second as a figure in the launcher's wide face, lime while they keep the display's rate
+//   and white otherwise, FPS after them on their baseline, and the mean frame time under them with ms after it, quiet
+//   grey; both numbers right-aligned in one column in cells as wide as their faces' widest digits, their units in the
+//   next (counter_look.h). Over the last second, from the count of frames shown that the player keeps anyway (frames.cpp;
+//   frame_rate.h says how it reads it). Shown whole, as every other piece, so its words keep their contrast over any frame
+//   of the game. Hidden until the game's first frame and while the game is held still, never a 0 that the overlay itself
+//   caused. It lets clicks through.
 #include "overlay_win32.h"
 
 // GDI+ and the picture it draws into, which the error box before the game draws with too (error_box_win32.cpp).
@@ -67,6 +70,8 @@
 #include "overlay_glass.h"
 // The overlay's scale, the game's own with a floor at Windows' scale; the handle's own scale and its tab's sizes.
 #include "overlay_scale.h"
+// The frame counter's sizes, its rows and columns, its figure's colour and its frame time's words.
+#include "counter_look.h"
 // The bar's way down and up, and the handle's part in it.
 #include "overlay_motion.h"
 // The sound panel's layout, and the sound it sets.
@@ -262,9 +267,8 @@ constexpr float kShadow = 0.35f, kShadowBlur = 18, kShadowDrop = 4;
 constexpr float kRoomSide = 24, kRoomTop = 20, kRoomBottom = 28;
 // The glass's blur (a Gaussian's sigma at 720 lines) and its saturation; the question's dim behind its card.
 constexpr float kGlassBlur = 10, kGlassSaturation = 1.15f, kDimBlur = 4, kDim = 0.40f;
-// The frame counter's window as a whole, glass, words and all: 62 % (158 of 255), so that the game shows through it
-// while its words still read (the probe measures them over the game's frames at this opacity).
-constexpr BYTE kCounterAlpha = 158;
+// The frame counter's window as a whole: shown whole, as every other piece (counter_look.h's kCounterOpacity says why).
+constexpr BYTE kCounterAlpha = static_cast<BYTE>(kCounterOpacity);
 // A piece wanted on the screen waits this long for its first picture with the frame behind it, then shows its bare
 // tint; the bar and the question read ahead, so they rarely wait.
 constexpr UINT64 kGlassWaitMs = 150;
@@ -313,6 +317,18 @@ RectF measure(const std::wstring& text, const Font& f) {
     RectF box;
     g.MeasureString(text.c_str(), -1, &f, PointF(0, 0), &tight(), &box);
     return box;
+}
+
+// A face's ascent at its size: from the top of its line, where GDI+ sets words drawn at a point, down to its baseline
+// (the family's cell ascent over its em, times the font's size in pixels), so that words of two faces can stand on one
+// baseline.
+float ascent(const Font& f) {
+    FontFamily family;
+    f.GetFamily(&family);
+    const INT style = f.GetStyle();
+    const UINT16 em = family.GetEmHeight(style);
+    // A family that gives no em (none found): the size itself, a line's top no lower than its words.
+    return em ? f.GetSize() * static_cast<float>(family.GetCellAscent(style)) / static_cast<float>(em) : f.GetSize();
 }
 
 // The probe's note of words drawn (or that would be), opaque ones only: a faint one under them is no words of its own;
@@ -505,8 +521,6 @@ namespace game {
 const Color kRedTop(255, 0xC4, 0x2B, 0x1C), kRedFoot(255, 0x9E, 0x1F, 0x14);
 // The line under its tab row and along its notice band.
 const Color kLine(255, 0x64, 0xBB, 0x3E);
-// Its Q and MAX box: a green-black fill under a lime border.
-constexpr std::uint8_t kBoxTop[3] = {0x16, 0x24, 0x19}, kBoxFoot[3] = {0x0F, 0x17, 0x0B};
 }  // namespace game
 
 // The game's bevel inside a piece's edge: a line of light along its top and a line of shade along its foot, clear of
@@ -614,29 +628,35 @@ bool on_handle(int x, int y) { return in_handle_reach(x, y, area_w(), area_h());
 
 // ---- the frame counter's look (the painter's)
 
-// The counter's glass, as the game's Q and MAX box: its size at this scale, the same whatever its numbers (room for
-// three digits and "99.9 ms"): the label FPS on the left, the number on the right, the frame time under the number.
+// The counter's faces at this scale (counter_look.h's sizes): the figure in DMTQ Wide, the launcher's figures' face; the
+// units and the frame time in Pretendard SemiBold, as the overlay sets its values (the sound panel's levels): at the
+// overlay's small size a regular stroke is thinner than a pixel and shows darker than its grey (counter_look.h says by
+// how much).
+std::unique_ptr<Font> counter_small() { return font(Weight::kSemiBold, fpx(kCounterSmall), false); }
+
+// What those faces measure at this scale, which the counter is laid out by: the widest digit of each (a digit's cell:
+// tabular figures, which GDI+ does not set from the faces' own), the small face's full stop, its wider unit.
+CounterFaces counter_faces() {
+    CounterFaces f;
+    auto figure = wide_font(fpx(kCounterFigure));
+    auto small = counter_small();
+    for (wchar_t d = L'0'; d <= L'9'; ++d) {
+        f.figure_cell = std::max(f.figure_cell, measure(std::wstring(1, d), *figure).Width);
+        f.small_cell = std::max(f.small_cell, measure(std::wstring(1, d), *small).Width);
+    }
+    f.small_point = measure(L".", *small).Width;
+    f.unit_w = std::max(measure(L"FPS", *small).Width, measure(L"ms", *small).Width);
+    return f;
+}
+
+// The counter's glass at this scale: the same whatever its numbers (three digits' room), so that its place never moves
+// with them.
 struct FpsMetrics {
-    float pad_x, pad_y, gap, cell, number_h, label_w, time_h, w, h;
+    float w, h;
 };
 FpsMetrics fps_metrics() {
-    FpsMetrics m{};
-    auto number = font(Weight::kBold, fpx(18), false);
-    auto label = font(Weight::kBold, fpx(11), false);
-    auto time = font(Weight::kRegular, fpx(11), false);
-    m.pad_x = fpx(10);
-    m.pad_y = fpx(6);
-    m.gap = fpx(12);
-    // Tabular figures: every digit in a cell as wide as the widest, so that the number does not jitter as it changes.
-    for (wchar_t d = L'0'; d <= L'9'; ++d) m.cell = std::max(m.cell, measure(std::wstring(1, d), *number).Width);
-    m.number_h = measure(L"0", *number).Height;
-    m.label_w = measure(L"FPS", *label).Width;
-    const RectF t = measure(L"88.8 ms", *time);
-    m.time_h = t.Height;
-    // The number's line a little tighter than its face's own height: the time sits close under it.
-    m.w = std::ceil(m.pad_x * 2 + std::max(m.label_w + m.gap + m.cell * 3, t.Width));
-    m.h = std::ceil(m.pad_y * 2 + m.number_h * 0.86f + m.time_h);
-    return m;
+    const CounterLayout l = counter_layout(counter_faces(), scale());
+    return FpsMetrics{l.w, l.h};
 }
 
 // Whether a song is going on for the piece being laid out, and whether the game is known to be in its menus: the painter's
@@ -671,71 +691,74 @@ RECT window_around(int gx, int gy, int gw, int gh) {
     return r;
 }
 
-// The counter's look for `fps` frames a second and `ms` a frame (fps below 0: not measured yet, dashes) in `corner`:
-// the game's Q and MAX box in glass, its green-black over the frame, a pixel of lime around it, the label in lime, the
-// number white and bold, the time grey. Its window's place goes to the paint.
-void fps_look(Paint& p, int fps, float ms, int corner) {
-    const FpsMetrics m = fps_metrics();
-    const POINT at = fps_place(corner, static_cast<int>(m.w), static_cast<int>(m.h));
-    const RECT chip{at.x, at.y, at.x + static_cast<LONG>(m.w), at.y + static_cast<LONG>(m.h)};
-    const RECT win = window_around(chip.left, chip.top, static_cast<int>(m.w), static_cast<int>(m.h));
+// A number set in tabular figures: each digit in the middle of a cell `cell` wide, any other character (a full stop, a
+// dash) in its own advance, the whole right-aligned on `right` with its baseline at `base`: its digits keep their
+// places as the number changes.
+void tabular(Graphics& g, const std::wstring& text, const Font& f, float cell, float right, float base, const Color& colour) {
+    // Each character's room, and the whole's.
+    std::vector<float> room;
+    float whole = 0;
+    for (wchar_t c : text) {
+        room.push_back(c >= L'0' && c <= L'9' ? cell : measure(std::wstring(1, c), f).Width);
+        whole += room.back();
+    }
+    // From the column's right edge back by the whole, each character on the middle of its room, its line's top above the
+    // baseline by the face's ascent.
+    float x = right - whole;
+    const float top = base - ascent(f);
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        const std::wstring one(1, text[i]);
+        say(g, one, f, colour, PointF(x + (room[i] - measure(one, f).Width) / 2, top));
+        x += room[i];
+    }
+}
+
+// The counter's look for `fps` frames a second and `ms` a frame (fps below 0: not measured yet, dashes) in `corner`, the
+// display at `hz` refreshes a second (0: not known): one of the overlay's cards of glass (the notice's charcoal over the
+// frame, its light edge and bevel, its small corners), small; on it the frames a second as a figure in the launcher's
+// wide face, lime while they keep the display's rate and white otherwise, FPS after them on their baseline and the frame
+// time under them with ms after it, both in the overlay's quiet grey; the two numbers right-aligned in one column, their
+// units in the next (counter_look.h). Its window's place goes to the paint.
+void fps_look(Paint& p, int fps, float ms, int corner, float hz) {
+    const CounterFaces faces = counter_faces();
+    // The figure's words: its digits, or two dashes before the first measure.
+    const std::wstring figure = fps < 0 ? std::wstring(L"--") : std::to_wstring(fps);
+    const CounterLayout l = counter_layout(faces, scale());
+    const POINT at = fps_place(corner, static_cast<int>(l.w), static_cast<int>(l.h));
+    const RECT chip{at.x, at.y, at.x + static_cast<LONG>(l.w), at.y + static_cast<LONG>(l.h)};
+    const RECT win = window_around(chip.left, chip.top, static_cast<int>(l.w), static_cast<int>(l.h));
     p.x = win.left;
     p.y = win.top;
     Look& look = p.look;
     const int w = win.right - win.left, h = win.bottom - win.top;
     const RectF glass(static_cast<REAL>(chip.left - win.left), static_cast<REAL>(chip.top - win.top), static_cast<REAL>(chip.right - chip.left),
                       static_cast<REAL>(chip.bottom - chip.top));
-    const float radius = fpx(4);
+    // The overlay's cards' glass: their corners, their shadow, the pieces' tint in the game's charcoal top to foot.
+    const float radius = fpx(kCounterRound);
     pane_shape(look, w, h, glass, radius);
     look.tint = kTintPiece;
-    std::copy(game::kBoxTop, game::kBoxTop + 3, look.tint_top);
-    std::copy(game::kBoxFoot, game::kBoxFoot + 3, look.tint_foot);
+    const std::uint8_t charcoal[3] = {kTintR, kTintG, kTintB};
+    std::copy(charcoal, charcoal + 3, look.tint_top);
+    std::copy(charcoal, charcoal + 3, look.tint_foot);
     std::unique_ptr<Bitmap> surface;
     std::unique_ptr<Graphics> g(fresh_fore(look, surface));
-    // Its border: a pixel of the game's lime at 55 %, on the glass's outermost pixels; the game's bevel inside it.
-    {
-        const float line = std::max(1.0f, fpx(1));
-        GraphicsPath border;
-        rounded(border, RectF(glass.X + line / 2, glass.Y + line / 2, glass.Width - line, glass.Height - line), std::max(0.0f, radius - line / 2));
-        Pen lime(Color(140, tone::kLime.GetR(), tone::kLime.GetG(), tone::kLime.GetB()), line);
-        g->DrawPath(&lime, &border);
-        bevel(*g, glass, radius, 26, 60);
-    }
-    auto number = font(Weight::kBold, fpx(18), false);
-    auto label = font(Weight::kBold, fpx(11), false);
-    auto time_font = font(Weight::kRegular, fpx(11), false);
-    const float top = glass.Y + m.pad_y;
-    const float right = glass.X + glass.Width - m.pad_x;
-    // The number, right-aligned digit by digit in cells as wide as the widest digit; before the first measure, a dash
-    // as wide as two of them.
-    if (fps < 0) {
-        const std::wstring dash = L"--";
-        say(*g, dash, *number, Color(255, 255, 255, 255), PointF(right - m.cell * 2 + (m.cell * 2 - measure(dash, *number).Width) / 2, top));
-    } else {
-        const std::wstring digits = std::to_wstring(fps);
-        float x = right - m.cell * static_cast<float>(digits.size());
-        for (wchar_t d : digits) {
-            const std::wstring one(1, d);
-            // Each digit in the middle of its cell.
-            say(*g, one, *number, Color(255, 255, 255, 255), PointF(x + (m.cell - measure(one, *number).Width) / 2, top));
-            x += m.cell;
-        }
-    }
-    // FPS in lime on the left, on the number's foot: the bottom of the number's line less the face's room below its
-    // digits.
-    const float foot = top + m.number_h * 0.80f;
-    const float label_h = measure(L"FPS", *label).Height;
-    say(*g, L"FPS", *label, tone::kLime, PointF(glass.X + m.pad_x, foot - label_h * 0.80f));
-    // The mean frame time under the number, grey, right-aligned; none to give (not measured yet, or no frame in the
-    // last look's time): dashes.
-    wchar_t time[32];
-    if (fps <= 0) std::swprintf(time, 32, L"-- ms");
-    else std::swprintf(time, 32, L"%.1f ms", static_cast<double>(ms));
-    const float time_w = measure(time, *time_font).Width;
-    say(*g, time, *time_font, tone::kSecondary, PointF(right - time_w, top + m.number_h * 0.86f));
-    // The words' zone: the glass's inside, as dark as the quiet grey needs.
-    look.zones = {Look::Zone{glass.X + m.pad_x / 2, glass.Y + m.pad_y / 2, glass.X + glass.Width - m.pad_x / 2, glass.Y + glass.Height - m.pad_y / 2,
-                             kUnderSecondary}};
+    // The light edge round it, lighter along its top, and the game's bevel inside it, as the notice has them.
+    edge(*g, glass, radius);
+    bevel(*g, glass, radius, 40, 90);
+    auto figure_font = wide_font(fpx(kCounterFigure));
+    auto small = counter_small();
+    // The frames a second: the figure, lime while they keep the display's rate.
+    const Color& figure_colour = counter_lit(fps, hz) ? tone::kLime : tone::kPrimary;
+    tabular(*g, figure, *figure_font, faces.figure_cell, glass.X + l.numbers_right, glass.Y + l.figure_base, figure_colour);
+    // Its unit after it on the figure's baseline, quiet.
+    say(*g, L"FPS", *small, tone::kSecondary, PointF(glass.X + l.units_left, glass.Y + l.figure_base - ascent(*small)));
+    // The mean frame time under it in the same column, and its unit in the units' column; dashes with none to give (not
+    // measured yet, or no frame in the last second).
+    tabular(*g, wide(counter_time(fps, ms)), *small, faces.small_cell, glass.X + l.numbers_right, glass.Y + l.small_base, tone::kSecondary);
+    say(*g, L"ms", *small, tone::kSecondary, PointF(glass.X + l.units_left, glass.Y + l.small_base - ascent(*small)));
+    // The words' zone: the glass's inside, as dark as its small grey words need over the frame behind it.
+    const float pad_x = fpx(kCounterPadX), pad_y = fpx(kCounterPadY);
+    look.zones = {Look::Zone{glass.X + pad_x / 2, glass.Y + pad_y / 2, glass.X + glass.Width - pad_x / 2, glass.Y + glass.Height - pad_y / 2, kCounterUnder}};
     look.feather = fpx(6);
     ++p.look_serial;
 }
@@ -1522,11 +1545,12 @@ struct Order {
     int sound_hover = kNoControl, sound_held = kNoControl;
     // The notice's room across: the area's right edge, or the sound panel's left edge less a gap while it is open.
     int free_right = 0;
-    // The notice's words and whether it is live; the counter's corner and its numbers; whether the handle is lit.
+    // The notice's words and whether it is live; the counter's corner and its numbers, and the display's refreshes a
+    // second its figure is lit against (0: not known); whether the handle is lit.
     std::string text;
     bool live = false, lit = false;
     int corner = 0, fps = -1;
-    float ms = 0;
+    float ms = 0, hz = 0;
     // The notice's picture where it lies under the question's dim (null: none up), and its place in the game's area.
     std::shared_ptr<Canvas> under;
     int under_x = 0, under_y = 0;
@@ -1615,7 +1639,7 @@ Painted paint_counter(const Order& o, Paint& p) {
     const Drawing d(o.view);
     const CounterScale own;
     if (p.made_for != o.key) {
-        fps_look(p, o.fps, o.ms, o.corner);
+        fps_look(p, o.fps, o.ms, o.corner, o.hz);
         p.made_for = o.key;
     }
     paint_draw(p, *o.shots);
@@ -2699,11 +2723,18 @@ constexpr UINT kFpsMs = 500, kFpsWaitMs = 100;
 // Whether it was up at the last look, for the log's line when it comes or goes.
 bool g_fps_said_up = false;
 
-// The counter's look as text: its numbers (the time to a tenth of a millisecond, as it shows), its corner, its view.
-std::string fps_key(const View& v) {
-    char key[96];
-    std::snprintf(key, sizeof key, "counter %dx%d %.4f %d %d %d %.1f %d", v.w, v.h, static_cast<double>(v.dpi), v.top_room, g_fps_corner, g_reading.fps,
-                  static_cast<double>(g_reading.ms), v.song ? 1 : 0);
+// The display's refreshes a second the counter's figure is lit against: the interval the window keeps for the display it
+// is on (the measured one where the display's own rate was not exact), 0 where none is known.
+float counter_hz() {
+    const long long interval = g_hooks.refresh_ns ? g_hooks.refresh_ns() : 0;
+    return interval > 0 ? static_cast<float>(1e9 / static_cast<double>(interval)) : 0.0f;
+}
+
+// The counter's look as text: its numbers (the time as it shows), whether its figure is lit, its corner, its view.
+std::string fps_key(const View& v, float hz) {
+    char key[112];
+    std::snprintf(key, sizeof key, "counter %dx%d %.4f %d %d %d %s %d %d", v.w, v.h, static_cast<double>(v.dpi), v.top_room, g_fps_corner, g_reading.fps,
+                  counter_time(g_reading.fps, g_reading.ms).c_str(), counter_lit(g_reading.fps, hz) ? 1 : 0, v.song ? 1 : 0);
     return key;
 }
 
@@ -2762,12 +2793,14 @@ void counter_place() {
         glass_wish();
     }
     const View v = view_now();
-    const std::string key = fps_key(v);
+    const float hz = counter_hz();
+    const std::string key = fps_key(v, hz);
     Order o;
     o.view = v;
     o.corner = g_fps_corner;
     o.fps = g_reading.fps;
     o.ms = g_reading.ms;
+    o.hz = hz;
     o.key = key;
     order(kCounterPiece, std::move(o));
     g_fps.alpha = kCounterAlpha;
@@ -4528,8 +4561,8 @@ void test_save(const std::wstring& prefix, const std::wstring& frame_png, bool w
             time_line(layout, "notice", p, *shots);
         }
     }
-    // The frame counter in each corner, at 240 frames a second, at its window's opacity; at the top, with the bar down as
-    // well; and its other numbers at the top left, its own place.
+    // The frame counter in each corner, at 240 frames a second on a display at 240 Hz (its figure lit), at its window's
+    // opacity; at the top, with the bar down as well; and its other numbers at the top left, its own place.
     for (int corner = 1; corner <= 4; ++corner) {
         for (bool bar : {false, true}) {
             if (bar && corner > 2) continue;
@@ -4540,6 +4573,7 @@ void test_save(const std::wstring& prefix, const std::wstring& frame_png, bool w
             o.corner = corner;
             o.fps = 240;
             o.ms = 4.2f;
+            o.hz = 240;
             char name[32];
             std::snprintf(name, sizeof name, "fps%d%s", corner, bar ? "-bar" : "");
             o.key = std::string("probe ") + name;
@@ -4560,18 +4594,24 @@ void test_save(const std::wstring& prefix, const std::wstring& frame_png, bool w
             }
         }
     }
+    // Its other numbers on a display at 240 Hz: before the first measure, a second without a frame, a loading screen's
+    // few frames a second, a frame limit of 60, a menu short of the display's rate by a few frames, the display's rate,
+    // more than it with VSync off (999, the counter's room); and 60 on a display at 60 Hz.
     struct Count {
         int fps;
-        float ms;
+        float ms, hz;
         const char* name;
     };
-    for (const Count& n : {Count{-1, 0, "fps-dash"}, Count{0, 0, "fps-0"}, Count{60, 16.7f, "fps-60"}, Count{999, 1.0f, "fps-999"}}) {
+    for (const Count& n : {Count{-1, 0, 240, "fps-dash"}, Count{0, 0, 240, "fps-0"}, Count{3, 333.3f, 240, "fps-3"}, Count{60, 16.7f, 240, "fps-60"},
+                           Count{227, 4.4f, 240, "fps-227"}, Count{240, 4.2f, 240, "fps-240"}, Count{999, 1.0f, 240, "fps-999"},
+                           Count{60, 16.7f, 60, "fps-60at60"}}) {
         Order o;
         o.view = base;
         o.shots = shots;
         o.corner = 1;
         o.fps = n.fps;
         o.ms = n.ms;
+        o.hz = n.hz;
         o.key = std::string("probe ") + n.name;
         Paint p;
         g_test_texts = &g_test_words;
@@ -4733,6 +4773,7 @@ void test_motion(const std::wstring& prefix, const std::wstring& frame_png) {
     o.key = "probe motion counter";
     o.fps = 240;
     o.ms = 4.2f;
+    o.hz = 240;
     const Painted counter = paint_counter(o, counter_paint);
     if (!bar.picture || !handle.picture || !lit.picture || !notice.picture || !counter.picture) return;
     FILE* numbers = _wfopen((prefix + L"motion.txt").c_str(), L"w");
