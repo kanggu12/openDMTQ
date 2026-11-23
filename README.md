@@ -45,8 +45,8 @@ same app in the OpenDMTQ PC client.
 
 With the ID and password the server's owner gives you:
 
-1. On an **Android phone**, open the server's address (or scan its QR code), sign in, and tap **Download app (.apk)**:
-   the game, connected to that server. [iPhones cannot play](docs/game-files.md#iphones).
+1. On an **Android phone**, open the server's address (or scan its QR code), sign in, tap **Download app (.apk)** and
+   install it: the game, connected to that server. [iPhones cannot play](docs/game-files.md#iphones).
 2. On a **Windows PC**, take the PC client's installer from the same page. Its launcher signs in and keeps the game up
    to date.
 
