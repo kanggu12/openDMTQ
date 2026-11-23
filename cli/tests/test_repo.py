@@ -214,6 +214,74 @@ class WindowsLinesTest(unittest.TestCase):
                     self.assertEqual(said, word, name)
 
 
+class DocVersionsTest(unittest.TestCase):
+    """.github/doc_versions.py: the README's quick start and the guides download the release the chart names, by the
+    names its files have, so that a line copied from them fetches what it says."""
+
+    @classmethod
+    def setUpClass(cls):
+        # The script lives outside any package (in .github/), so it is loaded from its path, as release_notes.py is.
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("doc_versions", os.path.join(ROOT, ".github", "doc_versions.py"))
+        cls.versions = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.versions)
+
+    def tree(self, d, chart, readme, guide=""):
+        """A tree of its own: the chart at a version, a README and one guide, and the script the one-line install runs."""
+        from pathlib import Path
+        root = Path(d)
+        (root / "deploy" / "helm" / "opendmtq").mkdir(parents=True)
+        (root / "deploy" / "helm" / "opendmtq" / "Chart.yaml").write_text(
+            f'apiVersion: v2\nversion: {chart}\nappVersion: "{chart}"\n', encoding="utf-8")
+        (root / "docs").mkdir()
+        (root / "docs" / "install.md").write_text(guide, encoding="utf-8")
+        (root / "host").mkdir()
+        (root / "host" / "get.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+        (root / "README.md").write_text(readme, encoding="utf-8")
+        # The changelog keeps each release's own names: never read.
+        (root / "CHANGELOG.md").write_text("opendmtq-server-0.1.0-windows-x64.zip\n", encoding="utf-8")
+        return root
+
+    def test_the_tree_names_the_release_its_chart_carries(self):
+        from pathlib import Path
+        self.assertEqual(self.versions.stale(Path(ROOT)), [])
+
+    def test_another_release_or_a_file_it_has_not_is_named_and_written_over(self):
+        import tempfile
+        old = ("curl.exe -fLO https://github.com/kanggu12/openDMTQ/releases/download/v1.9.0/opendmtq-server-1.9.0-windows-x64.zip\n"
+               "curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/v1.9.0/host/get.sh | sh\n")
+        # The guides' stand-in for any release, another project's release, and a release's file that is not there.
+        guide = ("V=1.2.3: opendmtq-phone-runtime-1.2.3-android-arm64-armv7.zip\n"
+                 "https://github.com/iBotPeaches/Apktool/releases/download/v2.12.1/apktool_2.12.1.jar\n"
+                 "https://github.com/kanggu12/openDMTQ/releases/download/v2.0.0/opendmtq-server-2.0.0-linux.zip\n")
+        with tempfile.TemporaryDirectory() as d:
+            root = self.tree(d, "2.0.0", old, guide)
+            found = self.versions.stale(root)
+            # Each line of the README once for its other release, and the file release 2.0.0 does not have.
+            self.assertEqual([(p, n, what) for p, n, what, _ in found],
+                             [("README.md", 1, "1.9.0"), ("README.md", 2, "1.9.0"),
+                              ("docs/install.md", 3, "opendmtq-server-2.0.0-linux.zip")])
+            # The run fails, saying each place with its fix, as the release's gate shows it.
+            import contextlib
+            import io
+            said = io.StringIO()
+            with contextlib.redirect_stderr(said):
+                self.assertEqual(self.versions.main(["--root", d]), 1)
+            self.assertIn("README.md:1 names 1.9.0: the chart is 2.0.0 (.github/doc_versions.py --write)", said.getvalue())
+            # --write puts the chart's version in the README, and leaves the stand-in, the other project and the
+            # changelog as they were.
+            self.assertEqual(self.versions.write(root), ["README.md"])
+            readme = (root / "README.md").read_text(encoding="utf-8")
+            self.assertEqual(readme, old.replace("1.9.0", "2.0.0"))
+            self.assertEqual((root / "docs" / "install.md").read_text(encoding="utf-8"), guide)
+            self.assertIn("0.1.0", (root / "CHANGELOG.md").read_text(encoding="utf-8"))
+            # The file that is not there stays to be put right by hand.
+            self.assertEqual(len(self.versions.stale(root)), 1)
+            # A link to the tree's own script at the tag: the script has to be in the tree.
+            (root / "host" / "get.sh").unlink()
+            self.assertIn(("README.md", 2, "host/get.sh", "the tree has no such file"), self.versions.stale(root))
+
+
 class FiguresTest(unittest.TestCase):
     """The guides' figures name what the program has now: no setting it reads no more (ADMIN_PORT, the admin pages' own
     port before 0.11.0), no loopback address with a port, no build's file name a player never has."""

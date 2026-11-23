@@ -221,19 +221,21 @@ few processors, and `NAME_PREFIX`, `TAG` and `PORTS` (the first of nine in a row
 ports apart from another's on the same machine. Its report, with each step's whole output and one line for each step in
 the steps' order, is in `_work/qa/<commit>`; the newest five are kept.
 
-**A release** (`.github/workflows/release.yml`, a tag `v*`) first checks that the tag, the chart and CHANGELOG.md name one
-version (`.github/release_notes.py`), runs CI again on the tag's commit and asks for `qa/local`. Its files are then made,
-laid out, signed, checked and published on the machine that holds the project's signing key by `.github/release.sh`, with
-the steps of the workflow's own publishing job, which stops on GitHub as it has no key
+**A release** (`.github/workflows/release.yml`, a tag `v*`) first checks that the tag, the chart and CHANGELOG.md name
+one version (`.github/release_notes.py`), runs CI again on the tag's commit, whose repository checks find the README's
+and the guides' download lines naming that version too (`.github/doc_versions.py`), and asks for `qa/local`. Its files
+are then made, laid out, signed, checked and published on the machine that holds the project's signing key by
+`.github/release.sh`, with the steps of the workflow's own publishing job, which stops on GitHub as it has no key
 ([CONTRIBUTING.md](../CONTRIBUTING.md#releases)): the runtime for newer phones, the player for Windows, the PC client's
 installer and its update packages (the delta from the last release's full package), the Windows bundle, then the
 release's files under their names (`.github/release_assets.py`: the PC client's installer, the server for Windows, the
-chart, the runtime for newer phones, the PC client's update feed and its full and delta packages, the checksums and their
-signature), whose notes are that version's section of the changelog. Before anything is pushed it runs the release's own
-checks: the Windows bundle under Wine, a host install on Debian 12, and the last release's PC client updating to these
-files (`tests/release/update.sh`; `tests/release/update_signed.sh` does the same with a key made for the test,
-[above](#what-runs-where)). `.github/release.sh --dry-run VERSION` does all of it, the images for both platforms
-included, and publishes nothing; `gh workflow run release.yml` rehearses the gates on GitHub, with the chart's own version.
+chart, the runtime for newer phones, the PC client's update feed and its full and delta packages, the checksums and
+their signature), whose notes are that version's section of the changelog. Before anything is pushed it runs the
+release's own checks: the Windows bundle under Wine, a host install on Debian 12, and the last release's PC client
+updating to these files (`tests/release/update.sh`; `tests/release/update_signed.sh` does the same with a key made for
+the test, [above](#what-runs-where)). `.github/release.sh --dry-run VERSION` does all of it, the images for both
+platforms included, and publishes nothing; `gh workflow run release.yml` rehearses the gates on GitHub, with the chart's
+own version.
 
 **A deploy** (`./opendmtq deploy`) puts the commit that is checked out on this machine's server:
 

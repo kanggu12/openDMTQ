@@ -9,7 +9,8 @@
 # _work/release/VERSION). It runs in this checkout, which must be clean: the files the release puts beside the tools' code
 # (the runtime for newer phones, the PC client's installer and its update files, all git-ignored) are taken away again
 # at the end. Its steps, each with its log in OUT/logs and one line on the screen:
-#   1. gates: the tag is HEAD's, the chart and CHANGELOG.md name VERSION and have its notes, CI and qa/local passed on it
+#   1. gates: the tag is HEAD's, the chart and CHANGELOG.md name VERSION and have its notes, the README's and the guides'
+#      download lines name it, CI and qa/local passed on it
 #   2. the runtime for newer phones and the player for Windows (arm32/), then the PC client's installer and its update
 #      packages, the delta from the last release's full package
 #   3. the Windows bundle, with the runtime and the installer beside the tools' code as a release has them
@@ -114,6 +115,9 @@ gates() {
   fi
   # One version in the chart and CHANGELOG.md, with notes for it.
   python3 .github/release_notes.py "v$VERSION" > "$OUT/release-notes.md" || problems=1
+  # The README's quick start and the guides download this release's files by their names (the release commit runs
+  # .github/doc_versions.py --write), so that a line copied from them fetches what it says.
+  python3 .github/doc_versions.py || problems=1
   # CI on GitHub: every check of this commit finished and passed (a skipped one counts as passed, as for a deploy).
   if ! gh api "repos/$REPO/commits/$sha/check-runs?per_page=100" --jq '.check_runs[] | "\(.name)=\(.status)/\(.conclusion)"' \
       > "$OUT/check-runs.txt"; then
