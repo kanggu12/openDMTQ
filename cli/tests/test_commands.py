@@ -1036,6 +1036,9 @@ class MessageTest(unittest.TestCase):
             self.assertEqual(sb.output().count("ADMIN_PASSWORD in .env"), 3, sb.output())
             self.assertEqual(sb.output().count("/opendmtq/admin/"), 3, sb.output())
             self.assertNotIn("localhost", sb.output())
+            # The setup's end gives the password itself, beside where it is kept, as a host install's setup does (CLI-93;
+            # main named only where it was kept); up and status name where it is kept.
+            self.assertEqual(len(re.findall(r"Password +x  \(kept as ADMIN_PASSWORD in \.env\)", sb.output())), 1, sb.output())
 
     def test_help_keeps_deploy_out_of_the_newcomers_list(self):
         # deploy is a maintainer's command for a live server: under a heading of its own after the list, and it still

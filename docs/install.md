@@ -120,15 +120,17 @@ git clone --branch v0.11.2 --depth 1 https://github.com/kanggu12/openDMTQ.git &&
 
 The setup runs in the terminal: the address phones use, the game's files (found as [above](#what-you-need)), the server
 and its app, and under WSL the Windows firewall rule for the server's port (Windows asks for an administrator once). It
-checks it all and ends with the server's addresses and a QR code for phones. Files of another name or in another place:
+checks it all and ends with the server's addresses, the owner's ID and password, and a QR code for phones. Files of
+another name or in another place:
 
 ```sh
 ./opendmtq setup --from ~/games/dmtq
 ```
 
 Sign in to the admin pages at the address the setup ends with (`./opendmtq status` shows it again), the server's own
-address with `/opendmtq/admin/`, as `admin` with `ADMIN_PASSWORD` from `.env`; the same ID and password sign in to the
-players' site. Make an account for each player on the admin pages' **Accounts** page.
+address with `/opendmtq/admin/`, as `admin` with the password the setup ends with (kept as `ADMIN_PASSWORD` in `.env`);
+the same ID and password sign in to the players' site. Make an account for each player on the admin pages' **Accounts**
+page.
 
 The clone is of one release. To update, take the newer release's tag (this guide names its own) and start again;
 `.env` and `data` stay:

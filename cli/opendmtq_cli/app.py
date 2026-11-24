@@ -281,8 +281,13 @@ def admin_answers(values):
     return r.returncode == 0
 
 
-def address_lines(host, values):
-    """The block `up` and the setup's end close with: the players' site, the admin pages and the owner's sign-in."""
+def address_lines(host, values, password=False):
+    """The block `up` and the setup's end close with: the players' site, the admin pages and the owner's sign-in.
+    password: the password itself, beside where it is kept (the setup's end, as a host install's first start and the
+    Windows bundle's window show it); else only where it is kept."""
+    if password and values.get("ADMIN_PASSWORD"):
+        return look.address_block(f"http://{host}/", admin_link(values), values.get("ADMIN_USER") or "admin",
+                                  password=values["ADMIN_PASSWORD"], where="kept as ADMIN_PASSWORD in .env")
     return look.address_block(f"http://{host}/", admin_link(values), values.get("ADMIN_USER") or "admin",
                               where="ADMIN_PASSWORD in .env")
 
@@ -1254,7 +1259,8 @@ def cmd_setup(args):
 def setup_end_lines(host, where, https, values):
     """What the setup ends with, before the QR code: the addresses block, what is done and the phone's steps, each block
     one blank line from the next, every line on the common left edge (look.py)."""
-    lines = [""] + address_lines(host, values) + [""]
+    # The owner's sign-in with its password, as a host install's setup gives it: the first time anyone signs in.
+    lines = [""] + address_lines(host, values, password=True) + [""]
     lines += look.para("Done. The site and the app download open to accounts you make: on the admin pages, under "
                        "Accounts, make one for each player.")
     lines += [""] + look.para(f"On the phone ({where}):")
