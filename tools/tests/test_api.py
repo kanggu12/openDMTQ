@@ -50,6 +50,11 @@ def now():
     return int(time.time())
 
 
+# The table of the highest player number handed out, as the game server makes it (server/game/src/account.php,
+# OPENDMTQ_NUMBER_TABLE), for the tests' databases.
+NUMBER_TABLE = "CREATE TABLE IF NOT EXISTS MemberNumber (last INTEGER NOT NULL)"
+
+
 class Server(Install):
     """A server with something of everything, made once (Server.make) and copied for each test: players and plays, the
     songs, two builds, two recordings (one still being made), a backup, a request log, accounts and tokens."""
@@ -1470,6 +1475,30 @@ class JobTest(unittest.TestCase):
             with sqlite3.connect(admin.core.DB) as con:
                 self.assertEqual(sorted(r[0] for r in con.execute("SELECT access FROM SignIn")),
                                  ["account 9, no login yet", "player 7"])
+
+    def test_a_restore_never_takes_the_highest_player_number_back(self):
+        # The server keeps the highest player number it ever handed out (server/game/src/account.php, MemberNumber) and
+        # gives a new phone the one after it: a restore keeps the larger of today's and the backup's, so a number handed
+        # out since the backup (player 12 here) is never handed out again; a backup from before the table gets it, and a
+        # backup with higher numbers of its own (from another PC) keeps them (ADM-229).
+        for backup_last, today, want in ((9, 12, 12), (None, 12, 12), (20, 12, 20)):
+            with Server() as inst:
+                with sqlite3.connect(admin.core.DB) as con:
+                    if backup_last is not None:
+                        con.execute(NUMBER_TABLE)
+                        con.execute("INSERT INTO MemberNumber (last) VALUES (?)", (backup_last,))
+                name = inst.ask("POST", "/backups").get_json()["backup"]["name"]
+                with sqlite3.connect(admin.core.DB) as con:
+                    con.execute(NUMBER_TABLE)
+                    con.execute("DELETE FROM MemberNumber")
+                    con.execute("INSERT INTO MemberNumber (last) VALUES (?)", (today,))
+                    con.execute("INSERT INTO Member (id, nickname, guid, puid, udid) VALUES (12, 'Later', '12', '12', 'phone-d')")
+                r = inst.ask("POST", f"/backups/{name}/restore")
+                self.assertEqual(wait_job(inst, r.get_json()["job"]["id"])["state"], "done")
+                with sqlite3.connect(admin.core.DB) as con:
+                    self.assertEqual(con.execute("SELECT last FROM MemberNumber").fetchall(), [(want,)], (backup_last, today))
+                    # The player who joined since is not in the restored database: their number stays handed out.
+                    self.assertEqual(con.execute("SELECT COUNT(*) FROM Member WHERE id = 12").fetchone()[0], 0)
 
     def test_a_sign_in_noted_while_a_restore_runs_is_kept(self):
         # The game server notes sign-ins all the while: one noted after the restore's first look at the live database and

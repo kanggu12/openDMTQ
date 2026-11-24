@@ -28,6 +28,11 @@ def thirty(sb):
             for i in range(1, 31)]
 
 
+# The table of the highest player number handed out, as the game server makes it (server/game/src/account.php,
+# OPENDMTQ_NUMBER_TABLE), for the tests' databases.
+NUMBER_TABLE = "CREATE TABLE IF NOT EXISTS MemberNumber (last INTEGER NOT NULL)"
+
+
 def put_back_said(why_not=None):
     """The tools container's `songs put-back` when done, as it prints it (tools/opendmtq_tools/songs.py, main()): the songs
     back, and their song list made, or why not."""
@@ -210,6 +215,31 @@ class RealDatabaseTest(unittest.TestCase):
             con.execute(f"ALTER TABLE Member ADD COLUMN {column} TEXT")
         con.executemany("INSERT INTO Member (id, puid, guid) VALUES (?, ?, ?)", [(int(p), p, g) for p, g in pairs])
         con.commit()
+
+    def test_a_restore_never_takes_the_highest_player_number_back(self):
+        # As the admin pages' restore (CLI-96): the larger of today's highest number handed out and the backup's, the
+        # table made for a backup from before it.
+        for backup_last, today, want in ((9, 12, 12), (None, 12, 12), (20, 12, 20)):
+            with Sandbox() as sb:
+                live = self.database(backup.DB)
+                live.execute(NUMBER_TABLE)
+                live.execute("INSERT INTO MemberNumber (last) VALUES (?)", (today,))
+                live.commit()
+                live.close()
+                with tempfile_folder() as tmp:
+                    old = self.database(os.path.join(tmp, "old.db3"))
+                    if backup_last is not None:
+                        old.execute(NUMBER_TABLE)
+                        old.execute("INSERT INTO MemberNumber (last) VALUES (?)", (backup_last,))
+                        old.commit()
+                    old.close()
+                    with open(os.path.join(tmp, "old.db3"), "rb") as f:
+                        content = f.read()
+                name = sb.archive("data/backups/opendmtq-20260101-120000-manual.tar.gz", {"dmtq.db3": content})
+                self.assertEqual(sb.call(app.cmd_restore, name=name, with_key=False), 0, sb.output())
+                con = sqlite3.connect(backup.DB)
+                self.assertEqual(con.execute("SELECT last FROM MemberNumber").fetchall(), [(want,)], (backup_last, today))
+                con.close()
 
     def test_a_restore_keeps_only_the_sign_ins_of_players_the_backup_has(self):
         # As the admin pages' restore: a player of the backup's and an account of its not logged in yet stay; a player made

@@ -303,11 +303,72 @@ def keep_sign_ins(live, restored):
     return len(rows)
 
 
+# The highest player number ever handed out (server/game/src/account.php: MemberNumber, one row), and the other numbers a
+# database shows were handed out, as account.php's odq_numbers_seen reads them: a restore keeps the larger of the live
+# database's and the backup's, as the admin pages' restore does (backups.keep_numbers there).
+NUMBER_TABLE = "CREATE TABLE IF NOT EXISTS MemberNumber (last INTEGER NOT NULL)"
+NUMBERS_SEEN = ("SELECT MAX(last) FROM MemberNumber", "SELECT MAX(id) FROM Member", "SELECT MAX(guid) FROM SignIn",
+                "SELECT MAX(guid) FROM SiteUser")
+
+
+def numbers_handed_out(con):
+    """The highest player number con shows was handed out (NUMBERS_SEEN), 0 for none: a table or a column it does not
+    have counts as nothing."""
+    highest = 0
+    for sql in NUMBERS_SEEN:
+        try:
+            seen = con.execute(sql).fetchone()[0]
+        except sqlite3.OperationalError:
+            continue
+        # A number kept as text counts as the number it is.
+        try:
+            highest = max(highest, int(seen or 0))
+        except (TypeError, ValueError):
+            pass
+    return highest
+
+
+def keep_numbers(live, restored):
+    """Gives the restored database the larger of its own highest player number handed out and the live one's
+    (MemberNumber, the table made when it has none): a number handed out since the backup is never handed out again, to
+    a phone the old player's recordings and site account would then follow. Returns the number kept."""
+    now = 0
+    if os.path.isfile(live):
+        try:
+            con = sqlite3.connect(live)
+            try:
+                now = numbers_handed_out(con)
+            finally:
+                con.close()
+        except sqlite3.DatabaseError:
+            # A live database that cannot be read (damaged): the backup's own numbers.
+            now = 0
+    try:
+        con = sqlite3.connect(restored)
+    except sqlite3.Error:
+        return 0
+    try:
+        with con:
+            highest = max(numbers_handed_out(con), now)
+            con.execute(NUMBER_TABLE)
+            con.execute("DELETE FROM MemberNumber")
+            con.execute("INSERT INTO MemberNumber (last) VALUES (?)", (highest,))
+    except sqlite3.DatabaseError:
+        # No database to put it in (the restore's own checks stand before this): nothing kept.
+        return 0
+    finally:
+        con.close()
+    return highest
+
+
 def keep_all(live, restored):
     """All three, as the restore runs this file: (tokens kept, accounts kept or None when the backup's stay, webhooks
-    kept or None when the backup's stay). The game's sign-ins of now go with them (keep_sign_ins())."""
+    kept or None when the backup's stay). The game's sign-ins of now go with them (keep_sign_ins()), and the highest
+    player number handed out (keep_numbers()), after the sign-ins and the accounts, whose players count among the
+    numbers."""
     kept = keep(live, restored), keep_accounts(live, restored), keep_webhooks(live, restored)
     keep_sign_ins(live, restored)
+    keep_numbers(live, restored)
     return kept
 
 

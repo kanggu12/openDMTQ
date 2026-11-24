@@ -118,6 +118,42 @@ def put_sign_ins(con, rows):
     con.executemany(f"INSERT INTO SignIn ({', '.join(SIGN_IN_COLUMNS)}) VALUES ({', '.join('?' for _ in SIGN_IN_COLUMNS)})", rows)
 
 
+# The highest player number ever handed out (server/game/src/account.php: MemberNumber, one row), and the other numbers
+# a database shows were handed out (its players', and the players its game sign-ins and its site accounts name), as
+# account.php's odq_numbers_seen reads them: a restore keeps the larger of the live database's and the backup's.
+NUMBER_TABLE = "CREATE TABLE IF NOT EXISTS MemberNumber (last INTEGER NOT NULL)"
+NUMBERS_SEEN = ("SELECT MAX(last) FROM MemberNumber", "SELECT MAX(id) FROM Member", "SELECT MAX(guid) FROM SignIn",
+                "SELECT MAX(guid) FROM SiteUser")
+
+
+def numbers_handed_out(con):
+    """The highest player number con shows was handed out (NUMBERS_SEEN), 0 for none: a table or a column it does not
+    have counts as nothing."""
+    highest = 0
+    for sql in NUMBERS_SEEN:
+        try:
+            seen = con.execute(sql).fetchone()[0]
+        except sqlite3.OperationalError:
+            continue
+        # A number kept as text (Member's columns are text in older databases) counts as the number it is.
+        try:
+            highest = max(highest, int(seen or 0))
+        except (TypeError, ValueError):
+            pass
+    return highest
+
+
+def keep_numbers(con, live):
+    """con's highest number handed out (MemberNumber) made the larger of its own and live (the live database's), the
+    table made where it is not: a restore never takes it back, so a number handed out since the backup is never handed
+    out again, to a phone the old player's recordings and site account would then follow. As ./opendmtq restore keeps it
+    (cli/opendmtq_cli/keep_tokens.py, keep_numbers)."""
+    highest = max(numbers_handed_out(con), live)
+    con.execute(NUMBER_TABLE)
+    con.execute("DELETE FROM MemberNumber")
+    con.execute("INSERT INTO MemberNumber (last) VALUES (?)", (highest,))
+
+
 def players_in(con):
     """con's game players as a sign-in names them: (account, player) pairs, Member's puid and guid as text. None of a
     database whose table has no such columns (from long before them)."""
@@ -819,18 +855,22 @@ def restore_backup(name, path):
                     """At the swap's lock, nothing more coming from the server meanwhile: today's game sign-ins of the
                     players the restored database has (sign_ins_of: none of a damaged database set aside), so that every
                     game signed in by then goes on signing as it did and none signs for a player the backup does not
-                    have; and today's accounts as they are by then (a password changed on MY PAGE a moment ago stays)."""
-                    rows, accounts = [], None
+                    have; today's accounts as they are by then (a password changed on MY PAGE a moment ago stays); and
+                    the highest player number handed out by then, never taken back (keep_numbers)."""
+                    rows, accounts, number = [], None, 0
                     if not kept:
                         with contextlib.closing(read_live()) as live:
                             rows = sign_ins(live)
                             if kept_accounts:
                                 accounts = live.execute(f"SELECT {', '.join(auth.ACCOUNT_COLUMNS)} FROM SiteUser").fetchall()
+                            # The highest player number handed out by then (keep_numbers).
+                            number = numbers_handed_out(live)
                     with contextlib.closing(sqlite3.connect(restored)) as last:
                         with last:
                             put_sign_ins(last, sign_ins_of(rows, players_in(last)))
                             if accounts is not None:
                                 auth.put_accounts(last, accounts)
+                            keep_numbers(last, number)
 
                 swap_in(restored, at_lock=last_look)
             with db() as con:
