@@ -2501,6 +2501,41 @@ class RestoreRefusesAndRescuesTest(unittest.TestCase):
                 else:
                     self.assertIn(f"./opendmtq restore {self.NAME} --with-key", page)
 
+    def test_a_backup_and_its_restore_work_beside_the_backups_not_in_tmp(self):
+        # This service's /tmp is a tmpfs in memory with Docker Compose (1.5 GB): a server whose database and added songs
+        # were larger had backups it could make but not restore ("the disk is full", with the disk far from full). The
+        # snapshot and the unpacking are beside the backups now: with a /tmp that takes nothing, a backup and its restore
+        # both work, and nothing of their work stays there (ADM-220; main unpacked in /tmp and could not restore).
+        with Install() as inst, mock.patch.object(admin.songs, "rebuild"):
+            old_game_database(admin.core.DB, [])
+            member_rows(admin.core.DB, [(7, "Sena", "a")])
+            os.makedirs(inst.path("custom/songs/9001"))
+            with open(inst.path("custom/songs/9001/9001.webm"), "wb") as f:
+                f.write(os.urandom(4096))
+            with mock.patch.object(tempfile, "tempdir", inst.path("no-tmp")):
+                name = admin.backups.make_backup("manual")
+                with sqlite3.connect(admin.core.DB) as con:
+                    con.execute("UPDATE Member SET nickname = 'Riku'")
+                shutil.rmtree(inst.path("custom/songs"))
+                said, done = admin.backups.restore_backup(name, inst.path(f"backups/{name}"))
+            self.assertTrue(done, said)
+            with sqlite3.connect(admin.core.DB) as con:
+                self.assertEqual(con.execute("SELECT nickname FROM Member").fetchall(), [("Sena",)])
+            self.assertTrue(os.path.isfile(inst.path("custom/songs/9001/9001.webm")))
+            self.assertEqual([n for n in os.listdir(admin.core.BACKUPS) if not n.endswith(".tar.gz")], [])
+
+    def test_what_a_stopped_backup_or_restore_left_beside_the_backups_goes_at_the_next_start(self):
+        # Its folder with what it unpacked, as old as a .part left by a stopped backup: cleared; one at work now stays.
+        with Install() as inst:
+            old = inst.path("backups/.restoring-old")
+            os.makedirs(os.path.join(old, "custom"))
+            with open(os.path.join(old, "dmtq.db3"), "wb") as f:
+                f.write(b"x")
+            os.utime(old, (time.time() - 7200, time.time() - 7200))
+            os.makedirs(inst.path("backups/.backing-up-now"))
+            admin.backups.clear_partial_backups()
+            self.assertEqual(sorted(os.listdir(admin.core.BACKUPS)), [".backing-up-now"])
+
     def test_two_backups_in_one_second_keep_both(self):
         with Install():
             old_game_database(admin.core.DB, [])

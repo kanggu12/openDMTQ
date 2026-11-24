@@ -5,6 +5,7 @@ import datetime
 import hashlib
 import os
 import re
+import shutil
 import sqlite3
 import tarfile
 import tempfile
@@ -175,6 +176,20 @@ def new_backup_path(reason):
     return path
 
 
+# What a backup and a restore work on, in folders of their own beside the backups (on the disk that holds them, where the
+# archive itself goes or comes from): never in this service's /tmp, a tmpfs in memory with Docker Compose (1.5 GB,
+# compose.yaml) and an emptyDir with a limit in the Helm chart, which a database or the added songs may outgrow. Hidden,
+# and no .tar.gz: never on the list. One a stopped service left is cleared at its next start (clear_partial_backups).
+WORK_PREFIXES = (".backing-up-", ".restoring-")
+
+
+def work_folder(prefix):
+    """A folder of its own for a backup's or a restore's work, beside the backups (WORK_PREFIXES), removed with all in it
+    when the work ends: a TemporaryDirectory there."""
+    os.makedirs(core.BACKUPS, exist_ok=True)
+    return tempfile.TemporaryDirectory(dir=core.BACKUPS, prefix=prefix)
+
+
 def make_backup(reason, protect=None):
     """Database (online snapshot) and signing key in one archive, like `opendmtq backup`. The
     pruning never removes protect (the archive a restore is reading)."""
@@ -183,7 +198,8 @@ def make_backup(reason, protect=None):
     # Under another name until it is whole: a restart or a full disk must not leave half an archive that counts as the
     # newest backup, on the list with a Restore button.
     partial = path + ".part"
-    with tempfile.TemporaryDirectory() as tmp:
+    # The database's snapshot beside the archive it goes into, not in /tmp (WORK_PREFIXES).
+    with work_folder(WORK_PREFIXES[0]) as tmp:
         snap = os.path.join(tmp, "dmtq.db3")
         src, dst = sqlite3.connect(core.DB, timeout=5), sqlite3.connect(snap)
         with dst:
@@ -552,7 +568,13 @@ def restore_backup(name, path):
     """Puts an archive's database and added songs in place, as the page's Restore does. Returns what to say of it, in the
     page's words, [(tone, words)], and whether it was restored: the caller notes the change (a page in its request, the
     API's job when it ends). The caller holds _restoring."""
-    with tempfile.TemporaryDirectory() as tmp:
+    # Unpacked beside the backups, where the archive itself is (WORK_PREFIXES): the database and every added song may be
+    # larger than this service's /tmp, and a restore failed there saying the disk was full.
+    try:
+        work = work_folder(WORK_PREFIXES[1])
+    except OSError as e:
+        return [("bad", t("bak.not_restored", detail=why(e)))], False
+    with work as tmp:
         try:
             with tarfile.open(path) as tar:
                 member = next((m for m in tar.getmembers() if m.name == "dmtq.db3" and m.isfile()), None)
@@ -709,12 +731,19 @@ def auto_backup_once():
 
 
 def clear_partial_backups():
-    """What a stopped service left of an archive it was writing. Only old ones: `opendmtq backup` writes these too."""
+    """What a stopped service left of an archive it was writing, or of a backup's or a restore's work beside the backups
+    (WORK_PREFIXES). Only old ones: `opendmtq backup` writes .part files too, and another of this service's processes may
+    be at work."""
     try:
         for name in os.listdir(core.BACKUPS):
             path = os.path.join(core.BACKUPS, name)
-            if name.endswith(".part") and time.time() - os.path.getmtime(path) > 3600:
+            if time.time() - os.path.getmtime(path) <= 3600:
+                continue
+            if name.endswith(".part"):
                 os.remove(path)
+            elif name.startswith(WORK_PREFIXES) and os.path.isdir(path):
+                # A folder with what it unpacked: all of it.
+                shutil.rmtree(path, ignore_errors=True)
     except OSError:
         pass
 
