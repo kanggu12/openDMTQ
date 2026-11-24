@@ -486,7 +486,7 @@ async function self(contexts) {
   await page.goto(`file://${path.join(__dirname, 'defects.html')}`, { waitUntil: 'load' });
   const seenOnPage = await audit(page);
   const kinds = new Set(seenOnPage.map(f => f.kind));
-  for (const kind of ['clipped', 'sticks-out', 'overlap', 'rows', 'columns', 'past-screen', 'page-wide', 'covered', 'contrast', 'default-control', 'no-style', 'small-target', 'broken-image', 'side-scroll', 'broken-word', 'split-sentence',
+  for (const kind of ['clipped', 'sticks-out', 'overlap', 'rows', 'columns', 'past-screen', 'page-wide', 'covered', 'contrast', 'default-control', 'no-style', 'small-target', 'broken-image', 'side-scroll', 'broken-word', 'broken-figure', 'split-sentence',
     'touching', 'edge-touch', 'tight-padding', 'uneven-gaps', 'off-scale']) {
     check(`the checker sees ${kind}`, kinds.has(kind));
   }

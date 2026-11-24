@@ -163,8 +163,8 @@ password refused and counted toward the sign-in's limit, the limit reached, a ne
 and API tokens, Sign out everywhere else, the server's own account, and each change in the log of changes.
 
 On each view `layout.js` measures what can be measured about a page: text cut off, past its box, on other text or under another
-box; rows and columns out of line; anything past the screen; a box that scrolls sideways; an ordinary word split over two
-lines; a sentence a column or grid box cuts into lines of their own; a placeholder wider than its box; too little contrast; a control still in the browser's own look; a class no stylesheet
+box; rows and columns out of line; anything past the screen; a box that scrolls sideways; an ordinary word or a figure (a
+score with its commas) split over two lines; a sentence a column or grid box cuts into lines of their own; a placeholder wider than its box; too little contrast; a control still in the browser's own look; a class no stylesheet
 mentions; something too small to press; a picture that did not load. Beside it `spacing.js` measures the room between
 things: two boxes that touch or overlap, a box against its box's inner edge, text closer to its box's edge than the box's
 padding, gaps of different sizes in one row or column, and a gap off the page's own spacing. A failed request or a

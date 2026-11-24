@@ -14,6 +14,7 @@
 //   broken-image  a picture that did not load
 //   side-scroll  a box whose content is wider than it: what is past the edge looks cut off until one thinks of swiping
 //   broken-word  an ordinary word split over two lines, because its column is too narrow
+//   broken-figure  a figure (a score with its commas, a number of four digits or more) split over two lines
 //   split-sentence  a sentence a flex or grid box has cut into pieces, each on a line of its own
 // Marks on an element: data-layout-ok says why it is allowed; things that are decoration (aria-hidden) do not count.
 window.layoutAudit = function layoutAudit() {
@@ -299,6 +300,15 @@ window.layoutAudit = function layoutAudit() {
       word.setEnd(node, m.index + m[0].length);
       const tops = new Set([...word.getClientRects()].filter(r => r.width > 0.5).map(r => Math.round(r.top)));
       if (tops.size > 1) { say('broken-word', p.el, m[0]); break; }
+    }
+    // And a figure: a score with its thousands' commas, or four digits or more, standing on its own (not a part of a file's
+    // name, a date or an address, which may break where they must). Its last digits on a line of their own read as
+    // another number (the podium's "2,104,43" over "6").
+    for (const m of p.text.matchAll(/(?<![\w.,:/-])(?:\d{1,3}(?:,\d{3})+|\d{4,})(?![\w.,:/-])/g)) {
+      word.setStart(node, m.index);
+      word.setEnd(node, m.index + m[0].length);
+      const tops = new Set([...word.getClientRects()].filter(r => r.width > 0.5).map(r => Math.round(r.top)));
+      if (tops.size > 1) { say('broken-figure', p.el, m[0]); break; }
     }
   }
 

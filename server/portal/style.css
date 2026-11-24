@@ -1112,7 +1112,11 @@ td.actions { width: 1%; text-align: right; }
 .pod-name:focus-visible { outline: none; }
 .pod-name:focus-visible::after { outline: 2px solid var(--cyan); outline-offset: -3px; }
 .pod .live-mark { z-index: 1; }
-.pod-score { font: 800 26px/1.1 var(--display); letter-spacing: 0.01em; font-variant-numeric: tabular-nums; color: var(--accent); }
+/* The score in one piece, never broken inside the number (overflow-wrap would break it where the card ran out of room): in
+   its place's size, and smaller only where its card's room is short of the widest total, 99,999,999, which is about 4.3
+   times the size across in this face (23 % of the room, cqi: the room is the score's own box, its container). */
+.pod-score { container-type: inline-size; font: 800 26px/1.1 var(--display); letter-spacing: 0.01em; font-variant-numeric: tabular-nums; color: var(--accent); }
+.pod-fig { display: block; white-space: nowrap; font-size: min(1em, 23cqi); }
 .pod-sub { font-size: var(--t-xs); color: var(--ash); }
 .pod.first { order: 2; padding-block: 28px 26px; }
 .pod.first .pod-place { font-size: 84px; }
@@ -1122,7 +1126,9 @@ td.actions { width: 1%; text-align: right; }
 .pod.third { order: 3; }
 /* Two places: first, then second, not the other way round. */
 .pod.second:last-child { order: 3; }
-@media (max-width: 640px) {
+/* Up to 860 px the first place across the top and the other two side by side under it: three in a row there gave the first
+   card's big figure less room than a total of eight digits takes (a seven-digit score broke over two lines at 744 px). */
+@media (max-width: 860px) {
   .podium { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* One width for the numeral (the first place's is bigger), so that the cards' names and scores start on one line. */
   .pod { grid-template-columns: var(--ctl-sm) minmax(0, 1fr); column-gap: 10px; padding-inline: 14px; }

@@ -67,7 +67,8 @@ page_header(t('rank.title'), 'ranking');
         <div class="pod <?= ['first', 'second', 'third'][$i] ?><?= (int)$p['id'] === $me ? ' me' : '' ?>">
           <span class="pod-place place-<?= $i + 1 ?>"><?= $i + 1 ?></span>
           <span class="pod-who"><a class="pod-name" href="player.php?id=<?= (int)$p['id'] ?>"><?= h($p['name']) ?></a><?= $podium_keys ? keys_count_mark((int)$p['keys']) : '' ?><?= live_mark($db, (int)$p['id']) ?></span>
-          <span class="pod-score"><?= $value($p) ?></span>
+          <?php // The figure in a box of its own, which takes a smaller size where the card's room is short of the widest total. ?>
+          <span class="pod-score"><span class="pod-fig"><?= $value($p) ?></span></span>
           <span class="pod-sub"><?= $sorts[$sort] ?></span>
         </div>
       <?php endforeach; ?>
