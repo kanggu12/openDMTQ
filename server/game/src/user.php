@@ -131,8 +131,9 @@ function odq_user_set_nickname(array $p)
 
 /*
  * user.setConnectUuid [guid, code, os]: a transfer code typed on this phone (OPTION, the transfer code's input): the
- * phone's player becomes the code's player. Every row of the phone's guid then points at that player, so the phone's next
- * login, after the restart the game makes at once, plays as them. Taken only from the phone's own game, for its own player
+ * phone's player becomes the code's player. Every row of the phone's guid then points at that player, with the player's
+ * name (the game shows the name of its own account's row, user.getUsersByPuid), so the phone's next login, after the
+ * restart the game makes at once, plays as them under their name. Taken only from the phone's own game, for its own player
  * (signin.php), and only with a code the code's owner was shown: never one made from that account's number (account.php),
  * which anyone could work out.
  */
@@ -147,9 +148,12 @@ function odq_user_use_transfer_code(array $p)
     if ($found === '' || $found === '0' || odq_code_from_number($owner['code'], $owner)) {
         return odq_no_account();
     }
-    $q = @odq_db()->prepare('UPDATE Member SET guid = :found WHERE guid = :g');
+    // The name the player has: their first row's, as the rankings show it (odq_member_by() reads the first row).
+    $name = odq_member_by('guid', $found)['nickname'] ?? $owner['nickname'];
+    $q = @odq_db()->prepare('UPDATE Member SET guid = :found, nickname = :name WHERE guid = :g');
     if ($q) {
         $q->bindValue(':found', $found, SQLITE3_TEXT);
+        $q->bindValue(':name', $name, odq_sqlite_type($name));
         $q->bindValue(':g', $p[0] ?? null, odq_sqlite_type($p[0] ?? null));
         @$q->execute();
     }

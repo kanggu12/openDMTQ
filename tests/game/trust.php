@@ -16,7 +16,7 @@
  *   - a save earns MAX POINT and experience once for the play its sign-in started, and nothing without one;
  *   - the transfer code's two calls, the name and the items equipped are the player's own game's alone; a transfer code is
  *     random, never one made from the player's number (such a code is replaced at a start, and never shown or taken), and
- *     moves a phone onto the player.
+ *     moves a phone onto the player under the player's name.
  *
  * Usage: php tests/game/trust.php <database file> <base address of the server>      (exit status 0 when every check passed)
  */
@@ -332,6 +332,10 @@ $asset = call($base, $now_key, 'game.getUserAsset', [$ivy])['result'] ?? [];
 check("GAME-142 a new phone's own game types the code its owner was shown, and at its next sign-in it is that player, signing as them",
     ($moved['result']['status'] ?? null) === 'SUCCESS' && $now === $ivy && $now_key !== '' && array_key_exists('mpoint', $asset),
     json_encode([$moved, $now, $asset]));
+// The name the game shows on its top bar, which it asks by its own account (the phone's puid, Kim's number): the player's.
+$shown_name = call($base, $now_key, 'user.getUsersByPuid', [[(string)$kim], ['display_name']])['result'] ?? null;
+check("GAME-142 and the moved phone shows the player's name, as the rankings do, not the name its own account had",
+    $shown_name === [['display_name' => 'Ivy2']], json_encode($shown_name));
 // Jon, with a code worked out from Ivy's number as every code once was, signed with his own key: no move.
 $tried = [];
 foreach ([code_of_number($ivy), code_of_number($ivy, 'CODE')] as $guess) {
