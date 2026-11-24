@@ -41,9 +41,8 @@ error.**, with OpenDMTQ's notice **You cannot play on this server** and the same
 
 These are the server's: tell its owner. When the server's address or port changes, the server builds a new app for
 it, and the download page says so for a month: install the new download over the app you have
-([the app installs but cannot connect](#the-app-installs-but-cannot-connect)). A server on port 80 that was updated to
-0.11.0 moved to 8791: its new address is the old one with `:8791`. A game that stops at its start, or shows an empty
-song list, waits for files on the server
+([the app installs but cannot connect](#the-app-installs-but-cannot-connect)). A game that stops at its start, or shows
+an empty song list, waits for files on the server
 ([the game stops at its start](#the-game-stops-at-its-start-or-the-song-list-is-empty)). While the server is under
 maintenance the site says **Under maintenance**, and the game cannot start until it ends.
 
@@ -69,8 +68,8 @@ Windows blocking the installer, black videos and broken sound. A PC reaches the 
 [the server's site does not open](#the-servers-site-does-not-open) applies to it too. The PC client's
 [connection test](windows-player.md#testing-the-connection) (**Online**, **Test connection**, or
 `OpenDMTQ-cmd.exe --test-server`) says which step of the way to the server does not get through: the address, the
-name, the port, the server, the sign-in, the game server or the downloads. A server that moved to port 8791 (servers
-updated to 0.11.0 left port 80) is found there, one press away. **Help**, **Save a report** gives whoever helps the logs
+name, the port, the server, the sign-in, the game server or the downloads. A server that moved to port 8791 or the
+ports after it is found there, one press away. **Help**, **Save a report** gives whoever helps the logs
 and the PC's details in one zip, with the names, the addresses and the sign-ins left out.
 
 ## For server owners
@@ -115,9 +114,8 @@ When the game does not start or shows no songs, this chart leads to the right se
   with `./opendmtq port <port>` (`OpenDMTQ.exe port <port>`, or the admin pages' **Server** page): the app is built
   again for it. A new install takes 8791, or the first free port after it when 8791 is taken; the players' site, the
   admin pages and the API are all on that one port.
-- A server set up on port 80 before 0.11.0 is on 8791 after the update (its start, `status` and the **Server** page
-  say so once): phones open the address with `:8791` and install the app built for it from the download page. Exposed
-  to the internet, the router forwards to the server's new port: the start says which port to forward where.
+- A server set up on port 80 before 0.11.0 is on 8791 after the update: [the server's port](install.md#the-servers-port)
+  says what that changes for phones and for a router.
 - `./opendmtq doctor` fails when the port in the address and `LISTEN_PORT` differ: phones would call one port while
   the server listens on the other. `./opendmtq host` sets both.
 
@@ -140,8 +138,8 @@ When the game does not start or shows no songs, this chart leads to the right se
   start `OpenDMTQ.exe` again), and install the new app on the phones over the old one. A DHCP reservation for the PC
   in the router's settings keeps its address from changing. `./opendmtq doctor` and `./opendmtq setup` notice a
   changed address, and `import` and `restore` say so without changing it.
-- **The server moved to another port** (`port`, or the update of a server on port 80 to 8791): phones install the app
-  built for the new port, over the old one, from the site's download page at the new address.
+- **The server moved to another port** (`port`, or [the update off port 80](install.md#the-servers-port)): phones
+  install the app built for the new port, over the old one, from the site's download page at the new address.
 - `./opendmtq check` (`OpenDMTQ.exe check`) walks the same path the app takes. If it passes and the phone still
   fails, the problem is between the phone and the server (see above).
 

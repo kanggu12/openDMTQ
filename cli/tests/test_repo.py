@@ -338,6 +338,56 @@ class FiguresTest(unittest.TestCase):
                 self.assertNotIn(old, words, os.path.basename(path))
 
 
+class PlayersGuideTest(unittest.TestCase):
+    """DEP-132: each guide is for its reader. The PC client's guide is the players': how the player draws, sounds, lays
+    its pieces out and was measured is the architecture's (main's guide had all of it, 11,372 words); and the move of a
+    server off port 80 with 0.11.0 is told once, in the install guide, which the other guides link to."""
+
+    @staticmethod
+    def read(*parts):
+        with open(os.path.join(ROOT, *parts), encoding="utf-8") as f:
+            return f.read()
+
+    def test_the_players_guide_leaves_the_internals_to_the_architecture(self):
+        guide = " ".join(self.read("docs", "windows-player.md").split())
+        architecture = " ".join(self.read("docs", "architecture.md").split())
+        # The machine it was measured on, the player's threads and passes, its switches for measuring, and the
+        # translator's name: in the architecture, and none of them in the players' guide.
+        for words in ("RTX 4090", "Ryzen 9 9950X", "render thread", "UI thread", "framebuffer of the player's own",
+                      "EXT_disjoint_timer_query", "ARM32_STATS", "PLAYER_OFFSCREEN", "PLAYER_TRACE_KEYS", "Dynarmic",
+                      "v-blank virtualization", "pixel buffer", "stats: glass", "table of methods", "29 to 36 ms"):
+            self.assertIn(words, architecture, words)
+            if words != "29 to 36 ms":
+                self.assertNotIn(words, guide, words)
+        # What players read stays theirs: the settings' table the launcher's tests hold it to, and the project's key.
+        self.assertIn("| `upscaler` | `fsr1`, `nis`, `bilinear` | Upscaler, below 100 % |", guide)
+        self.assertIn("8ead95551a5d5d216dca12de20138465d4cfbcec48ec2b2611c9e49fc47b77d7", guide)
+        self.assertIn("[the picture](architecture.md#the-picture)", guide)
+
+    def test_the_move_off_port_80_is_told_in_the_install_guide(self):
+        # A paragraph or list item that tells of the move (port 80 and 0.11.0 together) links to the install guide's
+        # telling, in every guide but the install guide itself, the chart's own (its values move it), the API's and the
+        # tests' references; the Windows bundle's plain text guide does not tell it (its window does).
+        skip = ("install.md", "kubernetes.md", "api.md", "testing.md", "test-cases.md")
+        found = []
+        for path in [os.path.join(ROOT, "README.md")] + sorted(glob.glob(os.path.join(ROOT, "docs", "*.md"))):
+            if os.path.basename(path) in skip:
+                continue
+            with open(path, encoding="utf-8") as f:
+                for block in re.split(r"\n\s*\n|\n(?=\s*[-*] |\s*\d+\. )", f.read()):
+                    if re.search(r"\bport 80\b", block) and "0.11.0" in block and "install.md#the-servers-port" not in block:
+                        found.append(os.path.relpath(path, ROOT) + ": " + " ".join(block.split())[:80])
+        self.assertEqual(found, [])
+        readme = " ".join(self.read("host", "windows", "README.txt").split())
+        self.assertFalse(re.search(r"port 80\b.*0\.11\.0", readme))
+        # Where it is told, it is told whole: the port it goes to, phones, a PC client, a router, and port 80 by choice.
+        told = " ".join(self.read("docs", "install.md").split("\n## The server's port\n", 1)[1].split("\n## ", 1)[0].split())
+        for words in ("before 0.11.0 on port 80 moves off it", "every phone installs it again",
+                      "a PC client set up for the old port finds the new one", "the router then forwards the new port",
+                      "so does one on port 80 by `port 80`"):
+            self.assertIn(words, told)
+
+
 class OriginalNamesTest(unittest.TestCase):
     """DEP-130: the README and the guides, their figures among them, name none of the game's own: its original hosts,
     its platform and SDK, its app's package and another edition, its data files, its code, its songs (the owner's rule).

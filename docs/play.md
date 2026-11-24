@@ -94,7 +94,7 @@ that score), and beside a total says how many such scores it counts; the ranking
   installs beside the old one instead was signed with a new key: tell the server's owner
   ([restoring](troubleshooting.md#restoring)).
 - **A server that moved:** for a month after the owner moves the server to another address or port, its download page
-  says so, with the old address and the new one. A server set up on port 80 before 0.11.0 moved to 8791 with the update.
+  says so, with the old address and the new one.
   Open the new address, install the app built for it over the old one, and on a PC run the installer from the page
   again; the PC client's connection test also finds a server that moved to 8791
   ([testing the connection](windows-player.md#testing-the-connection)).

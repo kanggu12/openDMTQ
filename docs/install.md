@@ -190,9 +190,10 @@ over the old one (each phone keeps its account; a Windows PC runs the installer 
 program holds is refused, and so is a port below 1024 that the computer keeps from the server's user. Exposed to the
 internet, forward the new port on the router instead of the old one.
 
-A server set up before 0.11.0 on port 80 moves off it at its first start after the update, as `port` moves a server:
-to the port its admin pages had, 8791 unless you set another (or the first free one after it). The app is built again
-for the new address, so every phone installs it again from the site's download page; the start, `status` and the
+A server set up before 0.11.0 on port 80 moves off it at its first start after the update, as `port` moves a server: to
+the port its admin pages had, 8791 unless you set another (or the first free one after it). The app is built again for
+the new address, so every phone installs it again from the site's download page, and a PC client set up for the old port
+finds the new one with its [connection test](windows-player.md#testing-the-connection); the start, `status` and the
 Server page say it once, and on WSL the Windows firewall rule moves with it. Exposed to the internet, the router then
 forwards the new port to it in place of 80, as the start says; a public port the router forwards from another one
 (`PUBLIC_HOST=myhome.example.com:8443` beside `LISTEN_PORT=80`) is the router's and stays, with the app and its address,

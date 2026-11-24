@@ -72,8 +72,7 @@ theirs: [playing on a server](play.md).
 
 **Which port does it use?**
 One, for everything: the game, the players' site, the admin pages and the API, 8791 unless another program has it.
-`port <port>`, or the admin pages' **Server** page, moves it; phones then install the app built for the new port. A
-server set up on port 80 before 0.11.0 moves to 8791 at its first start after the update
+`port <port>`, or the admin pages' **Server** page, moves it; phones then install the app built for the new port
 ([the server's port](install.md#the-servers-port)).
 
 **Can players outside my home play?**
