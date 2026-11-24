@@ -76,8 +76,13 @@ URL = re.compile(r"(?i)\b(?:https?|wss?)://(?:[^\s/?#@\"'<>]*@)?(?P<host>\[[0-9a
 _OCTET = r"(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)"
 IPV4 = re.compile(r"(?<![\w.])%s(?:\.%s){3}(?:[:-]\d{1,5}(?!\d)|(?!\w|\.\w))" % (_OCTET, _OCTET))
 # What may be an IPv6 address (bare, or in brackets with its port after them): taken only when it is one, so that neither
-# a time of day (07:53:11) nor a name with colons in it is (_ipv6).
-IPV6 = re.compile(r"(?i)(?<![\w:.%])(\[)?((?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4})(%[\w.-]+)?(?(1)\](?::\d{1,5})?)(?![\w:])")
+# a time of day (07:53:11) nor a name with colons in it is (_ipv6). Its last part may be an IPv4 address, as in IPv6's
+# form for one (::ffff:192.0.2.7, which Windows' name lookup can give): taken whole with it, never its first part alone
+# (which left the IPv4 address's last three parts in). The IPv4 part first: its first number is hex digits as well; and
+# no part of a longer dotted number (a version of five parts), as for IPV4.
+IPV6 = re.compile(r"(?i)(?<![\w:.%%])(\[)?((?:[0-9a-f]{0,4}:){2,7}"
+                  r"(?:%s(?:\.%s){3}(?!\.?\w)|[0-9a-f]{0,4}(?!\.\d)))"
+                  r"(%%[\w.-]+)?(?(1)\](?::\d{1,5})?)(?![\w:])" % (_OCTET, _OCTET))
 # A host's name with a dot in it, or localhost, and its port (club.example.test:8443); its last part starts with a letter
 # and has two at least (a domain's), so a C file's line (conf.c:5180) is none.
 HOST_PORT = re.compile(r"(?i)(?<![\w.@/-])(?P<host>(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z][a-z0-9-]*[a-z0-9]|"

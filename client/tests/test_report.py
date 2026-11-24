@@ -312,6 +312,28 @@ class EveryForm(Played):
             self.assertIn(line, old)
         self.assertIn("player: live: asks <server>", files["player/player.log"])
 
+    def test_an_ipv4_address_in_ipv6s_form_is_left_out_whole(self):
+        # A name looked up to an IPv4 address in IPv6's form for one (::ffff: and the address), as Windows' lookup can
+        # give it: in the test the launcher saved and in its log's line of it, the whole address goes, none of its parts
+        # left behind (main left "<server>.168.7.20"); a version of five parts stays as it is.
+        from opendmtq_client import connection
+        mapped = "::ffff:192.168.7.20"
+        result = connection.Result("http://lanbox.example.test:8791")
+        result.step("address").done("ok", "ok", 1, url="http://lanbox.example.test:8791", scheme="http",
+                                    host="lanbox.example.test", port=8791)
+        result.step("lookup").done("ok", "ok", 1, host="lanbox.example.test", addresses=mapped)
+        result.ended = True
+        connection.save(result)
+        self.logged("INFO connection-test connection test: [ok  ] Name lookup  lanbox.example.test is at %s.  (3 ms)" % mapped,
+                    "INFO MainThread player: v1.2.3.4.5 and ::ffff:1.2.3.4.5")
+        _path, _left, files = self.make()
+        everything = "\n".join(files.values())
+        for private in ("168.7.20", "192.168.7", "::ffff:192"):
+            self.assertNotIn(private, everything, private)
+        self.assertIn("Name lookup  <server> is at <server>.  (3 ms)", files["launcher/launcher.log"])
+        self.assertIn("<server> is at <server>.", files["system/connection-test.txt"])
+        self.assertIn("player: v1.2.3.4.5 and ::ffff:1.2.3.4.5", files["launcher/launcher.log"])
+
     def test_the_connection_tests_lines_however_they_are_worded(self):
         # Every line of the test that holds an ID, a server's name or a host, as the window logs it and as --test-server
         # says it, with values no settings know: each is left out by the words around it, the words as they are now.
