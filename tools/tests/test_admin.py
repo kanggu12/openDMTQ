@@ -347,7 +347,9 @@ class OwnerIdTest(unittest.TestCase):
                 if said:
                     inst.client.set_cookie("opendmtq_lang", "ko")
                     page = html.unescape(inst.client.get("/opendmtq/admin/").get_data(as_text=True))
-                    self.assertIn(f"소유자 아이디 {user}로는 플레이어 사이트에 로그인할 수 없습니다.", page)
+                    # The ID after a colon: no particle to fit to how it ends.
+                    self.assertIn(f"소유자 아이디로 플레이어 사이트에 로그인할 수 없습니다: {user}. 사이트에서 쓰는 아이디는 "
+                                  "영문(A-Z, a-z), 숫자, 마침표(.), 밑줄(_), 하이픈(-)으로 된 1~40자입니다.", page)
 
     def test_the_rule_is_the_sites(self):
         # The pattern the site's PHP takes the owner's ID by (server/portal/auth.php site_owner()) is the admin pages'.
