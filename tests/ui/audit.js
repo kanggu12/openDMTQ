@@ -957,6 +957,33 @@ const PATTERN_PAGES = [
   ['admin-backups', `${A}/backups`], ['admin-app', `${A}/app`],
 ];
 
+// A link in a sentence is drawn in the sentence's own colour, told by its underline: the section's colour is the screen's
+// main button's. Every page of the patterns' list, at a phone's width and a laptop's: each link that stands inline among
+// loose words of its own line's box (a sentence, not a list's name or a cell's) has the colour of the words around it.
+// Before: the home page's "How to install" was a lime link right under the lime download, and the owner's pages' links
+// were their amber next to the amber main button.
+async function textLinks(contexts) {
+  const misses = [];
+  for (const [width, height] of [[1280, 900], [360, 740]]) {
+    for (const [name, url] of PATTERN_PAGES) {
+      const page = await contexts.signed.newPage();
+      await page.setViewport({ width, height, ...(width < 700 ? { isMobile: true, hasTouch: true } : {}) });
+      await page.setCookie({ name: 'opendmtq_lang', value: 'en', url });
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      const found = await page.evaluate(() => [...document.querySelectorAll('a[href]')].filter(a => {
+        const s = getComputedStyle(a), box = a.parentElement;
+        if (s.display !== 'inline' || !box || a.closest('.btn, .button, nav, .tabs, [aria-hidden="true"]') || !a.getClientRects().length) return false;
+        // Among words of its own: loose text beside it in the same box.
+        return [...box.childNodes].some(n => n.nodeType === Node.TEXT_NODE && n.nodeValue.trim());
+      }).filter(a => getComputedStyle(a).color !== getComputedStyle(a.parentElement).color)
+        .map(a => `"${a.textContent.trim().slice(0, 30)}" ${getComputedStyle(a).color} in ${getComputedStyle(a.parentElement).color}`));
+      for (const f of found) misses.push(`${name} ${width}: ${f}`);
+      await page.close();
+    }
+  }
+  check('a link in a sentence has the colour of its words, the section\'s colour left to the main button', misses.length === 0, misses.slice(0, 8).join(' ; '));
+}
+
 // P1: nothing said only under a mouse pointer. No title anywhere on the pages (a title shows to a mouse alone: a finger and
 // the keyboard never see it); every mark with words of its own (data-tip) is reached by the keyboard; and its words show,
 // whole and on top, when it has the focus (gone with Escape), when a finger presses it (gone with a second press, or a press
@@ -3056,6 +3083,7 @@ async function myPage(contexts) {
   } else if (stage === 'mine') {
     await myPage(contexts);
   } else if (stage === 'patterns') {
+    await textLinks(contexts);
     await hoverOnly(contexts);
     await inPlace(contexts);
     await formsLook(contexts);

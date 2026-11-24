@@ -469,8 +469,11 @@ code { font-family: var(--mono); font-size: var(--t-xs); background: rgba(255, 2
 /* Each piece of the address stays whole; lines break only between them (<wbr>). */
 .app-name .addr span { white-space: nowrap; }
 
-/* Text links: the section's colour, a thin underline on the pointer. Buttons, tabs, tiles and rows are their own thing. */
-:where(.lead, .meta, .note, .warn, .done, .error, .empty, .steps, .notes, .lost) a:not(.btn, .button) { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+/* Text links: in the words' own colour, told by their underline, which thickens under the pointer. The section's colour is
+   the screen's main button's (the home page's lit download had a lime link right under it); buttons, tabs, tiles and rows
+   are their own thing. */
+:where(.lead, .meta, .note, .warn, .done, .error, .empty, .steps, .notes, .lost) a:not(.btn, .button) { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+:where(.lead, .meta, .note, .warn, .done, .error, .empty, .steps, .notes, .lost) a:not(.btn, .button):hover { text-decoration-thickness: 2px; }
 
 /* ------------------------------------------------------------------ controls */
 
@@ -1743,7 +1746,8 @@ table.board.parts :is(th, td):last-child { padding-right: 0; }
 table.board.parts th:nth-child(1) { width: 34%; }
 table.board.parts th:nth-child(2) { width: 38%; }
 table.board.parts th.name, table.board.parts td.name { width: auto; min-width: 0; vertical-align: top; overflow-wrap: break-word; font-weight: 400; }
-table.board.parts td.name a { color: var(--accent); text-decoration: underline; }
+/* A part's name leads to its own page: a text link, in the words' colour with its underline. */
+table.board.parts td.name a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
 table.board.parts td.name a::after { content: none; }
 /* A phone: a row is a block, its part's name first and the rest under it. Three columns would be a few words a line. */
 @media (max-width: 620px) {
