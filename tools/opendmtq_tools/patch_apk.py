@@ -679,6 +679,17 @@ def patch_words(root):
             f"say where MAX Point comes from")
 
 
+def address_said(old):
+    """A literal the patcher rewrites, as its log says it: the original client's addresses by what each is (their text is
+    the table's, client_marks), another server's as the client has it (that server's owner chose it)."""
+    m = RPC_LITERAL.fullmatch(old)
+    if m and m.group(2) in OFFICIAL_RPC_HOSTS:
+        # The live game address first, then its second of the same form.
+        return "the game's address" if m.group(2) == OFFICIAL_RPC_HOSTS[0] else "the game's second address"
+    roles = {client_marks.API_BASE: "the platform's API", client_marks.WEB_BASE: "the platform's web base"}
+    return roles.get(old, old)
+
+
 def patch_metadata(path, host):
     """Rewrite the IL2CPP literals (in place when they fit, appended when longer). Returns the hosts of the other server
     the client was changed for, if it was: the SDK's addresses name them too (redirect_smali)."""
@@ -687,7 +698,7 @@ def patch_metadata(path, host):
     hosts = other_hosts(meta)
     for old, new in address_edits(meta, host).items():
         n = meta.replace_all(old, new)
-        log(f"  metadata  {old}  ->  {new}" + (f"  ({n}x)" if n > 1 else ""))
+        log(f"  metadata  {address_said(old)}  ->  {new}" + (f"  ({n}x)" if n > 1 else ""))
     with open(path, "wb") as f:
         f.write(meta.tobytes())
     return hosts

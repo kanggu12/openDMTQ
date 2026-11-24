@@ -141,6 +141,23 @@ class AddressTest(unittest.TestCase):
             "http://play.example.net:8080/www": f"http://{HOST}/www",
         })
 
+    def test_the_log_says_the_original_addresses_by_their_role(self):
+        # The original client's four addresses are said by what each is, never as the client has them; another server's
+        # as it is (its owner chose it).
+        for literals, said in ((ORIGINAL, ["the game's address", "the game's second address", "the platform's API",
+                                           "the platform's web base"]), (OTHER, ["http://play.example.net/DMQ/rpc"])):
+            with tempfile.TemporaryDirectory() as d, mock.patch.object(patch_apk, "log") as log:
+                path = os.path.join(d, "global-metadata.dat")
+                with open(path, "wb") as f:
+                    f.write(il2cpp.build(COMMON + literals))
+                patch_apk.patch_metadata(path, HOST)
+            lines = "\n".join(c.args[0] for c in log.call_args_list)
+            for words in said:
+                self.assertIn(f"  metadata  {words}  ->  http://{HOST}", lines)
+            if literals is ORIGINAL:
+                for literal in ORIGINAL:
+                    self.assertNotIn(literal, lines)
+
     def test_the_original_keeps_its_four_edits(self):
         meta = il2cpp.Metadata(il2cpp.build(COMMON + ORIGINAL))
         self.assertEqual(patch_apk.address_edits(meta, HOST), patch_apk.metadata_edits(HOST))
