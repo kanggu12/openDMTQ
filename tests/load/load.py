@@ -19,8 +19,9 @@ server's most memory in each. Every save of the players is counted: stored, refu
 HTTP error, or no answer within TIMEOUT_S. The test passes when none of the players' saves fails in any of the first
 rounds, every segment of the broadcasts is taken, every look at the list of who is on is answered, and the heavy work
 ends well; after the kill nothing answered as stored is gone, the database is whole and saves are stored again; on the
-full disk each save is refused with the retry code and nothing of it kept, the server answers, and with room again saves
-are stored. The times are printed for each round.
+full disk each save is refused with the retry code and nothing of it kept, the server answers, a player's phone starting
+the game is answered up to the game's own login, and with room again saves are stored and the phone signs in. The times
+are printed for each round.
 
 Usage: python3 tests/load/load.py SITE_URL                      the rounds
        python3 tests/load/load.py SITE_URL seed COUNT FILE      COUNT players through the game's logins: "guid udid" lines
@@ -486,15 +487,38 @@ def crash_round(players, charts):
     return out
 
 
+def sign_in_end(udid, base):
+    """How a phone's sign-in ended, as the game makes one at every start (the platform login by its device id, then the
+    game's login with the token it gave): "signed in", "platform <status>" (no token: the game's platform SDK waits on its
+    first screen, saying nothing), "login <code>" (the game's login refused: its own popup) or "login http <status>"."""
+    conn = Conn(base)
+    st, raw = conn.post("/api/accounts/v3/global/login_dmq", urllib.parse.urlencode({"udid": udid}).encode(),
+                        {"Content-Type": "application/x-www-form-urlencoded"})
+    try:
+        token = json.loads(raw)["value"]["access_token"] if st == 200 else None
+    except (ValueError, KeyError, TypeError):
+        token = None
+    if not token:
+        return f"platform {st}"
+    st, reply, _ = rpc(conn, "user.loginV2", [token, " ", "", "1.3.5", "ANDROID", "KR"])
+    if st != 200 or reply is None:
+        return f"login http {st}"
+    if reply.get("error"):
+        return "login " + str(reply["error"].get("code"))
+    return "signed in"
+
+
 def full_round():
     """A second server whose database's disk is small (FULL_SITE): a player's saves stored; the disk filled to its last
     byte (FULL_FILL_CMD); the saves then refused with the code after which the client offers to retry, nothing of them
-    kept, the server answering its other requests; room again (FULL_FREE_CMD) and the saves stored; the database whole
-    after (FULL_CHECK_CMD). Returns its figures, printed too."""
+    kept, the server answering its other requests, the player's phone signing in again answered up to the game's own
+    login (which refuses it with its popup, or signs it in); room again (FULL_FREE_CMD), the saves stored and the phone
+    signed in; the database whole after (FULL_CHECK_CMD). Returns its figures, printed too."""
     conn = Conn(FULL_SITE)
     _, reply, _ = rpc(conn, "game.getSongList", [])
     charts = [p["pattern_id"] for s in reply["result"]["songs"] for p in s["song_patterns"]]
-    guid = new_player(f"load-full-{random.randrange(10**9)}", FULL_SITE)
+    udid = f"load-full-{random.randrange(10**9)}"
+    guid = new_player(udid, FULL_SITE)
 
     def saves(n):
         """How n saves of the player ended, each on a chart of its own (none of them earlier on this server)."""
@@ -518,8 +542,12 @@ def full_round():
     out["answers while full"] = st == 200 and r is not None and st2 == 200 and r2 is not None
     # What the full disk kept: the three saves from before, nothing of the ten.
     out["rows while full"] = len((r2 or {}).get("result") or [])
+    # The player's phone starting the game again while the disk is full, three times, as the game signs in at every start.
+    out["sign-ins while full"] = [sign_in_end(udid, FULL_SITE) for _ in range(3)]
     subprocess.run(FULL_FREE_CMD, shell=True, capture_output=True, text=True)
     out["after"] = saves(3)
+    # And once there is room again.
+    out["sign-in after"] = sign_in_end(udid, FULL_SITE)
     out["integrity"] = subprocess.run(FULL_CHECK_CMD, shell=True, capture_output=True, text=True).stdout.strip()
     print("== full disk")
     for k, v in out.items():
@@ -719,6 +747,13 @@ def main():
         verdict(full["full"] == {"refused SVC.05099": 10} and full["rows while full"] == 3,
                 f"full disk: each save refused with the code the client retries on, nothing of it kept ({full['full']})")
         verdict(full["answers while full"], "full disk: the server answers its other requests meanwhile")
+        # The phone of a player there before: its platform login answered each time (a 503 left the game waiting on its
+        # first screen with nothing said), its game login refusing it with a code the game shows its own popup for, or
+        # signing it in; with room again, signed in.
+        ends = full["sign-ins while full"]
+        verdict(all(e.startswith("login SVC.") or e == "signed in" for e in ends) and full["sign-in after"] == "signed in",
+                f"full disk: a player's phone starting the game is answered up to the game's own login ({ends}), and signed in "
+                f"with room again ({full['sign-in after']})")
         verdict(full["integrity"] == "ok", f"full disk: the database is whole after ({full['integrity']})")
     return 1 if bad else 0
 

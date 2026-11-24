@@ -44,7 +44,13 @@ function odq_raw_form(string $body): array
  * account, with a number never handed out before and a random transfer code (account.php), in one transaction so that two
  * phones starting together never share one. The reply's access token carries the account's puid, which the game's own
  * login (user.loginV2) then reads; it is noted with the account in the same transaction (signin.php), and the game's
- * login takes no token the platform login did not hand out.
+ * login takes no token the platform login did not note.
+ *
+ * A database that does not take the note answers: an existing account's login while it is busy (another writer past the
+ * five seconds' wait) with 503, after which the SDK tries again a moment later, and otherwise (its disk full) with the
+ * token, not noted, so that the game goes on to its own login, which refuses it with a popup of the game's own (a 503 left
+ * the game waiting on its first screen with nothing said, for as long as the disk stayed full). A new account is never
+ * answered without its account kept: 503.
  *
  * $old: the /accounts path, whose reply text differs slightly, as it always has.
  */
@@ -60,6 +66,8 @@ function odq_platform_login(string $body, bool $old): void
         $random .= '0123456789abcdef'[random_int(0, 15)];
     }
     $t = time() . '000';
+    // An account found by the phone's device id (its account is there whatever happens to the note).
+    $found = false;
     try {
         if (!@$db->exec('BEGIN IMMEDIATE')) {
             throw new RuntimeException($db->lastErrorMsg());
@@ -69,6 +77,7 @@ function odq_platform_login(string $body, bool $old): void
         $row = $q->execute()->fetchArray(SQLITE3_ASSOC);
         if ($row) {
             $puid = (string)$row['puid'];
+            $found = true;
         } else {
             // A new account: the next number (never a deleted player's), which is its puid and its guid too.
             $id = odq_next_number($db);
@@ -90,11 +99,19 @@ function odq_platform_login(string $body, bool $old): void
             throw new RuntimeException($db->lastErrorMsg());
         }
     } catch (Throwable $e) {
-        // Never a token for an account that was not saved, nor one that was not noted: the SDK tries again a moment later.
+        // Why it failed, read before the rollback (which has its own result): SQLite's busy or locked (5, 6, in the low byte
+        // that an extended code keeps), or anything else.
+        $busy = in_array($db->lastErrorCode() & 0xff, [5, 6], true);
+        // Never a token for an account that was not saved, nor one that was noted only in part.
         @$db->exec('ROLLBACK');
         error_log('opendmtq: platform login: ' . $e->getMessage());
-        odq_send(503, 'application/json', '{"result_code":"503","result_msg":"SERVER_BUSY"}', ['Retry-After: 1']);
-        return;
+        if (!$found || $busy) {
+            // The SDK tries again a moment later.
+            odq_send(503, 'application/json', '{"result_code":"503","result_msg":"SERVER_BUSY"}', ['Retry-After: 1']);
+            return;
+        }
+        // The existing account's token, not noted: the game's own login says the rest (above).
+        $token = "$puid|576|IPHONE|KR|$random|$t";
     }
     if ($old) {
         // The old SDK's reply, on one line, as the official server sent it.

@@ -1685,6 +1685,18 @@ class SameFiguresTest(unittest.TestCase):
                 self.assertEqual(int(shown.group(1)) if shown else 0, api_hours, cap_gb)
                 self.assertEqual("Less than an hour of broadcast still fits" in page, api_hours == 0, cap_gb)
 
+    def test_a_nearly_full_disk_says_that_players_cannot_sign_in_or_save_once_it_is_full(self):
+        # 1 GB left of 10 TB: the Status page's line, and the API's, says what stops once the disk is full: the players'
+        # sign-ins and saves (the game server cannot keep either), and the recordings; in both languages.
+        with Server() as inst, mock.patch.object(shutil, "disk_usage", return_value=self.disk(1024 ** 3)):
+            said = [a["text"] for a in inst.ask("GET", "/status").get_json()["attention"] if a["text"].startswith("Only ")]
+            inst.sign_in()
+            inst.client.set_cookie("opendmtq_lang", "ko")
+            page = inst.client.get("/opendmtq/admin/").get_data(as_text=True)
+        self.assertEqual(said, ["Only 1 GB left on the disk: once it is full, players cannot sign in or save their plays, "
+                                "and recordings stop being kept."])
+        self.assertIn("다 차면 플레이어가 로그인하거나 플레이를 저장할 수 없고, 녹화도 저장되지 않습니다.", page)
+
     def test_each_qualitys_costs_are_the_same_on_the_page_and_in_the_api(self):
         with Server() as inst:
             qualities = inst.ask("GET", "/broadcasts").get_json()["qualities"]
