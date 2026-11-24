@@ -1472,6 +1472,50 @@ class ChildOutputTest(unittest.TestCase):
                 self.assertIn('errors="replace"', call, f"{rel}: {call}")
 
 
+class GuestTestRunnersTest(unittest.TestCase):
+    """The runtime's guest test programs, run by four runners: a phone's (arm32/test.sh), a desktop Linux host's
+    (test_desktop.sh), the Windows layer's under Wine (test_windows.sh) and on Windows itself (test_windows.ps1, CI's
+    arm32-windows-real). Windows itself went without the futex and atomics tests for two weeks, so that the layer's waits,
+    wakes, requeues and the end of a wait it makes by itself were checked under Wine alone; and on the layer the futex
+    test's lostsignal phase skipped itself where that end was gone, and passed."""
+
+    @staticmethod
+    def shell_programs(name):
+        # The programs of a shell runner's loop ("for test in ...; do"), each as its words: a program and its arguments.
+        with open(os.path.join(ROOT, "arm32", name), encoding="utf-8") as f:
+            loop = re.search(r"for test in (.*?); do", f.read(), re.S).group(1)
+        import shlex
+        return [entry.split() for entry in shlex.split(loop.replace("\\\n", " "))]
+
+    @staticmethod
+    def powershell_programs():
+        # The programs of arm32/test_windows.ps1's list ($tests = @(...)).
+        with open(os.path.join(ROOT, "arm32", "test_windows.ps1"), encoding="utf-8") as f:
+            text = f.read()
+        return re.findall(r"'([^']+)'", re.search(r"\$tests = @\((.*?)\)", text, re.S).group(1)), text
+
+    def test_windows_itself_runs_every_program_the_other_runners_run(self):
+        windows, _ = self.powershell_programs()
+        for runner in ("test.sh", "test_desktop.sh", "test_windows.sh"):
+            programs = [words[0] for words in self.shell_programs(runner)]
+            # The same programs as often, in the same order.
+            self.assertEqual(windows, programs, runner)
+
+    def test_on_the_windows_layer_the_futex_test_must_run_its_lostsignal_phase(self):
+        # Both Windows runners give the futex test the word that the layer ends a wait by itself, and want the phase's
+        # ok line: a skip of it fails there.
+        futexes = [words for words in self.shell_programs("test_windows.sh") if words[0] == "futexes"]
+        self.assertEqual(futexes, [["futexes", "--waits-end-alone"]])
+        with open(os.path.join(ROOT, "arm32", "test_windows.sh"), encoding="utf-8") as f:
+            self.assertIn('[ "$1" = futexes ] && ! echo "$out" | grep -q "^ok   lostsignal"', f.read())
+        _, ps1 = self.powershell_programs()
+        self.assertIn("if ($test -eq 'futexes') { $arguments += '--waits-end-alone' }", ps1)
+        self.assertIn("if ($test -eq 'futexes') { $ok = $ok -and ($run.Text -match '(?m)^ok\\s+lostsignal') }", ps1)
+        # On Linux, where the kernel never ends such a wait by itself, the phase cannot run: no runner there says so.
+        for runner in ("test.sh", "test_desktop.sh"):
+            self.assertIn(["futexes"], self.shell_programs(runner), runner)
+
+
 class OverlayFacesTest(unittest.TestCase):
     """The player's overlay draws its words in faces it loads into private font collections. On Windows, Font::GetFamily
     hands back such a collection's own family, and the FontFamily it fills deletes that family when it goes: the next words

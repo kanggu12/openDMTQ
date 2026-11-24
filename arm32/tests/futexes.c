@@ -1,6 +1,6 @@
 // Futex wake-ups are never lost: many threads wait and wake in the patterns the C library, the Java VM and the game's
 // job system use, and a wake that does not reach a waiter that was about to sleep leaves it asleep for good.
-// Eight phases, each with threads that sleep without a timeout (a lost wake hangs them) and a watchdog that
+// Nine phases, each with threads that sleep without a timeout (a lost wake hangs them) and a watchdog that
 // fails the test when no thread made progress for a few seconds, instead of hanging it:
 //   mailbox   pairs of threads handing a counter to each other, the waits plain and with bitsets, the wakes too
 //   barrier   a generation barrier of eight threads, the last one to arrive wakes all the others
@@ -14,6 +14,12 @@
 //             meant for is lost, as a condition variable's is, and the worker's wait has to end on its own (a spurious
 //             wake-up, which the standard allows a condition variable) for the worker to look at its flag again; it runs
 //             only where a wait without a timeout ends by itself (the Windows layer), and says so where it is skipped
+//
+//   futexes [--waits-end-alone] [phase]
+//
+// --waits-end-alone is the runner's word that this host ends a wait without a timeout by itself (the Windows layer, every
+// 100 ms): the lostsignal phase then runs whatever a look at the host would find, so that a layer that lost that end
+// fails it (the watchdog's four seconds) where it would otherwise only be skipped. A phase's name runs that phase alone.
 #include <errno.h>
 #include <limits.h>
 #include <linux/futex.h>
@@ -595,8 +601,23 @@ static void report(const char* name, long long start) {
 }
 
 int main(int argc, char** argv) {
-    const char* only = argc > 1 ? argv[1] : NULL;
     setvbuf(stdout, NULL, _IONBF, 0);
+    // The runner's word that waits end by themselves here (see the top of this file), then a phase's name, both optional.
+    int waits_end_alone = 0;
+    const char* only = NULL;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--waits-end-alone") == 0) {
+            waits_end_alone = 1;
+        } else if (argv[i][0] == '-' || only) {
+            // An option this program does not know, or a second phase: taken for a phase's name, it would run no phase
+            // at all and pass.
+            printf("FAIL: futexes takes --waits-end-alone and one phase's name, not %s\n", argv[i]);
+            printf("SOME CHECKS FAILED\n");
+            return 1;
+        } else {
+            only = argv[i];
+        }
+    }
     struct sigaction sa;
     memset(&sa, 0, sizeof sa);
     sa.sa_handler = sig_noop;  // no SA_RESTART: interrupted waits return EINTR
@@ -694,8 +715,10 @@ skip_wakeop:;
     phase_name = "lostsignal";
     if (only && !strstr("lostsignal", only)) goto skip_lostsignal;
     t0 = now_ns(CLOCK_MONOTONIC);
-    // Only where a wait ends by itself; elsewhere the line says why the phase does not run, and the program goes on.
-    if (!waits_end_by_themselves()) {
+    // Only where a wait ends by itself; elsewhere the line says why the phase does not run, and the program goes on. Where
+    // the runner says waits end by themselves here, the phase runs without the look: one that never ends is then the
+    // watchdog's failure, not a skip (a look that a loaded machine kept waiting past its second would say no too).
+    if (!waits_end_alone && !waits_end_by_themselves()) {
         printf("skip lostsignal: a wait without a timeout ends here only with a wake, as on the Linux kernel, and this "
                "phase needs one that ends by itself\n");
         goto skip_lostsignal;

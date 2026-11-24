@@ -81,15 +81,23 @@ function Write-Result([string]$name, [bool]$ok, $run) {
     $script:failed = $true
 }
 
-# Each guest program prints ALL CHECKS PASSED when every check held. The signal, interrupt and wake tests run several
-# times: thread handshakes are where timing bugs show. 300 s each, as under Wine.
+# Each guest program prints ALL CHECKS PASSED when every check held: the same programs as arm32/test_windows.sh, on the
+# layer under Windows' own kernel. The signal, interrupt and wake tests run several times: thread handshakes are where
+# timing bugs show. 300 s each, as under Wine.
 $tests = @('basic', 'signals', 'signals', 'signals', 'signals', 'signals', 'interrupt', 'interrupt', 'interrupt', 'wakes', 'wakes', 'wakes',
-    'restart', 'restart', 'coherence', 'cxx', 'neon', 'memory', 'calls', 'descriptors', 'zones', 'dl')
+    'futexes', 'atomics', 'restart', 'restart', 'coherence', 'cxx', 'neon', 'memory', 'calls', 'descriptors', 'zones', 'dl')
 foreach ($test in $tests) {
     $arguments = @('--sysroot', $sysroot, (Join-Path $guest $test))
     if ($test -eq 'dl') { $arguments += "$guestDir/libplugin.so" }
+    # The futex test is told that the layer ends a wait without a timeout by itself (every 100 ms), so that its lostsignal
+    # phase, the video decoder of a game that needs that end, runs here.
+    if ($test -eq 'futexes') { $arguments += '--waits-end-alone' }
     $run = Invoke-Program $runner $arguments 300
-    Write-Result $test ($run.Text -match 'ALL CHECKS PASSED') $run
+    $ok = $run.Text -match 'ALL CHECKS PASSED'
+    # The futex test passes here only with that phase run and its ok line said: a skip of it, or a test that took the word
+    # for a phase of its own and ran none, fails.
+    if ($test -eq 'futexes') { $ok = $ok -and ($run.Text -match '(?m)^ok\s+lostsignal') }
+    Write-Result $test $ok $run
 }
 # With fastmem, a store into a PROT_NONE page (a thread stack guard) must still fault: the runtime ends the process
 # there, so the line after the store never prints.

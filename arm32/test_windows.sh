@@ -29,12 +29,17 @@ b=$w/build-windows-x86_64
 run="wine $b/arm32run.exe"
 failed=0
 # Each program prints ALL CHECKS PASSED when every check held. The signal, interrupt and wake tests run several times:
-# thread handshakes are where timing bugs show.
-for test in basic signals signals signals signals signals interrupt interrupt interrupt wakes wakes wakes futexes atomics restart restart \
-    coherence cxx neon memory calls descriptors zones "dl $w/guest/libplugin.so"; do
+# thread handshakes are where timing bugs show. The futex test is told that this layer ends a wait without a timeout by
+# itself (every 100 ms), so that its lostsignal phase, the video decoder of a game that needs that end, runs here.
+for test in basic signals signals signals signals signals interrupt interrupt interrupt wakes wakes wakes "futexes --waits-end-alone" atomics \
+    restart restart coherence cxx neon memory calls descriptors zones "dl $w/guest/libplugin.so"; do
   set -- $test
   out=$(timeout 300 $run --sysroot $w/sysroot $w/guest/$1 ${2:-} 2>&1 || true)
-  if echo "$out" | grep -q "ALL CHECKS PASSED"; then echo "PASS $1"
+  # The futex test passes here only with that phase run and its ok line said: a skip of it, or a test that took the word
+  # for a phase of its own and ran none, fails.
+  ran=yes
+  if [ "$1" = futexes ] && ! echo "$out" | grep -q "^ok   lostsignal"; then ran=no; fi
+  if echo "$out" | grep -q "ALL CHECKS PASSED" && [ $ran = yes ]; then echo "PASS $1"
   else echo "FAIL $1"; echo "$out" | grep -v "DT_FLAGS_1" | tail -n 15 | sed "s/^/    /"; failed=1
   fi
 done
