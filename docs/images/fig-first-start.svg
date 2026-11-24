@@ -15,7 +15,7 @@
 <text x="450" y="109" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">the RPC address, the patch folder and its version</text>
 <path d="M225,152 L667,152" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
 <path d="M674,152 L665.0,156.5 L665.0,147.5 Z" fill="#7b8794" data-tip="674,152"/>
-<text x="450" y="145" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">patch_new.csv.lz4, the patch manifest</text>
+<text x="450" y="145" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">the patch manifest</text>
 <path d="M675,188 L233,188" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-dasharray="5 4"/>
 <path d="M226,188 L235.0,183.5 L235.0,192.5 Z" fill="#7b8794" data-tip="226,188"/>
 <text x="450" y="181" font-size="12" fill="#aeb8c3" text-anchor="middle" data-box="231,669">the client's data files, with sizes and checksums</text>

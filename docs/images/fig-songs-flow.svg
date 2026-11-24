@@ -40,7 +40,7 @@
 <text x="54" y="424.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="54,446">what game.getSongList offers</text>
 <path d="M480,370 H888 L900,382 V450 H480 Z" fill="#1a1f25" stroke="#3a434d" stroke-width="1" stroke-linejoin="round"/>
 <text x="494" y="405.25" font-size="15" font-weight="600" fill="#eef2f6" text-anchor="start" data-box="494,886">data/custom/web</text>
-<text x="494" y="424.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="494,886">the client's tables, tiles, patch_new.csv.lz4</text>
+<text x="494" y="424.25" font-size="12.5" fill="#aeb8c3" text-anchor="start" data-box="494,886">the client's tables, tiles and patch manifest</text>
 <path d="M250,320.5 L250,362" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>
 <path d="M250,369 L245.5,360.0 L254.5,360.0 Z" fill="#7b8794" data-tip="250,369"/>
 <path d="M690,320.5 L690,362" fill="none" stroke="#7b8794" stroke-width="1.6" stroke-linejoin="round"/>

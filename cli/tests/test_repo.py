@@ -306,6 +306,77 @@ class FiguresTest(unittest.TestCase):
                 self.assertNotIn(old, words, os.path.basename(path))
 
 
+class OriginalNamesTest(unittest.TestCase):
+    """DEP-130: the README and the guides, their figures among them, name none of the game's own: its original hosts,
+    its platform and SDK, its app's package and another edition, its data files, its code, its songs (the owner's rule).
+    They say what each is for instead. The words are kept here as digests only, so that this file names none of them."""
+
+    # The first 16 hex digits of the SHA-256 of each word in lower case: the original hosts' labels and the platform's,
+    # the SDK's name, the original app's package, another edition of the game, classes, methods and fields of the
+    # game's and the SDK's code, the client's table files and a column of one, and the patch manifest's name.
+    REFUSED = {
+        "d6346b9af21aa4ed", "2afe30a2bd45057c", "80db63946107faba", "368d8e31a31df004", "2ae3f64dcdf74642",
+        "699b0abdb612e9e7", "3949fb706769665e", "21e87c9ee4d3d311", "10190bd54cc85dab", "a72c2dc8615e4f9c",
+        "3f0a5df004ed8c37", "e35a09609cd77109", "0f46de540331dd14", "30cd4a85fc09f695", "80c8afd70c8ca8d9",
+        "66499da637f97267", "ca4ad6efe36dc03c", "190f7a024f816eba", "33e2bdae3386546f", "0769a2191e4774ff",
+        "dafda178f5d5db6a", "cf6b2f2c19b0716c", "03dc667a2453fa27", "fe60034562453c6d", "d24c7811fc74d2c0",
+    }
+    # A word as the digests were made of it: letters and digits, alone or joined by underscores as a file's or a
+    # table's name joins them (each part is looked at too).
+    WORD = re.compile(r"[a-z0-9]+(?:_[a-z0-9]+)*")
+    # A song by its id in the game's own names for its tiles: a bundle (d3_e and the id) or a sprite (e, the id, _).
+    SONG_ID = re.compile(r"\bd3_e\d|\be\d+_[a-z]")
+
+    @staticmethod
+    def pages():
+        """The README, every guide and every figure of the guides: what the project shows a person."""
+        found = [os.path.join(ROOT, "README.md")]
+        found += sorted(glob.glob(os.path.join(ROOT, "docs", "*.md")))
+        found += sorted(glob.glob(os.path.join(ROOT, "docs", "images", "*.svg")))
+        return found
+
+    @classmethod
+    def refused(cls, text):
+        """The numbers of the lines of text that name one of the refused words, or a song by its id."""
+        import hashlib
+        lines = []
+        for number, line in enumerate(text.lower().splitlines(), 1):
+            words = set()
+            for found in cls.WORD.findall(line):
+                # The whole word and each of its parts: a table's file and a name's label alike.
+                words.add(found)
+                words.update(found.split("_"))
+            if any(hashlib.sha256(w.encode()).hexdigest()[:16] in cls.REFUSED for w in words) or cls.SONG_ID.search(line):
+                lines.append(number)
+        return lines
+
+    def test_the_guides_name_none_of_the_games_own(self):
+        pages = self.pages()
+        self.assertGreater(len(pages), 40)
+        found = []
+        for path in pages:
+            with open(path, encoding="utf-8") as f:
+                lines = self.refused(f.read())
+            if lines:
+                # The page and its lines, never the word: this file says none of them.
+                found.append(f"{os.path.relpath(path, ROOT)}: lines {lines}")
+        self.assertEqual(found, [], "these name the game's own (a host, the platform, the app's package, a data file, "
+                                    "its code or a song's id): say what it is for instead")
+
+    def test_the_check_finds_what_it_is_for(self):
+        # Made of parts, so that this file holds none of the words whole: an original host's address, a class and a
+        # method of the game's code, a table file of the client data, a tile bundle and a sprite by a song's id. Each is
+        # found; the same lines with the words they now use, and the messenger whose name begins as another edition's
+        # word, are not.
+        made = ["https://" + "dmq" + "glb.mb." + "pm" + "ang.com/DMQ/rpc", "Play" + "SongSlotView." + "Apply" + "DiscInfo",
+                "the " + "song_" + "song table", "dlc/" + "d3" + "_e12.unity3d", "e12" + "_somesong",
+                "Kak" + "ao edition"]
+        self.assertEqual(self.refused("\n".join(made)), [1, 2, 3, 4, 5, 6])
+        kept = ["https://<the game's host>/DMQ/rpc", "where the list fills in a song's slot", "the tables of songs",
+                "a bundle numbered by its song id", "e<song id>", "Kak" + "aoTalk and LINE", "user.loginV2 and SVC.05008"]
+        self.assertEqual(self.refused("\n".join(kept)), [])
+
+
 class DesignTest(unittest.TestCase):
     """What the markup asks of the stylesheets, including pages no test reaches with a browser (an error page, a rare state)."""
 

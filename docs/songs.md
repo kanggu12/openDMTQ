@@ -102,36 +102,35 @@ so old scores and phones' cached files never attach to a different song. OpenDMT
 
 - the server's song list (`songList.json`), which the game server reads on every request;
 - the overlay the server prefers over the imported content: the song and chart files, the jacket, and the client's
-  patch tables for every language (`song_song`, `song_songPattern`, `song_desc`, and the song's item in
-  `product_item`, its product in `product_product` and that product in the music shop categories of
-  `category_categoryproduct`), the song's tile image (`dlc/d3_e<song id>.unity3d`, about 30 KB), and the patch
-  manifest (`patch_new.csv.lz4`) with their new sizes and checksums. Phones download the changed tables and tile
+  patch tables for every language (the song's rows in the tables of songs, charts and descriptions, and its item, the
+  item's product and that product's place in the music shop's categories), the song's tile image (a bundle of its own,
+  about 30 KB), and the patch manifest with their new sizes and checksums. Phones download the changed tables and tile
   images at their next start (about 700 KB), and the song's files when a player first picks it.
 
 The product matters: the game looks up the product of every song it lists, through the music shop categories, and a
-song without one makes its song list fail (a `NullReferenceException` in `PlaySongSlotView.ApplyDiscInfo`) and the
+song without one makes its song list fail (a `NullReferenceException` where the list fills in a song's slot) and the
 game close at the lobby. Added songs get the form of the game's free songs: product id 2000000 + song id, one game
 point, in categories 3 and 103.
 
 ### The tile in the song list
 
-The song list, the shop and the rankings draw a song from an image bundle; `viewImg/eye` is for the
-song screen only. The client resolves the name in `product_item.img_url_1` without any list of what exists: the text
-before the first `_` picks the bundle, `e33_paperplanes` is `dlc/d3_e33.unity3d` in the phone's patch folder, opened
-with `file://`, and the name then picks a sprite in the bundle's atlas. So an added song gets a bundle of its own,
-`dlc/d3_e<song id>.unity3d`, with one sprite, `e<song id>_<name>` (`tools/opendmtq_tools/jacket_atlas.py`). Song ids
-start above the game's atlas numbers (0 to 33) and are never reused.
+The song list, the shop and the rankings draw a song from an image bundle; `viewImg/eye` is for the song screen only.
+The client resolves the image name in the song's item without any list of what exists: the text before the first `_`
+names a bundle in the phone's patch folder by its number, opened with `file://`, and the whole name then picks a sprite
+in the bundle's atlas. So an added song gets a bundle of its own, numbered by its song id as the game numbers its
+bundles, with one sprite named after the song (`tools/opendmtq_tools/jacket_atlas.py`). Song ids start above the numbers
+of the game's own bundles and are never reused.
 
-The bundle is made from one of the imported songs' bundles, `d3_e33`, by the first rebuild after the song is added, and
-kept beside the song's files (`data/custom/songs/<song id>/tile-<key>.unity3d`, in backups with them): later rebuilds
-take it from there, and make it again only when the jacket, the template, the song's name or OpenDMTQ's way of making it
-changed. Its shader, material and type information stay; the sprite list and the texture are replaced. The tile is the
-centre of the jacket at 256x149, the size of every tile of the game (those were framed by hand, so a jacket that needs
-other framing has to be cropped before upload). The texture is uncompressed RGBA32, because the tools have no encoder
-for the game's ETC2, and is 256x256: 256 KB of memory while shown, the same as one of the game's atlases of six tiles.
-The imported bundles are not changed. Without the imported songs there is no bundle to start from: the song then keeps
-the name `e0_<name>` and plays as before with an empty tile, and `rebuild()` reports it in `tile_failures` (the admin
-Songs page shows it).
+The bundle is made from one of the imported songs' bundles by the first rebuild after the song is added, and kept beside
+the song's files (`data/custom/songs/<song id>/tile-<key>.unity3d`, in backups with them): later rebuilds take it from
+there, and make it again only when the jacket, the template, the song's name or OpenDMTQ's way of making it changed. Its
+shader, material and type information stay; the sprite list and the texture are replaced. The tile is the centre of the
+jacket at 256x149, the size of every tile of the game (those were framed by hand, so a jacket that needs other framing
+has to be cropped before upload). The texture is uncompressed RGBA32, because the tools have no encoder for the game's
+ETC2, and is 256x256: 256 KB of memory while shown, the same as one of the game's atlases of six tiles. The imported
+bundles are not changed. Without the imported songs there is no bundle to start from: the song's image name then points
+at the game's first bundle, which has no sprite of it, the song plays as before with an empty tile, and `rebuild()`
+reports it in `tile_failures` (the admin Songs page shows it).
 
 The imported rows stay byte-identical; only rows are appended. Removing an added song takes it out of the same files.
 

@@ -54,15 +54,14 @@ How each part runs, with Docker Compose and without containers:
 
 ## One address for four hosts
 
-The game was written for four hosts. The patched app sends all of them to one address, where their paths do not
-collide:
+The game was written for four hosts, each with a role of its own. The patched app sends all of them to one address,
+where their paths do not collide:
 
-| Original host | Paths | Purpose |
-|---|---|---|
-| `dmqglb.mb.pmang.com` | `/DMQ/rpc`, `/DMQ/Songs`, `/DMQ/Patterns`, `/patch`, `/viewImg`, `/static`, `/score` | The game's requests and files |
-| `www.neonapi.com` | `/api/...` | The platform's login and reports |
-| `pmangplus.com` | `/accounts`, `/apps`, `/members`, `/product` | The platform SDK |
-| `static.pmangplus.com` | `/inspection` | The maintenance notice |
+- **The game's requests and files:** `/DMQ/rpc`, `/DMQ/Songs`, `/DMQ/Patterns`, `/patch`, `/viewImg`, `/static`,
+  `/score`.
+- **The platform's login and reports:** `/api/...`.
+- **The platform SDK:** `/accounts`, `/apps`, `/members`, `/product`.
+- **The maintenance notice:** `/inspection`.
 
 OpenDMTQ adds `/` (sends a visitor to the site), `/opendmtq/` (the site and `health.php`), `/thumbs` (small jackets for
 the site), `/apk` (the newest app), `/windows` (the PC client's installer, set up for this server; both go on from where
@@ -278,8 +277,7 @@ Before every start `songs.py` rebuilds `data/custom` from the content and the ad
 - `catalog.json`, facts of the client's tables some replies need (charts that cost MAX POINT, the items everyone owns,
   the unlock product);
 - the overlay `web/`: the client's tables with the rows of the songs the server has, the song list's tiles of added
-  songs, and the patch manifest (`patch_new.csv.lz4`) with their sizes and checksums. Phones download what changed at
-  their next start.
+  songs, and the patch manifest with their sizes and checksums. Phones download what changed at their next start.
 
 With the client data and no songs, the tables lose every song's row and the game starts with an empty song list. The
 chart table keeps its rows: the client refuses an empty one. Without the client data the game cannot start at all (it
@@ -298,22 +296,21 @@ fetches the images of its screens from the server), so the server reports itself
   is pointed at this server (`address_edits`, `redirect_smali`), and an SDK edit it already has counts as made. An app
   this patcher built has its hook class and is refused, as is anything without the game's RPC.
 - **IL2CPP metadata** (`assets/bin/Data/Managed/Metadata/global-metadata.dat`, version 23). Four string literals are
-  rewritten: the game RPC URL (live and `-dq`), the platform API base and the platform web base. Literal data has no
-  terminators; a table of (length, offset) entries delimits it. A replacement that fits is written over the old bytes
-  and its length shrunk. A longer one is appended to the literal data, and every later section's header offset is
-  shifted by the padded growth. Tests cover both, and that neighbouring literals and later sections stay
-  byte-identical.
-- **pmangplus SDK** (smali): the SDK's API hosts, its log endpoints and customer-centre links, and the scheme
+  rewritten: the game RPC URL (the live one and a second of the same form), the platform API base and the platform web
+  base. Literal data has no terminators; a table of (length, offset) entries delimits it. A replacement that fits is
+  written over the old bytes and its length shrunk. A longer one is appended to the literal data, and every later
+  section's header offset is shifted by the padded growth. Tests cover both, and that neighbouring literals and later
+  sections stay byte-identical.
+- **The platform SDK** (smali): the SDK's API hosts, its log endpoints and customer-centre links, and the scheme
   selection, which is forced to HTTP. The game keeps to plain HTTP although the server's port also answers HTTPS: that
   HTTPS is for browsers, with a certificate from the server's own authority, which the app would not trust. The
   manifest and the network security config allow cleartext HTTP (`patch_target`: the target is raised from Android 8.1
   to 9, so that Android 14 and later no longer show a notice at its start, and it asks for the Apache HTTP classes its
-  SDK uses). Login goes straight to the guest login instead of trying Google Play Games first (`PPImpl`): that sign-in
-  cannot succeed for a re-signed app.
+  SDK uses). Login goes straight to the guest login instead of trying Google Play Games first, in the SDK's own sign-in:
+  that sign-in cannot succeed for a re-signed app.
 - **SDK screens with no use here** (smali): after OPTION > Google Play log out, the SDK no longer opens Google's Play
-  Games screens (`PPImpl$19`). It no longer asks Google Play for the local prices of the paid items at every start
-  (`PPImpl`, `getPriceLocalization`). The clipboard is left alone (`ExternalSDK`, `GetClipboard` and `SetClipboard`):
-  at every sign-in the game read it for a token the old Kakao edition left there, then emptied it.
+  Games screens. It no longer asks Google Play for the local prices of the paid items at every start. The clipboard is
+  left alone: at every sign-in the game read it for a token an older edition of the game left there, then emptied it.
 - **Game code** (`lib/armeabi-v7a/libil2cpp.so`, `IL2CPP_EDITS`, with the bytes of clients 1.3.5 and 1.3.4): the main
   menu goes past the event notice popup. The question before the first start's data download answers itself. The shop
   opens on its MAX tab, as its Q tab is gone. A menu left alone keeps its frame rate instead of stepping down to 18 fps.
@@ -338,8 +335,8 @@ fetches the images of its screens from the server), so the server reports itself
   later) keep running the game natively. See [arm32/README.md](../arm32/README.md).
 - **The shim** (`arm32/shim`): phones that run the game's own 32-bit libraries get `lib/armeabi-v7a/libopendmtq.so`
   and a small Java class, `com.opendmtq.Hook`, for the live view and the frame rate.
-- **The app's package** (`axml.py`): `com.neowizinternet.game.technikaq_g_a.s<first ten hex digits of the signing
-  key's hash>`, so that apps of different servers and the original game can sit side by side on a device. It follows
+- **The app's package** (`axml.py`): the game's own package name with `.s<first ten hex digits of the signing key's
+  hash>` after it, so that apps of different servers and the original game can sit side by side on a device. It follows
   the signing key: a change of address keeps it, and a key restored from a backup brings it back.
 - **The app's name** (`axml.py`): `TECHNIKA Q (<server name>)`. The name is the whole address, port included, unless
   `SERVER_NAME` (`./opendmtq name`, the admin pages' Server page) says otherwise.
