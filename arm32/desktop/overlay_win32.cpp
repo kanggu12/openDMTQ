@@ -298,10 +298,13 @@ void note(const char* line) {
 
 // ---- words (the painter's: GDI+ is used on its thread alone, apart from the cursor's own pictures)
 
-// The words' format: set tight (no room of GDI+'s either side), on one line, its spaces measured.
+// The words' format: set tight (no room of GDI+'s either side), on one line, its spaces measured. One for each thread
+// that sets words, as the picture measure() measures on: a GDI+ object is not to be used from two threads at once
+// (Windows' GDI+ refuses or worse where Wine's lets it pass). Made on the thread's first use and kept for its life,
+// never freed: a thread's end may come after GDI+ has shut down.
 const StringFormat& tight() {
-    static const std::unique_ptr<StringFormat> f = [] {
-        std::unique_ptr<StringFormat> s(StringFormat::GenericTypographic()->Clone());
+    thread_local const StringFormat* const f = [] {
+        StringFormat* s = StringFormat::GenericTypographic()->Clone();
         s->SetFormatFlags(s->GetFormatFlags() | StringFormatFlagsNoWrap | StringFormatFlagsMeasureTrailingSpaces);
         return s;
     }();
@@ -310,9 +313,9 @@ const StringFormat& tight() {
 
 // A text's box as `font` sets it: its advance and its line's height.
 RectF measure(const std::wstring& text, const Font& f) {
-    // A one-pixel picture to measure on.
-    static Bitmap probe(1, 1, PixelFormat32bppPARGB);
-    Graphics g(&probe);
+    // A one-pixel picture to measure on, one for each thread (as tight()'s format, kept for the thread's life).
+    thread_local Bitmap* const probe = new Bitmap(1, 1, PixelFormat32bppPARGB);
+    Graphics g(probe);
     smooth(g);
     RectF box;
     g.MeasureString(text.c_str(), -1, &f, PointF(0, 0), &tight(), &box);
@@ -638,7 +641,7 @@ CounterFaces counter_faces() {
 }
 
 // The counter's glass at this scale: the same whatever its numbers (three digits' room), so that its place never moves
-// with them.
+// with them. Measured with GDI+ (the painter's); the UI thread lays it out by its faces' widths instead (counter_file_faces).
 struct FpsMetrics {
     float w, h;
 };
@@ -2752,7 +2755,10 @@ bool counter_under_panel() {
     POINT at{};
     {
         const CounterScale own;
-        m = fps_metrics();
+        // Its size from its faces' own widths (counter_look.h's counter_file_faces): this is the UI thread, which makes no
+        // GDI+ object for the counter while the painter sets the overlay's words with its own.
+        const CounterLayout l = counter_layout(counter_file_faces(scale()), scale());
+        m = FpsMetrics{l.w, l.h};
         at = fps_place(g_fps_corner, static_cast<int>(m.w), static_cast<int>(m.h));
     }
     const SoundScale cap;

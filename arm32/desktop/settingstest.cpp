@@ -490,19 +490,9 @@ void bar_checks() {
 
 // The frame counter's scale and place (overlay_scale.h), against the game's own buttons as measured on its frames in
 // each shape: the game stretches its layout across by its width over 1280 and down by its height over 720.
-// The counter's faces as the overlay measures them at scale `k` (1 at 720 lines), read once from their files: DMTQ Wide's
-// widest digit (8) 802 of its 1000 units at 18 px, Pretendard SemiBold's (4) 1322 of its 2048 at 11 px, its full stop
-// 558, and its wider unit, FPS, 3686 (ms 2844).
-player::overlay::CounterFaces counter_faces_at(float k) {
-    player::overlay::CounterFaces f;
-    f.figure_cell = 802.0f / 1000.0f * player::overlay::kCounterFigure * k;
-    // The small face at the size it is drawn at: 11 at 720 lines times the scale, never under its least.
-    const float small = player::overlay::counter_small_px(k);
-    f.small_cell = 1322.0f / 2048.0f * small;
-    f.small_point = 558.0f / 2048.0f * small;
-    f.unit_w = 3686.0f / 2048.0f * small;
-    return f;
-}
+// The counter's faces as the overlay measures them at scale `k` (1 at 720 lines): their files' widths
+// (counter_look.h's counter_file_faces), which the UI thread lays the counter out by.
+player::overlay::CounterFaces counter_faces_at(float k) { return player::overlay::counter_file_faces(k); }
 
 // The counter's glass at scale `k`, as fps_metrics lays it out: whole pixels.
 struct Glass {

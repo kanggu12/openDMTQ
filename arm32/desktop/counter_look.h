@@ -59,6 +59,22 @@ struct CounterFaces {
     float figure_cell = 0, small_cell = 0, small_point = 0, unit_w = 0;
 };
 
+// The faces' widths at scale `k` from their files (the figure at kCounterFigure * k, the small words at
+// counter_small_px(k)): DMTQ Wide's widest digit (8) 802 of its 1000 units, Pretendard SemiBold's (4) 1322 of its 2048,
+// its full stop 558, and its wider unit, FPS, 3686 (ms 2844); what Windows' GDI+ measures, to a hair. The UI thread lays
+// the counter out by these, with no GDI+ object of its own (GDI+'s objects are not to be used from two threads at once,
+// and the painter sets the overlay's words on its own), and the checks hold the layout to them.
+inline CounterFaces counter_file_faces(float k) {
+    CounterFaces f;
+    f.figure_cell = 802.0f / 1000.0f * kCounterFigure * k;
+    // The small face at the size it is drawn at: 11 at 720 lines times the scale, never under its least.
+    const float small = counter_small_px(k);
+    f.small_cell = 1322.0f / 2048.0f * small;
+    f.small_point = 558.0f / 2048.0f * small;
+    f.unit_w = 3686.0f / 2048.0f * small;
+    return f;
+}
+
 // Where everything of the counter stands in its glass, in pixels from the glass's top left at scale `k`: the glass's
 // size (whole pixels), the right edge of the numbers' column and the left edge of the units', and the two rows'
 // baselines. The numbers' column holds three of the figure's digits: the frames a second are 999 at most (frame_rate's

@@ -1243,6 +1243,36 @@ class OverlayFacesTest(unittest.TestCase):
         self.assertEqual(found, [], "Font::GetFamily on a private collection's font frees its family on Windows")
 
 
+class OverlayThreadsTest(unittest.TestCase):
+    """A GDI+ object is not to be used from two threads at once: Windows' GDI+ refuses or worse where Wine's lets it pass.
+    The overlay sets its words on the painter's thread; its UI thread asks where the frame counter stands (whether the
+    sound panel covers it) twice a second, and before 0.11.2's release it measured the counter's words for that with GDI+,
+    on the one picture and format the painter measured with. Only a real Windows shows what that does: it is checked
+    here."""
+
+    def setUp(self):
+        with open(os.path.join(ROOT, "arm32", "desktop", "overlay_win32.cpp"), encoding="utf-8") as f:
+            self.code = f.read()
+
+    def body(self, head):
+        # A function's body, from its head to the line that closes it, without its comments.
+        start = self.code.index(head)
+        end = self.code.index("\n}\n", start)
+        return "\n".join(line.split("//", 1)[0] for line in self.code[start:end].splitlines())
+
+    def test_the_ui_thread_lays_the_counter_out_without_gdiplus(self):
+        body = self.body("bool counter_under_panel() {")
+        for call in ("fps_metrics(", "counter_faces(", "measure(", "font(", "wide_font(", "counter_small("):
+            self.assertNotIn(call, body)
+        self.assertIn("counter_file_faces(", body)
+
+    def test_measuring_keeps_its_gdiplus_objects_per_thread(self):
+        for head in ("const StringFormat& tight() {", "RectF measure(const std::wstring& text, const Font& f) {"):
+            body = self.body(head)
+            self.assertIn("thread_local", body, head)
+            self.assertNotRegex(body, r"\bstatic\b", head)
+
+
 class ImporterTest(unittest.TestCase):
     """The import opens the owner's archives with 7-Zip: what its container must not see."""
 
