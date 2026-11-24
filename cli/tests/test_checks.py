@@ -157,9 +157,9 @@ class BuildStatusTest(unittest.TestCase):
     def test_doctor_says_when_the_game_data_came_without_its_screens(self):
         with Sandbox() as sb:
             install(sb)
-            sb.write("data/custom/missing-game-files.json", json.dumps(["dlc/d3_a0.unity3d"]))
+            sb.write("data/custom/missing-game-files.json", json.dumps(["dlc/d_screens.unity3d"]))
             self.assertGreaterEqual(checks.doctor(), 1, sb.output())
-            self.assertIn("of the game's own files are missing (dlc/d3_a0.unity3d", sb.output())
+            self.assertIn("of the game's own files are missing (dlc/d_screens.unity3d", sb.output())
             self.assertIn("Import the client data again", sb.output())
 
     def test_doctor_fails_on_a_failed_rebuild(self):

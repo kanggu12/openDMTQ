@@ -948,7 +948,7 @@ def _chart_loads(path):
 
 def _repair_charts(overlay):
     """Put, into the overlay being built, the pair of every imported chart the game cannot load. Returns the charts
-    served from their pair and those left unreadable, by file name ("388", "534_EARPHONE")."""
+    served from their pair and those left unreadable, by file name (a chart's number, or its number and _EARPHONE)."""
     patterns = os.path.join(content_web(), "DMQ", "Patterns")
     from_pair, unreadable = [], []
     for song in base_song_list():

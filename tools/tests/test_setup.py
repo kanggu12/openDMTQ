@@ -214,11 +214,11 @@ class StepsTest(unittest.TestCase):
         # The files given lacked some of the game's own: the game would stop at its start without a word.
         with HostInstall() as inst, mock.patch.object(admin.songs, "has_game_data", lambda: True):
             inst.write("apk/base/client.apk", "PK")
-            inst.write("custom/missing-game-files.json", json.dumps(["dlc/d3_a0.unity3d", "dlc/d_i0.unity3d"]))
+            inst.write("custom/missing-game-files.json", json.dumps(["dlc/d_screens.unity3d", "dlc/d_icons.unity3d"]))
             inst.sign_in()
             self.assertFalse(setup.steps_done()["files"])
             page = inst.page(BASE + "/setup?step=files")
-            self.assertIn("2 of its files are missing (dlc/d3_a0.unity3d, ...)", page)
+            self.assertIn("2 of its files are missing (dlc/d_screens.unity3d, ...)", page)
             self.assertIn("Import the client data again.", page)
 
     def test_a_server_waiting_for_its_files_is_pointed_to_the_setup_not_called_down(self):

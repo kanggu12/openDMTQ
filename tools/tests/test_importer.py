@@ -25,11 +25,11 @@ def game_folder(root, songs=(1, 2)):
         f"{importer.HOST}/DMQ/Patterns/Patterns.zip": "every chart again",
         f"{importer.HOST}/patch/phone_new/1.003.005/android/patch_new.csv.lz4": "manifest",
         f"{importer.HOST}/patch/phone_new/1.003.005/android/table/us/song_song.csv.lz4": "table",
-        f"{importer.HOST}/patch/phone_new/1.003.005/android/dlc/d3_a0.unity3d.lz4": "screen images",
-        f"{importer.HOST}/patch/phone_new/1.003.005/android/dlc/d3_e0.unity3d.lz4": "song tiles",
+        f"{importer.HOST}/patch/phone_new/1.003.005/android/dlc/d_screens.unity3d.lz4": "screen images",
+        f"{importer.HOST}/patch/phone_new/1.003.005/android/dlc/d3_e900.unity3d.lz4": "song tiles",
         f"{importer.HOST}/patch/phone_new/1.003.005/android/preview/song1.p.opus.lz4": "preview",
-        f"{importer.HOST}/static/dmq/banner/x/howtoplay_play.png": "how to play",
-        f"{importer.HOST}/viewImg/news/phone1.png": "news",
+        f"{importer.HOST}/static/dmq/banner/x/made_page.png": "how to play",
+        f"{importer.HOST}/viewImg/news/made_news1.png": "news",
         f"{importer.HOST}/viewImg/eye/Song1.png": "jacket in another case",
     }
     for s in songs:
@@ -86,11 +86,11 @@ class PartsTest(unittest.TestCase):
         self.assertEqual(content_files(self.data), {
             "web/patch/phone_new/1.003.005/android/patch_new.csv.lz4",
             "web/patch/phone_new/1.003.005/android/table/us/song_song.csv.lz4",
-            "web/patch/phone_new/1.003.005/android/dlc/d3_a0.unity3d.lz4",
-            "web/patch/phone_new/1.003.005/android/dlc/d3_e0.unity3d.lz4",
+            "web/patch/phone_new/1.003.005/android/dlc/d_screens.unity3d.lz4",
+            "web/patch/phone_new/1.003.005/android/dlc/d3_e900.unity3d.lz4",
             "web/patch/phone_new/1.003.005/android/preview/song1.p.opus.lz4",
-            "web/static/dmq/banner/x/howtoplay_play.png",
-            "web/viewImg/news/phone1.png",
+            "web/static/dmq/banner/x/made_page.png",
+            "web/viewImg/news/made_news1.png",
         })
 
     def test_the_songs_come_with_their_list_and_files(self):
@@ -176,36 +176,36 @@ class LinksTest(unittest.TestCase):
 
     def test_a_link_to_a_file_outside_the_folder_is_left_out(self):
         # A picture and a song's music named as the game names them, each a link to the key.
-        self.link("static/dmq/banner/x/howtoplay_play.png", self.secret)
+        self.link("static/dmq/banner/x/made_page.png", self.secret)
         self.link("DMQ/Songs/2/2.fpk", self.secret)
         self.assertTrue(importer.import_game_files([self.src], {"game", "songs"}))
         got = content_files(self.data)
-        self.assertNotIn("web/static/dmq/banner/x/howtoplay_play.png", got)
+        self.assertNotIn("web/static/dmq/banner/x/made_page.png", got)
         self.assertNotIn("web/DMQ/Songs/2/2.fpk", got)
         self.assertNotIn("the server's key", self.served())
         # Everything else came as it would have, and the owner is told why two files did not.
         self.assertIn("web/DMQ/Songs/1/1.fpk", got)
-        self.assertIn("web/viewImg/news/phone1.png", got)
+        self.assertIn("web/viewImg/news/made_news1.png", got)
         self.assertIn("  left out 2 link(s): the game's files and folders are never links", self.said)
 
     def test_a_linked_folder_is_left_out_with_all_it_holds(self):
         # The owner's own pictures, in a folder outside: linked in as a folder of news pictures, and as the whole
         # folder of the pictures of HOW TO PLAY.
         outside = os.path.join(self.tmp, "photos")
-        write(outside, {"phone2.png": "the owner's photo", "dmq/banner/x/howtoplay_play.png": "the owner's photo"})
+        write(outside, {"made_news2.png": "the owner's photo", "dmq/banner/x/made_page.png": "the owner's photo"})
         self.link("viewImg/news2", outside)
         self.link("static", outside)
         self.assertTrue(importer.import_game_files([self.src], {"game"}))
         got = content_files(self.data)
         self.assertFalse([rel for rel in got if rel.startswith(("web/viewImg/news2/", "web/static/"))], got)
         self.assertNotIn("the owner's photo", self.served())
-        self.assertIn("web/viewImg/news/phone1.png", got)
+        self.assertIn("web/viewImg/news/made_news1.png", got)
 
     def test_a_link_inside_the_folder_is_left_out_too(self):
         # Pointing at a file of the folder itself: no game file is a link, wherever it points.
-        self.link("viewImg/news/phone2.png", os.path.join(self.host, "viewImg", "news", "phone1.png"))
+        self.link("viewImg/news/made_news2.png", os.path.join(self.host, "viewImg", "news", "made_news1.png"))
         importer.import_game_files([self.src], {"game"})
-        self.assertNotIn("web/viewImg/news/phone2.png", content_files(self.data))
+        self.assertNotIn("web/viewImg/news/made_news2.png", content_files(self.data))
 
     def test_a_song_list_that_is_a_link_is_left_out(self):
         # A list of songs that is a link to a file outside: the list is made from the game's own tables instead.
@@ -454,10 +454,10 @@ class FormsTest(unittest.TestCase):
     def test_the_game_host_folder_under_another_name(self):
         www = os.path.join(self.tmp, "in", "server", "www")
         tables(www, [(1, "first")], [(11, 1)])
-        write(www, {"DMQ/Songs/1/1.fpk": "m", "DMQ/Patterns/11": "c", "viewImg/news/phone1.png": "n"})
+        write(www, {"DMQ/Songs/1/1.fpk": "m", "DMQ/Patterns/11": "c", "viewImg/news/made_news1.png": "n"})
         self.assertTrue(importer.is_game_folder(www))
         self.assertTrue(importer.import_game_files([www], {"game", "songs"}))
-        self.assertIn("web/viewImg/news/phone1.png", content_files(self.data))
+        self.assertIn("web/viewImg/news/made_news1.png", content_files(self.data))
         self.assertEqual([s["song_id"] for s in self.songs()], [1])
 
     def test_an_opendmtq_servers_content_with_its_song_list(self):
@@ -494,8 +494,8 @@ class GameDataAloneTest(unittest.TestCase):
     # with it; not the pictures of HOW TO PLAY and of the news beside it.
     GAME_DATA = {"web/patch/phone_new/1.003.005/android/patch_new.csv.lz4",
                  "web/patch/phone_new/1.003.005/android/table/us/song_song.csv.lz4",
-                 "web/patch/phone_new/1.003.005/android/dlc/d3_a0.unity3d.lz4",
-                 "web/patch/phone_new/1.003.005/android/dlc/d3_e0.unity3d.lz4",
+                 "web/patch/phone_new/1.003.005/android/dlc/d_screens.unity3d.lz4",
+                 "web/patch/phone_new/1.003.005/android/dlc/d3_e900.unity3d.lz4",
                  "web/patch/phone_new/1.003.005/android/preview/song1.p.opus.lz4"}
 
     def setUp(self):
@@ -559,14 +559,14 @@ class GameDataAloneTest(unittest.TestCase):
         importer.import_game_files([self.whole], {"game", "songs"})
         before = content_files(self.data)
         self.assertIn("web/DMQ/Songs/1/1.fpk", before)
-        self.assertIn("web/static/dmq/banner/x/howtoplay_play.png", before)
+        self.assertIn("web/static/dmq/banner/x/made_page.png", before)
         self.copy_patch("only/patch/phone_new")
         # A newer patch folder: a table more, the screens' bundle gone.
         write(os.path.join(self.tmp, "only"), {"patch/phone_new/1.003.005/android/table/us/song_new.csv.lz4": "table"})
-        os.remove(os.path.join(self.tmp, "only/patch/phone_new/1.003.005/android/dlc/d3_a0.unity3d.lz4"))
+        os.remove(os.path.join(self.tmp, "only/patch/phone_new/1.003.005/android/dlc/d_screens.unity3d.lz4"))
         self.assertTrue(importer.import_game_files([os.path.join(self.tmp, "only")], {"game", "songs"}))
         self.assertEqual(content_files(self.data),
-                         before - {"web/patch/phone_new/1.003.005/android/dlc/d3_a0.unity3d.lz4"}
+                         before - {"web/patch/phone_new/1.003.005/android/dlc/d_screens.unity3d.lz4"}
                          | {"web/patch/phone_new/1.003.005/android/table/us/song_new.csv.lz4"})
         self.assertIn("songs: none there, the songs on the server stay as they are", self.said)
         # Asked for the songs alone, it takes nothing at all.
@@ -604,7 +604,7 @@ class GameDataAloneTest(unittest.TestCase):
         self.assertIn(os.path.join(down, "unpacked", "server"), candidates)
         self.assertTrue(importer.import_game_files(candidates, {"game", "songs"}))
         self.assertIn("web/DMQ/Songs/1/1.fpk", content_files(self.data))
-        self.assertIn("web/static/dmq/banner/x/howtoplay_play.png", content_files(self.data))
+        self.assertIn("web/static/dmq/banner/x/made_page.png", content_files(self.data))
 
     def test_a_phone_new_folder_of_another_program_is_not_the_game(self):
         # A client version's folder with its Android tables is what counts: not a name alone, not the iPhone's.
@@ -658,7 +658,7 @@ class SongsAloneTest(unittest.TestCase):
         tables(os.path.join(self.game), [(1, "first"), (2, "second")], [(11, 1), (12, 1), (21, 2)])
         write(self.game, {"patch/phone_new/1.003.005/android/patch_new.csv.lz4": "manifest",
                           "patch/phone_new/1.003.005/android/preview/first.p.opus.lz4": "preview",
-                          "patch/phone_new/1.003.005/android/dlc/d3_e0.unity3d.lz4": "tiles"})
+                          "patch/phone_new/1.003.005/android/dlc/d3_e900.unity3d.lz4": "tiles"})
         # The songs alone: their folder, and their jackets.
         self.songs = os.path.join(self.tmp, "Downloads", "songs")
         write(self.songs, {"DMQ/Songs/1/1.fpk": "m", "DMQ/Songs/2/2.fpk": "m", "DMQ/Patterns/11": "c",
@@ -738,11 +738,11 @@ class SongsAloneTest(unittest.TestCase):
         whole = os.path.join(self.tmp, "whole")
         game_folder(whole)
         importer.import_game_files([whole], {"game", "songs"})
-        live = os.path.join(self.data, "content", "web", "static", "dmq", "banner", "x", "howtoplay_play.png")
+        live = os.path.join(self.data, "content", "web", "static", "dmq", "banner", "x", "made_page.png")
         before = os.stat(live).st_ino
         lean = os.path.join(self.tmp, "lean")
         shutil.copytree(os.path.join(whole, importer.HOST, "patch"), os.path.join(lean, "patch"))
-        write(lean, {"static/dmq/banner/x/howtoplay_play.png": "another picture"})
+        write(lean, {"static/dmq/banner/x/made_page.png": "another picture"})
         self.assertTrue(importer.import_game_files([lean], {"game"}))
         # The server's own picture stays, and the import wrote nothing through to it.
         with open(live) as f:
@@ -975,10 +975,10 @@ class ArchiveFormsTest(unittest.TestCase):
             link = zipfile.ZipInfo(importer.HOST + "/static/dmq/banner/x/linked.png")
             link.create_system = 3
             link.external_attr = 0o120777 << 16
-            z.writestr(link, "howtoplay_play.png")
+            z.writestr(link, "made_page.png")
         self.assertTrue(importer.import_game_files([archive], {"game", "songs"}))
         got = content_files(self.data)
-        self.assertIn("web/static/dmq/banner/x/howtoplay_play.png", got)
+        self.assertIn("web/static/dmq/banner/x/made_page.png", got)
         self.assertNotIn("web/static/dmq/banner/x/linked.png", got)
 
 

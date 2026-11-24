@@ -504,8 +504,10 @@ class OriginalNamesTest(unittest.TestCase):
 
     # The first 16 hex digits of the SHA-256 of each word in lower case. NAMES, refused in every file: the original
     # hosts' labels and the platform's, the SDK's name, the original app's package, another edition of the game, and
-    # classes, namespaces, methods and fields of the game's code, of its platform's SDK and of its own plugins, and the
-    # shipped bundle the added songs' tiles are made from (the songs' code reads its name from client_marks).
+    # classes, namespaces, methods and fields of the game's code, of its platform's SDK and of its own plugins, the
+    # shipped bundle the added songs' tiles are made from (the songs' code reads its name from client_marks), and the
+    # client data's bundles and the original server's pictures and their folders that the code looks for or that tests
+    # took as examples (the game server reads its pictures' paths from client_names.php).
     NAMES = {
         "d6346b9af21aa4ed", "2afe30a2bd45057c", "80db63946107faba", "368d8e31a31df004", "2ae3f64dcdf74642",
         "699b0abdb612e9e7", "3949fb706769665e", "21e87c9ee4d3d311", "10190bd54cc85dab", "a72c2dc8615e4f9c",
@@ -518,7 +520,9 @@ class OriginalNamesTest(unittest.TestCase):
         "ea7d325704aae6e0", "085758866bafc839", "45f82add335a4e84", "ff9fe74e651359f4", "a059d5a3311523d2",
         "e2021168280ad242", "27cff103a57227e4", "e27e7a215113fff9", "a6faad178c4d3037", "d707471e11bc2920",
         "6c48b84ce1677c6a", "26286318a778dc27", "0ae9bb2b7c69db7a", "97e1000e4c7d506c", "d520944fb3e43fca",
-        "e0ab14225016f86a", "aa832ceb753844fa", "a311be37dd5a6251",
+        "e0ab14225016f86a", "aa832ceb753844fa", "a311be37dd5a6251", "847053d2d1ee9ccb", "cd00aac3857131aa",
+        "d5a2ed90ad0b6d1f", "a8d2797dad014303", "1b216a676ccd4fd2", "033cd5b89a9c3784", "993ed6cc230cf757",
+        "a2837efea8c83966", "558833f8e0152483", "99d92d53c18fa744",
     }
     # DATA, refused in the pages only: the client's table files and a column of one, and the patch manifest's name, the
     # protocol's own names, which the server serves and the tools read by them.
@@ -656,7 +660,9 @@ class ClientNamesTest(unittest.TestCase):
     """DEP-138: the names the runtime and the player look up in the game's code and define for its SDKs are those of the
     patcher's table of the client's names (tools/opendmtq_tools/client_marks.py), encoded: arm32/src/client_names.h is
     what the table makes, each of its names decodes as client_names::text() decodes it to the table's, and the C++ that
-    looks them up holds none of them as it is. A failure says which by its constant, never by the name."""
+    looks them up holds none of them as it is. The same for the original server's pictures the game server offers
+    (server/game/src/client_names.php, read by game.php by their role). A failure says which by its constant or its
+    role, never by the name."""
 
     # The C++ that looks the names up, or defines them for the game's Java calls.
     USERS = ("arm32/desktop/keyplay.cpp", "arm32/desktop/soundmix.cpp", "arm32/desktop/platform_sdk.cpp",
@@ -695,6 +701,27 @@ class ClientNamesTest(unittest.TestCase):
             text = bytes(b ^ ((0x5C + i) & 0xFF) for i, b in enumerate(raw)).decode("utf-8")
             # Compared by digest, so that a failure prints no name.
             self.assertEqual(hashlib.sha256(text.encode()).hexdigest(), hashlib.sha256(name.encode()).hexdigest(), const)
+
+    def test_the_servers_pictures_are_the_tables(self):
+        import base64
+        import hashlib
+        marks = self.marks()
+        with open(os.path.join(ROOT, "server", "game", "src", "client_names.php"), encoding="utf-8") as f:
+            php = f.read()
+        self.assertEqual(php, marks.php_text(),
+                         "write it again from tools/: python3 -m opendmtq_tools.client_marks --php > ../server/game/src/client_names.php")
+        # The paths as PHP decodes them (base64 of a JSON object, its pieces joined), by digest against the table's.
+        pieces = php.split("const ODQ_CLIENT_PATHS", 1)[1].split(";", 1)[0]
+        held = json.loads(base64.b64decode("".join(re.findall(r"'([A-Za-z0-9+/=]+)'", pieces))))
+        self.assertEqual(sorted(held), sorted(marks.SERVER_PICTURES))
+        for role, path in marks.SERVER_PICTURES.items():
+            self.assertEqual(hashlib.sha256(held[role].encode()).hexdigest(), hashlib.sha256(path.encode()).hexdigest(), role)
+        # The game server reads each by its role and holds none as it is.
+        with open(os.path.join(ROOT, "server", "game", "src", "game.php"), encoding="utf-8") as f:
+            game = f.read()
+        self.assertEqual([role for role, path in marks.SERVER_PICTURES.items() if path in game], [])
+        for role in marks.SERVER_PICTURES:
+            self.assertIn(f"odq_client_path('{role}')", game)
 
     def test_the_code_that_looks_them_up_holds_none_as_it_is(self):
         names = [(const, name) for const, _, name in self.marks().PLAYER if const]

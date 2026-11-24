@@ -9,6 +9,7 @@
  * response classes and their JSON names (client 1.3.4).
  */
 
+require_once __DIR__ . '/client_names.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/content.php';
 require_once __DIR__ . '/util.php';
@@ -87,11 +88,12 @@ function odq_game_ad_ticket_used(array $p)
  */
 function odq_game_default_setting(array $p)
 {
-    // The two pages of the "how to play" popup and two banners of old screens, as the official server named them.
-    $play = 'static/dmq/banner/180802_tuto2_package/howtoplay_play.png';
-    $note = 'static/dmq/banner/180802_tuto2_package/howtoplay_note.png';
-    $tstop = 'static/dmq/banner/180716_mucasummer/180716_tstop_summer.png';
-    $twc = 'static/dmq/banner/180716_mucasummer/180716_twc_summer.png';
+    // The two pages of the "how to play" popup and two banners of old screens, at the original server's paths, each by
+    // its role (client_names.php keeps them encoded).
+    $play = odq_client_path('howto_play');
+    $note = odq_client_path('howto_note');
+    $tstop = odq_client_path('tstop');
+    $twc = odq_client_path('twc');
     // Without the images the popup would show two empty pages: it is not offered then.
     $howto = odq_served_file($play) && odq_served_file($note) ? 'Y' : 'N';
     $pairs = [

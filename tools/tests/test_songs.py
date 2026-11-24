@@ -85,24 +85,24 @@ class GameFilesTest(unittest.TestCase):
             json.dump([], f)
         self.patch = songs.patch_dir(os.path.join(src, "web"))
         os.makedirs(os.path.join(self.patch, "dlc"))
-        names = ["dlc/d3_a0.unity3d", "dlc/d_sk01.unity3d", "dlc/d3_e5.unity3d", "dlc/d_e5.unity3d", "preview/a.p.opus",
+        names = ["dlc/d_screens.unity3d", "dlc/d_skin.unity3d", "dlc/d3_e5.unity3d", "dlc/d_e5.unity3d", "preview/a.p.opus",
                  "Fonts/SimplifiedChinese/a.unity3d"]
         manifest = "file_name,file_size\r\n" + "\r\n".join(f"{n},1" for n in names)
         with open(os.path.join(self.patch, "patch_new.csv.lz4"), "wb") as f:
             f.write(songs.lz4_encode(("\ufeff" + manifest).encode("utf-8")))
         # Of the game's own bundles, only the skin came.
-        self.bundle("dlc/d_sk01.unity3d")
+        self.bundle("dlc/d_skin.unity3d")
 
     def bundle(self, rel):
         with open(os.path.join(self.patch, rel + ".lz4"), "wb") as f:
             f.write(songs.stored_encode(b"UnityFS"))
 
     def test_the_screens_left_out_are_named_and_the_songs_and_fonts_are_not(self):
-        self.assertEqual(songs.rebuild()["missing_game_files"], ["dlc/d3_a0.unity3d"])
-        self.assertEqual(songs.missing_game_files(), ["dlc/d3_a0.unity3d"])
+        self.assertEqual(songs.rebuild()["missing_game_files"], ["dlc/d_screens.unity3d"])
+        self.assertEqual(songs.missing_game_files(), ["dlc/d_screens.unity3d"])
 
     def test_with_all_of_them_nothing_is_named(self):
-        self.bundle("dlc/d3_a0.unity3d")
+        self.bundle("dlc/d_screens.unity3d")
         songs.rebuild()
         self.assertEqual(songs.missing_game_files(), [])
 
