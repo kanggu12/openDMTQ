@@ -431,6 +431,15 @@ class Deadlines(Folder):
             srv.trust(server.base, f.read().strip())
         self.given_up(server)
 
+    def test_the_connection_tests_heads_of_the_downloads(self):
+        # The downloads step asks for heads alone: headers that trickle in are given up at the step's wait too.
+        from opendmtq_client import connection
+        server = self.trickling(what="head")
+        with mock.patch.object(srv, "TIMEOUT", 1):
+            took, out = timed(lambda: connection._head(server.base, "/apk"))
+        self.assertLess(took, 2.0, out)
+        self.assertEqual(out[0], False)
+
     def test_an_answer_in_time_is_taken_as_before(self):
         # The deadline cuts each read's wait to what is left of it, nothing more: a server that answers is read whole,
         # and outside a deadline a socket waits as its request said.

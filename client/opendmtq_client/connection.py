@@ -472,7 +472,8 @@ def _head(url, path, cookie=None):
     request = srv._request(url + path, cookie=cookie)
     request.method = "HEAD"
     try:
-        with srv._opener(url).open(request, timeout=srv.TIMEOUT) as response:
+        # Its answer whole within the wait, however it trickles in (server.within), as every other step's.
+        with srv.within(srv.TIMEOUT), srv._opener(url).open(request, timeout=srv.TIMEOUT) as response:
             kind = (response.headers.get("Content-Type") or "").split(";")[0].strip()
             if path == "/apk" and kind != "application/vnd.android.package-archive":
                 return False, "not the app (%s)" % (kind or "no type")
