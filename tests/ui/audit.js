@@ -573,6 +573,36 @@ async function backgroundClear(contexts) {
     misses.slice(0, 8).join(' ; '));
 }
 
+// The status page's cards on a laptop's screen and a large monitor's, in both languages: none stretched past what it holds
+// (no more room between its last line and its own padding at its foot than that padding again, 24 px), and the cards
+// that stand side by side split the width at one place. Before: in rows of two the shorter card was stretched to the taller (the grades' card 131 px
+// empty at its foot, the app's 103 px), and the two rows split at 633/647 and 733/748.
+async function statusCards(contexts) {
+  for (const width of [1280, 1920]) {
+    for (const lang of ['en', 'ko']) {
+      const page = await contexts.signed.newPage();
+      await page.setViewport({ width, height: 900 });
+      await page.setCookie({ name: 'opendmtq_lang', value: lang, url: A });
+      await page.goto(`${A}/`, { waitUntil: 'networkidle2' });
+      const seen = await page.evaluate(() => {
+        const cards = [...document.querySelectorAll('.dash-grid .card:not(.span-12)')].filter(c => c.getClientRects().length);
+        const empty = cards.map(c => {
+          const r = c.getBoundingClientRect(), pad = parseFloat(getComputedStyle(c).paddingBottom);
+          const last = Math.max(...[...c.children].filter(k => k.getClientRects().length).map(k => k.getBoundingClientRect().bottom + parseFloat(getComputedStyle(k).marginBottom)));
+          return { card: (c.querySelector('h2') || c).textContent.trim().slice(0, 24), foot: Math.round(r.bottom - pad - last) };
+        }).filter(c => c.foot > 24);
+        // Where the cards beside another one start, right of the page's middle: one place for every row.
+        const mid = innerWidth / 2;
+        const splits = [...new Set(cards.map(c => Math.round(c.getBoundingClientRect().left)).filter(x => x > mid))];
+        return { empty, splits };
+      });
+      check(`the status page's cards are as tall as what they hold and split the width at one place (${width}px, ${lang})`,
+        seen.empty.length === 0 && seen.splits.length <= 1, JSON.stringify(seen));
+      await page.close();
+    }
+  }
+}
+
 // The hall of fame (the Rankings page's This month tab: the months before) at a laptop's width and a phone's, in both
 // languages: its months are columns of the card itself, no fill, edge or shadow of their own (no box in the card), and side
 // by side they run across all of the card's room, the last one ending where that room does. Before: each month a filled
@@ -3195,6 +3225,7 @@ async function myPage(contexts) {
     await sweep(contexts, FULL, ALL_WIDTHS);
     await backgroundClear(contexts);
     await hallOfFame(contexts);
+    await statusCards(contexts);
   } else if (stage === 'keys') {
     await keyboardMarks(contexts);
   } else if (stage === 'thispc') {

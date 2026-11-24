@@ -427,10 +427,13 @@ table.players tbody tr:nth-last-child(-n+2):not(:first-child):not(:nth-child(2))
 .sum-grades { min-width: 0; }
 @media (max-width: 860px) { .sum-charts { grid-template-columns: minmax(0, 1fr); } }
 .dash-grid > * { grid-column: span 6; min-width: 0; }
-.dash-grid > .wide-card { grid-column: span 7; }
-.dash-grid > .wide-card + .card { grid-column: span 5; }
 .dash-grid > .span-12 { grid-column: 1 / -1; }
-@media (max-width: 960px) { .dash-grid > * , .dash-grid > .wide-card, .dash-grid > .wide-card + .card { grid-column: 1 / -1; } }
+/* Two columns of cards at the page's own split (half and half, as the rows above them): each card one under another in its
+   column, as tall as what it holds; the columns themselves side by side, the shorter one's room left under its last
+   card. */
+.dash-grid > .dash-col { display: grid; gap: var(--gap); align-content: start; }
+.dash-col > * { min-width: 0; }
+@media (max-width: 960px) { .dash-grid > * { grid-column: 1 / -1; } }
 /* The resources: the figures now beside the day's two charts, the game server's strip across under them. */
 .res-grid { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1fr); gap: 14px 26px; align-items: stretch; margin-bottom: 18px; }
 @media (max-width: 1100px) { .res-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .res-rows { grid-column: 1 / -1; } }

@@ -86,21 +86,12 @@
   </section>
   {% endif %}
 
-  {# The disk: the whole, then OpenDMTQ's part at its own scale. #}
-  <section class="card chart-card">
-    <h2>{{ t('dash.c_disk') }}</h2>
-    {{ disk_chart }}
-    {% if disk_own %}<h3>{{ t('dash.c_disk_own', size=disk_own_total) }}</h3>{{ disk_own }}{% endif %}
-  </section>
-
-  {% if counts %}
-  <section class="card chart-card">
-    <h2>{{ t('dash.c_grades') }}</h2>
-    {% if counts.records %}{{ chart.grades }}{% else %}<p class="empty">{{ t('dash.recent_none') }}</p>{% endif %}
-  </section>
-  {% endif %}
-
-  <section class="card wide-card">
+  {# The last four in two columns at the page's one split, each card as tall as what it holds: the plays (the latest, then
+     their grades) on one side, the server's files (its disk, then its app) on the other. In rows of two, the shorter of
+     each pair was stretched to the taller (the grades' card 131 px empty at its foot, the app's 103 px), and the two rows
+     split the width at different places. #}
+  <div class="dash-col">
+  <section class="card">
     <h2>{{ t('dash.recent') }} <a class="more" href="{{ url_for('logs_page', tab='plays') }}">{{ t('dash.all_plays') }}</a></h2>
     {% if not counts %}<p class="empty">{{ t('dash.db_short') }}</p>{% elif not recent %}<p class="empty">{{ t('dash.recent_none') }}</p>{% else %}
     <table class="compact recent"><tbody>
@@ -110,6 +101,22 @@
       {% endfor %}
     </tbody></table>
     {% endif %}
+  </section>
+
+  {% if counts %}
+  <section class="card chart-card">
+    <h2>{{ t('dash.c_grades') }}</h2>
+    {% if counts.records %}{{ chart.grades }}{% else %}<p class="empty">{{ t('dash.recent_none') }}</p>{% endif %}
+  </section>
+  {% endif %}
+  </div>
+
+  <div class="dash-col">
+  {# The disk: the whole, then OpenDMTQ's part at its own scale. #}
+  <section class="card chart-card">
+    <h2>{{ t('dash.c_disk') }}</h2>
+    {{ disk_chart }}
+    {% if disk_own %}<h3>{{ t('dash.c_disk_own', size=disk_own_total) }}</h3>{{ disk_own }}{% endif %}
   </section>
 
   <section class="card">
@@ -132,5 +139,6 @@
       {% if build %}<a class="btn btn-primary" href="{{ url_for('app_download', name=build.file) }}">{{ t('btn.download') }}</a><a class="btn" href="{{ url_for('app_page') }}">{{ t('dash.manage_app') }}</a>{% else %}<a class="btn btn-primary" href="{{ url_for('app_page') }}">{{ t('dash.build_app') }}</a>{% endif %}
     </div>
   </section>
+  </div>
 </div>
 {% endblock %}
