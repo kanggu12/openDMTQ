@@ -1597,6 +1597,30 @@ void sound_panel_checks() {
         }
     }
     check(bad == 0, "the sound panel and its button over 16 shapes and scales: inside, apart, padded, large enough, room for the notice");
+    // A notice in a song while the panel is open (WIN-471): its card centred in the room left of the panel, less the
+    // overlay's 8 (notice_free_right), as wide as overlay_scale.h's notice_song_most lets it be: 400 at least at 720 lines,
+    // as with the panel closed at 16:9, and clear of the pause button's column at the left, of the pause screen's Q and
+    // MAX at the right (from the area's own edge) and of the panel. Main took the Q and MAX's room from the panel's edge,
+    // which left the words their least, 160, in every shape but 21:9: a ban's two lines in five.
+    int notice_bad = 0;
+    for (const Shape& sh : shapes) {
+        const float k0 = scale_for(sh.h, sh.dpi);
+        const SoundLayout l = sound_layout(sh.w, sh.h, k0, static_cast<int>(std::lround(kBarTall * k0)));
+        // The notice's room across, as notice_free_right gives it, and the widest its card may be there.
+        const int room = static_cast<int>(l.panel.x) - static_cast<int>(std::lround(8 * k0));
+        const float gap = 8 * k0, most = notice_song_most(room, sh.w, sh.h, gap);
+        // The card at its widest, centred in the room.
+        const float left = static_cast<float>(room) / 2 - most / 2, right = static_cast<float>(room) / 2 + most / 2;
+        const float qmax = static_cast<float>(sh.w) - kPauseBoxFromRight * handle_scale_for(sh.w, sh.h);
+        if (most < 400 * k0 - 0.5f || left < pause_right(sh.w, sh.h) + gap - 0.5f || right > qmax - gap + 0.5f || right > static_cast<float>(room) + 0.5f) {
+            ++notice_bad;
+            std::printf("  %dx%d at %.0f %%: a song's notice beside the open panel at most %.0f wide (%.0f at 720 lines), from %.0f to %.0f\n", sh.w, sh.h,
+                        static_cast<double>(sh.dpi * 100), static_cast<double>(most), static_cast<double>(most / k0), static_cast<double>(left),
+                        static_cast<double>(right));
+        }
+    }
+    check(notice_bad == 0,
+          "a song's notice beside the open sound panel has 400 at least of room at 720 lines, clear of the pause button's column, the Q and MAX and the panel, over 16 shapes and scales");
     // The equaliser's chips by their words (WIN-302; main made the five one width, "Custom" 3 and 4 pixels from its border
     // and "Flat" 18 and 19): in each shape and either language, each word in the middle of its chip with the same room on
     // both sides as every other chip's, at least the scale's 8, the chips 8 apart and the row as wide as the inside.

@@ -1223,7 +1223,8 @@ void sound_look(Paint& p, const audio::Levels& levels, int hover, int held) {
 // The notice's look for "title\ndetail": a glass card with the red LIVE tag on its left while live (once ended, the
 // title says so alone: no tag), the title over where to watch; its window's place goes to the paint, centred at the top
 // of the game's area (in a song 16 under its top, in the menus under their header), clear of the frame counter where it
-// stands at the top (`corner`, Settings::ShowFps's order) and, in a song, of the Q and MAX of the song's pause screen.
+// stands at the top (`corner`, Settings::ShowFps's order) and, in a song, of the Q and MAX of the song's pause screen and
+// the pause button's column.
 void notice_look(Paint& p, const std::string& text, bool live, int corner, int free_right) {
     const std::wstring all = wide(text);
     const std::size_t cut = all.find(L'\n');
@@ -1265,9 +1266,11 @@ void notice_look(Paint& p, const std::string& text, bool live, int corner, int f
         const float reach = on_left ? static_cast<float>(at.x) + m.w : static_cast<float>(aw - at.x);
         beside = std::max(beside, pad + badge_w + gap + after + 2.0f * (reach + fpx(8)));
     }
-    // In a song, the Q and MAX its pause screen shows at the top right (at the game's own scale, from the area's right
-    // edge) as a counter there would be: the card, centred, clear of them on both sides.
-    if (song) beside = std::max(beside, pad + badge_w + gap + after + 2.0f * (kPauseBoxFromRight * handle_scale_for(area_w(), area_h()) + fpx(8)));
+    // In a song, the Q and MAX its pause screen shows at the top right and the pause button's column at the left, each
+    // from the area's own edge at the game's own scale (overlay_scale.h's notice_song_most): the card, centred in its
+    // room, clear of both. While the sound panel narrows that room, the Q and MAX stay where the area's edge has them, so
+    // the words keep the room the panel leaves (taken from the panel's edge, they had their least, 160).
+    if (song) beside = std::max(beside, pad + badge_w + gap + after + (static_cast<float>(aw) - notice_song_most(aw, area_w(), area_h(), fpx(8))));
     const float room = std::max(fpx(160), std::min(fpx(560) - pad - badge_w - gap - after, static_cast<float>(aw) - beside));
     std::vector<std::wstring> title_lines = wrap_even(title, *title_font, room);
     std::vector<std::wstring> detail_lines = detail.empty() ? std::vector<std::wstring>{} : wrap_even(detail, *detail_font, room);

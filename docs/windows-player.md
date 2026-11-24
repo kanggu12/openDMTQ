@@ -266,6 +266,7 @@ bands, **Low** (120 Hz), **Mid** (1 kHz) and **High** (6 kHz), as sliders of -12
 or a finger from wherever its row is pressed, and every change is heard at once; moving a band makes the equaliser
 Custom from the preset's bands. The launcher's **Sound** page shows what it changes, and the next game keeps it. The bar
 stays down while the panel is open; the Sound button again, a press on the game, minimising or the question close it.
+A notice shown meanwhile stands beside the panel, and an FPS counter it would cover hides until it closes.
 [The sound](#the-sound) says what each control changes.
 
 ### Quitting, the window and the pointer

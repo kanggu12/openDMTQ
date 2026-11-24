@@ -205,6 +205,23 @@ inline int notice_top(int area_w, int area_h, int sixteen, int inset, int top_ro
 // it on both of its sides as it is centred.
 constexpr float kPauseBoxFromRight = 389;
 
+// The widest a notice's card may be in a song, centred in the room it has across (`room`: the area's width, or the room
+// left of the sound panel while that is open, from the area's left edge), `gap` clear of the pause button and the column
+// under it at the area's left (pause_right) and of the pause screen's Q and MAX at its right (kPauseBoxFromRight in from
+// the area's right edge, at the game's own scale): twice the nearer of the two from the room's middle. With the panel
+// closed the Q and MAX are the nearer, as before (1280 - 2 x 397 at 720 lines); with it open the room is narrower and its
+// middle further left, and the pause button's column is (at 1280x720, 742 for a room of 904; it was the room less 2 x 397,
+// which left the words their least, 160, as if the Q and MAX stood at the panel's edge). Never below 0.
+inline float notice_song_most(int room, int area_w, int area_h, float gap) {
+    // The game's own scale for its pause button and its Q and MAX: the narrower of its two (pause_right's).
+    const float k = handle_scale_for(area_w, area_h);
+    const float middle = static_cast<float>(room) / 2;
+    // From the room's middle to the pause button's column, and to the Q and MAX, each less the gap.
+    const float to_left = middle - (pause_right(area_w, area_h) + gap);
+    const float to_right = (static_cast<float>(area_w) - kPauseBoxFromRight * k - gap) - middle;
+    return std::max(0.0f, 2 * std::min(to_left, to_right));
+}
+
 // ---- the handle's tab
 
 // The handle's tab at 720 lines: 25.6 wide where it hangs from the game's top edge, its sides leaning in 0.268 a pixel
