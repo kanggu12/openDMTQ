@@ -3384,9 +3384,9 @@ class AccountsTest(unittest.TestCase):
             self.act(inst, "password", "Sena")
             self.act(inst, "delete", "Sena")
             page = inst.client.get("/opendmtq/admin/logs?tab=changes").get_data(as_text=True)
-            for words in ("Made an account", "Switched an account off", "Made a new password", "Deleted an account"):
+            for words in ("Made an account", "Disabled an account", "Made a new password", "Deleted an account"):
                 self.assertIn(words, page)
-            self.assertEqual(page.count("Switched an account off"), 1)
+            self.assertEqual(page.count("Disabled an account"), 1)
 
     def test_with_no_account_the_status_page_leads_to_the_setups_players_step(self):
         from opendmtq_tools.admin import setup

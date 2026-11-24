@@ -101,6 +101,13 @@ class AdminStrings(unittest.TestCase):
                 self.assertNotIn(old, text, key)
             self.assertIsNone(re.search(r"(?<!휴대)(?<!아이)폰", text), key)
 
+    def test_an_accounts_switch_has_one_name(self):
+        # The log of changes names an account's switch with its button's word and the state it leaves (Disable, Disabled:
+        # 비활성화, 비활성), not a word of its own ("Switched an account off", 계정 끄기) (ADM-241).
+        for lang, table in strings.STRINGS.items():
+            self.assertIn(table["acc.turn_off"].lower(), table["change.acc_off"].lower(), lang)
+            self.assertIn(table["acc.turn_on"].lower(), table["change.acc_on"].lower(), lang)
+
     def test_the_notices_page_and_its_cards_share_one_word(self):
         # The menu's word for the Notices page is its cards' (공지), as the game's own toast says it, and the setup goes on
         # in the words a Korean reader uses (ADM-195).
