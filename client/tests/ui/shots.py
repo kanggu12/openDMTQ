@@ -2154,7 +2154,11 @@ def maintenance_check(app, out, tag, problems):
     wait_out(app.root, 2.0)
     settle(app)
     dialog = done.get("dialog")
-    if dialog is None or dialog.detail != w("help.repair.done.restart", n=1):
+    # One file put back, the launcher's own: said as one (main: "Files put back: 1. Some are the launcher's own", and
+    # no words of their own for one file, which this check then finds missing rather than stopping at).
+    from opendmtq_client import i18n
+    one = w("help.repair.done.restart.one") if "help.repair.done.restart.one" in i18n.TEXT else None
+    if dialog is None or one is None or dialog.detail != one:
         problems.append("%s: the repair said %r" % (tag, dialog and dialog.detail))
     if not os.path.isfile(os.path.join(install, "current", "OpenDMTQ.exe")):
         problems.append("%s: the repair did not put the launcher's file back" % tag)
