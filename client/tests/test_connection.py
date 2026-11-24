@@ -524,7 +524,7 @@ class UseThisAddress(Folder):
         app.post = app.tasks.append
         app.test_connection = lambda: app.tests.append(state.current)
         for name in ("use_found_address", "_moved", "set_status", "user_acted", "_say_state", "busy_now", "_game_open",
-                     "ready", "server_answers"):
+                     "files_in_use", "ready", "server_answers"):
             setattr(app, name, getattr(launcher.LauncherApp, name).__get__(app))
         app.text = lambda: launcher.LauncherApp.status_text.fget(app)
         return app
@@ -552,3 +552,25 @@ class UseThisAddress(Folder):
                 self.assertEqual(app.tests, [site.url])
         self.assertEqual(state.current, site.url)
         self.assertIsNone(app.address_draft)
+
+    def test_not_while_a_game_from_the_command_line_plays_from_the_old_app(self):
+        # The old address's app goes with the move: while a game the command line started plays from it (playing.py,
+        # which this window's own busy state knows nothing of), the move waits, as Forget of the server in use does
+        # (main moved and deleted the app under the game).
+        from opendmtq_client import apps, playing
+        site = stub.Site().start()
+        self.addCleanup(site.stop)
+        old = "http://127.0.0.1:%d" % closed_port()
+        state = st.LauncherState()
+        state.add_server(old, "Stand-in")
+        os.makedirs(apps.folder(old))
+        app = self.window(state)
+        with mock.patch.object(playing, "running", return_value=True):
+            app.use_found_address(site.url)
+        for thread in [t for t in threading.enumerate() if t.name == "move"]:
+            thread.join(10)
+        for task in list(app.tasks):
+            task()
+        self.assertEqual(app.status_message.key, "online.busy")
+        self.assertEqual(state.current, old)
+        self.assertTrue(os.path.isdir(apps.folder(old)))

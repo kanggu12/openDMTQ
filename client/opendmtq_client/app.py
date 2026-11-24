@@ -663,8 +663,9 @@ class LauncherApp:
 
     def use_found_address(self, found):
         """The test's Use this address: the server PLAY plays on moves to the address it was found at (its sign-in kept;
-        its app, built for the old address, goes), asked of the server first on a worker thread."""
-        if self.busy_now():
+        its app, built for the old address, goes), asked of the server first on a worker thread. Not while that app is
+        in use: downloading, or playing from this window or the command line (files_in_use, as Forget asks)."""
+        if self.files_in_use():
             self.set_status(i18n.Said("online.busy"), "warn")
             return
         self.user_acted()
