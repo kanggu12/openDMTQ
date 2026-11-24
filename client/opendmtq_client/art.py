@@ -845,8 +845,6 @@ BUTTON_LOOKS = {
                 "text": theme.TEXT},
     "danger": {"normal": ("#ff8592", theme.BAD, "#e04558"), "hover": ("#ff9ba6", "#ff7484", theme.BAD),
                "pressed": (theme.BAD, "#ea4d60", "#e04558"), "disabled": _OFF, "text": "#2b0409"},
-    "warn": {"normal": ("#ffdc6e", theme.WARN, "#e0b22a"), "hover": ("#ffe48d", "#ffd556", theme.WARN),
-             "pressed": (theme.WARN, "#e0b22a", "#c99c1e"), "disabled": _OFF, "text": theme.INK},
     "home": {"normal": ("#acf673", theme.OK, "#76cb33"), "hover": ("#bcf98c", "#9df55a", "#82d83c"),
              "pressed": ("#9ee665", "#7fe234", "#6bb92e"), "disabled": _OFF, "text": "#0d1c04"},
     # Removing or starting over: metal with a red tint and pale red words, filled red under the pointer.

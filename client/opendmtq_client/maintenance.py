@@ -209,7 +209,9 @@ def uninstall_program(app):
         # Cancel first and the ring on it: Enter alone removes nothing.
         choice = dialogs.choose(app, "danger", w("help.uninstall"), w("help.uninstall.ask"),
                                 w("help.uninstall.detail", size=removal.megabytes(total)),
-                                [(w("help.uninstall.keep"), "keep", "warn"),
+                                # Keep data the plain metal beside the red of deleting everything for good: the one
+                                # coloured button is the one that removes (main filled Keep data yellow).
+                                [(w("help.uninstall.keep"), "keep", "neutral"),
                                  (w("help.uninstall.all"), "all", "danger")])
         if choice == "keep":
             # Written before the uninstaller starts: it closes what runs from the program's folder, this window too.

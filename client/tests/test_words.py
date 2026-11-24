@@ -166,6 +166,20 @@ class Look(unittest.TestCase):
 
 
 
+class ButtonRoles(unittest.TestCase):
+    def test_no_button_is_yellow(self):
+        # A button's colour is its role's (DESIGN.md: main lime, red where it removes for good, metal for the rest): no
+        # look of art.BUTTON_LOOKS is filled with the warning's yellow, and every dialog's main button is lime or red
+        # (main had a yellow look for a dialog's Keep data and the cannot-start window's Start over, with no role).
+        from opendmtq_client import art, dialogs
+        warn = theme.WARN.lower()
+        for look, colours in art.BUTTON_LOOKS.items():
+            for state in ("normal", "hover", "pressed"):
+                self.assertNotIn(warn, [c.lower() for c in colours[state]], (look, state))
+        for kind, style in dialogs.KINDS.items():
+            self.assertIn(style["button"], ("home", "danger"), kind)
+
+
 class Wording(unittest.TestCase):
     def test_a_unit_after_a_number_has_a_space(self):
         # "53 MB", "{total} MB", "{hz} Hz" in both languages, as the rest of the product writes them: never "103.2MB".

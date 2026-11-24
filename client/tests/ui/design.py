@@ -507,11 +507,22 @@ def buttons(root, ui, name):
     return problems
 
 
+# A button's look by its role (DESIGN.md's controls by role): the main action's lime, the red of removing for good as a
+# main action, the plain metal, and the metal tinted red of a quiet removal. A look of no role (main's yellow) is none.
+ROLE_LOOKS = {"home": "main", "danger": "main", "neutral": "plain", "danger_quiet": "danger"}
+
+
 def check_dialog(dialog, name):
     """A dialog's buttons as the pages' (role height, words and the same room either side) and their words on their
-    middles."""
+    middles; each in a look of a role, and one main button at most (lime, or red where it removes for good)."""
     problems = []
     ui, c = dialog.ui, dialog.canvas
+    for words, _value, look in dialog.buttons:
+        if look not in ROLE_LOOKS:
+            problems.append("%s: the dialog's button %r is drawn %r, a look of no role" % (name, words, look))
+    mains = [b[0] for b in dialog.buttons if ROLE_LOOKS.get(b[2]) == "main"]
+    if len(mains) > 1:
+        problems.append("%s: the dialog has %d main buttons: %r" % (name, len(mains), mains))
     for i, (left, top, right, bottom) in enumerate(dialog._boxes):
         words = dialog.buttons[i][0]
         if abs((bottom - top) - ui.px(ROLE_HEIGHT["plain"])) > SLACK:

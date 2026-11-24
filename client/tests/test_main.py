@@ -302,6 +302,9 @@ class CommandLine(Folder):
         self.assertEqual(asked[2], "런처 설정을 읽을 수 없습니다.")
         self.assertIn("C:\\settings.json", asked[3])
         self.assertEqual([b[1] for b in asked[4]], ["close", "reset"])
+        # Start over the window's lime main button, Close the plain metal (main filled Start over yellow, a look with no
+        # role in the design).
+        self.assertEqual([b[2] for b in asked[4]], ["neutral", "home"])
         self.assertEqual([b[1] for b in main.cannot_start_dialog(newer, "ko")[4]], ["close"])
 
     def test_unknown_arguments_are_refused(self):

@@ -271,7 +271,9 @@ def cannot_start_dialog(error, language):
         return ("error", w("start.title"), w("start.newer"), w("start.newer.detail", path=error.path),
                 [(w("start.close"), "close", "home")], 0, "close")
     return ("error", w("start.title"), w("start.broken"), w("start.broken.detail", path=error.path),
-            [(w("start.close"), "close", "neutral"), (w("start.over"), "reset", "warn")], 1, "close")
+            # Start over is the window's one main button, in lime: it sets the file aside and removes nothing (main
+            # filled it in a yellow no button has as its role).
+            [(w("start.close"), "close", "neutral"), (w("start.over"), "reset", "home")], 1, "close")
 
 
 def _ask(question, yes):

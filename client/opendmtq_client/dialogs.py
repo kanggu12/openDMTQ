@@ -3,9 +3,9 @@
 The launcher asks and tells in a card over its window instead of Windows' message boxes: the window behind is blurred
 and dimmed (drawn from its widgets by snapshot.py, so nothing is read from the screen), the card is the site's frosted
 gunmetal with its top-right corner cut, the question in Pretendard Bold beside a small lamp, and the site's buttons at
-its foot. The lamp and the main button take the colour of what the dialog is about: red to remove something for good,
-yellow for a big change, lime to tell. Buttons say what they do. Esc cancels, Enter presses the button with the ring,
-Tab and the arrow keys move the ring.
+its foot. The lamp takes the colour of what the dialog is about: red to remove something for good, yellow for what
+did not go as it should, lime to tell; its main button is lime, or red where it removes for good. Buttons say what
+they do. Esc cancels, Enter presses the button with the ring, Tab and the arrow keys move the ring.
 
 ask() and tell() wait for the answer like a message box. A window of its own (when the launcher cannot open, so
 there is no window to draw over) comes from standalone().
@@ -23,10 +23,11 @@ from opendmtq_client import art, safety, snapshot, theme, widgets
 log = logging.getLogger("opendmtq_client")
 
 # Each kind: the colour of its lamp and of the light along a progress track, and the look of its main button
-# (art.BUTTON_LOOKS).
+# (art.BUTTON_LOOKS): red where it removes for good, else the lime of a screen's one main button. A warning says itself
+# by its lamp; no button is yellow (no role of the design's is).
 KINDS = {
     "danger": {"accent": theme.BAD, "button": "danger"},
-    "warn": {"accent": theme.WARN, "button": "warn"},
+    "warn": {"accent": theme.WARN, "button": "home"},
     "info": {"accent": theme.OK, "button": "home"},
     "error": {"accent": theme.BAD, "button": "home"},
 }
