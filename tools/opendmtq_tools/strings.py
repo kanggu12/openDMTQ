@@ -994,6 +994,8 @@ STRINGS = {
         "rec.select": "Select the recording of {date}",
         "rec.now": "Recording now",
         "rec.hidden": "Hidden from players",
+        # A recording with no song in it: the site's words for it (live.choosing, strings.php).
+        "rec.choosing": "Choosing a song",
         "rec.show": "Show",
         "rec.hide": "Hide",
         "rec.delete_selected": "Delete selected",
@@ -2273,6 +2275,7 @@ STRINGS = {
         "rec.select": "{date} 녹화 선택",
         "rec.now": "녹화 중",
         "rec.hidden": "플레이어에게 숨김",
+        "rec.choosing": "곡 고르는 중",
         "rec.show": "다시 표시",
         "rec.hide": "숨기기",
         "rec.delete_selected": "선택 삭제",

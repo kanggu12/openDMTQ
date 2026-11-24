@@ -1093,6 +1093,19 @@ class RecordingsTest(unittest.TestCase):
                 inst.client.post("/opendmtq/admin/recordings", data={"csrf": csrf, "action": "limits", "cap_gb": cap, "days": days})
                 self.assertEqual(admin.recordings.rec_limits(), {"cap_gb": 20, "days": 30})
 
+    def test_a_recording_with_no_song_says_the_sites_words(self):
+        # A broadcast with no song in it yet, or ended before one: the site's words for it, in both languages, not a dash
+        # with nothing said (ADM-243).
+        with Install() as inst:
+            self._rec(7, 1800000000)
+            self._rec(7, 1800000200, opened=True)
+            inst.sign_in()
+            for lang, words in (("en", "Choosing a song"), ("ko", "곡 고르는 중")):
+                inst.client.set_cookie("opendmtq_lang", lang)
+                page = inst.client.get("/opendmtq/admin/recordings").get_data(as_text=True)
+                cells = re.findall(r'class="rec-songs">([^<]*)<', page)
+                self.assertEqual(cells, [words, words], lang)
+
     def test_an_open_recording_counts_from_its_list_and_stays_when_deleted(self):
         with Install():
             rec = self._rec(opened=True)
