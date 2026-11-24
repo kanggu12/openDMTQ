@@ -6,6 +6,106 @@ one of fixes, changes and smaller additions raises the patch number. Each releas
 
 ## [Unreleased]
 
+## [0.11.3] - 2026-11-24
+
+OpenDMTQ 0.11.3 closes a hole that let anyone who could reach a game server take over another player's account, makes
+backups, restores and port moves hold on every install kind, and smooths the launcher, the installer, the site, the
+admin pages and the pieces over the game wherever a second full review found them wrong or awkward.
+
+### Security
+
+- A player's transfer code, name and equipped items are changed only by that player's own game: the calls that read or
+  use a transfer code, rename a player or change what they wear are taken only when signed by one of that player's
+  sign-ins. Before, anyone who reached the game server could read any player's code, move their account onto another
+  phone, rename them, and then spend their MAX POINT as if from their own game. Transfer codes are random now: a code
+  made by an earlier release is replaced at the server's first start of 0.11.3, so a player who wrote theirs down reads
+  the new one in the game's OPTION.
+- A deleted player's number is never handed out again, and their game's sign-ins go with them: before, the next new
+  phone could get the same number and take the deleted player's game as its own. A restore keeps the highest number the
+  server ever handed out, and only the sign-ins of players the restored database has.
+- Two logins of one sign-in at the same moment get the same key; one of them could be refused at its next start, save
+  or purchase.
+- The live view counts a song as played only from the player's own signed start.
+- The PC client's report leaves out an IPv4 address written in IPv6's form, and the name a sound device carries of its
+  owner ("Sena's AirPods").
+
+### Changed
+
+- The FPS counter waits in the menus and shows in each song, with keyboard play on and off: no menu screen leaves it a
+  place clear of the game's own tabs and panels. The launcher's Position line says so.
+- The sound panel's frequencies and values are set in SemiBold, never under 10 pixels, over glass dark enough to keep
+  every word at 4.5:1 or more; a notice beside the open panel takes the room it leaves, two lines where it took five.
+- The loading tips that sent players to quests for MAX Point say it comes from playing. The patcher is 1.13.0 and the
+  phones' runtime changes, so every server builds its app again; the site's home and download pages say when the server
+  made a new app for phones.
+- The first PLAY in the launcher links a site account with no player to this PC's game player, when that player has no
+  account either, and says it once; the admin pages' Accounts page names each game player with their device and last
+  play.
+- The end of a maintenance is told only to players whose game was told it began.
+- OpenDMTQ-cmd.exe has the launcher's My records (`--records`), My page on the site (`--my-page`), Reset keys
+  (`--reset-keys`) and Use this address (`--use-found`).
+- The launcher and the installer: no yellow buttons (Keep data is plain beside the red Delete all, Start over is the
+  cannot-start window's main button); no card holds a single setting; a ready check row that is not fine says what is
+  wrong; the background's shards and the lit top's panes stay clear of every card and window button; the person who
+  runs a server is its owner, and downloads are 다운로드 throughout.
+- The site and the admin pages: on a screen held sideways every section stays whole and its own to press; the
+  background's shards stay out of the content column; the hall of fame's months are columns across its card; links in
+  a sentence are in the words' colour; an account's changes wait under its More; the Status page's cards are as tall
+  as what they hold; on a phone the Logs page lists its requests 50 at a time.
+- The guides name the game's hosts by their role and none of its files, code or songs; the Docker way clones the
+  release and updates to a release's tag; the guide for players is for players (its workings moved to the
+  architecture), the move off port 80 is told once, and the guides state facts where they recommended or warned. The
+  phone's and the PC's guides tell the account transfer in the game's own words (OPTION's TRANSFER CODE), and the
+  README's first picture and the site's, the admin pages', the launcher's and the game's pictures show 0.11.3.
+- The code, its comments, its logs and its tests name none of the game's servers, its app, its files or its code: the
+  names the patcher, the game server, the player and the tools look for are one encoded table, read by their role,
+  and the patcher finds the client's server address by its form.
+
+### Fixed
+
+- Backups: a restore on the admin pages failed for a server with gigabytes of added songs and said the disk was full;
+  it unpacks beside the backups now. A backup whose bytes changed after it was made is refused on upload and at its
+  restore. An upload or a backup on a full disk is answered in words. A sign-in noted while a restore runs is kept.
+- Port moves: on Kubernetes the Server page's port command moves the router Service with the address, and the pods know
+  the Service's own port; a move behind a router keeps the router's own port and names the forward on every install
+  kind; a waiting change can be taken back; the move off port 80 stays in sight until Done; on Docker Compose the move
+  is made whole or not at all, and a data folder of another user is said first.
+- Docker Compose: BIND_ADDRESS is where `up` waits for the admin pages and what their link says; the refusal to a visit
+  from elsewhere names the server's own port, and the API's refusal is the API's own JSON; the setup ends with the
+  owner's password itself, as a host install's does.
+- With the data disk full, a player's game reaches its own login and its own error message instead of waiting with
+  nothing on the screen, and the Status page says that players cannot sign in or save once it is full.
+- The Linux line tells a system without sudo how to have it first and says which release it brings; starting with the
+  computer and uninstalling say so on a Linux without systemd instead of ending with a traceback; the setup's message
+  for a player names the installer for Windows the site will hand out; an owner's ID the players' site does not take is
+  said with its rule.
+- A one-time link of a disabled account says that the account is disabled.
+- The launcher: Korean PLAY said there were no records beside the list of them; the first-start guide's SERVER step
+  stayed on "Connecting..." after the server answered; a connection test that finds the server gone says so at once; a
+  game ended from outside after it started is no longer said to have not started; no paragraph leaves a short last
+  word alone on its last line; the installer fits its choices with the launcher and the game open and dims its close
+  button while it works.
+- The site and the admin pages: the rankings podium's score is never broken in the middle of the number; the band of an
+  answer's words keeps clear of the button just pressed and stays over a question; the Server page's answers come back
+  to their card in sight; Esc closes a row's More; a ban's end is written as every other date; the setup names a folder
+  it found by what it holds; Korean words as a Korean product says them.
+- The PC client: every answer and update package comes whole within its time however a server trickles it, and so do
+  the server's own downloads of a release; Use this address waits while a game started from the command line plays from
+  the old app; a report of a server named OpenDMTQ keeps OpenDMTQ's own words.
+- The runtime answers futex wakes at the edges of their arguments, and a tgkill naming another thread group, as a
+  phone's kernel does.
+- A rebuild of the phones' app stopped part-way never leaves latest.json describing another app than the file it names.
+- The release with its files is published before main names it, so the README's lines never point at a release that is
+  not there yet.
+
+### For contributors
+
+- Windows itself runs the futex and atomics tests, and the futex test's lost-signal phase has to run on the Windows
+  layer; the launcher's UI suite draws 150 % and the smallest window at 200 % and fails on Tcl's background errors; the
+  pages' suite sweeps screens held sideways and checks the shards against every card; the overlay's words are made on
+  its painter's thread alone; a check reads every file of the repository for the game's own names, and the tests use
+  made-up files.
+
 ## [0.11.2] - 2026-11-24
 
 OpenDMTQ 0.11.2 keeps the game's music list at its page after songs are downloaded, gives the PC client's FPS counter

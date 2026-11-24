@@ -41,8 +41,8 @@ On 64-bit Windows 10 or 11, paste into **Windows PowerShell**:
 
 ```powershell
 cd ~
-curl.exe -fLO https://github.com/kanggu12/openDMTQ/releases/download/v0.11.2/opendmtq-server-0.11.2-windows-x64.zip
-tar.exe -xf opendmtq-server-0.11.2-windows-x64.zip
+curl.exe -fLO https://github.com/kanggu12/openDMTQ/releases/download/v0.11.3/opendmtq-server-0.11.3-windows-x64.zip
+tar.exe -xf opendmtq-server-0.11.3-windows-x64.zip
 start .\OpenDMTQ\OpenDMTQ.exe
 ```
 
@@ -86,7 +86,7 @@ On Debian or Ubuntu, or a Mac with [Homebrew](https://brew.sh), as the user who 
 another Linux, use [Docker](#docker):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/v0.11.2/host/get.sh | sh
+curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/v0.11.3/host/get.sh | sh
 ```
 
 1. It downloads the latest release of OpenDMTQ into `~/openDMTQ` (`OPENDMTQ_DIR=<folder>` before `sh` chooses
@@ -115,7 +115,7 @@ cd ~/openDMTQ
 On Linux, or on Windows with WSL 2, with Docker 23 or newer and Compose, Python 3.9 or newer, and git:
 
 ```sh
-git clone --branch v0.11.2 --depth 1 https://github.com/kanggu12/openDMTQ.git && cd openDMTQ
+git clone --branch v0.11.3 --depth 1 https://github.com/kanggu12/openDMTQ.git && cd openDMTQ
 ./opendmtq setup
 ```
 
@@ -137,7 +137,7 @@ The clone is of one release. To update, take the newer release's tag (this guide
 `.env` and `data` stay:
 
 ```sh
-git fetch origin tag v0.11.2 && git checkout -q v0.11.2
+git fetch origin tag v0.11.3 && git checkout -q v0.11.3
 ./opendmtq up
 ```
 
@@ -283,8 +283,8 @@ MCowBQYDK2VwAyEAjq2VVRpdXSFtyhLeIBOEZdTPvOxI7CsmEcnkn8R7d9c=
 and in the folder you downloaded to:
 
 ```sh
-openssl pkeyutl -verify -pubin -inkey opendmtq-release.pem -rawin -in opendmtq-0.11.2-sha256sums.txt -sigfile opendmtq-0.11.2-sha256sums.txt.sig
-sha256sum -c --ignore-missing opendmtq-0.11.2-sha256sums.txt
+openssl pkeyutl -verify -pubin -inkey opendmtq-release.pem -rawin -in opendmtq-0.11.3-sha256sums.txt -sigfile opendmtq-0.11.3-sha256sums.txt.sig
+sha256sum -c --ignore-missing opendmtq-0.11.3-sha256sums.txt
 ```
 
 The first says `Signature Verified Successfully`, the second `OK` for each file you have.

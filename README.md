@@ -59,21 +59,21 @@ On **Windows 10 or 11**, in PowerShell (the server then runs while its window is
 
 ```powershell
 cd ~
-curl.exe -fLO https://github.com/kanggu12/openDMTQ/releases/download/v0.11.2/opendmtq-server-0.11.2-windows-x64.zip
-tar.exe -xf opendmtq-server-0.11.2-windows-x64.zip
+curl.exe -fLO https://github.com/kanggu12/openDMTQ/releases/download/v0.11.3/opendmtq-server-0.11.3-windows-x64.zip
+tar.exe -xf opendmtq-server-0.11.3-windows-x64.zip
 start .\OpenDMTQ\OpenDMTQ.exe
 ```
 
 On **Debian or Ubuntu**, or a **Mac** with Homebrew, as your own user:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/v0.11.2/host/get.sh | sh
+curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/v0.11.3/host/get.sh | sh
 ```
 
 With **Docker** (Compose, Python 3 and git):
 
 ```sh
-git clone --branch v0.11.2 --depth 1 https://github.com/kanggu12/openDMTQ.git && cd openDMTQ
+git clone --branch v0.11.3 --depth 1 https://github.com/kanggu12/openDMTQ.git && cd openDMTQ
 ./opendmtq setup
 ```
 
