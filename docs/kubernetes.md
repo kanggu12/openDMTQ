@@ -92,6 +92,17 @@ kubectl -n opendmtq create secret tls opendmtq-tls --cert=fullchain.pem --key=pr
 helm upgrade opendmtq oci://ghcr.io/kanggu12/charts/opendmtq -n opendmtq --reuse-values --set router.tls.secretName=opendmtq-tls
 ```
 
+To move the server to another port, name the Service's port with the address's, as the admin pages' Server page does:
+`--reuse-values` keeps the release's own values, and a `router.service.port` among them stays otherwise. The app is
+built again for the new address, and the site's download page tells players:
+
+```sh
+helm upgrade opendmtq oci://ghcr.io/kanggu12/charts/opendmtq -n opendmtq --reuse-values --set publicHost=192.168.1.50:9000 --set router.service.port=9000
+```
+
+Where `publicHost` names a port that a router or a load balancer forwards to the Service, `--set router.service.port`
+alone moves the Service; the address and the app stay, and the forward goes to the new port.
+
 Lower node detection time on the control plane (`--node-monitor-grace-period`) shortens API
 recovery after a node failure; the kind configuration uses 10 seconds.
 

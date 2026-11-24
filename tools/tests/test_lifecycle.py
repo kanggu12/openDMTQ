@@ -593,6 +593,27 @@ class PortMoveTest(unittest.TestCase):
             self.assertIn("./opendmtq port &lt;port&gt;", page)
             self.assertNotIn('action="/opendmtq/admin/server/port"', page)
 
+    def test_on_kubernetes_the_command_moves_the_service_with_the_address(self):
+        # The release's own values stay under --reuse-values, a router.service.port 80 of a values file from before 0.11.0
+        # among them: the command names the Service's port with the address's, or the Service's alone where the address
+        # names a port forwarded to it (DEP-110; main's set publicHost alone, and the Service went back to 80). The page,
+        # GET /server's commands and the setup's change of address say the same.
+        own = "helm upgrade opendmtq <chart> -n games --reuse-values --set publicHost=game.example.com:<port> --set router.service.port=<port>"
+        alone = "helm upgrade opendmtq <chart> -n games --reuse-values --set router.service.port=<port>"
+        for public, listen, command in (("game.example.com:8791", "8791", own), ("game.example.com:8443", "8791", alone)):
+            with Install() as inst, mock.patch.object(admin.setup, "IN_KUBERNETES", True), \
+                    mock.patch.object(admin.core, "PUBLIC_HOST", public), \
+                    mock.patch.dict(os.environ, {"LISTEN_PORT": listen, "POD_NAMESPACE": "games"}):
+                headers = self.token(inst)
+                inst.sign_in()
+                page = html.unescape(inst.client.get("/opendmtq/admin/server").get_data(as_text=True))
+                self.assertIn(f'<pre class="log cmd">{command}</pre>', page, public)
+                self.assertEqual(inst.client.get("/opendmtq/api/v1/server", headers=headers).get_json()["commands"]["port"],
+                                 command)
+                setup_page = html.unescape(inst.client.get("/opendmtq/admin/setup?step=address").get_data(as_text=True))
+                self.assertIn(f"--set publicHost=<address>:{public.rsplit(':', 1)[1]} --set router.service.port={listen}</pre>",
+                              setup_page, public)
+
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class AppNameTest(unittest.TestCase):

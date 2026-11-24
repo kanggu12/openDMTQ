@@ -841,6 +841,10 @@ def setup_page():
         view["addresses"] = this_pcs_addresses() if HOST_INSTALL else []
         view["current"] = address_parts(core.PUBLIC_HOST)[0]
         view["port"] = address_parts(core.PUBLIC_HOST)[1]
+        # The server's own port (on Kubernetes the router Service's, which the chart gives these pages): the command that
+        # changes the address keeps the Service on it. A router.service.port that --reuse-values keeps from a values
+        # file of before 0.11.0 (80) would otherwise take the Service back there beside an address with a port.
+        view["own_port"] = core.own_port() or view["port"]
     elif step == "players":
         count, _ = auth.accounts_count()
         view["accounts"] = count or 0

@@ -1117,6 +1117,56 @@ class HelmPortTest(unittest.TestCase):
         self.assertEqual(set(hosts), {"192.168.1.10:8791"})
         self.assertNotRegex(out, r"192\.168\.1\.10(:80)?[/\"]")
 
+    @staticmethod
+    def server_page_sets(case):
+        """The --set words of the Server page's Kubernetes port command (tools/opendmtq_tools/admin/lifecycle.py,
+        kube_port_command), for an address on the Service's own port ("own") or one forwarded to it ("forwarded"), with
+        a made-up host and port 9000 in place of its placeholders."""
+        with open(os.path.join(ROOT, "tools", "opendmtq_tools", "admin", "lifecycle.py"), encoding="utf-8") as f:
+            body = re.search(r"\ndef kube_port_command\(.*?\n(?=\n\S)", f.read(), re.S).group(0)
+        # The two returns, the forward's first (its words name no publicHost).
+        lines = re.findall(r'return f"\{upgrade\}([^"]*)"', body)
+        line = lines[0] if case == "forwarded" else lines[1]
+        return [s.replace("{host}", "game.example.com").replace("<port>", "9000") for s in re.findall(r"--set (\S+)", line)]
+
+    def test_the_server_pages_port_command_moves_a_release_installed_from_old_values(self):
+        # A release installed with a values file of before 0.11.0 (router.service.port: 80, its default then, and a
+        # publicHost without a port): the chart has it on 8791 (DEP-90); the Server page's command, which --reuse-values
+        # runs with that file's values kept (-f here), moves the Service with the address to the new port, and every
+        # container is told both (DEP-110; main's command set publicHost alone and put the Service back on 80).
+        with tempfile.TemporaryDirectory() as d:
+            old = os.path.join(d, "values.yaml")
+            with open(old, "w", encoding="utf-8") as f:
+                f.write("router:\n  replicas: 2\n  service:\n    type: LoadBalancer\n    port: 80\n    nodePort: null\n")
+            chart = os.path.join(ROOT, "deploy", "helm", "opendmtq")
+
+            def render(sets):
+                done = subprocess.run(["helm", "template", "t", chart, "-f", os.path.join(ROOT, "deploy", "kind", "values.yaml"),
+                                       "-f", old, "--set", "publicHost=game.example.com"] + [a for s in sets for a in ("--set", s)],
+                                      capture_output=True, text=True, timeout=120)
+                self.assertEqual(done.returncode, 0, done.stderr)
+                service = next(doc for doc in done.stdout.split("\n---") if "kind: Service" in doc
+                               and re.search(r"^  name: t-opendmtq$", doc, re.M))
+                return (int(re.search(r"^ +port: (\d+)$", service, re.M).group(1)),
+                        set(re.findall(r"name: PUBLIC_HOST, value: \"?([^\"}\s]+)", done.stdout)),
+                        set(re.findall(r"name: LISTEN_PORT, value: \"?(\d+)", done.stdout)))
+
+            self.assertEqual(render([]), (8791, {"game.example.com:8791"}, {"8791"}))
+            sets = self.server_page_sets("own")
+            self.assertIn("router.service.port=9000", sets)
+            self.assertEqual(render(sets), (9000, {"game.example.com:9000"}, {"9000"}))
+            # The forward's: the Service alone, the address and the app as they were.
+            forwarded = self.server_page_sets("forwarded")
+            self.assertEqual(forwarded, ["router.service.port=9000"])
+            self.assertEqual(render(["publicHost=game.example.com:8443"] + forwarded), (9000, {"game.example.com:8443"}, {"9000"}))
+
+    def test_the_server_and_its_admin_pages_are_told_the_services_own_port(self):
+        # The Server page's port card names the server's own port, the Service's, also where publicHost names another
+        # that a router forwards to it (DEP-111; main gave the pods no LISTEN_PORT, so the card named publicHost's).
+        out = self.rendered("publicHost=game.example.com:8443", "router.service.port=8791")
+        self.assertEqual(re.findall(r"name: LISTEN_PORT, value: \"?(\d+)", out), ["8791", "8791"])
+        self.assertEqual(set(re.findall(r"name: PUBLIC_HOST, value: \"?([^\"}\s]+)", out)), {"game.example.com:8443"})
+
 
 class HostAdminConfTest(unittest.TestCase):
     """The admin pages' part of a host install's Apache settings (host/opendmtq_host/apache.py): the API goes where the pages

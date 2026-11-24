@@ -139,7 +139,9 @@
     {% endif %}
   {% elif kubernetes %}
     <p class="meta">{{ t('setup.address_k8s') }}</p>
-    <pre class="log">helm upgrade opendmtq oci://ghcr.io/kanggu12/charts/opendmtq --reuse-values --set publicHost=&lt;address&gt;</pre>
+    {# The new address keeps the port phones call now, and the Service stays on its own port, named too
+       (lifecycle.kube_port_command says why). #}
+    <pre class="log">helm upgrade opendmtq oci://ghcr.io/kanggu12/charts/opendmtq --reuse-values --set publicHost=&lt;address&gt;:{{ port }} --set router.service.port={{ own_port }}</pre>
   {% else %}
     <p class="meta">{{ t('setup.address_docker') }}</p>
     <pre class="log">./opendmtq host &lt;address&gt;</pre>

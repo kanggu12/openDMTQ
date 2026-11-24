@@ -74,6 +74,22 @@ def kube_names():
     return os.environ.get("OPENDMTQ_RELEASE") or "opendmtq", os.environ.get("POD_NAMESPACE") or "opendmtq"
 
 
+def kube_port_command(release, ns):
+    """The command that moves a Helm release to another port: the router Service's port named with the address's, as the
+    chart reads them (deploy/helm/opendmtq/templates/_helpers.tpl, opendmtq.routerPort). --reuse-values keeps the
+    release's own values, and a router.service.port among them (80, from a values file of before 0.11.0) would keep the
+    Service where it was while the app is built for the new port, which then answers nothing. Where the address names
+    another port than the Service's own (a router's or a load balancer's, forwarded to it), the Service moves alone and
+    the address stays, as on every other install (move_port): the app phones have keeps working."""
+    upgrade = f"helm upgrade {release} <chart> -n {ns} --reuse-values"
+    # Behind a forward: only the Service's port; the forward then goes to it.
+    if public_port() != port_now():
+        return f"{upgrade} --set router.service.port=<port>"
+    host, _ = setup.address_parts(core.PUBLIC_HOST)
+    # The address and the Service on the same new port, the one the app is built for.
+    return f"{upgrade} --set publicHost={host}:<port> --set router.service.port=<port>"
+
+
 def commands():
     """The command for each action on an install where these pages cannot do it: Docker Compose's ./opendmtq, or
     Kubernetes' kubectl and helm. On a host install, which does each from here, only what its pages cannot do when they
@@ -85,12 +101,11 @@ def commands():
                 "name": "./opendmtq name <name>"}
     if kind == "kubernetes":
         release, ns = kube_names()
-        host, _ = setup.address_parts(core.PUBLIC_HOST)
         return {"stop": f"kubectl -n {ns} scale deploy -l app.kubernetes.io/instance={release} --replicas=0",
                 "restart": f"kubectl -n {ns} rollout restart deploy -l app.kubernetes.io/instance={release}",
                 "uninstall": f"helm uninstall {release} -n {ns}",
                 "delete_data": f"kubectl -n {ns} delete pvc -l app.kubernetes.io/instance={release}",
-                "port": f"helm upgrade {release} <chart> -n {ns} --reuse-values --set publicHost={host}:<port>",
+                "port": kube_port_command(release, ns),
                 "name": f"helm upgrade {release} <chart> -n {ns} --reuse-values --set serverName=<name>"}
     # The install's own command: OpenDMTQ.exe on Windows, the opendmtq its setup put on the PATH elsewhere. On Windows
     # the server stops with its window and starts with OpenDMTQ.exe: no command for those (COMMAND_LEADS says so).

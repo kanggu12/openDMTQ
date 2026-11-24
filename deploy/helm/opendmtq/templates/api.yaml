@@ -80,6 +80,9 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - {name: PUBLIC_HOST, value: {{ $host | quote }}}
+            # The server's own port, the router Service's: publicHost's may be another that is forwarded to it, and the
+            # server's own refusals name this one where they say where the admin pages and the API open.
+            - {name: LISTEN_PORT, value: {{ include "opendmtq.routerPort" . | quote }}}
             - {name: OPENDMTQ_VERSION, value: {{ .Chart.AppVersion | quote }}}
             - {name: SERVER_NAME, value: {{ .Values.serverName | quote }}}
             - {name: OPENDMTQ_APK_OUT, value: /srv/apk-all/out}
@@ -139,6 +142,9 @@ spec:
                     "--access-logfile", "-", "opendmtq_tools.admin:app"]
           env:
             - {name: PUBLIC_HOST, value: {{ $host | quote }}}
+            # The server's own port, the router Service's, which the Server page's port card names and its command moves
+            # (publicHost's may be another, forwarded to it: a router's or a load balancer's).
+            - {name: LISTEN_PORT, value: {{ include "opendmtq.routerPort" . | quote }}}
             - {name: OPENDMTQ_VERSION, value: {{ .Chart.AppVersion | quote }}}
             - {name: SERVER_NAME, value: {{ .Values.serverName | quote }}}
             - {name: SERVER_URL, value: "http://127.0.0.1:8080"}
