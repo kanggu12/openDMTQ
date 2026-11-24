@@ -14,6 +14,7 @@ Usage (inside the tools container): python3 -m opendmtq_tools.patch_apk --host 1
 """
 
 import argparse
+import contextlib
 import datetime
 import hashlib
 import json
@@ -21,9 +22,11 @@ import os
 import re
 import secrets
 import shutil
+import signal
 import struct
 import subprocess
 import sys
+import threading
 import zipfile
 
 from . import axml, filelock, il2cpp, pack_arm64, qr, unity_assets
@@ -980,23 +983,76 @@ def build_lock(out_dir):
     return lock
 
 
-def put_in_place(src, dest):
-    """Copy src to dest through a temporary file next to dest that is then swapped in whole. A second
-    build on the same day has the same name as the app the portal offers: a phone that is downloading
-    it keeps reading the old file, and a copy that fails half-way (a full disk) leaves the old file
-    as it was, never a truncated one under the name latest.json points at."""
+@contextlib.contextmanager
+def stop_signals_held():
+    """A stop that comes while the app and its manifests take the old ones' places (docker stop's, compose down's or a
+    restart's SIGTERM, Ctrl-C's SIGINT) is kept until they all have, then handled as it would have been at once (the
+    builder's handler, Python's KeyboardInterrupt, the end of the process): it never comes between them. Python runs
+    signal handlers in its main thread only, and only there can they be changed: a build in another thread keeps none."""
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+    came = []
+    before = {}
+    for signum in (signal.SIGINT, signal.SIGTERM):
+        handler = signal.getsignal(signum)
+        # One set outside Python (None) could not be put back: that signal is left as it is.
+        if handler is None:
+            continue
+        before[signum] = handler
+        # Only noted for now.
+        signal.signal(signum, lambda number, frame: came.append(number))
+    try:
+        yield
+    finally:
+        # The handlers as they were, before any stop that came is handled.
+        for signum, handler in before.items():
+            signal.signal(signum, handler)
+        # Each stop that came, now that the files agree, as it would have been handled then.
+        for signum in came:
+            handler = before[signum]
+            if callable(handler):
+                handler(signum, None)
+            elif handler == signal.SIG_DFL:
+                signal.raise_signal(signum)
+
+
+def put_in_place(src, dest, manifest, manifests):
+    """The new app (src) at dest, and its manifest at each of manifests (the build's own beside it, and latest.json unless
+    the build keeps the portal's download), all taking the old ones' places together. A second build on the same day has
+    the same name as the app the portal offers, and latest.json describes it to the PC clients, which check the file
+    against it, and to the pages. Whatever takes time or room comes first, next to the old files under names nothing
+    reads: the app's copy (a hundred MB, on a disk that may be full), its hash and size (filled into manifest), the
+    manifests' text. Then three renames, with a stop held back until they are done (stop_signals_held). A phone that is
+    downloading the old app keeps reading it, a copy that fails half-way leaves the old app as it was, and no stop leaves
+    latest.json describing one app while its file is another. Returns the manifest."""
     # A dot in front: neither the admin pages, the pruning nor the portal take it for a build.
     part = os.path.join(os.path.dirname(dest), "." + os.path.basename(dest) + ".part")
+    # What to take away again if the build ends before the renames.
+    staged = [part]
     try:
         shutil.copyfile(src, part)
-        os.replace(part, dest)
+        # What phones and PC clients will check the app against: the bytes that take the old file's place.
+        manifest["sha256"] = sha256(part)
+        manifest["size"] = os.path.getsize(part)
+        for target in manifests:
+            staged.append(target + ".tmp")
+            with open(target + ".tmp", "w", encoding="utf-8") as f:
+                json.dump(manifest, f, indent=2)
+        # The app first, then its manifests, each swapped in whole so that readers never see half a file.
+        with stop_signals_held():
+            os.replace(part, dest)
+            for target in manifests:
+                os.replace(target + ".tmp", target)
     except BaseException:
-        # Nothing half-copied stays behind (a hundred MB on a disk that may be full).
-        try:
-            os.remove(part)
-        except OSError:
-            pass
+        # Nothing half-made stays behind (a hundred MB on a disk that may be full); what took its place stays.
+        for path in staged:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
         raise
+    return manifest
 
 
 def main(argv=None):
@@ -1078,28 +1134,22 @@ def build(args, host, out_dir):
         name = app_file_name(host, args.stamp)
         os.makedirs(out_dir, exist_ok=True)
         dest = os.path.join(out_dir, name)
-        # Swapped in whole: the same name may be the app the portal offers right now.
-        put_in_place(os.path.join(signed_dir, signed[0]), dest)
+        # Manifest the CLI and the web portal read: which file to offer and which host it targets. Its hash and size are
+        # the copy's that takes the old file's place (put_in_place).
+        manifest = {
+            "file": name, "host": host, "built_at": datetime.datetime.now().isoformat(timespec="seconds"),
+            "sha256": None, "size": None,
+            "base": os.path.basename(base), "base_sha256": sha256(base), "base_version": client["version"],
+            "base_kind": client["kind"], "patcher": VERSION,
+            "key_sha256": keystore_sha256(), "runtime": runtime, "label": label, "package": package,
+        }
+        # Each build keeps its own manifest (the admin page lists them); latest.json is the portal's.
+        targets = [dest + ".json"] + ([] if args.keep_latest else [os.path.join(out_dir, "latest.json")])
+        # The app and its manifests in their places together: the same name may be the app the portal offers right now.
+        put_in_place(os.path.join(signed_dir, signed[0]), dest, manifest, targets)
     finally:
         # Hundreds of MB, in the admin service's RAM-backed /tmp: never left behind.
         shutil.rmtree(WORK, ignore_errors=True)
-
-    # Manifest the CLI and the web portal read: which file to offer and which host it targets.
-    manifest = {
-        "file": name, "host": host, "built_at": datetime.datetime.now().isoformat(timespec="seconds"),
-        "sha256": sha256(dest), "size": os.path.getsize(dest),
-        "base": os.path.basename(base), "base_sha256": sha256(base), "base_version": client["version"],
-        "base_kind": client["kind"], "patcher": VERSION,
-        "key_sha256": keystore_sha256(), "runtime": runtime, "label": label, "package": package,
-    }
-    # Each build keeps its own manifest (the admin page lists them); latest.json is the portal's.
-    targets = [dest + ".json"] + ([] if args.keep_latest else [os.path.join(out_dir, "latest.json")])
-    for target in targets:
-        tmp = target + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(manifest, f, indent=2)
-        # Atomic swap so readers never see a half-written manifest.
-        os.replace(tmp, target)
 
     # Keep the newest ten builds (and never the one the portal offers).
     prune_builds(out_dir)

@@ -300,6 +300,66 @@ class ReplaceTest(unittest.TestCase):
             # Nothing half-copied is left next to it.
             self.assertEqual([f for f in os.listdir(out) if f.endswith(".part")], [])
 
+    def test_a_stop_as_the_new_app_takes_the_old_ones_place_leaves_it_described(self):
+        # docker stop's SIGTERM, or Ctrl-C, right after a same-day rebuild's app took the old file's place: latest.json went
+        # on describing the old app (its size and hash) until the builder ran again, and a PC client without the app found
+        # the new one damaged against it. The stop now waits for the manifests and ends the run after them.
+        for signum, stop in ((signal.SIGTERM, SystemExit), (signal.SIGINT, KeyboardInterrupt)):
+            with self.subTest(signal=signum.name), Workshop() as w, \
+                    mock.patch.object(builder.runtime, "add_or_note"), contextlib.redirect_stdout(io.StringIO()):
+                # The builder's first app, then the same day's rebuild under the same name, as at every start after an
+                # update.
+                w.signed = b"first build"
+                builder.main(["--host", HOST])
+                name = w.manifest()["file"]
+                real = os.replace
+
+                def replace(src, dst, *args, **kwargs):
+                    real(src, dst, *args, **kwargs)
+                    # The stop, the moment the new app is in the old one's place.
+                    if os.path.basename(dst) == name:
+                        os.kill(os.getpid(), signum)
+                w.signed = b"second build, another size"
+                with mock.patch("os.replace", replace), self.assertRaises(stop):
+                    builder.main(["--host", HOST, "--force"])
+                with open(w.path("out/" + name), "rb") as f:
+                    app = f.read()
+                # The new app is there, and what latest.json and its own manifest say is that app.
+                self.assertEqual(app, b"second build, another size")
+                for rel in ("out/latest.json", "out/" + name + ".json"):
+                    self.assertEqual((w.manifest(rel)["sha256"], w.manifest(rel)["size"]), (sha256(app), len(app)), rel)
+                # The run says it was stopped, and the next one finds nothing damaged; nothing half made is left.
+                self.assertEqual(w.status()["state"], "failed")
+                self.assertNotIn("damaged", builder.reason_to_build(HOST, w.base) or "")
+                self.assertEqual([f for f in os.listdir(w.path("out")) if f.endswith((".part", ".tmp"))], [])
+
+    def test_a_stop_while_the_new_app_is_hashed_leaves_latest_json_true(self):
+        # The second that hashing a hundred MB takes was the gap: the new app was in place by then, and a stop left
+        # latest.json describing the old one under its name. The hashing comes before the swap now, and a stop then leaves
+        # the old app and its manifests as they were, and nothing of the new one.
+        with Workshop() as w, mock.patch.object(builder.runtime, "add_or_note"), contextlib.redirect_stdout(io.StringIO()):
+            w.signed = b"first build"
+            builder.main(["--host", HOST])
+            before = w.manifest()
+            real = patch_apk.sha256
+
+            def hashing(path):
+                # docker stop's SIGTERM while the new app is hashed, wherever it is then.
+                with open(path, "rb") as f:
+                    if f.read() == b"second build, another size":
+                        os.kill(os.getpid(), signal.SIGTERM)
+                return real(path)
+            w.signed = b"second build, another size"
+            with mock.patch.object(patch_apk, "sha256", hashing), self.assertRaises(SystemExit):
+                builder.main(["--host", HOST, "--force"])
+            m = w.manifest()
+            with open(w.path("out/" + m["file"]), "rb") as f:
+                app = f.read()
+            # What latest.json says is the file under its name: the old app, as it was.
+            self.assertEqual((m["sha256"], m["size"]), (sha256(app), len(app)))
+            self.assertEqual((m, app), (before, b"first build"))
+            self.assertEqual([f for f in os.listdir(w.path("out")) if f.endswith((".part", ".tmp"))], [])
+
     def test_a_damaged_app_is_built_again(self):
         # The size the manifest records no longer fits the file (a copy cut short before builds
         # swapped their file in whole): phones would download a broken app.
