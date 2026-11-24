@@ -475,6 +475,10 @@ def owner_file_at_start():
 
 # At start: the owner signs in to the site with what .env says from the first page on.
 owner_file_at_start()
+# An owner's ID the site does not take: said in the log at the start, as the Status page says it (status.attention).
+if not owner.OWNER_ID.fullmatch(core.ADMIN_USER):
+    app.logger.warning("the owner's ID %r cannot sign in to the players' site: an ID there is 1 to 40 letters (A-Z, a-z), "
+                       "digits, '.', '_' or '-'; change ADMIN_USER and start the server again", core.ADMIN_USER)
 
 
 @app.route(BASE + "/login", methods=["GET", "POST"])

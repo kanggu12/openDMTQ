@@ -6,7 +6,13 @@ pages' libraries."""
 import hashlib
 import hmac
 import os
+import re
 import secrets
+
+# An owner's ID the players' site takes (server/portal/auth.php site_owner(), whose sign-in cookie carries 1 to 40 of its
+# bytes): any other opens the admin pages and never the site, whose sign-in then answers "Wrong ID or password". The
+# command line's copy, for its starts: cli/opendmtq_cli/env.py OWNER_ID.
+OWNER_ID = re.compile(r"[A-Za-z0-9._-]{1,40}")
 
 # The rounds of the accounts' passwords (admin/auth.py ACCOUNT_ROUNDS, the site's SITE_ROUNDS): the same number.
 ROUNDS = 120000

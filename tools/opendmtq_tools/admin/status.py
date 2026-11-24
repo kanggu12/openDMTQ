@@ -45,6 +45,10 @@ def attention(health, counts, saved, backup_age, on, build, failed, usage):
         # The step the setup opens at: the first not done.
         step = next(s for s in STEPS if not steps[s])
         out.append(("warn", t("alert.setup", step=step_words()[step]), url_for("setup_page"), t("setup.continue")))
+    # The owner's ID one the players' site does not take (owner.OWNER_ID): the owner signs in here, never there.
+    from .. import owner
+    if not owner.OWNER_ID.fullmatch(core.ADMIN_USER):
+        out.append(("bad", t("alert.owner_id", id=core.ADMIN_USER), url_for("server_page") + "#password", t("nav.server")))
     # Every account is disabled: nobody can get in. (With no account at all the setup is not done, and its line above
     # leads to its players' step.)
     total, usable = auth.accounts_count()

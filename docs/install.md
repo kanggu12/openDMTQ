@@ -237,7 +237,7 @@ counts from the server's next start.
 | `PORT_80` | `chosen`: port 80 by your own choice (`./opendmtq port 80`), which every start keeps; a server only set up on port 80 before 0.11.0 moves off it | `./opendmtq port 80` |
 | `BASE_APK` | The client to patch when `data/apk/base` holds several (a file name there) | `./opendmtq apk --base` |
 | `ADMIN_PASSWORD` | The owner's password on the admin pages and the players' site | the setup, `./opendmtq password`, the admin pages' Server page |
-| `ADMIN_USER` | The owner's ID (`admin` when unset) | by hand |
+| `ADMIN_USER` | The owner's ID (`admin` when unset): 1 to 40 letters (A-Z, a-z), digits, `.`, `_` or `-`, which the players' site takes too | by hand |
 | `ADMIN_ON_PUBLIC_PORT` | `yes`: admin pages at `/opendmtq/admin/` from anywhere; `no`: from the server PC only, on the same port | `./opendmtq expose` (unless `--admin-public`) |
 | `LIVE_DEFAULT` | `on`: a new player's broadcast starts on until the Broadcasts page says otherwise ([broadcasts](live.md)); `off` when unset | by hand |
 | `RESTART` | `unless-stopped`: the server starts again with Docker | by hand |

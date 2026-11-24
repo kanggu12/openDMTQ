@@ -12,7 +12,7 @@ from xml.sax.saxutils import escape
 
 from opendmtq_cli import checks, env, look
 from .paths import HERE, CLI, DATA, ENV_FILE, LOGS, MAC, ROOT, START_WAIT, WINDOWS
-from .output import die, ok, say, tell
+from .output import die, ok, say, tell, warn
 from .programs import programs
 from .settings import admin_url, leave_port_80, listen_port, require_settings, settings, site_url
 from .folders import make_folders, tool, version
@@ -54,6 +54,10 @@ def cmd_start(args):
         for line in look.address_block(site_url(values), admin_url(values),
                                        values.get("ADMIN_USER") or "admin", where="ADMIN_PASSWORD in .env"):
             say(line)
+        # An owner's ID the players' site does not take, said with the sign-in (env.owner_id_problem).
+        problem = env.owner_id_problem(values)
+        if problem:
+            warn(problem)
     return 0
 
 

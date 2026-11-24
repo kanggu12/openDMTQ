@@ -6,7 +6,7 @@ import os
 import sys
 import time
 
-from opendmtq_cli import discover, look
+from opendmtq_cli import discover, env, look
 from .paths import DATA, ROOT, WINDOWS
 from .output import die, ok, say, tell, warn
 from .programs import programs
@@ -152,6 +152,10 @@ def summary(values):
                                    values.get("ADMIN_USER") or "admin", values.get("ADMIN_PASSWORD"),
                                    f"kept in .env in {ROOT}" + ("; Notepad opens it" if WINDOWS else "")):
         say(line)
+    # An owner's ID the players' site does not take: said where the owner reads their sign-in (env.owner_id_problem).
+    problem = env.owner_id_problem(values)
+    if problem:
+        warn(problem)
     say("")
     tell("Players need an account: make one for each on the admin pages, under Accounts.")
     show_address(values)

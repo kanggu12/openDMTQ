@@ -327,6 +327,36 @@ class LogsPageTest(unittest.TestCase):
         page = self.page({"access.log": ("a-request\n", 50), "access.log.1": ("b-request\n", 0), "access.log.2": ("c-request\n", 100)})
         self.assertNotIn("c-request", page)
 
+@unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
+class OwnerIdTest(unittest.TestCase):
+    """An owner's ID (ADMIN_USER) the players' site does not take (an e-mail address, a space, Hangul, more than 40):
+    the admin pages open with it, the site answers "Wrong ID or password"; the Status page says so with the rule and what
+    to change, in both languages (ADM-228; main said nothing)."""
+
+    def test_the_status_page_says_an_id_the_site_does_not_take(self):
+        # (One longer than 40 signs in nowhere: these pages take 40 characters of an ID typed. The starts say it.)
+        for user, said in (("kang@home.example", True), ("owner one", True), ("김세나", True),
+                           ("admin", False), ("kang.home_2-x", False), ("x" * 40, False)):
+            with Install() as inst, mock.patch.object(admin.core, "ADMIN_USER", user):
+                inst.client.post("/opendmtq/admin/login", data={"name": user, "password": "pw"})
+                page = html.unescape(inst.client.get("/opendmtq/admin/").get_data(as_text=True))
+                english = (f"The owner's ID, {user}, cannot sign in to the players' site: an ID there is 1 to 40 letters "
+                           "(A-Z, a-z), digits, ., _ or -. Change ADMIN_USER (admin.user in the Helm chart) and start the "
+                           "server again.")
+                self.assertEqual(english in page, said, user)
+                if said:
+                    inst.client.set_cookie("opendmtq_lang", "ko")
+                    page = html.unescape(inst.client.get("/opendmtq/admin/").get_data(as_text=True))
+                    self.assertIn(f"소유자 아이디 {user}로는 플레이어 사이트에 로그인할 수 없습니다.", page)
+
+    def test_the_rule_is_the_sites(self):
+        # The pattern the site's PHP takes the owner's ID by (server/portal/auth.php site_owner()) is the admin pages'.
+        from opendmtq_tools import owner
+        with open("/server/portal/auth.php", encoding="utf-8") as f:
+            site = re.search(r"preg_match\('/\^(.*?)\$/', \$lines\[0\]\)", f.read())
+        self.assertEqual(site.group(1), owner.OWNER_ID.pattern)
+
+
 class BuildStatusTest(unittest.TestCase):
     def dashboard(self, inst):
         inst.sign_in()

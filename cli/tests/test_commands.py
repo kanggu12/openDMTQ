@@ -831,6 +831,23 @@ class MessageTest(unittest.TestCase):
             self.assertIn("http://127.0.0.1:8790/opendmtq/admin/login", sb.urls)
             self.assertNotIn("9791", sb.output())
 
+    def test_an_owners_id_the_site_does_not_take_is_said_at_the_start(self):
+        # ADMIN_USER of an e-mail address, a space, Hangul or more than 40 characters opens the admin pages (40 at most)
+        # and never the players' site: up says so with the rule, under the owner's sign-in (CLI-95; main said nothing).
+        for user in ("kang@home.example", "owner one", "김세나", "x" * 41):
+            with Sandbox(f"PUBLIC_HOST=192.168.0.10:8791\nLISTEN_PORT=8791\nADMIN_USER={user}\nADMIN_PASSWORD=x\n") as sb:
+                game_data(sb)
+                with mock.patch.object(app.time, "sleep"):
+                    self.assertEqual(sb.call(app.cmd_up), 0, sb.output())
+                self.assertIn(f"ADMIN_USER={user} cannot sign in to the players' site: an ID there is 1 to 40 letters "
+                              "(A-Z, a-z), digits, '.', '_' or '-'; change it in .env, then start the server again",
+                              sb.output(), user)
+        with Sandbox("PUBLIC_HOST=192.168.0.10:8791\nLISTEN_PORT=8791\nADMIN_USER=kang.home_2-x\nADMIN_PASSWORD=x\n") as sb:
+            game_data(sb)
+            with mock.patch.object(app.time, "sleep"):
+                self.assertEqual(sb.call(app.cmd_up), 0, sb.output())
+            self.assertNotIn("cannot sign in", sb.output())
+
     def test_bind_address_is_where_up_waits_and_what_the_link_says(self):
         # BIND_ADDRESS, as docs/troubleshooting.md has a Linux owner set it, publishes the port on that address alone
         # (CLI-92; main waited on 127.0.0.1, where nothing answered, for 30 s and said the admin pages were not answering,

@@ -18,6 +18,20 @@ _NAME = re.compile(r"(?=.{1,253}$)([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(
 # starts a comment, a backslash or a backquote).
 OWNER_PASSWORD = r"[^\s\"'$#\\`]{10,64}"
 
+# The owner's ID as the players' site takes it (server/portal/auth.php site_owner(); tools/opendmtq_tools/owner.py
+# OWNER_ID, the admin pages' copy): another opens the admin pages and never the site.
+OWNER_ID = r"[A-Za-z0-9._-]{1,40}"
+
+
+def owner_id_problem(values):
+    """Words for an owner's ID (ADMIN_USER) the players' site does not take, or None: what the start says, as the admin
+    pages' Status page says it."""
+    user = values.get("ADMIN_USER") or "admin"
+    if re.fullmatch(OWNER_ID, user):
+        return None
+    return (f"ADMIN_USER={user} cannot sign in to the players' site: an ID there is 1 to 40 letters (A-Z, a-z), digits, "
+            "'.', '_' or '-'; change it in .env, then start the server again")
+
 
 def parse(text):
     """KEY=value pairs from .env text, the way docker compose reads them."""

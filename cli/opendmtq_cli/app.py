@@ -410,6 +410,10 @@ def cmd_up(args):
     print()
     for line in address_lines(host, values):
         print(line)
+    # An owner's ID the players' site does not take: said with the sign-in, as the admin pages' Status page says it.
+    problem = env.owner_id_problem(values)
+    if problem:
+        warn(problem)
     wait_builder(since)
     if checks.app_lacks_runtime():
         warn(checks.no_runtime_notice())

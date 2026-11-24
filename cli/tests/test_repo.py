@@ -1356,6 +1356,18 @@ class HostAdminConfTest(unittest.TestCase):
             self.assertNotIn("18791/opendmtq/admin/\"", conf)
 
 
+class OwnerIdRuleTest(unittest.TestCase):
+    def test_the_command_line_the_admin_pages_and_the_site_take_one_owners_id(self):
+        # The owner's ID as the players' site takes it, the same in the three places that say or take it (CLI-95, ADM-228).
+        with open(os.path.join(ROOT, "tools", "opendmtq_tools", "owner.py"), encoding="utf-8") as f:
+            tools = re.search(r'^OWNER_ID = re\.compile\(r"(.*)"\)$', f.read(), re.M).group(1)
+        with open(os.path.join(ROOT, "cli", "opendmtq_cli", "env.py"), encoding="utf-8") as f:
+            cli = re.search(r'^OWNER_ID = r"(.*)"$', f.read(), re.M).group(1)
+        with open(os.path.join(ROOT, "server", "portal", "auth.php"), encoding="utf-8") as f:
+            site = re.search(r"preg_match\('/\^(.*?)\$/', \$lines\[0\]\)", f.read()).group(1)
+        self.assertEqual({tools, cli, site}, {"[A-Za-z0-9._-]{1,40}"})
+
+
 class VirtualInterfacesTest(unittest.TestCase):
     def test_the_command_line_and_the_admin_pages_skip_the_same_ones(self):
         # Two packages that do not import each other: an interface on one list only gives an address on one screen only.
