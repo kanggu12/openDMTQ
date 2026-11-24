@@ -96,6 +96,8 @@ same account once, within a minute. **My records**, under the page's columns, li
 best records from the server, each with the song, the chart, when, the score (with the keyboard's mark before it when a
 keyboard played it) and the place on that chart (#2 of 5); it is asked for when the page shows and again after a game.
 An account the server's owner has not linked to a game player says so instead, and signed out the card is not there.
+The first **PLAY** links an account that has no player to this PC's game player, when that player has no account
+either, and the bottom line says so once.
 
 ![My records, the PLAY page's last card: three recent plays and three best records, each with its song, chart and when, the score with the keyboard's mark before those a keyboard played, and the place on the chart; at its top right what the keyboard's mark means](images/client-records.png)
 

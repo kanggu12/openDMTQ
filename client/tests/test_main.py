@@ -747,8 +747,9 @@ class LinkAtPlay(Folder):
         self.assertEqual(code, 0, said)
         folder = os.path.join(self.home, "local", "OpenDMTQ", "app.example.stand.in", "data")
         os.makedirs(folder)
-        with open(os.path.join(folder, "android_id"), "w", encoding="utf-8") as f:
-            f.write("0a1b2c3d4e5f6071\n")
+        # As the player for Windows leaves it: the sixteen digits, then Windows' line end.
+        with open(os.path.join(folder, "android_id"), "w", encoding="utf-8", newline="") as f:
+            f.write("0a1b2c3d4e5f6071\r\n")
         code, said = self.run_main(["--play"])
         self.assertEqual(code, 0, said)
         line = "This PC's player is now linked to your site account %s." % stub.ACCOUNT

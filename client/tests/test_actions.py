@@ -331,6 +331,66 @@ class Actions(Folder):
         self.assertEqual(json.loads(kept)["servers"][0]["cookie"], self.site.cookie)
 
 
+class LinkSaidInTheWindow(Folder):
+    """The window says the link once, after the game: with the line of how the game ended while it stands, alone once the
+    player has moved on, nothing for no link; PLAY's records asked for again after it, saved."""
+
+    def window(self, state):
+        """A stand-in for the window with its game's-end methods and the status line's; its tasks kept for the test."""
+        import types
+        from opendmtq_client import app as launcher
+        app = types.SimpleNamespace(state=state, words=i18n.Words("en"), status_message=None, status_tone="normal",
+                                    status_action=None, status_transient=False, status_sticky=False, tasks=[],
+                                    asked=[], _paint_status=lambda: None)
+        app.post = app.tasks.append
+        app.refresh_records = lambda force=False: app.asked.append(force)
+        for name in ("after_game", "_linked_after_game", "set_status"):
+            setattr(app, name, getattr(launcher.LauncherApp, name).__get__(app))
+        app.text = lambda: launcher.LauncherApp.status_text.fget(app)
+        return app
+
+    def ended(self, app, linked=None, sticky=True):
+        """The game's end as the window's watch leaves it, then its link's worker and its tasks run in order."""
+        import threading
+        app.set_status(i18n.Said("status.ended", time=i18n.span(300)), "ok", sticky=sticky)
+        app.play_linked = linked
+        app.after_game()
+        for thread in [t for t in threading.enumerate() if t.name == "link"]:
+            thread.join(10)
+        for task in list(app.tasks):
+            task()
+
+    def test_said_once_after_how_the_game_ended(self):
+        state = st.LauncherState()
+        app = self.window(state)
+        with mock.patch.object(actions, "link_player", return_value=None) as asked:
+            # A link PLAY made at its start: said, nothing asked again.
+            self.ended(app, linked=stub.ACCOUNT)
+            asked.assert_not_called()
+        self.assertEqual(app.text(), "The game closed after 5 min. This PC's player is now linked to your site account %s."
+                         % stub.ACCOUNT)
+        self.assertEqual(app.status_tone, "ok")
+        self.assertTrue(app.status_sticky)
+        self.assertEqual(app.asked, [True])
+        # In Korean too, as the window's language says it.
+        app.words = i18n.Words("ko")
+        self.assertTrue(app.text().endswith("이 PC의 플레이어를 사이트 계정 %s에 연결했습니다." % stub.ACCOUNT), app.text())
+
+    def test_the_first_game_here_and_a_player_who_moved_on(self):
+        state = st.LauncherState()
+        app = self.window(state)
+        # The game's end made it (the PC's first game): the link alone once the player has moved on (nothing sticky).
+        with mock.patch.object(actions, "link_player", return_value=stub.ACCOUNT):
+            self.ended(app, sticky=False)
+        self.assertEqual(app.text(), "This PC's player is now linked to your site account %s." % stub.ACCOUNT)
+        # No link: the line of how the game ended stays as it was, and the records are asked for all the same.
+        app = self.window(state)
+        with mock.patch.object(actions, "link_player", return_value=None):
+            self.ended(app)
+        self.assertEqual(app.text(), "The game closed after 5 min.")
+        self.assertEqual(app.asked, [True])
+
+
 class LinkAtPlay(Folder):
     """PLAY links the signed-in site account to this PC's game player on the server (client.php?claim), when the account
     has no player and that player no account: at PLAY when a game played here before gave the id the game signs in by,
@@ -350,11 +410,12 @@ class LinkAtPlay(Folder):
         actions.sign_in(self.state, stub.ACCOUNT, stub.PASSWORD)
 
     def played_here(self):
-        """The id the player writes in the game's data folder of the server's app at the game's first start."""
+        """The id the player writes in the game's data folder of the server's app at the game's first start, as the
+        player for Windows leaves it (a run under Wine read for its form: the sixteen digits, then Windows' line end)."""
         folder = os.path.join(player.data_folder(self.site.describe()["package"]), "data")
         os.makedirs(folder, exist_ok=True)
-        with open(os.path.join(folder, "android_id"), "w", encoding="utf-8") as f:
-            f.write(self.DEVICE + "\n")
+        with open(os.path.join(folder, "android_id"), "w", encoding="utf-8", newline="") as f:
+            f.write(self.DEVICE + "\r\n")
 
     def claims(self):
         return [r for r in self.site.requests if r[1] == "/opendmtq/client.php?claim"]

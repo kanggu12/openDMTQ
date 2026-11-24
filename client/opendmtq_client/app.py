@@ -438,6 +438,8 @@ class LauncherApp:
         from opendmtq_client import playing
         self.busy = False
         self.session = session
+        # The site account this PLAY linked to this PC's game player: said once the game is over (after_game).
+        self.play_linked = getattr(session, "linked", None)
         # A download PLAY made is over and in place.
         self.download, self.download_error = None, None
         self.state.save()
@@ -489,7 +491,33 @@ class LauncherApp:
         if self.state.values != sound and self.page_follow is not None and not followed:
             # The sound the in-game menu set, on the page on show (the Sound page, the guide's step), in place.
             self.page_follow()
-        # The game's plays are on the server now: PLAY's records asked for again.
+        # The game's plays are on the server now: PLAY's records asked for again, once a link it made is said.
+        self.after_game()
+
+    def after_game(self):
+        """The game's end, on a worker thread: the site account linked to this PC's game player now when the game's first
+        start here gave the id it signs in by (actions.link_player; a link PLAY made at its start is taken as it is),
+        said once on the status line; then PLAY's records asked for again, as they are now."""
+        made, self.play_linked = getattr(self, "play_linked", None), None
+
+        def work():
+            # A sign-in that ended, and the link settled, are changed on the window's own thread, as every change is.
+            account = made or actions.link_player(self.state, change=self.post)
+            self.post(lambda: self._linked_after_game(account))
+
+        threading.Thread(target=work, daemon=True, name="link").start()
+
+    def _linked_after_game(self, account):
+        """A link made (`account`, or None): said once, after the words of how the game ended while they stand (they stay
+        until the player acts), or alone once the player has moved on; then the records, which are its player's now."""
+        if account:
+            said = i18n.Said("status.linked", account=account)
+            if self.status_sticky:
+                self.set_status(i18n.Said("status.and", first=self.status_message, then=said), self.status_tone,
+                                action=self.status_action, sticky=True)
+            else:
+                self.set_status(said, "ok", sticky=True)
+            self.state.save()
         self.refresh_records(force=True)
 
     def open_player_log(self):
