@@ -257,7 +257,9 @@ buttons, and it goes while the bar is down.
 <p align="center">
   <img src="images/game-pc-sound.jpg" alt="The sound panel open under the bar during a song, its Sound button pressed in:
   Master, Music and Effects as sliders at 85, 80 and 90 %, the equaliser's presets, each as wide as its word, with Bass
-  chosen, and its Low, Mid and High bands in decibels; the FPS counter at 240 at the bottom right" width="100%">
+  chosen, and its Low, Mid and High bands with their frequencies, in decibels, the panel's numbers in a heavier face over
+  darker glass; beside the panel, in the room it leaves, the broadcast notice, LIVE, Broadcasting your play; the FPS
+  counter at 240 at the bottom right" width="100%">
 </p>
 
 The bar's **Sound** button opens a card of glass under the bar at the game's right side: **Master**, **Music** and
