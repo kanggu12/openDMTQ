@@ -485,18 +485,41 @@ class OneWordingTest(unittest.TestCase):
 class OriginalNamesTest(unittest.TestCase):
     """DEP-130: the README and the guides, their figures among them, name none of the game's own: its original hosts,
     its platform and SDK, its app's package and another edition, its data files, its code, its songs (the owner's rule).
-    They say what each is for instead. The words are kept here as digests only, so that this file names none of them."""
+    They say what each is for instead. DEP-137: every other text file of the repository (code, comments, tests, fixtures,
+    scripts, other guides) names none of them either, but for the client data's own files and the protocol's own keys,
+    which the code must name to serve and read them; a name the code must use is in client_marks.py's table, encoded.
+    The words are kept here as digests only, so that this file names none of them."""
 
-    # The first 16 hex digits of the SHA-256 of each word in lower case: the original hosts' labels and the platform's,
-    # the SDK's name, the original app's package, another edition of the game, classes, methods and fields of the
-    # game's and the SDK's code, the client's table files and a column of one, and the patch manifest's name.
-    REFUSED = {
+    # The first 16 hex digits of the SHA-256 of each word in lower case. NAMES, refused in every file: the original
+    # hosts' labels and the platform's, the SDK's name, the original app's package, another edition of the game, and
+    # classes, namespaces, methods and fields of the game's code, of its platform's SDK and of its own plugins.
+    NAMES = {
         "d6346b9af21aa4ed", "2afe30a2bd45057c", "80db63946107faba", "368d8e31a31df004", "2ae3f64dcdf74642",
         "699b0abdb612e9e7", "3949fb706769665e", "21e87c9ee4d3d311", "10190bd54cc85dab", "a72c2dc8615e4f9c",
         "3f0a5df004ed8c37", "e35a09609cd77109", "0f46de540331dd14", "30cd4a85fc09f695", "80c8afd70c8ca8d9",
-        "66499da637f97267", "ca4ad6efe36dc03c", "190f7a024f816eba", "33e2bdae3386546f", "0769a2191e4774ff",
-        "dafda178f5d5db6a", "cf6b2f2c19b0716c", "03dc667a2453fa27", "fe60034562453c6d", "d24c7811fc74d2c0",
+        "66499da637f97267", "ca4ad6efe36dc03c", "e15796bd9e3f785f", "69a2af1bb770167d", "8c5adbbbe569b129",
+        "28d9f7f04d91d12f", "bd8481b1ad66b328", "b10e4f1ece4b571e", "9bba163aae0165ab", "ebf31e02252fec8e",
+        "139c5e9d74ccd696", "58500ef45cfff001", "5d9781cd523dc098", "a6c25d6a6132ea0a", "032e06177f33d612",
+        "a00e8cd128b19c05", "658eddd1c535648d", "994b2b87279cca43", "1c685bc3313b2bac", "32a9fbe79ce90c19",
+        "15bb5105e341825c", "cac7bbb7b05a86e1", "5ac8842856b4642c", "599f06e47e6c98fa", "d02ad212e4b923f5",
+        "ea7d325704aae6e0", "085758866bafc839", "45f82add335a4e84", "ff9fe74e651359f4", "a059d5a3311523d2",
+        "e2021168280ad242", "27cff103a57227e4", "e27e7a215113fff9", "a6faad178c4d3037", "d707471e11bc2920",
+        "6c48b84ce1677c6a", "26286318a778dc27", "0ae9bb2b7c69db7a", "97e1000e4c7d506c", "d520944fb3e43fca",
+        "e0ab14225016f86a", "aa832ceb753844fa",
     }
+    # DATA, refused in the pages only: the client's table files and a column of one, and the patch manifest's name, the
+    # protocol's own names, which the server serves and the tools read by them.
+    DATA = {
+        "190f7a024f816eba", "33e2bdae3386546f", "0769a2191e4774ff", "dafda178f5d5db6a", "cf6b2f2c19b0716c",
+        "03dc667a2453fa27", "fe60034562453c6d", "d24c7811fc74d2c0",
+    }
+    # The words the pages refuse.
+    REFUSED = NAMES | DATA
+    # The protocol's own keys among NAMES (a key of the game's reply with a song's addresses): kept where one stands quoted
+    # whole, as the code reads and writes it.
+    KEYS = {"2afe30a2bd45057c"}
+    # A word quoted whole, with either quote.
+    QUOTED = re.compile(r"""(['"])([a-z0-9_]+)\1""")
     # A word as the digests were made of it: letters and digits, alone or joined by underscores as a file's or a
     # table's name joins them (each part is looked at too).
     WORD = re.compile(r"[a-z0-9]+(?:_[a-z0-9]+)*")
@@ -511,18 +534,50 @@ class OriginalNamesTest(unittest.TestCase):
         found += sorted(glob.glob(os.path.join(ROOT, "docs", "images", "*.svg")))
         return found
 
+    @staticmethod
+    def tree():
+        """Every file of the repository but the pages: its tracked files where git can tell them (the repository a clone
+        of its own), else every file under it but the folders it ignores (CI's Python 3.9 container has no git, and an
+        export may lie in another repository)."""
+        pages = set(OriginalNamesTest.pages())
+        top = subprocess.run(["git", "-C", ROOT, "rev-parse", "--show-toplevel"], capture_output=True, text=True) if shutil.which("git") else None
+        if top is not None and top.returncode == 0 and os.path.realpath(top.stdout.strip()) == os.path.realpath(ROOT):
+            out = subprocess.run(["git", "-C", ROOT, "ls-files", "-z"], capture_output=True, check=True).stdout
+            found = [os.path.join(ROOT, rel) for rel in out.decode("utf-8").split("\0") if rel]
+        else:
+            found = []
+            for folder, dirs, files in os.walk(ROOT):
+                # The folders .gitignore leaves out at the top (game data, scratch, a host install's own), and git's own.
+                dirs[:] = [d for d in dirs if d not in ("__pycache__", "node_modules")
+                           and not (folder == ROOT and d in (".git", "_work", "data", ".host"))]
+                found += [os.path.join(folder, name) for name in files]
+        return sorted(path for path in found if path not in pages and os.path.isfile(path))
+
     @classmethod
-    def refused(cls, text):
-        """The numbers of the lines of text that name one of the refused words, or a song by its id."""
+    def refused(cls, text, tree=False):
+        """The numbers of the lines of text that name a refused word: in a page one of REFUSED, or a song by its id; in any
+        other file (tree) one of NAMES, but a protocol key quoted whole."""
         import hashlib
+        refused = cls.NAMES if tree else cls.REFUSED
+        # Each word's digest once: a long file repeats its words.
+        digests = {}
+
+        def digest(word):
+            if word not in digests:
+                digests[word] = hashlib.sha256(word.encode()).hexdigest()[:16]
+            return digests[word]
+
         lines = []
         for number, line in enumerate(text.lower().splitlines(), 1):
+            if tree:
+                # A protocol key quoted whole is the protocol's own: out of the line before its words are read.
+                line = cls.QUOTED.sub(lambda m: "" if digest(m.group(2)) in cls.KEYS else m.group(0), line)
             words = set()
             for found in cls.WORD.findall(line):
                 # The whole word and each of its parts: a table's file and a name's label alike.
                 words.add(found)
                 words.update(found.split("_"))
-            if any(hashlib.sha256(w.encode()).hexdigest()[:16] in cls.REFUSED for w in words) or cls.SONG_ID.search(line):
+            if any(digest(w) in refused for w in words) or (not tree and cls.SONG_ID.search(line)):
                 lines.append(number)
         return lines
 
@@ -551,6 +606,88 @@ class OriginalNamesTest(unittest.TestCase):
         kept = ["https://<the game's host>/DMQ/rpc", "where the list fills in a song's slot", "the tables of songs",
                 "a bundle numbered by its song id", "e<song id>", "Kak" + "aoTalk and LINE", "user.loginV2 and SVC.05008"]
         self.assertEqual(self.refused("\n".join(kept)), [])
+
+    def test_the_rest_of_the_tree_names_none_of_the_games_own(self):
+        files = self.tree()
+        self.assertGreater(len(files), 500)
+        found = []
+        for path in files:
+            try:
+                with open(path, encoding="utf-8") as f:
+                    text = f.read()
+            except (UnicodeDecodeError, OSError):
+                # A picture, a font or an archive: no words to read.
+                continue
+            lines = self.refused(text, tree=True)
+            if lines:
+                # The file and its lines, never the word: this file says none of them.
+                found.append(f"{os.path.relpath(path, ROOT)}: lines {lines}")
+        self.assertEqual(found, [], "these name the game's own (a host, the platform, the app's package, its code or its "
+                                    "SDK's): say what it is for, and keep a name the code must use in client_marks.py")
+
+    def test_the_tree_check_finds_what_it_is_for(self):
+        # Made of parts, as above: the SDK's class by its path, the game's input class looked up by name, the key of a
+        # song's addresses quoted whole in a reply and the same key read unquoted. The first two and the last are found;
+        # the quoted key, the protocol's own, and a table file the server serves by its name are not.
+        code = ['jvm::define("com/' + "pm" + "ang" + 'plus/unity3d/Facade");', 'klass("", "DMQ' + 'Input");',
+                "return ['" + "pm" + "ang' => $files];", "url." + "pm" + "ang", 'open("song' + '_song.csv")']
+        self.assertEqual(self.refused("\n".join(code), tree=True), [1, 2, 4])
+        # The same lines in a page: the quoted key and the table file are refused there too.
+        self.assertEqual(self.refused("\n".join(code)), [1, 2, 3, 4, 5])
+
+
+class ClientNamesTest(unittest.TestCase):
+    """DEP-138: the names the runtime and the player look up in the game's code and define for its SDKs are those of the
+    patcher's table of the client's names (tools/opendmtq_tools/client_marks.py), encoded: arm32/src/client_names.h is
+    what the table makes, each of its names decodes as client_names::text() decodes it to the table's, and the C++ that
+    looks them up holds none of them as it is. A failure says which by its constant, never by the name."""
+
+    # The C++ that looks the names up, or defines them for the game's Java calls.
+    USERS = ("arm32/desktop/keyplay.cpp", "arm32/desktop/soundmix.cpp", "arm32/desktop/platform_sdk.cpp",
+             "arm32/desktop/sdk.cpp", "arm32/src/live.cpp", "arm32/src/tweaks.cpp", "arm32/shim/shim.cpp")
+
+    @staticmethod
+    def marks():
+        """client_marks.py on its own, by its path (it needs the standard library only; the tools' package around it
+        needs what a test machine may not have)."""
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("client_marks", os.path.join(ROOT, "tools", "opendmtq_tools", "client_marks.py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    @staticmethod
+    def header():
+        with open(os.path.join(ROOT, "arm32", "src", "client_names.h"), encoding="utf-8") as f:
+            return f.read()
+
+    def test_the_header_is_the_tables(self):
+        self.assertEqual(self.header(), self.marks().cpp_header(),
+                         "write it again from tools/: python3 -m opendmtq_tools.client_marks --cpp > ../arm32/src/client_names.h")
+
+    def test_each_name_decodes_to_the_tables(self):
+        import hashlib
+        # Each constant and its hex digits, a long name's pieces joined as the compiler joins them.
+        held = {const: "".join(re.findall(r'"([0-9a-f]*)"', body))
+                for const, body in re.findall(r"constexpr const char (k\w+)\[\] =([^;]*);", self.header())}
+        names = [(const, name) for const, _, name in self.marks().PLAYER if const]
+        self.assertEqual(sorted(held), sorted(const for const, _ in names))
+        self.assertGreater(len(names), 60)
+        for const, name in names:
+            raw = bytes.fromhex(held[const])
+            # As client_names::text() reads it: each byte XORed with 0x5c plus its place (mod 256).
+            text = bytes(b ^ ((0x5C + i) & 0xFF) for i, b in enumerate(raw)).decode("utf-8")
+            # Compared by digest, so that a failure prints no name.
+            self.assertEqual(hashlib.sha256(text.encode()).hexdigest(), hashlib.sha256(name.encode()).hexdigest(), const)
+
+    def test_the_code_that_looks_them_up_holds_none_as_it_is(self):
+        names = [(const, name) for const, _, name in self.marks().PLAYER if const]
+        for rel in self.USERS:
+            with open(os.path.join(ROOT, rel), encoding="utf-8") as f:
+                text = f.read()
+            self.assertIn('#include "client_names.h"', text, rel)
+            # A name quoted as it is, by its constant.
+            self.assertEqual([const for const, name in names if f'"{name}"' in text], [], rel)
 
 
 class DesignTest(unittest.TestCase):
