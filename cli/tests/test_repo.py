@@ -191,6 +191,22 @@ class GuidesFactsTest(unittest.TestCase):
             self.assertIn("on two cores it answers hundreds of game requests a second", " ".join(f.read().split()))
 
 
+class HeadlessSetupTest(unittest.TestCase):
+    def test_the_install_guide_says_where_the_files_go_on_a_computer_without_a_screen(self):
+        # DEP-135: on a computer without a screen the setup's address opens in another computer's browser, and the setup
+        # there looks in the server's own folders only: the Linux steps say so, and how the files get there or are named
+        # (main said only that the address is printed, and a first owner found no way to the files).
+        with open(os.path.join(ROOT, "docs", "install.md"), encoding="utf-8") as f:
+            text = f.read()
+        linux = " ".join(text.split("\n## Linux or macOS\n", 1)[1].split("\n## ", 1)[0].split())
+        for words in ("which another computer's browser opens", "looks for the game's files in the server's own folders only",
+                      "they go onto it first", "`./opendmtq setup --from <folder>` imports them from wherever they are on it"):
+            self.assertIn(words, linux)
+        # The flag the guide names is the host program's own.
+        with open(os.path.join(ROOT, "host", "opendmtq_host", "cli.py"), encoding="utf-8") as f:
+            self.assertIn('s.add_argument("--from", dest="from_folder"', f.read())
+
+
 class PlayerRateTest(unittest.TestCase):
     def test_the_readme_says_the_players_own_limit(self):
         # The player takes any frame limit up to its own most (arm32/desktop/settings.cpp) and follows the display's

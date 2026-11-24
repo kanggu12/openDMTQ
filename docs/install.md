@@ -94,7 +94,9 @@ curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/v0.11.2/host/get.
 2. It installs Apache, PHP, Java and Python from the system's packages, apt's (asking for your password, `sudo`) or
    Homebrew's, and puts the `opendmtq` command on your PATH.
 3. It starts the server and opens the same setup as on Windows in the browser; on a computer without a screen it prints
-   the setup's address instead.
+   the setup's address instead, which another computer's browser opens. The setup looks for the game's files in the
+   server's own folders only: on a computer without a screen they go onto it first (into its Downloads, for example), or
+   `./opendmtq setup --from <folder>` imports them from wherever they are on it.
 
 Running the line again updates OpenDMTQ to the latest release; `.env` and `data` stay. Everyday commands, in its
 folder:
