@@ -59,6 +59,11 @@ OWN_PORT=${LISTEN_PORT:-$OPENDMTQ_PORT}
 # else is told where they open. A visit with a header that a proxy adds to say whom it passes on is one from elsewhere
 # that a proxy on the server PC passes on, whatever address it comes from: never the server PC's own. (A browser sends
 # none of these; the doors' own X-Forwarded-Proto is set after this rule is checked.)
+# A refusal of the API as the API itself words one ({"error": {"code", "message"}}), for an ErrorDocument: its quotes
+# escaped for Apache, which takes the text between the outer ones. The words hold no quote or backslash of their own.
+api_refusal() {
+    printf '{\\"error\\": {\\"code\\": \\"%s\\", \\"message\\": \\"%s\\"}}' "$1" "$2"
+}
 NOT_FORWARDED='-z %{HTTP:X-Forwarded-For} && -z %{HTTP:Forwarded} && -z %{HTTP:X-Real-IP} && -z %{HTTP:X-Forwarded-Host} && -z %{HTTP:X-Forwarded-Proto} && -z %{HTTP:Via}'
 local_only() {
     cat <<CONF
@@ -74,6 +79,8 @@ local_only() {
         Require ip $LOCAL_FROM
         Require expr "$NOT_FORWARDED"
     </RequireAll>
+    Header always set Content-Type "application/json" "expr=%{REQUEST_STATUS} == 403"
+    ErrorDocument 403 "$(api_refusal server_pc_only "The API answers on the server PC: http://localhost:$OWN_PORT/opendmtq/api/v1/")"
 </LocationMatch>
 CONF
 }
@@ -196,11 +203,6 @@ CONF
 fi
 PLAIN_ADMIN=/var/opendmtq/run/plain-admin.conf
 rm -f "$PLAIN_ADMIN"
-# A refusal of the API as the API itself words one ({"error": {"code", "message"}}), for an ErrorDocument: its quotes
-# escaped for Apache, which takes the text between the outer ones. The words hold no quote or backslash of their own.
-api_refusal() {
-    printf '{\\"error\\": {\\"code\\": \\"%s\\", \\"message\\": \\"%s\\"}}' "$1" "$2"
-}
 if [ -f "$PASS" ]; then
     case "$OPENDMTQ_NAME" in
         10.*|192.168.*|127.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*|localhost) lan=yes ;;

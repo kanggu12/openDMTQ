@@ -130,6 +130,12 @@ NOT_FORWARDED = ("-z %{HTTP:X-Forwarded-For} && -z %{HTTP:Forwarded} && -z %{HTT
                  "-z %{HTTP:X-Forwarded-Host} && -z %{HTTP:X-Forwarded-Proto} && -z %{HTTP:Via}")
 
 
+def api_refusal(code, message):
+    """A refusal of the API as the API itself words one ({"error": {"code", "message"}}), for an ErrorDocument: its quotes
+    escaped for Apache, which takes the text between the outer ones (as server/entrypoint.sh's api_refusal)."""
+    return '{\\"error\\": {\\"code\\": \\"%s\\", \\"message\\": \\"%s\\"}}' % (code, message)
+
+
 def admin_conf(values):
     """The admin pages (/opendmtq/admin) and their API (/opendmtq/api) on the server's one port, passed to the admin
     service on loopback: from anywhere on a local network address; on an internet one (or with ADMIN_ON_PUBLIC_PORT=no)
@@ -167,7 +173,9 @@ def admin_conf(values):
             "</LocationMatch>",
             '<LocationMatch "^/opendmtq/api(/|$)">',
             *server_pc,
-            f'    ErrorDocument 403 "The API answers on the server PC: http://localhost:{port}/opendmtq/api/v1/"',
+            # The API's refusal in its own form, JSON with its code and words, as Docker Compose's server answers it.
+            '    Header always set Content-Type "application/json" "expr=%{REQUEST_STATUS} == 403"',
+            f'    ErrorDocument 403 "{api_refusal("server_pc_only", f"The API answers on the server PC: http://localhost:{port}/opendmtq/api/v1/")}"',
             "</LocationMatch>",
         ]
     return "\n".join(lines) + "\n"

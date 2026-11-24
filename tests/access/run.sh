@@ -139,6 +139,20 @@ for door in 8081 8443; do
   else
     fail "door $door, from elsewhere, the admin pages' refusal: $said"
   fi
+  # The API's refusal in the API's own form, JSON with its code and the way in on the server PC: on the plain door,
+  # with HTTPS not working here, that it needs HTTPS; on the HTTPS door, that it answers on the server PC (main answered
+  # Apache's bare page there, and named 8443 on the plain door).
+  if [ "$door" = 8081 ]; then
+    want='403 {"error": {"code": "no_https", "message": "The API needs HTTPS on this address, and it is not working. Run ./opendmtq up (or ./opendmtq doctor) on the server PC, or use http://localhost:8790/opendmtq/api/v1/ there. In Kubernetes, use kubectl port-forward to port 8000 of the api pod."}}'
+  else
+    want='403 {"error": {"code": "server_pc_only", "message": "The API answers on the server PC: http://localhost:8790/opendmtq/api/v1/"}}'
+  fi
+  said=$(visit "$door" "$OUTSIDE" /opendmtq/api/v1/status)
+  if [ "$said" = "$want" ]; then
+    pass "door $door, from elsewhere, the API's refusal is its own JSON"
+  else
+    fail "door $door, from elsewhere, the API's refusal: $said"
+  fi
 done
 
 echo "-- exposed, every visit from the gateway's address (ADMIN_LOCAL=none: Docker Desktop, rootless Docker)"
@@ -210,6 +224,18 @@ for path in /opendmtq/admin/login /opendmtq/api/v1/status; do
   if [ "$got" = 403 ]; then pass "host install, from elsewhere, $path: 403"; else
     fail "host install, from elsewhere, $path: $got, expected 403"; fi
 done
+# The host install's API refusal from elsewhere, in the API's own form as the server's (its type and its words).
+# shellcheck disable=SC2016  # PHP code: its $variables are PHP's.
+said=$(docker exec -e TARGET="$NAME-host" "$NAME-echo" php -r '
+  $c = stream_context_create(["http" => ["ignore_errors" => true, "timeout" => 10]]);
+  $body = @file_get_contents("http://" . getenv("TARGET") . ":8090/opendmtq/api/v1/status", false, $c);
+  $type = preg_grep("#^Content-Type:#i", $http_response_header ?? []);
+  echo trim(implode(" ", $type)), " ", $body;')
+if [ "$said" = 'Content-Type: application/json {"error": {"code": "server_pc_only", "message": "The API answers on the server PC: http://localhost:8790/opendmtq/api/v1/"}}' ]; then
+  pass "host install, from elsewhere, the API's refusal is its own JSON"
+else
+  fail "host install, from elsewhere, the API's refusal: $said"
+fi
 
 echo "$failures failed"
 [ "$failures" -eq 0 ]
