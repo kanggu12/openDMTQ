@@ -347,9 +347,10 @@ fetches the images of its screens from the server), so the server reports itself
 Every metadata, smali and screen edit must match an exact count: a different client build stops the patcher instead
 of producing a half-patched app. The code edits are applied only where the bytes match. The builder skips the work
 when the newest build already matches the address, the base APK, the patcher version, the signing key and the runtime
-bundle (and its file is the size its manifest records). A new build takes the place of the old file whole, and only
-one build runs at a time. Each run leaves its outcome in `data/apk/out/build.json`, which the site, the admin pages
-and `./opendmtq doctor` read.
+bundle (and its file is the size its manifest records). A new build takes the place of the old file whole, together
+with its manifest and `latest.json`, which are written beside them first: a stop that comes then (docker stop, Ctrl-C)
+waits until all three are in place. Only one build runs at a time. Each run leaves its outcome in
+`data/apk/out/build.json`, which the site, the admin pages and `./opendmtq doctor` read.
 
 ## The PC client
 
