@@ -439,9 +439,21 @@ long wake_locked(const void* word, long n, std::uint32_t bitset) {
 // A 12-bit field as the signed number it holds, in 32 bits: bit 11 is its sign, as in the kernel's sign_extend32(field, 11).
 std::uint32_t signed12(std::uint32_t field) { return (field ^ 0x800u) - 0x800u; }
 
-// FUTEX_WAKE_OP's operation on the second word, and its comparison of the old value.
-bool wake_op(std::uint32_t* word2, std::uint32_t encoded) {
+// A wake's count as the kernel reads it: a number with a sign (the 32 bits the guest passed), and one of 0 or below still
+// wakes one waiter, as the kernel's loop counts the waiter it woke before it compares with the count. FUTEX_WAKE,
+// FUTEX_WAKE_BITSET and both counts of FUTEX_WAKE_OP; a requeue's count of 0 wakes nobody (futex_requeue counts first).
+long wake_count(std::uint32_t count) {
+    const int n = static_cast<int>(count);
+    return n <= 0 ? 1 : n;
+}
+
+// FUTEX_WAKE_OP's operation on the second word, and its comparison of the old value, as the kernel's
+// futex_atomic_op_inuser: 1 when the comparison holds, 0 when it does not, -ENOSYS for an operation the kernel does not
+// know (5 to 7: the word is left as it was) or a comparison it does not know (6 to 15: the operation is done first).
+int wake_op(std::uint32_t* word2, std::uint32_t encoded) {
     std::uint32_t op = (encoded >> 28) & 7, cmp = (encoded >> 24) & 15;
+    // SET, ADD, OR, ANDN and XOR are all there is: the kernel refuses the others before it touches the word.
+    if (op > 4) return -ENOSYS;
     // Both arguments are numbers with a sign, as the kernel of a phone reads them: 0xfff is -1 and 0x800 is -2048, so that
     // an ADD can count down and a comparison can be with a number below zero.
     std::uint32_t oparg = signed12((encoded >> 12) & 0xfff), cmparg = signed12(encoded & 0xfff);
@@ -454,7 +466,7 @@ bool wake_op(std::uint32_t* word2, std::uint32_t encoded) {
         case 1: next = old + oparg; break;
         case 2: next = old | oparg; break;
         case 3: next = old & ~oparg; break;
-        default: next = old ^ oparg; break;
+        default: next = old ^ oparg; break;  // 4, XOR: the only one left
         }
     } while (!__atomic_compare_exchange_n(word2, &old, next, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
     int o = static_cast<int>(old), a = static_cast<int>(cmparg);
@@ -464,7 +476,9 @@ bool wake_op(std::uint32_t* word2, std::uint32_t encoded) {
     case 2: return o < a;
     case 3: return o <= a;
     case 4: return o > a;
-    default: return o >= a;
+    case 5: return o >= a;
+    // The word changed all the same: the kernel reads the comparison only after the operation.
+    default: return -ENOSYS;
     }
 }
 
@@ -489,16 +503,23 @@ long futex(std::uint32_t* word, int op, std::uint32_t val, const struct timespec
     }
     case FUTEX_WAKE:
     case FUTEX_WAKE_BITSET: {
+        const std::uint32_t bitset = cmd == FUTEX_WAKE ? 0xffffffffu : val3;
+        // A bitset of 0 meets no waiter's: the kernel refuses the call.
+        if (!bitset) return -EINVAL;
         std::lock_guard<std::mutex> l(g_futex_lock);
-        return wake_locked(word, static_cast<long>(val), cmd == FUTEX_WAKE ? 0xffffffffu : val3);
+        return wake_locked(word, wake_count(val), bitset);
     }
     case FUTEX_REQUEUE:
     case FUTEX_CMP_REQUEUE: {
+        // Both counts with their sign, the requeue's in the timeout's place: the kernel refuses one below 0 before it
+        // looks at anything else (so before FUTEX_CMP_REQUEUE's word, not EAGAIN), and wakes none for a count of 0.
+        const int wake = static_cast<int>(val);
+        const int move = static_cast<int>(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(timeout)));
+        if (wake < 0 || move < 0) return -EINVAL;
         std::lock_guard<std::mutex> l(g_futex_lock);
         if (cmd == FUTEX_CMP_REQUEUE && __atomic_load_n(word, __ATOMIC_SEQ_CST) != val3) return -EAGAIN;
-        long woken = wake_locked(word, static_cast<long>(val), 0xffffffffu);
-        // The requeue count travels in the timeout's place.
-        long move = static_cast<long>(reinterpret_cast<std::uintptr_t>(timeout)), moved = 0;
+        long woken = wake_locked(word, wake, 0xffffffffu);
+        long moved = 0;
         auto range = futex_waiters().equal_range(word);
         std::vector<Waiter*> taken;
         for (auto it = range.first; it != range.second && moved < move;) {
@@ -514,10 +535,12 @@ long futex(std::uint32_t* word, int op, std::uint32_t val, const struct timespec
     }
     case FUTEX_WAKE_OP: {
         std::lock_guard<std::mutex> l(g_futex_lock);
-        bool also = wake_op(word2, val3);
-        long woken = wake_locked(word, static_cast<long>(val), 0xffffffffu);
-        // The second count travels in the timeout's place.
-        if (also) woken += wake_locked(word2, static_cast<long>(reinterpret_cast<std::uintptr_t>(timeout)), 0xffffffffu);
+        int also = wake_op(word2, val3);
+        // An operation or a comparison the kernel does not know: its error, and nobody woken on either word.
+        if (also < 0) return also;
+        long woken = wake_locked(word, wake_count(val), 0xffffffffu);
+        // The second count travels in the timeout's place, its 32 bits as the guest passed them.
+        if (also) woken += wake_locked(word2, wake_count(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(timeout))), 0xffffffffu);
         return woken;
     }
     default:

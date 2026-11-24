@@ -1,6 +1,6 @@
 // Futex wake-ups are never lost: many threads wait and wake in the patterns the C library, the Java VM and the game's
 // job system use, and a wake that does not reach a waiter that was about to sleep leaves it asleep for good.
-// Nine phases, each with threads that sleep without a timeout (a lost wake hangs them) and a watchdog that
+// Ten phases, each with threads that sleep without a timeout (a lost wake hangs them) and a watchdog that
 // fails the test when no thread made progress for a few seconds, instead of hanging it:
 //   mailbox   pairs of threads handing a counter to each other, the waits plain and with bitsets, the wakes too
 //   barrier   a generation barrier of eight threads, the last one to arrive wakes all the others
@@ -8,6 +8,8 @@
 //   signals   the mailbox again with signals (handlers without SA_RESTART, so waits return EINTR) at all its threads
 //   requeue   a condition variable the way the C library of a desktop builds it: wake one, requeue the rest to the mutex
 //   wakeop    FUTEX_WAKE_OP waking two words at once, its two 12-bit arguments read with their sign as the kernel reads them
+//   edges     the kernel's answers at the edges of the wakes' arguments: FUTEX_WAKE_OP's operations and comparisons it
+//             does not know (ENOSYS), counts of 0 and below (one woken), a bitset of 0 and requeue counts below 0 (EINVAL)
 //   churn     batches of threads made, started with one wake and joined (the join is a futex wait too)
 //   pthread   semaphores in a ring, a mutex and condition variables with and without timeouts
 //   lostsignal  the handshake of a game's video decoder (seek and its worker): a signal that comes before the wait it was
@@ -383,6 +385,135 @@ static void op_comparison(void) {
     }
 }
 
+// ----------------------------------------------------------------------------------------------------- edges
+
+// A failed check of the edges phase: its line, and one more failure for the program's end.
+static void edge_fail(const char* what, long got, int err) {
+    printf("FAIL edges: %s (returned %ld, errno %d)\n", what, got, err);
+    atomic_fetch_add(&failures, 1);
+}
+
+// FUTEX_WAKE_OP with an operation the kernel does not know (5 to 7, the shift flag or not): ENOSYS before the word is
+// touched. With a comparison it does not know (6 to 15): the operation is done, then ENOSYS, as the kernel's
+// futex_atomic_op_inuser does it. Neither wakes anybody (no count comes back). Nobody waits on these words.
+static void edge_unknown_op_and_comparison(void) {
+    static word nobody, w;
+    for (unsigned op = 5; op <= 7; op++) {
+        for (unsigned shift = 0; shift <= FUTEX_OP_OPARG_SHIFT; shift += FUTEX_OP_OPARG_SHIFT) {
+            atomic_store(&w, 5);
+            // A comparison that holds (the old value is 5): only the operation can make the call fail.
+            long n = futex_count(&nobody, FUTEX_WAKE_OP, 1, 1, &w, FUTEX_OP(op | shift, 1, FUTEX_OP_CMP_EQ, 5));
+            int e = errno;
+            // The kernel's answer, and the word as it was.
+            if (n != -1 || e != ENOSYS || atomic_load(&w) != 5) {
+                char what[96];
+                snprintf(what, sizeof what, "an operation the kernel does not know (%u%s) left 0x%x, not ENOSYS and 5", op,
+                         shift ? " with the shift flag" : "", atomic_load(&w));
+                edge_fail(what, n, e);
+            }
+        }
+    }
+    for (unsigned cmp = 6; cmp <= 15; cmp++) {
+        atomic_store(&w, 5);
+        // ADD 1 on 5: the kernel adds before it reads the comparison.
+        long n = futex_count(&nobody, FUTEX_WAKE_OP, 1, 1, &w, FUTEX_OP(FUTEX_OP_ADD, 1, cmp, 5));
+        int e = errno;
+        if (n != -1 || e != ENOSYS || atomic_load(&w) != 6) {
+            char what[96];
+            snprintf(what, sizeof what, "a comparison the kernel does not know (%u) left 0x%x, not ENOSYS and 6", cmp,
+                     atomic_load(&w));
+            edge_fail(what, n, e);
+        }
+    }
+}
+
+// A word two sleepers wait on, for as long as it holds 0.
+static word edge_word, edge_other;
+static atomic_int edge_asleep;
+static void* edge_sleeper(void* arg) {
+    word* w = arg;
+    atomic_fetch_add(&edge_asleep, 1);
+    unsigned cur;
+    // Back to sleep after any wake: only the word's change ends it.
+    while ((cur = atomic_load(w)) == 0) futex(w, FUTEX_WAIT, cur, NULL, NULL, 0);
+    return NULL;
+}
+
+// One wake call made with two threads asleep on `sleepers_on`, again until it wakes somebody, for two seconds at most (a
+// sleeper whose wait ended by itself, on the Windows layer every 100 ms, is not in the wait for a moment); the number it
+// said it woke, 0 if it never woke anybody. The sleepers' end after it whatever the calls did.
+static long edge_wakes(word* sleepers_on, int op, unsigned val, long count, unsigned val3) {
+    pthread_t t[2];
+    atomic_store(&edge_word, 0);
+    atomic_store(&edge_other, 0);
+    atomic_store(&edge_asleep, 0);
+    for (int i = 0; i < 2; i++) pthread_create(&t[i], NULL, edge_sleeper, sleepers_on);
+    // Both in their loops; the first calls may still come before they sleep, and are made again.
+    while (atomic_load(&edge_asleep) < 2) sched_yield();
+    long n = 0;
+    long long end = now_ns(CLOCK_MONOTONIC) + 2000000000LL;
+    do {
+        n = futex_count(&edge_word, op, val, count, &edge_other, val3);
+        if (n != 0) break;
+        // A step for the watchdog: these tries end by their own clock.
+        tick();
+        usleep(1000);
+    } while (now_ns(CLOCK_MONOTONIC) < end);
+    // Their end: the word changes first, so that a wake one of them misses finds it awake.
+    atomic_store(sleepers_on, 1);
+    futex(sleepers_on, FUTEX_WAKE, INT_MAX, NULL, NULL, 0);
+    for (int i = 0; i < 2; i++) pthread_join(t[i], NULL);
+    return n;
+}
+
+// A wake's count is a number with a sign, and one of 0 or below still wakes one waiter: the kernel's loop counts the
+// waiter it woke before it compares with the count. Two sleepers, so that a count read as "all" shows too. For
+// FUTEX_WAKE_OP both counts: the first word's, and the second word's when the comparison holds (ADD 0 on 0, EQ 0).
+static void edge_counts(void) {
+    static const struct { const char* what; int op; unsigned val; long count; unsigned val3; int second; } cases[] = {
+        {"FUTEX_WAKE with a count of 0", FUTEX_WAKE, 0, 0, 0, 0},
+        {"FUTEX_WAKE with a count of -1", FUTEX_WAKE, 0xffffffffu, 0, 0, 0},
+        {"FUTEX_WAKE_BITSET with a count of 0", FUTEX_WAKE_BITSET, 0, 0, FUTEX_BITSET_MATCH_ANY, 0},
+        {"FUTEX_WAKE_OP with a first count of 0", FUTEX_WAKE_OP, 0, 1, FUTEX_OP(FUTEX_OP_ADD, 0, FUTEX_OP_CMP_EQ, 1), 0},
+        {"FUTEX_WAKE_OP with a first count of -1", FUTEX_WAKE_OP, 0xffffffffu, 1, FUTEX_OP(FUTEX_OP_ADD, 0, FUTEX_OP_CMP_EQ, 1), 0},
+        {"FUTEX_WAKE_OP with a second count of 0", FUTEX_WAKE_OP, 1, 0, FUTEX_OP(FUTEX_OP_ADD, 0, FUTEX_OP_CMP_EQ, 0), 1},
+        {"FUTEX_WAKE_OP with a second count of -1", FUTEX_WAKE_OP, 1, -1, FUTEX_OP(FUTEX_OP_ADD, 0, FUTEX_OP_CMP_EQ, 0), 1},
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+        long n = edge_wakes(cases[i].second ? &edge_other : &edge_word, cases[i].op, cases[i].val, cases[i].count, cases[i].val3);
+        int e = errno;
+        // One of the two sleepers, as the kernel wakes.
+        if (n != 1) {
+            char what[96];
+            snprintf(what, sizeof what, "%s woke %ld of two sleepers, not 1", cases[i].what, n);
+            edge_fail(what, n, e);
+        }
+    }
+}
+
+// What the kernel refuses before it wakes or moves anybody: a wake whose bitset is 0, which meets no waiter's, and a
+// requeue with a count below 0 (looked at before FUTEX_CMP_REQUEUE's word is compared, so not EAGAIN). Nobody waits here.
+static void edge_refused(void) {
+    static word nobody, other;
+    static const struct { const char* what; int op; unsigned val; long count; unsigned val3; } cases[] = {
+        {"FUTEX_WAKE_BITSET with a bitset of 0", FUTEX_WAKE_BITSET, 1, 0, 0},
+        {"FUTEX_REQUEUE waking -1", FUTEX_REQUEUE, 0xffffffffu, 1, 0},
+        {"FUTEX_REQUEUE moving -1", FUTEX_REQUEUE, 1, -1, 0},
+        {"FUTEX_CMP_REQUEUE moving -1", FUTEX_CMP_REQUEUE, 1, -1, 0},
+        {"FUTEX_CMP_REQUEUE waking -1 with a word that differs", FUTEX_CMP_REQUEUE, 0xffffffffu, 1, 7},
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+        atomic_store(&nobody, 0);
+        long n = futex_count(&nobody, cases[i].op, cases[i].val, cases[i].count, &other, cases[i].val3);
+        int e = errno;
+        if (n != -1 || e != EINVAL) {
+            char what[96];
+            snprintf(what, sizeof what, "%s, not refused with EINVAL", cases[i].what);
+            edge_fail(what, n, e);
+        }
+    }
+}
+
 // ----------------------------------------------------------------------------------------------------- churn
 
 enum { kChurnBatch = 16, kChurnBatches = 120 };
@@ -711,6 +842,16 @@ skip_requeue:;
     }
     report("wakeop", t0);
 skip_wakeop:;
+
+    phase_name = "edges";
+    if (only && !strstr("edges", only)) goto skip_edges;
+    t0 = now_ns(CLOCK_MONOTONIC);
+    // What the kernel refuses first (nothing to wait for), then the counts, each with two sleepers.
+    edge_unknown_op_and_comparison();
+    edge_refused();
+    edge_counts();
+    report("edges", t0);
+skip_edges:;
 
     phase_name = "lostsignal";
     if (only && !strstr("lostsignal", only)) goto skip_lostsignal;
