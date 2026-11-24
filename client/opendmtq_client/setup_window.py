@@ -174,8 +174,9 @@ class SetupWindow:
         self.mover.bind(self.header)
         for widget in (column, mark):
             self.mover.bind(widget, lambda e: e.y_root - self.root.winfo_rooty() < self.header.tall)
-        # The page's buttons (the coming page's while one is made), the ones in the strip now, and what Esc does there.
-        self.buttons, self.shown_buttons = [], []
+        # The page's buttons (the coming page's while one is made), the row of them in the strip now (set_buttons), and
+        # what Esc does there.
+        self.buttons, self.shown_row = [], None
         self.escape = None
         # The page being made off the screen, with what it shows once it takes the old one's place (page()), or None.
         self.coming = None
@@ -198,7 +199,7 @@ class SetupWindow:
             self._drop_coming()
         content = self.page_area.new_page()
         self.coming = {"content": content, "title": title, "lead": lead, "steps": (list(steps), step),
-                       "buttons": [], "escape": None, "note": ("", theme.MUTED)}
+                       "row": None, "escape": None, "note": ("", theme.MUTED)}
         self.buttons = []
         # At the latest once the window has nothing more to do, should its caller not show it: never a page left made
         # and unseen. The caller shows it itself, in its own turn, so that the page before and its buttons are gone
@@ -209,15 +210,15 @@ class SetupWindow:
     def _drop_coming(self):
         """The page being made goes without having shown, its buttons with it."""
         coming, self.coming = self.coming, None
-        for button in coming["buttons"]:
-            button.destroy()
+        if coming["row"] is not None:
+            coming["row"].destroy()
         coming["content"].destroy()
 
     def show_page(self):
         """The page made off the screen (page()) takes the place of the one on show, whole: the title in the header,
-        the line under it at the page's top, where the title's foot is, the column's steps, the page (the old one leaves
-        the screen whole before its widgets go, widgets.ScrollArea.show_page), the strip's buttons and its note. All of
-        it is drawn once the turn is over, together."""
+        the line under it at the page's top, where the title's foot is, the column's steps, the strip's note, the page
+        (the old one leaves the screen whole before its widgets go, widgets.ScrollArea.show_page) and the strip's
+        buttons, the page before's going last (_put_buttons). All of it is drawn once the turn is over, together."""
         coming, self.coming = self.coming, None
         if coming is None:
             # Shown already (page()'s own late look, after its caller showed it).
@@ -225,10 +226,13 @@ class SetupWindow:
         self.header.set_title(coming["title"])
         self.page_area.set_heading("", coming["lead"])
         self.steps.show(*coming["steps"])
-        self.page_area.show_page(coming["content"])
-        self._put_buttons(coming["buttons"])
-        self.escape = coming["escape"]
+        # The note before the buttons: its words measured after the page before's buttons went could send their going
+        # to the screen early (_put_buttons).
         self._say(*coming["note"])
+        self.escape = coming["escape"]
+        self.page_area.show_page(coming["content"])
+        # Last of the switch's work.
+        self._put_buttons(coming["row"])
 
     def card(self, parent, title=None, last=True, foot=False):
         """A card on the page, as the launcher's: its title, the cut corner, the site's room inside; `foot`: its foot's
@@ -242,14 +246,20 @@ class SetupWindow:
         main button when it removes for good), "danger" (quiet red) or "secondary" (quiet); the one at `default` takes
         the keyboard (Enter presses it); `escape` is what Esc does. For a page being made (page()), they come with it,
         and the page on show keeps its own until then."""
-        made = [widgets.Button(self.button_row, self.ui, words, command, kind=kind) for words, command, kind in buttons]
+        # A row of their own in the strip's, so that they go in one piece when the next page's come (_put_buttons).
+        row = tk.Frame(self.button_row, bg=theme.STRIP)
+        made = [widgets.Button(row, self.ui, words, command, kind=kind) for words, command, kind in buttons]
+        px = self.ui.px
+        for i, button in enumerate(made):
+            # The buttons' gap, as on the launcher's pages and dialogs (8, the spacing scale's).
+            button.pack(side="left", padx=(px(8) if i else 0, 0))
         if self.coming is not None:
             # Given again while the page is made: the ones given first go unseen.
-            for button in self.coming["buttons"]:
-                button.destroy()
-            self.coming.update(buttons=made, escape=escape)
+            if self.coming["row"] is not None:
+                self.coming["row"].destroy()
+            self.coming.update(row=row, escape=escape)
         else:
-            self._put_buttons(made)
+            self._put_buttons(row)
             self.escape = escape
         self.buttons = made
         if default is not None and 0 <= default < len(made):
@@ -257,15 +267,24 @@ class SetupWindow:
             self.focus_later(made[default])
         return made
 
-    def _put_buttons(self, buttons):
-        """`buttons` (made in the strip's row) in the strip, in place of the ones there."""
-        for button in self.shown_buttons:
-            button.destroy()
-        px = self.ui.px
-        for i, button in enumerate(buttons):
-            # The buttons' gap, as on the launcher's pages and dialogs (8, the spacing scale's).
-            button.pack(side="left", padx=(px(8) if i else 0, 0))
-        self.shown_buttons = list(buttons)
+    def _put_buttons(self, row):
+        """`row` (set_buttons' row of a page's buttons, or None for none) in the strip, in place of the one there, which
+        goes last of its turn's work and in one piece. Its going is the one part of a page switch the screen shows as
+        soon as the X server has it (the strip's colour where the buttons were), and Tk on X sends the server what it
+        has queued whenever its queue fills, and at times while it lets a widget go: anything queued after a button
+        went (a picture made, words measured, the next button let go) could send that going before the turn is over,
+        the page before showing without its buttons, or one of them, until the next page is drawn."""
+        if row is not None:
+            # Laid out once the turn is over, the row there gone by then.
+            row.pack(side="left")
+        old, self.shown_row = self.shown_row, row
+        if old is not None:
+            # Gone in this turn, so that a second click waiting in Tk's queue reaches nothing: the row's window taken by
+            # Tk itself, its buttons with it in the one request it sends last, after it has let go of all they held
+            # (tkinter's own destroy takes each button's window away first, one by one).
+            self.root.tk.call("destroy", str(old))
+            # Python's side of them: the commands their bindings registered let go of, their windows gone already.
+            old.destroy()
 
     def say(self, text, colour=theme.MUTED):
         """The line at the strip's left end; for a page being made (page()), said as the page shows."""

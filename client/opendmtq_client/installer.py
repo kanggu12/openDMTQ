@@ -292,7 +292,9 @@ class Installer:
 
     @busy.setter
     def busy(self, on):
-        # The header's close button dimmed while it is (it cannot close the window then), pressable again after.
+        # The header's close button dimmed while it is (it cannot close the window then), pressable again after. Set
+        # before a page switch of the same turn, never after it: the switch is its turn's last work (setup_window's
+        # show_page), and the button's new look made after it showed the switch on the screen before that turn's end.
         self._busy = bool(on)
         header = getattr(getattr(self, "window", None), "header", None)
         if header is not None:
@@ -726,10 +728,11 @@ class Installer:
             log.exception("could not start Velopack's setup")
             self.failed(self.words.failed("setup.no_setup", e, network=False))
             return
-        # The work under way: its page in the place of the page before, whole, in this same turn (the page before's
-        # buttons gone with it, so that a second click on Install waiting in Tk's queue reaches nothing).
-        self.window.show_page()
+        # The work under way: the window's close button dimmed, then its page in the place of the page before, whole,
+        # in this same turn (the page before's buttons gone with it, so that a second click on Install waiting in Tk's
+        # queue reaches nothing). The switch last, as the busy setter says.
         self.busy = True
+        self.window.show_page()
         self.started_at = time.time()
         self.root.after(POLL, self._wait_setup)
 
@@ -840,9 +843,10 @@ class Installer:
             log.exception("could not start Velopack's uninstaller")
             self.failed(w("setup.failed.start_uninstaller", error=w.error(e)))
             return
-        # The work under way: its page in the place of the page before, whole, in this same turn.
-        self.window.show_page()
+        # The work under way: the window's close button dimmed, then its page in the place of the page before, whole,
+        # in this same turn (the switch last, as the busy setter says).
         self.busy = True
+        self.window.show_page()
         self.started_at = time.time()
         self.ended_at = None
         self.root.after(POLL, self._wait_uninstaller)

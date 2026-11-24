@@ -49,6 +49,9 @@ MOVING_FRAMES, MOVING_MS = 2, 50
 # For an answer that makes one card of a page again with other content (signed out: the sign-in form in place of the
 # account), that card alone: its frames while it is laid out, never the page's other cards made again.
 CARD_FRAMES, CARD_MS = 8, 250
+# How long the X server is given, once a page switch's work is done, to show what that work sent it (film_switch's
+# look at the screen then): far more than it takes on an idle machine, a margin for a loaded one.
+HELD = 0.05
 # Where a frame between is saved as a picture for each change that has one (--frames), or None.
 FRAMES_OUT = None
 # What the changes do to the page beside the film (FieldWatch), once main() has made it.
@@ -318,7 +321,9 @@ def film_switch(root, area, act):
     flat under the old title for as long as the next page took to make: 0.8 s at 150 % on Windows for HELP); the page
     frames of the page before whose widgets went while it was still on the screen (tkinter takes a frame's widgets away
     one by one, each leaving the page's flat frame where it was); the frames between the page before and the page
-    after; whether the screen changed. The window is settled first, as a person sees it before the click."""
+    after; whether the screen changed; and whether the screen had already changed when the click's work was done, as
+    the X server had it then (`held`), whatever the film caught. The window is settled first, as a person sees it
+    before the click."""
     run_until(root, 0.3)
     box = window_box(root)
     before = grab(box)
@@ -330,6 +335,13 @@ def film_switch(root, area, act):
         act()
         # The click's own work done: the frames seen by now showed the page while the next one was made.
         made = time.monotonic()
+        # The screen now, its turn not yet over and nothing of the next page drawn: the page before, whole. Tk on X
+        # sends the X server what it has queued whenever its queue fills, so work queued after a part of the switch
+        # can send that part before the turn is over (the installer's close button, dimmed after its page switch, showed
+        # the page before without its buttons until the next page was drawn). The film sees such a frame only when the
+        # rest of the work is long (a loaded machine); the screen as the server has it says so every time.
+        time.sleep(HELD)
+        held = grab(box)
         run_until(root, FILM)
     tcl.eval("set ::odq_ordering 0")
     after = grab(box)
@@ -343,7 +355,8 @@ def film_switch(root, area, act):
         if went and (not left or went[0] < left[0]):
             # Its widgets went while it was still on the screen.
             torn.append(frame)
-    return {"during": len(during), "torn": torn, "frames_between": len(between), "changed": before != after}
+    return {"during": len(during), "held": held != before, "torn": torn, "frames_between": len(between),
+            "changed": before != after}
 
 
 # The faces of the page's controls (WIN-243): each kind's name, the function of art's that draws it (the version before
@@ -393,11 +406,13 @@ def faces_shown(inner):
 
 
 def switch_problems(name, filmed):
-    """What film_switch saw that a person must not: frames while the page was made, a page taken apart on the screen,
-    a screen that did not change."""
+    """What film_switch saw that a person must not: frames while the page was made, the page before changed on the
+    screen by the time the switch's work was done, a page taken apart on the screen, a screen that did not change."""
     problems = []
     if filmed["during"]:
         problems.append("%s: %d frames between showed while the page was made" % (name, filmed["during"]))
+    if filmed["held"]:
+        problems.append("%s: the page before had changed on the screen before the switch's work was done" % name)
     for path in filmed["torn"]:
         problems.append("%s: the page before was taken apart on the screen (%s)" % (name, path))
     if not filmed["changed"]:
