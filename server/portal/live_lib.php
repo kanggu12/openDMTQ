@@ -186,7 +186,8 @@ function live_ids(string $raw): array
 
 /*
  * The last change of the in-game maintenance notice, as the admin pages write it with every change (custom/maintenance.json,
- * songs.py maintenance_stamp()): ['id', 'kind' (on, changed or off), 'on', 'message', 'at'], or null before the first one.
+ * songs.py maintenance_stamp()): ['id', 'kind' (on, changed or off), 'on', 'message', 'at', 'since' (the number of the
+ * change that turned it on; none in an older server's stamp)], or null before the first one.
  * Read once per request.
  */
 function live_maintenance(): ?array

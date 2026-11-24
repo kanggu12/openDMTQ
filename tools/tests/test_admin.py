@@ -2082,6 +2082,46 @@ class MaintenanceMessageTest(unittest.TestCase):
             with open(inst.path("custom/web/inspection/status.json"), encoding="utf-8") as f:
                 self.assertTrue(json.load(f)["value"]["noti_url"].endswith(f"/inspection/noti.html?v={seen[-1]}"))
 
+    def test_every_change_names_the_change_that_turned_the_maintenance_on(self):
+        # GAME-160: /live/state tells a maintenance's end only to the players it told the maintenance to, by the number
+        # of the change that turned it on ("since"): the change itself when it turns it on, the same through its new
+        # messages and its end, a new one when it is turned on again. An end with nothing on before it (the page's Turn
+        # off on a server that never had the notice on) began nothing: its own number, which no player has seen.
+        with Install():
+            admin.song_pages.set_notice(False, "")
+            nothing_on = admin.songs.maintenance_stamp()
+            self.assertEqual((nothing_on["kind"], nothing_on["since"]), ("off", nothing_on["id"]))
+            sinces = []
+            for on, message in ((True, "Back at nine."), (True, "Back at ten."), (False, ""), (True, "")):
+                admin.song_pages.set_notice(on, message)
+                sinces.append((admin.songs.maintenance_stamp()["id"], admin.songs.maintenance_stamp()["since"]))
+            first_on = sinces[0][0]
+            self.assertEqual([since for _, since in sinces[:3]], [first_on] * 3)
+            # Turned on again: a maintenance of its own, from its own number.
+            self.assertEqual(sinces[3][1], sinces[3][0])
+            self.assertGreater(sinces[3][0], sinces[2][0])
+
+    def test_a_stamp_from_an_older_server_still_gives_the_end_its_start(self):
+        # GAME-160: a maintenance turned on by 0.11.2 or older (a stamp without "since") and ended after the update: its end
+        # names the change that turned it on, which the stamp before it was; after a new message of the older server's,
+        # nothing to go by, and /live/state tells the end as before.
+        with Install() as inst:
+            admin.song_pages.set_notice(True, "Back at nine.")
+            on = admin.songs.maintenance_stamp()
+            del on["since"]
+            with open(inst.path("custom/maintenance.json"), "w", encoding="utf-8") as f:
+                json.dump(on, f)
+            admin.song_pages.set_notice(False, "")
+            self.assertEqual(admin.songs.maintenance_stamp()["since"], on["id"])
+            admin.song_pages.set_notice(True, "Back at ten.")
+            changed = admin.songs.maintenance_stamp()
+            changed["kind"] = "changed"
+            del changed["since"]
+            with open(inst.path("custom/maintenance.json"), "w", encoding="utf-8") as f:
+                json.dump(changed, f)
+            admin.song_pages.set_notice(False, "")
+            self.assertNotIn("since", admin.songs.maintenance_stamp())
+
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")
 class PlayerMessageTest(unittest.TestCase):

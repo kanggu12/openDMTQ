@@ -1184,10 +1184,12 @@ def _thumbnail(src, dest):
 
 
 # Each change of the maintenance notice, numbered (custom/maintenance.json, outside the overlay so that it outlives a
-# notice turned off): {"id", "kind", "on", "message", "at"}. kind is what changed: "on" (turned on), "changed" (a new
-# message while on) or "off" (ended). id grows with every change, past the clock's seconds too, so that a number never
+# notice turned off): {"id", "kind", "on", "message", "at", "since"}. kind is what changed: "on" (turned on), "changed" (a
+# new message while on) or "off" (ended). id grows with every change, past the clock's seconds too, so that a number never
 # comes back after a restore or a moved clock: the game's notice page is asked for under it (noti_url's ?v=, which no
 # cache has seen), and /live/state hands each change to each player in the game once (server/game/live/state.php).
+# since is the number of the change that turned this maintenance on, so that /live/state tells its end only to the
+# players it told this maintenance to (a player who comes into the game after it ended never met it).
 MAINTENANCE_STAMP = "maintenance.json"
 
 
@@ -1211,8 +1213,18 @@ def _stamp_maintenance(on, message):
         return last
     # No stamp yet with a notice already on (a server from before the stamp): that notice counts as the one changed now.
     kind = "off" if not on else ("changed" if was_on else "on")
-    stamp = {"id": max((last or {}).get("id", 0) + 1, int(time.time())), "kind": kind, "on": on,
-             "message": message if on else "", "at": int(time.time())}
+    number = max((last or {}).get("id", 0) + 1, int(time.time()))
+    stamp = {"id": number, "kind": kind, "on": on, "message": message if on else "", "at": int(time.time())}
+    # The change that turned this maintenance on: this one when it does; for a new message or the end, the one before it
+    # named, or that one itself if it turned the notice on (a stamp of 0.11.2 and older names none). An end with nothing
+    # on before it began none: its own number, which no player has seen. Without one (a new message stamped by an older
+    # server before this end), /live/state tells the end as before.
+    if kind == "on" or not was_on:
+        stamp["since"] = number
+    elif isinstance(last.get("since"), int):
+        stamp["since"] = last["since"]
+    elif last.get("kind") == "on":
+        stamp["since"] = last["id"]
     _write_json(os.path.join(CUSTOM, MAINTENANCE_STAMP), stamp)
     return stamp
 

@@ -1112,6 +1112,37 @@ check("on again: a new number for the page, and the player told again",
 maintenance_post(action="off")
 check("maintenance off again: told again", state().get("toast_kind") == "maint_off")
 
+
+def kinds_told(udid, polls=3):
+    """The kinds of notice a player's game is handed over a few polls of /live/state (its own notices come first)."""
+    return [json.loads(request(plain, f"{SITE}/live/state?ids={udid}&lang=en")[2]).get("toast_kind", "") for _ in range(polls)]
+
+
+# LIVE-70: the end of a maintenance is news only to a player it was told to. A player whose game first asks after it
+# ended never met it: it hears nothing of it (main told it "Maintenance is over" for half an hour after the end).
+late_udid = f"live-smoke4-{random.randrange(10**9):09d}"
+new_player(late_udid)
+late = kinds_told(late_udid)
+check("a player who comes into the game after a maintenance ended hears nothing of it", "maint_off" not in late and "maint_on" not in late, late)
+# LIVE-71: a player in a song all through a maintenance heard nothing of its start (that waited for the song's end, and
+# the end took its place): its end is no news to it either.
+song_udid = f"live-smoke5-{random.randrange(10**9):09d}"
+song_guid = new_player(song_udid)
+kinds_told(song_udid)
+call("game.getPreviewPlayInfo", [song_guid, 1])
+maintenance_post(action="on", message="Back soon.")
+during = kinds_told(song_udid, 2)
+maintenance_post(action="off")
+call("game.savePlayResult", [song_guid, 1, [0, 0] + [0] * 10 + [50], 50, 0, [0, 0, 0], [0, 0, 0], "smoke"])
+after_song = kinds_told(song_udid)
+check("a player in a song all through a maintenance hears nothing of it, during it or after the song",
+      not any(k.startswith("maint_") for k in during + after_song), (during, after_song))
+# And a player told of it hears its end, as before: the main player, told of this one's start between songs.
+maintenance_post(action="on", message="Back in a minute.")
+told_start = state().get("toast_kind")
+maintenance_post(action="off")
+check("a player told that a maintenance began hears that it is over", told_start == "maint_on" and state().get("toast_kind") == "maint_off", told_start)
+
 # A player left on for what run.sh tests from inside the server.
 last_udid = f"live-smoke3-{random.randrange(10**9):09d}"
 last_guid = new_player(last_udid)

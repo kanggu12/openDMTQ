@@ -63,7 +63,7 @@ function live_ban_line(array $ban, string $lang): string
 // The line under the title of a notice turned on without a message of the owner's own (DEFAULT_NOTICE, lib.php).
 const MAINT_PLAIN = ['ko' => '점검이 끝나면 여기서 다시 알려 드려요', 'en' => 'You will hear here when it is over'];
 const MAINT_DEFAULT = 'The server is under maintenance. Please try again later.';
-// An end older than this is no news to a player who comes into the game after it: nothing said then.
+// An end older than this is no news, even to a player it was told to who was away from the game meanwhile: nothing said.
 const MAINT_FRESH = 1800;
 
 // Broadcasts on or off for the whole server: while off, nobody is on, whatever their own switch says.
@@ -131,6 +131,13 @@ function live_take_maintenance(array $row): array
     }
     // An end long past is no news: nothing said, nothing marked.
     if ($m['kind'] === 'off' && time() - (int)($m['at'] ?? 0) > MAINT_FRESH) {
+        return ['', 0, ''];
+    }
+    // An end is news only to a player this maintenance was told to: one whose game was handed the change that turned it
+    // on or a new message of it, numbered from "since" on (songs.py's stamp). A player who comes into the game after it
+    // ended, or who heard nothing of it (in a song all through it), never met it: nothing said, nothing marked. A stamp
+    // from an older server names no "since": as before.
+    if ($m['kind'] === 'off' && is_int($m['since'] ?? null) && (int)$row['maint_seen'] < $m['since']) {
         return ['', 0, ''];
     }
     $rw = live_db(true);
