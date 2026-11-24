@@ -140,6 +140,18 @@ check('SRV-82 a wrong password is told only that it is wrong, as for any account
 [, , $page] = visit('POST', "$base/opendmtq/login.php", ['user' => 'offsite', 'password' => 'offpass'], 'opendmtq_lang=ko');
 check('SRV-82 in Korean too', strpos($page, '이 계정은 비활성화되어 로그인할 수 없습니다.') !== false, substr(strip_tags($page), 0, 200));
 
+// ------------------------------------------------------------------ SRV-100: a one-time link of an account switched off
+
+// A link made a moment before (as the PC client's My page on the site and the admin API's POST /site/link make one) of the
+// account switched off above, opened at once in a browser signed in to nothing, in both languages.
+foreach (['en' => 'This account is disabled and cannot sign in.', 'ko' => '이 계정은 비활성화되어 로그인할 수 없습니다.'] as $lang => $words) {
+    $token = once_issue('offsite', '/opendmtq/me.php');
+    [$status, $headers, $page] = visit('GET', "$base/opendmtq/login.php?once=" . rawurlencode((string)$token), [], "opendmtq_lang=$lang");
+    check("SRV-100 a one-time link of an account switched off signs nobody in, and the page says the account is disabled ($lang)",
+        $token !== null && $status === 200 && signin_cookie($headers) === '' && strpos($page, $words) !== false
+        && strpos($page, $lang === 'en' ? 'was used already' : '이미 쓰였거나') === false, "$status " . substr(strip_tags($page), 0, 300));
+}
+
 // ------------------------------------------------------------------ WIN-288: the PC client's sign-in of an account switched off
 
 // The launcher signs in through client.php?signin, under the sign-in page's own limit on failures: the account switched

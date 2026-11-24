@@ -32,9 +32,9 @@ if (isset($_GET['once'])) {
         header('Location: ' . $link['next'], true, 303);
         exit;
     }
-    // Used, run out or refused: the sign-in page says so, above its form (signed in already, on to the page as below); a
-    // banned player's account says why, in the owner's words, as the form does.
-    $error = $ban !== null && !$row['off'] ? 'signin.banned' : 'signin.once_used';
+    // Used, run out or refused: the sign-in page says so, above its form (signed in already, on to the page as below); an
+    // account switched off says that it is, and a banned player's account why, in the owner's words, as the form does.
+    $error = $row !== null && $row['off'] ? 'signin.off' : ($ban !== null ? 'signin.banned' : 'signin.once_used');
     $banned = $ban !== null && !$row['off'] ? site_ban_words($ban) : '';
 }
 // Already signed in (this form sent again, a back button): on to the page, but not into a second
