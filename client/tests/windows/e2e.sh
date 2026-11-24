@@ -19,8 +19,8 @@
 #   5. Repair from the command line: a file of the player and one of the launcher put back as they were installed
 #   6. Clear game data: the id alone stays; the FPS counter switched on and 4 LINE's keys set from the command line (the
 #      launcher's window closed for it, then opened again), and the game starts again with the same id and gets to its
-#      menu, the counter up (set at the bottom right, in the menus under their header at the right), a click on its
-#      place reaching the game, the player's settings file carrying keyboard play's keys
+#      menu, the counter up and waiting there (the menus give it no place: it shows in a song), a click under the
+#      menus' header at the right reaching the game, the player's settings file carrying keyboard play's keys
 #   7. Uninstall with the data: refused while the window is open, then the program, its shortcut, its data and its
 #      logs (Velopack's and the installer's) gone
 # Every step leaves a screenshot of the virtual screen in OUT_DIR, and the logs.
@@ -483,18 +483,20 @@ docker run --rm --name "${E2E_NAME:-odq-client-e2e-$$}" --network "$NET" -v "$OU
   game=\$(xdotool search --name 'TECHNIKA' 2>/dev/null | tail -n 1)
   eval \$(xdotool getwindowgeometry --shell \"\$game\")
   xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 0.5
-  # The counter up: set at the bottom right, it stands in the menus, where the game is now, under their header at the
-  # right (arm32/desktop/overlay_scale.h's counter_at), its glass 90 by 41 at 720 lines, 16 in from the right and 8 under
-  # the header's 100. A click on its middle (61 in from the right and 128 down at 720; the game's area is 16:9 here,
-  # where the counter's scale is the overlay's), the pointer away at once, reaches the game, which keeps the keyboard.
+  # The counter up: set at the bottom right, it waits in the menus, where the game is now, and says so (the menus give
+  # it no place: ALBUM's tab and the shop's panel lie under the one the other screens leave, under their header at the
+  # right, arm32/desktop/overlay_scale.h's counter_has_menus_place). A click there (61 in from the right and 128 down at
+  # 720; the game's area is 16:9 here), the pointer away at once, reaches the game, which keeps the keyboard.
   player_said 'the frame counter is up' || { snap no-counter; echo 'FAIL: the FPS counter did not come up'; exit 1; }
+  wait_for 20 'player_said \"the frame counter waits in the menus\"' || { snap counter-in-menus; echo 'FAIL: the FPS counter did not wait in the menus'; exit 1; }
+  echo 'the FPS counter waits in the menus'
   before=\$(presses); moves=\$(focus_moves)
   cx=\$((WIDTH - \$(opx 61))) cy=\$(opx 128)
   xdotool mousemove \$((X + cx)) \$((Y + cy)) click 1 mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 2)); sleep 1
   [ \"\$(presses)\" -gt \"\$before\" ] || { snap counter-click; echo \"FAIL: a click on the counter's place did not reach the game\"; exit 1; }
   [ \"\$(last_press)\" = \"\$cx,\$cy\" ] || { echo \"FAIL: the counter's click reached the game at \$(last_press)\"; exit 1; }
   [ \"\$(focus_moves)\" = \"\$moves\" ] || { echo 'FAIL: the game lost the keyboard to the counter'; exit 1; }
-  echo \"a click on the counter's place reached the game at \$(last_press), and the game kept the keyboard\"
+  echo \"a click under the menus' header at the right reached the game at \$(last_press), and the game kept the keyboard\"
   snap counter-up
   # The bar's X, then its question's Quit the game (as in step 4); the counter hides while the question holds the game.
   bar_chip 0; xdotool click 1; sleep 2
