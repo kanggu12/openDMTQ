@@ -6,13 +6,34 @@ one of fixes, changes and smaller additions raises the patch number. Each releas
 
 ## [Unreleased]
 
-## [0.11.2] - 2026-11-20
+## [0.11.2] - 2026-11-24
 
-OpenDMTQ 0.11.2 fixes how the runtime that plays the game on PCs and on phones without 32-bit support answers a signal
+OpenDMTQ 0.11.2 keeps the game's music list at its page after songs are downloaded, gives the PC client's FPS counter
+a clear card of the overlay's own glass, shortens the README's quick start, and fixes how the runtime answers a signal
 sent to a thread that has ended.
+
+### Added
+
+- For contributors: `.github/doc_versions.py` checks that the README's and the guides' download lines name the release
+  the chart carries and that every file they link exists in it (`--write` puts the version in); the release's gates
+  and the docs' tests run it.
+
+### Changed
+
+- The PC client's FPS counter is a card of the same glass as the notices over the game: the frame rate as a large
+  figure in the launcher's wide face with "FPS" after it and the frame time under it, the digits in steady columns,
+  lit lime only after three seconds at the display's rate. Its words keep a contrast of 4.5:1 or more over the game at
+  every size, and the live notice's second line does too.
+- The README's quick start comes in two parts, Play and Run a server: a phone or a PC in two steps, and a server in a
+  few lines for Windows, for Debian, Ubuntu or a Mac, and with Docker, each downloading the release by its own address;
+  the install guide holds each way step by step.
 
 ### Fixed
 
+- The game's music list went back to its first page after songs were downloaded from it (ticked one by one or with
+  **Select ALL**, then **DOWNLOAD**), and after a download cancelled on the way; it now stays at the page the player was
+  on. This is a new edit of client 1.3.4's code (1.3.5 already keeps the page), so the patcher is 1.12.0 and every
+  server builds its app again: players get the new app.
 - The runtime that plays the game on Windows and on phones without 32-bit support passed a signal meant for a thread
   that had ended (`tkill` or `tgkill` naming thread 0, as the C library does for a thread that has ended and is not
   joined yet) to the whole game, where another of its threads ran the signal's handler; it now refuses it, as a
