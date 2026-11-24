@@ -307,7 +307,7 @@ class LogsPageTest(unittest.TestCase):
             inst.write("state/access.log", '203.0.113.5 - - [10/Nov/2026:08:00:00 +0000] "GET /a HTTP/1.1" 200 10 "-" "curl/8"\n')
             inst.sign_in()
             page = inst.client.get("/opendmtq/admin/logs").get_data(as_text=True)
-            have = re.search(r'<div id="log-rows" data-have="([^"]+)">', page).group(1).replace("&#34;", '"')
+            have = re.search(r'<div id="log-rows" data-have="([^"]+)"', page).group(1).replace("&#34;", '"')
             self.assertRegex(have, r'^W/"[0-9a-f]{32}"$')
             r = inst.client.get("/opendmtq/admin/logs?rows=1", headers={"If-None-Match": have})
             self.assertEqual((r.status_code, r.get_data()), (304, b""))
