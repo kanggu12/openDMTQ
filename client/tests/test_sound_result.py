@@ -30,7 +30,7 @@ class SoundResult(Folder):
     def test_what_the_card_says_in_both_languages(self):
         self.write(SOUND_RESULT)
         result = player.last_sound()
-        self.assertEqual(player.sound_words(i18n.Words("en"), result), ("ok", "Shared, 10 ms period, 18 ms out", "no gaps"))
+        self.assertEqual(player.sound_words(i18n.Words("en"), result), ("ok", "Shared, 10 ms period, 18 ms output delay", "no gaps"))
         self.assertEqual(player.sound_words(i18n.Words("ko"), result), ("ok", "공유, 주기 10 ms, 출력 지연 18 ms", "끊김 없음"))
 
     def test_gaps_the_low_latency_mode_and_the_device_alone(self):
@@ -38,12 +38,12 @@ class SoundResult(Folder):
         text = SOUND_RESULT.replace("mode=shared\n", "mode=shared-low\n").replace("period_ms=10.00", "period_ms=2.67")
         self.write(text.replace("gaps=0\ngame_gaps=0", "gaps=1\ngame_gaps=0"))
         self.assertEqual(player.sound_words(i18n.Words("en"), player.last_sound()),
-                         ("change", "Shared (low latency), 2.7 ms period, 18 ms out", "1 gap"))
+                         ("change", "Shared (low latency), 2.7 ms period, 18 ms output delay", "1 gap"))
         self.write(text.replace("gaps=0\ngame_gaps=0", "gaps=2\ngame_gaps=3"))
         self.assertEqual(player.sound_words(i18n.Words("ko"), player.last_sound()),
                          ("change", "공유(저지연), 주기 2.7 ms, 출력 지연 18 ms", "끊김 5번"))
         self.write(SOUND_RESULT.replace("mode=shared\n", "mode=exclusive\n").replace("period_ms=10.00", "period_ms=3.00"))
-        self.assertEqual(player.sound_words(i18n.Words("en"), player.last_sound())[1], "Exclusive, 3 ms period, 18 ms out")
+        self.assertEqual(player.sound_words(i18n.Words("en"), player.last_sound())[1], "Exclusive, 3 ms period, 18 ms output delay")
 
     def test_a_latency_never_measured_and_no_device(self):
         # A clock that never answered: no time said; no device at all: no period either.

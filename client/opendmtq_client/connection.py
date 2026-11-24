@@ -369,11 +369,12 @@ def _steps(result, address, server, end, stop, cancel):
 
 
 def round_trip(times):
-    """The round trip's outcome from the times of the asks answered (ms): (state, its words' key under
+    """The round trip's outcome from the times of the requests answered (ms): (state, its words' key under
     test.round_trip, their values). Every ask answered ("all") or some ("ok", a warning), each with the median and the
-    fastest and slowest, or one figure when those are one ("_same": never "1~1 ms"); none ("bad")."""
+    fastest and slowest, or one figure when those are one ("_same": never "1~1 ms"); none ("bad", with how many were
+    asked: its words stand alone as the test's verdict)."""
     if not times:
-        return "bad", "bad", {}
+        return "bad", "bad", {"of": ROUND_TRIPS}
     fast, slow = round(min(times)), round(max(times))
     every = len(times) == ROUND_TRIPS
     key = ("all" if every else "ok") + ("_same" if fast == slow else "")

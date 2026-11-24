@@ -218,6 +218,52 @@ class Wording(unittest.TestCase):
                 self.assertNotIn(phrase, ko, key)
         self.assertIn("screen.fps.hint.free.unlimited", i18n.TEXT)
 
+    def test_one_korean_sentence_says_one_thing(self):
+        # A Korean sentence two keys share says the same as both their English ones: main said "아직 플레이 기록이 없습니다."
+        # for the records' "No plays recorded yet." and for the last game's "No game yet.", so the Korean PLAY page said
+        # there were no records beside the records it listed. Names and buttons aside (연결 테스트 for the test and its
+        # button, 로그인 for Sign-in and Sign in): Korean names them alike.
+        said = {}
+        for key, (en, ko) in i18n.TEXT.items():
+            if re.search(r"[.?!]$", ko.strip()):
+                said.setdefault(ko, {})[key] = en
+        for ko, keys in said.items():
+            self.assertEqual(len(set(keys.values())), 1, (ko, keys))
+        # The last game says this PC; the records keep their own sentence.
+        self.assertNotEqual(i18n.TEXT["play.last.none"][1], i18n.TEXT["play.records.none"][1])
+        self.assertIn("이 PC", i18n.TEXT["play.last.none"][1])
+
+    def test_a_download_is_said_as_a_download(self):
+        # The owner's word for downloading is 다운로드 (main kept 받다 in twenty lines: "새 앱 받기" beside "앱 다운로드",
+        # the guide's "앱 받기", "받은 앱", "받다 만 파일"). 받다 stays only for a server that takes a connection or a sign-in.
+        for key, (_en, ko) in i18n.TEXT.items():
+            for found in re.finditer("받", ko):
+                self.assertTrue(ko[:found.start()].endswith(("연결을 ", "로그인을 ", "로그인을 더 이상 ")), (key, ko))
+        self.assertEqual(i18n.TEXT["guide.download.title"][1], "앱 다운로드")
+
+    def test_the_server_is_run_by_its_owner(self):
+        # Where the words point a player to the person who runs the server, that person is its owner (소유자), as the docs
+        # and the site say (main: "the server's admin", "서버 관리자"). Windows' administrator rights stay 관리자 권한.
+        for key, (en, ko) in i18n.TEXT.items():
+            self.assertIsNone(re.search(r"(?i)\b(server's|its) admin\b", en), key)
+            self.assertNotIn("서버 관리자", ko, key)
+        for key in ("online.signin.hint", "guide.power.need.1", "guide.server.text", "error.server.too_old"):
+            self.assertIn("owner", i18n.TEXT[key][0], key)
+            self.assertIn("소유자", i18n.TEXT[key][1], key)
+
+    def test_english_as_a_person_writes_it(self):
+        # main's English read as translated: "All 5 asks answered: 3 ms in the middle", "18 ms out", "it is no OpenDMTQ
+        # server for PCs", "without the part for PCs", "where the game leaves room there", and "Files put back: 1. Some
+        # are the launcher's own" for one file.
+        for key, (en, _ko) in i18n.TEXT.items():
+            for phrase in ("asks answered", "None of the asks", "in the middle", "it is no ", "the part for PCs",
+                           "leaves room there", "Some are the"):
+                self.assertNotIn(phrase, en, key)
+            # A sound's delay to the device's output says so: never "18 ms out".
+            self.assertIsNone(re.search(r"\bms out\b", en), key)
+        # One file put back, said as one.
+        self.assertTrue(i18n.TEXT["help.repair.done.restart.one"][0].startswith("One file put back"))
+
     def test_one_title_for_one_thing(self):
         # The Sound page's card of the last game's sound and PLAY's Last game are two things, with two titles (main
         # called both Last game, 지난 플레이).
@@ -322,8 +368,14 @@ class KoreanParticles(unittest.TestCase):
         # own 예기치 않게 종료, this PC's id 기기 ID, the Music volume 음악 and the Custom preset 커스텀 (the in-game panel
         # says the same), a button 버튼 as the site and the game's own pages say it.
         for key, (_en, ko) in i18n.TEXT.items():
-            for old in ("로그인이 끝났", "저절로 닫", "플레이어 ID", "배경음", "바쁜 PC", "잠시만요", "단추", "자기 주소"):
+            for old in ("로그인이 끝났", "저절로 닫", "플레이어 ID", "배경음", "바쁜 PC", "잠시만요", "단추", "자기 주소", "사운드 장치"):
                 self.assertNotIn(old, ko, key)
+        # A sound device is 소리 장치 on the Sound page and in Help's report line alike (main: 사운드 장치 there); Back is
+        # 뒤로 in the guide and in the installer (main: 이전 in the installer); forgetting a server has a word of its own
+        # (main: 지우기, as Clear game data's button).
+        self.assertIn("소리 장치", i18n.TEXT["help.report.hint"][1])
+        self.assertEqual(i18n.TEXT["setup.previous"][1], i18n.TEXT["guide.back"][1])
+        self.assertNotEqual(i18n.TEXT["online.forget"][1], i18n.TEXT["help.clear.confirm"][1])
         self.assertEqual(i18n.TEXT["sound.volume.music"][1], "음악")
         self.assertEqual(i18n.TEXT["sound.eq.custom"][1], "커스텀")
         with open(os.path.join(PACKAGE, "..", "..", "arm32", "desktop", "overlay_win32.cpp"), encoding="utf-8") as f:

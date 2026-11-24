@@ -364,11 +364,11 @@ class CommandLine(Folder):
         with open(player.result_path(), "w", encoding="utf-8") as f:
             f.write(SOUND_RESULT)
         code, said = self.run_main(["--status"])
-        self.assertIn("last game: Shared, 10 ms period, 18 ms out, no gaps", said)
+        self.assertIn("last game: Shared, 10 ms period, 18 ms output delay, no gaps", said)
         with open(player.result_path(), "w", encoding="utf-8") as f:
             f.write(SOUND_RESULT.replace("game_gaps=0", "game_gaps=4"))
         code, said = self.run_main(["--status"])
-        self.assertIn("last game: Shared, 10 ms period, 18 ms out, 4 gaps", said)
+        self.assertIn("last game: Shared, 10 ms period, 18 ms output delay, 4 gaps", said)
         # No sound device: said alone.
         with open(player.result_path(), "w", encoding="utf-8") as f:
             f.write(SOUND_RESULT.replace("mode=shared\n", "mode=none\n"))

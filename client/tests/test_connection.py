@@ -120,7 +120,7 @@ class ConnectionTest(Folder):
                          r"^The app \(0\.1 MB\) and the client data's list \(3 KB\) are there to download\.$")
         # Every ask answered: the median and the fastest and slowest, or one figure when they are one.
         self.assertRegex(self.said(steps["round_trip"]),
-                         r"^All 5 asks answered: (\d+ ms in the middle, from \d+ to \d+ ms|\d+ ms each)\.$")
+                         r"^All 5 requests answered: (median \d+ ms \(\d+ to \d+ ms\)|\d+ ms each)\.$")
         # Heads alone for the downloads: nothing downloaded whole.
         self.assertNotIn(("GET", "/apk", self.site.cookie), self.site.requests)
         self.assertIn(("HEAD", "/apk", self.site.cookie), self.site.requests)
@@ -156,7 +156,7 @@ class ConnectionTest(Folder):
                   "The server answers; its game server is under maintenance (patch 1.003.005).",
                   "서버가 응답하지만 게임 서버가 점검 중입니다(패치 1.003.005)."),
                  ("round_trip", "ok", dict(n=4, of=5, median=3, fast=2, slow=5),
-                  "The server answers. Round trip: 4 of 5 asks answered: 3 ms in the middle, from 2 to 5 ms.",
+                  "The server answers. Round trip: 4 of 5 requests answered: median 3 ms (2 to 5 ms).",
                   "서버가 응답합니다. 응답 시간: 5번 중 4번 응답: 중앙값 3 ms, 2~5 ms."))
         for step, key, values, english, korean in cases:
             result = connection.Result("http://192.0.2.20")
@@ -164,15 +164,26 @@ class ConnectionTest(Folder):
             self.assertEqual(EN.say(result.verdict()), english, key)
             self.assertEqual(KO.say(result.verdict()), korean, key)
 
+    def test_a_failures_verdict_is_what_its_step_found(self):
+        # A failure's verdict is the finding alone, which says what it is about: the step's red row under it names the
+        # step (main: "Game server: The game server answers without its client data...", the step said twice).
+        for step, key, values in (("game", "no_data", {}), ("server", "too_old", {}),
+                                  ("signin", "ended", dict(account="player1")), ("round_trip", "bad", dict(of=5))):
+            result = connection.Result("http://192.0.2.20")
+            result.step(step).done("bad", key, 1.0, **values)
+            for words in (EN, KO):
+                self.assertEqual(words.say(result.verdict()), words.say(result.step(step).said), (step, key))
+                self.assertFalse(words.say(result.verdict()).startswith(words("test." + step) + ":"), (step, key))
+
     def test_the_round_trip_says_each_figure_once(self):
         # All five answered, some, none; the fastest and the slowest one figure when they are one (main: "1~1 ms").
-        cases = (([1.2, 2.0, 1.9, 4.6, 2.2], "ok", "All 5 asks answered: 2 ms in the middle, from 1 to 5 ms.",
+        cases = (([1.2, 2.0, 1.9, 4.6, 2.2], "ok", "All 5 requests answered: median 2 ms (1 to 5 ms).",
                   "5번 모두 응답: 중앙값 2 ms, 1~5 ms."),
-                 ([1.0, 1.2, 0.9, 1.1, 1.3], "ok", "All 5 asks answered: 1 ms each.", "5번 모두 응답: 각 1 ms."),
-                 ([3.0, 7.0, 5.0], "warn", "3 of 5 asks answered: 5 ms in the middle, from 3 to 7 ms.",
+                 ([1.0, 1.2, 0.9, 1.1, 1.3], "ok", "All 5 requests answered: 1 ms each.", "5번 모두 응답: 각 1 ms."),
+                 ([3.0, 7.0, 5.0], "warn", "3 of 5 requests answered: median 5 ms (3 to 7 ms).",
                   "5번 중 3번 응답: 중앙값 5 ms, 3~7 ms."),
-                 ([2.0, 2.4], "warn", "2 of 5 asks answered: 2 ms each.", "5번 중 2번 응답: 각 2 ms."),
-                 ([], "bad", "None of the asks was answered.", "한 번도 응답하지 않았습니다."))
+                 ([2.0, 2.4], "warn", "2 of 5 requests answered: 2 ms each.", "5번 중 2번 응답: 각 2 ms."),
+                 ([], "bad", "None of the 5 timed requests was answered.", "응답 시간 측정 요청 5번에 모두 응답이 없었습니다."))
         for times, state, english, korean in cases:
             got, key, values = connection.round_trip(times)
             said = i18n.Said("test.round_trip." + key, **values)
@@ -195,9 +206,13 @@ class ConnectionTest(Folder):
         self.assertEqual(self.said(steps["port"]),
                          "127.0.0.1 refuses the connection on port %d, and no OpenDMTQ server answers on ports %d to %d "
                          "either." % (port, probed[0], probed[-1]))
-        # What comes after a port that does not answer is not tried, and says so.
+        # What comes after a port that does not answer is not tried: the copied text says so in two words, and the
+        # verdict is the port's own finding alone, without its step's name before it (main: "Port: 127.0.0.1 refuses
+        # ...", the step said twice); the card shows the steps not tried with their grey ring alone (shots.py).
         self.assertEqual([steps[k].state for k in connection.STEPS[3:]], ["skip"] * 7)
-        self.assertEqual(self.said(steps["round_trip"]), "Not tried: a step before it did not get through.")
+        self.assertEqual(self.said(steps["round_trip"]), "Not tried.")
+        self.assertEqual(EN.say(result.verdict()), self.said(steps["port"]))
+        self.assertEqual(KO.say(result.verdict()), self.said(steps["port"], KO))
         self.assertTrue(result.failed())
         self.assertIsNone(result.moved)
 
@@ -243,7 +258,7 @@ class ConnectionTest(Folder):
             other.server_close()
         self.assertEqual(steps["port"].state, "ok")
         self.assertEqual((steps["server"].state, self.said(steps["server"])),
-                         ("bad", "Something answers on the port, and it is no OpenDMTQ server for PCs."))
+                         ("bad", "Something answers on the port, but it is not an OpenDMTQ server for PCs."))
         self.assertTrue(result.failed())
 
     def test_another_web_server_on_the_old_port_and_the_server_moved(self):
@@ -258,7 +273,7 @@ class ConnectionTest(Folder):
             web.stop()
         self.assertEqual(result.moved, self.site.url)
         self.assertEqual((steps["server"].state, self.said(steps["server"])),
-                         ("bad", "Something answers on the port, and it is no OpenDMTQ server for PCs. An OpenDMTQ server "
+                         ("bad", "Something answers on the port, but it is not an OpenDMTQ server for PCs. An OpenDMTQ server "
                                  "answers at %s." % self.site.url))
         self.assertEqual(self.said(steps["server"], KO), "포트에서 응답은 오지만 PC용 OpenDMTQ 서버가 아닙니다. %s에서 "
                                                          "OpenDMTQ 서버가 응답합니다." % self.site.url)
@@ -287,7 +302,7 @@ class ConnectionTest(Folder):
     def test_an_opendmtq_too_old_for_pcs(self):
         self.site.old = True
         result, steps, _ = self.run_test(signed=False)
-        self.assertEqual(self.said(steps["server"]), "An OpenDMTQ older than 0.8 answers, without the part for PCs.")
+        self.assertEqual(self.said(steps["server"]), "An OpenDMTQ server older than 0.8 answers: it does not support the PC client.")
         self.assertEqual(steps["version"].state, "skip")
 
     def test_a_sign_in_that_ended(self):
@@ -380,7 +395,7 @@ class ConnectionTest(Folder):
         with mock.patch.object(connection, "PORTS", (closed_port(),)):
             code, said = run_main(["--test-server", "127.0.0.1:%d" % closed_port()])
         self.assertEqual(code, 1, said)
-        self.assertIn("[skip] Round trip: Not tried", said)
+        self.assertIn("[skip] Round trip: Not tried.", said)
         self.assertIn("[fail] Port: 127.0.0.1 refuses the connection", said)
         # No server known and none given: said, 2.
         st.LauncherState().save()

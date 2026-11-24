@@ -115,8 +115,10 @@ def repair_program(app):
             dialogs.tell(app, "warn", w("help.repair"), w("help.repair.partly"),
                          w("help.repair.partly.detail", n=result.restored, failed=len(result.failed)))
         elif result.restored:
-            # The running launcher goes on with the files it loaded; its next start reads the ones put back.
-            detail = "help.repair.done.restart" if result.needs_restart else "help.repair.done.detail"
+            # The running launcher goes on with the files it loaded; its next start reads the ones put back. One file put
+            # back is said as one (main: "Files put back: 1. Some are the launcher's own").
+            detail = ("help.repair.done.restart.one" if result.restored == 1 else "help.repair.done.restart") \
+                if result.needs_restart else "help.repair.done.detail"
             dialogs.tell(app, "info", w("help.repair"), w("help.repair.done"), w(detail, n=result.restored))
         else:
             dialogs.tell(app, "info", w("help.repair"), w("help.repair.fine"),

@@ -605,9 +605,9 @@ def cards_check(app, page, name, problems):
 
 def sound_last_check(app, out, tag, problems):
     """The Sound page's last game's sound, the Output card's last block under its own heading, after the output's
-    choices: "No game yet." before the first game; after one, the player's result (last-game-sound.txt beside the
-    settings file, as the player writes it) as one row, its lamp lime with no gaps and a ring with some, said again when
-    a game ends while the page is on show; in view as a person scrolls to it, measured as every screen is."""
+    choices: "No game on this PC yet." before the first game; after one, the player's result (last-game-sound.txt
+    beside the settings file, as the player writes it) as one row, its lamp lime with no gaps and a ring with some, said
+    again when a game ends while the page is on show; in view as a person scrolls to it, measured as every screen is."""
     import tkinter as tk
     from opendmtq_client import i18n
     from tests.base import SOUND_RESULT
@@ -645,7 +645,7 @@ def sound_last_check(app, out, tag, problems):
     if said() != [w("sound.last.none")]:
         problems.append("%s_sound: before a game the last game's sound says %r" % (tag, said()))
     # The row's words in each language: how the device was had, then the gaps.
-    row = "Shared, 10 ms period, 18 ms out" if w.language == "en" else "공유, 주기 10 ms, 출력 지연 18 ms"
+    row = "Shared, 10 ms period, 18 ms output delay" if w.language == "en" else "공유, 주기 10 ms, 출력 지연 18 ms"
     cases = (("none", None, None),
              ("ok", SOUND_RESULT, [row, "no gaps" if w.language == "en" else "끊김 없음"]),
              ("gaps", SOUND_RESULT.replace("gaps=0\ngame_gaps=0", "gaps=1\ngame_gaps=2"),

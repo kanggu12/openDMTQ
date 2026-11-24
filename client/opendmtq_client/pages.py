@@ -1037,8 +1037,8 @@ def decibels(w, n):
 
 def last_sound_block(app, parent):
     """How the last game's sound went as the player measured it, the Output card's last block under its own heading:
-    its row's lamp marks the gaps; "No game yet." before the first. Returns follow(), which says it again when the result
-    changed (a game that ended while the page is on show)."""
+    its row's lamp marks the gaps; "No game on this PC yet." before the first. Returns follow(), which says it again
+    when the result changed (a game that ended while the page is on show)."""
     ui, w = app.ui, app.words
     # Its heading, a list's sub-heading (the labels' face) over the row, as My records heads its lists.
     block = tk.Frame(parent, bg=theme.PANEL)
@@ -2133,8 +2133,11 @@ def test_step_shown(app, test, step):
     picture, image = shown["pictures"][step.state]
     row["lamp"].configure(image=image)
     row["lamp"].odq_picture = picture
-    row["found"].configure(text=app.words.say(step.said) if step.said else app.words("test.waiting"),
-                           fg=theme.TEXT if step.state == "bad" else theme.MUTED)
+    # A step not tried shows its grey ring and its name alone: the verdict over the steps says what stopped them, and
+    # the same line under each of the steps after it said nothing more (main: "Not tried: a step before it did not get
+    # through." eight times over). The copied text keeps its two words (connection.Result.text).
+    found = "" if step.state == "skip" else app.words.say(step.said) if step.said else app.words("test.waiting")
+    row["found"].configure(text=found, fg=theme.TEXT if step.state == "bad" else theme.MUTED)
     row["took"].configure(text=connection.took(step.ms) if step.ms is not None and step.state != "skip" else "")
     # The time beside the words grew from nothing ("12 ms"), and the row's width did not change to tell the words: they
     # are wrapped again for the room left of it, so that no line of them is wider than that room (Tk would cut it).
