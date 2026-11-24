@@ -1,6 +1,6 @@
 """The launcher with the keyboard alone, on the test container's virtual screen: the order Tab goes in, a control Tab
 reaches below the part of the page in view coming into view, and a choice that draws its page again keeping the page's
-place and the keyboard's control (the Sound page and the guide's SOUND CHECK, as the Screen page does).
+place and the keyboard's control (the Sound page and the guide's SOUND & SCREEN, as the Screen page does).
 
 Run inside the opendmtq-client-ui container only (client/tests/ui/run.sh); it refuses anywhere else, because it opens
 windows. The server is the tests' stand-in site (tests/stub.py) on this machine's loopback, the player a stand-in.
@@ -282,7 +282,7 @@ def main():
     actions_module.sign_in(app.state, stub.ACCOUNT, stub.PASSWORD)
     app.state.save()
 
-    # ---- The guide's SOUND CHECK: VSync switched with Space keeps the step's place and the keyboard.
+    # ---- The guide's SOUND & SCREEN: VSync switched with Space keeps the step's place and the keyboard.
     app.state.guide_done = False
     app.state.save()
     app.show()
@@ -302,12 +302,12 @@ def main():
     shots.settle(app)
     focus = app.root.focus_get()
     if app.state.values["vsync"] == vsync:
-        problems.append("SOUND CHECK: Space did not switch VSync")
+        problems.append("SOUND & SCREEN: Space did not switch VSync")
     if before <= 0 or abs(area.canvas.canvasy(0) - before) > 1:
-        problems.append("SOUND CHECK: switching VSync moved the step from %d px to %d" % (before,
+        problems.append("SOUND & SCREEN: switching VSync moved the step from %d px to %d" % (before,
                                                                                          area.canvas.canvasy(0)))
     if not isinstance(focus, widgets.Toggle):
-        problems.append("SOUND CHECK: after VSync's switch the keyboard is on %r" % (focus,))
+        problems.append("SOUND & SCREEN: after VSync's switch the keyboard is on %r" % (focus,))
 
     # ---- The guide's Tab order: the step's page, then the bar left to right (Skip, Back, Next).
     app.guide.back()

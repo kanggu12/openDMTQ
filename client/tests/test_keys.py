@@ -357,6 +357,16 @@ class Table(unittest.TestCase):
             self.table.pressed(box, press(45, "k", "k"))
         self.app.changed.assert_called_once_with("keys_3line", "K/E F J")
 
+    def test_dimmed_lanes_take_no_key(self):
+        # Keyboard play off: the lanes stay on show, dimmed, and a click or a key on a box does nothing (the card keeps
+        # its keys in view, where main took them away and left the switch alone in its card).
+        self.table.enabled = False
+        box = self.box()
+        self.assertIsNone(self.table.pressed(box, press(36, "Return", "\r")))
+        self.table.clicked(box)
+        self.assertIsNone(self.table.waiting)
+        self.app.changed.assert_not_called()
+
     def test_only_delete_takes_a_key_away(self):
         # Backspace was never asked for: it is refused by its name as any key no lane takes, and the lane keeps both
         # its keys. Delete takes the box's key away.

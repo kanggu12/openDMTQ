@@ -2664,9 +2664,23 @@ class KeyBox(tk.Canvas):
         if printed:
             self.create_text(x + name_width + px(self.GAP), middle, text=printed, font=print_font, fill=theme.MUTED,
                              anchor="w")
+        # Its words' items, in their own colours, for the dimmed look (set_enabled).
+        self.words_items = [item for item in self.find_all() if self.type(item) == "text"]
+        self.words_colours = [self.itemcget(item, "fill") for item in self.words_items]
+        self.enabled = True
         self.bind("<Enter>", lambda e: self._paint(under=True))
         self.bind("<Leave>", lambda e: self._paint(under=False))
         self._paint()
+
+    def set_enabled(self, on):
+        """In use (keyboard play on), or dimmed: its words in the faintest grey, no brighter edges under the pointer,
+        skipped by Tab and the pointer's hand, as the lanes stand while keyboard play is off (a card of the switch
+        alone held a single setting)."""
+        self.enabled = bool(on)
+        for item, colour in zip(self.words_items, self.words_colours):
+            self.itemconfigure(item, fill=colour if self.enabled else theme.FAINT)
+        self.configure(takefocus=1 if self.enabled else 0, cursor="hand2" if self.enabled else "arrow")
+        self._paint(under=False)
 
     def set_waiting(self, on):
         """Waiting for a key (the accent round it, the cyan ring away: the accent says where the key goes), or not."""
@@ -2677,7 +2691,8 @@ class KeyBox(tk.Canvas):
     def _paint(self, under=None):
         """The face for the box's state: the accent while it waits, brighter edges under the pointer, else normal."""
         if under is not None:
-            self.under = under
+            # A dimmed box's edges stay as they are under the pointer: it takes no key now.
+            self.under = under and getattr(self, "enabled", True)
         self.state = "focus" if self.waiting else ("hover" if self.under else "normal")
         self.itemconfigure(self.face, image=box_face(self, self.state))
 

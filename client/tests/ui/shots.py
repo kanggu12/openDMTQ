@@ -1241,8 +1241,9 @@ def keys_check(app, out, tag, problems):
     app.key_prints.clear()
     for name in choices.LANES:
         app.changed(name, choices.DEFAULTS[name])
-    # ---- the switch, by the keyboard: off takes the table and Reset keys away, on brings them back, the keyboard on
-    # the switch each time, and the switch where it was (under the pointer that switched it).
+    # ---- the switch, by the keyboard: off dims the table (its keys on show, none taking a key or the keyboard) and
+    # takes Reset keys away, on brings them back in use, the keyboard on the switch each time, and the switch where it
+    # was (under the pointer that switched it).
     app.go("controls")
     settle(app)
     card = card_titled(app, w("controls.keys"))
@@ -1261,12 +1262,16 @@ def keys_check(app, out, tag, problems):
         if isinstance(focus, widgets.Toggle) and abs(focus.winfo_rooty() - before) > 1:
             problems.append("%s: keyboard play %s: the switch moved %d px" % (tag, "on" if on else "off",
                                                                             focus.winfo_rooty() - before))
-        shown = len(boxes())
+        shown = boxes()
+        # In use: each box takes the keyboard (Tab reaches it); dimmed: none does.
+        in_use = [x for x in shown if str(x.cget("takefocus")) not in ("", "0")]
         reset_shown = any(isinstance(x, widgets.Button) and x.words == w("controls.keys.reset") and x.winfo_ismapped()
                           for x in widgets_of(app.body.inner))
-        if app.state.values["keyboard"] != ("on" if on else "off") or (shown == 18) != on or reset_shown != on:
-            problems.append("%s: keyboard play %s: %r, %d boxes, Reset keys %s" % (
-                tag, "on" if on else "off", app.state.values["keyboard"], shown, "shown" if reset_shown else "gone"))
+        if app.state.values["keyboard"] != ("on" if on else "off") or len(shown) != 18 or \
+                len(in_use) != (18 if on else 0) or reset_shown != on:
+            problems.append("%s: keyboard play %s: %r, %d boxes, %d in use, Reset keys %s" % (
+                tag, "on" if on else "off", app.state.values["keyboard"], len(shown), len(in_use),
+                "shown" if reset_shown else "gone"))
         if not isinstance(focus, widgets.Toggle):
             problems.append("%s: keyboard play %s: the keyboard left the switch (now on %r)" % (tag, "on" if on else "off", focus))
         if not on:

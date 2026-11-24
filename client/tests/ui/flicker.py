@@ -190,8 +190,8 @@ CHANGES = (
         ("mode exclusive (arrow)", widgets.Segmented, "sound.mode", "<Right>", True),
         ("mode shared (arrow)", widgets.Segmented, "sound.mode", "<Left>", True))),
     ("controls", (
-        ("keyboard play off (takes the keys)", widgets.Toggle, "controls.keys.play", "<space>", True),
-        ("keyboard play on (brings the keys)", widgets.Toggle, "controls.keys.play", "<space>", True))),
+        ("keyboard play off (dims the keys)", widgets.Toggle, "controls.keys.play", "<space>", True),
+        ("keyboard play on (puts the keys in use)", widgets.Toggle, "controls.keys.play", "<space>", True))),
 )
 
 

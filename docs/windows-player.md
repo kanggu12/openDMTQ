@@ -25,7 +25,7 @@ then plays against the server as it does on a phone.
    app: **More info**, then **Run anyway**. The installer is not signed by a publisher Windows knows. Windows 11's
    Smart App Control, when it is on, blocks unsigned programs, this one among them, and has no **Run anyway**.
 3. The launcher's first start walks through the server (already filled in), the sign-in with your site ID, the app's
-   download, the picture and the sound, then the ready check, and **PLAY**. Each step asks its
+   download, the sound and the screen, then the ready check, and **PLAY**. Each step asks its
    question at the top; while **Next** waits, a line under the step says for what.
 
 The installer from the project's [releases](https://github.com/kanggu12/openDMTQ/releases/latest)

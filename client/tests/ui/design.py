@@ -3,7 +3,7 @@ cards are composed, the roles of its words, its buttons, and the page's own pict
 
 - composition: where two columns of cards fit, a page never shows three or more cards all at the column's full width
   one under another (a plain list of boxes); no card holds a single control with at most one line of words beside it
-  (a box for one button, or for one setting's row).
+  (a box for one button), nor one setting's row alone (its name and its description are the row's own).
 - text: every label in one of the type scale's fonts; a heading (a card's title, the first label over a group) never
   smaller than the words it heads; a button's words on its middle by the ink of their capitals, or of their Hangul
   syllables, within half a pixel.
@@ -196,7 +196,22 @@ def composition(root, ui, name):
                 problems.append("%s: the card %s holds a single control (%s)%s" % (
                     name, _said(card), _said(controls[0]),
                     " and the words %r" % str(words[0].cget("text"))[:40] if words else ""))
+            # A setting's row is one setting, its name and its description its own: a card that holds one such row and
+            # nothing else is a box for one setting (main let the Controls page's card of the switch alone pass, and
+            # the guide's card of the display's mode alone, by counting the row's name as a second line).
+            rows = [w for w in _all(card.body) if _is_setting_row(w) and _mapped(w)]
+            if len(rows) == 1:
+                outside = [w for w in controls + words if not _inside(w, rows[0])]
+                if not outside:
+                    problems.append("%s: the card %s holds a single setting (%s)" % (
+                        name, _said(card), _said(rows[0].control)))
     return problems
+
+
+def _is_setting_row(widget):
+    """Whether a widget is a setting's row (widgets.setting_row: its name, its control, the description it says under
+    them), read from what the row keeps: its control, its description and the way it says another."""
+    return all(hasattr(widget, name) for name in ("odq_names", "control", "hint", "say"))
 
 
 def _said(widget):

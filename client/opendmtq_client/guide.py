@@ -1,9 +1,10 @@
 """The first-start guide: six steps from nothing to the first song, one question each.
 
 POWER ON (language, what is needed), SERVER (the server's address, or the one the installer brought), SIGN IN (the ID
-and password its owner made), DOWNLOAD (that server's app), SOUND CHECK (sound and screen), STAGE START (the ready
-check and how to play, then PLAY). Each step's question is its page's title, its few words under it, and the steps go
-down the launcher's column, the one on show lit; while Next waits, a line at the foot of the step's card says for what.
+and password its owner made), DOWNLOAD (that server's app), SOUND & SCREEN (the volumes, the display's mode and the
+frames), STAGE START (the ready check, then PLAY). Each step's question is its page's title, its few words under it, and
+the steps go down the launcher's column, the one on show lit; while Next waits, a line at the foot of the step's card
+says for what.
 Every choice is the same setting the launcher's pages show, so the guide never knows anything the pages do not.
 """
 
@@ -81,7 +82,7 @@ class Guide:
         app, w = self.app, self.app.words
         # A progress bar of the page that went: the download's progress waits for the next one.
         app.download_bar = None
-        # The step that went took its own update with it (SOUND CHECK sets its own).
+        # The step that went took its own update with it (SOUND & SCREEN sets its own).
         app.page_follow = None
         key = STEPS[index]
         # The step made off the screen while the one on show stays whole on it, then put in its place with its title,
@@ -274,13 +275,13 @@ class Guide:
         _server_key, _signin, app_key, _others = pages.online_keys(app)
         self.sections.add(app_key, lambda holder: pages.app_panel(app, holder, self.redraw))
 
-    # -------------------------------------------------------------------------- 5 SOUND CHECK
+    # -------------------------------------------------------------------------- 5 SOUND & SCREEN
 
     def _sound(self, parent):
         app = self.app
-        # The same rows as the Sound and Screen pages, the ones a first start needs: the volumes and the frames side by
-        # side, one height (one under another in a narrow window, the volumes first, in view without scrolling in the
-        # smallest window), the display's mode under them across the step.
+        # The same rows as the Sound and Screen pages, the ones a first start needs: the volumes and the screen (the
+        # display's mode, then the frames) side by side, one height (one under another in a narrow window, the volumes
+        # first, in view without scrolling in the smallest window).
         left, right = pages._columns(parent, app.ui, weights=(1, 1))
         sound = pages.sound_rows(app, left, full=False, fill=True)
         screen = pages.screen_rows(app, parent, full=False, frames_in=right)

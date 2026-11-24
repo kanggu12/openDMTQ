@@ -786,10 +786,11 @@ def check_row(check, w, on_play=False, in_guide=False, installed=False, ended=Fa
 
 
 def screen_rows(app, parent, full=True, frames_in=None):
-    """The Screen page's settings in their cards, which the guide's SOUND CHECK shows too (full=False: the ones a first
-    start needs; Frames in `frames_in`, beside the volumes, and Display under them across the step). Every row is made
-    once: a choice changes its own control, the hints that follow from it and the rows it brings or takes (shown or
-    hidden in place, widgets.RowList), never the page (client/tests/ui/flicker.py)."""
+    """The Screen page's settings in their cards, which the guide's SOUND & SCREEN shows too (full=False: the ones a
+    first start needs, in one card of the screen in `frames_in`, beside the volumes: the display's mode first, then the
+    frames; a card of the mode alone across the step held a single setting). Every row is made once: a choice changes
+    its own control, the hints that follow from it and the rows it brings or takes (shown or hidden in place,
+    widgets.RowList), never the page (client/tests/ui/flicker.py)."""
     ui, w, v = app.ui, app.words, app.state.values
     display = displays.main_display(app.root)
     found = displays.connected()
@@ -801,14 +802,13 @@ def screen_rows(app, parent, full=True, frames_in=None):
         follow()
 
     # The groups side by side where the page is wide, one height (one under another in a narrow window): on the page,
-    # Display and Quality, then Frames across the page under them; in the guide, Frames beside the volumes and Display
-    # across the step under them.
+    # Display and Quality, then Frames across the page under them; in the guide, the screen's one card beside the
+    # volumes.
     if full:
         left, right = _columns(parent, ui, weights=(1, 1))
         card = _card(left, ui, w("screen.display"), last=True, fill=True)
     else:
-        card = widgets.Card(parent, ui, w("screen.display"))
-        card.pack(fill="x", pady=(ui.px(CARD_GAP), 0))
+        card = _card(frames_in, ui, w("guide.sound.screen"), last=True, fill=True)
     shown = widgets.RowList(card.body, ui)
     shown.pack(fill="x")
     slot = shown.add()
@@ -843,11 +843,12 @@ def screen_rows(app, parent, full=True, frames_in=None):
         quality = _card(right, ui, w("screen.picture"), last=True, fill=True)
         card = widgets.Card(parent, ui, w("screen.frames"))
         card.pack(fill="x", pady=(ui.px(CARD_GAP), 0))
+        frames = widgets.RowList(card.body, ui)
+        frames.pack(fill="x")
     else:
+        # The guide's frames in the same card's rows, under the mode.
         quality = None
-        card = _card(frames_in, ui, w("screen.frames"), last=True, fill=True)
-    frames = widgets.RowList(card.body, ui)
-    frames.pack(fill="x")
+        frames = shown
     rows["vsync"] = widgets.setting_row(
         frames.add().body, ui, w("screen.vsync"),
         lambda p: widgets.Toggle(p, ui, v["vsync"] == "on", lambda on: setter("vsync", "on" if on else "off")), " ")
@@ -1013,7 +1014,8 @@ def _focus_order(widget):
 def keep_place(area, root, rebuild):
     """A page area drawn again by `rebuild()` for a change (a choice that adds or removes rows, an answer that came),
     keeping where it was scrolled to and the control the keyboard was on: choosing a buffer at the Sound page's foot,
-    or switching VSync on the guide's SOUND CHECK, does not throw the page back to its top and the keyboard out of it."""
+    or switching VSync on the guide's SOUND & SCREEN, does not throw the page back to its top and the keyboard out of
+    it."""
     top = area.canvas.yview()[0]
     before = _focus_order(area.inner)
     focused = root.focus_get()
@@ -1089,7 +1091,7 @@ BANDS_ACROSS = 3 * (BAND_LEAST + 70) + 2 * CARD_GAP
 
 
 def sound_rows(app, parent, full=True, fill=False):
-    """The Sound page's settings in their cards, which the guide's SOUND CHECK shows too (full=False: the volumes
+    """The Sound page's settings in their cards, which the guide's SOUND & SCREEN shows too (full=False: the volumes
     alone). On the page, Volume and Output side by side, one height (one under another in a narrow window), the
     equaliser across the page under them: its preset, then its three bands side by side. Made once: a choice changes its
     own control and the hints and controls that follow from it, in place (an equaliser's preset moves its bands, a band
@@ -1242,9 +1244,10 @@ def build_controls(app, parent):
 
 
 def lanes_card(app, parent):
-    """Keyboard play's card: the switch for it and, while it is on, each LINE mode's lanes with their keys (LaneKeys)
-    and Reset keys at the card's title. The lanes are made with the page and shown or hidden in place by the switch, the
-    rest of the page as it was."""
+    """Keyboard play's card: the switch for it, then each LINE mode's lanes with their keys (LaneKeys), in use while it
+    is on, with Reset keys at the card's title, and dimmed while it is off: the keys stay on show, so that the card is
+    never the switch's alone (a box for one setting, as main's card was with keyboard play off). The switch changes the
+    lanes' look in place, the rest of the page as it was."""
     ui, w = app.ui, app.words
     card = _card(parent, ui, w("controls.keys"), last=True)
     on = app.state.values["keyboard"] == "on"
@@ -1255,7 +1258,7 @@ def lanes_card(app, parent):
     def switch(value):
         app.changed("keyboard", "on" if value else "off")
         row.say(w("controls.keys.play.hint." + ("on" if value else "off")))
-        rows.show(holder, value)
+        table.set_enabled(value)
         table.show_reset(value)
 
     # Its hint keeps the room of the longer of the two (widgets.keep_room), as the switch brings or takes the lanes.
@@ -1264,9 +1267,10 @@ def lanes_card(app, parent):
                               hints=[w("controls.keys.play.hint." + state) for state in ("on", "off")])
     row.pack(fill="x")
     rows.pack(fill="x")
-    # Where the lanes go, under the switch: made whether shown or not, so that the switch only shows them.
-    holder = rows.add(shown=on)
+    # Where the lanes go, under the switch: on show either way, the switch only changes their look.
+    holder = rows.add()
     table = LaneKeys(app, card, holder.body)
+    table.set_enabled(on)
     table.show_reset(on)
 
 
@@ -1326,8 +1330,24 @@ class LaneKeys:
                 block.grid(row=i, column=0, sticky="nw", pady=(px(self.ROW_GAP) if i else 0, 0))
                 self.table.columnconfigure(i, weight=0, uniform="")
 
+    def set_enabled(self, on):
+        """The lanes in use (keyboard play on) or dimmed, in place: dimmed, the boxes take no key and Tab skips them,
+        the names and numbers and the keys in the faintest grey, and the line under them, which says how to change a
+        key, goes (a box that waited stops)."""
+        self.enabled = bool(on)
+        if not self.enabled and self.waiting is not None:
+            self.stop()
+        for box in self.boxes:
+            box.set_enabled(self.enabled)
+        for label in self.names:
+            label.configure(fg=theme.MUTED if self.enabled else theme.FAINT)
+        if self.enabled and not self.line.winfo_manager():
+            self.line.pack(fill="x", pady=(self.ui.px(12), 0))
+        elif not self.enabled and self.line.winfo_manager():
+            self.line.pack_forget()
+
     def show_reset(self, shown):
-        """Reset keys at the card's title while the lanes show, gone while keyboard play is off."""
+        """Reset keys at the card's title while the lanes are in use, gone while keyboard play is off."""
         if shown and not self.reset_button.winfo_manager():
             self.reset_button.pack(side="right")
         elif not shown and self.reset_button.winfo_manager():
@@ -1364,8 +1384,9 @@ class LaneKeys:
         table.bind("<Destroy>", lambda e: self.typing_back() if e.widget is table else None)
         # Whether a box shows what the keyboard prints beside its key's name: the line under the table then says what it is.
         shown = False
-        # Every box, in Tab's order (again() finds the one the keyboard was on by its place).
-        self.boxes = []
+        # Every box, in Tab's order (again() finds the one the keyboard was on by its place); the modes' names and the
+        # lanes' numbers, dimmed with them; whether the lanes are in use (keyboard play on).
+        self.boxes, self.names, self.enabled = [], [], True
         # A block for each mode: its name over its lanes, each lane's number before its boxes. Side by side while the
         # card has the room, one under another when it has not (long keys in a narrow window): _flow().
         self.blocks = []
@@ -1375,12 +1396,14 @@ class LaneKeys:
             self.blocks.append(block)
             # The mode's name, as the game's tabs name it, in the launcher's wide face for English names: the menu's
             # size, never smaller than the keys it heads.
-            tk.Label(block, text=choices.mode(name), font=ui.fonts.nav, fg=theme.MUTED, bg=theme.PANEL).grid(
-                row=0, column=0, columnspan=2, sticky="w", pady=(0, px(6)))
+            heading = tk.Label(block, text=choices.mode(name), font=ui.fonts.nav, fg=theme.MUTED, bg=theme.PANEL)
+            heading.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, px(6)))
+            self.names.append(heading)
             for lane, lane_keys in enumerate(choices.lanes_of(name, values[name])):
                 # The lane's number from the top, then its boxes.
-                tk.Label(block, text=str(lane + 1), font=ui.fonts.body_bold, fg=theme.MUTED, bg=theme.PANEL).grid(
-                    row=lane + 1, column=0, sticky="w", padx=(0, px(self.NUMBER_GAP)))
+                number = tk.Label(block, text=str(lane + 1), font=ui.fonts.body_bold, fg=theme.MUTED, bg=theme.PANEL)
+                number.grid(row=lane + 1, column=0, sticky="w", padx=(0, px(self.NUMBER_GAP)))
+                self.names.append(number)
                 cell = tk.Frame(block, bg=theme.PANEL)
                 cell.grid(row=lane + 1, column=1, sticky="w", pady=px(self.LANE_GAP))
                 # The lane's keys, then one empty box while it has room for a second.
@@ -1465,7 +1488,9 @@ class LaneKeys:
             self.app.key_held = None
 
     def clicked(self, box):
-        """A click: the box waits for a key, or a waiting box stops."""
+        """A click: the box waits for a key, or a waiting box stops; nothing while the lanes are dimmed."""
+        if not getattr(self, "enabled", True):
+            return
         if self.waiting is box:
             self.stop()
         else:
@@ -1480,6 +1505,9 @@ class LaneKeys:
         """A key pressed on a box: Enter or Space makes a box wait, as a button is pressed; on a waiting box, the key
         for it. "break" for a key the box took, so that nothing else of the window acts on it. A key held down counts
         once: Windows repeats its press with no release, and its repeats would take it, or refuse it, at once."""
+        if not getattr(self, "enabled", True):
+            # Dimmed: the box takes no key (Tab does not reach it either).
+            return None
         if event.keycode == self.app.key_held:
             # The repeat of the key that started the wait or just went in: left out until it is let go.
             return "break"
@@ -1551,6 +1579,7 @@ class LaneKeys:
         focused = self.app.root.focus_get()
         where = where or getattr(focused, "odq_where", None)
         fresh = LaneKeys(self.app, self.card, self.holder)
+        fresh.set_enabled(self.app.state.values["keyboard"] == "on")
         fresh.show_reset(True)
         if where == "reset":
             # Reset keys was pressed: the keyboard stays on it.

@@ -62,7 +62,7 @@ The PC client plays the same app on Windows:
    installer (.exe)**.
 2. Run it and choose **Install**. It installs for your Windows user, without administrator rights, set up for the
    server. If Windows says it protected your PC: **More info**, then **Run anyway**.
-3. The launcher signs in with your ID and password, downloads the game and asks about the picture and the sound once.
+3. The launcher signs in with your ID and password, downloads the game and asks about the sound and the screen once.
    Then **PLAY**.
 
 The launcher keeps the game and itself up to date, from the server. Its **Play** page opens your [MY PAGE](#my-page)

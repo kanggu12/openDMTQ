@@ -647,8 +647,11 @@ TEXT = {
     "guide.download.title": ("Get the app", "앱 다운로드"),
     "guide.download.text": ("The server builds it for its own address, the same one its phones install. It comes once, and again only when the server has a newer one.",
                             "서버 주소에 맞춰 만든 앱으로, 휴대폰에 설치하는 앱과 같습니다. 한 번 다운로드하고, 서버에 새 버전이 있을 때만 다시 다운로드합니다."),
-    "guide.sound.name": ("SOUND CHECK", "SOUND CHECK"),
+    # The step named as its page names it (Sound and screen), one name for one step (main: SOUND CHECK in the column).
+    "guide.sound.name": ("SOUND & SCREEN", "SOUND & SCREEN"),
     "guide.sound.title": ("Sound and screen", "소리와 화면"),
+    # The step's card of the screen beside the volumes: the display's mode and the frames.
+    "guide.sound.screen": ("Screen", "화면"),
     "guide.stage.name": ("STAGE START", "STAGE START"),
     "guide.stage.title": ("Ready for stage 1", "1스테이지 준비 끝"),
     "guide.stage.text": ("PLAY starts the game with these settings. The launcher waits while you play.",
