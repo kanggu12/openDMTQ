@@ -644,6 +644,38 @@ async function rowMore(contexts) {
   }
 }
 
+// The Server page's forms on a laptop's screen: the port's field as wide as a port, its button beside it; and the answer
+// to the name's form (sent as it is, which the server refuses as the same name) comes back to the name's card with its
+// heading clear of the bar and of the band of the answer's words under it. Before: the port's field was 1011 px for five
+// digits, and the answer's page landed with the card's heading and first lines under the bar and the band.
+async function serverForms(contexts) {
+  for (const width of [1280, 1024]) {
+    const page = await contexts.signed.newPage();
+    await page.setViewport({ width, height: 800 });
+    await page.setCookie({ name: 'opendmtq_lang', value: 'en', url: A });
+    await page.goto(`${A}/server`, { waitUntil: 'domcontentloaded' });
+    const port = await page.evaluate(() => {
+      const field = document.querySelector('#port input[name=port]'), button = document.querySelector('#port form button');
+      if (!field || !button) return null;
+      const f = field.getBoundingClientRect(), b = button.getBoundingClientRect();
+      return { field: Math.round(f.width), beside: b.left >= f.right && b.top < f.bottom && b.bottom > f.top };
+    });
+    check(`the Server page's port field is as wide as a port, its button beside it (${width}px)`, port && port.field <= 240 && port.beside, JSON.stringify(port));
+    await page.$eval('#name form', f => f.scrollIntoView({ block: 'center' }));
+    await settle(page, () => page.click('#name form button'));
+    await pause(600);
+    const card = await page.evaluate(() => {
+      const bar = document.querySelector('.bar').getBoundingClientRect();
+      const band = document.querySelector('.bar > .said-stack');
+      const heading = document.querySelector('#name h2').getBoundingClientRect();
+      return { at: location.hash, heading: Math.round(heading.top), bar: Math.round(bar.bottom), band: band ? Math.round(band.getBoundingClientRect().bottom) : null };
+    });
+    check(`an answer about the name comes back to its card with its heading clear of the bar and the band (${width}px)`,
+      card.at === '#name' && card.heading >= Math.max(card.bar, card.band || 0) + 8, JSON.stringify(card));
+    await page.close();
+  }
+}
+
 // The setup's list of what it found on the server PC (run.sh puts them in the owner's home): the folder of the game's
 // files with no songs in it is named the client data folder, as the look at it says, and its row asks nothing about songs;
 // an archive that cannot be read leaves its row with no Import to press and no choice of songs once the look says so.
@@ -3147,6 +3179,7 @@ async function myPage(contexts) {
     await gameFlows(contexts);
     await adminFlows(contexts);
     await rowMore(contexts);
+    await serverForms(contexts);
     await setupFound(contexts);
     await webhookFlows(contexts);
     await repairSaid(contexts);

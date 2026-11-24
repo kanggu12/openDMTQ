@@ -1078,4 +1078,15 @@ function band(said) {
     // The band under the bar, as a change made in place says it.
     for (const m of document.querySelectorAll('main .flash[data-said]')) band(m);
   }
+  // An answer about one card (the Server page's port, name, password: its address names the card): the card's top just
+  // under the bar and the band, where it lay under them, its heading and first lines hidden.
+  const card = location.hash.length > 1 && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+  if (card) {
+    const bar = document.querySelector('.bar');
+    const stack = bar.querySelector(':scope > .said-stack');
+    const cover = (getComputedStyle(bar).position === 'sticky' ? bar.getBoundingClientRect().bottom : 0)
+      + (stack && getComputedStyle(stack).position !== 'fixed' ? stack.getBoundingClientRect().height : 0);
+    const top = card.getBoundingClientRect().top;
+    if (top < cover + 14 || top > innerHeight - 60) scrollBy(0, top - cover - 14);
+  }
 })();

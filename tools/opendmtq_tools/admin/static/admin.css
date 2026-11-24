@@ -241,6 +241,16 @@ table.recordings tr[id] { scroll-margin-top: 76px; }
    the window's top by the browser, it stands under the bar and the band of the answer's words, not beneath them: the bar's
    one row and the band's line, 14 px clear; two rows of the bar below 1240 px; on a phone the bar goes with the page and
    the band is at the screen's foot. */
+/* The Server page's fields as wide as what they hold, their button beside them: a port of five digits, a name of a few
+   words (a field across the whole card was 1011 px for a port). On a phone a form's field and button stand one under the
+   other, each across (style.css .form-row). */
+@media (min-width: 601px) {
+  #port .form-row > .grow { flex: 0 1 11em; }
+  #name .form-row > .grow { flex: 0 1 28em; }
+}
+main > .card[id] { scroll-margin-top: 118px; }
+@media (max-width: 1240px) { main > .card[id] { scroll-margin-top: 152px; } }
+@media (max-width: 720px) { main > .card[id] { scroll-margin-top: 14px; } }
 
 /* ------------------------------------------------------------------ the status page */
 
