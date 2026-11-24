@@ -1446,6 +1446,17 @@ class BackupFailureTest(unittest.TestCase):
             self.assertEqual(os.listdir(admin.core.BACKUPS), [])
             self.assertIn("the disk is full", inst.client.get("/opendmtq/admin/backups").get_data(as_text=True))
 
+    def test_a_snapshot_the_full_disk_cannot_hold_is_said_so(self):
+        # The database's snapshot is made beside the backups now (ADM-220): on a full disk SQLite's own copy fails first,
+        # and says so in its words, which the page takes for the disk being full (not "the server's log has the details").
+        with Install(), admin.app.test_request_context():
+            full = sqlite3.OperationalError("database or disk is full")
+            self.assertEqual(admin.core.why(full), "the disk is full")
+            with mock.patch.object(admin.backups, "make_backup", side_effect=full):
+                with self.assertRaises(admin.core.Refused) as refused:
+                    admin.backups.create()
+            self.assertEqual(refused.exception.words, "The backup failed: the disk is full.")
+
 
 
 @unittest.skipUnless(HAVE_FLASK, "needs Flask (in the tools image)")

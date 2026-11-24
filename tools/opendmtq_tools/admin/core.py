@@ -679,6 +679,10 @@ def why(e):
     app.logger.warning("admin: %s: %s", e.__class__.__name__, e)
     if isinstance(e, OSError) and e.errno == errno.ENOSPC:
         return tp("err.disk_full")
+    # SQLite's own word for it (SQLITE_FULL, 13): a database copy that the disk could not hold, a backup's snapshot of it
+    # beside the backups among them.
+    if isinstance(e, sqlite3.Error) and (getattr(e, "sqlite_errorcode", None) == 13 or "disk is full" in str(e)):
+        return tp("err.disk_full")
     if isinstance(e, sqlite3.OperationalError) and "locked" in str(e):
         return tp("err.db_busy")
     if isinstance(e, (tarfile.TarError, EOFError, zlib.error)):
