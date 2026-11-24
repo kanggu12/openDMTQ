@@ -562,19 +562,30 @@ def _play(state):
 
     session = actions.play(state, report=report)
     state.save()
+    w = i18n.Words("en")
+    if session.linked:
+        # The site account and this PC's game player linked by this PLAY: said once, in the window's words.
+        _say(w("status.linked", account=session.linked))
     _say("The game is running (process %d)." % session.process.pid)
     # The installer waits while a game runs (playing.py); held until it ends.
     playing.hold()
     record = actions.finish(state, session)
     playing.release()
+    # The game's first start on this PC gave the id it signs in by: the account and that player linked now, said once
+    # after how the game ended, as the window says it.
+    linked = None if session.linked else actions.link_player(state)
     state.save()
     if record.get("failed_start"):
         # The player's own "could not start": its log says why.
         _say("The game could not start. The player's log says why: %s" % _log_paths(state)["player"], error=True)
-        return 1
-    _say("The game ended after %d s%s." % (record["seconds"], " (it closed by itself, code %s)" % record["exit_code"]
-                                           if record["crashed"] else ""))
-    return 0 if not record["crashed"] else 1
+        code = 1
+    else:
+        _say("The game ended after %d s%s." % (record["seconds"], " (it closed by itself, code %s)" % record["exit_code"]
+                                               if record["crashed"] else ""))
+        code = 0 if not record["crashed"] else 1
+    if linked:
+        _say(w("status.linked", account=linked))
+    return code
 
 
 def parse(argv):

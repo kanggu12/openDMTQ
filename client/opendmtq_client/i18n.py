@@ -49,6 +49,11 @@ TEXT = {
     "status.mypage": ("Opening your page on the site...", "사이트의 내 페이지를 여는 중..."),
     "status.mypage.opened": ("Your page on the site is open in the browser.", "브라우저에서 사이트의 내 페이지를 열었습니다."),
     "status.site.opened": ("The server's site is open in the browser.", "브라우저에서 서버의 사이트를 열었습니다."),
+    # PLAY linked the site account to this PC's game player (actions.link_player), said once; after the line of how the
+    # game ended when the game's end made the link.
+    "status.linked": ("This PC's player is now linked to your site account {account}.",
+                      "이 PC의 플레이어를 사이트 계정 {account}에 연결했습니다."),
+    "status.and": ("{first} {then}", "{first} {then}"),
     "status.signed_out": ("Your sign-in ended (it ran out, or the password changed). Sign in again on the ONLINE page.",
                           "로그인이 만료되었습니다(기간이 지났거나 비밀번호가 바뀌었습니다). ONLINE 페이지에서 다시 로그인하세요."),
 

@@ -232,6 +232,66 @@ def records(state, change=at_once):
         raise
 
 
+# Where the settled answers of a link leave it (client.php?claim's "why"): the account has its player, or that player has
+# an account, or the account is the owner's, which keeps none. "none" (no game played here yet) and "banned" are asked
+# again at the next PLAY.
+SETTLED = ("taken", "owner")
+
+
+def device_id(state):
+    """This PC's game player on the server PLAY plays on: the id the player keeps in the game's data folder of the
+    server's app (removal.ID_FILE), which the game signs in by; None while the game has not run with that app."""
+    from opendmtq_client import removal
+    server = state.server()
+    have = apps.local(server["url"]) if server else None
+    if not have:
+        return None
+    try:
+        folder = player.data_folder(have["package"])
+    except player.NotAPackage:
+        return None
+    try:
+        with open(os.path.join(folder, removal.ID_FOLDER, removal.ID_FILE), encoding="utf-8-sig", errors="replace") as f:
+            found = f.read().strip()
+    except OSError:
+        return None
+    # As the player takes it (arm32/desktop/android_os.cpp, device_id): sixteen characters, else it makes another.
+    return found if len(found) == 16 and not any(c.isspace() for c in found) else None
+
+
+def link_player(state, change=at_once):
+    """At PLAY: the signed-in site account linked to this PC's game player on the server (client.php?claim), which the
+    server does when the account has no player and that player has no account either. Returns the account's ID when this
+    call made the link, else None: not signed in, no game played here with this app yet, linked already, that player
+    another account's, an older server, no answer (none of which stops PLAY). Once the server settled it for the account
+    (linked, or never to be: SETTLED), PLAY asks no more; a sign-in that ended is forgotten. Each change is made where
+    `change` makes it."""
+    server = state.server()
+    if server is None or not state.signed_in(server) or server.get("linked") == server.get("account"):
+        return None
+    device = device_id(state)
+    if device is None:
+        return None
+    account = server["account"]
+    try:
+        answer = srv.claim_player(server["url"], server["cookie"], device)
+    except srv.SignedOut:
+        change(lambda: state.forget_sign_in(server))
+        return None
+    except srv.ServerError as e:
+        log.info("could not ask %s to link the site account to this PC's player: %s", server["url"], e)
+        return None
+    if answer is None:
+        # A server from before such links (asked again at the next PLAY: it may be updated meanwhile).
+        return None
+    if answer["linked"] or answer["why"] in SETTLED:
+        change(lambda: server.update(linked=account))
+    if answer["linked"] and answer["now"]:
+        log.info("linked the site account to this PC's player on %s", server["url"])
+        return account
+    return None
+
+
 def open_url(url):
     """An address opened in the PC's own browser."""
     safety.refuse_windows_in_tests("the browser")
@@ -282,19 +342,25 @@ def play(state, report=lambda step, done=None, total=None: None, cancel=None, ch
     report(step, done, total) is told each step as it starts ("app", "download" with its progress, "offline" when the
     server did not answer, "starting"). A server that cannot be reached, or a sign-in that ended, still plays the app
     this PC has; an app the server says is built for its old address does not start (it would not reach the server).
-    Each change to the state (what the server offers, a sign-in that ended) is made where `change` makes it. Returns
-    the Session.
+    Each change to the state (what the server offers, a sign-in that ended, a link settled) is made where `change` makes
+    it. Returns the Session; its `linked` is the site account this PLAY linked to this PC's game player (link_player), or
+    None.
     """
     checks = readiness(state)
     if not can_play(checks):
         raise NotReady(stopping(checks))
     server = state.server()
+    # The site account this PLAY linked to this PC's game player, for the window and the command line to say once.
+    linked = None
     if state.signed_in(server):
         report("app")
         try:
             info = check_app(state, change)
             if not apps.current(server["url"], info):
                 get_app(state, info, lambda done, total: report("download", done, total), cancel, change)
+            # The server answers: the account and this PC's game player linked, when a game played here before gave the
+            # id the game signs in by (on a PC's very first game, the game's end links them: link_player again).
+            linked = link_player(state, change)
         except srv.SignedOut:
             # The game itself needs no site sign-in: the app this PC has plays, the Online page asks to sign in again.
             log.info("the server no longer takes the sign-in; playing the app this PC has")
@@ -319,6 +385,7 @@ def play(state, report=lambda step, done=None, total=None: None, cancel=None, ch
     log_file = player.log_path(have["package"])
     session = player.start(apps.folder(server["url"]), settings, log_file=log_file)
     session.settings_time = written
+    session.linked = linked
     log.info("started the game for %s (process %d)", server["url"], session.process.pid)
     return session
 

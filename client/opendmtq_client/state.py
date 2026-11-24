@@ -101,6 +101,9 @@ def _server(entry):
         "cookie": entry.get("cookie") or None,                # the site's sign-in cookie for it, or None
         "expires": int(entry.get("expires") or 0),            # when that sign-in ends (Unix time; 0: none)
         "app": app if isinstance(app, dict) else None,        # the server's app as it last described it
+        # The site account whose link to this PC's game player the server has settled (actions.link_player), or None:
+        # PLAY asks no more for it.
+        "linked": entry.get("linked") if isinstance(entry.get("linked"), str) else None,
     }
 
 

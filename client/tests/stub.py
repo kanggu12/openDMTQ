@@ -62,6 +62,13 @@ class Site:
         self.old = False               # an OpenDMTQ from before the PC client: no client.php, its health page only
         self.records = made_up_records()   # client.php?records' answer; None: a server from before records (404)
         self.links = True              # client.php?link answers; False: a server from before one-time links (404)
+        # client.php?claim (tests/game/claim.php reads the real one's answers): the players by the id their game signs
+        # in by, the player the account is linked to (None: none), the players another account has, and whether it
+        # answers at all (False: a server from before such links, 404).
+        self.devices = {}
+        self.linked = None
+        self.taken = set()
+        self.claims = True
         self.version = "0.8.0"         # the OpenDMTQ version client.php?about says
         # What its health page answers, as the real one does (server/portal/health.php), and the owner's maintenance
         # notice the game asks for at its start (/inspection/status.json).
@@ -194,6 +201,21 @@ class Site:
                         return self._json(403, {"error": "signin"})
                     return self._json(200, {"url": "/opendmtq/login.php?once=" + LINK_TOKEN,
                                             "page": "/opendmtq/player.php?id=7", "expires": 1999999999})
+                if self.path == "/opendmtq/client.php?claim":
+                    # As the real one answers (server/portal/client.php client_claim): the account's player as it is,
+                    # or the player of the id linked now, or why not.
+                    if not site.claims:
+                        return self._json(404, {"error": "unknown"})
+                    if not self._signed():
+                        return self._json(403, {"error": "signin"})
+                    if site.linked is not None:
+                        return self._json(200, {"linked": True, "now": False,
+                                                "player": {"id": site.linked, "name": "Player %d" % site.linked}})
+                    player = site.devices.get(form.get("device", [""])[0])
+                    if player is None or player in site.taken:
+                        return self._json(200, {"linked": False, "why": "none" if player is None else "taken"})
+                    site.linked = player
+                    return self._json(200, {"linked": True, "now": True, "player": {"id": player, "name": "Player %d" % player}})
                 if self.path != "/opendmtq/client.php?signin":
                     return self._json(404, {"error": "none"})
                 if form.get("user", [""])[0] in BANNED and form.get("password", [""])[0] == PASSWORD:

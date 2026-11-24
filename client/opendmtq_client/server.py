@@ -13,6 +13,8 @@ What the server answers is its site's client.php (server/portal/client.php) and 
   POST /opendmtq/client.php?link     a one-time link that signs a browser in as the same account and opens its player's
                                      page: {"url", "page", "expires"} (signed in; from 0.11)
   GET  /opendmtq/client.php?records  the account's player's latest plays and best records (signed in; from 0.11)
+  POST /opendmtq/client.php?claim    device: the PC's game player linked to the account when neither has the other
+                                     (signed in; from 0.11.3): {"linked", "now", "player"} or {"linked": false, "why"}
 
 Only the standard library (urllib), with short timeouts: the window calls these on a worker thread. The launcher keeps
 the cookie the sign-in gives (as a browser does), never the password. No redirect is followed: the site sends a request
@@ -489,6 +491,22 @@ def records(base, cookie):
             listed = answer.get(key) if isinstance(answer.get(key), list) else []
             out[key] = [r for r in (_record(row) for row in listed[:20]) if r is not None]
     return out
+
+
+def claim_player(base, cookie, device):
+    """The signed-in account linked to the game player who plays by `device` on the server (client.php?claim: this PC's
+    game's id, which it signs in by), which the server does when the account has no player and that player no account:
+    {"linked": True, "now": whether this call made the link} for an account that has its player, or {"linked": False,
+    "why": "none" (no player plays by that id yet), "taken" (that player has an account), "owner" or "banned"}. None from
+    a server older than such links (0.11.2 and before). SignedOut when the sign-in ended."""
+    data = urllib.parse.urlencode({"device": device}).encode("ascii")
+    status, answer, _ = _call(base, "/opendmtq/client.php?claim", data=data, cookie=cookie)
+    _signed_out_or(status, answer)
+    if status == 404:
+        return None
+    if status != 200 or not isinstance(answer, dict):
+        raise ServerError("the server answered %s" % status, "error.server.answered", status=status)
+    return {"linked": answer.get("linked") is True, "now": answer.get("now") is True, "why": _words(answer.get("why"), 20) or ""}
 
 
 # What an Android package name is: the player makes the game's data folder of it, so nothing else may pass (a name with

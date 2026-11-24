@@ -701,6 +701,61 @@ class Twins(Folder):
         self.assertIn("Moved to <server name> (<server>): PLAY plays on it from now on.", log)
 
 
+class LinkAtPlay(Folder):
+    """--play links the signed-in site account to this PC's game player, as the window's PLAY does, and says so once: at
+    the start when a game played here before, else after the PC's first game; a report leaves the ID out of the line."""
+
+    run_main = CommandLine.run_main
+
+    def setUp(self):
+        super().setUp()
+        self.site = stub.Site().start()
+        self.addCleanup(self.site.stop)
+        self.site.devices = {"0a1b2c3d4e5f6071": 7}
+        code, said = self.run_main(["--server", self.site.url, "--sign-in", stub.ACCOUNT], stdin=stub.PASSWORD + "\n")
+        self.assertEqual(code, 0, said)
+
+    def test_the_first_game_here_links_them_at_its_end(self):
+        # The stand-in player writes the id at its start, as the player does at the game's first start: put before its
+        # own lines, which end it.
+        with open(self.player, encoding="utf-8") as f:
+            own = f.read()
+        with open(self.player, "w", encoding="utf-8") as f:
+            f.write("\n".join(["import os",
+                               "_data = os.path.join(os.environ['LOCALAPPDATA'], 'OpenDMTQ', 'app.example.stand.in', 'data')",
+                               "os.makedirs(_data, exist_ok=True)",
+                               "open(os.path.join(_data, 'android_id'), 'w').write('0a1b2c3d4e5f6071\\n')", own]))
+        line = "This PC's player is now linked to your site account %s." % stub.ACCOUNT
+        code, said = self.run_main(["--play"])
+        self.assertEqual(code, 0, said)
+        self.assertEqual(said.count(line), 1, said)
+        self.assertLess(said.index("The game ended"), said.index(line))
+        self.assertEqual(self.site.linked, 7)
+        # Said once: the next PLAY asks nothing and says nothing of it.
+        code, said = self.run_main(["--play"])
+        self.assertEqual(code, 0, said)
+        self.assertNotIn(line, said)
+        # In a report, the ID left out of the line, as wherever an ID is written.
+        from opendmtq_client import report
+        path, _left = report.make(st.LauncherState.load(), path=os.path.join(self.home, "r.zip"), devices=[])
+        with zipfile.ZipFile(path) as z:
+            log = z.read("launcher/launcher.log").decode("utf-8")
+        self.assertIn("This PC's player is now linked to your site account <account>.", log)
+
+    def test_a_game_played_here_before_links_them_at_the_start(self):
+        code, said = self.run_main(["--app"])
+        self.assertEqual(code, 0, said)
+        folder = os.path.join(self.home, "local", "OpenDMTQ", "app.example.stand.in", "data")
+        os.makedirs(folder)
+        with open(os.path.join(folder, "android_id"), "w", encoding="utf-8") as f:
+            f.write("0a1b2c3d4e5f6071\n")
+        code, said = self.run_main(["--play"])
+        self.assertEqual(code, 0, said)
+        line = "This PC's player is now linked to your site account %s." % stub.ACCOUNT
+        self.assertEqual(said.count(line), 1, said)
+        self.assertLess(said.index(line), said.index("The game is running"))
+
+
 class Maintenance(Folder):
     """--repair, --clear-game-data and --uninstall: Help's buttons, from the command line."""
 

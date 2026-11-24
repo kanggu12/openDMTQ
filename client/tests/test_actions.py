@@ -329,3 +329,108 @@ class Actions(Folder):
             kept = f.read()
         self.assertNotIn(stub.PASSWORD, kept)
         self.assertEqual(json.loads(kept)["servers"][0]["cookie"], self.site.cookie)
+
+
+class LinkAtPlay(Folder):
+    """PLAY links the signed-in site account to this PC's game player on the server (client.php?claim), when the account
+    has no player and that player no account: at PLAY when a game played here before gave the id the game signs in by,
+    else at the end of the PC's first game; once the server settled it, PLAY asks no more (main: never linked, both
+    the launcher's My records and the site's MY PAGE saying the account is linked to no player)."""
+
+    # The id this PC's game signs in by, as the player keeps it (sixteen hex digits), and its player on the server.
+    DEVICE, PLAYER = "0a1b2c3d4e5f6071", 7
+
+    def setUp(self):
+        super().setUp()
+        self.site = stub.Site().start()
+        self.addCleanup(self.site.stop)
+        self.site.devices = {self.DEVICE: self.PLAYER}
+        self.state = st.LauncherState()
+        actions.connect(self.state, self.site.url)
+        actions.sign_in(self.state, stub.ACCOUNT, stub.PASSWORD)
+
+    def played_here(self):
+        """The id the player writes in the game's data folder of the server's app at the game's first start."""
+        folder = os.path.join(player.data_folder(self.site.describe()["package"]), "data")
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, "android_id"), "w", encoding="utf-8") as f:
+            f.write(self.DEVICE + "\n")
+
+    def claims(self):
+        return [r for r in self.site.requests if r[1] == "/opendmtq/client.php?claim"]
+
+    def test_play_links_them_when_a_game_played_here_before(self):
+        actions.get_app(self.state)
+        self.played_here()
+        session = actions.play(self.state)
+        actions.finish(self.state, session)
+        self.assertEqual(session.linked, stub.ACCOUNT)
+        self.assertEqual((self.site.linked, self.state.server()["linked"]), (self.PLAYER, stub.ACCOUNT))
+        # Settled for the account: the next PLAY asks no more, and says nothing.
+        asked = len(self.claims())
+        session = actions.play(self.state)
+        actions.finish(self.state, session)
+        self.assertIsNone(session.linked)
+        self.assertEqual(len(self.claims()), asked)
+
+    def test_the_first_game_here_links_them_at_its_end(self):
+        # No game yet with this app: nothing to link at PLAY, nothing asked; the game's first start gave the id, and its
+        # end links them (the window and --play ask link_player then).
+        session = actions.play(self.state)
+        self.assertIsNone(session.linked)
+        self.assertEqual(self.claims(), [])
+        actions.finish(self.state, session)
+        self.played_here()
+        self.assertEqual(actions.link_player(self.state), stub.ACCOUNT)
+        self.assertEqual(self.site.linked, self.PLAYER)
+        # Asked again: settled, nothing asked.
+        self.assertIsNone(actions.link_player(self.state))
+        self.assertEqual(len(self.claims()), 1)
+
+    def test_an_account_linked_already_is_left_as_it_is(self):
+        # The owner linked it on the Accounts page: nothing made, nothing said, settled.
+        self.site.linked = 3
+        actions.get_app(self.state)
+        self.played_here()
+        self.assertIsNone(actions.link_player(self.state))
+        self.assertEqual((self.site.linked, self.state.server()["linked"]), (3, stub.ACCOUNT))
+
+    def test_what_is_never_linked_and_what_is_asked_again(self):
+        actions.get_app(self.state)
+        self.played_here()
+        # The player has another account: never linked, settled.
+        self.site.taken = {self.PLAYER}
+        self.assertIsNone(actions.link_player(self.state))
+        self.assertEqual(self.state.server()["linked"], stub.ACCOUNT)
+        # No player plays by this id yet (the game has not signed in), a server older than such links, no answer: asked
+        # again at the next PLAY, nothing settled.
+        self.state.server()["linked"] = None
+        self.site.taken, self.site.devices = set(), {}
+        self.assertIsNone(actions.link_player(self.state))
+        self.site.claims = False
+        self.assertIsNone(actions.link_player(self.state))
+        self.assertIsNone(self.state.server()["linked"])
+        self.assertEqual(len(self.claims()), 3)
+        # Another account signed in: asked for it (settled was the other's).
+        self.state.server()["linked"] = "someone.else"
+        self.site.claims, self.site.devices = True, {self.DEVICE: self.PLAYER}
+        self.assertEqual(actions.link_player(self.state), stub.ACCOUNT)
+        # A sign-in that ended: forgotten where changes are made, as every answer's.
+        self.state.server()["linked"] = None
+        self.site.linked = None
+        self.site.signed_cookies.clear()
+        handed = []
+        self.assertIsNone(actions.link_player(self.state, change=handed.append))
+        self.assertTrue(self.state.signed_in())
+        for change in handed:
+            change()
+        self.assertFalse(self.state.signed_in())
+        # Not signed in, or no game's id of a proper form: nothing asked.
+        asked = len(self.claims())
+        self.assertIsNone(actions.link_player(self.state))
+        actions.sign_in(self.state, stub.ACCOUNT, stub.PASSWORD)
+        self.site.signed_cookies.add(self.site.cookie)
+        with open(os.path.join(player.data_folder(self.site.describe()["package"]), "data", "android_id"), "w") as f:
+            f.write("short\n")
+        self.assertIsNone(actions.link_player(self.state))
+        self.assertEqual(len(self.claims()), asked)

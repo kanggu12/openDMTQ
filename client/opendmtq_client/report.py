@@ -144,7 +144,8 @@ _ID = r"[^\s,;:()<>\"']*[^\s,;:()<>\"'.]"
 # it), a sign-in's line ("Signed in as player1.", "signed in as player1 on ..."), the command line's --sign-in, an
 # installer's ("the ID player1 to sign in with"), --status's ("signed in: player1", "no (player1, ended)"), the ready
 # check's ("[ok  ] account: player1"), --records' for an account linked to no player (i18n play.records.unlinked, at
-# the log line's start), and the settings' fields.
+# the log line's start), --play's for the account PLAY linked to this PC's player (status.linked), and the settings'
+# fields.
 ACCOUNT_AT = _shapes(
     r"(\bcould not sign in to \S+ as )([^\n]+?)(?=: )",
     r"(\bsign(?:ed)?[ -]in(?: to \S+)? as )(%s)" % _ID,
@@ -154,6 +155,7 @@ ACCOUNT_AT = _shapes(
     r"(\bsigned in: )(?!no(?: \(|$))(%s)" % _ID,
     r"(\] account: )(?!not signed in$)(%s)" % _ID,
     r"(^\S+ \S+ [A-Z]+ \S+ )(%s)(?= is not linked to a player on this server\.)" % _ID,
+    r"(\blinked to your site account )(%s)" % _ID,
     r"(\"(?:account|fill)\"\s*:\s*\")([^\"]+)(?=\")")
 # The fields of the connection test's lines that name a server or a sign-in, and what each is (_worded).
 WORDED = {"account": "account", "name": "server_name", "host": "server"}
