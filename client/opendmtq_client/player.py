@@ -198,12 +198,14 @@ def app_log(have):
 
 
 class Session:
-    """A game the launcher started, while it runs and after."""
+    """A game the launcher started, while it runs and after: its process, its app's folder, when it started, and the
+    player's log with how long it was then (what the game writes from then on is this game's: first_frame)."""
 
-    def __init__(self, process, app_folder):
+    def __init__(self, process, app_folder, log_file=None, log_start=0):
         self.process = process
         self.app_folder = app_folder
         self.started = time.time()
+        self.log_file, self.log_start = log_file, log_start
 
     def running(self):
         return self.process.poll() is None
@@ -223,11 +225,14 @@ def start(app_folder, settings_file, path=None, log_file=None):
         # The game's window: never on a real screen from a test (a test's stand-in script opens none).
         safety.refuse_windows_in_tests("the game's player")
     output = None
+    # How long the log is as the game starts: its lines past that are this game's.
+    log_start = 0
     if log_file:
         try:
             os.makedirs(os.path.dirname(log_file), exist_ok=True)
             # Appended to, as the player appends: what an earlier game wrote stays.
             output = open(log_file, "ab")
+            log_start = output.seek(0, os.SEEK_END)
         except OSError:
             # A log that cannot be opened is no reason not to play.
             output = None
@@ -239,13 +244,46 @@ def start(app_folder, settings_file, path=None, log_file=None):
         # The player has its own copy of the handle now; the launcher's goes.
         if output is not None:
             output.close()
-    return Session(process, app_folder)
+    return Session(process, app_folder, log_file, log_start)
+
+
+# The line the player writes to its log as the game's first frame shows (arm32/desktop/frames.cpp): the game started.
+FIRST_FRAME = b"player: the game's first frame"
+
+
+def first_frame(session):
+    """Whether the game showed its first frame, by the player's own line for it in the log this game wrote (from where
+    the log was as it started; the log that started over meanwhile, player.log.1 and the new one). False with no log."""
+    path, start = getattr(session, "log_file", None), getattr(session, "log_start", 0)
+    if not path:
+        return False
+    try:
+        size = os.path.getsize(path)
+        parts = []
+        if size < start:
+            # Started over past its limit since the game started (own_folder.cpp): the part kept as player.log.1 holds
+            # the game's start, the new log the rest.
+            with open(path + ".1", "rb") as f:
+                f.seek(start)
+                parts.append(f.read())
+            start = 0
+        with open(path, "rb") as f:
+            f.seek(start)
+            parts.append(f.read())
+    except OSError:
+        return False
+    return any(FIRST_FRAME in part for part in parts)
 
 
 def finish(session):
-    """How a game that ended went: {"seconds", "exit_code", "crashed"}. The player ends with 0 after a game that
-    closed normally, 1 when it could not start, and with Windows' code of the fault when it crashed."""
+    """How a game that ended went: {"seconds", "exit_code", "crashed", "failed_start"}. The player ends with 0 after a
+    game that closed normally, 1 when it could not start, and with Windows' code of the fault when it crashed. A 1
+    after the game's first frame is no start that failed: the game ran, and was ended from outside it (Task Manager's
+    End task and taskkill end a program with 1), which a game the player closed is too."""
     code = session.process.wait()
-    # 1 is the player's own "could not start" (no window, no display, the app's files): no crash, and its log says why.
+    # 1 is the player's own "could not start" (no window, no display, the app's files) only before the game's first
+    # frame: no crash, and its log says why. After it, the game ran (main called a game ended by Task Manager after
+    # minutes of play one that could not start).
+    failed = code == 1 and not first_frame(session)
     return {"seconds": int(time.time() - session.started), "exit_code": code, "crashed": code not in (0, 1),
-            "failed_start": code == 1}
+            "failed_start": failed}

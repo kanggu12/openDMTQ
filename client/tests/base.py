@@ -18,6 +18,9 @@ FAKE_PLAYER = textwrap.dedent('''\
         sys.exit(0)
     args = sys.argv[1:]
     print("stand-in player: started")
+    if os.environ.get("FAKE_PLAYER_FRAME"):
+        # The real player's line as the game's first frame shows (arm32/desktop/frames.cpp), as its log has it.
+        print("player: the game's first frame")
     settings = open(args[args.index("--settings") + 1], encoding="utf-8").read() if "--settings" in args else ""
     with open(os.path.join(here, "started.json"), "w", encoding="utf-8") as f:
         json.dump({"args": args, "settings": settings}, f)
@@ -54,11 +57,12 @@ class Folder(unittest.TestCase):
     def setUp(self):
         self.home = tempfile.mkdtemp(prefix="odq-client-test-")
         self.saved = {k: os.environ.get(k) for k in ("OPENDMTQ_CLIENT_DIR", "LOCALAPPDATA", "XDG_DATA_HOME",
-                                                     "OPENDMTQ_PLAYER", "FAKE_PLAYER_EXIT")}
+                                                     "OPENDMTQ_PLAYER", "FAKE_PLAYER_EXIT", "FAKE_PLAYER_FRAME")}
         os.environ["OPENDMTQ_CLIENT_DIR"] = os.path.join(self.home, "client")
         os.environ["LOCALAPPDATA"] = os.path.join(self.home, "local")
         os.environ["XDG_DATA_HOME"] = os.path.join(self.home, "local")
         os.environ.pop("FAKE_PLAYER_EXIT", None)
+        os.environ.pop("FAKE_PLAYER_FRAME", None)
         self.player = os.path.join(self.home, "player", "fake_player.py")
         os.makedirs(os.path.dirname(self.player))
         with open(self.player, "w", encoding="utf-8") as f:

@@ -214,6 +214,52 @@ class Actions(Folder):
         self.assertFalse(record["crashed"])
         self.assertTrue(record["failed_start"])
 
+    def test_a_game_ended_from_outside_after_its_first_frame_is_no_failed_start(self):
+        # Task Manager's End task and taskkill end the player with 1 too: after the game's first frame (the player's own
+        # line in its log), the game ran, and it is no start that failed (main said "The game could not start" after
+        # minutes of play); nor a crash.
+        actions.connect(self.state, self.site.url)
+        actions.sign_in(self.state, stub.ACCOUNT, stub.PASSWORD)
+        os.environ["FAKE_PLAYER_EXIT"] = "1"
+        os.environ["FAKE_PLAYER_FRAME"] = "1"
+        record = actions.finish(self.state, actions.play(self.state))
+        self.assertEqual((record["crashed"], record["failed_start"]), (False, False))
+        # The next game that cannot start, after it in the same log, is one that could not start again.
+        os.environ.pop("FAKE_PLAYER_FRAME")
+        record = actions.finish(self.state, actions.play(self.state))
+        self.assertTrue(record["failed_start"])
+
+    def test_the_first_frame_is_read_from_this_games_part_of_the_log(self):
+        # The log as the player leaves it: an earlier game's first frame before this one's start counts for nothing; a
+        # log that started over past its limit during the game (player.log.1 and a new player.log) is read across both.
+        import types
+        log = os.path.join(self.home, "player.log")
+        with open(log, "wb") as f:
+            f.write(b"player: the game's first frame\nan earlier game\n")
+        start = os.path.getsize(log)
+        with open(log, "ab") as f:
+            f.write(b"player: cannot open a window\n")
+        session = types.SimpleNamespace(log_file=log, log_start=start)
+        self.assertFalse(player.first_frame(session))
+        with open(log, "ab") as f:
+            f.write(b"player: the game's first frame\n")
+        self.assertTrue(player.first_frame(session))
+        # Started over: the game's start in player.log.1, its first frame in either part.
+        with open(log, "rb") as f:
+            whole = f.read()
+        with open(log + ".1", "wb") as f:
+            f.write(whole)
+        with open(log, "wb") as f:
+            f.write(b"the rest\n")
+        self.assertTrue(player.first_frame(session))
+        self.assertFalse(player.first_frame(types.SimpleNamespace(log_file=None, log_start=0)))
+
+    def test_the_player_writes_the_first_frames_line(self):
+        # The launcher reads the player's own line for the game's first frame: the player's code writes it as it is.
+        with open(os.path.join(os.path.dirname(__file__), "..", "..", "arm32", "desktop", "frames.cpp"),
+                  encoding="utf-8") as f:
+            self.assertIn('log("%s");' % player.FIRST_FRAME.decode(), f.read())
+
     def test_play_refuses_when_not_ready(self):
         with self.assertRaises(actions.NotReady):
             actions.play(self.state)
