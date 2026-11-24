@@ -506,6 +506,19 @@ class WorkflowTest(unittest.TestCase):
         for old in ("opendmtq-player-windows.zip", "OpenDMTQ-windows.zip.sha256", "dist/client/*"):
             self.assertNotIn(old, release)
 
+    def test_the_release_is_there_before_anything_names_it(self):
+        # DEP-117: .github/release.sh publishes the tag, then the release with its files on it, then the images and the
+        # chart that names them, and main last: the README's quick start on main and the Linux line download this
+        # version's files from the release, which is there before main names it (main pushed main and the tag first, then
+        # built the images for minutes, and every quick-start line answered 404 until the release was made).
+        script = read(".github", "release.sh")
+        body = script[script.index("\npublish() {"):script.index("\nstep publish publish")]
+        order = [body.index(step) for step in ('git push origin "v$VERSION"', 'gh release create "v$VERSION"', "\n  images\n",
+                                               "helm push", "git push origin HEAD:main")]
+        self.assertEqual(order, sorted(order), body)
+        self.assertEqual(body.count("git push"), 2)
+        self.assertIn("--verify-tag", body)
+
     def test_the_rehearsal_names_the_same_steps(self):
         # The update proof under Wine (tests/release/update.sh) reads both sides as release_assets.py lays them out.
         script = read("tests", "release", "update.sh")

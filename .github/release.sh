@@ -300,18 +300,24 @@ if [ -n "$DRY" ]; then
 fi
 
 # ---- 7. published
+# In the order the release's own lines need it: the tag, then the release with every file on it (the README's quick start
+# and the Linux line download this version's files from it), then the images and the chart that names them, and main
+# last, whose README names this version from the moment it is there. (Main pushed first, then the images for some minutes,
+# left every quick-start line answering 404 until the release was made.) A main that does not take the push at the end
+# leaves the release whole: push it again by hand.
 publish() {
   # release.yml runs on the tag and stops without a key, by design: held while the tag goes up.
   gh workflow disable release -R "$REPO"
-  git push origin HEAD:main
   git push origin "v$VERSION"
+  # The notes are this version's part of CHANGELOG.md, with the compare link GitHub adds; the files are the release's
+  # folder alone, as layout made and checked it. On the tag pushed above (--verify-tag); gh uploads them to a draft and
+  # publishes it once all are there, so no launcher sees a release without its signed checksums.
+  gh release create "v$VERSION" -R "$REPO" "$D"/release/* --notes-file "$OUT/release-notes.md" --generate-notes --verify-tag
   gh auth token | docker login ghcr.io -u "$OWNER" --password-stdin
   gh auth token | helm registry login ghcr.io -u "$OWNER" --password-stdin
   images
   helm push "$D/opendmtq-$VERSION.tgz" "oci://$REGISTRY/charts"
-  # The notes are this version's part of CHANGELOG.md, with the compare link GitHub adds; the files are the release's
-  # folder alone, as layout made and checked it.
-  gh release create "v$VERSION" -R "$REPO" "$D"/release/* --notes-file "$OUT/release-notes.md" --generate-notes --verify-tag
+  git push origin HEAD:main
   gh workflow enable release -R "$REPO"
   docker buildx rm "$BUILDER" || true
   docker logout ghcr.io || true
