@@ -126,6 +126,11 @@ uninstall() {
 # Debian and Ubuntu: everything from the distribution, the Python libraries included (as in the tools image).
 install_apt() {
   step "System packages (apt)"
+  # A user's run asks sudo for the system's packages: a system without it (Debian's minimal install) is told how to have
+  # it, before anything is done.
+  if [[ -n $SUDO ]] && ! command -v sudo >/dev/null; then
+    fail "this system has no sudo, which installs the system's packages for $(id -un). As root: apt-get install sudo, then usermod -aG sudo $(id -un); sign in again as $(id -un) and run this again"
+  fi
   # Apache comes with a service of its own that takes port 80: noted now, so that a service this script brings is
   # turned off again (OpenDMTQ runs its own Apache), and one that was there before is left alone.
   local had_apache=no
@@ -265,7 +270,10 @@ main() {
     *":$dir:"*) ;;
     *) printf '  note  %s is not on your PATH; add it, or run %s\n' "$dir" "$REPO/opendmtq" ;;
   esac
-  printf '\nNext: ./opendmtq setup (it finds the game files in Downloads or on the Desktop, or pass --from <folder>).\n'
+  # What comes next, unless the one command that ran this goes on to it by itself (host/get.sh).
+  if [[ -z ${OPENDMTQ_SETUP_FOLLOWS:-} ]]; then
+    printf '\nNext: ./opendmtq setup (it finds the game files in Downloads or on the Desktop, or pass --from <folder>).\n'
+  fi
 }
 
 main "$@"

@@ -455,6 +455,20 @@ class AddTest(unittest.TestCase):
             self.assertEqual(self.fetched, [self.RELEASE_URL])
             install.assert_not_called()
 
+    def test_the_command_line_says_the_runtime_once(self):
+        # A new one put in place says it is ready; one there already says it is in place: one line either way (the Linux
+        # line's update said both for the same runtime, DEP-115).
+        said = []
+        with mock.patch.object(runtime, "APK_DIR", self.apk), mock.patch.object(runtime, "log", said.append):
+            self.release = self.made_zip()
+            self.assertEqual(runtime.main(["--refresh"]), 0)
+            self.assertEqual([line for line in said if line.startswith("The runtime")],
+                             ["The runtime for newer phones is ready (v1)."])
+            said.clear()
+            self.assertEqual(runtime.main(["--refresh"]), 0)
+            self.assertEqual([line for line in said if line.startswith("The runtime")],
+                             ["The runtime for newer phones is in place (v1)."])
+
 
 @unittest.skipUnless(os.path.isfile(os.path.join(ROOT, "arm32", "build.sh")), "the runtime's sources are not at hand")
 class WhatIsHandedOutTest(unittest.TestCase):

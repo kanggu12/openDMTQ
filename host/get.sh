@@ -28,7 +28,7 @@ latest_tag() {
 }
 
 # Where the code comes from: the release tagged $1, or the main branch while there is none. OPENDMTQ_TARBALL gives
-# another copy (the host install's test gives its own).
+# another copy (the host install's test gives its own), and OPENDMTQ_TARBALL_TAG the release that copy is, if any.
 code_url() {
   if [ -n "${OPENDMTQ_TARBALL:-}" ]; then
     printf '%s\n' "$OPENDMTQ_TARBALL"
@@ -54,13 +54,22 @@ manifest() {
 # The code, into the folder only when it has come whole. Over what is there: only the program's files are in it, so the
 # settings (.env), the data (data/) and this install's own programs (.host/) stay.
 fetch_code() {
-  tag=
+  tag=${OPENDMTQ_TARBALL_TAG:-}
   if [ -z "${OPENDMTQ_TARBALL:-}" ]; then
     # Not knowing is not "no release": that would put the newest code, tried by no release, in its place.
     tag=$(latest_tag) || die "GitHub could not be asked for the latest release: check the connection, then run this again${updating:+ (./opendmtq start starts the server meanwhile)}"
   fi
   url=$(code_url "$tag")
-  say "Downloading OpenDMTQ into $DIR"
+  # What it downloads, and on an update the release it replaces (the VERSION the last run wrote): one line.
+  old=$(cat "$DIR/VERSION" 2>/dev/null || true)
+  new=${tag#v}
+  if [ -z "$updating" ]; then
+    say "Downloading OpenDMTQ${new:+ $new} into $DIR"
+  elif [ -n "$old" ] && [ "$old" = "$new" ]; then
+    say "Downloading OpenDMTQ $new into $DIR again"
+  else
+    say "Updating OpenDMTQ in $DIR${old:+ from $old}${new:+ to $new}"
+  fi
   mkdir -p "$(dirname "$DIR")"
   work=$(mktemp -d "$DIR.new.XXXXXX")
   # A stalled download (under 10 KB/s for a minute) stops with the message below. No retry: what curl already wrote has
@@ -95,6 +104,12 @@ main() {
   [ "$(id -u)" -ne 0 ] || die "please run this as the user who will run the server, not as root; it asks for sudo when it needs it"
   command -v curl >/dev/null 2>&1 || die "curl is needed: install it, then run this again"
   command -v tar >/dev/null 2>&1 || die "tar is needed: install it, then run this again"
+  # On Linux the system's packages come through sudo (host/install.sh): a system without it (Debian's minimal install)
+  # is told how to have it before anything is downloaded.
+  if [ "$(uname -s)" = Linux ] && ! command -v sudo >/dev/null 2>&1; then
+    me=$(id -un)
+    die "this system has no sudo, which installs the system's packages for $me. As root: apt-get install sudo, then usermod -aG sudo $me; sign in again as $me and run this again"
+  fi
   # What runs next may ask things, and must ask a person: this shell's own input is this script.
   if (: </dev/tty) 2>/dev/null; then
     input=/dev/tty
@@ -109,7 +124,12 @@ main() {
   fi
   fetch_code
   cd "$DIR"
-  host/install.sh <"$input"
+  # The setup follows at the end, so install.sh does not say it comes next (OPENDMTQ_NO_SETUP: it does not follow).
+  if [ -n "${OPENDMTQ_NO_SETUP:-}" ]; then
+    host/install.sh <"$input"
+  else
+    OPENDMTQ_SETUP_FOLLOWS=yes host/install.sh <"$input"
+  fi
   # And it brings the latest release's runtime for newer phones. Not being able to changes nothing: the one there stays.
   if [ -n "$updating" ] && [ -f .env ]; then
     ./opendmtq runtime --no-app <"$input" || true

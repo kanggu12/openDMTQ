@@ -368,9 +368,13 @@ def main(argv=None):
     if len(argv) == 3 and argv[0] == "--pack":
         pack(argv[1], argv[2])
         return 0
+    before = version_in_place(os.path.join(APK_DIR, "arm32"))
     if not add_or_note(refresh="--refresh" in argv):
         return 1
-    log(f"The runtime for newer phones is in place ({version_in_place(os.path.join(APK_DIR, 'arm32'))}).")
+    now = version_in_place(os.path.join(APK_DIR, "arm32"))
+    # One line: a new one put in place has said it is ready (put_in_place); the one there already says it is in place.
+    if now == before:
+        log(f"The runtime for newer phones is in place ({now}).")
     return 0
 
 

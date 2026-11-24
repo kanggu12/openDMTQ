@@ -1086,6 +1086,81 @@ class HostPortsTest(unittest.TestCase):
         self.assertEqual(self.settings.admin_url(exposed), "http://localhost:8790/opendmtq/admin/")
 
 
+@unittest.skipUnless(sys.platform.startswith("linux") and shutil.which("curl") and shutil.which("tar"), "the Linux line")
+class GetScriptTest(unittest.TestCase):
+    """host/get.sh, the README's Linux line, run by sh on a release whose own install and command are stand-ins: what it
+    says on a first run and on an update, and on a system without sudo (DEP-115, DEP-116)."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = self._tmp.name
+        # The person running it: a user (the line refuses root), as `id` says.
+        self.stubs = os.path.join(self.root, "stubs")
+        os.makedirs(self.stubs)
+        self.stub("id", '#!/bin/sh\ncase "$1" in -u) echo 1000 ;; -un) echo player ;; *) echo "uid=1000(player)" ;; esac\n')
+
+    def stub(self, name, text, folder=None):
+        path = os.path.join(folder or self.stubs, name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.chmod(path, 0o755)
+
+    def release(self):
+        """A copy of OpenDMTQ as GitHub hands out a release (one folder on top): its install says whether the setup follows
+        and marks the install done; its command says what it was asked."""
+        top = os.path.join(self.root, "src", "openDMTQ-x")
+        self.stub("install.sh", '#!/bin/sh\nmkdir -p .host && touch .host/installed\n'
+                  'echo "install: the setup follows: ${OPENDMTQ_SETUP_FOLLOWS:-no}"\n', os.path.join(top, "host"))
+        self.stub("opendmtq", '#!/bin/sh\necho "opendmtq $*"\n', top)
+        tarball = os.path.join(self.root, "release.tar.gz")
+        subprocess.run(["tar", "-C", os.path.join(self.root, "src"), "-czf", tarball, "openDMTQ-x"], check=True)
+        return tarball
+
+    def line(self, path=None, tag=None):
+        """The line run as a pipe runs it: (its exit code, what it printed)."""
+        env = {"HOME": self.root, "PATH": path or f"{self.stubs}:{os.environ['PATH']}", "OPENDMTQ_DIR": os.path.join(self.root, "openDMTQ"),
+               "OPENDMTQ_TARBALL": "file://" + self.release()}
+        if tag:
+            env["OPENDMTQ_TARBALL_TAG"] = tag
+        with open(os.path.join(ROOT, "host", "get.sh"), "rb") as script:
+            done = subprocess.run(["sh"], stdin=script, capture_output=True, text=True, env=env, timeout=120)
+        return done.returncode, done.stdout + done.stderr
+
+    def test_it_says_the_release_and_the_update_and_no_next_step_the_setup_takes(self):
+        # First run: the release it downloads; install.sh is told the setup follows (it said "Next: ./opendmtq setup" in the
+        # middle, then the line ran the setup itself). Again with a newer release: from which to which, once.
+        code, said = self.line(tag="v1.0.0")
+        self.assertEqual(code, 0, said)
+        self.assertIn(f"Downloading OpenDMTQ 1.0.0 into {self.root}/openDMTQ", said)
+        self.assertIn("install: the setup follows: yes", said)
+        self.assertTrue(said.rstrip().endswith("opendmtq setup"), said)
+        code, said = self.line(tag="v1.1.0")
+        self.assertEqual(code, 0, said)
+        self.assertIn("opendmtq stop", said)
+        self.assertIn(f"Updating OpenDMTQ in {self.root}/openDMTQ from 1.0.0 to 1.1.0", said)
+        self.assertNotIn("Downloading", said)
+        code, said = self.line(tag="v1.1.0")
+        self.assertIn(f"Downloading OpenDMTQ 1.1.0 into {self.root}/openDMTQ again", said)
+
+    def test_a_system_without_sudo_is_told_how_to_have_it_before_anything_is_downloaded(self):
+        # Debian's minimal install has no sudo: main went on to the packages and ended with "sudo: command not found"
+        # (exit 127). Every program of this system but sudo, and the stand-in id.
+        bare = os.path.join(self.root, "bare")
+        os.makedirs(bare)
+        for folder in ("/usr/local/bin", "/usr/bin", "/bin"):
+            for name in os.listdir(folder) if os.path.isdir(folder) else []:
+                if name != "sudo" and not os.path.lexists(os.path.join(bare, name)):
+                    os.symlink(os.path.join(folder, name), os.path.join(bare, name))
+        code, said = self.line(path=f"{self.stubs}:{bare}", tag="v1.0.0")
+        self.assertEqual(code, 1, said)
+        self.assertIn("this system has no sudo, which installs the system's packages for player. As root: apt-get install "
+                      "sudo, then usermod -aG sudo player; sign in again as player and run this again", said)
+        self.assertNotIn("Downloading", said)
+        self.assertFalse(os.path.exists(os.path.join(self.root, "openDMTQ")))
+
+
 @unittest.skipIf(sys.platform in ("win32", "darwin"), "the Linux start with the computer")
 class HostServiceTest(unittest.TestCase):
     """A host install's start with the computer on a Linux without systemd (a container, a system with another init):
