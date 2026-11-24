@@ -109,6 +109,15 @@ check("SRV-81 a one-time link of a banned player's account signs nobody in",
     $token !== null && $status === 200 && signin_cookie($headers) === '', "$status " . (signin_cookie($headers) !== '' ? 'cookie set' : 'no cookie'));
 check('SRV-81 and the sign-in page says the account cannot sign in until the end, with the owner\'s reason',
     strpos($page, 'This account cannot sign in until') !== false && strpos($page, 'Made-up scores') !== false, substr(strip_tags($page), 0, 300));
+// Its end as every other date of the site and the admin pages write one: the day by its numbers, then the time. In the
+// server's zone, as the page writes it: the entrypoint gives the server's PHP the zone TZ names, and this runs by docker
+// exec without that setting (as moved.php does).
+$zone = getenv('TZ');
+if ($zone && in_array($zone, timezone_identifiers_list(), true)) {
+    date_default_timezone_set($zone);
+}
+$ends = date('Y-m-d H:i', (int)$db->querySingle('SELECT until FROM PlayerBan WHERE guid = 9411'));
+check("SRV-110 and the end is written as the site writes every date, $ends", strpos($page, "until $ends:") !== false, substr(strip_tags($page), 0, 300));
 // The same link of the account once the ban has ended: signed in, on to its page.
 $db->exec('UPDATE PlayerBan SET until = ' . (time() - 1) . ' WHERE guid = 9411');
 $token = once_issue('evesite', '/opendmtq/me.php');

@@ -176,7 +176,8 @@ function site_ban_words(array $ban): string
     if ($ban['until'] === null) {
         return t('signin.banned', ['reason' => $reason]);
     }
-    return t('signin.banned_until', ['reason' => $reason, 'when' => date(lang() === 'ko' ? 'Y. n. j. H:i' : 'M j, Y, H:i', $ban['until'])]);
+    // Its end written as every other date of the site and the admin pages (2026-12-01 11:34), in either language.
+    return t('signin.banned_until', ['reason' => $reason, 'when' => date('Y-m-d H:i', $ban['until'])]);
 }
 
 /* The cookie's signature: when it ends, whose it is, and the account's password as kept. */
