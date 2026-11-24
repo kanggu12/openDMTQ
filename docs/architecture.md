@@ -31,7 +31,7 @@ game's files, or a run by hand ([testing](testing.md)).
 | Host install | The same server without containers, and the Windows bundle | `host/`: `get.sh` and `install.sh` for Linux and macOS, `windows/` for the Windows bundle, and the program itself, a package in layers (`paths`, `settings`, `apache`, `server`, `commands`, `setup`): start at `opendmtq_host/server.py` (`Server`) | `tests/host/run.sh`, `tests/windows/wine.sh`, `tests/windows/run.ps1` (CI); `tests/host/update.sh`, `tests/windows/update.sh`, `tests/windows/play_here.sh` (by hand) |
 | Helm chart | The same images on Kubernetes, with a router in front ([kubernetes.md](kubernetes.md)) | `deploy/helm` (`values.yaml`) | the chart against Kubernetes' schemas (CI), `tests/ha/failover.sh` (by hand) |
 | Database | One SQLite file shared by the game server, the site and the admin pages ([below](#the-database)) | `server/game/bin/setup-db.php` | `tests/upgrade/run.sh` (CI) |
-| Releases | The release's files under their names, their checksums and the project's signature over them ([below](#releases-and-their-signature)) | `.github/release.sh` (a release made, checked and published), `.github/release_assets.py` (`layout`, `check`), `.github/release_notes.py`, `.github/workflows/release.yml`; the signature in `tools/opendmtq_tools/signing.py` | `cli/tests/test_release.py` (CI); `tests/release/update.sh` and `update_signed.sh` under Wine (by hand) |
+| Releases | The release's files under their names, their checksums and the project's signature over them ([below](#releases-and-their-signature)) | `.github/release.sh` (a release made, checked and published), `.github/release_assets.py` (`layout`, `check`), `.github/release_notes.py`, `.github/doc_versions.py` (the guides' download lines), `.github/workflows/release.yml`; the signature in `tools/opendmtq_tools/signing.py` | `cli/tests/test_release.py` (CI); `tests/release/update.sh` and `update_signed.sh` under Wine (by hand) |
 | The tests | The tests beyond unit tests: the contract, the pages, who reaches the admin pages, an upgrade, the live server, the host install, the Windows bundle, the updates of each kind of install and of the PC client | `tests/` ([testing.md](testing.md)) | [what runs where](testing.md#what-runs-where) |
 
 How each part runs, with Docker Compose and without containers:
@@ -739,6 +739,13 @@ name: a package Velopack puts together from a delta package holds the same files
 files. The delta package (`opendmtq.client-<version>-delta.nupkg`) is made from the previous release's full package,
 which the PC client's build is given (`OPENDMTQ_PREVIOUS_RELEASE`). A PC client of 0.10.0 or older checks no
 signature: it updates from GitHub over HTTPS as it always did, and every update after that is checked.
+
+The README's quick start and the install guide download a release's files from that release's own address
+(`releases/download/v<version>/`, under the names above) and take the one-line install's script at its tag, so that a
+line copied from them fetches what it says. `.github/doc_versions.py` reads every such line in the README,
+CONTRIBUTING.md and the guides against the chart's version, and the files each names against the release's names and
+the tree; the release commit runs it with `--write`, and the repository checks and the release's gates refuse a tree
+whose lines name another release.
 
 ## Without containers
 
