@@ -852,15 +852,24 @@ class MessageTest(unittest.TestCase):
         # BIND_ADDRESS, as docs/troubleshooting.md has a Linux owner set it, publishes the port on that address alone
         # (CLI-92; main waited on 127.0.0.1, where nothing answered, for 30 s and said the admin pages were not answering,
         # and printed http://localhost:<port>/ for an exposed server, which answered nothing either).
+        # A local network server: a visit on plain HTTP to that address is sent to the HTTPS door (the sandbox answers
+        # it as a real server does), so up asks the admin service itself, and the link is the address phones use.
         lan = "PUBLIC_HOST=192.168.0.10:8790\nLISTEN_PORT=8790\nBIND_ADDRESS=192.168.0.10\nADMIN_PASSWORD=x\n"
         with Sandbox(lan) as sb:
             game_data(sb)
+            sb.programs[("docker", "exec")] = done(0)
             with mock.patch.object(app.time, "sleep"):
                 self.assertEqual(sb.call(app.cmd_up), 0, sb.output())
-            self.assertIn("http://192.168.0.10:8790/opendmtq/admin/login", sb.urls)
-            self.assertNotIn("http://127.0.0.1:8790/opendmtq/admin/login", sb.urls)
+            self.assertEqual([u for u in sb.urls if u.endswith("/opendmtq/admin/login")], [])
             self.assertIn("http://192.168.0.10:8790/opendmtq/admin/", sb.output())
             self.assertNotIn("not answering", sb.output())
+        # The same while the admin service has not started: said once the wait is over.
+        with Sandbox(lan) as sb:
+            game_data(sb)
+            sb.programs[("docker", "exec")] = done(1)
+            with mock.patch.object(app.time, "sleep"):
+                self.assertEqual(sb.call(app.cmd_up), 0, sb.output())
+            self.assertIn("admin pages are not answering yet", sb.output())
         # Exposed, the pages kept to the server PC: a visit from this PC to that address counts as one from elsewhere, so
         # this PC has no door to them; up asks the admin service itself, and the link says how to have them.
         exposed = ("PUBLIC_HOST=game.example.com:8790\nLISTEN_PORT=8790\nADMIN_ON_PUBLIC_PORT=no\nBIND_ADDRESS=192.168.0.10\n"

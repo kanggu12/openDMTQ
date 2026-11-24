@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+import urllib.parse
 from unittest import mock
 
 from opendmtq_cli import app, backup, checks, env, keep_tokens, system
@@ -200,6 +201,17 @@ class Sandbox:
             return 200, json.dumps({"ok": True, "host": host, "songs": 1, "players": 0,
                                     "patch": "1.003.005"}).encode()
         if url.endswith("/opendmtq/admin/login"):
+            where = urllib.parse.urlsplit(url).hostname or ""
+            bind = self.env().get("BIND_ADDRESS", "")
+            loopback = where == "localhost" or where.startswith("127.")
+            # A port published on one other address alone (BIND_ADDRESS): nothing answers on this PC's loopback.
+            if loopback and bind and bind != "0.0.0.0" and not bind.startswith("127."):
+                return 0, b""
+            # A plain-HTTP visit to any other address than loopback, while HTTPS works (https_problem None), is sent
+            # to the HTTPS door (server/entrypoint.sh): urllib follows it there and does not take the server's own
+            # certificate, as a real server answers checks.http.
+            if not loopback and self.https is None:
+                return 0, b""
             return 200, b""
         return 0, b""
 

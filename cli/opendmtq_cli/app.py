@@ -232,12 +232,13 @@ def on_loopback(values):
 
 
 def admin_address(values):
-    """host:port where this PC reaches the admin pages on the server's one port over plain HTTP, or None where it has no
-    such door: on its loopback (a visit to localhost stays on plain HTTP and counts as the server PC's own,
-    server/entrypoint.sh), or at BIND_ADDRESS for a local network address, whose pages open from anywhere there; none
-    for a port on one other address alone with the pages kept off the local network's plain HTTP."""
-    public = values.get("ADMIN_ON_PUBLIC_PORT", "yes") == "yes"
-    if on_loopback(values) or (public and env.is_lan_only(values.get("PUBLIC_HOST", ""))):
+    """host:port where this PC reaches the admin pages on the server's one port over plain HTTP, answered by the pages
+    themselves, or None where it has no such door. Its loopback is one: a visit to localhost stays on plain HTTP and
+    counts as the server PC's own (server/entrypoint.sh). A port published on one other address alone (BIND_ADDRESS) is
+    none: there a visit on plain HTTP is sent to the HTTPS door while HTTPS works (a local network address; the
+    redirect answers before the admin service is asked, and the server's own certificate is no Python's), or refused
+    (the pages kept to the server PC on an internet address)."""
+    if on_loopback(values):
         return f"{checks.local_address(values)}:{env.listen_port(values)}"
     return None
 
@@ -399,7 +400,7 @@ def cmd_up(args):
            f"once; a phone that installs http://{host}/ca.crt does not; its fingerprint: ./opendmtq doctor)")
     values = env.load(ENV_FILE)
     # The admin service starts a few seconds after the server; wait so the link works at once (at this PC's door to
-    # them, the address BIND_ADDRESS narrows the port to among them, or the service itself where this PC has none).
+    # them on its loopback, or the service itself where the port is published on another address alone: BIND_ADDRESS).
     for _ in range(30):
         if admin_answers(values):
             break
