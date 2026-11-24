@@ -54,10 +54,11 @@
 //   (its charcoal, its light edge and bevel, its small corners), at the bottom right, where it covers the fewest of the
 //   game's own labels and buttons, unless another corner is chosen (at the top left, beside a song's pause button), 8
 //   pixels in at 720 lines, at the smaller of the two scales the game stretches its layout by (overlay_scale.h), as the
-//   handle is. On it the frames a second as a figure in the launcher's wide face, lime while they keep the display's rate
-//   and white otherwise, FPS after them on their baseline, and the mean frame time under them with ms after it, quiet
-//   grey; both numbers right-aligned in one column in cells as wide as their faces' widest digits, their units in the
-//   next (counter_look.h). Over the last second, from the count of frames shown that the player keeps anyway (frames.cpp;
+//   handle is; in a song only (it waits in the menus, where no place is clear of the game's own on every screen). On it
+//   the frames a second as a figure in the launcher's wide face, lime while they keep the display's rate and white
+//   otherwise, FPS after them on their baseline, and the mean frame time under them with ms after it, quiet grey; both
+//   numbers right-aligned in one column in cells as wide as their faces' widest digits, their units in the next
+//   (counter_look.h). Over the last second, from the count of frames shown that the player keeps anyway (frames.cpp;
 //   frame_rate.h says how it reads it). Shown whole, as every other piece, so its words keep their contrast over any frame
 //   of the game. Hidden until the game's first frame and while the game is held still, never a 0 that the overlay itself
 //   caused. It lets clicks through.
@@ -117,8 +118,8 @@ struct View {
     bool full = false;
     // Whether a song is going on (keyboard play's word: its first frame to its end): the notice and the frame counter
     // stand in a song's places then, clear of the menus' header otherwise (also where the player cannot tell). And
-    // whether the game is known to be in its menus (no song, by the same word): the counter waits there in a window shape
-    // whose menus leave it no place.
+    // whether the game is known to be in its menus (no song, by the same word): the counter waits there, where the game's
+    // screens leave it no place.
     bool song = false, menus = false;
 };
 // What the UI thread last saw of them (view_now), for what it places itself between pictures (the counter's and the
@@ -668,9 +669,9 @@ int bar_whole() { return static_cast<int>(std::lround(kBarTall * scale_for(area_
 // The counter's glass's top left for its corner (Settings::ShowFps's order: 1 top left, 2 top right, 3 bottom left, 4
 // bottom right), as overlay_scale.h's counter_at places it: in a song in its corner, 8 pixels in at 720 lines, at the
 // left 8 right of the game's pause button and the column under it (it covers nothing a song uses), at the top left under
-// the bar while that is down; at the top right of a song and in the menus whatever the corner, under the menus' header
-// at the right, the one place no menu screen of the game's has a button, a word or its header in (its name and level, a
-// song's title and score, the music list's tabs and grid button, SELECT MUSIC and DOWNLOAD are all in the corners). The
+// the bar while that is down; at the top right of a song, and where the player cannot tell a song from the menus whatever
+// the corner, under the menus' header at the right, clear of the pause screen's Q and MAX (in the menus it waits:
+// overlay_scale.h's counter_has_menus_place says why). The
 // pause button is as wide as the game's width says in every shape, so beside it the counter keeps its 8 at 21:9, where the
 // height's scale would put it on the button, and at 4:3. Laid out at the counter's own scale (CounterScale), as its look is.
 POINT fps_place(int corner, int chip_w, int chip_h) {
@@ -1243,13 +1244,13 @@ void notice_look(Paint& p, const std::string& text, bool live, int corner, int f
     const float badge_w = live ? measure(badge, *badge_font).Width + badge_pad * 2 + fpx(0.66f) * 4 + slant : 0.0f;
     // The words' room: within 560 at 720 lines, and within the game's area however small its window; a long server name
     // wraps there, into even lines. A counter at the top (at the top left of a song; under the menus' header at the right,
-    // where it stands in the menus whatever its corner and at the top right of a song) keeps its place: the card, centred,
-    // stays clear of it. Its room across: the area's width, or up to the sound panel's left edge while that is open
-    // (free_right).
+    // where it stands at the top right of a song and where the player cannot tell a song from the menus whatever its
+    // corner) keeps its place: the card, centred, stays clear of it. Its room across: the area's width, or up to the sound
+    // panel's left edge while that is open (free_right).
     const bool song = song_now();
     const int aw = free_right > 0 ? std::min(free_right, area_w()) : area_w();
     float beside = pad + badge_w + gap + after + 2 * px(kRoomSide);
-    // A counter that waits in the menus (no place for it in this window's shape) is nowhere to keep clear of.
+    // A counter that waits in the menus (the menus leave it no place: overlay_scale.h) is nowhere to keep clear of.
     const bool counter_waits = menus_now() && !counter_has_menus_place(area_w(), area_h(), dpi_scale());
     if (!counter_waits && (corner == 1 || corner == 2 || (corner != 0 && !song))) {
         // The counter's size and place as it is drawn, at its own scale; the notice's own lengths at the overlay's.
@@ -2781,16 +2782,16 @@ bool counter_under_panel() {
     return x1 > lay.panel.x && x0 < lay.panel.right() && y1 > lay.panel.y && y0 < lay.panel.bottom();
 }
 
-// Whether the counter waits in the menus now: known to be in them, in a window shape whose menus leave it no place clear
-// of the game's buttons and words (overlay_scale.h's counter_has_menus_place: wider than 16:9, or the smallest windows at
-// a large scale). Said in the log as it starts and stops waiting.
+// Whether the counter waits in the menus now: known to be in them, where no place is clear of the game's buttons and words
+// on every menu screen (overlay_scale.h's counter_has_menus_place: ALBUM's FAVORITE tab ends under the one place the
+// others leave). Said in the log as it starts and stops waiting.
 bool counter_waits() {
     view_now();
     const bool waits = g_menus_now && !counter_has_menus_place(area_w(), area_h(), dpi_scale());
     static bool said = false;
     if (waits != said) {
         said = waits;
-        note(waits ? "player: the frame counter waits in the menus: this window's shape leaves it no place clear of the game's own there; it shows in a song"
+        note(waits ? "player: the frame counter waits in the menus, where the game's own screens leave it no place clear of their buttons; it shows in a song"
                    : "player: the frame counter has its place again");
     }
     return waits;

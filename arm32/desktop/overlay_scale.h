@@ -156,19 +156,19 @@ constexpr float kMenusRight = 16;
 // in an area of area_w by area_h; `inset` is 8 at 720 lines and `right` kMenusRight, both at the counter's own scale.
 // In a song (`song`): in its corner, 8 in from the area's edges, at the left `inset` right of the game's pause button and
 // of the column under it (its life gauge, FEVER, score, rate and combo), so that it covers nothing a song uses; at the top
-// left below `top_room` (the bar's room while it is down). At the top right of a song, and in the menus whatever its
-// corner (also where the player cannot tell: keyboard play off), under the menus' header at the right (under_header,
-// `bar` the bar's whole height): the one place none of the game's menu screens has a button, a word or its header in (the
-// music list, the downloads, a song's page and its options, the rankings before a song, the result, the loading
-// screens), measured on their frames in each shape, and clear of the Q and MAX a song's own pause screen shows at its
-// top right. Every other place near a corner of the menus has the game's own there on one screen or another: the
-// player's name and level, the music list's tabs and grid button, a song's title and score, SELECT MUSIC, DOWNLOAD.
+// left below `top_room` (the bar's room while it is down). At the top right of a song, and where the player cannot tell
+// a song from the menus (keyboard play off), whatever its corner, under the menus' header at the right (under_header,
+// `bar` the bar's whole height): clear of the Q and MAX a song's own pause screen shows at its top right, and of the
+// header and the buttons of the music list, the downloads, a song's page and its options, the rankings before a song,
+// the result and the loading screens, measured on their frames in each shape. In the menus it waits
+// (counter_has_menus_place): ALBUM's FAVORITE tab ends under that place too.
 struct CounterAt {
     int x, y;
 };
 inline CounterAt counter_at(int corner, int area_w, int area_h, int inset, int chip_w, int chip_h, int top_room, bool song = true, int bar = 0,
                             int right = 0) {
-    // The menus (and a song's top right): under the header at the right, as far in as the next page's cards need.
+    // A song's top right, and where the player cannot tell a song from the menus (the menus have it wait): under the
+    // menus' header at the right, as far in as the next page's cards need.
     if (!song || corner == 2) return CounterAt{area_w - std::max(inset, right) - chip_w, under_header(area_w, area_h, inset, bar)};
     // In a song: which sides of the area the corner touches.
     const bool at_right = corner == 4, bottom = corner == 3 || corner == 4;
@@ -181,15 +181,24 @@ inline CounterAt counter_at(int corner, int area_w, int area_h, int inset, int c
 // where it stands 8 under the top (under the menus' header the bar never reaches it).
 inline bool counter_under_bar(int corner, bool song) { return song && corner == 1; }
 
-// Whether the counter has its place under the menus' header at the right in an area of area_w by area_h at Windows'
-// scale `dpi`: in an area no wider than 16:9 (a pixel's slack: 1366x768), where the music list's grid and the next page's
-// cards at its right edge leave it the room, and drawn at the game's own size there (not at its floor for legibility,
-// where it is larger than that room: a small window at 150 %). Wider (21:9: the music list shows its next page's cards at
-// the right under the header) and in those smallest windows no place on the game's menu screens is clear of their
-// buttons and words for it: there it waits in the menus, and shows in a song.
+// Whether the counter has a place in the menus in an area of area_w by area_h at Windows' scale `dpi`: in none. Every
+// place near a corner of the menu screens holds something of the game's own on one screen or another (the player's name
+// and level, the music list's tabs and grid button, a song's title and score, SELECT MUSIC, DOWNLOAD), and the one place
+// under the header at the right that the music list, the downloads, a song's page, the result and the rankings leave
+// free has ALBUM's FAVORITE tab under it: the tab's slanted end reaches 1187 at 720 lines where the counter's glass starts
+// at 1174 (and 891 at 4:3, where it starts at 878), and the shop's panel's top line runs 6 under its foot, measured on the
+// game's frames at 16:9 and 4:3. Four pixels narrower it still lies on the tab; one narrow enough for the room between
+// the tab and the music list's next page at the right (80 at 720 lines, 64 within the counter's insets) would be smaller
+// in the menus than in a song, and where the counter is drawn at its least already (960x720 at 150 %: 70 wide, its small
+// words at their least) no smaller one stays legible. So it waits in the menus in every shape, as it did in a window wider
+// than 16:9 and in the smallest windows, and shows in each song. The parameters stay for the checks, which hold every
+// place this gives to the game's measured menu screens.
 inline bool counter_has_menus_place(int area_w, int area_h, float dpi) {
-    const bool narrow = static_cast<long long>(area_w) * 9 <= static_cast<long long>(area_h) * 16 + 9;
-    return narrow && counter_scale_for(area_w, area_h, dpi) <= handle_scale_for(area_w, area_h) + 0.0001f;
+    // No shape and no scale gives it one (above): the frame counter waits in the menus and shows in a song.
+    (void)area_w;
+    (void)area_h;
+    (void)dpi;
+    return false;
 }
 
 // The notice's glass's top: in a song 16 under the top (`sixteen`, at the overlay's scale) and lower by the bar's room while

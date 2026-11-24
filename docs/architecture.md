@@ -521,12 +521,12 @@ picture](windows-player.md#the-picture)):
   the song's own controls: at the bottom right by default, over the play field's corner. **Position** moves it to
   another corner, kept while the counter is off: at the top left and the bottom left it stands 8 pixels right of the
   pause button and the column under it, at the top right under the row of the Q and MAX the song's pause screen shows
-  there. In the menus every corner holds something of the game's own on one screen or another (the player's name and
-  level, the music list's tabs and grid button, a song's title and score, SELECT MUSIC, DOWNLOAD), so there it stands at
-  the right under the game's header, whatever its corner: the one place where none of the menu screens has a button or a
-  word, measured on each of them at 16:9, 16:10 and 4:3. In a window wider than 16:9 (the music list shows its next page
-  there) or so small that the counter, at its least size, would not fit that room, it waits in the menus and shows in
-  each song. With keyboard play off the player cannot tell a song from the menus, and the counter stands at the right
+  there. In the menus it waits and shows in each song: every place near a corner of the menu screens holds something of
+  the game's own on one screen or another (the player's name and level, the music list's tabs and grid button, a song's
+  title and score, SELECT MUSIC, DOWNLOAD), and under the game's header at the right, the one place the music list, the
+  downloads, a song's page and the result leave free, ALBUM's FAVORITE tab ends and the shop's panel begins just under
+  it, measured on each of them at 16:9 and 4:3. With keyboard play off the player cannot tell a song from the menus, and
+  the counter stands at the right
   under the game's header throughout. The game stretches its screens to the window's shape (at 21:9 its buttons are
   wider than tall, at 4:3 narrower), and the counter keeps to its buttons' narrower side: in a window narrower than 16:9
   it is a little smaller, so that it covers no more of them there than at 16:9. Its units and frame time are never set

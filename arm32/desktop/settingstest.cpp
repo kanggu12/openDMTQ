@@ -709,12 +709,13 @@ void counter_checks() {
 
 // Where the frame counter and the notice stand against the game's own header, buttons and words (overlay_scale.h's
 // counter_at, counter_has_menus_place, notice_top), as measured on the game's frames: the music list, the downloads, a
-// song's page and its options, the result, the rankings before a song, and a song with its own pause screen, at 16:9
-// (1280x720) and 4:3 (960x720 at 150 %). In the menus every corner's counter stands under the header at the right, on
-// none of them, in every shape that has that room, and waits where none has; in a song each corner keeps clear of the
-// pause button, the column under it and the pause screen's Q and MAX; the notice stands under the menus' header there and
-// 16 under the top in a song, clear of the pause screen's Q and MAX (WIN-303, WIN-304; main put the top left counter on
-// the player's name and level in every menu and the notice on the header's items and RANK).
+// song's page and its options, the result, the rankings before a song, the grid button's menu, ALBUM, the shop, OPTION,
+// and a song with its own pause screen, at 16:9 (1280x720) and 4:3 (960x720 at 150 %). Wherever the menus give the
+// counter a place, every corner's counter stands on none of their screens (they give it none: ALBUM's FAVORITE tab ends
+// under the one the others leave, WIN-470); in a song each corner keeps clear of the pause button, the column under it
+// and the pause screen's Q and MAX; the notice stands under the menus' header there and 16 under the top in a song,
+// clear of the pause screen's Q and MAX (WIN-303, WIN-304; main put the top left counter on the player's name and level
+// in every menu and the notice on the header's items and RANK).
 void menus_place_checks() {
     using namespace player::overlay;
     // The counter's inset and its room from the right under the header (its glass: counter_glass, at its scale).
@@ -743,7 +744,13 @@ void menus_place_checks() {
         {"the result's header", 0, 0, 1280, 95}, {"the result's chart and title", 44, 110, 450, 195}, {"the result's figures", 45, 245, 585, 575},
         {"RANKINGS", 272, 632, 455, 698}, {"PLAY AGAIN", 756, 632, 941, 698}, {"SELECT MUSIC", 970, 632, 1232, 698},
         // The rankings before a song: its title, the list, MY RANK.
-        {"RANKING", 15, 8, 380, 62}, {"the ranking's list", 20, 70, 420, 330}};
+        {"RANKING", 15, 8, 380, 62}, {"the ranking's list", 20, 70, 420, 330},
+        // The menu the grid button opens (SHOP, ALBUM, OPTION and its X), ALBUM (its two tabs, whose FAVORITE ends in a
+        // slant from 1171 at its top to 1187 at its foot, and its panel), the shop (its three tabs over the same panel) and
+        // OPTION's list: the game's frames at 1280x720 (WIN-470).
+        {"the grid menu's X", 1185, 32, 1246, 93}, {"the grid menu's SHOP, ALBUM and OPTION", 360, 265, 935, 390},
+        {"ALBUM's ALL SONG and FAVORITE tabs", 685, 103, 1188, 156}, {"ALBUM's and the shop's panel", 63, 155, 1217, 670},
+        {"the shop's MAX, PARTNER and NOTE / SKIN tabs", 258, 103, 1022, 156}, {"OPTION's list", 175, 133, 1105, 680}};
     // A song's own at 16:9: the column of the pause button, the life gauge, FEVER, the score, rate and combo; the pause
     // screen's Q and MAX, its title and its buttons.
     const Rect song_16_9[] = {{"the pause button", 13, 10, 73, 70}, {"the column's gauge and figures", 0, 75, 75, 720},
@@ -753,7 +760,12 @@ void menus_place_checks() {
     // page's cards, the song page's X and its Q and MAX.
     const Rect menus_4_3[] = {{"the music list's header", 0, 0, 960, 75}, {"the music list's grid", 222, 190, 868, 575},
                               {"the next page's cards", 933, 170, 960, 600}, {"the song page's X", 905, 22, 937, 53},
-                              {"the song page's Q and MAX", 757, 385, 930, 450}, {"the song's title and score", 30, 25, 360, 175}};
+                              {"the song page's Q and MAX", 757, 385, 930, 450}, {"the song's title and score", 30, 25, 360, 175},
+                              // The grid menu's X, ALBUM's tabs (FAVORITE's slant to 891 at its foot) and panel, the shop's tabs and
+                              // OPTION's list, at 960x720 (WIN-470).
+                              {"the grid menu's X", 889, 24, 935, 70}, {"ALBUM's ALL SONG and FAVORITE tabs", 514, 77, 892, 118},
+                              {"ALBUM's and the shop's panel", 47, 116, 913, 705}, {"the shop's MAX, PARTNER and NOTE / SKIN tabs", 193, 77, 767, 118},
+                              {"OPTION's list", 130, 100, 830, 690}};
     struct Area {
         int w, h;
         float dpi;
@@ -771,8 +783,10 @@ void menus_place_checks() {
         const int cw = chip.w, ch = chip.h;
         const int bar = static_cast<int>(std::lround(kBarTall * scale_for(a.h, a.dpi)));
         for (int corner = 1; corner <= 4; ++corner) {
-            // In the menus, with the bar up and down alike (it never reaches the counter there).
+            // In the menus, with the bar up and down alike (it never reaches the counter there), wherever they give it a
+            // place (counter_has_menus_place: none now, ALBUM's tab being under the one the other screens left).
             for (const int room : {0, bar}) {
+                if (!counter_has_menus_place(a.w, a.h, a.dpi)) break;
                 const CounterAt at = counter_at(corner, a.w, a.h, inset, cw, ch, room, false, bar, right);
                 for (int i = 0; i < a.menus_n; ++i) {
                     if (overlaps(a.menus[i], at.x, at.y, cw, ch)) {
@@ -831,7 +845,7 @@ void menus_place_checks() {
         for (int corner = 1; corner <= 4; ++corner) {
             // In the menus where the counter has its place there, with the bar up and down alike.
             for (const int room : {0, bar}) {
-                if (!a.menus) break;
+                if (!a.menus || !counter_has_menus_place(a.w, a.h, a.dpi)) break;
                 const CounterAt at = counter_at(corner, a.w, a.h, inset, chip.w, chip.h, room, false, bar, right);
                 for (const Rect& r : menus_16_9) {
                     if (overlaps(at_game(r), at.x, at.y, chip.w, chip.h)) {
@@ -869,15 +883,15 @@ void menus_place_checks() {
     check(notice_top(1280, 720, 16, 8, 0, 74, false) == 108 && notice_top(1280, 720, 16, 8, 74, 74, false) == 108 && notice_top(960, 720, 16, 8, 0, 74, false) == 83,
           "the notice in the menus: 8 under their header (100 at 16:9, 75 at 4:3) or under the bar if that is lower, the same with the bar down");
     check(1280 - 2 * (kPauseBoxFromRight + 8) > 400, "a song's notice keeps 400 at least of room clear of the pause screen's Q and MAX at 16:9");
-    // Where the menus leave the counter its place: up to 16:9 at the game's own size; not wider, nor in the smallest
-    // windows at a large scale, where it waits for a song.
-    check(counter_has_menus_place(1280, 720, 1) && counter_has_menus_place(1920, 1080, 1) && counter_has_menus_place(1366, 768, 1) &&
-              counter_has_menus_place(1920, 1200, 1) && counter_has_menus_place(1024, 768, 1) && counter_has_menus_place(960, 720, 1.5f) &&
-              counter_has_menus_place(640, 360, 1) && counter_has_menus_place(3840, 2160, 2),
-          "the counter has its place in the menus at 16:9, 16:10 and 4:3, and in a 640x360 window at 100 %");
-    check(!counter_has_menus_place(1680, 720, 1) && !counter_has_menus_place(2560, 1080, 1) && !counter_has_menus_place(3440, 1440, 1) &&
-              !counter_has_menus_place(720, 405, 1.5f) && !counter_has_menus_place(480, 270, 1),
-          "the counter waits in the menus at 21:9 and in the smallest windows at their scale's floor");
+    // Where the menus leave the counter a place: in no shape and at no scale (WIN-470). ALBUM's FAVORITE tab ends under
+    // the place at the right under the header that every other menu screen leaves free, at 16:9 and 4:3 alike, so the
+    // counter waits in the menus and shows in a song (main stood it on that tab at 16:9, 16:10 and 4:3).
+    check(!counter_has_menus_place(1280, 720, 1) && !counter_has_menus_place(1920, 1080, 1) && !counter_has_menus_place(1366, 768, 1) &&
+              !counter_has_menus_place(1920, 1200, 1) && !counter_has_menus_place(1024, 768, 1) && !counter_has_menus_place(960, 720, 1.5f) &&
+              !counter_has_menus_place(640, 360, 1) && !counter_has_menus_place(3840, 2160, 2) && !counter_has_menus_place(1680, 720, 1) &&
+              !counter_has_menus_place(2560, 1080, 1) && !counter_has_menus_place(3440, 1440, 1) && !counter_has_menus_place(720, 405, 1.5f) &&
+              !counter_has_menus_place(480, 270, 1),
+          "the counter waits in the menus in every shape and at every scale: 16:9, 16:10, 4:3, 21:9 and the smallest windows");
 }
 
 // The bar's way down and up (overlay_motion.h): its pace, its times, a turn back midway, Windows' animations off; the

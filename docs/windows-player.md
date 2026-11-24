@@ -188,7 +188,7 @@ applied, so one the launcher does not take changes none of them:
 | `vsync` | `on`, `off` | VSync |
 | `fps` | `auto` (the display's rate), `unlimited`, or any whole number from 30 to 1000; the page offers the rates up to the fastest connected display's (160, 165, 180 Hz and others) | Frame limit |
 | `show_fps` | `off`, `on` (a corner's name, as `fps_position` takes it, is on in that corner) | FPS counter |
-| `fps_position` | `bottom_right` (a song's play field's corner), `top_left` (beside a song's pause button), `top_right`, `bottom_left`: the corner in a song (in the menus at the right under the game's header); kept while the counter is off | Position, while the counter is on |
+| `fps_position` | `bottom_right` (a song's play field's corner), `top_left` (beside a song's pause button), `top_right`, `bottom_left`: the corner in a song (not shown in the menus); kept while the counter is off | Position, while the counter is on |
 | `render_scale` | `100`, `85`, `75`, `67`, `50` | Render scale |
 | `upscaler` | `fsr1`, `nis`, `bilinear` | Upscaler, below 100 % |
 | `anti_aliasing` | `off`, `cmaa2`, `smaa` | Anti-aliasing |
@@ -353,9 +353,8 @@ off, says why in its log, and the game plays by touch as before.
   under them, the mean frame time, over the last second, twice a second. The figure is lime while the frames keep the
   display's rate and white below it or where the display's rate is not known. In a song it stands in its corner, clear
   of the song's own controls: at the bottom right by default; **Position** moves it to another corner. In the menus it
-  stands at the right under the game's header, whatever its corner, the one place where none of the menu screens has a
-  button or a word (with keyboard play off, there throughout). In a window wider than 16:9, or too small for it, it shows
-  in songs only. It shows from the game's first frame and hides while the game holds still, and the broadcast does not
+  waits, and it shows again in each song; with keyboard play off it stands at the right under the game's header
+  throughout. It shows from the game's first frame and hides while the game holds still, and the broadcast does not
   show it.
 - **The render scale** draws the game at a share of the window's pixels (100 % down to 50 %), stretched to fill it:
   lighter for the graphics card, and softer. 67 % of 1920x1080 is 1280x720, so the game lays itself out as it does at
