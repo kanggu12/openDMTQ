@@ -191,10 +191,6 @@ class PortalStrings(unittest.TestCase):
                 self.fail(f"{key}: {text}")
         for key, text in self.en.items():
             self.assertNotIn(EM_DASH, text, key)
-            # The site names no owner to a player (no "ask the owner"): only the lines MY PAGE shows the owner of their own
-            # account call it the owner's, as the admin pages do.
-            if key not in OWNER_ONLY:
-                self.assertNotIn("owner", text, key)
 
     def test_the_owner_is_called_the_owner(self):
         # One word for the owner, the admin pages' (소유자, Owner): MY PAGE's lines for the owner's own account too, never
@@ -208,6 +204,21 @@ class PortalStrings(unittest.TestCase):
             for key, text in table.items():
                 self.assertNotIn("server's own account", plain(text), key)
                 self.assertNotIn("서버 자체의 계정", text, key)
+
+    def test_the_person_who_runs_the_server_is_its_owner(self):
+        # Where the site points a player to the person who runs the server (whose ID and password they sign in with, who
+        # links their account and switches their broadcasts), it is the server's owner, the word of the docs, the admin
+        # pages and the launcher: never "the server's admin" (서버 관리자), which named the person by the pages' word. The
+        # admin pages themselves (관리자 페이지) and admin rights keep theirs (PAGE-105).
+        plain = lambda text: text.replace("\\'", "'")
+        for key, text in self.en.items():
+            self.assertNotIn("server's admin", plain(text), key)
+        for key, text in self.ko.items():
+            self.assertNotIn("서버 관리자", text, key)
+            self.assertIsNone(re.search(r"관리자(?:가|에게|는|께)", text), f"{key}: {text}")
+        for key in ("signin.lead", "me.not_linked", "me.cast_switch"):
+            self.assertIn("server's owner", plain(self.en[key]), key)
+            self.assertIn("서버 소유자", self.ko[key], key)
 
 
 if __name__ == "__main__":

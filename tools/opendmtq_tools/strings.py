@@ -1849,7 +1849,7 @@ STRINGS = {
         "setup.address_k8s": "Kubernetes에서는 차트의 publicHost 값이 주소입니다. 바꾸려면 이 명령을 실행하세요.",
         "setup.bad_address": "로컬 네트워크에서 서버 PC가 쓰는 주소가 아닙니다: {host}",
         "setup.players_title": "플레이어 계정",
-        "setup.players_lead": "사이트와 앱 다운로드는 관리자가 만든 계정으로만 열립니다. 플레이어마다 하나씩 만드세요. 비밀번호는 자동으로 만들어집니다.",
+        "setup.players_lead": "사이트와 앱 다운로드는 여기서 만든 계정으로만 열립니다. 플레이어마다 하나씩 만드세요. 비밀번호는 자동으로 만들어집니다.",
         "setup.players_count": "지금까지 만든 계정: {n}개.",
         "setup.made_note": "설정에서 만듦",
         "setup.app_title": "휴대폰 앱",
