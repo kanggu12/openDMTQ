@@ -207,7 +207,7 @@ jobs:
       fail-fast: false
       matrix:
         stages:
-          - empty full
+          - empty full moved
           - thispc keys air notices maint notice
           - flows mine patterns quiet away down
     env:

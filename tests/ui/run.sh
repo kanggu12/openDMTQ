@@ -6,7 +6,7 @@
 #
 # Usage: tests/ui/run.sh [report folder, default _work/ui-report]
 # ONLY="full flows" runs those stages (the checker's own, self, and the setup always run first); keys is the keyboard's marks,
-# mine MY PAGE.
+# mine MY PAGE, moved the app's state after a move.
 # KEEP=1 leaves the stack up afterwards.
 # NO_BUILD=1 uses the images already tagged opendmtq-*:uitest.
 set -euo pipefail
@@ -186,7 +186,7 @@ stage() {
     -e SITE="http://127.0.0.1:$SITE_PORT" -e ADMIN="http://127.0.0.1:$ADMIN_PORT" -e PASSWORD="$PASSWORD" -e OUT=/out \
     -e SWEEP_WORKERS="$SWEEP_WORKERS" \
     -e CHAT="http://$CHAT:8080" -e CHAT_LOCAL="http://127.0.0.1:$CHAT_PORT" \
-    -e SHOTS_ALL="${SHOTS_ALL:-}" \
+    -e SHOTS_ALL="${SHOTS_ALL:-}" -e MOVED="${MOVED:-}" \
     -v "$UI:/usr/src/app/ui:ro" -v "$REPORT:/out" --entrypoint node "$BROWSER_IMAGE" ui/audit.js "$1" 2>&1 \
     | tee "$REPORT/last.txt" >> "$REPORT/results.txt" || status=$?
   if [ "$status" -ne 0 ]; then
@@ -267,6 +267,21 @@ export SITE_URL="http://127.0.0.1:$SITE_PORT" ADMIN_URL="http://127.0.0.1:$ADMIN
 python3 "$UI/feed.py" record
 
 stage full
+
+# The app's states the home page and the download page speak of, set as the server's start and the builder leave them and
+# then put back (audit.js moved): the server moved here an hour ago, the app on offer the old address's and the new one
+# being made (address-moved.json, build.json).
+if wanted moved; then
+  cp "$DATA/apk/out/latest.json" "$DATA/latest.json.kept"
+  now=$(date +%s)
+  printf '{"from": "192.168.1.10:8791", "to": "%s", "at": %s}' "$HOST" $((now - 3600)) > "$DATA/state/address-moved.json"
+  sed "s/\"host\": \"$HOST\"/\"host\": \"192.168.1.10:8791\"/" "$DATA/latest.json.kept" > "$DATA/apk/out/latest.json"
+  printf '{"host": "%s", "state": "building", "time": %s}' "$HOST" "$now" > "$DATA/apk/out/build.json"
+  MOVED=building stage moved
+  rm -f "$DATA/state/address-moved.json" "$DATA/apk/out/build.json"
+  cp "$DATA/latest.json.kept" "$DATA/apk/out/latest.json"
+  rm -f "$DATA/latest.json.kept"
+fi
 
 # The admin pages from the server PC itself, its browser on the admin service's own network (its loopback): Play on this
 # PC as a host install on Linux shows it (how to play from a Windows PC), then as the Windows bundle does, from a second

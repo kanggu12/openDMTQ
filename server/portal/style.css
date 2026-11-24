@@ -451,6 +451,9 @@ p { margin: 0 0 10px; }
 .empty .btn-line { justify-content: center; }
 /* Messages: one spacing, tinted by what they mean. Yellow a notice, red a failure, the section's colour a success. */
 .warn, .error, .done { margin: 12px 0; padding: 11px 14px; font-size: var(--t-md); }
+/* Straight on the page (the download page's notice of a move above its card): the page's own gap around it, no margin of
+   its own added to it (the gaps around the move's notice were 32 and 20 px). */
+main.wrap > .warn { margin: 0; }
 .warn { background: color-mix(in srgb, var(--warn) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 42%, transparent); color: #ffe6a0; }
 .error { background: color-mix(in srgb, var(--bad) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 46%, transparent); color: #ffc4cb; }
 .done { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 42%, transparent); color: color-mix(in srgb, var(--accent) 55%, #fff); }
@@ -1328,6 +1331,10 @@ table.plays td.when { width: 6.5em; color: var(--ash); font-size: var(--t-sm); }
 .install-main { min-width: 0; }
 /* Android only, said as plainly as the button is. */
 .for-android { margin: 12px 0 0; font-size: var(--t-md); color: var(--chalk); }
+/* The PC's steps under the installer's size and version, with the room the app's card leaves under its size line, and at
+   the site's reading measure (across the whole card they ran 127 characters a line). */
+.pc-steps { margin: 12px 0 0; max-width: 74ch; }
+#computer .meta { max-width: 74ch; }
 /* Three steps in order, big numbers: this one really is a sequence. Grouped by the space between them, with no box each. */
 .steps { list-style: none; counter-reset: step; margin: 28px 0 0; padding: 24px 0 0; border-top: 1px solid rgba(255, 255, 255, 0.12); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 36px; font-size: var(--t-md); line-height: 1.6; color: #dfe5eb; }
 .steps li { position: relative; counter-increment: step; min-width: 0; padding-left: 48px; overflow-wrap: break-word; }

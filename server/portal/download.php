@@ -47,7 +47,8 @@ page_header(t('dl.title'), 'download', $start ? '1;url=/apk' : ($building ? '20'
         <p class="warn" role="status"><?= t('build.failed') ?></p>
       <?php elseif ($building): ?>
         <?php // Being made now: for this address for the first time, or again for a new one. ?>
-        <p class="warn" role="status"><?= t($stale ? 'build.stale' : 'build.wait') ?></p>
+        <?php // (The move's notice above says the address changed: here only that the app is being made.) ?>
+        <p class="warn" role="status"><?= t($stale && !$moved ? 'build.stale' : 'build.wait') ?></p>
       <?php elseif (!$apk || $stale): ?>
         <?php // None for this address, and nothing making one: said once, no waiting. ?>
         <p class="warn" role="status"><?= t('build.none') ?></p>
@@ -105,7 +106,8 @@ page_header(t('dl.title'), 'download', $start ? '1;url=/apk' : ($building ? '20'
       <?php /* The version when the installer came with one (a release's); a copy put there by hand has its size only. */ ?>
       <?php $win_version = (string)($win['version'] ?? ''); $win_mb = number_format($win['size'] / 1048576, 1); ?>
       <p class="meta"><?= $win_version !== '' ? t('pc.meta', ['size' => $win_mb, 'version' => $win_version]) : t('pc.meta_size', ['size' => $win_mb]) ?></p>
-      <p><?= t('pc.steps', ['address' => public_host()]) ?></p>
+      <?php // Its steps under the size and version with the room the card above leaves there, at the site's reading measure. ?>
+      <p class="pc-steps"><?= t('pc.steps', ['address' => public_host()]) ?></p>
       <p class="meta"><?= t('pc.needs') ?></p>
     </section>
   <?php endif; ?>

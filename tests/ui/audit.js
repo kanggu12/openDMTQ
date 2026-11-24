@@ -2,6 +2,8 @@
 //   node audit.js self     the checker itself finds each planted defect (defects.html)
 //   node audit.js empty    every page of a server with nothing on it
 //   node audit.js full     every page with players, plays, recordings and an app, at five widths, in both languages
+//   node audit.js moved    the home page and the download page in the app's state run.sh sets (MOVED): after a move with
+//                          the app being made
 //   node audit.js keys     the keyboard's marks on the site and the admin pages, held to the database (keys.json in OUT)
 //   node audit.js air      the pages that change while players are on air, and the video playing
 //   node audit.js maint    the owner turns maintenance on: the notice, whole, on every page that shows it; then off again
@@ -571,6 +573,60 @@ async function backgroundClear(contexts) {
   await reader.close();
   check(`no shard and no pane's edge in the content column, at its cards or the bar's keys, on every page at every width (${views} views)`, misses.length === 0,
     misses.slice(0, 8).join(' ; '));
+}
+
+// The download page's card for computers at a laptop's width and a large monitor's, in both languages: its steps a line of
+// their own under the installer's size, with the room the app's card leaves under its size line (12 px), and every line of
+// it at the site's reading measure (80 characters at most). Before: the steps glued to the size line (0 px) and 127
+// characters a line across the card.
+async function downloadCards(contexts) {
+  for (const width of [1280, 1920]) {
+    for (const lang of ['en', 'ko']) {
+      const page = await contexts.signed.newPage();
+      await page.setViewport({ width, height: 900 });
+      await page.setCookie({ name: 'opendmtq_lang', value: lang, url: P });
+      await page.goto(`${P}/download.php`, { waitUntil: 'domcontentloaded' });
+      const seen = await page.evaluate(() => {
+        // The room between a size line and what comes after it, by where their words are drawn.
+        const words = el => { const r = document.createRange(); r.selectNodeContents(el); const rs = [...r.getClientRects()]; return { top: Math.min(...rs.map(x => x.top)), bottom: Math.max(...rs.map(x => x.bottom)) }; };
+        const pc = document.querySelector('#computer .meta'), app = document.querySelector('#install .get-app .meta');
+        if (!pc || !app) return { missing: true };
+        const room = (a, b) => Math.round(words(b).top - words(a).bottom);
+        // Characters a line: each paragraph's width in its own face's zero.
+        const ruler = document.createElement('canvas').getContext('2d');
+        const measure = [...document.querySelectorAll('#computer p')].map(p => {
+          const s = getComputedStyle(p);
+          ruler.font = `${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
+          return Math.round(p.getBoundingClientRect().width / ruler.measureText('0').width);
+        });
+        return { pc: room(pc, pc.nextElementSibling), app: room(app, app.nextElementSibling), measure };
+      });
+      check(`the download page's card for computers has its steps under its size line with room, at the reading measure (${width}px, ${lang})`,
+        !seen.missing && seen.pc >= 8 && Math.abs(seen.pc - seen.app) <= 3 && Math.max(...seen.measure) <= 80, JSON.stringify(seen));
+      await page.close();
+    }
+  }
+}
+
+// The app's states the home page and the download page speak of, as run.sh sets them for this stage (MOVED): "building",
+// the server moved here an hour ago, the app on offer the old address's and the new one being made: the move said once,
+// the card's line saying only that the app is being made, and both pages whole at a phone's width and a laptop's in both
+// languages (before: "the address changed" twice, in two yellow boxes, and gaps of 32 and 20 px around the notice).
+async function movedPages(contexts) {
+  const state = process.env.MOVED;
+  const page = await contexts.signed.newPage();
+  await page.setViewport({ width: 1280, height: 900 });
+  await page.setCookie({ name: 'opendmtq_lang', value: 'en', url: P });
+  await page.goto(`${P}/download.php`, { waitUntil: 'domcontentloaded' });
+  const download = await page.evaluate(() => ({ moved: !!document.getElementById('moved'), news: (document.getElementById('new-app') || { textContent: '' }).textContent,
+    card: [...document.querySelectorAll('#install .warn')].filter(w => w.getClientRects().length).map(w => w.textContent.trim()),
+    told: (document.querySelector('main').textContent.match(/address changed|moved on/g) || []).length }));
+  await page.goto(`${P}/`, { waitUntil: 'domcontentloaded' });
+  const home = await page.evaluate(() => ({ moved: !!document.getElementById('moved'), news: (document.getElementById('new-app') || { textContent: '' }).textContent }));
+  check('after a move, with the app being made, the download page says the move once and the card only that the app is being made',
+    download.moved && download.told === 1 && download.card.join() === 'The app is being built.' && home.moved, JSON.stringify([download, home]));
+  await page.close();
+  await sweep(contexts, [[`home (${state})`, `${P}/`], [`download (${state})`, `${P}/download.php`]], FEW_WIDTHS);
 }
 
 // The status page's cards on a laptop's screen and a large monitor's, in both languages: none stretched past what it holds
@@ -3226,6 +3282,9 @@ async function myPage(contexts) {
     await backgroundClear(contexts);
     await hallOfFame(contexts);
     await statusCards(contexts);
+    await downloadCards(contexts);
+  } else if (stage === 'moved') {
+    await movedPages(contexts);
   } else if (stage === 'keys') {
     await keyboardMarks(contexts);
   } else if (stage === 'thispc') {
