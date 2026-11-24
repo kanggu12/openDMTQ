@@ -269,8 +269,12 @@ def register():
 
 def the_file(storage_field):
     """The file a route's upload sent (None when there is none). Read before anything else: a body over the route's
-    limit is refused (413) here, as on the pages."""
-    return request.files.get(storage_field)
+    limit is refused (413) here, as on the pages; a backup the backups disk could not hold while it came is refused in
+    the page's words (core.AdminRequest)."""
+    sent = request.files.get(storage_field)
+    if request.upload_failed is not None:
+        raise Refused(500, "upload_failed", core.t("bak.upload_failed", detail=core.why(request.upload_failed)))
+    return sent
 
 
 # ------------------------------------------------------------------------------ status

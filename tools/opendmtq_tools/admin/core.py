@@ -11,6 +11,7 @@ import errno
 import functools
 import hmac
 import html
+import io
 import json
 import mimetypes
 import os
@@ -157,13 +158,41 @@ class AdminRequest(Request):
             return MAX_SIGNED_OUT
         return MAX_BACKUP if self.endpoint == "backups_page" else songs.MAX_PACKAGE
 
+    def spools_to_backups(self):
+        """True for the requests whose upload waits on the backups disk while the form is read (_get_file_stream)."""
+        return self.endpoint == "backups_page" or self.endpoint in API_TO_BACKUPS
+
     def _get_file_stream(self, total_content_length, content_type, filename=None, content_length=None):
         # A backup waits on the backups disk, not in this container's /tmp (memory, shared with builds). The API's upload
         # of one too.
-        if self.endpoint == "backups_page" or self.endpoint in API_TO_BACKUPS:
+        if self.spools_to_backups():
             os.makedirs(BACKUPS, exist_ok=True)
             return tempfile.TemporaryFile(dir=BACKUPS)
         return super()._get_file_stream(total_content_length, content_type, filename, content_length)
+
+    # Why a backup's upload could not be written where it waits while the form was read (a full backups disk), for what
+    # the page and the API say of it (auth.guard, api.the_file); None while nothing went wrong.
+    upload_failed = None
+
+    def _load_form_data(self):
+        try:
+            super()._load_form_data()
+        except OSError as e:
+            # Only an upload that waits on the backups disk: any other failure is what it is.
+            if not self.spools_to_backups():
+                raise
+            self.upload_failed = e
+            # What is left of the body, read and let go: a browser still sending it takes an answer that comes before
+            # it is all read for a broken connection, and shows nothing of it.
+            rest = self._get_stream_for_parsing()
+            try:
+                while rest.read(1024 * 1024):
+                    pass
+            except Exception:  # noqa: BLE001 - a sender that went away: nothing more to read
+                pass
+            # Nothing of the form, as with an empty one: the request goes on to say why (the stream read to its end).
+            d = self.__dict__
+            d["stream"], d["form"], d["files"] = io.BytesIO(), self.parameter_storage_class(), self.parameter_storage_class()
 
     @functools.cached_property
     def page_lang(self):

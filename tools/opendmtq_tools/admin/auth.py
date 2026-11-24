@@ -291,6 +291,11 @@ def guard():
         return redirect(url_for("login", next=request.full_path.rstrip("?") if request.method == "GET" else core.form_page()))
     if request.method == "POST":
         sent = request.form.get("csrf") or request.headers.get("X-CSRF", "")
+        # A backup's upload the backups disk could not hold while its form was read (core.AdminRequest): said in words.
+        # Nothing was taken, so nothing needs the form's token.
+        if request.upload_failed is not None:
+            flash(t("bak.upload_failed", detail=core.why(request.upload_failed)), "bad")
+            return redirect(core.form_page())
         if not same_text(sent, session.get("csrf", "")):
             # A page left open across signing out and in again: it reloads with a valid form.
             flash(t("err.stale_form"), "bad")

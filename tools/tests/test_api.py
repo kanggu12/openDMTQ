@@ -7,6 +7,7 @@ Flask is installed in the tools image only; outside it these tests are skipped (
 import ast
 import contextlib
 import datetime
+import errno
 import hashlib
 import io
 import json
@@ -1565,6 +1566,43 @@ class FilesTest(unittest.TestCase):
         with Server() as inst:
             r = inst.client.post(V1 + "/maintenance", data=b"x" * (admin.core.MAX_SIGNED_OUT + 10), content_type="application/json")
             self.assertEqual(r.status_code, 401)
+
+    def test_an_upload_the_backups_disk_cannot_hold_is_said_in_words(self):
+        # The upload waits on the backups disk while its form is read: a full disk ended the read with an exception, the
+        # connection was reset, and the owner had no words, on the page and through the API. Said now, the rest of the body
+        # read to its end so that the answer reaches the sender, and nothing left in the folder (ADM-224, API-101).
+        class FullDisk(io.BytesIO):
+            # A spool on a disk with room for a kilobyte.
+            def write(self, data):
+                if self.tell() + len(data) > 1024:
+                    raise OSError(errno.ENOSPC, "No space left on device")
+                return super().write(data)
+
+        def body(*fields):
+            parts = [f"--x\r\nContent-Disposition: form-data; name=\"{n}\"\r\n\r\n{v}\r\n".encode() for n, v in fields]
+            return b"".join(parts) + (b"--x\r\nContent-Disposition: form-data; name=\"file\"; filename=\"moved.tar.gz\"\r\n"
+                                      b"Content-Type: application/gzip\r\n\r\n" + os.urandom(64 * 1024) + b"\r\n--x--\r\n")
+
+        with Server() as inst, mock.patch.object(admin.core.tempfile, "TemporaryFile", lambda dir=None: FullDisk()):
+            before = sorted(os.listdir(admin.core.BACKUPS))
+            sent = io.BytesIO(body())
+            r = inst.client.post(V1 + "/backups/upload", input_stream=sent, content_length=len(sent.getvalue()),
+                                 content_type="multipart/form-data; boundary=x",
+                                 headers={"Authorization": "Bearer " + Server.secrets["owner"]})
+            self.assertEqual((r.status_code, r.get_json()["error"]["code"]), (500, "upload_failed"))
+            self.assertEqual(r.get_json()["error"]["message"], "The upload failed: the disk is full.")
+            self.assertEqual(sent.read(), b"")
+            inst.sign_in()
+            inst.client.get("/opendmtq/admin/backups")
+            with inst.client.session_transaction(path="/opendmtq/admin/") as sess:
+                csrf = sess["csrf"]
+            sent = io.BytesIO(body(("csrf", csrf), ("action", "upload")))
+            r = inst.client.post("/opendmtq/admin/backups", input_stream=sent, content_length=len(sent.getvalue()),
+                                 content_type="multipart/form-data; boundary=x", headers={"Referer": "http://localhost/opendmtq/admin/backups"})
+            self.assertEqual((r.status_code, r.headers["Location"]), (302, "/opendmtq/admin/backups"))
+            self.assertEqual(sent.read(), b"")
+            self.assertIn("The upload failed: the disk is full.", inst.client.get("/opendmtq/admin/backups").get_data(as_text=True))
+            self.assertEqual(sorted(os.listdir(admin.core.BACKUPS)), before)
 
     def test_a_backup_whose_bytes_changed_on_the_way_is_not_kept(self):
         # An upload is read to its end before it joins the list: its gzip check says whether its bytes are the ones it was
