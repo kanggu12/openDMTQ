@@ -1635,6 +1635,29 @@ void sound_panel_checks() {
     }
     check(notice_bad == 0,
           "a song's notice beside the open sound panel has 400 at least of room at 720 lines, clear of the pause button's column, the Q and MAX and the panel, over 16 shapes and scales");
+    // The panel's quiet grey words (WIN-472): the bands' frequencies and the values never under 10 pixels at the panel's
+    // scale in any shape (main set the frequencies at 11 times it: 8.25 in a 960x540 window, 4.2 to 1 over a light frame),
+    // a band's name and its frequency together within its row (a pixel's slack: Pretendard's line is 1.193 of its size),
+    // and the glass under them held dark enough that SemiBold strokes of that size keep 4.5 to 1 over any frame: their
+    // least, 0.46 in relative luminance (measured over the game's frames, the FPS counter's), against the most the glass
+    // may light them (main held the panel to the overlay's 0.074: its values came to 4.3 over a light song).
+    int grey_bad = 0;
+    for (const Shape& sh : shapes) {
+        const float k0 = scale_for(sh.h, sh.dpi);
+        const SoundLayout l = sound_layout(sh.w, sh.h, k0, static_cast<int>(std::lround(kBarTall * k0)));
+        const float hz = sound_grey_px(kBandHzSize, l.scale), value = sound_grey_px(kValueSize, l.scale);
+        const float band_block = (14 * l.scale + hz) * 1.193f;
+        if (hz < 10 - 0.001f || value < 10 - 0.001f || band_block > l.row[kLow].h + 1) {
+            ++grey_bad;
+            std::printf("  %dx%d at %.0f %%: the panel's grey words at %.2f and %.2f pixels, a band's two lines %.1f high in a row of %.1f\n", sh.w, sh.h,
+                        static_cast<double>(sh.dpi * 100), static_cast<double>(hz), static_cast<double>(value), static_cast<double>(band_block),
+                        static_cast<double>(l.row[kLow].h));
+        }
+    }
+    const float least_ink = 0.46f, contrast = (least_ink + 0.05f) / (kPanelGreyUnder + 0.05f);
+    if (contrast < 4.5f) std::printf("  the panel's grey words keep %.2f to 1 at the glass's most light, %.3f\n", static_cast<double>(contrast), static_cast<double>(kPanelGreyUnder));
+    check(grey_bad == 0 && contrast >= 4.5f,
+          "the sound panel's grey words: never under 10 pixels, a band's two lines within its row, and 4.5 to 1 at the most the glass may light them, over 16 shapes and scales");
     // The equaliser's chips by their words (WIN-302; main made the five one width, "Custom" 3 and 4 pixels from its border
     // and "Flat" 18 and 19): in each shape and either language, each word in the middle of its chip with the same room on
     // both sides as every other chip's, at least the scale's 8, the chips 8 apart and the row as wide as the inside.

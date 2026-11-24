@@ -1126,8 +1126,10 @@ void sound_look(Paint& p, const audio::Levels& levels, int hover, int held) {
     bevel(*g, glass, radius, 40, 90);
     auto title_font = font(Weight::kBold, fpx(17), g_korean);
     auto label_font = font(Weight::kRegular, fpx(14), g_korean);
-    auto small_font = font(Weight::kRegular, fpx(11), g_korean);
-    auto value_font = font(Weight::kSemiBold, fpx(13), false);
+    // The quiet grey words, the bands' frequencies and the values, in SemiBold and never under 10 pixels (sound_panel.h's
+    // sound_grey_px): regular strokes at 11 thin out and show darker than their grey over a light frame.
+    auto small_font = font(Weight::kSemiBold, sound_grey_px(kBandHzSize, scale()), g_korean);
+    auto value_font = font(Weight::kSemiBold, sound_grey_px(kValueSize, scale()), false);
     auto chip_font = font(Weight::kBold, fpx(13), g_korean);
     // A row's words in the middle of its height, at its left or right.
     auto say_left = [&](const wchar_t* text, const Font& f, const Color& c, const RectF& box) {
@@ -1213,8 +1215,9 @@ void sound_look(Paint& p, const audio::Levels& levels, int hover, int held) {
         const RectF m = measure(control_name(c), *chip_font);
         say(*g, control_name(c), *chip_font, chosen ? tone::kLime : tone::kPrimary, PointF(r.X + (r.Width - m.Width) / 2, r.Y + (r.Height - m.Height) / 2));
     }
-    // The words' zones: the whole inside, as dark as the quiet words need.
-    look.zones = {Look::Zone{glass.X + fpx(8), glass.Y + fpx(8), glass.X + glass.Width - fpx(8), glass.Y + glass.Height - fpx(8), kUnderSecondary}};
+    // The words' zones: the whole inside, as dark as the quiet grey words need (sound_panel.h's kPanelGreyUnder: their
+    // strokes at 10 to 13 pixels keep 4.5 to 1 over any frame under it).
+    look.zones = {Look::Zone{glass.X + fpx(8), glass.Y + fpx(8), glass.X + glass.Width - fpx(8), glass.Y + glass.Height - fpx(8), kPanelGreyUnder}};
     look.feather = fpx(16);
     ++p.look_serial;
 }

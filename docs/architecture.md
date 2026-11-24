@@ -654,7 +654,8 @@ song's own sample against its 1 to 4 kHz, where 0.10.0's was about 35 dB down.
   and the notice's foot. Their words keep 4.5:1 against the light behind them: where the game is light under the words,
   the tint deepens there. With none of them up, the glass costs the game nothing. The words are set in Pretendard
   (titles and buttons bold; the notice's second line, the FPS counter's units and frame time and the sound panel's
-  levels semibold) and the FPS counter's figure in the launcher's wide face, both of which the player carries in its
+  levels and bands' frequencies semibold, the small grey ones never under 10 pixels) and the FPS counter's figure in the
+  launcher's wide face, both of which the player carries in its
   `fonts` folder. The wordmark is a picture for each of the overlay's scales from 1 to 4, drawn by the launcher's own
   code (`arm32/desktop/assets/make_wordmark.py`) and carried in the player's `images` folder: at those scales it is
   drawn pixel for pixel, between them the next larger is drawn down, and below 1 the first one is.

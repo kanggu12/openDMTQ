@@ -38,6 +38,20 @@ constexpr float kChipWords[2][kPresets] = {{22.7f, 29.6f, 34.1f, 38.7f, 48.0f}, 
 // The track's height and the thumb's diameter.
 constexpr float kTrackTall = 4, kThumb = 16;
 
+// The panel's quiet grey words: each band's corner frequency under its name (11 at 720 lines) and each slider's value at
+// its right (13), set in Pretendard SemiBold, the weight the overlay sets its values and its small grey words in (the
+// FPS counter's, the notice's second line): a regular stroke at 11 is thinner than a pixel and shows far darker than
+// its grey (the band frequencies came to 4.2 to 1 in a 960x540 window, 8.25 pixels, measured over the game's frames).
+// Never set under 10 pixels, the counter's least (counter_look.h), however small the panel is drawn.
+constexpr float kBandHzSize = 11, kValueSize = 13, kGreyWordsLeast = 10;
+// A grey word's size in pixels at the panel's scale `k`: its size at 720 lines times the scale, never under the least.
+inline float sound_grey_px(float size, float k) { return std::max(size * k, kGreyWordsLeast); }
+// The most the glass may light those words from under them (relative luminance), for the overlay's tint to deepen to over
+// a light frame: the counter's bound for its small grey words (counter_look.h's kCounterUnder), under which SemiBold
+// strokes of 10 pixels and more (0.46 at the least, measured) keep 5 to 1. At the 0.074 the overlay holds its larger grey
+// words to, the values fell to 4.3 over a light song at 1280x720 (their strokes 0.47).
+constexpr float kPanelGreyUnder = 0.045f;
+
 // The panel's height at 720 lines: its top, the title, the volumes, the equaliser's title and chips, its bands, its foot.
 constexpr float kPanelTall = kPanelTop + kTitleRow + kTitleLine + kAfterLine + 3 * kSliderRow + kGroupGap + kTitleRow + kTitleLine + kAfterLine + kChipRow +
                              kChipsAfter + 3 * kSliderRow + kPanelFoot;
