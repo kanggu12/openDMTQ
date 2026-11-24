@@ -145,6 +145,39 @@ class Report(Played):
         self.assertEqual(report.left_words(i18n.Words("ko"), left[:3]), "경로 속 Windows 사용자 이름, 사이트 아이디, 서버 주소")
         self.assertEqual(report.left_words(i18n.Words("en"), []), "nothing of the kind was found")
 
+    def test_a_sound_device_named_after_a_person(self):
+        # Windows names a Bluetooth headset's outputs as its owner's phone named it, in English with the curly apostrophe
+        # a phone writes, or the straight one, and in Korean; a second device of a name gets "2- " before it. The owner's
+        # name is left out of the list of devices and of the player's log naming the device it opened (main kept both
+        # whole); a device named after nobody stays as it was, and so does the same name as a word of a log's own.
+        devices = [{"id": "{0.0.0.00000000}.{bbbb}", "name": "Headphones (Sena Kim’s AirPods Pro)", "default": True},
+                   {"id": "{0.0.0.00000000}.{cccc}", "name": "Headset (Sena Kim's AirPods Pro Hands-Free AG Audio)",
+                    "default": False},
+                   {"id": "{0.0.0.00000000}.{dddd}", "name": "헤드폰(김세나의 Galaxy Buds2 Pro)", "default": False},
+                   {"id": "{0.0.0.00000000}.{eeee}", "name": "Speakers (2- Max's Speaker)", "default": False},
+                   {"id": "{0.0.0.00000000}.{ffff}", "name": "Speakers (Realtek(R) Audio)", "default": False}]
+        with open(player.log_path(PACKAGE), "a", encoding="utf-8") as f:
+            f.write('player: sound: the game\'s OpenAL asked for the device default and opened "OpenAL Soft on '
+                    'Headphones (Sena Kim’s AirPods Pro)"\nplayer: frame rate max 240 Hz\n')
+        path, left = report.make(self.state, path=os.path.join(self.home, "out", "people.zip"), devices=devices)
+        with zipfile.ZipFile(path) as z:
+            files = {name: z.read(name).decode("utf-8") for name in z.namelist()}
+        everything = "\n".join(files.values())
+        for private in ("Sena Kim", "김세나", "Max's"):
+            self.assertNotIn(private, everything, private)
+        sound = files["system/sound.txt"]
+        for line in ("Headphones (<name>’s AirPods Pro) (default)", "Headset (<name>'s AirPods Pro Hands-Free AG Audio)",
+                     "헤드폰(<name>의 Galaxy Buds2 Pro)", "Speakers (2- <name>'s Speaker)", "Speakers (Realtek(R) Audio)"):
+            self.assertIn(line, sound)
+        self.assertIn('opened "OpenAL Soft on Headphones (<name>’s AirPods Pro)"', files["player/player.log"])
+        # Where the name stands as the device's owner, nowhere else.
+        self.assertIn("player: frame rate max 240 Hz", files["player/player.log"])
+        # Said with what else was left out, by its own words, in both languages.
+        self.assertIn(("person", 5), left)
+        self.assertIn("<name> person: 5", files["about.txt"])
+        self.assertEqual(report.left_words(i18n.Words("en"), [("person", 5)]), "people's names in sound devices' names")
+        self.assertEqual(report.left_words(i18n.Words("ko"), [("person", 5)]), "소리 장치 이름 속 사람 이름")
+
     def test_only_the_end_of_a_long_game_log(self):
         with open(player.log_path(PACKAGE), "w", encoding="utf-8") as f:
             f.write("an old game's line\n" * 60000 + "the last game's line\n")

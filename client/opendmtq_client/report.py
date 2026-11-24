@@ -17,8 +17,9 @@ What is left out is replaced by a word in angle brackets wherever it is found, i
 and every path with it (the home folder, the temporary folder), every site ID where the launcher writes one (signed in
 with, filled in, typed for a sign-in that failed), every server's address (as written, as host:port, its host, the
 address its app is built for, its folder's name here) and its own name, the sign-in cookies, tokens (an API's, a
-broadcast's upload key, a one-time sign-in link's), this PC's player id (the game's device id), and the words typed in
-the game. Servers are left out whether the settings know them or not (a server forgotten since, an address typed that
+broadcast's upload key, a one-time sign-in link's), this PC's player id (the game's device id), the words typed in the
+game, and the name a sound device is named after (Windows names a Bluetooth headset as its owner's phone named it:
+"Headphones (Sena's AirPods Pro)", "헤드폰(김세나의 Galaxy Buds2 Pro)"). Servers are left out whether the settings know them or not (a server forgotten since, an address typed that
 never answered, the last connection test of any address): by their forms (web addresses, IP addresses, host:port), by
 where the launcher writes an address or a name, and each one any file names is left out of all of them. The list of
 what was left out, by kind and how often, is in about.txt and is what the window and the command line say after it is
@@ -47,10 +48,17 @@ NAME = "opendmtq-report-%s.zip"
 # The most of the game's log taken: its end, the last games (the player adds to one file from game to game).
 PLAYER_LOG_TAIL = 512 * 1024
 # The kinds of what is left out, in the order the list says them (i18n report.left.<kind>).
-KINDS = ("user", "account", "server", "server_name", "cookie", "token", "device", "typed")
+KINDS = ("user", "person", "account", "server", "server_name", "cookie", "token", "device", "typed")
 # The word each kind is replaced by.
-WORDS = {"user": "<user>", "account": "<account>", "server": "<server>", "server_name": "<server name>",
-         "cookie": "<cookie>", "token": "<token>", "device": "<device id>", "typed": "<typed>"}
+WORDS = {"user": "<user>", "person": "<name>", "account": "<account>", "server": "<server>",
+         "server_name": "<server name>", "cookie": "<cookie>", "token": "<token>", "device": "<device id>",
+         "typed": "<typed>"}
+# Whose a sound device is, where its name says it: the words right before an English possessive ("Sena Kim's AirPods
+# Pro", the apostrophe straight or the curly one a phone writes) or the Korean one ("김세나의 Galaxy Buds2 Pro"), from the
+# start of the device's own name: the name's start, or inside the brackets Windows puts it in after the kind of output
+# ("Headphones (...)"), past the number Windows puts before a second device of the same name ("2- ").
+OWNER = (re.compile(r"(?:^|\()\s*(?:\d+- )?(?P<who>[^()<>'’\s][^()<>'’]*?)['’]s(?=\s)"),
+         re.compile(r"(?:^|\()\s*(?:\d+- )?(?P<who>[^()<>\s][^()<>]*?)의(?=\s)"))
 # A sign-in cookie of the site as the launcher keeps it (server/portal/auth.php: when it ends, the account in hex, the
 # signature), and under its name in a header.
 COOKIE_VALUE = re.compile(r"\b\d{10}\.(?:[0-9a-f]{2}){3,40}\.[0-9a-f]{64}\b")
@@ -413,6 +421,24 @@ def _devices(scrub):
         scrub.add("device", found)
 
 
+def _owners(scrub, devices):
+    """The names the sound devices are named after (OWNER), left out wherever such a name stands before its possessive:
+    in the list of the devices, and in the player's log where it names the device it opened. Nowhere else: a first name
+    may well be a word of the logs' own ("Max", "Will")."""
+    for device in devices:
+        name = str(device.get("name") or "")
+        # The English possessive, then the Korean one, each with what must follow the name for it to be this one.
+        for pattern, after in zip(OWNER, (r"(?=['’]s\s)", r"(?=의\s)")):
+            for match in pattern.finditer(name):
+                who = match.group("who").strip()
+                if not who or ("person", who.lower(), after) in scrub.known:
+                    # Nothing before the possessive, or a name left out already (a second device of the same owner).
+                    continue
+                scrub.known.add(("person", who.lower(), after))
+                # Never inside a longer word, and only as the device's owner.
+                scrub.pattern("person", r"(?<!\w)%s%s" % (re.escape(who), after), WORDS["person"], len(who))
+
+
 def scrubber(state):
     """What every file of a report leaves out, for this launcher's state on this PC."""
     scrub = Scrub()
@@ -581,6 +607,8 @@ def make(state, path=None, devices=None, now=None):
     # The displays, as the launcher's log has them at each start, and the sound devices.
     files["system/displays.txt"] = "\n".join(displays.describe(displays.connected())) + "\n"
     listed = devices if devices is not None else player.audio_devices()
+    # Whose a device is, where its name says it: left out of every file, this list's first.
+    _owners(scrub, listed)
     files["system/sound.txt"] = "".join("%s%s\n    %s\n" % (d["name"], " (default)" if d["default"] else "", d["id"])
                                         for d in listed) or "The player listed no sound devices.\n"
     # The last connection test, as Copy gives it, in English.

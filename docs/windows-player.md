@@ -136,7 +136,8 @@ selected in File Explorer: the launcher's logs, the end of the game's log, the s
 devices, Windows and the graphics cards, the launcher's and the player's versions, and the last connection test. Left
 out of every file, each replaced by a word in angle brackets: the Windows user's name in paths, every site ID, every
 server's address and name (also of servers the settings no longer know: one forgotten since, an address typed, the last
-test of any address), the sign-in cookies, tokens and keys, this PC's player id and what was typed in the game. The
+test of any address), the sign-in cookies, tokens and keys, this PC's player id, what was typed in the game and the
+name a sound device is named after (Windows names a Bluetooth headset as its owner's phone named it). The
 window says which of those it found; `about.txt` in the zip lists them with how often.
 
 ### Updates

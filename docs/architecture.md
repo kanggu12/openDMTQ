@@ -402,8 +402,8 @@ Three of the launcher's parts reach past its own pages:
 - **The report** (`report.py`; Help's Save a report, and `--report FILE`) puts the launcher's and the end of the
   player's logs, the settings, the displays, the sound devices, Windows, the graphics cards and the last connection
   test in one zip, with the Windows user's name, every site ID, every server's address and name (by their forms and
-  where the launcher writes them, whether the settings know them or not), sign-ins, tokens and this PC's player id
-  replaced by a word, and says what it left out.
+  where the launcher writes them, whether the settings know them or not), sign-ins, tokens, this PC's player id and
+  the name a sound device is named after replaced by a word, and says what it left out.
 - **My records and My page on the site** (`server.py`): the PLAY page's card asks `client.php?records` with the
   launcher's sign-in, and its button opens MY PAGE in the browser through a one-time link (`client.php?link`).
 

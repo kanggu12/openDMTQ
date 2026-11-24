@@ -484,6 +484,7 @@ TEXT = {
     "help.report.failed": ("The report was not saved.", "보고서를 저장하지 못했습니다."),
     # What a report leaves out (report.KINDS), in the list the dialog and --report say after it is made.
     "report.left.user": ("your Windows user name in paths", "경로 속 Windows 사용자 이름"),
+    "report.left.person": ("people's names in sound devices' names", "소리 장치 이름 속 사람 이름"),
     "report.left.account": ("your site ID", "사이트 아이디"),
     "report.left.server": ("the servers' addresses", "서버 주소"),
     "report.left.server_name": ("the servers' names", "서버 이름"),
