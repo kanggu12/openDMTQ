@@ -1273,6 +1273,18 @@ class AppStepTest(unittest.TestCase):
             self.assertNotIn("No Android app of the game yet", page)
             self.assertIn("The app above still works", page)
 
+    def test_an_app_ready_without_its_client_is_a_note_not_an_error(self):
+        # Players get the app; only building it again needs the game's Android app, which was taken away: said as a plain
+        # note, not in the red box of something wrong (ADM-244).
+        with HostInstall() as inst:
+            inst.app_for(HOST)
+            inst.sign_in()
+            page = inst.page(BASE + "/setup?step=app")
+            self.assertIn(f"The app for {HOST} is ready.", page)
+            said = re.search(r'<p class="flash ([a-z]+)" role="status">The app above still works', page)
+            self.assertIsNotNone(said, page)
+            self.assertEqual(said.group(1), "note")
+
     def test_with_the_app_ready_the_step_says_so_and_no_steps_of_how_to_play(self):
         # The step's state and its button; how players install the app and play is the docs' (install.md, play.md), not
         # a list on the page, with or without the code the build made (the Status page's Add a player card has that)

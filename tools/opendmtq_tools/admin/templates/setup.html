@@ -188,7 +188,9 @@
   {% if done.app %}<p class="setup-state"><span class="lamp on"></span>{{ t('setup.app_ready', host=public_host) }}</p>
   {# A failed build: players still get the app on offer when there is one; otherwise only why it failed. #}
   {% elif failed and has_apk %}<p class="setup-state"><span class="lamp bad"></span>{{ t('app.offer_failed', why=failed) if offer else t('setup.build_failed', why=failed) }}</p>{% endif %}
-  {% if done.app and not has_apk %}<p class="flash bad" role="status">{{ t('setup.no_apk_rebuild', url=url_for('setup_page', step='files')) if host_install else t('app.no_base') }}</p>{% endif %}
+  {# The app ready and its client gone: nothing is wrong now, only a new build waits for it (a plain note: red is for an app
+     nobody can get and nothing can build). #}
+  {% if done.app and not has_apk %}<p class="flash note" role="status">{{ t('setup.no_apk_rebuild', url=url_for('setup_page', step='files')) if host_install else t('app.no_base') }}</p>{% endif %}
   {# The builder adds the runtime for newer phones by itself: the owner hears of it only when it could not. #}
   {% if runtime %}<p class="setup-state"><span class="lamp on"></span>{{ t('setup.runtime_on') }}</p>
   {% elif runtime_failed %}<p class="flash bad" role="status">{{ t('setup.runtime_failed', why=runtime_failed) }}</p>{% endif %}
