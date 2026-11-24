@@ -591,7 +591,8 @@ function odq_game_save_fail_log(array $p)
  * equips. Stored on every row of the player (a transfer code can give a player two); an empty slot is stored as
  * NULL. Only the player's own items are equipped (player.php's odq_owned_items(): what everyone has but those taken from
  * them, and what they bought or were given); any other id leaves its slot empty, as the game's own lists never offer it.
- * The reply gives the four values back as they were kept: as sent, and null for one that was not the player's.
+ * The reply gives the four values back as they were kept: as sent, and null for one that was not the player's. Taken only
+ * from the player's own game (signin.php).
  */
 function odq_game_set_slots(array $p)
 {

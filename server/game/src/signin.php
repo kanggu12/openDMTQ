@@ -7,9 +7,9 @@
  * as its SHA-256 and the player), so that a signature tells which player's game made a request:
  *
  *   - the game's login takes only an access token the platform's login handed out for the account it names;
- *   - a request with a call that spends or earns a player's currency, or any other the signature has always guarded (a
- *     chart's start, a save, the shop: odq_signed_call()), is taken only signed with the key of a sign-in of the very
- *     player that call names;
+ *   - a request with a call that spends or earns a player's currency, or changes what the player has or shows (a chart's
+ *     start, a save, the shop, the items equipped, the name, the transfer code's two calls: odq_signed_call()), is taken
+ *     only signed with the key of a sign-in of the very player that call names;
  *   - a save earns MAX POINT and experience only for the play its sign-in started last (game.getPreviewPlayInfo's
  *     game_token, which the save sends back), and only once.
  *
@@ -123,13 +123,20 @@ function odq_sign_in_key(string $access, int $guid): ?string
     return @$w->execute() ? $key : null;
 }
 
+// The calls of a player's that the game's signature guards besides the shop's and the saves': a chart's start, which takes
+// its price; the items the player equips; the transfer code's two calls, the one that shows the player's code and the one
+// that moves the phone's account onto a code's player; the name the player picks.
+const OPENDMTQ_SIGNED_CALLS = ['game.getpreviewplayinfo', 'game.setslotitem', 'user.getconnectuuid', 'user.setconnectuuid', 'user.setnickname'];
+
 /*
- * The calls the game's signature guards (a request with one of them is refused whole without it, rpc.php): a chart's start,
- * which takes its price; a save and its log; every call of the shop. Each names its player first.
+ * The calls the game's signature guards (a request with one of them is refused whole without it, rpc.php): a chart's start;
+ * a save and its log; every call of the shop; the items equipped; the transfer code's calls; the player's name. Each names
+ * its player first, and is taken only signed with the key of a sign-in of that player (the game signs every request after
+ * its login).
  */
 function odq_signed_call(string $method): bool
 {
-    return $method === 'game.getpreviewplayinfo' || strpos($method, 'game.saveplayresult') === 0 || strpos($method, 'shop.') === 0;
+    return in_array($method, OPENDMTQ_SIGNED_CALLS, true) || strpos($method, 'game.saveplayresult') === 0 || strpos($method, 'shop.') === 0;
 }
 
 /* The sign-in that signed this request, ['access', 'guid'], when one did (odq_signed_by_own_game() found it); else null. */

@@ -8,6 +8,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/game.php';
 require_once __DIR__ . '/signin.php';
+require_once __DIR__ . '/account.php';
 
 /*
  * user.loginV2 [accessToken, nickName, profileImg, version, os, area]: the game's own login, right after the
@@ -65,13 +66,40 @@ function odq_user_login(array $p)
     ];
 }
 
-/* user.getConnectUuid [guid, os]: the player's transfer code, to type on another phone (OPTION, CONNECT ACCOUNT). */
+/*
+ * user.getConnectUuid [guid, os]: the player's transfer code, to type on another phone (OPTION, CONNECT ACCOUNT). Taken
+ * only from the player's own game (signin.php). A code made from the account's number (a database restored from a backup
+ * of before, until the next start replaces it: account.php) is never handed out: the account gets a random one in its
+ * place first.
+ */
 function odq_user_transfer_code(array $p)
 {
     $member = odq_member_by('guid', $p[0] ?? null);
     $code = $member ? (string)$member['code'] : '';
     if ($code === '' || $code === '0') {
         return odq_no_account();
+    }
+    if (odq_code_from_number($code, $member)) {
+        $db = odq_db();
+        $new = odq_new_code($db);
+        // On the very row it was read from, and only while it still holds that code (another request may have replaced it).
+        $w = @$db->prepare('UPDATE Member SET code = :new WHERE rowid = (SELECT rowid FROM Member WHERE guid = :g AND code = :old ORDER BY rowid LIMIT 1)');
+        if ($w) {
+            $w->bindValue(':new', $new, SQLITE3_TEXT);
+            $w->bindValue(':g', $member['guid'], SQLITE3_TEXT);
+            $w->bindValue(':old', $code, SQLITE3_TEXT);
+        }
+        if (!$w || !@$w->execute()) {
+            // Not kept (the disk full): the code the game offers to retry, never the old one.
+            error_log('opendmtq: getConnectUuid: ' . $db->lastErrorMsg());
+            return odq_error('SVC.05099', 'OpenDMTQ: the transfer code could not be kept; try again');
+        }
+        // The code the account holds now: this one, or the one another request wrote first.
+        $member = odq_member_by('guid', $p[0] ?? null);
+        $code = $member ? (string)$member['code'] : '';
+        if ($code === '' || odq_code_from_number($code, $member)) {
+            return odq_no_account();
+        }
     }
     return ['status' => 'SUCCESS', 'code' => 200, 'uuid' => $code, 'result_msg' => 'OK'];
 }
@@ -88,7 +116,8 @@ function odq_user_by_puid(array $p)
     return [[odq_text($field) => $member ? $member['nickname'] : ' ']];
 }
 
-/* user.setNickname [guid, nickName]: the name the player picks; on every row of the player. */
+/* user.setNickname [guid, nickName]: the name the player picks; on every row of the player. Taken only from the player's
+   own game (signin.php). */
 function odq_user_set_nickname(array $p)
 {
     $q = @odq_db()->prepare('UPDATE Member SET nickname = :n WHERE guid = :g');
@@ -101,15 +130,21 @@ function odq_user_set_nickname(array $p)
 }
 
 /*
- * user.setConnectUuid [guid, code, os]: a transfer code typed on this phone (OPTION, RESTORE DATA): the phone's
- * player becomes the code's player. Every row of the phone's guid then points at that player, so the phone's
- * next login plays as them.
+ * user.setConnectUuid [guid, code, os]: a transfer code typed on this phone (OPTION, the transfer code's input): the
+ * phone's player becomes the code's player. Every row of the phone's guid then points at that player, so the phone's next
+ * login, after the restart the game makes at once, plays as them. Taken only from the phone's own game, for its own player
+ * (signin.php), and only with a code the code's owner was shown: never one made from that account's number (account.php),
+ * which anyone could work out.
  */
 function odq_user_use_transfer_code(array $p)
 {
+    // A phone's own player: a call that names nobody moves nobody.
+    if (odq_intval($p[0] ?? null) <= 0) {
+        return odq_no_account();
+    }
     $owner = odq_member_by('code', $p[1] ?? null);
     $found = $owner ? (string)$owner['guid'] : '';
-    if ($found === '' || $found === '0') {
+    if ($found === '' || $found === '0' || odq_code_from_number($owner['code'], $owner)) {
         return odq_no_account();
     }
     $q = @odq_db()->prepare('UPDATE Member SET guid = :found WHERE guid = :g');

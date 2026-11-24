@@ -13,7 +13,10 @@
  *   - the game's login takes only an access token the platform's login handed out, and gives each sign-in a key of its own;
  *   - a chart's start, which takes its price, and a save are taken only signed with the key of that very player's sign-in:
  *     not unsigned, not with the key every player once had, not with another player's;
- *   - a save earns MAX POINT and experience once for the play its sign-in started, and nothing without one.
+ *   - a save earns MAX POINT and experience once for the play its sign-in started, and nothing without one;
+ *   - the transfer code's two calls, the name and the items equipped are the player's own game's alone; a transfer code is
+ *     random, never one made from the player's number (such a code is replaced at a start, and never shown or taken), and
+ *     moves a phone onto the player.
  *
  * Usage: php tests/game/trust.php <database file> <base address of the server>      (exit status 0 when every check passed)
  */
@@ -249,5 +252,122 @@ $db->exec("DELETE FROM Member WHERE guid = '9407'");
 check('GAME-105 the save of a player deleted while their game was in is handled without a popup (SVC.05008) and kept nowhere',
     $status === 200 && ($gone['error']['code'] ?? null) === 'SVC.05008' && (int)$db->querySingle('SELECT COUNT(*) FROM Play WHERE user_id = 9407') === 0,
     json_encode([$status, $gone]));
+
+// ------------------------------------------------------------------ GAME-140: the transfer code, the name and the items are the player's own game's
+
+/* The calls of one request with no signature at all, as anyone who reaches the address can send them: [status, replies]. */
+function unsigned(string $base, array $calls): array
+{
+    $list = [];
+    foreach ($calls as $i => [$method, $params]) {
+        $list[] = ['id' => $i, 'method' => $method, 'params' => $params];
+    }
+    [$status, $raw] = post("$base/DMQ/rpc", json_encode($list), ['Content-Type: application/json']);
+    return [$status, json_decode($raw, true) ?: []];
+}
+
+/* What the database has of a player's account, by their first row: "name/code/slots" (each slot's item or null). */
+function account(SQLite3 $db, int $guid): string
+{
+    return (string)$db->querySingle("SELECT nickname || '/' || coalesce(code, 'null') || '/' || coalesce(slot_item1, 'null') || ','
+        || coalesce(slot_item2, 'null') FROM Member WHERE guid = '$guid' ORDER BY rowid LIMIT 1");
+}
+
+/* A transfer code made from a number, as servers before 0.11.3 made every code: the last ten hex digits of MD5("CODE_" . n). */
+function code_of_number(int $number, string $prefix = 'CODE_'): string
+{
+    return substr(md5($prefix . $number), -10);
+}
+
+// Ivy and Jon: two phones of their own, new accounts as the platform's login makes them, each signed in as the game does.
+[$ivy, $ivy_key] = sign_in($base, 'trust-ivy');
+[$jon, $jon_key] = sign_in($base, 'trust-jon');
+$db->exec("UPDATE Member SET nickname = 'Ivy', slot_item1 = 30001 WHERE guid = '$ivy'");
+$db->exec("UPDATE Member SET nickname = 'Jon' WHERE guid = '$jon'");
+$ivy_before = account($db, $ivy);
+$jon_code = (string)$db->querySingle("SELECT code FROM Member WHERE guid = '$jon'");
+// Each of the four calls naming Ivy, sent by someone other than Ivy's game: unsigned, and signed with Jon's own key.
+$others = [
+    'user.getConnectUuid' => [$ivy, 'ANDROID'],
+    'user.setNickname' => [$ivy, 'renamed-by-anyone'],
+    'game.setSlotItem' => [$ivy, 30002, 0, 0, 0],
+    'user.setConnectUuid' => [$ivy, $jon_code, 'ANDROID'],
+];
+foreach ($others as $method => $params) {
+    [$open, $open_reply] = unsigned($base, [[$method, $params]]);
+    [$jons, $jons_reply] = batch($base, $jon_key, [[$method, $params]]);
+    check("GAME-140 $method naming another player is refused whole, unsigned and signed with one's own key: nothing shown, nothing changed",
+        $open === 403 && $open_reply === [] && $jons === 403 && $jons_reply === [] && account($db, $ivy) === $ivy_before,
+        json_encode([$open, $open_reply, $jons, $jons_reply, account($db, $ivy), $ivy_before]));
+}
+// Ivy's own game: her code shown, her name and her items changed.
+$shown = call($base, $ivy_key, 'user.getConnectUuid', [$ivy, 'ANDROID'])['result']['uuid'] ?? null;
+$named = call($base, $ivy_key, 'user.setNickname', [$ivy, 'Ivy2'])['result'] ?? null;
+$slots = call($base, $ivy_key, 'game.setSlotItem', [$ivy, 30002, 0, 0, 0])['result']['slot_item1'] ?? null;
+check("GAME-140 the player's own game is shown the code, picks the name and equips the items",
+    $shown === explode('/', $ivy_before)[1] && $named === true && $slots === 30002 && account($db, $ivy) === "Ivy2/$shown/30002,null",
+    json_encode([$shown, $named, $slots, account($db, $ivy)]));
+
+// ------------------------------------------------------------------ GAME-141: a transfer code is random, never made from the number
+
+// A third new account, through the old SDK's path too (whose codes once lacked the underscore).
+[, $raw] = post("$base/accounts/v3/global/login_dmq", 'app_id=576&udid=trust-old-path&device_cd=IPHONE', ['Content-Type: application/x-www-form-urlencoded']);
+$old_path = (int)explode('|', (string)(json_decode($raw, true)['value']['access_token'] ?? ''))[0];
+$codes = [];
+foreach ([$ivy, $jon, $old_path] as $guid) {
+    $codes[$guid] = (string)$db->querySingle("SELECT code FROM Member WHERE guid = '$guid'");
+}
+$made = array_filter($codes, fn($code, $guid) => in_array($code, [code_of_number($guid), code_of_number($guid, 'CODE')], true), ARRAY_FILTER_USE_BOTH);
+check('GAME-141 a new account\'s transfer code is ten lowercase hex digits of its own, none made from its number (both logins\' paths)',
+    $old_path > 0 && count(array_unique($codes)) === 3 && !$made && count(array_filter($codes, fn($c) => preg_match('/^[0-9a-f]{10}$/', $c) === 1)) === 3,
+    json_encode([$codes, array_keys($made)]));
+
+// ------------------------------------------------------------------ GAME-142: the account move, by the player's own games
+
+// Ivy's old phone shows her code; Kim's new phone (a new account) types it: Kim's phone becomes Ivy at its next sign-in.
+[$kim, $kim_key] = sign_in($base, 'trust-kim');
+$moved = call($base, $kim_key, 'user.setConnectUuid', [$kim, $shown, 'ANDROID']);
+[$now, $now_key] = sign_in($base, 'trust-kim');
+$asset = call($base, $now_key, 'game.getUserAsset', [$ivy])['result'] ?? [];
+check("GAME-142 a new phone's own game types the code its owner was shown, and at its next sign-in it is that player, signing as them",
+    ($moved['result']['status'] ?? null) === 'SUCCESS' && $now === $ivy && $now_key !== '' && array_key_exists('mpoint', $asset),
+    json_encode([$moved, $now, $asset]));
+// Jon, with a code worked out from Ivy's number as every code once was, signed with his own key: no move.
+$tried = [];
+foreach ([code_of_number($ivy), code_of_number($ivy, 'CODE')] as $guess) {
+    $tried[] = call($base, $jon_key, 'user.setConnectUuid', [$jon, $guess, 'ANDROID'])['error']['code'] ?? 'taken';
+}
+[$jon_now] = sign_in($base, 'trust-jon');
+check('GAME-142 a code worked out from a player\'s number is no code: refused (SVC.05001), and the phone stays its own player',
+    $tried === ['SVC.05001', 'SVC.05001'] && $jon_now === $jon, json_encode([$tried, $jon_now]));
+
+// ------------------------------------------------------------------ GAME-143: codes made from numbers, replaced at a start and never taken
+
+// Three accounts as a database of an earlier server has them: two codes made from the number (with and without the
+// underscore), one of another form. Lee and Mae sign in as the game does.
+[$lee, $lee_key] = sign_in($base, 'trust-lee');
+[$mae] = sign_in($base, 'trust-mae');
+[$ned] = sign_in($base, 'trust-ned');
+$db->exec("UPDATE Member SET code = '" . code_of_number($lee) . "' WHERE guid = '$lee'");
+$db->exec("UPDATE Member SET code = '" . code_of_number($mae, 'CODE') . "' WHERE guid = '$mae'");
+$db->exec("UPDATE Member SET code = 'nedscode01' WHERE guid = '$ned'");
+// Before any start: Lee's own game is shown a new random code, never the one made from the number; Mae's is taken by nobody.
+$lee_shown = call($base, $lee_key, 'user.getConnectUuid', [$lee, 'ANDROID'])['result']['uuid'] ?? null;
+$mae_taken = call($base, $kim_key, 'user.setConnectUuid', [$kim, code_of_number($mae, 'CODE'), 'ANDROID'])['error']['code'] ?? 'taken';
+check('GAME-143 before a start, the player\'s own game is shown a random code in place of one made from the number, and nobody can type such a code',
+    is_string($lee_shown) && preg_match('/^[0-9a-f]{10}$/', $lee_shown) === 1 && $lee_shown !== code_of_number($lee)
+    && (string)$db->querySingle("SELECT code FROM Member WHERE guid = '$lee'") === $lee_shown && $mae_taken === 'SVC.05001',
+    json_encode([$lee_shown, $mae_taken]));
+// The next start of the server (its start step, as at every start): each code made from a number replaced, the other kept.
+$db->exec("UPDATE Member SET code = '" . code_of_number($lee) . "' WHERE guid = '$lee'");
+exec('php ' . escapeshellarg("$app/game/bin/setup-db.php") . ' ' . escapeshellarg($path) . ' 2>&1', $said, $code);
+$after = [];
+foreach ([$lee, $mae, $ned] as $guid) {
+    $after[$guid] = (string)$db->querySingle("SELECT code FROM Member WHERE guid = '$guid'");
+}
+check('GAME-143 a start gives each account whose code was made from its number a random one, says how many, and keeps any other code',
+    $code === 0 && preg_match('/^[0-9a-f]{10}$/', $after[$lee]) === 1 && $after[$lee] !== code_of_number($lee)
+    && preg_match('/^[0-9a-f]{10}$/', $after[$mae]) === 1 && $after[$mae] !== code_of_number($mae, 'CODE') && $after[$ned] === 'nedscode01'
+    && (bool)preg_grep('/new random transfer code/', $said), json_encode([$code, $after, $said]));
 
 exit($failures ? 1 : 0);

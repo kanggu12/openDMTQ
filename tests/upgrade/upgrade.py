@@ -123,10 +123,18 @@ def reads(guid, puid):
     return {method: call(method, params) for method, params in asked}
 
 
-def same_reads(old, new):
-    """Whether a phone reads what it read before: every reply the same, but for the one change 0.11.0 makes on purpose.
+def made_from_number(code, guid):
+    """Whether a transfer code is one made from the player's number, as releases before 0.11.3 made every code (the last
+    ten hex digits of an MD5 of "CODE_", or "CODE" on the old login's path, and the number)."""
+    return code in (hashlib.md5(f"{prefix}{guid}".encode()).hexdigest()[-10:] for prefix in ("CODE_", "CODE"))
+
+
+def same_reads(old, new, guid):
+    """Whether player guid's phone reads what it read before: every reply the same, but for the changes made on purpose.
     The server keeps each player's experience since 0.11.0, and a player of before starts at their level's own by the
-    game's table, where 0.10.0 said 0 with level 99: the level the same, the experience that level's or more."""
+    game's table, where 0.10.0 said 0 with level 99: the level the same, the experience that level's or more. A transfer
+    code made from the player's number (anyone could work it out) is replaced at the first start of 0.11.3 by a random one:
+    ten lowercase hex digits, not made from the number; any other code stays as it was."""
     if old.keys() != new.keys():
         return False
     for method in old:
@@ -134,6 +142,11 @@ def same_reads(old, new):
         if method == "game.getUserAsset" and isinstance(a, dict) and isinstance(b, dict):
             rest = lambda reply: {k: v for k, v in reply.items() if k != "exp"}
             if rest(a) != rest(b) or int(b.get("exp") or 0) < int(a.get("exp") or 0):
+                return False
+        elif method == "user.getConnectUuid" and isinstance(a, dict) and isinstance(b, dict) and made_from_number(a.get("uuid"), guid):
+            rest = lambda reply: {k: v for k, v in reply.items() if k != "uuid"}
+            code = str(b.get("uuid") or "")
+            if rest(a) != rest(b) or not re.fullmatch(r"[0-9a-f]{10}", code) or made_from_number(code, guid):
                 return False
         elif a != b:
             return False
@@ -393,7 +406,7 @@ def after():
     check("a phone is the player it was", phone("upgrade-phone-1") == (guid, puid) and phone("upgrade-phone-2")[0] == other)
     for who, old in sorted(kept["reads"].items()):
         new = reads(int(who), puid if int(who) == guid else kept["other_puid"])
-        check(f"player {who} reads the same records, achievements, items, transfer code, name and rankings", same_reads(old, new), changed(old, new))
+        check(f"player {who} reads the same records, achievements, items, transfer code, name and rankings", same_reads(old, new, int(who)), changed(old, new))
 
     # The owner's side: the same password opens the pages, and they show what was there.
     admin = owner()
@@ -457,7 +470,7 @@ def after():
     well = health()
     check("after it the server is well, with the two players of the backup", well.get("ok") is True and well.get("players") == 2, well)
     old, new = kept["reads"][str(guid)], reads(guid, puid)
-    check("the player's records are those of the backup", same_reads(old, new), changed(old, new))
+    check("the player's records are those of the backup", same_reads(old, new, guid), changed(old, new))
     check("broadcasts are still on, and the switch flipped since stays as it is today", state("upgrade-phone-1")["on"] is True
           and state("upgrade-phone-2")["on"] is True and broadcasts(admin) is True)
     check("the token made before still works after the restore", api(token, "/players")[0] == 200)

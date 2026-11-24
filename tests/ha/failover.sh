@@ -29,6 +29,9 @@ trap cleanup EXIT
 
 # One JSON-RPC call through the router; prints the reply body.
 rpc() { curl -s -m 5 -X POST "$URL/DMQ/rpc" -H 'Content-Type: application/json' -d "$1"; }
+# The same, signed as the game signs every request after its login (Fp: MD5 of the key its login gave, then the body):
+# a call that changes a player's own things (their name) is taken only from that player's game. $1 the key, $2 the body.
+signed_rpc() { curl -s -m 5 -X POST "$URL/DMQ/rpc" -H 'Content-Type: application/json' -H "Fp: $(printf '%s%s' "$1" "$2" | md5sum | cut -d' ' -f1)" -d "$2"; }
 # Value of a JSON path from stdin, e.g. jget '[0]["result"]["guid"]'.
 jget() { python3 -I -c "import json,sys; print(json.load(sys.stdin)$1)"; }
 # True once the game server (the api) knows the marker player by name. Through the game's own request: the site's pages
@@ -90,8 +93,11 @@ wait_recovered() {
 
 echo "== write a player through the router"
 TOKEN=$(curl -s -m 5 -X POST "$URL/api/accounts/v3/global/login_dmq" -d "udid=$MARK" | jget '["value"]["access_token"]')
-GUID=$(rpc "[{\"id\":1,\"method\":\"user.loginV2\",\"params\":[\"$TOKEN\",\" \",\"\",\"1.3.5\",\"ANDROID\",\"KR\"]}]" | jget '[0]["result"]["guid"]')
-rpc "[{\"id\":2,\"method\":\"user.setNickname\",\"params\":[$GUID,\"$MARK\"]}]" > /dev/null
+LOGIN=$(rpc "[{\"id\":1,\"method\":\"user.loginV2\",\"params\":[\"$TOKEN\",\" \",\"\",\"1.3.5\",\"ANDROID\",\"KR\"]}]")
+GUID=$(jget '[0]["result"]["guid"]' <<< "$LOGIN")
+# The key the game's login gave this sign-in, which its game signs with from then on.
+KEY=$(jget '[0]["result"]["SECRET_KEY"]' <<< "$LOGIN")
+signed_rpc "$KEY" "[{\"id\":2,\"method\":\"user.setNickname\",\"params\":[$GUID,\"$MARK\"]}]" > /dev/null
 has_marker || { echo "player $MARK not visible after writing it"; exit 1; }
 set_settings "$(api_pod)"
 has_settings "$(api_pod)" || { echo "the broadcast settings not readable after writing them"; exit 1; }

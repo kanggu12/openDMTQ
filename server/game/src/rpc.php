@@ -95,10 +95,12 @@ const ODQ_MAX_CALLS = 64;
 
 /*
  * The game signs each request: an Fp header with md5(secret key + body), the key being the one its login reply gave it,
- * a key of that sign-in's own (signin.php). It is checked for what spends or earns a player's currency or cannot be undone
- * by a look at the rankings: a chart's start, saving a play and the shop, each taken only signed with the key of a sign-in
- * of the player it names. That stops anything that merely posts to the address and anyone without that player's sign-in,
- * and it leaves health checks and other reads open. One such call makes the whole batch need the signature.
+ * a key of that sign-in's own (signin.php). It is checked for what spends or earns a player's currency, changes what the
+ * player has or shows, or cannot be undone by a look at the rankings: a chart's start, saving a play, the shop, the items
+ * equipped, the player's name and the transfer code's two calls (which show the code that moves the player to another
+ * phone, and move a phone's account onto a code's player), each taken only signed with the key of a sign-in of the player
+ * it names. That stops anything that merely posts to the address and anyone without that player's sign-in, and it leaves
+ * health checks and other reads open. One such call makes the whole batch need the signature.
  */
 function odq_signature_ok(string $body, $calls): bool
 {

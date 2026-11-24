@@ -274,6 +274,16 @@ if (!odq_sign_in_table($db)) {
     fwrite(STDERR, "opendmtq: cannot add the game's sign-ins to the database: " . $db->lastErrorMsg() . "\n");
     exit(1);
 }
+require_once __DIR__ . '/../src/account.php';
+// Transfer codes made from a player's number, as earlier servers made every code (anyone who knows the number, which the
+// rankings show, works it out): each gets a random one in its place. The new code shows in the game's OPTION.
+$replaced = odq_replace_number_codes($db);
+if ($replaced > 0) {
+    echo "opendmtq: gave $replaced account(s) a new random transfer code in place of one made from the player's number\n";
+} elseif ($replaced < 0) {
+    // Not replaced now (the database busy past the wait): the transfer code's calls take and show none of them meanwhile.
+    fwrite(STDERR, "opendmtq: could not replace the transfer codes made from players' numbers: " . $db->lastErrorMsg() . "\n");
+}
 // The accounts of the site, made on the Accounts page of the admin pages and checked by the site's sign-in:
 // every page of it is behind that. The same statement as ACCOUNT_TABLE there (which also adds guid).
 $db->exec("CREATE TABLE IF NOT EXISTS SiteUser (name TEXT PRIMARY KEY COLLATE NOCASE, pass TEXT NOT NULL,

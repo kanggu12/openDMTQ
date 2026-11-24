@@ -8,6 +8,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/signin.php';
+require_once __DIR__ . '/account.php';
 
 /* The SDK's plain success. */
 const OPENDMTQ_API_OK = ['value' => true, 'result_code' => '000', 'result_msg' => 'API_OK'];
@@ -40,11 +41,12 @@ function odq_raw_form(string $body): array
 /*
  * POST /api/accounts/v3/global/login_dmq (the Android SDK) and /accounts/v3/global/login_dmq (the old iOS SDK and
  * ./opendmtq check): the platform login. The phone's device id (udid) is its account: a new one gets a new
- * account, in one transaction so that two phones starting together never share one. The reply's access token
- * carries the account's puid, which the game's own login (user.loginV2) then reads; it is noted with the account in the
- * same transaction (signin.php), and the game's login takes no token the platform login did not hand out.
+ * account, with a random transfer code (account.php), in one transaction so that two phones starting together never share
+ * one. The reply's access token carries the account's puid, which the game's own login (user.loginV2) then reads; it is
+ * noted with the account in the same transaction (signin.php), and the game's login takes no token the platform login did
+ * not hand out.
  *
- * $old: the /accounts path, whose transfer codes and reply text differ slightly, as they always have.
+ * $old: the /accounts path, whose reply text differs slightly, as it always has.
  */
 function odq_platform_login(string $body, bool $old): void
 {
@@ -74,8 +76,8 @@ function odq_platform_login(string $body, bool $old): void
             $w->bindValue(':id', $id, SQLITE3_INTEGER);
             $w->bindValue(':p', (string)$id, SQLITE3_TEXT);
             $w->bindValue(':u', $udid, SQLITE3_TEXT);
-            // The transfer code (user.getConnectUuid); the old path's never had the underscore.
-            $w->bindValue(':c', substr(md5(($old ? 'CODE' : 'CODE_') . $id), -10), SQLITE3_TEXT);
+            // The transfer code (user.getConnectUuid): random, of the form codes have always had.
+            $w->bindValue(':c', odq_new_code($db), SQLITE3_TEXT);
             if (!$w->execute()) {
                 throw new RuntimeException($db->lastErrorMsg());
             }
