@@ -973,6 +973,42 @@ async function pressAndConfirm(page, selector) {
   await settle(page, () => page.click('#ask [value=yes]'));
 }
 
+// A row's More opened as a person opens it: brought to the middle of the screen as one scrolls to the row, then pressed by
+// the pointer, tapped on a phone's screen, or with the keyboard's place on it, Enter. What the row does less often waits in
+// its panel, closed until then (the Players page's and the Accounts page's rows): a press of a button in a closed panel
+// presses nothing. The panel's selector comes back, open on the page's top layer and laid out, its drop-in done.
+async function openRowMore(page, more, how = 'pointer') {
+  const summary = `${more} > summary`;
+  await page.$eval(summary, s => s.scrollIntoView({ block: 'center' }));
+  if (how === 'keyboard') {
+    // The keyboard's place on More, as Tab brings it there, and Enter, which opens a disclosure.
+    await page.focus(summary);
+    await page.keyboard.press('Enter');
+  } else if (how === 'tap') {
+    await page.tap(summary);
+  } else {
+    await page.click(summary);
+  }
+  // Open, its panel floated with a size of its own (admin.js shows it when the details opens), and still: its drop-in
+  // moves it for a moment, and a press or a measure in that moment lands short of where it ends.
+  await page.waitForFunction(m => {
+    const d = document.querySelector(m), box = d && d.querySelector('.row-more-in');
+    return !!box && d.open && box.getBoundingClientRect().height > 0 && box.getAnimations().every(a => a.playState !== 'running');
+  }, { timeout: 5000, polling: 50 }, more);
+  return `${more}[open] > .row-more-in`;
+}
+
+// The keyboard's place moved on with Tab as a person moves it, until it is on what the selector names, at most `most`
+// presses: whether it got there.
+async function tabTo(page, selector, most = 8) {
+  for (let i = 0; i < most; i++) {
+    await page.keyboard.press('Tab');
+    // Where the keyboard is now, against what it should reach.
+    if (await page.evaluate(s => !!document.activeElement && document.activeElement.matches(s), selector)) return true;
+  }
+  return false;
+}
+
 // A floating layer (a row's menu, a tooltip, a question) whole and on top: points over all of it, five by five just
 // inside its edges, each in the window and each hitting the layer itself (elementFromPoint), not a card drawn over it or
 // the page behind a part cut off. A layer the pointer passes through (a tooltip) takes the pointer for the measurement.
@@ -1510,16 +1546,25 @@ async function inPlace(contexts) {
   // What new players start with and the quality, saved in place.
   const saved = await sameWay(page, () => page.click('#broadcasts form:has(input[name=action][value=settings]) button'), () => !!document.querySelector('.flash.float'));
   check("the Broadcasts page's settings are saved in place", saved.ok, saved.detail);
-  // The Accounts page: an account switched off and on again.
+  // The Accounts page: an account switched off and on again from its row's More, by the keyboard alone, as a person
+  // without a mouse does it: More reached and opened with Enter, Tab to the switch in its panel, Enter.
   await page.goto(`${A}/accounts`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('tr:has(input[value="manager"]) .account-state');
-  const stateText = () => document.querySelector('tr:has(input[value="manager"]) .account-state').textContent.trim();
-  const acc = await page.evaluate(stateText);
-  const accOff = await sameWay(page, () => page.click('tr:has(td.primary) form:has(input[value=off]):has(input[value="manager"]) button'),
-    w => { const c = document.querySelector('tr:has(input[value="manager"]) .account-state'); return !!c && c.textContent.trim() !== w; }, acc);
-  const acc2 = await page.evaluate(stateText);
-  const accOn = await sameWay(page, () => page.click('tr:has(td.primary) form:has(input[value=on]):has(input[value="manager"]) button'),
-    w => { const c = document.querySelector('tr:has(input[value="manager"]) .account-state'); return !!c && c.textContent.trim() !== w; }, acc2);
+  const manager = 'table.accounts tr:has(input[name=name][value="manager"])';
+  await page.waitForSelector(`${manager} .account-state`);
+  const stateText = row => document.querySelector(`${row} .account-state`).textContent.trim();
+  // The state's words changed from what they were.
+  const flipped = ([row, was]) => { const c = document.querySelector(`${row} .account-state`); return !!c && c.textContent.trim() !== was; };
+  // More opened with Enter, the keyboard taken on to the switch in the panel (Disable or Enable, as the account is), Enter.
+  const switchByKeys = async () => {
+    const panel = await openRowMore(page, `${manager} .row-more`, 'keyboard');
+    const reached = await tabTo(page, `${panel} form:has(input[name=action][value=off]) button, ${panel} form:has(input[name=action][value=on]) button`);
+    if (!reached) throw new Error("Tab did not reach the switch in the account's More");
+    await page.keyboard.press('Enter');
+  };
+  const acc = await page.evaluate(stateText, manager);
+  const accOff = await sameWay(page, switchByKeys, flipped, [manager, acc]);
+  const acc2 = await page.evaluate(stateText, manager);
+  const accOn = await sameWay(page, switchByKeys, flipped, [manager, acc2]);
   check('an account is switched off and on again in place', accOff.ok && accOn.ok, `${accOff.detail} | ${accOn.detail}`);
   // The Songs page: a song hidden and shown again.
   await page.goto(`${A}/songs`, { waitUntil: 'domcontentloaded' });
@@ -2739,7 +2784,9 @@ async function adminFlows(contexts) {
   check('the new account signs in to the site', new URL(friend.url()).pathname === '/opendmtq/' && await visible(friend, '.stage'), friend.url());
   await page.goto(`${A}/accounts`, { waitUntil: 'domcontentloaded' });
   check('the password is not shown again', !(await page.$('.account-keys')));
-  await press(page, 'tr:has(td.primary) form:has(input[value=off]):has(input[value="friend1"]) button');
+  // Switched off from its row's More, opened by the pointer as the owner opens it, then Disable in its panel.
+  const friendPanel = await openRowMore(page, 'table.accounts tr:has(input[name=name][value="friend1"]) .row-more', 'pointer');
+  await press(page, `${friendPanel} form:has(input[name=action][value=off]) button`);
   await friend.goto(`${P}/ranking.php`, { waitUntil: 'domcontentloaded' });
   check('switched off, the account is signed out', new URL(friend.url()).pathname === '/opendmtq/login.php', friend.url());
   await theirs.close();
@@ -2770,9 +2817,10 @@ async function adminFlows(contexts) {
     await press(p, '#tokens form button');
     const token = await panelAt(p);
     const withToken = await primaries(p);
-    const row = 'table.accounts form:has(input[name=action][value=password]):has(input[name=name][value="inview"]) button';
-    await p.$eval(row, e => e.scrollIntoView({ block: 'center' }));
-    await pressAndConfirm(p, row);
+    // The account's New password, in its row's More: More brought to the screen's middle and pressed as the screen is
+    // used, tapped on the phone, the pointer on the laptop; then New password in the panel, and Continue.
+    const inview = await openRowMore(p, 'table.accounts tr:has(input[name=name][value="inview"]) .row-more', width < 500 ? 'tap' : 'pointer');
+    await pressAndConfirm(p, `${inview} form:has(input[name=action][value=password]) button`);
     const password = await panelAt(p);
     const withPassword = await primaries(p);
     // The setup's Players step, before and after it makes an account.
@@ -2799,22 +2847,37 @@ async function adminFlows(contexts) {
   check("one primary button on the Accounts page and the setup's Players step, with what shows once or without", notOne.length === 0,
     notOne.join('; '));
 
-  // The accounts' buttons stand in the same columns in every row: a button whose word depends on the account (Disable or
-  // Enable, Give or Remove admin rights) is as wide as its other word too. Now with an admin, a player and a switched-off
-  // account, at the narrowest tablet, a tablet on its side, both sides of the width where the buttons leave the row,
-  // and a laptop, in both languages; the layout measured at each, where the player's list showed "Not linked" cut.
+  // The accounts' buttons stand in the same places in every row's More: a button whose word depends on the account
+  // (Disable or Enable, Give or Remove admin rights) is as wide as its other word too. Now with an admin, a player and a
+  // switched-off account, at the narrowest tablet, a tablet on its side, both sides of the width where More leaves the
+  // row for a line under it, and a laptop, in both languages; the layout measured at each, where the player's list showed
+  // "Not linked" cut. Each row's More opened by the pointer and read with its panel open, where the owner sees the
+  // buttons (with every More closed they stand nowhere anyone sees, and read alike whatever the panel does).
   const ragged = [];
   for (const lang of ['ko', 'en']) {
     await page.goto(`${A}/lang?to=${lang}&next=%2Fopendmtq%2Fadmin%2Faccounts`, { waitUntil: 'domcontentloaded' });
     for (const w of [744, 1024, 1240, 1241, 1280]) {
       await page.setViewport({ width: w, height: 900 });
-      // Each row's buttons by their left edges: one set of edges for every row, or the columns are ragged.
-      const lefts = await page.$$eval('table.accounts tbody tr', rows => rows.map(r => [...r.querySelectorAll('.btns .btn')].map(b => Math.round(b.getBoundingClientRect().left)).join('/')));
-      if (new Set(lefts).size > 1) ragged.push(`${lang} ${w}: ${lefts.join(' ')}`);
       await noFindings(page, `the accounts at ${w} px, ${lang}`);
+      // Each row's panel: its buttons' places and sizes against the panel's own corner, one layout for every row.
+      const layouts = [];
+      const rows = await page.$$eval('table.accounts tbody tr .row-more', all => all.length);
+      for (let i = 1; i <= rows; i++) {
+        const panel = await openRowMore(page, `table.accounts tbody tr:nth-child(${i}) .row-more`, 'pointer');
+        layouts.push(await page.$eval(panel, box => {
+          const at = box.getBoundingClientRect();
+          return [...box.querySelectorAll('.btn')].map(b => {
+            const r = b.getBoundingClientRect();
+            return [r.left - at.left, r.top - at.top, r.width, r.height].map(Math.round).join(',');
+          }).join('/');
+        }));
+        // Closed again, as the owner closes it, before the next row's.
+        await page.keyboard.press('Escape');
+      }
+      if (layouts.length === 0 || new Set(layouts).size > 1) ragged.push(`${lang} ${w}: ${layouts.join(' ') || 'no More'}`);
     }
   }
-  check('the buttons of every account stand in the same columns', ragged.length === 0, ragged.join('; '));
+  check("every account's More opens its buttons in the same places", ragged.length === 0, ragged.join('; '));
   // Back to the width and the language the rest of these steps expect.
   await page.setViewport({ width: 1280, height: 900 });
 
