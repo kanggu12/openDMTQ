@@ -73,7 +73,7 @@ curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/v0.11.2/host/get.
 With **Docker** (Compose, Python 3 and git):
 
 ```sh
-git clone https://github.com/kanggu12/openDMTQ.git && cd openDMTQ
+git clone --branch v0.11.2 --depth 1 https://github.com/kanggu12/openDMTQ.git && cd openDMTQ
 ./opendmtq setup
 ```
 

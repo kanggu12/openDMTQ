@@ -257,6 +257,38 @@ class DocVersionsTest(unittest.TestCase):
         self.assertIn(f"curl.exe -fLO {base}/v{version}/opendmtq-server-{version}-windows-x64.zip", quick)
         self.assertIn(f"tar.exe -xf opendmtq-server-{version}-windows-x64.zip", quick)
         self.assertIn(f"curl -fsSL https://raw.githubusercontent.com/kanggu12/openDMTQ/v{version}/host/get.sh | sh", quick)
+        # Docker's lines clone that release's source by its tag, not the main branch.
+        self.assertIn(f"git clone --branch v{version} --depth 1 https://github.com/kanggu12/openDMTQ.git && cd openDMTQ",
+                      quick)
+
+    def test_the_docker_way_follows_the_release(self):
+        # DEP-131: a clone of the source is of one release, as the downloads are: the install guide clones the chart's
+        # release by its tag and updates to a release's tag, and no page tells an owner to pull a branch (main's clone
+        # followed the main branch, so a new server ran the commits past the release, and git pull took it further).
+        from pathlib import Path
+        version = self.versions.chart_version(Path(ROOT))
+        with open(os.path.join(ROOT, "docs", "install.md"), encoding="utf-8") as f:
+            docker = f.read().split("\n## Docker\n", 1)[1].split("\n## ", 1)[0]
+        self.assertIn(f"git clone --branch v{version} --depth 1 https://github.com/kanggu12/openDMTQ.git && cd openDMTQ\n",
+                      docker)
+        self.assertIn(f"git fetch origin tag v{version} && git checkout -q v{version}\n./opendmtq up\n", docker)
+        pages = [os.path.join(ROOT, "README.md"), os.path.join(ROOT, ".github", "SECURITY.md")]
+        # The guides an owner follows: the test cases say what main did, in its words.
+        pages += [p for p in glob.glob(os.path.join(ROOT, "docs", "*.md")) if not p.endswith("test-cases.md")]
+        for path in pages:
+            with open(path, encoding="utf-8") as f:
+                self.assertNotIn("git pull", f.read(), os.path.relpath(path, ROOT))
+        # Another release's clone and update are said with their fix, and --write puts the chart's in their place.
+        import tempfile
+        old = ("git clone --branch v1.9.0 --depth 1 https://github.com/kanggu12/openDMTQ.git && cd openDMTQ\n"
+               "git fetch origin tag v1.9.0 && git checkout -q v1.9.0\n")
+        with tempfile.TemporaryDirectory() as d:
+            root = self.tree(d, "2.0.0", old)
+            self.assertEqual([(p, n, what) for p, n, what, _ in self.versions.stale(root)],
+                             [("README.md", 1, "1.9.0"), ("README.md", 2, "1.9.0")])
+            self.assertEqual(self.versions.write(root), ["README.md"])
+            self.assertEqual((root / "README.md").read_text(encoding="utf-8"), old.replace("1.9.0", "2.0.0"))
+            self.assertEqual(self.versions.stale(root), [])
 
     def test_another_release_or_a_file_it_has_not_is_named_and_written_over(self):
         import tempfile

@@ -92,9 +92,9 @@ them and restores them ([backups and a new computer](install.md#backups-and-a-ne
 **What happens to the data if I update OpenDMTQ?**
 Everything of yours is in the `data` folder and the `.env` file, and an update leaves those alone. On Windows, close the
 server's window and run the newer release's four lines, as the [quick start](../README.md#quick-start) has them; on
-Linux or macOS, the same command again ([installing](install.md)). With Docker, `git pull`, then `./opendmtq up`;
-`./opendmtq runtime` also brings the newest runtime for newer phones. The PC clients that play on the server then
-update to its version from the server itself.
+Linux or macOS, the same command again ([installing](install.md)). With Docker, the newer release's
+[tag](install.md#docker), then `./opendmtq up`; `./opendmtq runtime` also brings the newest runtime for newer phones.
+The PC clients that play on the server then update to its version from the server itself.
 
 **The game shows no songs.** The song list is empty until the songs are imported. On Windows and a host install: on the
 admin pages, **Songs**, **Choose the folder**, then the client data and the song data together, or the `DMQ` folder

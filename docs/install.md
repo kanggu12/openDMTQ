@@ -111,7 +111,7 @@ cd ~/openDMTQ
 On Linux, or on Windows with WSL 2, with Docker 23 or newer and Compose, Python 3.9 or newer, and git:
 
 ```sh
-git clone https://github.com/kanggu12/openDMTQ.git && cd openDMTQ
+git clone --branch v0.11.2 --depth 1 https://github.com/kanggu12/openDMTQ.git && cd openDMTQ
 ./opendmtq setup
 ```
 
@@ -126,8 +126,15 @@ code for phones. Files of another name or in another place:
 
 Sign in to the admin pages at the address the setup ends with (`./opendmtq status` shows it again), the server's own
 address with `/opendmtq/admin/`, as `admin` with `ADMIN_PASSWORD` from `.env`; the same ID and password sign in to the
-players' site. Make an account for each player on the admin pages' **Accounts** page. To update, `git pull`, then
-`./opendmtq up`.
+players' site. Make an account for each player on the admin pages' **Accounts** page.
+
+The clone is of one release. To update, take the newer release's tag (this guide names its own) and start again;
+`.env` and `data` stay:
+
+```sh
+git fetch origin tag v0.11.2 && git checkout -q v0.11.2
+./opendmtq up
+```
 
 ## Kubernetes
 
@@ -147,7 +154,7 @@ Android phone or tablet, or the PC client on a Windows PC: [playing on a server]
 | Start | `OpenDMTQ.exe` | `./opendmtq start` | `./opendmtq up` |
 | Stop | close the window | `./opendmtq stop` | `./opendmtq down` |
 | See the address | the window shows it | `./opendmtq status` | `./opendmtq status` |
-| Update | close the window, then run the newer release's [four lines](#windows) | run the `curl` line again | `git pull`, then `./opendmtq up` |
+| Update | close the window, then run the newer release's [four lines](#windows) | run the `curl` line again | the newer release's [tag](#docker), then `./opendmtq up` |
 | Start with the computer | a shortcut in `shell:startup` | `./opendmtq service` | `RESTART=unless-stopped` in `.env`, or `cli/install.sh --service` |
 | Import songs | admin pages, **Songs**, or a folder dropped on `OpenDMTQ.exe` (the game's files in it too) | admin pages, **Songs** | `./opendmtq import --songs <folder>` |
 | Name the app (`TECHNIKA Q (<name>)`) | admin pages, **Server**, **Change the name** (or `OpenDMTQ.exe name <name>`) | `./opendmtq name <name>`, or the same page | `./opendmtq name <name>` |

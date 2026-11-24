@@ -3,8 +3,9 @@
     python3 .github/doc_versions.py [--write] [--root DIR]
 
 The README's quick start and the guides download a release's files from that release's own address
-(releases/download/v1.2.3/opendmtq-server-1.2.3-windows-x64.zip) and run the one-line install from its tag
-(raw.githubusercontent.com/kanggu12/openDMTQ/v1.2.3/host/get.sh), so a line copied from them fetches what it names.
+(releases/download/v1.2.3/opendmtq-server-1.2.3-windows-x64.zip), run the one-line install from its tag
+(raw.githubusercontent.com/kanggu12/openDMTQ/v1.2.3/host/get.sh) and clone the source at its tag for Docker (git
+clone --branch v1.2.3, and git fetch origin tag v1.2.3 to update), so a line copied from them fetches what it names.
 Every version written so must be the Helm chart's (deploy/helm/opendmtq/Chart.yaml), which a release raises, and every
 file such a link names must be one of that release's (.github/release_assets.py) or of the tree. 1.2.3 is no release:
 the guides write it where any release goes. Lists each place that names another version, or a file that is not there,
@@ -40,6 +41,9 @@ PATTERNS = [
     re.compile(r"opendmtq\.client-(" + V + r")-"),
     # The release's images on GitHub's registry.
     re.compile(r"ghcr\.io/kanggu12/opendmtq-(?:server|tools):(" + V + r")\b"),
+    # The Docker way's clone of the release by its tag, and its update to a release's tag: a copy of the source is of one
+    # release, as the downloads are, and follows no branch.
+    re.compile(r"git (?:clone --branch|fetch origin tag|checkout -q) v(" + V + r")\b"),
 ]
 # A link to one file to download, with its version and the file: a release's file, or the tree's file at a tag. It ends
 # where Markdown, a shell or a quote ends it.
