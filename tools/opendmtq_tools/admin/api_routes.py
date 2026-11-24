@@ -375,10 +375,24 @@ SHAPES = {
         Field("app_name", "string", "The app's name on phones now: TECHNIKA Q and the name, or the address while there is none."),
         Field("next_name", "string", "The name it takes at its next start (POST /server/name), when another than now: \"\" for none; null otherwise.", nullable=True),
         Field("next_address", "string", "The address it moves to at its next start (http://host:port/), when it was moved (POST /server/port); null otherwise.", nullable=True),
+        Field("next_port", "integer", "Its own port from its next start, when another than now (POST /server/port), also where its address stays (a router's own port in it); null otherwise.", nullable=True),
         Field("moved_from", "integer", "The port it left at its first start with this version: 80, for a server set up on it before 0.11.0 without its owner choosing it, which moved to the port its admin pages had; null for one that never moved.", nullable=True),
+        Field("move_off_80", "MoveOff80", "The notice of that move while it is open, as the Server page and the Status page show it: until POST /server/moved-80/close or a month after the move; null otherwise.", nullable=True),
         Field("moved", "Moved", "Its last move to another address, which the site's download page tells players of for a month: null otherwise.", nullable=True),
         Field("removes", "[string]", "What Uninstall removes on this install, as the Server page lists it: of folder, firewall, startup, service, link, containers, images, clone and release."),
         Field("data", "[DataPart]", "The server's data, part by part.")]),
+    "MoveOff80": Shape("The notice of a move off port 80, open.", [
+        Field("from", "integer", "The port it left: 80."),
+        Field("to", "integer", "The port it took."),
+        Field("address", "string", "Its address since (http://host:port/)."),
+        Field("address_stays", "boolean", "True when the address stayed as it was: a router's own port in it, which goes on to the new port."),
+        Field("router", "RouterForward", "For an address the internet reaches through a router, the forward to set there; null on a local network address.", nullable=True),
+        Field("words", "string", "What the Server page says of it.")]),
+    "RouterForward": Shape("A forward the router makes to the server.", [
+        Field("public", "integer", "The port phones call on the router."),
+        Field("to", "integer", "The server's own port it goes to."),
+        Field("was", "integer", "The server's port it went to until then.")]),
+    "Closed": Shape("A notice closed.", [Field("closed", "boolean", "True: it no longer shows on the Server page and the Status page.")]),
     "Moved": Shape("A move of the server to another address.", [
         Field("from", "string", "The address it served before (host:port)."),
         Field("to", "string", "The address it serves now (host:port)."),
@@ -392,11 +406,13 @@ SHAPES = {
     "Renamed": Shape("The server's name in the app's title, from its next start.", [
         Field("name", "string", "The new name: \"\" for none, its address naming the app then."),
         Field("app_name", "string", "The app's name on phones from the next start, when the app is built again with it."),
-        Field("from_next_start", "boolean", "True: the server takes it at its next start, and builds the app again with it then.")]),
+        Field("from_next_start", "boolean", "True: the server takes it at its next start, and builds the app again with it then. False: the name was the one it runs with, and the change that waited for the next start is taken back.")]),
     "PortMoved": Shape("A move to another port, from the server's next start.", [
         Field("port", "integer", "The new port."),
         Field("address", "string", "The server's address from its next start: the players' site, with the admin pages and this API under it."),
-        Field("from_next_start", "boolean", "True: the server answers there from its next start, with the app built again for it.")]),
+        Field("from_next_start", "boolean", "True: the server answers there from its next start. False: the port was the one it serves, and the move that waited for the next start is taken back."),
+        Field("new_app", "boolean", "True when its address moves with the port, and the app is built again for it at the next start (phones install it); false where the address stays (a router's own port in it) and phones keep the app they have."),
+        Field("router", "RouterForward", "For an address the internet reaches through a router, the forward to set there from the next start; null on a local network address, and for a move taken back.", nullable=True)]),
     "ServerRestarting": Shape("A restart asked for.", [Field("restarting", "boolean", "True: every part stops and starts again within seconds, this API with it."),
         Field("instance", "string", "This run's: GET /status gives another once the new one answers.")]),
     "Uninstalling": Shape("An uninstall asked for.", [
@@ -1016,13 +1032,20 @@ ROUTES = [
     Route("POST", "/server/port", "write", "server_port", "Server", "Moves the server to another port, as the Server page's Move to this port does.",
           "A host install and the Windows bundle only. LISTEN_PORT and the port in PUBLIC_HOST in .env: the server answers there from its "
           "next start (POST /server/restart makes it now), when the app is built again for the new address and the site's download page "
-          "tells players to install it over the old one.",
+          "tells players to install it over the old one. An internet address that names a router's own port stays, with the app: "
+          "LISTEN_PORT moves alone, and the answer names the router's forward to the new port. The port it serves takes back a move "
+          "waiting for the next start.",
           body=[Field("port", "integer", "The new port, 1 to 65535.")], answer="PortMoved",
           errors=[(400, "bad_port", "Not a port from 1 to 65535."),
                   (409, "same_port", "The server is on that port already."),
                   (409, "port_taken", "Another program holds that port on this computer."),
                   (409, "port_not_allowed", "This computer keeps that port from the user the server runs as (below 1024)."),
                   (409, "by_command", "Docker Compose or Kubernetes: the command line moves the server (the message names the command).")]),
+    Route("POST", "/server/moved-80/close", "write", "server_moved_80_close", "Server", "Closes the notice of the move off port 80, as its Done on the Server page does.",
+          "The Server page and the Status page show it, with the router's forward to set for an internet address, until it is closed or a "
+          "month after the move.", answer="Closed",
+          errors=[(404, "no_move", "No open notice of a move off port 80."),
+                  (500, "close_failed", "It could not be noted (the message says why).")]),
     Route("POST", "/server/name", "write", "server_name", "Server", "Changes the server's name in the app's title, as the Server page's Change the name does.",
           "A host install and the Windows bundle only. SERVER_NAME in .env: the server takes it at its next start (POST /server/restart makes "
           "it now), when the app is built again with it. Phones keep working with the app they have, which calls the same address. With "

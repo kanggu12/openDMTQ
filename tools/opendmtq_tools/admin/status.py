@@ -70,6 +70,12 @@ def attention(health, counts, saved, backup_age, on, build, failed, usage):
         out.append(("warn", t("alert.old_backup", ago=ago(time.time() - backup_age)), url_for("backups_page"), t("nav.backups")))
     if on:
         out.append(("warn", t("alert.maintenance"), url_for("maintenance_page") + "#maintenance", t("nav.maintenance")))
+    # The move off port 80 at the first start of this version, while its notice is open on the Server page (until the
+    # owner says it is done there, or for a month): where it went, and the router's new forward where there is a router.
+    from . import lifecycle
+    moved = lifecycle.moved_off_80()
+    if moved:
+        out.append(("warn", lifecycle.moved_off_80_words(moved), url_for("server_page") + "#port", t("nav.server")))
     # A chat whose messages do not go through (its webhook deleted in the chat, the server without internet): the first one
     # with why, and the way to the card.
     hooks = webhooks.failing()

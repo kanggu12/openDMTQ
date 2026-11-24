@@ -40,18 +40,20 @@
   <h2>{{ t('port.title') }}</h2>
   {# The server's own port, the one the form moves; where the phones' app calls another (a router's, forwarded to it),
      the lead says nothing of the app and the line under it says where the app calls and where that goes. #}
-  <p class="lead">{{ t('port.lead' if public_port == port else 'port.lead_forwarded', port=port) }}</p>
-  {% if public_port != port %}<p class="meta" id="port-forwarded">{{ t('port.forwarded', address='http://' ~ public_host ~ '/', public=public_port, port=port) }}</p>{% endif %}
-  {% if next_address %}<p class="setup-state"><span class="lamp wait"></span>{{ t('port.pending', address='http://' ~ next_address ~ '/') }}</p>{% endif %}
-  {# A move off port 80 at the first start of this version: said here once, with the router's forward to the new port for
-     an internet address (a router's own port in the address stays, and the app with it). #}
-  {% if moved_80 %}<p class="setup-state" id="moved-80"><span class="lamp ok"></span>{{ t('port.moved_80_stays' if moved_80.stays else 'port.moved_80', was=moved_80.was, now=moved_80.now, address=moved_80.address) }}{% if moved_80.router %} {{ t('port.moved_80_router', public=moved_80.public, now=moved_80.now, was=moved_80.was) }}{% endif %}</p>{% endif %}
+  <p class="lead">{{ t('port.lead_forwarded' if forwarded else 'port.lead', port=port) }}</p>
+  {% if forwarded %}<p class="meta" id="port-forwarded">{{ t('port.forwarded', address='http://' ~ public_host ~ '/', public=public_port, port=port) }}</p>{% endif %}
+  {% if next_address %}<p class="setup-state"><span class="lamp wait"></span>{{ t('port.pending', address='http://' ~ next_address ~ '/') }}</p>
+  {% elif next_port %}<p class="setup-state"><span class="lamp wait"></span>{{ t('port.pending_port', port=next_port) }}</p>{% endif %}
+  {# A move off port 80 at the first start of this version, with the router's forward to set for an internet address (a
+     router's own port in the address stays, and the app with it): the step it may need, in sight until the owner says it
+     is done or the move is a month old (lifecycle.moved_off_80). #}
+  {% if moved_80 %}<div class="setup-state moved-80" id="moved-80"><span class="lamp wait"></span><p>{{ moved_80 }}</p><form method="post" action="{{ url_for('server_moved_80') }}"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm">{{ t('port.moved_done') }}</button></form></div>{% endif %}
   {% if can_move_port %}
   {# Checked on the page (admin.js, novalidate), as the other forms: what is wrong said under the field. #}
   <form method="post" action="{{ url_for('server_port') }}" class="form-row" novalidate>
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label class="field grow">{{ t('port.new') }} <input class="input" name="port" type="number" min="1" max="65535" inputmode="numeric" required data-bad="{{ tp('port.bad') }}" placeholder="{{ port }}"></label>
-    <button class="btn" data-ask="{{ tp('port.confirm') }}" data-yes="{{ tp('port.move') }}">{{ t('port.move') }}</button>
+    <button class="btn" data-ask="{{ tp('port.confirm_forwarded' if forwarded else 'port.confirm') }}" data-yes="{{ tp('port.move') }}">{{ t('port.move') }}</button>
   </form>
   {% elif commands.port %}
   <p class="meta">{{ t('port.by_command_lead') }}</p>

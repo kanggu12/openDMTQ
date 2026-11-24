@@ -76,8 +76,10 @@ CHANGE_WORDS = {
     "player_game:unban": "change.game_unban", "player_game:reset": "change.game_reset",
     "game_settings:unlimited-on": "change.game_all_on", "game_settings:unlimited-off": "change.game_all_off",
     "game_settings:start": "change.game_start",
-    # The owner's password and the app's name changed on the Server page (lifecycle.py).
+    # The owner's password and the app's name changed on the Server page (lifecycle.py), and its note of the move off port
+    # 80 closed.
     "server:password": "change.server_password", "server:name": "change.server_name",
+    "server:moved-80-closed": "change.server_moved_80",
     # What a player changed of their own account on the site's MY PAGE (server/portal/me_lib.php writes these lines).
     "site:password": "change.site_password", "site:id": "change.site_id", "site:signout": "change.site_signout",
     # The PC client's first PLAY linking the account to the PC's game player (server/portal/client.php client_claim).

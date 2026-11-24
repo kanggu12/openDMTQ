@@ -593,22 +593,28 @@ def cmd_port(args):
     # This copy's own edge holds the port it serves now; any other program's port is refused.
     if system.port_busy(args.port) and not system.edge_holds(args.port):
         die(f"port {args.port} is taken on this computer by another program; choose another")
-    host = env.split(current)[0]
-    new = env.join(host, args.port)
+    # A router's own port in an internet address stays, with the app phones have (env.port_move).
+    new, stays, router = env.port_move(current, now, args.port)
     # Port 80 by the owner's own choice: kept at every start (a server only set up on it before 0.11.0 moves off it).
     env.save(ENV_FILE, {"PUBLIC_HOST": new, "LISTEN_PORT": str(args.port),
                         **({env.CHOSE_80: "chosen"} if args.port == 80 else {})})
     if args.port != 80:
         env.drop(ENV_FILE, (env.CHOSE_80,))
-    ok(f"the server moves to port {args.port} at its next start: http://{new}/")
+    if stays:
+        ok(f"the server moves to port {args.port} at its next start; its address stays http://{new}/")
+    else:
+        ok(f"the server moves to port {args.port} at its next start: http://{new}/")
     # The rule for phones on WSL follows the port now: the next start needs it.
     if env.is_wsl():
         open_firewall(args.port, internet=not env.is_lan_only(new), replaces=now)
-    lines = ["./opendmtq restart (or up) starts it there and builds the app for the new address.",
-             "Players install the new app over the old one, which keeps each device's account; the site's download "
-             "page says so."]
-    if not env.is_lan_only(new):
-        lines.append(f"On the router(s), forward TCP {args.port} to this PC in place of {now}.")
+    if stays:
+        lines = ["./opendmtq restart (or up) starts it there; phones keep the app they have."]
+    else:
+        lines = ["./opendmtq restart (or up) starts it there and builds the app for the new address.",
+                 "Players install the new app over the old one, which keeps each device's account; the site's download "
+                 "page says so."]
+    if router:
+        lines.append(router)
     print()
     for line in lines:
         print(line)

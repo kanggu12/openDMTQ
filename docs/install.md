@@ -190,13 +190,17 @@ to this port**: it sets `LISTEN_PORT` and the port in `PUBLIC_HOST`, and from th
 The app is built again for the new address then, and the site's download page tells players, for a month, to install it
 over the old one (each phone keeps its account; a Windows PC runs the installer from the page again). A port another
 program holds is refused, and so is a port below 1024 that the computer keeps from the server's user. Exposed to the
-internet, forward the new port on the router instead of the old one.
+internet, the router forwards the new port in place of the old one, as the move says. An address that names a port the
+router forwards to the server's own (`PUBLIC_HOST=myhome.example.com:8443` beside `LISTEN_PORT=8791`) stays, with the app
+phones have: `LISTEN_PORT` moves alone, and the router's forward of 8443 goes to the new port. The server's own port
+again, while a move waits for the next start, takes that move back.
 
 A server set up before 0.11.0 on port 80 moves off it at its first start after the update, as `port` moves a server: to
 the port its admin pages had, 8791 unless you set another (or the first free one after it). The app is built again for
 the new address, so every phone installs it again from the site's download page, and a PC client set up for the old port
-finds the new one with its [connection test](windows-player.md#testing-the-connection); the start, `status` and the
-Server page say it once, and on WSL the Windows firewall rule moves with it. Exposed to the internet, the router then
+finds the new one with its [connection test](windows-player.md#testing-the-connection); the start and `status` say it
+once, the Server page and the Status page until **Done** on the Server page or for a month, and on WSL the Windows
+firewall rule moves with it. Exposed to the internet, the router then
 forwards the new port to it in place of 80, as the start says; a public port the router forwards from another one
 (`PUBLIC_HOST=myhome.example.com:8443` beside `LISTEN_PORT=80`) is the router's and stays, with the app and its address,
 and the router's forward of it goes to the new port. Its admin pages answer on the one port after the update, nothing

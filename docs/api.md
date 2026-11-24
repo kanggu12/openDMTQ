@@ -834,6 +834,7 @@ The Server page: the server's state, stopping and restarting it, the repair, its
 | [`POST /server/stop`](#post-serverstop) | write | Stops the server, as the Server page's Stop the server does. |
 | [`POST /server/restart`](#post-serverrestart) | write | Restarts the server, as the Server page's Restart does. |
 | [`POST /server/port`](#post-serverport) | write | Moves the server to another port, as the Server page's Move to this port does. |
+| [`POST /server/moved-80/close`](#post-servermoved-80close) | write | Closes the notice of the move off port 80, as its Done on the Server page does. |
 | [`POST /server/name`](#post-servername) | write | Changes the server's name in the app's title, as the Server page's Change the name does. |
 | [`POST /server/password`](#post-serverpassword) | write | Changes the owner's password, as the Server page's Change the password does. |
 | [`POST /server/repair`](#post-serverrepair) | write | Checks and repairs the server, as the Server page's Check and repair does. |
@@ -871,7 +872,7 @@ Refusals:
 
 #### `POST /server/port`
 
-Moves the server to another port, as the Server page's Move to this port does. A host install and the Windows bundle only. LISTEN_PORT and the port in PUBLIC_HOST in .env: the server answers there from its next start (POST /server/restart makes it now), when the app is built again for the new address and the site's download page tells players to install it over the old one.
+Moves the server to another port, as the Server page's Move to this port does. A host install and the Windows bundle only. LISTEN_PORT and the port in PUBLIC_HOST in .env: the server answers there from its next start (POST /server/restart makes it now), when the app is built again for the new address and the site's download page tells players to install it over the old one. An internet address that names a router's own port stays, with the app: LISTEN_PORT moves alone, and the answer names the router's forward to the new port. The port it serves takes back a move waiting for the next start.
 
 Body (JSON):
 
@@ -886,6 +887,17 @@ Refusals:
 - `409 port_taken`: Another program holds that port on this computer.
 - `409 port_not_allowed`: This computer keeps that port from the user the server runs as (below 1024).
 - `409 by_command`: Docker Compose or Kubernetes: the command line moves the server (the message names the command).
+
+#### `POST /server/moved-80/close`
+
+Closes the notice of the move off port 80, as its Done on the Server page does. The Server page and the Status page show it, with the router's forward to set for an internet address, until it is closed or a month after the move.
+
+Answer: `200` with [Closed](#closed).
+
+Refusals:
+
+- `404 no_move`: No open notice of a move off port 80.
+- `500 close_failed`: It could not be noted (the message says why).
 
 #### `POST /server/name`
 
@@ -2681,10 +2693,37 @@ The server as the Server page shows it.
 - `app_name` (string): The app's name on phones now: TECHNIKA Q and the name, or the address while there is none.
 - `next_name` (string, or null): The name it takes at its next start (POST /server/name), when another than now: "" for none; null otherwise.
 - `next_address` (string, or null): The address it moves to at its next start (http://host:port/), when it was moved (POST /server/port); null otherwise.
+- `next_port` (integer, or null): Its own port from its next start, when another than now (POST /server/port), also where its address stays (a router's own port in it); null otherwise.
 - `moved_from` (integer, or null): The port it left at its first start with this version: 80, for a server set up on it before 0.11.0 without its owner choosing it, which moved to the port its admin pages had; null for one that never moved.
+- `move_off_80` ([MoveOff80](#moveoff80), or null): The notice of that move while it is open, as the Server page and the Status page show it: until POST /server/moved-80/close or a month after the move; null otherwise.
 - `moved` ([Moved](#moved), or null): Its last move to another address, which the site's download page tells players of for a month: null otherwise.
 - `removes` (list of string): What Uninstall removes on this install, as the Server page lists it: of folder, firewall, startup, service, link, containers, images, clone and release.
 - `data` (list of [DataPart](#datapart)): The server's data, part by part.
+
+#### MoveOff80
+
+The notice of a move off port 80, open.
+
+- `from` (integer): The port it left: 80.
+- `to` (integer): The port it took.
+- `address` (string): Its address since (http://host:port/).
+- `address_stays` (boolean): True when the address stayed as it was: a router's own port in it, which goes on to the new port.
+- `router` ([RouterForward](#routerforward), or null): For an address the internet reaches through a router, the forward to set there; null on a local network address.
+- `words` (string): What the Server page says of it.
+
+#### RouterForward
+
+A forward the router makes to the server.
+
+- `public` (integer): The port phones call on the router.
+- `to` (integer): The server's own port it goes to.
+- `was` (integer): The server's port it went to until then.
+
+#### Closed
+
+A notice closed.
+
+- `closed` (boolean): True: it no longer shows on the Server page and the Status page.
 
 #### Moved
 
@@ -2715,7 +2754,7 @@ The server's name in the app's title, from its next start.
 
 - `name` (string): The new name: "" for none, its address naming the app then.
 - `app_name` (string): The app's name on phones from the next start, when the app is built again with it.
-- `from_next_start` (boolean): True: the server takes it at its next start, and builds the app again with it then.
+- `from_next_start` (boolean): True: the server takes it at its next start, and builds the app again with it then. False: the name was the one it runs with, and the change that waited for the next start is taken back.
 
 #### PortMoved
 
@@ -2723,7 +2762,9 @@ A move to another port, from the server's next start.
 
 - `port` (integer): The new port.
 - `address` (string): The server's address from its next start: the players' site, with the admin pages and this API under it.
-- `from_next_start` (boolean): True: the server answers there from its next start, with the app built again for it.
+- `from_next_start` (boolean): True: the server answers there from its next start. False: the port was the one it serves, and the move that waited for the next start is taken back.
+- `new_app` (boolean): True when its address moves with the port, and the app is built again for it at the next start (phones install it); false where the address stays (a router's own port in it) and phones keep the app they have.
+- `router` ([RouterForward](#routerforward), or null): For an address the internet reaches through a router, the forward to set there from the next start; null on a local network address, and for a move taken back.
 
 #### ServerRestarting
 

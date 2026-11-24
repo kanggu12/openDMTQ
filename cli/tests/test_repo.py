@@ -959,6 +959,33 @@ class HostPortsTest(unittest.TestCase):
                 self.assertEqual(f.read(), "PUBLIC_HOST=192.168.0.10:8791\nLISTEN_PORT=8791\nADMIN_PASSWORD=x\n")
             self.assertTrue(any("at its next start: http://192.168.0.10:8791/" in line for line in said), said)
 
+    def test_a_move_behind_a_router_says_its_forward_and_keeps_a_routers_own_port(self):
+        # The host program's port command on an internet address (DEP-113): on the server's own port the address moves with
+        # it and the router's new forward is said; a router's own port (8443) stays, with the app phones have, LISTEN_PORT
+        # moving alone and the forward of 8443 going on to it (main said nothing of the router and rewrote 8443).
+        from opendmtq_host import commands
+        for text, address, line, phones in (
+                ("PUBLIC_HOST=game.example.com:8791\nLISTEN_PORT=8791\nADMIN_PASSWORD=x\n", "game.example.com:9000",
+                 "On the router(s), forward TCP 9000 to port 9000 of this PC, in place of the forward of TCP 8791.",
+                 "the app is built again for the new address then"),
+                ("PUBLIC_HOST=game.example.com:8443\nLISTEN_PORT=8791\nADMIN_PASSWORD=x\n", "game.example.com:8443",
+                 "On the router(s), forward TCP 8443 to port 9000 of this PC in place of port 8791.",
+                 "phones keep the app they have")):
+            with tempfile.TemporaryDirectory() as d:
+                path = os.path.join(d, ".env")
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(text)
+                said = []
+                with mock.patch.object(commands, "ENV_FILE", path), mock.patch.object(self.settings, "ENV_FILE", path), \
+                        mock.patch.object(commands, "say", said.append), mock.patch.object(commands, "tell", said.append), \
+                        mock.patch.object(commands, "ok", said.append), \
+                        mock.patch.object(self.settings, "bindable", lambda port, address="0.0.0.0": True):
+                    self.assertEqual(commands.cmd_port(argparse.Namespace(port=9000)), 0)
+                    values = self.settings.settings()
+                self.assertEqual((values["PUBLIC_HOST"], values["LISTEN_PORT"]), (address, "9000"))
+                self.assertIn(line, said)
+                self.assertTrue(any(phones in s for s in said), said)
+
     def test_a_server_on_port_80_moves_at_its_start(self):
         # The Windows bundle or a host install set up before 0.11.0 on port 80: its start moves it to the port its admin
         # pages had (8791 here, the first free one after it when taken), says so once, notes the move for the download
@@ -1011,7 +1038,7 @@ class HostPortsTest(unittest.TestCase):
         for text, address, lines in (
                 ("PUBLIC_HOST=game.example.com\nLISTEN_PORT=80\nADMIN_PASSWORD=x\n", "game.example.com:8791",
                  ["The server moved from port 80 to 8791: http://game.example.com:8791/",
-                  "On the router(s), forward TCP 8791 to port 8791 of this PC in place of port 80.",
+                  "On the router(s), forward TCP 8791 to port 8791 of this PC, in place of the forward of TCP 80.",
                   "Phones install the app again from that address (the site's download page says so), and PCs connect to it."]),
                 ("PUBLIC_HOST=game.example.com:8443\nLISTEN_PORT=80\nADMIN_PASSWORD=x\n", "game.example.com:8443",
                  ["The server moved from port 80 to 8791; its address stays http://game.example.com:8443/",

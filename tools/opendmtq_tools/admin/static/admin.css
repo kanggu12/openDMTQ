@@ -882,6 +882,13 @@ table.data-parts .runtime { font-weight: 400; }
 .ask .btn[disabled] { opacity: 0.42; cursor: not-allowed; }
 /* The stopped page's state, its light beside the heading as on the Server page. */
 .server-state .setup-state { color: var(--chalk); }
+/* The notice of the move off port 80 on the Server page's port card (server.html): the lamp on the words' first line, the
+   words at the lead's measure, and its Done under them, where they begin. (Beside the words at the line's end, as drawn
+   first, it left them a narrow column at a phone's width, and the lamp in the middle of eight lines.) */
+.moved-80 { display: grid; grid-template-columns: 9px minmax(0, 1fr); column-gap: 8px; row-gap: 10px; align-items: start; }
+.moved-80 .lamp { margin-top: 6px; margin-top: calc((1lh - 9px) / 2); }
+.moved-80 p { max-width: 74ch; margin: 0; text-wrap: pretty; }
+.moved-80 form { grid-column: 2; display: flex; margin: 0; }
 
 /* ------------------------------------------------------------------ a player's own page (player.html) */
 

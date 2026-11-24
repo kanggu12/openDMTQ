@@ -201,7 +201,7 @@ class HostTest(unittest.TestCase):
         # Its own port moved with it: the router forwards the new one, and phones install the app again.
         self.assertEqual(env.move_off_80_words({"from": 80, "to": 8791, "address": "game.example.com:8791"}, start=True),
                          ["The server moved from port 80 to 8791: http://game.example.com:8791/",
-                          "On the router(s), forward TCP 8791 to port 8791 of this PC in place of port 80.",
+                          "On the router(s), forward TCP 8791 to port 8791 of this PC, in place of the forward of TCP 80.",
                           "Phones install the app again from that address (the site's download page says so), and PCs connect to it."])
         # On a local network address no router stands between: as before.
         self.assertEqual(env.move_off_80_words({"from": 80, "to": 8791, "address": "192.168.0.10:8791"}),

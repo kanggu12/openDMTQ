@@ -352,6 +352,14 @@ def port_free_host(inst):
     return host_install(inst) + [mock.patch.object(admin.lifecycle, "port_free", lambda port: True)]
 
 
+def moved_off_80(inst):
+    """A server that moved off port 80 at its first start with this version a moment ago, as cli/opendmtq_cli/env.py
+    note_move_off_80 notes it: its notice open."""
+    with open(os.path.join(os.path.dirname(admin.core.DB), "port-moved.json"), "w", encoding="utf-8") as f:
+        json.dump({"from": 80, "to": 8791, "address": HOST, "at": int(time.time()), "said": ["start"]}, f)
+    return []
+
+
 def no_rebuild(inst):
     return [mock.patch.object(admin.songs, "rebuild")]
 
@@ -713,6 +721,10 @@ def CASES():
         C("server_port", "POST", "/server/port", 200, setup=port_free_host, json={"port": 8792},
           check=lambda t, inst, r: t.assertIn("LISTEN_PORT=8792", open(inst.path(".env"), encoding="utf-8").read())),
         C("server_port", "POST", "/server/port", 409, "by_command", json={"port": 8792}),
+        # The notice of the move off port 80, open (written as the command line's start writes it), and none to close.
+        C("server_moved_80_close", "POST", "/server/moved-80/close", 200, setup=moved_off_80,
+          check=lambda t, inst, r: t.assertIsNone(admin.lifecycle.moved_off_80())),
+        C("server_moved_80_close", "POST", "/server/moved-80/close", 404, "no_move"),
         # The owner's password: written to .env and taken at once on a host install; the command line's elsewhere; one .env
         # would read as something else refused.
         C("server_password", "POST", "/server/password", 200, setup=host_install, json={"password": "Xk3vQ9pLm2Rt7w"},
@@ -2398,6 +2410,7 @@ PAGE_ACTIONS = {
     "server_page?job": ["job_get"],
     "server_restart": ["server_restart"],
     "server_port": ["server_port"],
+    "server_moved_80": ["server_moved_80_close"],
     "server_password": ["server_password"],
     "server_name": ["server_name"],
     "server_repair": ["server_repair"],

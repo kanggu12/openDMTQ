@@ -235,6 +235,29 @@ def note_move_off_80(folder, old, new, said="start", port=None):
                                     "said": [said]})
 
 
+def router_line(public, port, was, stays):
+    """The router's step when the server moves from its port `was` to `port`, for an internet address: a router's own port
+    in the address (`public`, not the server's own) stays and its forward goes on to the new port (stays); else the
+    address's port moved with the server's, and the router forwards the new port in place of the old one's forward. The
+    admin pages' Server page says the same (tools/opendmtq_tools/strings.py, port.moved_80_router and port.router_new)."""
+    if stays:
+        return f"On the router(s), forward TCP {public} to port {port} of this PC in place of port {was}."
+    return f"On the router(s), forward TCP {port} to port {port} of this PC, in place of the forward of TCP {was}."
+
+
+def port_move(address, own, port):
+    """What moving the server from its own port `own` to `port` makes of its address, as every install's command line and
+    the admin pages' Server page move it (tools/opendmtq_tools/admin/lifecycle.py, move_port): (the address from the next
+    start, whether it stays, the router's line or None). An internet address whose port is not the server's own names a
+    router's port, forwarded to it: it stays, with the app phones have, as the move off port 80 keeps it
+    (address_after_80). A local network address has no router between: its port always moves with the server's."""
+    host, public = split(address)
+    internet = not is_lan_only(address)
+    stays = internet and public != own
+    new = address if stays else join(host, port)
+    return new, stays, (router_line(public, port, own, stays) if internet else None)
+
+
 def move_off_80_words(moved, start=False):
     """What a move off port 80 says (note_move_off_80's record: from, to, address), in lines: where the server went and
     its address with it, or that its address stays (a router's own port in it); for an internet address the router's
@@ -248,7 +271,7 @@ def move_off_80_words(moved, start=False):
              f"The server moved from port {was} to {port}: http://{address}/"]
     if not is_lan_only(address):
         # The internet reaches the server through the router(s): what goes on to the server PC follows its port.
-        lines.append(f"On the router(s), forward TCP {public} to port {port} of this PC in place of port {was}.")
+        lines.append(router_line(public, port, was, stays))
     if not stays:
         lines.append("Phones install the app again from that address" + (" (the site's download page says so)" if start else "")
                      + ", and PCs connect to it.")

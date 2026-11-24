@@ -271,17 +271,24 @@ def cmd_port(args):
         return 0
     if not bindable(args.port):
         die(f"port {args.port} is taken on this computer by another program (or this user may not use it); choose another")
-    host, _ = env.split(values["PUBLIC_HOST"])
-    new = env.join(host, args.port)
+    # A router's own port in an internet address stays, with the app phones have; the router's line where there is one
+    # (opendmtq_cli.env.port_move, as the Server page and the compose command line move it).
+    new, stays, router = env.port_move(values["PUBLIC_HOST"], now, args.port)
     # Port 80 by the owner's own choice: kept at every start (a server only set up on it before 0.11.0 moves off it).
     env.save(ENV_FILE, {"PUBLIC_HOST": new, "LISTEN_PORT": str(args.port),
                         **({env.CHOSE_80: "chosen"} if args.port == 80 else {})})
     if args.port != 80:
         env.drop(ENV_FILE, (env.CHOSE_80,))
-    ok(f"the server moves to port {args.port} at its next start: http://{new}/")
-    tell(("Close the server's window and start OpenDMTQ.exe again" if WINDOWS else f"{CLI} restart") + " to move it "
-         "now; the app is built again for the new address then. Players install the new app over the old one, which "
-         "keeps each device's account; the site's download page says so.")
+    restart = "Close the server's window and start OpenDMTQ.exe again" if WINDOWS else f"{CLI} restart"
+    if stays:
+        ok(f"the server moves to port {args.port} at its next start; its address stays http://{new}/")
+        tell(f"{restart} to move it now; phones keep the app they have.")
+    else:
+        ok(f"the server moves to port {args.port} at its next start: http://{new}/")
+        tell(f"{restart} to move it now; the app is built again for the new address then. Players install the new app "
+             "over the old one, which keeps each device's account; the site's download page says so.")
+    if router:
+        tell(router)
     return 0
 
 

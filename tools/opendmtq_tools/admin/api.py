@@ -667,9 +667,32 @@ def server_get(args):
             "name": lifecycle.name_now(), "app_name": lifecycle.app_title(lifecycle.name_now()), "next_name": lifecycle.next_name(),
             # A URL as the other addresses are (lifecycle.next_address gives host:port).
             "next_address": f"http://{lifecycle.next_address()}/" if lifecycle.next_address() else None,
+            # Its own port from the next start, also where its address stays (a router's own port in it).
+            "next_port": lifecycle.next_port(),
             "moved_from": (lifecycle.moved_off_80(once=False) or {}).get("was"),
+            # The notice of that move while it is open (the Server page and the Status page show it), with its words.
+            "move_off_80": open_move_off_80(),
             # What the site's download page says of a move to this address, and the uninstall card's list.
             "moved": lifecycle.address_moved(), "removes": lifecycle.removes()}
+
+
+def open_move_off_80():
+    """The notice of the move off port 80 as the Server page shows it while it is open (lifecycle.moved_off_80), or None:
+    the port it left and the one it took, the address, whether the address stayed (a router's own port in it), the step
+    for the router where there is one, and the words."""
+    moved = lifecycle.moved_off_80()
+    if not moved:
+        return None
+    return {"from": moved["was"], "to": moved["now"], "address": moved["address"], "address_stays": moved["stays"],
+            "router": {"public": moved["public"], "to": moved["now"], "was": moved["was"]} if moved["router"] else None,
+            "words": plain(lifecycle.moved_off_80_words(moved))}
+
+
+@handler
+def server_moved_80_close(args):
+    """POST /server/moved-80/close: Done on the Server page's notice of the move off port 80 (lifecycle.close_moved_off_80)."""
+    lifecycle.close_moved_off_80()
+    return {"closed": True}
 
 
 @handler

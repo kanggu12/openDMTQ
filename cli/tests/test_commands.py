@@ -399,6 +399,26 @@ class PortCommandTest(unittest.TestCase):
             self.assertIn("port 8792 is taken on this computer by another program", sb.output())
             self.assertEqual(sb.env()["LISTEN_PORT"], "8791")
 
+    def test_behind_a_router_its_forward_is_said_and_a_routers_own_port_stays(self):
+        # An internet address on the server's own port moves with it, and the router is told to forward the new one; one
+        # that names a router's own port (8443, forwarded to 8791) stays with the app phones have, LISTEN_PORT moving
+        # alone and the forward of 8443 going to the new port (DEP-113; main rewrote the router's port into the address).
+        for env_text, address, said, phones in (
+                ("PUBLIC_HOST=game.example.com:8791\nLISTEN_PORT=8791\nADMIN_PASSWORD=x\n", "game.example.com:9000",
+                 "On the router(s), forward TCP 9000 to port 9000 of this PC, in place of the forward of TCP 8791.",
+                 "Players install the new app over the old one"),
+                ("PUBLIC_HOST=game.example.com:8443\nLISTEN_PORT=8791\nADMIN_PASSWORD=x\n", "game.example.com:8443",
+                 "On the router(s), forward TCP 8443 to port 9000 of this PC in place of port 8791.",
+                 "phones keep the app they have")):
+            with Sandbox(env_text) as sb:
+                self.assertEqual(sb.call(app.cmd_port, port=9000), 0, sb.output())
+                self.assertEqual((sb.env()["PUBLIC_HOST"], sb.env()["LISTEN_PORT"]), (address, "9000"))
+                self.assertEqual(sb.output().count(said), 1, sb.output())
+                self.assertIn(phones, sb.output())
+                if address.endswith(":8443"):
+                    self.assertIn("at its next start; its address stays http://game.example.com:8443/", sb.output())
+                    self.assertNotIn("builds the app", sb.output())
+
     def test_the_one_it_is_on_and_no_port(self):
         with Sandbox(self.SET_UP) as sb:
             self.assertEqual(sb.call(app.cmd_port, port=8791), 0)
@@ -871,7 +891,7 @@ class MessageTest(unittest.TestCase):
         for env_text, address, said in (
                 ("PUBLIC_HOST=game.example.com\nLISTEN_PORT=80\nADMIN_ON_PUBLIC_PORT=no\nADMIN_PASSWORD=x\n", "game.example.com:8791",
                  ["The server moved from port 80 to 8791: http://game.example.com:8791/",
-                  "On the router(s), forward TCP 8791 to port 8791 of this PC in place of port 80.",
+                  "On the router(s), forward TCP 8791 to port 8791 of this PC, in place of the forward of TCP 80.",
                   "Phones install the app again from that address (the site's download page says so), and PCs connect to it."]),
                 ("PUBLIC_HOST=game.example.com:8443\nLISTEN_PORT=80\nADMIN_ON_PUBLIC_PORT=no\nADMIN_PASSWORD=x\n", "game.example.com:8443",
                  ["The server moved from port 80 to 8791; its address stays http://game.example.com:8443/",

@@ -192,6 +192,16 @@ def next_address():
     return None
 
 
+def next_port():
+    """The server's own port from its next start, when .env says another than the one it serves (moved on this page or by
+    the command line), also where its address stays (a router's own port in it); None otherwise, and where these pages
+    cannot read .env."""
+    if not (setup.HOST_INSTALL and setup.ENV_FILE):
+        return None
+    kept = (env_setting("LISTEN_PORT") or "").strip()
+    return int(kept) if kept.isdigit() and int(kept) != port_now() else None
+
+
 def admin_address():
     """Where these pages open, for the Server page: (address, words or None). On a local network address at the address
     phones use, from anywhere there; on an internet address over HTTPS on the same port where they are on the public port
@@ -263,31 +273,58 @@ def moved_view(moved):
             "stays": public != moved["to"], "router": not core.lan_only(address)}
 
 
-def moved_off_80(once=True):
-    """The server's move off port 80 at its first start with this version (cli/opendmtq_cli/env.py note_move_off_80), as
-    moved_view() gives it. once: the first time this page asks for it, noted as said here, and None after that (the API
-    asks with once=False, and leaves it to the page). None for a server that never moved."""
-    path = os.path.join(os.path.dirname(core.DB), "port-moved.json")
+def moved_off_80_record():
+    """The move off port 80 at the server's first start with this version (cli/opendmtq_cli/env.py note_move_off_80,
+    port-moved.json), as {"from", "to", "address", "at", "said", ...}; None for a server that never moved."""
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(os.path.join(os.path.dirname(core.DB), "port-moved.json"), encoding="utf-8") as f:
             moved = json.load(f)
     except (OSError, ValueError):
         return None
-    if not isinstance(moved, dict) or not isinstance(moved.get("to"), int):
+    return moved if isinstance(moved, dict) and isinstance(moved.get("to"), int) else None
+
+
+def moved_off_80(once=True):
+    """The move off port 80 (moved_off_80_record) as moved_view() gives it. once: only while its notice is open, which the
+    Server page and the Status page's things to look at show with the step it may need (a router's new forward) until
+    the owner closes it (close_moved_off_80) or MOVED_DAYS after the move, as the site's download page tells players of
+    it for as long; once=False: whenever it moved (the API's moved_from). None otherwise."""
+    moved = moved_off_80_record()
+    if moved is None:
         return None
-    if not once:
-        return moved_view(moved)
-    if "page" in moved.get("said", []):
+    if once and (moved.get("closed") or time.time() - int(moved.get("at") or 0) >= MOVED_DAYS * 86400):
         return None
-    moved["said"] = list(moved.get("said", [])) + ["page"]
+    return moved_view(moved)
+
+
+def moved_off_80_words(view):
+    """What the Server page and the Status page say of an open move off port 80 (moved_off_80): where it went, its address
+    or that the address stays, and behind a router the forward to set there: a new forward of the new port where the
+    address's port moved with the server's (the old one was of port 80), or the forward of a router's own port going on
+    to the new one."""
+    words = t("port.moved_80_stays" if view["stays"] else "port.moved_80", was=view["was"], now=view["now"], address=view["address"])
+    if view["router"]:
+        words += " " + (t("port.moved_80_router", public=view["public"], now=view["now"], was=view["was"]) if view["stays"]
+                        else t("port.router_new", port=view["now"], was=view["was"]))
+    return words
+
+
+def close_moved_off_80():
+    """The owner's Done on the notice of the move off port 80: closed, on the Server page and the Status page, from now on.
+    Refused: no open notice (none, closed already, or older than MOVED_DAYS)."""
+    if moved_off_80() is None:
+        raise Refused(404, "no_move", t("port.moved_none"))
+    moved = moved_off_80_record()
+    moved["closed"] = int(time.time())
+    path = os.path.join(os.path.dirname(core.DB), "port-moved.json")
     try:
-        # Whole or not at all; said again next time when it cannot be written.
+        # Whole or not at all: shown again next time when it cannot be written.
         with open(path + ".new", "w", encoding="utf-8") as f:
             json.dump(moved, f)
         os.replace(path + ".new", path)
-    except OSError:
-        pass
-    return moved_view(moved)
+    except OSError as e:
+        raise Refused(500, "close_failed", t("port.moved_not_closed", why=core.why(e)))
+    changed("server:moved-80-closed", f"{moved.get('from', 80)} > {moved['to']}")
 
 
 def port_free(port):
@@ -319,28 +356,65 @@ def port_allowed(port):
 def move_port(raw):
     """Moves the server to another port (a host install, the Windows bundle): LISTEN_PORT and the port in PUBLIC_HOST in
     .env, from its next start, when the app is built again for the new address and the site's download page tells players
-    to install it. Refused: no such port, the one it is on, one another program holds, or an install where the command
-    line does it (Docker Compose, Kubernetes: the command to use). Returns {port, address, from_next_start}."""
+    to install it. An address that names a router's own port (an internet address whose port is not the server's own,
+    forwarded to it) stays, and the app with it: the server's own port moves alone, and the router's forward goes to it,
+    as the move off port 80 keeps such a port (cli/opendmtq_cli/env.py, address_after_80). The port it serves, while a
+    move waits for the next start, takes that move back. Refused: no such port, the one it is on, one another program
+    holds, or an install where the command line does it (Docker Compose, Kubernetes: the command to use). Returns {port,
+    address, from_next_start, new_app, router}: router, for an address the internet reaches through one, is the forward
+    to set there from the next start ({public, to, was}: the port phones call, the server's new port, and the one it went
+    to until then), None on a local network address and for a move taken back."""
     if not (setup.HOST_INSTALL and setup.ENV_FILE):
         raise Refused(409, "by_command", t("port.by_command", command=commands().get("port", "")))
     text = str(raw if raw is not None else "").strip()
     if not text.isdigit() or not 1 <= int(text) <= 65535:
         raise Refused(400, "bad_port", t("port.bad"))
     port = int(text)
-    if port == port_now() and next_address() is None:
+    own, public = port_now(), public_port()
+    # A move waiting for the next start, of the address or of the server's own port alone.
+    waiting = next_address() is not None or next_port() is not None
+    if port == own and not waiting:
         raise Refused(409, "same_port", t("port.same", port=port), tone="ok")
-    if port != port_now() and not port_free(port):
+    if port != own and not port_free(port):
         # Kept from the server's user, or held by another program: said as it is.
         if not port_allowed(port):
             raise Refused(409, "port_not_allowed", t("port.not_allowed", port=port))
         raise Refused(409, "port_taken", t("port.taken", port=port))
     host, _ = setup.address_parts(core.PUBLIC_HOST)
-    new = host if port == 80 else f"{host}:{port}"
+    internet = not core.lan_only(core.PUBLIC_HOST)
+    # A router's own port in the address: it stays, with the app phones have.
+    stays = internet and public != own
+    if port == own:
+        # Back to the port it serves: the move that waited goes, and the server stays as it runs.
+        new = core.PUBLIC_HOST
+    else:
+        new = core.PUBLIC_HOST if stays else (host if port == 80 else f"{host}:{port}")
     # Port 80 by the owner's own choice: the server's start keeps it (one only set up on it before 0.11.0 moves off it,
     # cli/opendmtq_cli/env.py leaves_80).
     setup.save_env({"PUBLIC_HOST": new, "LISTEN_PORT": str(port), **({"PORT_80": "chosen"} if port == 80 else {})})
-    changed("server:port", f"{core.PUBLIC_HOST} > {new}")
-    return {"port": port, "address": f"http://{new}/", "from_next_start": True}
+    moving = port != own
+    changed("server:port", f"{core.PUBLIC_HOST} > {new}" if moving and not stays else
+            f"{core.PUBLIC_HOST} (port {own} > {port})" if moving else f"{core.PUBLIC_HOST} (as it runs)")
+    # The router's forward from the next start: the address's port moves with the server's, or a router's own stays and
+    # goes on to the new port.
+    router = {"public": public if stays else port, "to": port, "was": own} if moving and internet else None
+    return {"port": port, "address": f"http://{new}/", "from_next_start": moving, "new_app": moving and new != core.PUBLIC_HOST,
+            "router": router}
+
+
+def port_words(moved):
+    """What the Server page says of a move (move_port's answer): where the server answers from its next start (or that the
+    waiting move is taken back), and, behind a router, where its forward goes then."""
+    if not moved["from_next_start"]:
+        return t("port.cancelled", port=moved["port"], address=moved["address"])
+    words = t("port.saved" if moved["new_app"] else "port.saved_stays", port=moved["port"], address=moved["address"])
+    router = moved["router"]
+    if router:
+        # The address's port moved with the server's: a new forward of that port, in place of the old one's. A router's own
+        # port in the address: its forward goes on to the new port.
+        words += " " + (t("port.router_new", port=router["to"], was=router["was"]) if moved["new_app"] else
+                        t("port.moved_80_router", public=router["public"], now=router["to"], was=router["was"]))
+    return words
 
 
 # The server's name in the app's title (TECHNIKA Q (name)) as these pages take a new one: no longer than the app builder
@@ -392,8 +466,10 @@ def rename_server(raw):
     except OSError as e:
         # .env as it was: nothing changed.
         raise Refused(500, "name_failed", t("name.not_saved", why=core.why(e)))
-    changed("server:name", f"{app_title(name_now())} > {app_title(name)}")
-    return {"name": name, "app_name": app_title(name), "from_next_start": True}
+    # The name it runs with, while another waited: the waiting one taken back, and nothing changes at the next start.
+    renaming = name != name_now()
+    changed("server:name", f"{app_title(name_now())} > {app_title(name)}" if renaming else f"{app_title(name)} (as it runs)")
+    return {"name": name, "app_name": app_title(name), "from_next_start": renaming}
 
 
 # The owner's password as these pages take a new one: it goes into .env as typed, where Docker Compose reads it too, so
@@ -610,11 +686,17 @@ def server_page():
     parts = data_parts()
     # Since when this service has run: the server's own start, as these pages start with it.
     started = int(setup.STARTED.rsplit("-", 1)[1]) if "-" in setup.STARTED else 0
+    moved = moved_off_80()
+    moved_words = moved_off_80_words(moved) if moved else None
     return render_template("server.html", kind=install_kind(), can_run=can_run_itself(), commands=commands(),
                            removes=removes(), parts=parts, total=sum(p["bytes"] for p in parts),
                            since=datetime.datetime.fromtimestamp(started).strftime("%Y-%m-%d %H:%M") if started else "",
                            version=os.environ.get("OPENDMTQ_VERSION") or "", root=repairing.install_root(),
-                           port=port_now(), public_port=public_port(), next_address=next_address(), moved_80=moved_off_80(),
+                           port=port_now(), public_port=public_port(), next_address=next_address(), next_port=next_port(),
+                           # A router's own port in an internet address, forwarded to the server's own: it stays at a move.
+                           forwarded=public_port() != port_now() and not core.lan_only(core.PUBLIC_HOST),
+                           # The move off port 80 while its notice is open, in the words it says it with.
+                           moved_80=moved_words,
                            admin_at=admin_address(),
                            can_move_port=bool(setup.HOST_INSTALL and setup.ENV_FILE),
                            # The app's name: as phones show it now, and the one waiting for the next start.
@@ -646,8 +728,17 @@ def server_port():
     """Move the server to another port from its next start (a host install): said on this page, and from then on above
     the Restart that makes it now."""
     try:
-        moved = move_port(request.form.get("port"))
-        flash(t("port.saved", address=moved["address"]), "ok")
+        flash(port_words(move_port(request.form.get("port"))), "ok")
+    except Refused as e:
+        flash(e.words, e.tone)
+    return redirect(url_for("server_page") + "#port")
+
+
+@app.route(BASE + "/server/moved-80", methods=["POST"])
+def server_moved_80():
+    """Done on the notice of the move off port 80: it goes from this page and the Status page; nothing else changes."""
+    try:
+        close_moved_off_80()
     except Refused as e:
         flash(e.words, e.tone)
     return redirect(url_for("server_page") + "#port")
@@ -659,7 +750,7 @@ def server_name():
     above the Restart that makes it now, as a move to another port is."""
     try:
         renamed = rename_server(request.form.get("name"))
-        flash(t("name.saved", app=renamed["app_name"]), "ok")
+        flash(t("name.saved" if renamed["from_next_start"] else "name.cancelled", app=renamed["app_name"]), "ok")
     except Refused as e:
         flash(e.words, e.tone)
     return redirect(url_for("server_page") + "#name")

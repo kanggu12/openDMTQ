@@ -531,24 +531,53 @@ class PortMoveTest(unittest.TestCase):
                 self.assertIn("LISTEN_PORT=8791", f.read())
             with mock.patch.object(admin.lifecycle, "port_free", lambda port: True):
                 moved = inst.client.post("/opendmtq/api/v1/server/port", json={"port": 8792}, headers=headers)
-            self.assertEqual(moved.get_json(), {"port": 8792, "address": "http://192.168.0.10:8792/", "from_next_start": True})
+            self.assertEqual(moved.get_json(), {"port": 8792, "address": "http://192.168.0.10:8792/", "from_next_start": True,
+                                                "new_app": True, "router": None})
             self.assertEqual(inst.client.get("/opendmtq/api/v1/server", headers=headers).get_json()["next_address"], "http://192.168.0.10:8792/")
 
-    def test_a_move_off_port_80_is_said_once_and_the_owners_port_80_is_kept(self):
+    def test_a_move_off_port_80_is_shown_until_it_is_done_and_the_owners_port_80_is_kept(self):
         # At its first start with this version a server set up on port 80 moved to 8791 (cli/opendmtq_cli/env.py): the
-        # Server page says it once, the API names the port it left each time; the page's own move to port 80 is the
-        # owner's choice, which the next start keeps (PORT_80=chosen).
+        # Server page and the Status page show it, with the wait lamp, on every visit until the owner's Done (the page's
+        # or the API's) or a month after the move; the API names the port it left each time (ADM-225; main said it once,
+        # under the lamp for "all is well", and never on the Status page). The page's own move to port 80 is the owner's
+        # choice, which the next start keeps (PORT_80=chosen).
         with Install() as inst, self.host(inst), mock.patch.object(admin.core, "PUBLIC_HOST", "192.168.0.10:8791"), \
                 mock.patch.object(admin.lifecycle, "port_free", lambda port: True):
             headers = self.token(inst)
-            with open(os.path.join(os.path.dirname(admin.core.DB), "port-moved.json"), "w", encoding="utf-8") as f:
-                json.dump({"from": 80, "to": 8791, "address": "192.168.0.10:8791", "at": 1, "said": ["start", "status"]}, f)
+            record = os.path.join(os.path.dirname(admin.core.DB), "port-moved.json")
+            with open(record, "w", encoding="utf-8") as f:
+                json.dump({"from": 80, "to": 8791, "address": "192.168.0.10:8791", "at": int(time.time()) - 86400,
+                           "said": ["start", "status"]}, f)
             inst.sign_in()
             words = "The server moved from port 80 to 8791 at its first start with this version: http://192.168.0.10:8791/."
-            self.assertIn(words, inst.client.get("/opendmtq/admin/server").get_data(as_text=True))
-            self.assertNotIn(words, inst.client.get("/opendmtq/admin/server").get_data(as_text=True))
             for _ in range(2):
-                self.assertEqual(inst.client.get("/opendmtq/api/v1/server", headers=headers).get_json()["moved_from"], 80)
+                page = inst.client.get("/opendmtq/admin/server").get_data(as_text=True)
+                self.assertRegex(page, r'<div class="setup-state moved-80" id="moved-80"><span class="lamp wait"></span><p>'
+                                 + re.escape(words))
+                self.assertIn(words, inst.client.get("/opendmtq/admin/").get_data(as_text=True))
+                got = inst.client.get("/opendmtq/api/v1/server", headers=headers).get_json()
+                self.assertEqual((got["moved_from"], got["move_off_80"]["to"], got["move_off_80"]["router"]), (80, 8791, None))
+                self.assertTrue(got["move_off_80"]["words"].startswith(words))
+                status = inst.client.get("/opendmtq/api/v1/status", headers=headers).get_json()
+                self.assertIn(words, json.dumps(status, ensure_ascii=False))
+            # Done, on the page: gone from both pages and from the API; the port it left is still named.
+            with inst.client.session_transaction("/opendmtq/admin/") as s:
+                csrf = s["csrf"]
+            self.assertEqual(inst.client.post("/opendmtq/admin/server/moved-80", data={"csrf": csrf}).status_code, 302)
+            self.assertNotIn('id="moved-80"', inst.client.get("/opendmtq/admin/server").get_data(as_text=True))
+            self.assertNotIn(words, inst.client.get("/opendmtq/admin/").get_data(as_text=True))
+            got = inst.client.get("/opendmtq/api/v1/server", headers=headers).get_json()
+            self.assertEqual((got["moved_from"], got["move_off_80"]), (80, None))
+            # The API's Done, on a notice open again; then nothing open to close.
+            with open(record, "w", encoding="utf-8") as f:
+                json.dump({"from": 80, "to": 8791, "address": "192.168.0.10:8791", "at": int(time.time())}, f)
+            self.assertEqual(inst.client.post("/opendmtq/api/v1/server/moved-80/close", headers=headers).get_json(), {"closed": True})
+            r = inst.client.post("/opendmtq/api/v1/server/moved-80/close", headers=headers)
+            self.assertEqual((r.status_code, r.get_json()["error"]["code"]), (404, "no_move"))
+            # A month after the move: no longer shown, Done or not.
+            with open(record, "w", encoding="utf-8") as f:
+                json.dump({"from": 80, "to": 8791, "address": "192.168.0.10:8791", "at": int(time.time()) - 31 * 86400}, f)
+            self.assertNotIn('id="moved-80"', inst.client.get("/opendmtq/admin/server").get_data(as_text=True))
             with inst.client.session_transaction("/opendmtq/admin/") as s:
                 csrf = s["csrf"]
             inst.client.post("/opendmtq/admin/server/port", data={"csrf": csrf, "port": "80"})
@@ -556,15 +585,16 @@ class PortMoveTest(unittest.TestCase):
                 self.assertEqual(f.read(), "PUBLIC_HOST=192.168.0.10\nLISTEN_PORT=80\nADMIN_PASSWORD=pw\nPORT_80=chosen\n")
 
     def test_a_move_off_port_80_behind_a_router_says_where_its_forward_goes(self):
-        # An exposed server moved off port 80: its public port moved with its own (the router forwards the new one), or
-        # it was the router's own and stays with the address (DEP-91, ADM-176); said once, in both languages.
+        # An exposed server moved off port 80: its public port moved with its own (a new forward of the new port, in place
+        # of the forward of port 80), or it was the router's own and stays with the address, its forward going on to the
+        # new port (DEP-91, ADM-176, ADM-225); in both languages, on every visit until Done.
         cases = (({"from": 80, "to": 8791, "address": "game.example.com:8791"},
                   "The server moved from port 80 to 8791 at its first start with this version: http://game.example.com:8791/. "
                   "Phones install the app again from that address, and PCs connect to it. "
-                  "On the router, forward TCP 8791 to port 8791 of this PC in place of port 80.",
+                  "On the router, forward TCP 8791 to port 8791 of this PC, in place of the forward of TCP 80.",
                   "이 버전으로 처음 시작할 때 서버가 80번 포트에서 8791번 포트로 옮겨졌습니다: http://game.example.com:8791/. "
                   "휴대폰은 이 주소에서 앱을 다시 설치하고, PC는 이 주소로 연결합니다. "
-                  "공유기에서 TCP 8791번 포트를 이 PC의 80번 포트 대신 8791번 포트로 포워딩하세요."),
+                  "공유기에서 TCP 80번 포트 포워딩 대신 TCP 8791번 포트를 이 PC의 8791번 포트로 포워딩하세요."),
                  ({"from": 80, "to": 8791, "address": "game.example.com:8443"},
                   "The server moved from port 80 to 8791 at its first start with this version; its address stays "
                   "http://game.example.com:8443/. On the router, forward TCP 8443 to port 8791 of this PC in place of port 80.",
@@ -574,14 +604,113 @@ class PortMoveTest(unittest.TestCase):
             for lang, words in (("en", english), ("ko", korean)):
                 with Install() as inst, self.host(inst), mock.patch.object(admin.core, "PUBLIC_HOST", moved["address"]):
                     with open(os.path.join(os.path.dirname(admin.core.DB), "port-moved.json"), "w", encoding="utf-8") as f:
-                        json.dump(dict(moved, at=1, said=["start"]), f)
+                        json.dump(dict(moved, at=int(time.time()), said=["start"]), f)
                     inst.client.set_cookie("opendmtq_lang", lang)
                     inst.sign_in()
-                    page = inst.client.get("/opendmtq/admin/server").get_data(as_text=True)
-                    shown = re.search(r'<p class="setup-state" id="moved-80"><span class="lamp ok"></span>(.*?)</p>', page, re.S)
-                    self.assertIsNotNone(shown, lang)
-                    self.assertEqual(shown.group(1), words)
-                    self.assertNotIn('id="moved-80"', inst.client.get("/opendmtq/admin/server").get_data(as_text=True))
+                    for _ in range(2):
+                        page = inst.client.get("/opendmtq/admin/server").get_data(as_text=True)
+                        shown = re.search(r'<div class="setup-state moved-80" id="moved-80"><span class="lamp wait"></span><p>(.*?)</p>',
+                                          page, re.S)
+                        self.assertIsNotNone(shown, lang)
+                        self.assertEqual(shown.group(1), words)
+
+    def moved_behind_a_router(self, public_host, new_port, lang="en"):
+        """A host install whose internet address is public_host, its own port 8791, moved on the Server page to new_port:
+        (.env after, what the page said, the page after, the API's answer to the same move made again)."""
+        with Install() as inst, self.host(inst), mock.patch.object(admin.core, "PUBLIC_HOST", public_host), \
+                mock.patch.dict(os.environ, {"LISTEN_PORT": "8791", "ADMIN_ON_PUBLIC_PORT": "no"}), \
+                mock.patch.object(admin.lifecycle, "port_free", lambda port: True):
+            env_text = f"PUBLIC_HOST={public_host}\nLISTEN_PORT=8791\nADMIN_ON_PUBLIC_PORT=no\nADMIN_PASSWORD=pw\n"
+            with open(inst.path(".env"), "w", encoding="utf-8") as f:
+                f.write(env_text)
+            headers = self.token(inst)
+            inst.client.set_cookie("opendmtq_lang", lang)
+            inst.sign_in()
+            with inst.client.session_transaction("/opendmtq/admin/") as s:
+                csrf = s["csrf"]
+            said = html.unescape(inst.client.post("/opendmtq/admin/server/port", data={"csrf": csrf, "port": str(new_port)},
+                                                  follow_redirects=True).get_data(as_text=True))
+            with open(inst.path(".env"), encoding="utf-8") as f:
+                env_after = f.read()
+            got = inst.client.get("/opendmtq/api/v1/server", headers=headers).get_json()
+            with open(inst.path(".env"), "w", encoding="utf-8") as f:
+                f.write(env_text)
+            answer = inst.client.post("/opendmtq/api/v1/server/port", json={"port": new_port}, headers=headers).get_json()
+        return env_after, said, got, answer
+
+    def test_a_move_of_an_internet_address_names_the_routers_new_forward(self):
+        # An address the internet reaches through a router, on the server's own port: the move takes the address with it,
+        # and the router now forwards the new port (DEP-113; main's page and the host's command line said nothing of it).
+        env_after, said, got, answer = self.moved_behind_a_router("game.example.com:8791", 9000)
+        self.assertIn("PUBLIC_HOST=game.example.com:9000\nLISTEN_PORT=9000\n", env_after)
+        self.assertIn("Saved. From the server's next start it answers here: http://game.example.com:9000/ (these pages under "
+                      "/opendmtq/admin/). Restart above to move it now. On the router, forward TCP 9000 to port 9000 of this "
+                      "PC, in place of the forward of TCP 8791.", said)
+        self.assertEqual((got["next_address"], got["next_port"]), ("http://game.example.com:9000/", 9000))
+        self.assertEqual(answer, {"port": 9000, "address": "http://game.example.com:9000/", "from_next_start": True, "new_app": True,
+                                  "router": {"public": 9000, "to": 9000, "was": 8791}})
+        _, said, _, _ = self.moved_behind_a_router("game.example.com:8791", 9000, lang="ko")
+        self.assertIn("공유기에서 TCP 8791번 포트 포워딩 대신 TCP 9000번 포트를 이 PC의 9000번 포트로 포워딩하세요.", said)
+        # A local network address has no router between: nothing of one.
+        env_after, said, _, answer = self.moved_behind_a_router("192.168.0.10:8791", 9000)
+        self.assertNotIn("router", said.lower())
+        self.assertIsNone(answer["router"])
+
+    def test_a_routers_own_port_in_the_address_stays_at_a_move(self):
+        # game.example.com:8443 forwarded to the server's own 8791 (as the move off port 80 keeps it): a move to 9000 moves
+        # LISTEN_PORT alone; the address and the app phones have stay, and the router's forward of 8443 goes to 9000
+        # (DEP-113; main wrote game.example.com:9000, built the app again for it, and said nothing of 8443's forward).
+        env_after, said, got, answer = self.moved_behind_a_router("game.example.com:8443", 9000)
+        self.assertIn("PUBLIC_HOST=game.example.com:8443\nLISTEN_PORT=9000\n", env_after)
+        self.assertIn("Saved. From the server's next start it listens on port 9000; its address stays "
+                      "http://game.example.com:8443/, and phones keep the app they have. Restart above to move it now. On the "
+                      "router, forward TCP 8443 to port 9000 of this PC in place of port 8791.", said)
+        self.assertIn('<span class="lamp wait"></span>From the next start: port 9000, at the same address</p>', said)
+        self.assertEqual((got["next_address"], got["next_port"]), (None, 9000))
+        self.assertEqual(answer, {"port": 9000, "address": "http://game.example.com:8443/", "from_next_start": True, "new_app": False,
+                                  "router": {"public": 8443, "to": 9000, "was": 8791}})
+        _, said, _, _ = self.moved_behind_a_router("game.example.com:8443", 9000, lang="ko")
+        self.assertIn("저장했습니다. 서버가 다음에 시작하면 9000번 포트에서 열리고, 주소는 http://game.example.com:8443/ 그대로라 "
+                      "휴대폰은 지금 앱을 그대로 씁니다. 바로 옮기려면 위에서 다시 시작하세요. 공유기에서 TCP 8443번 포트를 이 PC의 "
+                      "8791번 포트 대신 9000번 포트로 포워딩하세요.", said)
+
+    def test_the_port_and_the_name_it_runs_with_take_a_waiting_change_back(self):
+        # A move or a new name waiting for the next start, then the port or the name the server runs with: the change is
+        # taken back and said so, nothing new at the next start (ADM-226; main said "Saved ... restart above to apply").
+        with Install() as inst, self.host(inst), mock.patch.object(admin.core, "PUBLIC_HOST", "192.168.0.10:8791"), \
+                mock.patch.dict(os.environ, {"LISTEN_PORT": "8791", "SERVER_NAME": ""}), \
+                mock.patch.object(admin.lifecycle, "port_free", lambda port: True):
+            headers = self.token(inst)
+            inst.sign_in()
+            with inst.client.session_transaction("/opendmtq/admin/") as s:
+                csrf = s["csrf"]
+            for lang, port_words, name_words in (
+                    ("en", "The move waiting for the next start is cancelled: the server stays on port 8791, at http://192.168.0.10:8791/.",
+                     "The name change waiting for the next start is cancelled: the app stays TECHNIKA Q (192.168.0.10:8791)."),
+                    ("ko", "예약된 포트 변경을 취소했습니다. 서버는 지금처럼 8791번 포트로 http://192.168.0.10:8791/에서 열립니다.",
+                     "예약된 이름 변경을 취소했습니다. 앱 이름은 지금처럼 TECHNIKA Q (192.168.0.10:8791)입니다.")):
+                inst.client.set_cookie("opendmtq_lang", lang)
+                # The move's own answer read, as a browser reads it on the page it comes back to.
+                inst.client.post("/opendmtq/admin/server/port", data={"csrf": csrf, "port": "9000"}, follow_redirects=True)
+                page = html.unescape(inst.client.post("/opendmtq/admin/server/port", data={"csrf": csrf, "port": "8791"},
+                                                      follow_redirects=True).get_data(as_text=True))
+                self.assertIn(port_words, page, lang)
+                self.assertNotIn("Restart above", page)
+                inst.client.post("/opendmtq/admin/server/name", data={"csrf": csrf, "name": "Den"}, follow_redirects=True)
+                page = html.unescape(inst.client.post("/opendmtq/admin/server/name", data={"csrf": csrf, "name": ""},
+                                                      follow_redirects=True).get_data(as_text=True))
+                self.assertIn(name_words, page, lang)
+                with open(inst.path(".env"), encoding="utf-8") as f:
+                    text = f.read()
+                self.assertIn("PUBLIC_HOST=192.168.0.10:8791\nLISTEN_PORT=8791\n", text)
+                got = inst.client.get("/opendmtq/api/v1/server", headers=headers).get_json()
+                self.assertEqual((got["next_address"], got["next_port"], got["next_name"]), (None, None, None))
+            # The API's answers the same: nothing from the next start.
+            inst.client.post("/opendmtq/api/v1/server/port", json={"port": 9000}, headers=headers)
+            back = inst.client.post("/opendmtq/api/v1/server/port", json={"port": 8791}, headers=headers).get_json()
+            self.assertEqual((back["from_next_start"], back["router"]), (False, None))
+            inst.client.post("/opendmtq/api/v1/server/name", json={"name": "Den"}, headers=headers)
+            self.assertFalse(inst.client.post("/opendmtq/api/v1/server/name", json={"name": ""}, headers=headers).get_json()["from_next_start"])
 
     def test_in_containers_the_command_line_does_it(self):
         with Install() as inst:
