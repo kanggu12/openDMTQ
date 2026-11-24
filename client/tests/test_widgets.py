@@ -129,6 +129,21 @@ class Glass(unittest.TestCase):
                 self.assertEqual(whole.width - lead.width, int(math.floor(whole.width / 2.0 - 3.5 * scale)),
                                  (scale, hollow))
 
+    def test_a_korean_title_takes_the_room_of_an_english_one(self):
+        # The guide's questions in Korean are set in Pretendard, a little smaller than the wide face: their picture is as
+        # tall as an English one's and stands on its baseline, so that a step's heading takes the same room in either
+        # language (main: 6 px less in Korean, the cards moving up as the language changed, and the line under it 2 px
+        # from its letters), at 100 %, 150 % and 200 %; the letters inside the picture, their foot clear of its edge.
+        from opendmtq_client import art
+        for scale in (1.0, 1.5, 2.0):
+            english, base = art.page_title("Which server?", scale)
+            for korean_words in ("어느 서버인가요?", "1스테이지 준비 끝"):
+                korean, korean_base = art.page_title(korean_words, scale)
+                self.assertEqual((korean.height, korean_base), (english.height, base), (scale, korean_words))
+                ink = korean.split()[-1].getbbox()
+                self.assertGreater(ink[1], 0, (scale, korean_words))
+                self.assertLess(ink[3], korean.height, (scale, korean_words))
+
     def test_the_pages_shards_stand_right_of_their_room(self):
         # The launcher's page gives its shards a room: right of the content column and its clear room (ScrollArea's
         # shard_room). Nothing of them left of it at any width or scale, every part of the page; and some of them in it

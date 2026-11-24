@@ -1655,6 +1655,11 @@ def check_server(app, address, then=None):
             app.user_acted()
             app.state.save()
             app.refresh_checks()
+        # The address row on show says the answer in place, whoever asked (the guide's SERVER step asks by itself, and
+        # its line stayed on "Connecting..." after the server had answered: only a Connect pressed said it).
+        said = getattr(app, "address_answered", None)
+        if said is not None:
+            said()
         if then:
             then()
 
@@ -1694,11 +1699,19 @@ def form_row(parent, ui, title, build, top=False):
     """A row of a form (the Online page's server card, the guide's steps): the name in the page's names column, as a
     setting's (widgets.fit_names), and `build(row)`'s control in the next column, on one line by their middles. What the
     control answers (a field's error, how the connection stands, a note) goes under it in the control's column
-    (_answer), where a form's feedback belongs to its field."""
+    (_answer), where a form's feedback belongs to its field. `title` None: a row with no name and no names column, its
+    control from the card's own edge (the guide's card of one row, whose title names it)."""
     from opendmtq_client import i18n
     bg = _surface(parent)
     row = tk.Frame(parent, bg=bg)
     row.columnconfigure(1, weight=1)
+    # The rows under the control's line in its column, as they are said.
+    row.answers = 0
+    if title is None:
+        # Nothing in the names column, and no room kept for it.
+        row.control = build(row)
+        row.control.grid(row=0, column=1, sticky="w")
+        return row
     # The name in each language the launcher speaks: the page's layout is the same in both, whichever is on show.
     row.odq_names = i18n.every_language(title)
     row.columnconfigure(0, minsize=widgets.name_width(ui, row.odq_names))
@@ -1714,8 +1727,6 @@ def form_row(parent, ui, title, build, top=False):
     else:
         # The name on the middle of the control's one line (a field's, a button's, words).
         name.grid(row=0, column=0, sticky="w", padx=(0, ui.px(widgets.LABEL_GAP)))
-    # The rows under the control's line in its column, as they are said.
-    row.answers = 0
     return row
 
 
@@ -1794,9 +1805,11 @@ def address_row(app, parent, rerender):
             field.set_error(True)
             address.focus_set()
             return
-        # What is asked is what the field holds: kept for the page drawn again with the answer.
+        # What is asked is what the field holds: kept for the page drawn again with the answer, which this row says in
+        # place as every answer (app.address_answered, called by check_server): once, as a typed address's failure is
+        # said once.
         remember()
-        check_server(app, address.get(), then=lambda: (answered(), rerender()))
+        check_server(app, address.get(), then=rerender)
         # Said at once, before the server answers.
         answer.set(w("online.connecting"))
         field.set_error(False)
@@ -1816,6 +1829,9 @@ def address_row(app, parent, rerender):
             address.insert(0, app.state.current)
             field.refresh()
 
+    # Any answer to a server check says itself here, in place (check_server): the guide's own check of the server the
+    # installer brought too.
+    app.address_answered = answered
     address.bind("<Return>", lambda e: connect())
     address.bind("<KP_Enter>", lambda e: connect())
     # The page's main action is the next step: Connect while there is no server (then Sign in, then the app's download).
@@ -1836,10 +1852,11 @@ def connect_panel(app, parent, rerender):
     return address_row(app, card.body, rerender)
 
 
-def signin_rows(app, parent, rerender):
+def signin_rows(app, parent, rerender, named=True):
     """The sign-in on the current server, as rows: who is signed in and Sign out; or the form: the ID and the password,
     each in its row, the password shown on demand, Sign in under them; Enter in either field signs in. What is wrong
-    is said in place, under the field it is about (an empty one, a wrong password), or under the button."""
+    is said in place, under the field it is about (an empty one, a wrong password), or under the button. `named`
+    False: who is signed in without the row's name, in the guide's card whose title says it (Signed in, twice)."""
     ui, w = app.ui, app.words
     server = app.state.server()
     if server is None:
@@ -1867,7 +1884,7 @@ def signin_rows(app, parent, rerender):
             widgets.Button(line, ui, w("online.signout"), sign_out).pack(side="left", padx=(ui.px(VALUE_ACTION_GAP), 0))
             return line
 
-        form_row(parent, ui, w("online.account.signed"), control).pack(fill="x")
+        form_row(parent, ui, w("online.account.signed") if named else None, control).pack(fill="x")
         return
     fields, said, rows = {}, {}, {}
     for i, (key, secret) in enumerate((("online.id", False), ("online.password", True))):
@@ -1982,12 +1999,13 @@ def signin_panel(app, parent, rerender):
         return
     card = _card(parent, ui, w("online.account.signed" if app.state.signed_in(server) else "online.account"), last=True)
     _server_line(app, card.body)
-    signin_rows(app, card.body, rerender)
+    signin_rows(app, card.body, rerender, named=False)
 
 
-def app_row(app, parent, rerender):
+def app_row(app, parent, rerender, named=True):
     """The server's app on this PC, as a row: what it has (or that the server has a newer one), what the last look or
-    download said, and the download with its progress, or its button."""
+    download said, and the download with its progress, or its button. `named` False: without the row's name, in the
+    guide's card titled The server's app (main said it twice, over the row and as its name)."""
     ui, w = app.ui, app.words
     server = app.state.server()
     if server is None:
@@ -2008,7 +2026,7 @@ def app_row(app, parent, rerender):
         widgets.label(line, ui, text, fg=colour, bg=bg).pack(side="left")
         return line
 
-    row = form_row(parent, ui, w("online.app"), control)
+    row = form_row(parent, ui, w("online.app") if named else None, control)
     row.pack(fill="x")
     if app.download is None and app.app_note and not newer:
         # The last look for a newer app found none: said here, where its button is.
@@ -2063,7 +2081,7 @@ def app_panel(app, parent, rerender):
         return
     card = _card(parent, ui, w("online.app"), last=True)
     _server_line(app, card.body)
-    app_row(app, card.body, rerender)
+    app_row(app, card.body, rerender, named=False)
 
 
 def _date(details):

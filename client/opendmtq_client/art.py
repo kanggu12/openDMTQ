@@ -390,17 +390,19 @@ def page_title(text, scale=1.0, size=42, accent=theme.OK):
     set in Pretendard Bold, which has it, leant as the wide face leans. Returns an RGBA picture and its baseline."""
     k = SS
     t = size * scale * k
+    # The wide face's line at this size: every title's picture as tall as it, its baseline where the wide face's is, so
+    # that a page's heading takes the same room in either language (a Korean question's shorter picture moved the
+    # guide's cards 6 px up and set the line under it 2 px from its letters).
+    line = 1.08 * t
+    base = (line - (1.135 + 0.439) * t) / 2 + 1.135 * t
     # The wide face has no Hangul (the syllables 가 to 힣): a Korean title takes Pretendard Bold for all of it, its Latin
     # letters too.
     hangul = any("가" <= ch <= "힣" for ch in text)
     if hangul:
-        # Hangul stands taller than the wide face's capitals at one size: a little smaller, the same height on the page.
+        # Hangul stands taller than the wide face's capitals at one size: a little smaller, the same height on the page,
+        # on the same baseline (its own ascent of 1.0 and descent of 0.3 em fall inside the wide face's line).
         t = t * 0.86
     font = ImageFont.truetype(theme.HANGUL_TITLE_FILE if hangul else theme.WIDE_ITALIC_FILE, max(1, int(round(t))))
-    # Each face's ascent and descent in ems, which place the baseline in the 1.08 line.
-    asc, desc = (1.0, 0.3) if hangul else (1.135, 0.439)
-    line = 1.08 * t
-    base = (line - (asc + desc) * t) / 2 + asc * t
     # Room after the last letter for its lean and the 0.12 em the site keeps, and under the line for nothing.
     width = int(math.ceil(font.getlength(text) - 0.012 * t * len(text) + 0.3 * t))
     height = int(math.ceil(line))

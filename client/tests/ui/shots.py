@@ -405,6 +405,16 @@ def guide_check(app, site, out, tag, problems):
         settle(app)
         name = "%s_guide%d-%s" % (tag, i + 1, key)
         if key == "server":
+            # The step asks the server the installer brought by itself: once it answered, the line under the address
+            # says so, with no Connect pressed (main: "Connecting..." for as long as the step showed).
+            settle(app, 12, until=lambda: not guide.checking)
+            settle(app)
+            said = [x.cget("text") for x in widgets_of(app.root) if isinstance(x, tk.Label) and x.winfo_ismapped()]
+            connected = w("online.connected", name=app.state.server()["name"])
+            if connected not in said:
+                problems.append("%s: once the server answered, the line under its address does not say %r%s" % (
+                    name, connected, " (it says %r)" % w("online.connecting") if w("online.connecting") in said else ""))
+            shot(app.root, out, name + "-answered")
             # A failed Connect keeps what was typed, said in plain words; then the server the installer brought again.
             typed_address_check(app, out, name, problems, site.url)
         if key == "login":

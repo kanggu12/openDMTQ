@@ -196,6 +196,13 @@ def composition(root, ui, name):
                 problems.append("%s: the card %s holds a single control (%s)%s" % (
                     name, _said(card), _said(controls[0]),
                     " and the words %r" % str(words[0].cget("text"))[:40] if words else ""))
+            # The card's title said once: no row's name in it says it again (the guide's DOWNLOAD and SIGN IN cards were
+            # titled The server's app and Signed in over a row of the same name).
+            title = _title(card)
+            if title is not None:
+                again = [w for w in words if w is not title and str(w.cget("text")) == str(title.cget("text"))]
+                if again:
+                    problems.append("%s: the card %s says its title again in its rows" % (name, _said(card)))
             # A setting's row is one setting, its name and its description its own: a card that holds one such row and
             # nothing else is a box for one setting (main let the Controls page's card of the switch alone pass, and
             # the guide's card of the display's mode alone, by counting the row's name as a second line).

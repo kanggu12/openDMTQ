@@ -943,10 +943,22 @@ def span(seconds):
     return Said("common.minutes", m=minutes) if minutes else Said("common.seconds", s=int(seconds))
 
 
+class Text(str):
+    """Words looked up by their key with nothing filled in (a setting's name, a card's title): a str that keeps the key
+    it came from, so that what is laid out for every language finds that entry's words, and none of another entry that
+    happens to share them in one language (every_language)."""
+
+    def __new__(cls, text, key):
+        made = super().__new__(cls, text)
+        made.key = key
+        return made
+
+
 class Words:
     """Looks words up in the chosen language; a missing Korean entry falls back to English. A key with no words shows as
     itself, except in a test run or the UI tests' container, where it is an error: the tests reach every page, dialog
-    and step, and a word left out would otherwise go unseen until a player sees the raw key."""
+    and step, and a word left out would otherwise go unseen until a player sees the raw key. Words with nothing filled
+    in keep their key (Text)."""
 
     def __init__(self, language="en"):
         self.language = language
@@ -956,7 +968,8 @@ class Words:
             raise KeyError("no words for %r" % key)
         en, ko = TEXT.get(key, (key, key))
         text = ko if self.language == "ko" and ko else en
-        return text.format(**kw) if kw else text
+        # Filled in, the words are the entry's no more; as they are, they keep the key they came from.
+        return text.format(**kw) if kw else Text(text, key)
 
     def say(self, message):
         """A message kept to show (a Said, said in this language now), or plain text as it is; "" for none."""
@@ -993,8 +1006,14 @@ class Words:
 
 
 def every_language(text):
-    """A text in every language the launcher speaks: the words of each entry whose English or Korean words are `text` (a
-    setting's name, shown in one language while the page keeps room for both), or the text alone when none is."""
+    """A text in every language the launcher speaks (a setting's name, shown in one language while the page keeps room
+    for both): its own entry's words when it was looked up by its key (Text), else the words of each entry whose English
+    or Korean words are `text`, or the text alone when none is. By its key, a name never takes the room of another
+    entry's words that share its words in one language (Online's 서버 주소 took the report's "the servers' addresses",
+    and Korean forms were laid out wider than English ones)."""
+    key = getattr(text, "key", None)
+    if key in TEXT:
+        return sorted({words for words in TEXT[key] if words})
     found = {text}
     for en, ko in TEXT.values():
         if text in (en, ko):

@@ -94,6 +94,25 @@ def main():
             problems.append("Online: the field of %r stands off its name's middle (%.1f, %.1f)" % (
                 name.cget("text"), field.winfo_rooty() + field.winfo_height() / 2.0, middle))
 
+    # ---- The same form in the other language: its fields start where they started, the names column kept for both
+    # languages' names (main laid Korean forms out 39 px wider: 서버 주소 took the room of another entry's words).
+    def field_starts():
+        return sorted({x.winfo_rootx() for x in shots.widgets_of(app.body.inner)
+                       if isinstance(x, widgets.Field) and x.winfo_ismapped()})
+
+    here = field_starts()
+    language = app.state.picked_language or args.lang
+    app.set_language("ko" if language == "en" else "en")
+    shots.settle(app)
+    app.nav_go("online")
+    shots.settle(app)
+    there = field_starts()
+    if here != there:
+        problems.append("Online: the fields start at %r in %s and %r in the other language" % (here, args.lang, there))
+    app.set_language(language)
+    shots.settle(app)
+    w = app.words
+
     # ---- The settings' controls of the Screen page (below 100 %, with every row), of the Sound page and of Help's
     # tools: what shows of each starts on one line (a row name longer than the names' column would push its control
     # out of it).

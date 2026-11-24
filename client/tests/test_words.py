@@ -232,6 +232,16 @@ class Wording(unittest.TestCase):
                 self.assertNotIn(phrase, ko, key)
         self.assertIn("screen.fps.hint.free.unlimited", i18n.TEXT)
 
+    def test_a_name_takes_its_own_room_in_both_languages(self):
+        # A setting's or a form's name keeps room for its words in both languages, its own entry's: Online's 서버 주소 is
+        # also the report's words for "the servers' addresses", which main counted too, so Korean forms stood 39 px
+        # wider than English ones and the page moved as the language changed.
+        for language in ("en", "ko"):
+            w = i18n.Words(language)
+            self.assertEqual(i18n.every_language(w("online.address")), sorted(i18n.TEXT["online.address"]), language)
+            # Filled in, words are no entry's own: looked up by their words, as before.
+            self.assertEqual(i18n.every_language(w("online.to_play", name="Club")), [w("online.to_play", name="Club")])
+
     def test_one_korean_sentence_says_one_thing(self):
         # A Korean sentence two keys share says the same as both their English ones: main said "아직 플레이 기록이 없습니다."
         # for the records' "No plays recorded yet." and for the last game's "No game yet.", so the Korean PLAY page said
