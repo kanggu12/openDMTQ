@@ -72,7 +72,12 @@ function Write-Result([string]$name, [bool]$ok, $run) {
     } else {
         Write-Output "FAIL $name"
     }
-    $run.Text -split "`n" | Where-Object { $_ -notmatch 'DT_FLAGS_1' } | Select-Object -Last 15 | ForEach-Object { Write-Output "    $_" }
+    $lines = $run.Text -split "`n" | Where-Object { $_ -notmatch 'DT_FLAGS_1' }
+    # Every check the program says failed, wherever it stands in its output: a long program's failing line comes before
+    # the last lines shown below and was cut off with them (a check of audiotest on a CI runner said only its tail).
+    $lines | Where-Object { $_ -match '^\s*FAIL' } | ForEach-Object { Write-Output "    $_" }
+    # Then its last lines, for what it said as it ended.
+    $lines | Select-Object -Last 15 | ForEach-Object { Write-Output "    $_" }
     $script:failed = $true
 }
 
