@@ -108,6 +108,17 @@ class AdminStrings(unittest.TestCase):
             self.assertIn(table["acc.turn_off"].lower(), table["change.acc_off"].lower(), lang)
             self.assertIn(table["acc.turn_on"].lower(), table["change.acc_on"].lower(), lang)
 
+    def test_the_korean_reads_as_a_korean_product_says_it(self):
+        # Words a Korean reader stumbles on, put as a Korean product says them: a player's purchases at a time (시각) and
+        # what was paid (지불), an item given (지급) beside its column's word, a ban's end later than now, a visit through
+        # a proxy counted as one from elsewhere, the dot in an ID a 마침표 as MY PAGE says it (ADM-242).
+        ko = strings.STRINGS["ko"]
+        for key, text in ko.items():
+            for old in ("온 것이라도", "다른 곳에서 온 방문입니다", "낸 값", "앞으로의 시각", "주거나 회수", "점(.)"):
+                self.assertNotIn(old, text, key)
+        self.assertEqual((ko["game.th_when"], ko["game.th_paid"]), ("시각", "지불"))
+        self.assertIn("마침표(.)", ko["acc.bad_id"])
+
     def test_the_notices_page_and_its_cards_share_one_word(self):
         # The menu's word for the Notices page is its cards' (공지), as the game's own toast says it, and the setup goes on
         # in the words a Korean reader uses (ADM-195).
@@ -196,6 +207,8 @@ class PortalStrings(unittest.TestCase):
             # A tablet counts: "폰" alone only in the words that name both, or a phone in particular.
             if "폰" in text.replace("아이폰", "").replace("폰과 태블릿", "").replace("폰이나 태블릿", ""):
                 self.fail(f"{key}: {text}")
+            # One way to ask for another try, as every other line of the site asks (ADM-242).
+            self.assertNotIn("다시 해 보세요", text, key)
         for key, text in self.en.items():
             self.assertNotIn(EM_DASH, text, key)
 

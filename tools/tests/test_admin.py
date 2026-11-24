@@ -3459,7 +3459,7 @@ class FormChecksTest(unittest.TestCase):
             self.assertIn('data-show="보기" data-hide="숨기기"', login)
             inst.sign_in()
             page = inst.client.get("/opendmtq/admin/accounts").get_data(as_text=True)
-            self.assertIn('data-bad="아이디는 영문, 숫자, 점(.), 하이픈(-), 밑줄(_)로 3~20자입니다."', page)
+            self.assertIn('data-bad="아이디는 영문, 숫자, 마침표(.), 하이픈(-), 밑줄(_)로 3~20자입니다."', page)
             self.assertIn('data-bad="토큰 이름은 1~40자입니다."', page)
 
     def test_the_server_still_refuses_what_the_page_would_not_send(self):
