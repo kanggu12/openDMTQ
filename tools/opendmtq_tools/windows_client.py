@@ -264,6 +264,19 @@ def offered(out_dir):
         return None
 
 
+def will_offer(apk_dir):
+    """True when the site hands out the installer, or will from the app's next build, as find() would have it then: one
+    offered now (offered()), one at hand (beside this code, as a release's Windows bundle and tools image carry it, or
+    in `apk_dir` under this program's name or a release's), or the latest release's, which the build fetches, unless a
+    fetch failed within the day (no way out then). A setup makes the players' accounts before it builds the app: their
+    message names the installer as the site will have it."""
+    if offered(os.path.join(apk_dir, "out")) or bundled()[0] or bundled(os.path.join(apk_dir, SETUP_NAME))[0]:
+        return True
+    if glob.glob(os.path.join(glob.escape(apk_dir), RELEASE_NAME.format(version="*"))):
+        return True
+    return not fresh(os.path.join(apk_dir, FAILED), RETRY_AFTER)
+
+
 def sha256(path):
     """A file's SHA-256, read a megabyte at a time."""
     h = hashlib.sha256()

@@ -1718,8 +1718,11 @@ class InviteTest(unittest.TestCase):
 
     def test_the_message_names_the_server_and_the_pc_installer_when_the_site_has_it(self):
         # The server by the name its app has on the phone (SERVER_NAME, else the address), and the installer for Windows
-        # on the same page once the site hands one out (windows.json beside it, at its size), in both languages.
-        with Install() as install, mock.patch.dict(os.environ, {"SERVER_NAME": "Living Room"}):
+        # on the same page once the site hands one out (windows.json beside it, at its size), in both languages; none
+        # where none can be had (nothing at hand, and the last fetch of the release's failed within the day).
+        with Install() as install, mock.patch.dict(os.environ, {"SERVER_NAME": "Living Room"}), \
+                mock.patch.object(admin.apps.windows_client, "HERE", install.path("program")):
+            install.write("apk/" + admin.apps.windows_client.FAILED, "no way out\n")
             install.sign_in()
             page = html.unescape(self.message(install, "friend1"))
             self.assertIn("TECHNIKA Q (Living Room), an OpenDMTQ server\nSign in", page)
@@ -1738,6 +1741,27 @@ class InviteTest(unittest.TestCase):
             self.assertIn("TECHNIKA Q (Living Room), OpenDMTQ 서버", page)
             self.assertIn("Android 휴대폰과 태블릿용입니다.\nWindows PC: 같은 페이지의 설치 파일(.exe) 다운로드", page)
             self.assertNotIn("전용", page)
+
+    def test_the_setups_players_come_before_the_app_and_their_message_names_the_installer_it_will_have(self):
+        # The setup makes the players' accounts before it builds the app: on a Windows bundle (the installer beside its
+        # code) and on a host install (the build fetches the release's), the message names the installer the site will
+        # hand out (ADM-227; main named it only once data/apk/out held it, so the setup's messages had no PC line).
+        windows_line = "For Android phones and tablets.\nOn a Windows PC: the same page, Download the installer (.exe)."
+        for case in ("beside the code", "fetched by the build"):
+            with Install() as install, mock.patch.object(admin.apps.windows_client, "HERE", install.path("program")):
+                if case == "beside the code":
+                    os.makedirs(install.path("program"))
+                    with open(install.path("program/OpenDMTQ-Setup.exe"), "wb") as f:
+                        f.write(b"MZ" + b"\0" * admin.apps.windows_client.SMALLEST)
+                install.sign_in()
+                self.assertFalse(admin.apps.windows_client.offered(admin.core.APK + "/out"), case)
+                self.assertIn(windows_line, html.unescape(self.message(install, "friend1")), case)
+                # The setup's own players step, the same message.
+                csrf = page_token(install)
+                install.client.post("/opendmtq/admin/setup/player", data={"csrf": csrf, "name": "friend2"})
+                page = html.unescape(install.client.get("/opendmtq/admin/setup?step=players").get_data(as_text=True))
+                self.assertIn("ID: friend2", page, case)
+                self.assertIn(windows_line, page, case)
 
     def test_the_message_says_https_where_the_site_is_on_it(self):
         with Install() as install, mock.patch.multiple(admin.core, PUBLIC_HOST="play.example.com:8790", server_health=lambda fresh=False: {"ok": True, "https": True}):

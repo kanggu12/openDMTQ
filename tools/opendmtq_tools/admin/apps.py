@@ -100,8 +100,9 @@ def build_error():
 def invite_text(url, name, password):
     """The message to send a player with their new account: the server by the name its app has on their phone, where to
     sign in and get the app, their ID and password, and the installer for Windows on the same page when the site hands
-    one out (windows_client.offered, as the Download page decides)."""
-    pc = windows_client.offered(os.path.join(core.APK, "out"))
+    one out, or will once the app is built (windows_client.will_offer: the setup makes the accounts before the app, and
+    a Windows bundle's message named no installer there that its site then had)."""
+    pc = windows_client.will_offer(core.APK)
     return tp("invite.text_pc" if pc else "invite.text", app=core.app_name(), url=url, id=name, password=password)
 
 
