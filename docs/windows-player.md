@@ -161,8 +161,11 @@ it was. How it is fetched and checked: [updates](architecture.md#updates).
 `OpenDMTQ-cmd.exe`, in `%LOCALAPPDATA%\OpenDMTQ.Client\current`, does the same from the command line: `--status` (exit 0
 when PLAY can go; under **Sound** the last game's sound as the Sound page says it; its last line is the launcher's
 version, and a newer one when there is), `--test-server [ADDRESS]` (the connection test of the server PLAY plays on
-or of ADDRESS, each step as it ends; exit 0 when every step passed, 1 when one failed), `--server URL`, `--sign-in ID`
-(the password from standard input), `--sign-out`, `--app`, `--set NAME=VALUE`, `--audio-devices`,
+or of ADDRESS, each step as it ends; exit 0 when every step passed, 1 when one failed), `--server URL`, `--use-found`
+(Online's **Use this address**: the server moved to the address the last test found it at, its sign-in with it),
+`--sign-in ID` (the password from standard input), `--sign-out`, `--app`, `--records` (PLAY's **My records**),
+`--my-page` (PLAY's **My page on the site**, in the browser), `--set NAME=VALUE`, `--reset-keys` (the Controls page's
+**Reset keys**), `--audio-devices`,
 `--language en|ko|system`, `--guide`, `--skip-guide` (the guide's **Skip**: the window opens on its pages), `--servers`
 (the servers it knows, as **Online** lists them), `--open-log player|launcher`, `--report FILE` (Help's report, into
 FILE, or into a folder under its own name), `--play`, `--update`, `--forget URL`, `--reset`, `--repair`,

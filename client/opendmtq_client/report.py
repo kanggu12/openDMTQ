@@ -122,7 +122,8 @@ SERVER_AT = _shapes(
     r"(\bOpenDMTQ-)([^\s\\/\"']+?)(?=-v[\d.]+\.apk\b)",
     r"(\bopendmtq-pc-client-[\w.]+-windows-x64-setup-)([^\s\\/\"']+?)(?=\.exe\b)",
     r"(\bOpenDMTQ-Setup-)([^\s\\/\"']+?)(?=\.exe\b)")
-# Where a server's own name stands: --server's line ("Connected to NAME (address)."), a known server's that did not
+# Where a server's own name stands: --server's line ("Connected to NAME (address)."), --use-found's ("Moved to NAME
+# (address): ..."), a known server's that did not
 # answer ("NAME did not answer; playing on it as known (address)."), a server as one line names it (state.label, NAME
 # (address)) in --status and its ready check ("server: ...") and in --servers (each line "* " or "  " first, after the
 # log's time, level and thread, the name right after: never a blank or a bracket, which the ready check's lines start
@@ -131,6 +132,7 @@ SERVER_AT = _shapes(
 _IN_BRACKETS = r"(?= \((?:[a-z][a-z0-9+.-]*://|<server>)[^()\n]*\)"
 NAME_AT = _shapes(
     r"(\bConnected to )([^<>\n]+?)%s)" % _IN_BRACKETS,
+    r"(\bMoved to )([^<>\n]+?)%s)" % _IN_BRACKETS,
     r"(^\S+ \S+ [A-Z]+ \S+ )([^<>\n]+?)(?= did not answer; playing on it as known \()",
     r"(\bserver: )([^<>\n]+?)%s$)" % _IN_BRACKETS,
     r"(^\S+ \S+ [A-Z]+ \S+ [* ] )([^<>\n\[\s][^<>\n]*?)%s$)" % _IN_BRACKETS,
@@ -141,7 +143,8 @@ _ID = r"[^\s,;:()<>\"']*[^\s,;:()<>\"'.]"
 # Where the launcher writes a site ID, whatever it is: a sign-in that failed, with the ID as typed (to the error after
 # it), a sign-in's line ("Signed in as player1.", "signed in as player1 on ..."), the command line's --sign-in, an
 # installer's ("the ID player1 to sign in with"), --status's ("signed in: player1", "no (player1, ended)"), the ready
-# check's ("[ok  ] account: player1"), and the settings' fields.
+# check's ("[ok  ] account: player1"), --records' for an account linked to no player (i18n play.records.unlinked, at
+# the log line's start), and the settings' fields.
 ACCOUNT_AT = _shapes(
     r"(\bcould not sign in to \S+ as )([^\n]+?)(?=: )",
     r"(\bsign(?:ed)?[ -]in(?: to \S+)? as )(%s)" % _ID,
@@ -150,6 +153,7 @@ ACCOUNT_AT = _shapes(
     r"(\bsigned in: no \()(%s)(?=, ended\))" % _ID,
     r"(\bsigned in: )(?!no(?: \(|$))(%s)" % _ID,
     r"(\] account: )(?!not signed in$)(%s)" % _ID,
+    r"(^\S+ \S+ [A-Z]+ \S+ )(%s)(?= is not linked to a player on this server\.)" % _ID,
     r"(\"(?:account|fill)\"\s*:\s*\")([^\"]+)(?=\")")
 # The fields of the connection test's lines that name a server or a sign-in, and what each is (_worded).
 WORDED = {"account": "account", "name": "server_name", "host": "server"}

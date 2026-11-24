@@ -288,17 +288,21 @@ class EveryForm(Played):
             "INFO sign-in could not sign in to %s as %s: the ID or the password is wrong" % (FORGOTTEN, WRONG_ID),
             # An installer's ID, and the command line's arguments as the first line says them.
             "INFO MainThread the installer brought the ID %s to sign in with" % ONCE_ID,
-            "INFO MainThread OpenDMTQ 0.11.1 started: --server %s --sign-in=%s" % (TYPED, ONCE_ID))
+            "INFO MainThread OpenDMTQ 0.11.1 started: --server %s --sign-in=%s" % (TYPED, ONCE_ID),
+            # --records of an account linked to no player, in the window's words.
+            "INFO MainThread %s is not linked to a player on this server." % ACCOUNT)
         self.logged("INFO MainThread an older log, signed in as %s on %s" % (ONCE_ID, FORGOTTEN), name="launcher.log.2")
         _path, _left, files = self.make()
         everything = "\n".join(files.values())
-        for private in (ACCOUNT + ".", "signed in: " + ACCOUNT, "account: " + ACCOUNT, ONCE_ID, "sena kim", "as sena"):
+        for private in (ACCOUNT + ".", "signed in: " + ACCOUNT, "account: " + ACCOUNT, ONCE_ID, "sena kim", "as sena",
+                        ACCOUNT + " is not linked"):
             self.assertNotIn(private, everything, private)
         log = files["launcher/launcher.log"]
         for line in ("Signed in as <account>.", "signed in: <account>", "signed in: no (<account>, ended)",
                      "[ok  ] account: <account>", "[warn] account: not signed in",
                      "could not sign in to <server> as <account>: the ID or the password is wrong",
-                     "the installer brought the ID <account> to sign in with", "--sign-in=<account>"):
+                     "the installer brought the ID <account> to sign in with", "--sign-in=<account>",
+                     "MainThread <account> is not linked to a player on this server."):
             self.assertIn(line, log)
         self.assertIn("signed in as <account> on <server>", files["launcher/launcher.log.2"])
 

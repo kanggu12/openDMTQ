@@ -461,7 +461,9 @@ def _record(row):
     """One play or best of the site's records as the PLAY page shows it, or None for what is no record."""
     if not isinstance(row, dict) or _whole(row.get("score")) is None:
         return None
-    return {"title": _words(row.get("title")), "chart_name": _words(row.get("chart_name"), 60),
+    # The chart's number too: a chart whose song the song list no longer has is named by it ("Chart 61").
+    return {"chart": _whole(row.get("chart"), 0), "title": _words(row.get("title")),
+            "chart_name": _words(row.get("chart_name"), 60),
             "score": row["score"], "grade": _words(row.get("grade"), 2) or "", "keys": row.get("keys") is True,
             "rank": _whole(row.get("rank"), 1), "players": _whole(row.get("players"), 0) or 0,
             "new_record": row.get("new_record") is True, "at": _whole(row.get("at")) or _whole(row.get("set_at")),

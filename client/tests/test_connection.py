@@ -26,6 +26,14 @@ def closed_port():
         return s.getsockname()[1]
 
 
+def run_main(args):
+    """OpenDMTQ-cmd.exe with these arguments: (its exit code, what it printed)."""
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+        code = main.main(args)
+    return code, out.getvalue()
+
+
 class Other(socketserver.ThreadingTCPServer):
     """Another service on a port: it answers anything with a line that is no HTTP, as a mail or a shell server does."""
 
@@ -452,6 +460,25 @@ class MovedOverHttps(Https):
         # A test of the new address afterwards: the server's own certificate, trusted for it.
         result = connection.run(self.https.base, None)
         self.assertEqual(result.step("server").said.key, "test.server.ok_https_own")
+
+    def test_the_command_line_uses_the_address_found_with_its_authority(self):
+        # OpenDMTQ-cmd.exe's twin of Use this address: after --test-server found the server on its new port, --use-found
+        # plays on it there with the sign-in and the old address's authority taken along, as the window's button does
+        # (main: --server of the address found failed at the certificate, exit 2, and no option took the entry along).
+        state = st.LauncherState()
+        state.add_server(self.old, "Over HTTPS")
+        state.server(self.old).update(account="sena", cookie="1999999999.%s.%s" % ("sena".encode().hex(), "cd" * 32),
+                                      expires=1999999999)
+        state.save()
+        with mock.patch.object(connection, "PORTS", (closed_port(), self.https.port)):
+            code, said = run_main(["--test-server", "--use-found"])
+        self.assertEqual(code, 0, said)
+        self.assertIn("An OpenDMTQ server answers at %s." % self.https.base, said)
+        self.assertIn("Moved to Over HTTPS (%s): PLAY plays on it from now on." % self.https.base, said)
+        state = st.LauncherState.load()
+        self.assertEqual([(s["url"], s["account"]) for s in state.servers], [(self.https.base, "sena")])
+        self.assertEqual(state.current, self.https.base)
+        self.assertEqual(srv._trusted(), {self.https.base: self.ca})
 
     def test_another_program_with_its_own_certificate_on_the_old_port(self):
         # Another program took the old port, answering HTTPS with a certificate of its own authority, which the old

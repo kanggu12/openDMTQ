@@ -557,6 +557,150 @@ class CommandLine(Folder):
         self.assertTrue(out.getvalue().startswith("OpenDMTQ "))
 
 
+class Twins(Folder):
+    """The window's buttons that had no OpenDMTQ-cmd.exe twin: PLAY's My records and My page on the site, the Controls
+    page's Reset keys, and the connection test's Use this address (main: no option for any of them)."""
+
+    # main() as CommandLine runs it, without CommandLine's own tests run again here.
+    run_main = CommandLine.run_main
+
+    def setUp(self):
+        super().setUp()
+        self.site = stub.Site().start()
+        self.addCleanup(self.site.stop)
+
+    def signed_in(self):
+        code, said = self.run_main(["--server", self.site.url, "--sign-in", stub.ACCOUNT], stdin=stub.PASSWORD + "\n")
+        self.assertEqual(code, 0, said)
+
+    def test_my_records(self):
+        # Each list under its name, each record as the PLAY page shows it: the chart, the score, the keyboard's mark, the
+        # place on the chart, when, and a play's new record or a best's grade.
+        self.signed_in()
+        recent, best = self.site.records["recent"][0], self.site.records["best"][0]
+        code, said = self.run_main(["--records"])
+        self.assertEqual(code, 0, said)
+        self.assertIn("Recent plays: %s: 3 LINE Hard 9, 987,654, Keyboard play, #1 of 4, 5 min ago, New record"
+                      % recent["title"], said)
+        self.assertIn("Best records: %s: 3 LINE Hard 9, 987,654, Keyboard play, #1 of 4, 5 min ago, Grade S"
+                      % best["title"], said)
+        self.assertEqual(said.count("Recent plays: "), len(self.site.records["recent"]))
+        # A chart whose song the song list no longer has: by its number, as the page names it.
+        self.site.records["recent"][0] = dict(recent, title=None)
+        code, said = self.run_main(["--records"])
+        self.assertIn("Recent plays: Chart %d: 3 LINE Hard 9" % recent["chart"], said)
+        # An account linked to no player: the page's one line.
+        self.site.records = {"account": stub.ACCOUNT, "player": None, "recent": [], "best": []}
+        code, said = self.run_main(["--records"])
+        self.assertEqual((code, said.strip().splitlines()[-1]), (0, "%s is not linked to a player on this server."
+                                                                  % stub.ACCOUNT))
+        # A server older than records, and no sign-in: said, nothing else.
+        self.site.records = None
+        code, said = self.run_main(["--records"])
+        self.assertEqual(code, 2, said)
+        self.assertIn("keeps no records for PCs", said)
+        self.run_main(["--sign-out"])
+        code, said = self.run_main(["--records"])
+        self.assertEqual(code, 2, said)
+        self.assertIn("sign in to the server first", said)
+
+    def test_my_page_on_the_site(self):
+        # The one-time link the server makes, opened in the browser and never printed or logged; a server older than
+        # such links: its site's own address.
+        from opendmtq_client import actions
+        self.signed_in()
+        opened = []
+        with mock.patch.object(actions, "open_url", opened.append):
+            code, said = self.run_main(["--my-page"])
+            self.assertEqual(code, 0, said)
+            self.assertEqual(opened, [self.site.url + "/opendmtq/login.php?once=" + stub.LINK_TOKEN])
+            self.assertIn("Your page on the site is open in the browser.", said)
+            self.site.links = False
+            code, said = self.run_main(["--my-page"])
+            self.assertEqual((code, opened[-1]), (0, self.site.url + "/opendmtq/"))
+            self.assertIn("The server's site is open in the browser.", said)
+        with open(st.launcher_log(), encoding="utf-8") as f:
+            self.assertNotIn(stub.LINK_TOKEN, f.read())
+        # No browser to open it with: said, exit 2.
+        self.site.links = True
+        with mock.patch.object(actions, "open_url", side_effect=OSError("no browser")):
+            code, said = self.run_main(["--my-page"])
+        self.assertEqual(code, 2, said)
+        self.assertIn("The browser did not open: no browser", said)
+        self.assertNotIn(stub.LINK_TOKEN, said)
+        # A sign-in that ended: said, and forgotten as the window forgets it.
+        self.site.signed_cookies.clear()
+        code, said = self.run_main(["--my-page"])
+        self.assertEqual(code, 2, said)
+        self.assertFalse(st.LauncherState.load().signed_in())
+
+    def test_reset_keys(self):
+        # Each LINE mode's keys back to their defaults, said as --set says them, and in the player's settings file at once.
+        from opendmtq_client import player
+        self.run_main(["--set", "keys_2line=f/g j", "--set", "keys_4line=1 2 3 4"])
+        code, said = self.run_main(["--reset-keys"])
+        self.assertEqual(code, 0, said)
+        self.assertIn("keys_2line=F J, keys_3line=D F J, keys_4line=D F J K", said)
+        values = st.LauncherState.load().values
+        self.assertEqual([values[name] for name in choices.LANES], [choices.DEFAULTS[name] for name in choices.LANES])
+        with open(player.settings_path(), encoding="utf-8") as f:
+            self.assertIn("keys_2line=F J\n", f.read())
+        # Refused while the window is open, as every change is.
+        with mock.patch.object(main, "window_open", lambda: True):
+            code, said = self.run_main(["--reset-keys"])
+        self.assertEqual(code, 2, said)
+        self.assertIn("window is open", said)
+
+    def test_use_found_needs_what_the_last_test_found(self):
+        # No test yet, or the last one found the server where it is: nothing to use, said with the step before.
+        self.run_main(["--server", self.site.url])
+        code, said = self.run_main(["--use-found"])
+        self.assertEqual(code, 2, said)
+        self.assertIn("found it at no other address: test it first (--test-server)", said)
+        code, said = self.run_main(["--test-server", "--use-found"])
+        self.assertEqual(code, 2, said)
+        self.assertEqual(st.LauncherState.load().current, self.site.url)
+
+    def test_use_found_moves_the_server_with_its_sign_in(self):
+        # The test finds the server on another port of its host (its old port closed): --use-found plays on it there,
+        # its sign-in kept and its app for the old address gone; refused while a game plays from that app, and while the
+        # window is open.
+        from opendmtq_client import connection
+        from tests.test_connection import closed_port
+        old = "http://127.0.0.1:%d" % closed_port()
+        state = st.LauncherState()
+        state.add_server(old, "Stand-in")
+        state.server(old).update(account=stub.ACCOUNT, cookie=self.site.cookie, expires=1999999999)
+        state.save()
+        os.makedirs(apps.folder(old))
+        port = int(self.site.url.rsplit(":", 1)[1])
+        with mock.patch.object(connection, "PORTS", (closed_port(), port)):
+            code, said = self.run_main(["--test-server"])
+        self.assertEqual(code, 1, said)
+        self.assertIn("An OpenDMTQ server answers at %s." % self.site.url, said)
+        with mock.patch.object(playing, "running", return_value=True):
+            code, said = self.run_main(["--use-found"])
+        self.assertEqual(code, 2, said)
+        self.assertIn("Close the game first", said)
+        with mock.patch.object(main, "window_open", lambda: True):
+            code, said = self.run_main(["--use-found"])
+        self.assertEqual(code, 2, said)
+        self.assertEqual(st.LauncherState.load().current, old)
+        code, said = self.run_main(["--use-found"])
+        self.assertEqual(code, 0, said)
+        self.assertIn("Moved to Stand-in (%s): PLAY plays on it from now on." % self.site.url, said)
+        state = st.LauncherState.load()
+        self.assertEqual((state.current, [s["url"] for s in state.servers]), (self.site.url, [self.site.url]))
+        self.assertTrue(state.signed_in())
+        self.assertFalse(os.path.isdir(apps.folder(old)))
+        # In a report, the name and the address where --use-found's line has them.
+        from opendmtq_client import report
+        path, _left = report.make(state, path=os.path.join(self.home, "r.zip"), devices=[])
+        with zipfile.ZipFile(path) as z:
+            log = z.read("launcher/launcher.log").decode("utf-8")
+        self.assertIn("Moved to <server name> (<server>): PLAY plays on it from now on.", log)
+
+
 class Maintenance(Folder):
     """--repair, --clear-game-data and --uninstall: Help's buttons, from the command line."""
 

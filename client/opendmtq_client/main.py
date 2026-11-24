@@ -7,11 +7,16 @@
                                         with what it found and how long it took (exit 0: every step passed, 1: one
                                         failed)
   OpenDMTQ.exe --server URL             connect to a server and play on it from now on
+  OpenDMTQ.exe --use-found              move the server PLAY plays on to the address the last connection test found
+                                        it at (Online's Use this address: its sign-in goes with it, its old app goes)
   OpenDMTQ.exe --sign-in ID             sign in to the server (the password from standard input, or asked for)
   OpenDMTQ.exe --sign-out               forget the sign-in
   OpenDMTQ.exe --app                    download the server's app, or a newer one
+  OpenDMTQ.exe --records                PLAY's My records: the player's latest plays and best records on the server
+  OpenDMTQ.exe --my-page                PLAY's My page on the site, opened in the browser signed in
   OpenDMTQ.exe --set name=value ...     change a PC setting (values.py names them; keyboard play's keys as
                                         keys_3line="D F J")
+  OpenDMTQ.exe --reset-keys             each LINE mode's keys back to their defaults (the Controls page's Reset keys)
   OpenDMTQ.exe --audio-devices          list the sound devices the player can play on
   OpenDMTQ.exe --language en|ko|system  the launcher's language (system: Windows' display language)
   OpenDMTQ.exe --guide                  open the first-start guide again at the next start of the window
@@ -30,10 +35,12 @@
   OpenDMTQ.exe --uninstall [--delete-data] [--yes]  uninstall OpenDMTQ; --delete-data deletes its data on this PC too
 
 The console copy OpenDMTQ-cmd.exe takes the same arguments and prints to the terminal. Several jobs in one command run
-in the order above (--server, then --sign-in, then --app, then --play); --repair, --clear-game-data and --uninstall run
-on their own. While the launcher's window is open, the jobs that change what it keeps (--set, --reset, --forget,
---language, --guide, --server, --sign-in, --sign-out, --uninstall) are refused: the window would write its own copy over
-them. --repair, --clear-game-data and --uninstall are refused while a game runs: it uses the files they change.
+in the order above (--server, then --sign-in, then --app, then --play; --test-server before --use-found); --repair,
+--clear-game-data and --uninstall run on their own. While the launcher's window is open, the jobs that change what it
+keeps (--set, --reset-keys, --reset, --forget, --language, --guide, --server, --use-found, --sign-in, --sign-out,
+--uninstall) are refused: the window would write its own copy over them. --repair, --clear-game-data and --uninstall are
+refused while a game runs: it uses the files they change; so are --reset, --forget and --use-found of the server whose
+app it plays.
 """
 
 import argparse
@@ -585,8 +592,15 @@ def parse(argv):
     play.add_argument("--test-server", nargs="?", const="", metavar="ADDRESS",
                       help="test the connection to the server PLAY plays on, or to ADDRESS: each step with what it found "
                            "and how long it took (exit 0 when every step passes, 1 when one fails)")
+    play.add_argument("--records", action="store_true",
+                      help="PLAY's My records: the signed-in player's latest plays and best records on the server")
+    play.add_argument("--my-page", action="store_true",
+                      help="PLAY's My page on the site: the player's page opened in the browser, signed in already")
     online = p.add_argument_group("server and sign-in")
     online.add_argument("--server", metavar="URL", help="connect to the server at this address and play on it")
+    online.add_argument("--use-found", action="store_true",
+                        help="move the server PLAY plays on to the address the last connection test found it at "
+                             "(Online's Use this address): its sign-in goes with it, its app for the old address goes")
     online.add_argument("--sign-in", metavar="ID", help="sign in to the server (the password from standard input)")
     online.add_argument("--sign-out", action="store_true", help="forget the sign-in")
     online.add_argument("--app", action="store_true", help="download the server's app, or a newer one")
@@ -603,6 +617,8 @@ def parse(argv):
                                "keyboard play; keys_2line=\"F J\", keys_3line=\"D F J\", keys_4line=\"D F J K\": the lanes "
                                "from the top separated by spaces, a lane's keys one or two joined by /, each named as "
                                "the US layout's key at its place)")
+    settings.add_argument("--reset-keys", action="store_true",
+                          help="each LINE mode's keys back to their defaults (the Controls page's Reset keys)")
     settings.add_argument("--audio-devices", action="store_true", help="list the sound devices the player can play on")
     settings.add_argument("--language", choices=st.LANGUAGES + ("system",),
                           help="the launcher's language (system: Windows' display language)")
@@ -654,7 +670,7 @@ def parse(argv):
 def _writes(args):
     """Whether the command line changes what the launcher keeps (refused while its window is open)."""
     return any((args.set, args.reset, args.forget, args.language, args.guide, args.server, args.sign_in,
-                args.sign_out, args.uninstall, args.skip_guide))
+                args.sign_out, args.uninstall, args.skip_guide, args.use_found, args.reset_keys))
 
 
 def window_open():
@@ -668,7 +684,8 @@ def _jobs(args, maintenance=True):
     --clear-game-data and --uninstall."""
     return any((args.status, args.server, args.sign_in, args.sign_out, args.app, args.set, args.audio_devices,
                 args.language, args.guide, args.open_log, args.play, args.forget, args.reset, args.update,
-                args.skip_guide, args.servers, args.report, args.test_server is not None)) or (
+                args.skip_guide, args.servers, args.report, args.test_server is not None, args.use_found,
+                args.records, args.my_page, args.reset_keys)) or (
         maintenance and any((args.repair, args.clear_game_data, args.uninstall)))
 
 
@@ -861,6 +878,92 @@ def _servers(state):
              shown="%s %s" % (console.paint("*", "ok") if current else " ", console.paint(st.label(server), bold=current)))
 
 
+def _use_found(state):
+    """--use-found: Online's Use this address. The server PLAY plays on moves to the address its last connection test
+    found it at (another port of its host), asked there first, its sign-in and its own authority taken along; its app,
+    built for the old address, goes (actions.move_server). Refused when the last test found no such address, and while a
+    game plays from that app. 0 when it moved, 2 when not."""
+    from opendmtq_client import connection
+    if state.server() is None:
+        _say("No server to move: connect with --server URL.", error=True)
+        return 2
+    tested = connection.last()
+    if tested is None or tested.url != state.current or not tested.moved:
+        # The window offers Use this address only on such a test's card: here the test is the step before.
+        _say("The last connection test of %s found it at no other address: test it first (--test-server)."
+             % state.current, error=True)
+        return 2
+    if _started_meanwhile():
+        return 2
+    found = actions.move_server(state, state.current, tested.moved)
+    # The server by its name and its new address, as --server's line says one (the report knows both by this line).
+    _say("Moved to %s (%s): PLAY plays on it from now on." % (found["name"], state.current))
+    return 0
+
+
+def _record_words(w, row, recent):
+    """One record as PLAY's My records shows it, in `w`'s words: its chart ("3 LINE Hard 9"), the score, the keyboard's
+    mark when a keyboard played it, the player's place on that chart, when, and a play's new record or a best's grade."""
+    parts = [choices.chart_words(row["chart_name"])] if row["chart_name"] else []
+    parts.append("{:,}".format(row["score"]))
+    if row["keys"]:
+        parts.append(w("play.records.keys"))
+    if row["rank"]:
+        parts.append(w("play.records.place", n=row["rank"], all=max(row["players"], row["rank"])))
+    if row["at"]:
+        parts.append(w.say(i18n.ago(row["at"])))
+    if not recent and row["grade"]:
+        parts.append(w("play.records.grade", grade=row["grade"]))
+    if recent and row["new_record"]:
+        parts.append(w("play.records.new"))
+    return parts
+
+
+def _records(state):
+    """--records: PLAY's My records, the signed-in account's player's latest plays and best records on the server, each
+    list under its name and each record as the PLAY page shows it (_record_words), in the window's English words; the
+    page's one line for an account linked to no player. 0 when the server answered, 2 for a server older than records."""
+    w = i18n.Words("en")
+    answer = actions.records(state)
+    if answer is None:
+        _say("%s keeps no records for PCs (an OpenDMTQ older than 0.11)." % state.current, error=True)
+        return 2
+    if answer["player"] is None:
+        # The site account has no game player linked to it on this server.
+        _say(w("play.records.unlinked", account=answer["account"] or state.server()["account"]))
+        return 0
+    for title, rows, recent in ((w("play.records.recent"), answer["recent"], True),
+                                (w("play.records.best"), answer["best"], False)):
+        _show(console.heading(title))
+        if not rows:
+            _say("%s: %s" % (title, w("play.records.none")), shown="  " + w("play.records.none"))
+            continue
+        names = [row["title"] or w("play.records.chart", id=row.get("chart") or "") for row in rows]
+        width = max(len(name) for name in names)
+        for name, row in zip(names, rows):
+            said = ", ".join(_record_words(w, row, recent))
+            # In a terminal the titles in a column, bold; in the log and a pipe, each list's name first.
+            _say("%s: %s: %s" % (title, name, said), shown="  %s  %s" % (console.paint(name.ljust(width), bold=True), said))
+    return 0
+
+
+def _my_page(state):
+    """--my-page: PLAY's My page on the site, opened in the PC's browser signed in already (a one-time link the server
+    makes for this sign-in; a server older than such links, its site's own address), said as the window says it. The
+    link signs a browser in once: it is never printed or logged. 0 when the browser opened it, 2 when not."""
+    w = i18n.Words("en")
+    url = actions.my_page(state)
+    try:
+        actions.open_url(url)
+    except OSError as e:
+        # No browser to open it with: said, the address without its link in the log.
+        log.warning("could not open %s: %s", url.split("?", 1)[0], e)
+        _say("The browser did not open: %s" % e, error=True)
+        return 2
+    _say(w("status.mypage.opened" if "once=" in url else "status.site.opened"))
+    return 0
+
+
 def _run(state, args, jobs):
     """The jobs the command line asked for, in order; else the window."""
     if args.update:
@@ -903,7 +1006,12 @@ def _run(state, args, jobs):
         # A corner given as show_fps's value is the counter on in that corner: both settings said.
         said = [name.strip()] + (["fps_position"] if name.strip() == "show_fps" else [])
         _say(", ".join("%s=%s" % (n, state.values[n]) for n in said))
-    if args.set:
+    if args.reset_keys:
+        # The Controls page's Reset keys: each LINE mode's keys back to their defaults, said as --set says them.
+        for name in choices.LANES:
+            state.set_value(name, choices.DEFAULTS[name])
+        _say(", ".join("%s=%s" % (name, state.values[name]) for name in choices.LANES))
+    if args.set or args.reset_keys:
         # The player's settings file as they are now, as the window writes it at each change: the player's in-game
         # menu writes its sound back into it, and the window takes from it only what is newer than its own settings.
         player.write_settings(state.values, state.picked_language)
@@ -932,6 +1040,14 @@ def _run(state, args, jobs):
             # A server this launcher knows plays without asking it, as Online's "Play here" does.
             state.current = known["url"]
             _say("%s did not answer; playing on it as known (%s)." % (known["name"], known["url"]))
+    if args.use_found:
+        if args.test_server is not None:
+            # The test first, as the window's Use this address follows its test: the address it finds is the one used.
+            _test_server(state, args.test_server)
+            args.test_server = None
+        code = _use_found(state)
+        if code:
+            return code
     if args.sign_out:
         actions.sign_out(state)
         _say("Signed out.")
@@ -940,6 +1056,14 @@ def _run(state, args, jobs):
         _say("Signed in as %s." % answer["account"])
     if args.app:
         _get_app(state)
+    if args.records:
+        code = _records(state)
+        if code:
+            return code
+    if args.my_page:
+        code = _my_page(state)
+        if code:
+            return code
     if args.audio_devices:
         devices = player.audio_devices()
         if not devices:
