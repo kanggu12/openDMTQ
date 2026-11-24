@@ -15,6 +15,8 @@
 // for pacing.cpp's pace check.
 #include "tweaks.h"
 
+#include "client_names.h"
+
 #include "pacing.h"
 
 #include <atomic>
@@ -118,8 +120,9 @@ void apply(Thread& th, Tweak& t) {
     t.reported = true;
 }
 
-// The game's own way to its low resolution, LowResolution.Apply(true), on a device that did not keep its frame rate at the panel's
-// (framerate.h). Its static methods take a null first and the method's own information last, which the game itself passes as null.
+// The game's own way to its low resolution, its class's method that turns it on (true), on a device that did not keep its frame
+// rate at the panel's (framerate.h); the names are client_names.h's. Its static methods take a null first and the method's own
+// information last, which the game itself passes as null.
 void apply_low_resolution(Thread& th) {
     g_low_resolution_done = true;
     if (!low_resolution_wanted()) return;
@@ -129,10 +132,13 @@ void apply_low_resolution(Thread& th) {
     gaddr domain = call(g_api.domain_get, {});
     gaddr assembly = domain ? call(g_api.assembly_open, {domain, guest_string("Assembly-CSharp")}) : 0;
     gaddr image = assembly ? call(g_api.assembly_image, {assembly}) : 0;
-    gaddr cls = image ? call(g_api.class_from_name, {image, guest_string("Ares.Utility"), guest_string("LowResolution")}) : 0;
-    gaddr method = cls && method_from_name ? call(method_from_name, {cls, guest_string("Apply"), 1}) : 0;
+    // The game's low resolution's class, and its method that turns it on or off.
+    gaddr cls = image ? call(g_api.class_from_name, {image, guest_string(client_names::text(client_names::kResolutionNamespace)),
+                                                     guest_string(client_names::text(client_names::kLowResolutionClass))})
+                      : 0;
+    gaddr method = cls && method_from_name ? call(method_from_name, {cls, guest_string(client_names::text(client_names::kLowResolutionApply)), 1}) : 0;
     if (!method) {
-        log("arm32: resolution: no LowResolution.Apply; the panel's own stays");
+        log("arm32: resolution: the game has not its low resolution; the panel's own stays");
         return;
     }
     call(g_api.class_init, {cls});
@@ -140,10 +146,11 @@ void apply_low_resolution(Thread& th) {
     auto code = [&](gaddr info) { return *g.proc.mem.ptr<std::uint32_t>(info); };
     call(code(method), {0, 1, 0});
     // And what the game does after it at its start: the older of its two UI systems is told the new size.
-    gaddr width = call(method_from_name, {cls, guest_string("get_Width"), 0});
-    gaddr height = call(method_from_name, {cls, guest_string("get_Height"), 0});
-    gaddr screen = call(g_api.class_from_name, {image, guest_string(""), guest_string("NGUI2Screen")});
-    gaddr update = screen ? call(method_from_name, {screen, guest_string("UpdateResolution"), 2}) : 0;
+    // The size it draws at, and the older UI system's screen with its method that takes a new size.
+    gaddr width = call(method_from_name, {cls, guest_string(client_names::text(client_names::kResolutionWidth)), 0});
+    gaddr height = call(method_from_name, {cls, guest_string(client_names::text(client_names::kResolutionHeight)), 0});
+    gaddr screen = call(g_api.class_from_name, {image, guest_string(""), guest_string(client_names::text(client_names::kOldUiScreenClass))});
+    gaddr update = screen ? call(method_from_name, {screen, guest_string(client_names::text(client_names::kOldUiResize)), 2}) : 0;
     if (width && height && update) {
         call(g_api.class_init, {screen});
         call(code(update), {0, call(code(width), {0, 0}), call(code(height), {0, 0}), 0});

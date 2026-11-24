@@ -6,8 +6,11 @@
 //     rather than null, which C# scripts dereference.
 //   - The video plugin's start (it loads its libraries and hands its native code the asset manager) and the game's
 //     asset reader (an asset of the APK as a byte array).
-// Everything else of the SDKs is left to the VM's made-up methods, which do nothing.
+// Everything else of the SDKs is left to the VM's made-up methods, which do nothing. The game's own Java classes are
+// named by their role (client_names.h).
 #include "player.h"
+
+#include "client_names.h"
 
 #include <android/asset_manager.h>
 #include <android/asset_manager_jni.h>
@@ -230,7 +233,8 @@ void define_singletons() {
     h.static_method("getSdkName", "()Ljava/lang/String;", [](Call&) { return Value(jvm::string("")); });
     h.static_method("getSdkVersion", "()Ljava/lang/String;", [](Call&) { return Value(jvm::string("")); });
     // The game's own SDK: its clipboard is empty for now.
-    jvm::define("com/neowiz/externalsdkgbl/ExternalSDK").static_method("GetClipboard", "()Ljava/lang/String;", [](Call&) { return Value(jvm::string("")); });
+    jvm::define(client_names::text(client_names::kGameSdk))
+        .static_method(client_names::text(client_names::kGameSdkClipboard), "()Ljava/lang/String;", [](Call&) { return Value(jvm::string("")); });
 }
 
 void define_plugins() {
@@ -246,8 +250,9 @@ void define_plugins() {
         return Value();
     });
     // The game's asset reader: an asset of the APK whole, or null.
-    Class& acc = jvm::define("com/neowizgames/plugins/androidassetaccessor/AndroidAssetAccessor");
-    acc.static_method("ReadAssetFromJar", "(Ljava/lang/String;)[B", [](Call& c) {
+    Class& acc = jvm::define(client_names::text(client_names::kAssetReader));
+    // An asset whole, as a byte array.
+    acc.static_method(client_names::text(client_names::kAssetRead), "(Ljava/lang/String;)[B", [](Call& c) {
         bool found = false;
         std::vector<std::uint8_t> data = read_asset(c.str(0), &found);
         if (!found) return Value();
@@ -255,7 +260,8 @@ void define_plugins() {
         std::copy(data.begin(), data.end(), a->bytes.begin());
         return Value(a);
     });
-    acc.static_method("CheckFileExistsJar", "(Ljava/lang/String;)Z", [](Call& c) {
+    // Whether an asset is there.
+    acc.static_method(client_names::text(client_names::kAssetExists), "(Ljava/lang/String;)Z", [](Call& c) {
         AAsset* a = AAssetManager_open(AAssetManager_fromJava(nullptr, nullptr), c.str(0).c_str(), AASSET_MODE_UNKNOWN);
         if (a) AAsset_close(a);
         return Value::Z(a != nullptr);

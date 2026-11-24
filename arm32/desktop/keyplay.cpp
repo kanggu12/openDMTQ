@@ -1,17 +1,19 @@
 // Keyboard play: a song's lanes played with the computer's keys (keyboard_play.h has the rules, settings.cpp the keys).
 //
-// How the game takes a touch screen's fingers (libil2cpp.so, by IL2CPP's own names): once a frame while a song plays, the
-// score player (DMTScorePlayer) has its input (DMQInput) update. DMTInputBase.Run calls the class's OnUpdate through its
-// virtual table (slot 7), which reads Unity's touches and hands each to DMTInputBase.SetPress with its place; the press
-// lands in the track whose band holds it, and the score player then judges the presses against its notes in that frame,
-// at that frame's song time. Keyboard play puts a stub of its own in that slot. The game's own OnUpdate runs first, as it
+// How the game takes a touch screen's fingers (libil2cpp.so; its classes, methods and fields by their role here, their
+// names as IL2CPP has them in client_names.h): once a frame while a song plays, the score player has its input update.
+// The input's base class calls the input class's update through its virtual table (slot 7), which reads Unity's touches
+// and hands each to the base class's method that takes a press, with its place; the press lands in the track whose band
+// holds it, and the score player then judges the presses against its notes in that frame, at that frame's song time.
+// Keyboard play puts a stub of its own in that slot. The game's own update runs first, as it
 // always does; then each lane key that is down gives one press of its own, at the place the game will judge the lane's
 // next note at: the note's own place, a repeat point's group's first note (where the game judges repeats), a drag's
 // point on its curve while it runs; or where the timeline crosses the lane when no note is near. A key held keeps its
 // press there, so a hold is held. The game judges these presses as it judges fingers: the timing, the windows, the
 // combo, the score and the gauge are all its own.
 //
-// Three more slots say what the song does: OnReset (slot 5) at each play's start (a retry too), Pause (8) and Stop (10).
+// Three more slots say what the song does: the reset (slot 5) at each play's start (a retry too), the pause (8) and the
+// stop (10).
 // The score player skips the input's update while paused, so the pause and the stop let every lane key go: a key held
 // through them is no press until it comes up and down again. The game's code is found by name through IL2CPP's API and
 // checked against the places this player was written for: each method's address, the slots that hold them and the
@@ -31,6 +33,7 @@
 // at, and at the song's end the game's own judgement of its notes by type.
 #include "keyplay.h"
 
+#include "client_names.h"
 #include "guest.h"
 #include "host.h"
 #include "player.h"
@@ -58,14 +61,19 @@ using arm32::Thread;
 // Where an Il2CppClass's virtual table starts in this IL2CPP (metadata 23, 32-bit): each slot two words, the code and
 // its method's information.
 constexpr std::uint32_t kVtable = 0xb4;
-// The input class's slots keyboard play takes, each with the name of DMQInput's override in it and that override's RVA
-// (all but OnUpdate are empty: the class has nothing to do there). OnUpdate is kSlots[1].
+// The input class's slots keyboard play takes, each with its method's name (client_names.h), what the method is for and
+// the RVA of the input class's override in it (all but the update's are empty: the class has nothing to do there). The
+// update is kSlots[1].
 struct Slot {
     std::uint32_t slot;
     const char* name;
+    const char* role;
     std::uint32_t rva;
 };
-constexpr Slot kSlots[] = {{5, "OnReset", 0x10b597c}, {7, "OnUpdate", 0x10b5984}, {8, "Pause", 0x10b5b70}, {10, "Stop", 0x10b5b78}};
+constexpr Slot kSlots[] = {{5, client_names::kReset, "reset", 0x10b597c},
+                           {7, client_names::kUpdate, "update", 0x10b5984},
+                           {8, client_names::kPause, "pause", 0x10b5b70},
+                           {10, client_names::kStop, "stop", 0x10b5b78}};
 constexpr int kSlotCount = sizeof kSlots / sizeof kSlots[0];
 // The host functions behind the stubs, one a slot: reentrant ones (they call the game's code), at a range nothing else
 // of the runtime's uses (the JNI and the bridges are below 0x4000).
@@ -73,44 +81,46 @@ constexpr std::uint32_t kHookNumber = arm32::kReentrantBase + 0x7000;
 // The methods keyboard play calls, by class, name and their count of arguments, and their RVAs.
 constexpr std::uint32_t kRvaSetPress = 0x1095e40, kRvaTickToReal = 0x109c574, kRvaDragPos = 0x10a0608, kRvaTickToTime = 0xbc8050;
 
-// The fields read, at their offsets in the objects (checked by name at the start). The score player (DMTScorePlayer and
-// its base ScorePlayerBase): the song's tick and its time as the game judges by (the calibration in it), its state
+// The fields read, at their offsets in the objects (checked by name at the start). The score player (its class and its
+// base): the song's tick and its time as the game judges by (the calibration in it), its state
 // (Playing 0, Paused 1, Stop 2, Closed 3), its tracks, its clock of ticks to milliseconds, whether it is over or at its
 // end, and its notes.
 namespace sp {
 constexpr std::uint32_t CurTick = 0x50, CalMsTime = 0x70, State = 0x88, TrackStart = 0x8c, TrackCount = 0x90, TimeSection = 0x9c,
                         Gameover = 0x12d, End = 0x12e, NoteEvents = 0x138;
 }  // namespace sp
-// A note (DMTScoreEvent and its base ScoreEventBase): its track, tick, judgement (0 until judged), place, the tick a hold or
+// A note (its class and its base): its track, tick, judgement (0 until judged), place, the tick a hold or
 // drag was taken at (0 until then), its type, and a repeat point's group's first note.
 namespace ev {
 constexpr std::uint32_t Track = 0xc, Tick = 0x18, Duration = 0x1c, Judgement = 0x1e, Place = 0x2c, StartTick = 0x48, Type = 0x50, First = 0x60;
 }  // namespace ev
-// The fields with their names as IL2CPP has them, in the class they are looked up in (a base's are found from it).
+// The fields with their names as IL2CPP has them (client_names.h) and what each is, in the class they are looked up in
+// (a base's are found from it).
 struct Field {
     int cls;
     const char* name;
+    const char* role;
     std::uint32_t offset;
 };
 // The classes they are in: 0 the score player, 1 the note.
 constexpr Field kFields[] = {
-    {0, "<CurTick>k__BackingField", sp::CurTick},
-    {0, "<CurCalibrationMsTime>k__BackingField", sp::CalMsTime},
-    {0, "<State>k__BackingField", sp::State},
-    {0, "<PlayTrackStartNum>k__BackingField", sp::TrackStart},
-    {0, "<PlayTrackCnt>k__BackingField", sp::TrackCount},
-    {0, "<TimeSection>k__BackingField", sp::TimeSection},
-    {0, "<Gameover>k__BackingField", sp::Gameover},
-    {0, "<End>k__BackingField", sp::End},
-    {0, "<NoteEvents>k__BackingField", sp::NoteEvents},
-    {1, "<TrackIdx>k__BackingField", ev::Track},
-    {1, "tick", ev::Tick},
-    {1, "duration", ev::Duration},
-    {1, "<Judgement>k__BackingField", ev::Judgement},
-    {1, "<RealPosition>k__BackingField", ev::Place},
-    {1, "<JudgementStartTick>k__BackingField", ev::StartTick},
-    {1, "<NoteType>k__BackingField", ev::Type},
-    {1, "<FirstNote>k__BackingField", ev::First},
+    {0, client_names::kFieldTick, "current tick", sp::CurTick},
+    {0, client_names::kFieldJudgedTime, "judged time", sp::CalMsTime},
+    {0, client_names::kFieldState, "state", sp::State},
+    {0, client_names::kFieldTrackStart, "first track", sp::TrackStart},
+    {0, client_names::kFieldTrackCount, "count of tracks", sp::TrackCount},
+    {0, client_names::kFieldTimeSection, "clock", sp::TimeSection},
+    {0, client_names::kFieldGameover, "game over", sp::Gameover},
+    {0, client_names::kFieldEnd, "end", sp::End},
+    {0, client_names::kFieldNotes, "notes", sp::NoteEvents},
+    {1, client_names::kNoteTrack, "track", ev::Track},
+    {1, client_names::kNoteTick, "time in ticks", ev::Tick},
+    {1, client_names::kNoteDuration, "length", ev::Duration},
+    {1, client_names::kNoteJudgement, "judgement", ev::Judgement},
+    {1, client_names::kNotePlace, "place", ev::Place},
+    {1, client_names::kNoteStartTick, "start tick", ev::StartTick},
+    {1, client_names::kNoteType, "type", ev::Type},
+    {1, client_names::kNoteFirst, "first note", ev::First},
 };
 // The note types the press is placed differently for: repeat points (judged at their group's first note: 2, and the
 // Vita's 5 and 7, which no chart has) and drags (4).
@@ -267,7 +277,8 @@ gaddr guest_string(const std::string& s) {
     return a;
 }
 
-// The game's TickToRealPosition(track, tick) and GetDragNoteCurvePos(note): a point handed back through a hidden pointer.
+// The score player's place of a track at a tick (track, tick) and its drag's point on its curve (note): a point handed
+// back through a hidden pointer.
 void tick_to_real(Thread& t, gaddr player, std::uint32_t track, std::uint32_t tick, float& x, float& y) {
     t.call(g_tick_to_real, {g_scratch, player, track, tick, 0});
     x = f32(g_scratch);
@@ -410,7 +421,7 @@ void aim(Thread& t, gaddr player, Play& p, int lane, std::int64_t now, std::uint
 // One frame of a play, after the game's own update: the check's keys due, then each lane key's press.
 void frame(Thread& t, gaddr self, gaddr player) {
     Play& p = g_play;
-    // A new score player, or a play started again (OnReset): its notes and lanes now, at its first frame.
+    // A new score player, or a play started again (the reset): its notes and lanes now, at its first frame.
     if (player != p.player || p.fresh) begin(t, player);
     // Over (the gauge ran out) or at its end: no lane plays any more. The game runs this update only while Playing.
     const bool over = u8(player + sp::Gameover) || u8(player + sp::End);
@@ -481,7 +492,7 @@ void frame(Thread& t, gaddr self, gaddr player) {
             }
             // A drag on its way: the press goes along its curve, as the game draws and judges it.
             if (f.drag && f.target && tick >= f.drag_tick) drag_pos(t, player, f.target, f.x, f.y);
-            // The press, as DMQInput.OnUpdate makes one for a finger: touch type 0, the key's number, the place.
+            // The press, as the input class's update makes one for a finger: touch type 0, the key's number, the place.
             const std::uint32_t key = static_cast<std::uint32_t>(kKeyBase + (l * 2 + k) * 2 + f.which);
             t.call(g_set_press, {g_scratch + 16, self, player, 0, key, bits(f.x), bits(f.y), 0});
             f.pressing = true;
@@ -601,22 +612,31 @@ void install(Thread& th) {
     const gaddr image = assembly ? call(assembly_image, {assembly}) : 0;
     // The game's assembly not loaded yet: a later look.
     if (!image) return;
-    auto klass = [&](const char* ns, const char* name) { return call(class_from_name, {image, guest_string(ns), guest_string(name)}); };
-    const gaddr input = klass("", "DMQInput"), base = klass("DJMAXTECHNIKA", "DMTInputBase"), player = klass("DJMAXTECHNIKA", "DMTScorePlayer"),
-                note = klass("DJMAXTECHNIKA", "DMTScoreEvent"), section = klass("ScorePlayer.Base.Timer", "ScoreTimeSection");
+    // A class by its namespace (none: nullptr) and its name, each by its role (client_names.h).
+    auto klass = [&](const char* ns, const char* name) {
+        return call(class_from_name, {image, guest_string(ns ? client_names::text(ns) : std::string()), guest_string(client_names::text(name))});
+    };
+    // The input class, the input's base class, the score player, the notes and the score's clock.
+    const gaddr input = klass(nullptr, client_names::kInputClass), base = klass(client_names::kScoreNamespace, client_names::kInputBaseClass),
+                player = klass(client_names::kScoreNamespace, client_names::kScorePlayerClass),
+                note = klass(client_names::kScoreNamespace, client_names::kNoteClass),
+                section = klass(client_names::kTimerNamespace, client_names::kTimeSectionClass);
     if (!input || !base || !player || !note || !section) {
-        stay_out("the game has not the classes it plays through (DMQInput, DMTInputBase, DMTScorePlayer, DMTScoreEvent, ScoreTimeSection)");
+        stay_out("the game has not the classes it plays through (its input, the input's base, the score player, the notes, the score's clock)");
         return;
     }
     // The input class set up (its virtual table filled in) before its slots are read.
     call(class_init, {input});
-    // A method's information by class, name and count of arguments, and its code (the first word of the information).
-    auto method = [&](gaddr cls, const char* name, int args) { return call(method_from_name, {cls, guest_string(name), static_cast<std::uint32_t>(args)}); };
+    // A method's information by class, name (by its role, client_names.h) and count of arguments, and its code (the first
+    // word of the information).
+    auto method = [&](gaddr cls, const char* name, int args) {
+        return call(method_from_name, {cls, guest_string(client_names::text(name)), static_cast<std::uint32_t>(args)});
+    };
     auto code = [&](gaddr info) -> gaddr { return info ? u32(info) : 0; };
-    // Where libil2cpp.so starts, from OnUpdate's place: every other method is checked against its RVA from there.
-    const gaddr update_info = method(input, "OnUpdate", 1);
+    // Where libil2cpp.so starts, from the update's place: every other method is checked against its RVA from there.
+    const gaddr update_info = method(input, client_names::kUpdate, 1);
     if (!code(update_info)) {
-        stay_out("the game's input has no OnUpdate");
+        stay_out("the game's input has no update");
         return;
     }
     const gaddr lib = code(update_info) - kSlots[1].rva;
@@ -627,7 +647,7 @@ void install(Thread& th) {
         const gaddr at = input + kVtable + s.slot * 8;
         // The override at its RVA, and in its slot as the class's virtual table holds it (its code and its information).
         if (!code(infos[i]) || code(infos[i]) - lib != s.rva || u32(at) != code(infos[i]) || u32(at + 4) != infos[i]) {
-            stay_out(std::string("DMQInput.") + s.name + " is not where this player expects it (libil2cpp+" + hex(code(infos[i]) - lib) + ", expected " +
+            stay_out(std::string("the input's ") + s.role + " is not where this player expects it (libil2cpp+" + hex(code(infos[i]) - lib) + ", expected " +
                      hex(s.rva) + " in slot " + std::to_string(s.slot) + ")");
             return;
         }
@@ -639,10 +659,10 @@ void install(Thread& th) {
         std::uint32_t rva;
         gaddr* into;
     } calls[] = {
-        {"DMTInputBase.SetPress", code(method(base, "SetPress", 4)), kRvaSetPress, &g_set_press},
-        {"DMTScorePlayer.TickToRealPosition", code(method(player, "TickToRealPosition", 2)), kRvaTickToReal, &g_tick_to_real},
-        {"DMTScorePlayer.GetDragNoteCurvePos", code(method(player, "GetDragNoteCurvePos", 1)), kRvaDragPos, &g_drag_pos},
-        {"ScoreTimeSection.CalcTickToTime", code(method(section, "CalcTickToTime", 1)), kRvaTickToTime, &g_tick_to_time},
+        {"the input base's press", code(method(base, client_names::kSetPress, 4)), kRvaSetPress, &g_set_press},
+        {"the score player's place at a tick", code(method(player, client_names::kTickToPlace, 2)), kRvaTickToReal, &g_tick_to_real},
+        {"the score player's drag point", code(method(player, client_names::kDragPlace, 1)), kRvaDragPos, &g_drag_pos},
+        {"the clock's time of a tick", code(method(section, client_names::kTickToTime, 1)), kRvaTickToTime, &g_tick_to_time},
     };
     for (const Call& c : calls) {
         if (!c.code || c.code - lib != c.rva) {
@@ -652,16 +672,17 @@ void install(Thread& th) {
     }
     // The fields read, each at its offset.
     for (const Field& f : kFields) {
-        const gaddr info = call(field_from_name, {f.cls == 0 ? player : note, guest_string(f.name)});
+        const gaddr info = call(field_from_name, {f.cls == 0 ? player : note, guest_string(client_names::text(f.name))});
         const std::uint32_t offset = info ? static_cast<std::uint32_t>(th.call(field_offset, {info})) : 0;
         if (!info || offset != f.offset) {
-            stay_out(std::string("the field ") + f.name + " is not where this player expects it (" + (info ? hex(offset) : std::string("none")) +
+            stay_out(std::string(f.cls == 0 ? "the score player's " : "a note's ") + f.role + " is not where this player expects it (" +
+                     (info ? hex(offset) : std::string("none")) +
                      ", expected " + hex(f.offset) + ")");
             return;
         }
     }
     for (const Call& c : calls) *c.into = c.code;
-    // The guest memory the calls hand their points back in, and SetPress its result (16 bytes each).
+    // The guest memory the calls hand their points back in, and the press method its result (16 bytes each).
     g_scratch = gg.malloc(64);
     // The stubs, in a page of their own: push {r7, lr}; movw r7, #number; movt r7, #number >> 16; svc 0; pop {r7, pc}.
     // The svc reaches the runtime, which runs the host function of that number on this thread and returns its result.
@@ -684,11 +705,11 @@ void install(Thread& th) {
     }
     g_hook.store(kIn, std::memory_order_release);
     if (g_watch.load(std::memory_order_relaxed)) {
-        jvm::log("player: keyboard play is off: the game's input is hooked only to follow its songs (DMQInput's OnReset, OnUpdate, Pause and "
-                 "Stop, every method and field at its place); every key is the game's");
+        jvm::log("player: keyboard play is off: the game's input is hooked only to follow its songs (the input's reset, update, pause and "
+                 "stop, every method and field at its place); every key is the game's");
         return;
     }
-    jvm::log("player: keyboard play: the game's input is hooked (DMQInput's OnReset, OnUpdate, Pause and Stop, every method and field at its "
+    jvm::log("player: keyboard play: the game's input is hooked (the input's reset, update, pause and stop, every method and field at its "
              "place); the lane keys play while a song is played");
 }
 

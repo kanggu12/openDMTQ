@@ -1,13 +1,16 @@
-// The game's platform SDK as C# reaches it (com.pmangplus.unity3d.PPFacade), talking straight to the OpenDMTQ server
-// the app was built for. On a phone the SDK does its own HTTP and answers C# with UnitySendMessage("PmangPlus",
-// "OnEvent2", "<callback id>|<event>|1|1|<JSON>"); here each call does the same request on a thread of its own and
-// sends the same message:
-//   - loginByGamePlayIdGuest_DMQ: the server's platform login with this computer's device id, the account's key;
-//   - request(path, ...): the server's /api + path (the price list);
-//   - retryUnfinishedPurchase: no purchase is ever left unfinished (nothing is sold);
-//   - getPriceLocalization: the failure a phone without Google's billing gets, after which the game goes on;
-//   - hasPermission: granted, as on the phones the game was made for.
+// The platform's SDK as the game's C# reaches it (its Java class; every name of the SDK's is in client_names.h, by its
+// role), talking straight to the OpenDMTQ server the app was built for. On a phone the SDK does its own HTTP and answers
+// C# with UnitySendMessage to its Unity object, "<callback id>|<event>|1|1|<JSON>"; here each call does the same request
+// on a thread of its own and sends the same message:
+//   - the sign-in with the device's guest account: the server's platform login with this computer's device id, the
+//     account's key;
+//   - a request (path, ...): the server's /api + path (the price list);
+//   - the call to finish a purchase left unfinished: none ever is (nothing is sold);
+//   - the store's prices: the failure a phone without Google's billing gets, after which the game goes on;
+//   - whether a permission is granted: granted, as on the phones the game was made for.
 #include "player.h"
+
+#include "client_names.h"
 
 #include <cctype>
 #include <fstream>
@@ -24,6 +27,8 @@ using jvm::Class;
 using jvm::Object;
 using jvm::Ref;
 using jvm::Value;
+// Each name of the SDK's by its role.
+using client_names::text;
 
 // The server's address, from the packer's tweaks file among the libraries (its "server <host[:port]>" line).
 std::string server_base() {
@@ -121,17 +126,21 @@ std::string quoted(const std::string& s) {
     return out + "\"";
 }
 
-// The SDK's message to C#, as PPFacade.UnityMessage sends it: "<callback>|<event>|<n>|<count>|<part>", the JSON (compact)
-// cut into parts of 850 UTF-16 units, one message each; logged by event and length (the access token is in it).
+// The SDK's message to C#, as its Java class sends it: "<callback>|<event>|<n>|<count>|<part>", the JSON (compact) cut
+// into parts of 850 UTF-16 units, one message each, to its Unity object; logged by event and length (the access token is
+// in it).
 void answer(const std::string& callback, const std::string& event, const std::string& json) {
-    std::u16string text = jvm::string(compact(json))->chars;
+    // The Unity object the SDK's messages go to, and its method that takes them.
+    static const std::string object = text(client_names::kPlatformObject), method = text(client_names::kPlatformMessage);
+    // The JSON as UTF-16, which the parts are counted in.
+    std::u16string units = jvm::string(compact(json))->chars;
     std::vector<std::u16string> parts;
-    for (std::size_t at = 0; at < text.size(); at += 850) parts.push_back(text.substr(at, 850));
+    for (std::size_t at = 0; at < units.size(); at += 850) parts.push_back(units.substr(at, 850));
     if (parts.empty()) parts.emplace_back();
-    jvm::log("player: platform: %s for %s (%zu characters of JSON, %zu messages)", event.c_str(), callback.c_str(), text.size(), parts.size());
+    jvm::log("player: platform: %s for %s (%zu characters of JSON, %zu messages)", event.c_str(), callback.c_str(), units.size(), parts.size());
     for (std::size_t k = 0; k < parts.size(); ++k) {
         std::string head = callback + "|" + event + "|" + std::to_string(k + 1) + "|" + std::to_string(parts.size()) + "|";
-        send_to_unity("PmangPlus", "OnEvent2", head + jvm::string16(parts[k])->utf8());
+        send_to_unity(object, method, head + jvm::string16(parts[k])->utf8());
     }
 }
 
@@ -153,33 +162,41 @@ void platform_call(std::string path, std::string form, std::function<std::string
 
 }  // namespace
 
-void define_pmangplus() {
-    Class& c = jvm::define("com/pmangplus/unity3d/PPFacade");
+void define_platform_sdk() {
+    // The SDK's class the game's C# calls.
+    Class& c = jvm::define(text(client_names::kPlatformFacade));
     c.method("<init>", "()V", [](Call&) { return Value(); });
-    c.method("initialize", "(Landroid/app/Activity;)V", [](Call&) {
+    // At the game's start: nothing to set up.
+    c.method(text(client_names::kPlatformInitialize), "(Landroid/app/Activity;)V", [](Call&) {
         jvm::log("player: platform: initialize");
         return Value();
     });
-    c.method("setProperties", "(Ljava/lang/String;)V", [](Call&) { return Value(); });
-    c.method("hasPermission", "(Ljava/lang/String;)Z", [](Call& c) {
-        jvm::log("player: platform: hasPermission(%s)", c.str(0).c_str());
+    // The SDK's settings: none of them is needed here.
+    c.method(text(client_names::kPlatformProperties), "(Ljava/lang/String;)V", [](Call&) { return Value(); });
+    // Whether a permission is granted: always.
+    c.method(text(client_names::kPlatformPermission), "(Ljava/lang/String;)Z", [](Call& c) {
+        jvm::log("player: platform: permission %s granted", c.str(0).c_str());
         return Value::Z(true);
     });
-    c.method("retryUnfinishedPurchase", "(Ljava/lang/String;)V", [](Call& c) {
+    // A purchase left unfinished: none ever is, so the answer is an empty list.
+    c.method(text(client_names::kPlatformRetryPurchase), "(Ljava/lang/String;)V", [](Call& c) {
         std::string cb = c.str(0);
         std::thread([cb] {
-            answer(cb, "onRetryUnfinishedPurchase", "{\"response_code\":0,\"value\":[]}");
+            answer(cb, text(client_names::kEventRetryPurchase), "{\"response_code\":0,\"value\":[]}");
             jvm::detach();
         }).detach();
         return Value();
     });
-    c.method("loginByGamePlayIdGuest_DMQ", "(Ljava/lang/String;)V", [](Call& c) {
+    // The sign-in with the device's guest account: the server's platform login with this computer's device id.
+    c.method(text(client_names::kPlatformLogin), "(Ljava/lang/String;)V", [](Call& c) {
         jvm::log("player: platform: login");
         platform_call("/api/accounts/v3/global/login_dmq", "udid=" + device_id(),
-                      [](int, const std::string& reply) { return "{\"response_code\":0,\"value\":" + json_value(reply, "value") + "}"; }, c.str(0), "onLogin");
+                      [](int, const std::string& reply) { return "{\"response_code\":0,\"value\":" + json_value(reply, "value") + "}"; }, c.str(0),
+                      text(client_names::kEventLogin));
         return Value();
     });
-    c.method("request", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;)V", [](Call& c) {
+    // A request to the platform's API: the server's /api + path.
+    c.method(text(client_names::kPlatformRequest), "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;)V", [](Call& c) {
         jvm::log("player: platform: request %s %s", c.str(2).c_str(), c.str(0).c_str());
         std::string path = c.str(0), extra = c.l(4) ? quoted(c.str(4)) : "null";
         // The parameters come as a JSON object; the server reads none of them for the calls the game makes.
@@ -187,12 +204,13 @@ void define_pmangplus() {
             "/api" + path, "", [path, extra](int, const std::string& reply) {
                 return "{\"response_code\":0,\"path\":" + quoted(path) + ",\"extra_info\":" + extra + ",\"value\":" + json_value(reply, "value") + "}";
             },
-            c.str(5), "onRequest");
+            c.str(5), text(client_names::kEventRequest));
         return Value();
     });
-    c.method("getPriceLocalization", "([Ljava/lang/String;)V", [](Call&) {
+    // The store's prices in the player's currency: the failure a phone without Google's billing gets.
+    c.method(text(client_names::kPlatformPrices), "([Ljava/lang/String;)V", [](Call&) {
         std::thread([] {
-            answer("main", "onPriceLocalizationFail",
+            answer("main", text(client_names::kEventPricesFailed),
                    "{\"response_code\":400,\"value\":{\"result_msg\":\"API_ERR_PAY_GOOGLE_NOT_SUPPORTED\",\"error_params\":{},\"result_code\":\"20010\"}}");
             jvm::detach();
         }).detach();

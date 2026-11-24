@@ -32,6 +32,8 @@
 // adb reverse, a test server on the computer).
 #include "live.h"
 
+#include "client_names.h"
+
 #include "host.h"
 #include "live_net.h"
 #include "live_ts.h"
@@ -291,8 +293,8 @@ const Gl& gl() {
 
 std::atomic<bool> g_enabled{false};    // a server address, not turned off
 JavaVM* g_vm = nullptr;
-jclass g_device_class = nullptr;       // com.pmangplus.device.PPDevice
-jclass g_base_class = nullptr;         // com.pmangplus.base.PPBase
+jclass g_device_class = nullptr;       // the platform SDK's class with the device's ids (client_names.h)
+jclass g_base_class = nullptr;         // the platform SDK's class with the app's context
 
 std::atomic<Nanos> g_last_swap{0};     // when the game last swapped
 std::atomic<bool> g_want{false};       // pictures and sound are to be sent right now (set_want)
@@ -1072,8 +1074,9 @@ void add_static_string(JNIEnv* e, jclass c, const char* name, std::string& ids) 
 std::string read_ids(JNIEnv* e) {
     std::string ids;
     if (!g_device_class) return ids;
-    add_static_string(e, g_device_class, "udid", ids);
-    add_static_string(e, g_device_class, "udid_share", ids);
+    // The device's id, and its id shared between apps.
+    add_static_string(e, g_device_class, client_names::text(client_names::kDeviceId).c_str(), ids);
+    add_static_string(e, g_device_class, client_names::text(client_names::kDeviceSharedId).c_str(), ids);
     return ids;
 }
 
@@ -1091,7 +1094,9 @@ void toast_thread(std::string text) {
     if (g_vm->AttachCurrentThread(&e, nullptr) != JNI_OK) return;
     jclass looper = e->FindClass("android/os/Looper");
     jclass toast = e->FindClass("android/widget/Toast");
-    jfieldID context_field = g_base_class ? e->GetStaticFieldID(g_base_class, "appContext", "Landroid/content/Context;") : nullptr;
+    // The app's context, from the SDK's base class.
+    const std::string context_name = client_names::text(client_names::kBaseContext);
+    jfieldID context_field = g_base_class ? e->GetStaticFieldID(g_base_class, context_name.c_str(), "Landroid/content/Context;") : nullptr;
     jobject context = context_field ? e->GetStaticObjectField(g_base_class, context_field) : nullptr;
     clear_exception(e);
     if (looper && toast && context) {
@@ -1267,8 +1272,9 @@ void live_load(JavaVM* vm, JNIEnv* env, const std::string& lib_dir) {
         env->DeleteLocalRef(local);
         return global;
     };
-    g_device_class = keep_class("com/pmangplus/device/PPDevice");
-    g_base_class = keep_class("com/pmangplus/base/PPBase");
+    // The platform SDK's classes with the device's ids and the app's context.
+    g_device_class = keep_class(client_names::text(client_names::kPlatformDevice).c_str());
+    g_base_class = keep_class(client_names::text(client_names::kPlatformBase).c_str());
     if (!g_device_class) {
         log("arm32: live: no platform SDK in this app");
         return;

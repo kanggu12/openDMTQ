@@ -2,6 +2,8 @@
 // player's that runs a host function, which calls OpenAL's own.
 #include "soundmix.h"
 
+#include "client_names.h"
+
 #include "guest.h"
 #include "host.h"
 #include "jvm.h"
@@ -48,7 +50,7 @@ std::atomic<float> g_music{1.0f}, g_effects{1.0f};
 std::atomic<bool> g_changed{false};
 
 // The gain the game set on each source (1, OpenAL's own, until it sets one), whether OpenAL called it streaming at its
-// last play, and whether it is a song's (played by the score's own sounds, DMTUnitySound.Play: its share is its track's,
+// last play, and whether it is a song's (played by the score's own sounds, their class's Play: its share is its track's,
 // given through the score's track volumes, so OpenAL gets the game's gain as it is): the panel's change is given to
 // every source with it.
 struct Source {
@@ -270,11 +272,11 @@ constexpr arm32::HostFn kDeviceHooks[kDeviceCallCount] = {&on_open_device, &on_c
 // ---- a song's tracks: the music on its background tracks, the effects on the tracks the player plays
 //
 // A song's every sound is a sample of one of its tracks, whole buffers all of them: OpenAL cannot tell its music from
-// its key sounds. The score player can: each track's TrackInfomation says whether the player plays it (IsPlayTrack)
-// and holds the volume its sounds play at (Volume, which the chart's own volume events set too). Each frame, after the
-// score player's own update, each track's volume is the game's own times its share: the music's for a background
-// track, the effects' for a played one. The sounds the score plays (DMTUnitySound.Play) are marked meanwhile, so that
-// OpenAL's share leaves them as the game set them.
+// its key sounds. The score player can: each of its tracks says whether the player plays it and holds the volume its
+// sounds play at (which the chart's own volume events set too). Each frame, after the score player's own update, each
+// track's volume is the game's own times its share: the music's for a background track, the effects' for a played one.
+// The sounds the score plays (their class's Play) are marked meanwhile, so that OpenAL's share leaves them as the game
+// set them. The game's classes, methods and fields are named by their role (client_names.h).
 
 // libil2cpp.so's handle, and the hooks' state: still to be put in, in, or out for good.
 gaddr g_il2cpp = 0;
@@ -374,36 +376,39 @@ void install_score(Thread& th) {
     if (!th.call(thread_current, {})) return;
     auto call = [&](gaddr fn, std::initializer_list<std::uint32_t> args) { return static_cast<gaddr>(th.call(fn, args)); };
     // A guest copy of each name for the calls, which only read them: made once, kept (the looks repeat until IL2CPP is up).
-    auto text = [&](const char* s) {
+    auto guest_copy = [&](const std::string& s) {
         static std::map<std::string, gaddr> kept;
         auto it = kept.find(s);
         if (it != kept.end()) return it->second;
         return kept[s] = g().strdup(s);
     };
+    // A name of the game's code by its role, as a guest copy.
+    auto name = [&](const char* role) { return guest_copy(client_names::text(role)); };
     const gaddr domain = call(domain_get, {});
-    const gaddr assembly = domain ? call(assembly_open, {domain, text("Assembly-CSharp")}) : 0;
+    const gaddr assembly = domain ? call(assembly_open, {domain, guest_copy("Assembly-CSharp")}) : 0;
     const gaddr image = assembly ? call(assembly_image, {assembly}) : 0;
     if (!image) return;
-    const gaddr player = call(class_from_name, {image, text("DJMAXTECHNIKA"), text("DMTScorePlayer")});
-    const gaddr sound = call(class_from_name, {image, text(""), text("DMTUnitySound")});
+    // The score player, and the class of the sounds the score plays (in no namespace).
+    const gaddr player = call(class_from_name, {image, name(client_names::kScoreNamespace), name(client_names::kScorePlayerClass)});
+    const gaddr sound = call(class_from_name, {image, guest_copy(""), name(client_names::kSoundClass)});
     if (!player || !sound) {
-        score_out(!player ? "the game has not its score player (DJMAXTECHNIKA.DMTScorePlayer)" : "the game has not its score's sounds (DMTUnitySound)");
+        score_out(!player ? "the game has not its score player" : "the game has not its score's sounds");
         return;
     }
-    // The tracks' class, nested in the score player's base: the element of its TrackInfo array.
-    const gaddr tracks_info = call(field_from_name, {player, text("<TrackInfo>k__BackingField")});
+    // The tracks' class, nested in the score player's base: the element of its array of tracks.
+    const gaddr tracks_info = call(field_from_name, {player, name(client_names::kFieldTracks)});
     const gaddr tracks_type = tracks_info ? call(field_type, {tracks_info}) : 0;
     const gaddr tracks_class = tracks_type ? call(class_from_type, {tracks_type}) : 0;
     const gaddr track = tracks_class ? call(element_class, {tracks_class}) : 0;
     if (!track) {
-        score_out("the score player has not its tracks (ScorePlayerBase.TrackInfo)");
+        score_out("the score player has not its tracks");
         return;
     }
     call(class_init, {player});
     call(class_init, {sound});
     // A method's slot in its class's virtual table: the slot holding its code and its information.
-    auto slot_of = [&](gaddr cls, const char* name, int args, gaddr& code) -> int {
-        const gaddr info = call(method_from_name, {cls, text(name), static_cast<std::uint32_t>(args)});
+    auto slot_of = [&](gaddr cls, const char* role, int args, gaddr& code) -> int {
+        const gaddr info = call(method_from_name, {cls, name(role), static_cast<std::uint32_t>(args)});
         code = info && readable(info, 4) ? *g().proc.mem.ptr<std::uint32_t>(info) : 0;
         if (!code) return -1;
         for (int k = 0; k < 96; ++k) {
@@ -414,14 +419,15 @@ void install_score(Thread& th) {
         return -1;
     };
     gaddr update_code = 0, play_code = 0;
-    const int update_slot = slot_of(player, "OnUpdate", 1, update_code), play_slot = slot_of(sound, "Play", 5, play_code);
+    // The score player's update once a frame, and the sound class's method that plays a sound of the score.
+    const int update_slot = slot_of(player, client_names::kUpdate, 1, update_code), play_slot = slot_of(sound, client_names::kPlay, 5, play_code);
     if (update_slot < 0 || play_slot < 0) {
-        score_out("DMTScorePlayer.OnUpdate or DMTUnitySound.Play is not in its class's virtual table");
+        score_out("the score player's update or the score's sounds' play is not in its class's virtual table");
         return;
     }
     // The fields, by name, their offsets; the volume a float (IL2CPP_TYPE_R4) and the flag a bool (BOOLEAN).
-    auto field = [&](gaddr cls, const char* name, std::uint32_t kind, std::uint32_t& offset) {
-        const gaddr info = call(field_from_name, {cls, text(name)});
+    auto field = [&](gaddr cls, const char* role, std::uint32_t kind, std::uint32_t& offset) {
+        const gaddr info = call(field_from_name, {cls, name(role)});
         if (!info) return false;
         const gaddr type = call(field_type, {info});
         if (!type || static_cast<std::uint32_t>(th.call(type_kind, {type})) != kind) return false;
@@ -429,9 +435,10 @@ void install_score(Thread& th) {
         return offset > 0;
     };
     constexpr std::uint32_t kBool = 0x02, kFloat = 0x0c, kArray = 0x1d;
-    if (!field(player, "<TrackInfo>k__BackingField", kArray, g_off_tracks) || !field(track, "<IsPlayTrack>k__BackingField", kBool, g_off_is_play) ||
-        !field(track, "<Volume>k__BackingField", kFloat, g_off_volume)) {
-        score_out("the score's tracks are not as the player expects them (TrackInfo, IsPlayTrack, Volume)");
+    // The score player's tracks, and each track's flag (whether the player plays it) and volume.
+    if (!field(player, client_names::kFieldTracks, kArray, g_off_tracks) || !field(track, client_names::kTrackPlayed, kBool, g_off_is_play) ||
+        !field(track, client_names::kTrackVolume, kFloat, g_off_volume)) {
+        score_out("the score's tracks are not as the player expects them (the tracks, each one's flag and volume)");
         return;
     }
     // The stubs, as OpenAL's: push {r7, lr}; movw r7, #number; movt r7, #number >> 16; svc 0; pop {r7, pc}.
@@ -456,8 +463,8 @@ void install_score(Thread& th) {
         *g().proc.mem.ptr<std::uint32_t>(classes[i] + kVtable + static_cast<gaddr>(slots[i]) * 8) = at;
     }
     g_score_hook.store(kScoreIn, std::memory_order_release);
-    jvm::log("player: sound: a song's background tracks are the music, its played tracks the effects (DMTScorePlayer.OnUpdate in slot %d, "
-             "DMTUnitySound.Play in slot %d, TrackInfomation's IsPlayTrack and Volume at 0x%x and 0x%x)",
+    jvm::log("player: sound: a song's background tracks are the music, its played tracks the effects (the score player's update in slot %d, "
+             "the score's sounds' play in slot %d, a track's flag and volume at 0x%x and 0x%x)",
              update_slot, play_slot, g_off_is_play, g_off_volume);
 }
 

@@ -155,7 +155,7 @@ for 144 Hz, the most there is any use for, and the panel answers with the neares
 held for a second (five for a rate outside the usual 144, 120, 90, 72 and 60) it becomes the frame rate
 and the game's cap follows it (Tweaks), so each frame gets one refresh. Above 60 fps the pace is checked
 every two seconds while the game aims that high (an edit to the game keeps untouched menus from stepping down to 18 fps
-for its old battery saving, `SetTargetFrameRate`; its target still changes between scenes), so the runtime reads
+for its old battery saving, in its method that sets its target; its target still changes between scenes), so the runtime reads
 `Application.targetFrameRate` every tenth frame through the il2cpp API and drops a window in which it changed. The check goes by what the screen showed (the
 frames' present times): a phone's window falls short when more than 3 % of the frames stayed on screen for more
 than one refresh. With each frame stretched by 6 ms a Galaxy S26 Ultra made 110 fps and 7 % of its frames
@@ -198,7 +198,7 @@ again from itself, so that no burst follows a load (`clock_due`, checked by the 
 it used to write its low resolution option on at every start, 960 lines on a 1440 line panel), in 32-bit colour and with its
 textures at full size. With all that a Galaxy S26 Ultra keeps 120 fps with no frame late in a song. Frames come before sharpness, so
 a device that falls short (the check above, here also at 60 fps) gets the game's own low resolution from the next start on, through
-`LowResolution.Apply(true)` a few seconds in: a mark in the app's files says so. Not at once, because a song that has begun goes by
+the game's own method that turns it on, a few seconds in: a mark in the app's files says so. Not at once, because a song that has begun goes by
 the resolution it started with; until the next start the frame rate gives way as above.
 
 The JIT treats code pages from files (read-only, executable) as constant: a load from a fixed
@@ -208,16 +208,16 @@ every thread's translated code, not just the range.
 
 **Tweaks.** The packer can install a text file next to the runtime (`libarm32t-tweaks.so`) that
 sets static int fields of IL2CPP classes, through the il2cpp API on Unity's main thread, once the
-class is initialised (`src/tweaks.cpp`). OpenDMTQ uses it to raise Technika Q's frame cap
-(`VariableFrameController.maxFpsVal` and `maxOutgameFpsVal`, 60 in the game) to the app frame
-rate (twice that while frames are paced). Of the game's code only NGUI reads `Time.frameCount`, to
-update once per frame; the chart runs on a millisecond timer, and a song took the same time at 40
-and 60 fps.
+class is initialised (`src/tweaks.cpp`). OpenDMTQ uses it to raise Technika Q's frame caps (two
+static fields of the game's frame rate class, one while playing and one in the menus, 60 in the
+game) to the app frame rate (twice that while frames are paced). Of the game's code only NGUI reads
+`Time.frameCount`, to update once per frame; the chart runs on a millisecond timer, and a song took
+the same time at 40 and 60 fps.
 
 **Live view** (`src/live.cpp`, `src/live_ts.cpp`, `debug.arm32.live`, on; see
 [docs/live.md](../docs/live.md)). Off for a player until the server's owner turns it on. The control
 thread asks `GET /live/state` every 15 seconds while the game is on screen, with the device ids the
-platform SDK signed in with: it reads them from `PPDevice`'s static fields and never calls the getters,
+platform SDK signed in with: it reads them from its device class's static fields and never calls the getters,
 which remember their first answer. With live view off, the swap costs one atomic load and each audio
 buffer another.
 
@@ -341,7 +341,9 @@ arm32/bundle_windows.sh     # the player for Windows as a release ships it
 
 On a computer the runtime takes its switches from the environment only, logs to stderr, and gives the guest the system
 properties of an Android 9 phone of no particular make. In place of Android's Java side, the player hosts the game in a
-small Java VM of its own (`jvm/`) with the classes the game calls. On Windows a thin layer (`src/win`) gives the core
+small Java VM of its own (`jvm/`) with the classes the game calls. The names the runtime and the player look up in the
+game's code or define for its SDKs are in `src/client_names.h`, encoded and each by its role, written from the patcher's
+table of the client's names (`tools/opendmtq_tools/client_marks.py`). On Windows a thin layer (`src/win`) gives the core
 Linux's system calls (files, memory, threads and futexes, signals as interruptions, sockets); the player draws through
 ANGLE (OpenGL ES on Direct3D 11), plays its sound through WASAPI and decodes video with Media Foundation. The game's
 OpenAL tries OpenSL ES first, as on a phone, where its OpenSL ES device mixes at 44.1 kHz whatever it is asked; with no

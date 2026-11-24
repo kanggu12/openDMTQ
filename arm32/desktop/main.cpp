@@ -385,7 +385,7 @@ int main(int argc, char** argv) {
     player::define_media();
     player::define_sdks();
     player::define_web();
-    player::define_pmangplus();
+    player::define_platform_sdk();
     player::define_input();
     // This thread is the app's main thread: attached, as the phone's main thread is from the start, with the main looper.
     jvm::Env& env = jvm::attach();

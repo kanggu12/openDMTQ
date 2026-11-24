@@ -326,7 +326,8 @@ void define_media();
 void report_audio();
 void define_sdks();
 void define_web();
-void define_pmangplus();
+// The platform's SDK as the game's C# reaches it (platform_sdk.cpp).
+void define_platform_sdk();
 void define_input();
 
 // Touch input (input.cpp): finger `id` (the system's own number for it) put down (0), lifted (1), moved (2) or taken

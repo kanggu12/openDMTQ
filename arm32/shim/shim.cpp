@@ -18,6 +18,7 @@
 // Nothing here may stop the game. Whatever cannot be found is left as it was, and when the game has died
 // several times in a row soon after starting, the shim does nothing until a day has passed (the guard
 // below). debug.arm32.shim 0 turns it off.
+#include "client_names.h"
 #include "framerate.h"
 #include "host.h"
 #include "live.h"
@@ -208,8 +209,9 @@ void apply_tweak(Tweak& t) {
     t.reported = true;
 }
 
-// The game's own way to its low resolution, LowResolution.Apply(true), on a device that did not keep its frame rate at the panel's
-// (framerate.h). Its static methods take a null first and the method's own information last, which the game itself passes as null.
+// The game's own way to its low resolution, its class's method that turns it on (true), on a device that did not keep its frame
+// rate at the panel's (framerate.h); the names are client_names.h's. Its static methods take a null first and the method's own
+// information last, which the game itself passes as null.
 bool g_low_resolution_done = false;
 void apply_low_resolution() {
     g_low_resolution_done = true;
@@ -217,10 +219,13 @@ void apply_low_resolution() {
     void* domain = g_il2cpp.domain_get();
     void* assembly = domain ? g_il2cpp.assembly_open(domain, "Assembly-CSharp") : nullptr;
     void* image = assembly ? g_il2cpp.assembly_image(assembly) : nullptr;
-    void* cls = image ? g_il2cpp.class_from_name(image, "Ares.Utility", "LowResolution") : nullptr;
-    const void* method = cls ? g_il2cpp.method_from_name(cls, "Apply", 1) : nullptr;
+    // The game's low resolution's class, and its method that turns it on or off.
+    void* cls = image ? g_il2cpp.class_from_name(image, client_names::text(client_names::kResolutionNamespace).c_str(),
+                                                 client_names::text(client_names::kLowResolutionClass).c_str())
+                      : nullptr;
+    const void* method = cls ? g_il2cpp.method_from_name(cls, client_names::text(client_names::kLowResolutionApply).c_str(), 1) : nullptr;
     if (!method) {
-        log("arm32: resolution: no LowResolution.Apply; the panel's own stays");
+        log("arm32: resolution: the game has not its low resolution; the panel's own stays");
         return;
     }
     g_il2cpp.class_init(cls);
@@ -228,10 +233,11 @@ void apply_low_resolution() {
     auto code = [](const void* info) { return *static_cast<void* const*>(info); };
     reinterpret_cast<void (*)(void*, std::int32_t, void*)>(code(method))(nullptr, 1, nullptr);
     // And what the game does after it at its start: the older of its two UI systems is told the new size.
-    const void* width = g_il2cpp.method_from_name(cls, "get_Width", 0);
-    const void* height = g_il2cpp.method_from_name(cls, "get_Height", 0);
-    void* screen = g_il2cpp.class_from_name(image, "", "NGUI2Screen");
-    const void* update = screen ? g_il2cpp.method_from_name(screen, "UpdateResolution", 2) : nullptr;
+    // The size it draws at, and the older UI system's screen with its method that takes a new size.
+    const void* width = g_il2cpp.method_from_name(cls, client_names::text(client_names::kResolutionWidth).c_str(), 0);
+    const void* height = g_il2cpp.method_from_name(cls, client_names::text(client_names::kResolutionHeight).c_str(), 0);
+    void* screen = g_il2cpp.class_from_name(image, "", client_names::text(client_names::kOldUiScreenClass).c_str());
+    const void* update = screen ? g_il2cpp.method_from_name(screen, client_names::text(client_names::kOldUiResize).c_str(), 2) : nullptr;
     if (width && height && update) {
         g_il2cpp.class_init(screen);
         auto size = [&](const void* getter) { return reinterpret_cast<std::int32_t (*)(void*, void*)>(code(getter))(nullptr, nullptr); };

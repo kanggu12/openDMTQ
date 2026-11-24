@@ -1,4 +1,4 @@
-// The player's HTTP client, which the game's WWW and UnityWebRequest (web.cpp) and the platform's requests (pmangplus.cpp)
+// The player's HTTP client, which the game's WWW and UnityWebRequest (web.cpp) and the platform's requests (platform_sdk.cpp)
 // go through: HTTP/1.1, one request per connection, with what Android's HttpURLConnection adds to a request the caller
 // left without: a User-Agent, and Accept-Encoding: gzip. An answer the server compressed for that is inflated as it is
 // read, as a phone's is, and loses its Content-Encoding and Content-Length (Android clears both). Plain HTTP only: HTTPS
