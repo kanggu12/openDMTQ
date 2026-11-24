@@ -17,6 +17,12 @@
 // checked against the places this player was written for: each method's address, the slots that hold them and the
 // fields read. Anything else, and keyboard play stays out (said once in the log): the game plays by touch as before.
 //
+// With keyboard play off (keyboard=off) the hook goes in all the same, with the same checks, only to follow a song's
+// start and end (keyboard_play.h's hook_use), which the overlay places its pieces by: the stubs call the game's own
+// overrides first as ever, then say what the song does; no key is taken, no check's key sent, no note read, no press
+// made, and the bar is not told when a song is played (a press goes where it goes with no hook). Every key is the
+// game's.
+//
 // A play that a lane key pressed is marked to the server: the request that saves it (game.savePlayResult) goes with the
 // header X-OpenDMTQ-Keys: 1 (keyplay_mark_save, from web.cpp), which the server keeps with the play.
 //
@@ -165,9 +171,13 @@ long long steady_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
-// The hook's state: still to be put in, in, or out for good (keyboard off, or the game not the one expected).
+// The hook's state: still to be put in, in, or out for good (the game not the one expected).
 enum { kWaiting, kIn, kOff };
 std::atomic<int> g_hook{kWaiting};
+// Keyboard play off: the hook in only to follow the songs (hook_use's follows without its lanes), nothing of the keys'.
+std::atomic<bool> g_watch{false};
+// The bar told whether a song is being played (hook_use's bar_knows): with keyboard play on.
+std::atomic<bool> g_bar_knows{false};
 // libil2cpp.so's handle in the guest, once loaded.
 gaddr g_il2cpp = 0;
 // The game's code, once checked: the input's own overrides in the slots (kSlots' order), the calls made, and guest
@@ -277,6 +287,11 @@ void finish(Play& p, const char* how) {
     // The song is over for the overlay too: its question asks without the song's line, its pieces go to the menus' places.
     g_in_song.store(false, std::memory_order_release);
     const std::string why = std::string("the song ") + how;
+    // Keyboard play off: nothing to let go and no presses to count; the log says the song's end alone.
+    if (g_watch.load(std::memory_order_relaxed)) {
+        jvm::log("player: %s (keyboard play is off: the song followed for the overlay alone)", why.c_str());
+        return;
+    }
     keyplay_let_go(why.c_str());
     // A song that ended with no lane key pressed saves as a touch play's; one over or left saves nothing to say so of.
     const bool saves = std::string(how) == "ended";
@@ -322,6 +337,11 @@ void begin(Thread& t, gaddr player) {
     p.fresh = false;
     // A song is going on from this, its first frame, until finish() says its end.
     g_in_song.store(true, std::memory_order_release);
+    // Keyboard play off: the song's start is all it follows (no lanes, no notes read, no key's presses).
+    if (g_watch.load(std::memory_order_relaxed)) {
+        jvm::log("player: a song starts (keyboard play is off: followed for the overlay alone)");
+        return;
+    }
     p.start = u32(player + sp::TrackStart);
     p.lanes = static_cast<int>(std::min<std::uint32_t>(u32(player + sp::TrackCount), 4));
     // The notes: a FixedArray of the game's (its items' array at 0x8, its count at 0xc).
@@ -401,6 +421,8 @@ void frame(Thread& t, gaddr self, gaddr player) {
         finish(p, u8(player + sp::Gameover) ? "is over" : "ended");
         return;
     }
+    // Keyboard play off: the song's start, play and end are all it follows; no check's key is sent, no press made.
+    if (g_watch.load(std::memory_order_relaxed)) return;
     // The song's time as the game judges by, and its tick.
     const std::int64_t now = i64(player + sp::CalMsTime);
     const std::uint32_t tick = u32(player + sp::CurTick);
@@ -520,7 +542,7 @@ std::uint64_t on_update(Thread& t) {
     const auto b = timed ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     // The score player's fields read whole (its notes' list is the last of them).
     if (readable(player, sp::NoteEvents + 4)) frame(t, self, player);
-    if (timed && g_playing.load(std::memory_order_relaxed)) {
+    if (timed && !g_watch.load(std::memory_order_relaxed) && g_playing.load(std::memory_order_relaxed)) {
         // Keyboard play's part: the frame's work after the game's own, less the check's keys sent in it.
         const float ours = std::chrono::duration<float, std::micro>(std::chrono::steady_clock::now() - b).count() - g_cost.posting_us;
         note_cost(std::chrono::duration<float, std::micro>(b - a).count(), std::max(ours, 0.0f));
@@ -661,6 +683,11 @@ void install(Thread& th) {
         *gg.proc.mem.ptr<std::uint32_t>(input + kVtable + kSlots[i].slot * 8) = at;
     }
     g_hook.store(kIn, std::memory_order_release);
+    if (g_watch.load(std::memory_order_relaxed)) {
+        jvm::log("player: keyboard play is off: the game's input is hooked only to follow its songs (DMQInput's OnReset, OnUpdate, Pause and "
+                 "Stop, every method and field at its place); every key is the game's");
+        return;
+    }
     jvm::log("player: keyboard play: the game's input is hooked (DMQInput's OnReset, OnUpdate, Pause and Stop, every method and field at its "
              "place); the lane keys play while a song is played");
 }
@@ -673,11 +700,24 @@ void keyplay_library_loaded(const std::string& name, gaddr handle) {
 
 void keyplay_render(Thread& th) {
     if (g_hook.load(std::memory_order_relaxed) != kWaiting || !g_il2cpp) return;
-    // Keyboard play off in the settings: no hook at all, every key the game's.
-    if (!settings().keyboard) {
-        g_hook.store(kOff, std::memory_order_release);
-        jvm::log("player: keyboard play is off (keyboard=off): every key is the game's");
-        return;
+    // What the hook is for, by the settings, decided once (keyboard_play.h's hook_use): with keyboard play off every key is
+    // the game's, and the hook goes in all the same, only to follow the songs for the overlay's pieces.
+    static bool decided = false;
+    if (!decided) {
+        decided = true;
+        const keys::HookUse use = keys::hook_use(settings().keyboard);
+        // Read by the window's thread (keyplay_key, keyplay_song_state) and by the stubs' host functions.
+        g_watch.store(!use.lanes, std::memory_order_release);
+        g_bar_knows.store(use.bar_knows, std::memory_order_release);
+        if (!use.lanes) {
+            jvm::log("player: keyboard play is off (keyboard=off): every key is the game's; the game's input is hooked only to follow its "
+                     "songs, once its code is where this player expects it");
+        }
+        // No hook at all: out for good, as with the game's code elsewhere (nothing is known of a song then).
+        if (!use.hook) {
+            g_hook.store(kOff, std::memory_order_release);
+            return;
+        }
     }
     // Once IL2CPP is up and the game's assembly is loaded: a look every 30th render call until then.
     static unsigned renders = 0;
@@ -687,6 +727,8 @@ void keyplay_render(Thread& th) {
 
 bool keyplay_key(unsigned scan, bool extended, bool down, bool repeat) {
     if (g_hook.load(std::memory_order_acquire) != kIn) return false;
+    // Keyboard play off: the hook follows the songs alone, and every key is the game's.
+    if (g_watch.load(std::memory_order_acquire)) return false;
     // The key's lane in the song's mode (none before the first song).
     int slot = -1;
     const int lane = keys::lane_of(settings().lanes_of(g_lane_count.load(std::memory_order_acquire)), scan, extended, slot);
@@ -738,6 +780,9 @@ void keyplay_song_keys(std::vector<SongKey> keys) {
 int keyplay_song_state() {
     // Only the hook knows: without it, not known.
     if (g_hook.load(std::memory_order_acquire) != kIn) return -1;
+    // Keyboard play off: the hook follows the songs for the overlay's pieces alone (hook_use's bar_knows): the bar keeps
+    // the rule it has where nothing is known, so that every press goes where it goes with no hook.
+    if (!g_bar_knows.load(std::memory_order_acquire)) return -1;
     // Playing, and its last frame recent (a song left without a word from the game is not played any more).
     const bool playing = g_playing.load(std::memory_order_acquire) && steady_ms() - g_frame_ms.load(std::memory_order_acquire) < 500;
     return playing ? 1 : 0;

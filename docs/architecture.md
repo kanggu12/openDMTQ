@@ -529,16 +529,17 @@ picture](windows-player.md#the-picture)):
   the game's own on one screen or another (the player's name and level, the music list's tabs and grid button, a song's
   title and score, SELECT MUSIC, DOWNLOAD), and under the game's header at the right, the one place the music list, the
   downloads, a song's page and the result leave free, ALBUM's FAVORITE tab ends and the shop's panel begins just under
-  it, measured on each of them at 16:9 and 4:3. With keyboard play off the player cannot tell a song from the menus, and
-  the counter stands at the right
-  under the game's header throughout. The game stretches its screens to the window's shape (at 21:9 its buttons are
-  wider than tall, at 4:3 narrower), and the counter keeps to its buttons' narrower side: in a window narrower than 16:9
-  it is a little smaller, so that it covers no more of them there than at 16:9. Its units and frame time are never set
-  smaller than 10 pixels, so that in the smallest windows (a 960x540 window, or 640x360 at 150 %) its card is a little
-  larger than its share. A top left set by a launcher before 0.9.3, which wrote it whether chosen or not, reads as the
-  default; another corner set then stays. It counts the frames the player shows: a steady 60 reads 60, and only a whole
-  second without a frame reads 0. It shows from the game's first frame and hides while the game holds still. Drawn apart
-  from the game's picture, it costs the game nothing, and the broadcast does not show it.
+  it, measured on each of them at 16:9 and 4:3. With keyboard play off too: the hook on the game's input goes in all the
+  same, with the same checks of the game's code, only to follow a song's start and end (it takes no key). Only where the
+  game's code is not where the player expects it can the player not tell a song from the menus, and the counter stands
+  at the right under the game's header throughout. The game stretches its screens to the window's shape (at 21:9 its
+  buttons are wider than tall, at 4:3 narrower), and the counter keeps to its buttons' narrower side: in a window
+  narrower than 16:9 it is a little smaller, so that it covers no more of them there than at 16:9. Its units and frame
+  time are never set smaller than 10 pixels, so that in the smallest windows (a 960x540 window, or 640x360 at 150 %) its
+  card is a little larger than its share. A top left set by a launcher before 0.9.3, which wrote it whether chosen or
+  not, reads as the default; another corner set then stays. It counts the frames the player shows: a steady 60 reads 60,
+  and only a whole second without a frame reads 0. It shows from the game's first frame and hides while the game holds
+  still. Drawn apart from the game's picture, it costs the game nothing, and the broadcast does not show it.
 - **The render scale** draws the game at a share of the window's pixels (100 % down to 50 %), stretched to fill it:
   lighter for the graphics card, and softer. The share keeps the window's shape exactly where its size has fine enough
   steps (1920x1080 is 120 steps of 16x9): 67 % of 1920x1080 is 1280x720, so the game lays itself out as it does at full
@@ -727,14 +728,14 @@ every window size and scale. [The sound](#the-sound) says what each control chan
 - **Quitting**: the X asks first, in a glass card over the game dimmed and blurred behind it: **Keep playing** as the
   launcher's main button, or **Quit the game** as its secondary, red under the pointer; so a click by mistake does not
   end a song. Its buttons too act only when let go where they were pressed; Left, Right and Tab move the choice (marked
-  with the launcher's cyan keyboard ring), Enter takes it and Esc keeps playing. Asked mid-song (a song's first frame
-  to its end, its own pause screen too), a line under the question says that quitting mid-song loses the song's record;
-  in the menus, a song's loading screen among them, it asks without that line (with keyboard play off, the player cannot
-  tell a song from the menus, and it asks without it). The card keeps within three quarters of the game's width and nine
-  tenths of its height. The taskbar's Close window asks the same; on a minimised game it
-  first brings the window back and lets the game draw itself again, so that the question stands over the game. The game
-  holds still while it asks, as a phone's game does when its owner leaves it and as it does minimised: a song stops
-  where it was, with the game's own pause screen after.
+  with the launcher's cyan keyboard ring), Enter takes it and Esc keeps playing. Asked mid-song (a song's first frame to
+  its end, its own pause screen too), a line under the question says that quitting mid-song loses the song's record; in
+  the menus, a song's loading screen among them, it asks without that line (where the game's code is not where the
+  player expects it, the player cannot tell a song from the menus, and it asks without it; with keyboard play off it
+  can). The card keeps within three quarters of the game's width and nine tenths of its height. The taskbar's Close
+  window asks the same; on a minimised game it first brings the window back and lets the game draw itself again, so that
+  the question stands over the game. The game holds still while it asks, as a phone's game does when its owner leaves it
+  and as it does minimised: a song stops where it was, with the game's own pause screen after.
 - **The window**: the game has a title bar to move it by and a frame to size it by, dark as the launcher's menu column
   (on Windows 11 in its very colours; Windows 10 dark where it can), and no buttons of its own: it is minimised, put in
   full screen and quit from the bar. A double click on the title bar does nothing.
@@ -758,10 +759,15 @@ place the game will judge the lane's next note (a repeat point at its group's fi
 where the judgment line crosses the lane when no note is near. Three more of the game's methods say when a play starts
 and when its song pauses or stops. The player first finds these methods and the fields it reads by their names and
 checks each against the place it was written for; when one differs, keyboard play stays off and the log says which. With
-the stats on, a `stats: keyboard play` line every 5 seconds gives what the presses took a frame beside the game's own
-input update: on Windows 2 to 6 microseconds a frame on average and 10 to 19 at the 99th percentile, the game's own
-update 2 to 3; under Wine 3 to 8 and 22 to 36. `PLAYER_TRACE_KEYS=1` logs each press and the note it aims at, and at a
-song's end how the game judged its notes by type.
+keyboard play off (`keyboard=off`) the player puts the same hook in, with the same checks, only to follow when a play
+starts and when its song stops or ends: the overlay knows a song from the menus by it (the FPS counter waits in the
+menus, the notice and the question before quitting know a song). It then takes no key, reads no note and makes no press,
+and the bar keeps the rule it has where nothing is known (a press at the top edge is the bar's only with the game
+quiet), so that every press goes where it goes with no hook. With the stats on, a `stats: keyboard play` line every 5
+seconds gives what the presses took a frame beside the game's own input update: on Windows 2 to 6 microseconds a frame
+on average and 10 to 19 at the 99th percentile, the game's own update 2 to 3; under Wine 3 to 8 and 22 to 36.
+`PLAYER_TRACE_KEYS=1` logs each press and the note it aims at, and at a song's end how the game judged its notes by
+type.
 
 ## Start-up
 

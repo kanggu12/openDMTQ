@@ -349,13 +349,12 @@ off, says why in its log, and the game plays by touch as before.
   same length (60 or 120 on a 240 Hz display).
 - **VSync off:** frames go out as soon as they are drawn, evenly at the limit, which may be above the display's rate, or
   as fast as the PC draws without one. A little less delay, and the picture may tear.
-- **The FPS counter**, off by default, is a small card of the overlay's glass, as the notice is: the frames a second and,
-  under them, the mean frame time, over the last second, twice a second. The figure is lime while the frames keep the
-  display's rate and white below it or where the display's rate is not known. In a song it stands in its corner, clear
-  of the song's own controls: at the bottom right by default; **Position** moves it to another corner. In the menus it
-  waits, and it shows again in each song; with keyboard play off it stands at the right under the game's header
-  throughout. It shows from the game's first frame and hides while the game holds still, and the broadcast does not
-  show it.
+- **The FPS counter**, off by default, is a small card of the overlay's glass, as the notice is: the frames a second
+  and, under them, the mean frame time, over the last second, twice a second. The figure is lime while the frames keep
+  the display's rate and white below it or where the display's rate is not known. In a song it stands in its corner,
+  clear of the song's own controls: at the bottom right by default; **Position** moves it to another corner. In the
+  menus it waits, and it shows again in each song, with keyboard play on or off. It shows from the game's first frame
+  and hides while the game holds still, and the broadcast does not show it.
 - **The render scale** draws the game at a share of the window's pixels (100 % down to 50 %), stretched to fill it:
   lighter for the graphics card, and softer. 67 % of 1920x1080 is 1280x720, so the game lays itself out as it does at
   full size.

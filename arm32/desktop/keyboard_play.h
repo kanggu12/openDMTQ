@@ -1,7 +1,7 @@
 // Keyboard play's rules, apart from the game (keyplay.cpp is the game's side; settingstest.cpp checks these): the names
 // of the keys a lane can have and the place of each on the keyboard, a mode's lanes as the settings file names them, the
-// lane a key plays, the lane keys' state as the window's thread keeps it, when the lane keys play at all, and which
-// request of the game's saves a play.
+// lane a key plays, the lane keys' state as the window's thread keeps it, when the lane keys play at all, what the hook on
+// the game's input is for with keyboard play on and off, and which request of the game's saves a play.
 #pragma once
 
 #include <atomic>
@@ -247,6 +247,26 @@ constexpr long long kSongFrameMs = 1000;
 inline bool lanes_play(const When& w) {
     return w.keyboard && w.hooked && w.playing && w.since_frame_ms >= 0 && w.since_frame_ms <= kSongFrameMs && !w.held && !w.typing;
 }
+
+// What the hook on the game's input is for, by the settings (keyplay.cpp puts it in with every check of the game's code
+// either way). With keyboard play on, the lane keys play a song's lanes, the hook follows a song's start and its end, and
+// the bar knows when a song is being played. With it off (keyboard=off), the hook goes in all the same, only to follow a
+// song's start and end for the overlay's pieces (the FPS counter waits in the menus and shows in each song; the notice and
+// the question before quitting know a song from the menus); it takes no key, sends no check's key and reads no note, and
+// every press goes where it goes with no hook at all: every key is the game's, and the bar keeps the rule it has where
+// nothing is known (bar_gesture.h's bar_may_come: only with the game quiet).
+struct HookUse {
+    // The hook goes in (once the game's code is where this player expects it).
+    bool hook = false;
+    // The lane keys play while a song is being played (When's keyboard).
+    bool lanes = false;
+    // A song's start and end are followed, for the overlay's pieces (keyplay_in_song).
+    bool follows = false;
+    // The bar is told whether a song is being played (keyplay_song_state): in the menus a press at the top edge may be the
+    // bar's at once, as it may with keyboard play on; otherwise only with the game quiet, as with no hook.
+    bool bar_knows = false;
+};
+inline HookUse hook_use(bool keyboard) { return HookUse{true, keyboard, true, keyboard}; }
 
 // A JSON string at text[i] (its opening quote) as JSON writes it, into `out`, and i past its closing quote; false when it
 // does not end. The escapes as JSON has them: a \uXXXX of ASCII is that character, another a '?' (no name has one).

@@ -1168,6 +1168,19 @@ void keyboard_play_checks() {
         off.typing = true;
         check(!keys::lanes_play(off), "not while the game asks for text (its name field types letters)");
     }
+    // What the hook on the game's input is for (WIN-477): with keyboard play off it goes in all the same, only to follow a
+    // song's start and end, so that the overlay knows a song from the menus (the FPS counter waits in the menus); the lane
+    // keys play only with keyboard play on, and with it off every press goes where it went with no hook (the bar's rule
+    // too). With no hook at all for keyboard play off, the counter stood under the menus' header at the right throughout,
+    // on ALBUM's FAVORITE tab.
+    {
+        const keys::HookUse on = keys::hook_use(true), off = keys::hook_use(false);
+        check(on.hook && on.lanes && on.follows && on.bar_knows,
+              "keyboard play on: the hook goes in, the lane keys play, a song's start and end are followed, the bar knows a song");
+        check(off.hook && !off.lanes && off.follows,
+              "keyboard play off: the hook goes in only to follow a song's start and end, and no lane key plays");
+        check(!off.bar_knows, "keyboard play off: the bar keeps the rule it has with no hook (only with the game quiet), no press elsewhere");
+    }
     // The request that saves a play.
     const std::string save = R"([{"id":0,"method":"game.savePlayResult","params":[1,15,[0,0,279],279,0,[0,0,0],[0,0,0],"t"]}])";
     check(keys::saves_play("POST", save), "the game's RPC with game.savePlayResult saves a play");

@@ -116,8 +116,9 @@ struct View {
     float dpi = 1;
     int top_room = 0;
     bool full = false;
-    // Whether a song is going on (keyboard play's word: its first frame to its end): the notice and the frame counter
-    // stand in a song's places then, clear of the menus' header otherwise (also where the player cannot tell). And
+    // Whether a song is going on (the word of keyboard play's hook, which follows the songs with keyboard play off too:
+    // its first frame to its end): the notice and the frame counter stand in a song's places then, clear of the menus'
+    // header otherwise (also where the player cannot tell: the hook not in). And
     // whether the game is known to be in its menus (no song, by the same word): the counter waits there, where the game's
     // screens leave it no place.
     bool song = false, menus = false;

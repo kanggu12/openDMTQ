@@ -157,7 +157,8 @@ constexpr float kMenusRight = 16;
 // In a song (`song`): in its corner, 8 in from the area's edges, at the left `inset` right of the game's pause button and
 // of the column under it (its life gauge, FEVER, score, rate and combo), so that it covers nothing a song uses; at the top
 // left below `top_room` (the bar's room while it is down). At the top right of a song, and where the player cannot tell
-// a song from the menus (keyboard play off), whatever its corner, under the menus' header at the right (under_header,
+// a song from the menus (the game's input not hooked: its code not where the player expects it; keyboard play on or
+// off, the hook follows the songs), whatever its corner, under the menus' header at the right (under_header,
 // `bar` the bar's whole height): clear of the Q and MAX a song's own pause screen shows at its top right, and of the
 // header and the buttons of the music list, the downloads, a song's page and its options, the rankings before a song,
 // the result and the loading screens, measured on their frames in each shape. In the menus it waits

@@ -29,12 +29,14 @@ void keyplay_hold(bool held);
 // Whether a lane key is down: the game is being played (the overlay's bar waits, as for a finger on the game).
 bool keyplay_any_down();
 // Whether a song is being played now, as the game's thread last said it (its last frame less than half a second ago): 1
-// yes, 0 no, -1 not known (keyboard play not hooked: off, or the game's code not where it expects it).
+// yes, 0 no, -1 not known (the hook not in: the game's code not where it expects it). The bar asks it; with keyboard
+// play off it is -1 too, so that the bar keeps its rule for not knowing and every press goes where it goes with no hook
+// (the hook then follows the songs for the overlay's pieces alone: keyboard_play.h's hook_use).
 int keyplay_song_state();
 // Whether a song is going on now: 1 from its play's first frame to its end (on its own pause screen too, and while the
-// window holds the game still), 0 in the menus, -1 not known (keyboard play not hooked). The overlay asks it for the
-// question before quitting (the song's record is lost only mid-song) and for where its pieces stand (in a song, or clear
-// of the menus' header).
+// window holds the game still), 0 in the menus, -1 not known (the hook not in), with keyboard play on or off. The overlay
+// asks it for the question before quitting (the song's record is lost only mid-song) and for where its pieces stand (in
+// a song, or clear of the menus' header).
 int keyplay_in_song();
 
 // A check's key at a song's time (PLAYER_KEYS "@song+seconds:..."): a key's place going down or up when the song's own
