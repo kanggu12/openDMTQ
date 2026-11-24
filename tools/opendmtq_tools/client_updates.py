@@ -27,6 +27,7 @@ import os
 import re
 import shutil
 import tempfile
+import time
 import urllib.error
 import urllib.request
 
@@ -150,12 +151,14 @@ def _fetch(version, folder, releases):
 
 
 def _download(url, path, limit):
-    """One file to `path`, at most `limit` bytes: a feed is never given the whole disk."""
+    """One file to `path`, at most `limit` bytes and whole within runtime.FILE_SECONDS however it trickles in
+    (runtime.pieces): a feed is never given the whole disk, nor the whole day."""
     log(f"builder: fetching {url}")
+    started = time.monotonic()
     try:
         with urllib.request.urlopen(url, timeout=runtime.TIMEOUT) as r, open(path, "wb") as out:
             done = 0
-            for piece in iter(lambda: r.read(1 << 20), b""):
+            for piece in runtime.pieces(r, started, runtime.FILE_SECONDS):
                 done += len(piece)
                 if done > limit:
                     raise OSError(f"{os.path.basename(path)} is larger than the release says")

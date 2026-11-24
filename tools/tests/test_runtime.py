@@ -1,6 +1,8 @@
 """The arm32 runtime, ready-made: one zip with everything in it, from a copy at hand or the latest release, swapped in whole."""
 
+import contextlib
 import hashlib
+import http.server
 import io
 import json
 import os
@@ -8,6 +10,7 @@ import shutil
 import stat
 import tempfile
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -468,6 +471,79 @@ class AddTest(unittest.TestCase):
             self.assertEqual(runtime.main(["--refresh"]), 0)
             self.assertEqual([line for line in said if line.startswith("The runtime")],
                              ["The runtime for newer phones is in place (v1)."])
+
+
+@contextlib.contextmanager
+def trickling(body, gap):
+    """A release's server on this machine that answers at once with its headers, then sends `body` a byte every `gap`
+    seconds, each well within a read's wait: its address."""
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            try:
+                for i in range(len(body)):
+                    self.wfile.write(body[i:i + 1])
+                    self.wfile.flush()
+                    time.sleep(gap)
+            # The fetch gave up and went: nothing more to send.
+            except OSError:
+                pass
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.daemon_threads = True
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}/file"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+class TrickleTest(unittest.TestCase):
+    """DEP-118: a release's file that comes a byte at a time, each within a read's wait, stops at its deadline, its
+    headers' time counted: the runtime, the checksums and the PC client's update packages (main read a megabyte at a time,
+    or the whole file, with no deadline at all, and waited for as long as the server went on)."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+
+    def test_the_runtime_that_trickles_in_stops_at_its_deadline(self):
+        with trickling(b"x" * 400, 0.02) as url, mock.patch.object(runtime, "FILE_SECONDS", 0.5, create=True), \
+                mock.patch.object(runtime, "log"):
+            began = time.monotonic()
+            with self.assertRaises(runtime.RuntimeError_) as refused:
+                runtime.fetch(url, os.path.join(self._tmp.name, "runtime.zip"))
+        self.assertLess(time.monotonic() - began, 4)
+        self.assertIn("did not come whole within 0.5 seconds", str(refused.exception))
+
+    def test_a_small_file_and_an_update_package_stop_at_theirs(self):
+        from opendmtq_tools import client_updates
+        with trickling(b"y" * 400, 0.02) as url, mock.patch.object(runtime, "SMALL_SECONDS", 0.5, create=True):
+            began = time.monotonic()
+            with self.assertRaises(runtime.RuntimeError_):
+                runtime._small(url, 1000)
+        self.assertLess(time.monotonic() - began, 4)
+        with trickling(b"z" * 400, 0.02) as url, mock.patch.object(runtime, "FILE_SECONDS", 0.5, create=True), \
+                mock.patch.object(client_updates, "log"):
+            began = time.monotonic()
+            # runtime.Late, an OSError as any failure of a download.
+            with self.assertRaises(OSError):
+                client_updates._download(url, os.path.join(self._tmp.name, "package.nupkg"), 1000)
+        self.assertLess(time.monotonic() - began, 4)
+
+    def test_a_file_that_comes_in_time_comes_whole(self):
+        with trickling(b"w" * 50, 0.001) as url, mock.patch.object(runtime, "log"):
+            path = os.path.join(self._tmp.name, "runtime.zip")
+            runtime.fetch(url, path)
+        with open(path, "rb") as f:
+            self.assertEqual(f.read(), b"w" * 50)
 
 
 @unittest.skipUnless(os.path.isfile(os.path.join(ROOT, "arm32", "build.sh")), "the runtime's sources are not at hand")

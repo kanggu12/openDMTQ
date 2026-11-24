@@ -141,9 +141,12 @@ def fetch(releases, path):
     url = runtime.release_url(RELEASE_NAME, version, releases)
     print(f"builder: fetching the installer for Windows from {url}", flush=True)
     part = path + ".part"
+    started = time.monotonic()
     try:
+        # Whole within runtime.FILE_SECONDS however it trickles in (runtime.pieces).
         with urllib.request.urlopen(url, timeout=runtime.TIMEOUT) as r, open(part, "wb") as out:
-            shutil.copyfileobj(r, out)
+            for piece in runtime.pieces(r, started, runtime.FILE_SECONDS):
+                out.write(piece)
         # Read whole before it replaces anything: a file damaged on its way is no installer.
         if not whole(part):
             raise ValueError(f"{SETUP_NAME} from {url} is damaged")

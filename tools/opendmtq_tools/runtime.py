@@ -34,6 +34,7 @@ import re
 import shutil
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 import zipfile
@@ -68,10 +69,38 @@ HANDED_OUT = WHOLE + ("arm64-v8a/libarm32.so", "arm64-v8a/libarm32proxy.so", "ar
                       "notices/android-NOTICE.html.gz")
 # How long to wait for an answer: on a network with no way out this is all a build waits for.
 TIMEOUT = 15
+# How long a whole answer may take, however its bytes come: a release's file (the runtime, the PC client's installer and
+# its update packages: tens of megabytes, a slow line among them) and a small one (its checksums, their signature). A
+# read's own wait (TIMEOUT) is no limit to a server that sends a byte at a time, each within it.
+FILE_SECONDS = 30 * 60
+SMALL_SECONDS = 60
+# A piece of an answer read at a time: what has come, at most this much, the clock looked at after each.
+PIECE = 64 * 1024
 
 
 class RuntimeError_(Exception):
     """Why the runtime could not be had, in words for the page that shows it."""
+
+
+class Late(OSError):
+    """An answer that had not come whole within its time (pieces)."""
+
+
+def pieces(response, started, seconds):
+    """An answer's body in the pieces it comes in (what has arrived, at most PIECE each), whole within `seconds` from
+    `started` (time.monotonic() when it was asked for, its headers' time counted too): the clock is looked at after each
+    piece, so a server that sends a byte at a time, each within a read's wait, is stopped at the deadline, give or take
+    one read's wait (TIMEOUT); a megabyte read at a time waited for a megabyte however long it took. Late past it, an
+    OSError as any failure of a download is. As the PC client keeps its answers to one deadline
+    (client/opendmtq_client/server.py, within)."""
+    while True:
+        # One read of the connection at most: what has come, without waiting for the rest of the piece.
+        piece = response.read1(PIECE)
+        if not piece:
+            return
+        yield piece
+        if time.monotonic() - started > seconds:
+            raise Late(f"it did not come whole within {seconds} seconds")
 
 
 def log(message):
@@ -107,10 +136,18 @@ class Missing(RuntimeError_):
 
 
 def _small(url, limit):
-    """A release's small file (its checksums, their signature) as bytes, at most `limit` and one more."""
+    """A release's small file (its checksums, their signature) as bytes, at most `limit` and one more, whole within
+    SMALL_SECONDS however it trickles in (pieces)."""
+    started = time.monotonic()
     try:
         with urllib.request.urlopen(url, timeout=TIMEOUT) as r:
-            return r.read(limit + 1)
+            data = b""
+            for piece in pieces(r, started, SMALL_SECONDS):
+                data += piece
+                # Past the limit: no such file is that long, and no more of it is read.
+                if len(data) > limit:
+                    break
+            return data[:limit + 1]
     except urllib.error.HTTPError as e:
         if e.code == 404:
             raise Missing(f"{url} is not there") from None
@@ -187,11 +224,13 @@ def numbers_in(path):
 
 
 def fetch(url, path):
-    """The latest release's copy to path."""
+    """The latest release's copy to path, whole within FILE_SECONDS however it trickles in (pieces)."""
     log(f"Fetching the runtime for newer phones from {url}")
+    started = time.monotonic()
     try:
         with urllib.request.urlopen(url, timeout=TIMEOUT) as r, open(path, "wb") as out:
-            shutil.copyfileobj(r, out)
+            for piece in pieces(r, started, FILE_SECONDS):
+                out.write(piece)
     # URLError is an OSError; a connection cut off half-way can also end as the HTTP library's own error.
     except (OSError, http.client.HTTPException) as e:
         raise RuntimeError_(f"could not fetch it from {url}: {e}") from e
