@@ -23,8 +23,9 @@ The game's Android client as an APK, under any file name. These work:
 
 OpenDMTQ also tidies a few of the game's screens: no notice at every start, no question before the first download, the
 shop opening on its MAX tab, the panel's own resolution, menus kept at full frame rate when left alone, the music list
-kept at its page after a download. These fixes fit versions 1.3.5 and 1.3.4, original or changed for another server, and
-both were played through on an emulator. Another version plays the same, with those screens as the game had them.
+kept at its page after a download, no loading tip that sends players to quests. These fixes fit versions 1.3.5 and
+1.3.4, original or changed for another server, and both were played through on an emulator. Another version plays the
+same, with those screens as the game had them.
 
 These do not work:
 

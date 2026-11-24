@@ -7,16 +7,19 @@ The client reaches its backend through two layers:
 Both are rewritten to http://HOST. The game keeps to plain HTTP: it would not trust the certificate
 of the server's own authority (the HTTPS on the same port is for browsers). The manifest allows
 cleartext HTTP, so the phone needs no hosts app, proxy or certificate.
-Besides the addresses, a few edits to the SDK, the game code and the game's screens take out what is of
-no use on this server (smali_edits, IL2CPP_EDITS, ASSET_EDITS).
+Besides the addresses, a few edits to the SDK, the game code, the game's screens and its words take out what is of
+no use on this server (smali_edits, IL2CPP_EDITS, ASSET_EDITS, patch_words).
 
 Usage (inside the tools container): python3 -m opendmtq_tools.patch_apk --host 192.168.0.10 [--base FILE]
 """
 
 import argparse
 import contextlib
+import csv
 import datetime
+import glob
 import hashlib
+import io
 import json
 import os
 import re
@@ -32,7 +35,7 @@ import zipfile
 from . import axml, filelock, il2cpp, pack_arm64, qr, unity_assets
 
 # Tool version stamped into the manifest, so a portal can tell which patcher made an APK.
-VERSION = "1.12.0"
+VERSION = "1.13.0"
 # data/apk: base/ in, out/ and keystore/ written. The image mounts it at /apk; a host install names it.
 APK_DIR = os.environ.get("OPENDMTQ_APK", "/apk")
 # The command that imports on this install, for the messages that name it: the Windows bundle's program (the only one
@@ -682,6 +685,102 @@ def patch_assets(root, code=None):
         log(f"  screens   {name}: {len(edits)} {'edit' if len(edits) == 1 else 'edits'}")
 
 
+# ---- the game's words
+
+# The game's words for its screens are tables among the app's own files (.csv), a row for each string: its key, its words
+# in each language the game speaks (columns named text_ and two capitals), then a note. Two of the tips its loading
+# screens show say that MAX Point comes from quests as well, in four of its five languages; this server has no quests.
+# Their words become those of a tip of their kind that says where MAX Point comes from with no quest in it, in each
+# language: the game's own words (it shows some tips more than once anyway). Found by their words, never their keys: a
+# word for quests in any language beside MAX Point. A tip's kind is its key without the number at its end. The rows stay,
+# so that a tip the game picks by its number still has words; a table that is not of this form is left as it is.
+WORDS_COLUMN = re.compile(r"text_[A-Z]{2}")
+# Quests in the game's languages: Korean, Japanese, English (the word alone: a request is none), Chinese in its simplified
+# and its traditional script.
+QUEST_WORDS = re.compile(r"퀘스트|クエスト|\bquests?\b|任务|任務", re.I)
+MAX_POINT = re.compile(r"max\s*points?", re.I)
+
+
+def _csv_line(row):
+    """One row of a table as the game's tables write it: its fields apart by commas, quoted only where they must be."""
+    out = io.StringIO()
+    csv.writer(out, lineterminator="\n").writerow(row)
+    return out.getvalue()[:-1]
+
+
+def quest_free_words(text):
+    """A table of the game's words with each tip that sends a player to quests for MAX Point given the words of a tip of
+    its kind that says where MAX Point comes from without them: (the table, how many rows changed). The same text and 0
+    for a table of another form, or with no such tip, or with none to take words from."""
+    # Its lines as they end (the game's own end in a carriage return and a line feed), each a row.
+    eol = "\r\n" if "\r\n" in text else "\n"
+    lines = text.split(eol)
+    # A field that holds a line break is not of this form (the table is read a line at a time here).
+    if any(line.count('"') % 2 for line in lines):
+        return text, 0
+    rows = [next(csv.reader([line])) if line else [] for line in lines]
+    # The columns of words, by their names in its first row: none, and it is a table of another kind (a song list).
+    header = rows[0] if rows else []
+    words = [i for i, name in enumerate(header) if WORDS_COLUMN.fullmatch(name)]
+    if not words:
+        return text, 0
+
+    def full(row):
+        # A row of the table's own width, its key ending in a number (a numbered string: one of a kind).
+        return len(row) == len(header) and re.search(r"\d$", row[0]) is not None
+
+    def kind(row):
+        # The key without its number: the tips of a screen share it.
+        return re.sub(r"\d+$", "", row[0])
+
+    def quests(row):
+        # A word for quests in any of its languages.
+        return any(QUEST_WORDS.search(row[i]) for i in words)
+
+    def max_point(row):
+        # MAX Point named in any of its languages (the game writes it in Latin letters in all of them).
+        return any(MAX_POINT.search(row[i]) for i in words)
+
+    changed = 0
+    for n, row in enumerate(rows):
+        # A numbered string that sends a player to quests for MAX Point.
+        if n == 0 or not full(row) or not (quests(row) and max_point(row)):
+            continue
+        # The first tip of the same kind that speaks of MAX Point and of no quest, written in the table as this form
+        # writes it (so that the line made from it reads as the game's own).
+        source = next((r for m, r in enumerate(rows) if m and full(r) and kind(r) == kind(row) and max_point(r) and not quests(r)
+                       and _csv_line(r) == lines[m]), None)
+        if source is None:
+            continue
+        # Its key and its note stay; its words, in every language, are the other tip's.
+        lines[n] = _csv_line([source[i] if i in words else value for i, value in enumerate(row)])
+        changed += 1
+    return eol.join(lines), changed
+
+
+def patch_words(root):
+    """Make the edits to the game's words (quest_free_words) in each of its tables among the app's files; a table that
+    differs stays as it is."""
+    # Every table among the app's files: those of other kinds come back unchanged.
+    for path in sorted(glob.glob(os.path.join(root, "assets", "**", "*.csv"), recursive=True)):
+        with open(path, "rb") as f:
+            raw = f.read()
+        # UTF-8, with a byte order mark before it or not; a table in another encoding is no table of the game's words.
+        bom = raw.startswith(b"\xef\xbb\xbf")
+        try:
+            text = raw[3 if bom else 0:].decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        new, changed = quest_free_words(text)
+        if not changed:
+            continue
+        # Written as it was: its byte order mark, its line ends, every other line as it stood.
+        with open(path, "wb") as f:
+            f.write((b"\xef\xbb\xbf" if bom else b"") + new.encode("utf-8"))
+        log(f"  words     {changed} {'tip' if changed == 1 else 'tips'} of the loading screens that sent players to quests "
+            f"say where MAX Point comes from")
+
+
 def patch_metadata(path, host):
     """Rewrite the IL2CPP literals (in place when they fit, appended when longer). Returns the hosts of the other server
     the client was changed for, if it was: the SDK's addresses name them too (redirect_smali)."""
@@ -1100,6 +1199,7 @@ def build(args, host, out_dir):
         code = patch_il2cpp(os.path.join(src, "lib", "armeabi-v7a", "libil2cpp.so"))
         patch_assets(src, code)
         patch_settings(src)
+        patch_words(src)
         label = patch_label(os.path.join(src, "AndroidManifest.xml"), host)
         patch_target(os.path.join(src, "AndroidManifest.xml"))
         package = package_id(keystore_sha256())

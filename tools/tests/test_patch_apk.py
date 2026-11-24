@@ -819,6 +819,70 @@ class ScreenEditTest(unittest.TestCase):
                 self.assertTrue(edit[1].count("/") >= 1, edit)
 
 
+# A table of the game's words as the client's is written, made up: a byte order mark, a header of the key, five
+# languages' words and a note, lines ending in a carriage return and a line feed and none after the last, a field
+# quoted where it holds a comma. Its tips: one on where MAX Point comes from, two that send a player to quests for it
+# (the second with its Japanese words already true), one of another kind; a string of another kind on quests stays.
+WORDS_HEADER = "id,text_KR,text_US,text_JP,text_CN,text_TW,comment"
+WORDS_ROWS = [
+    'TIP_001,"맥스 포인트는 플레이로, 모아요",Max Points come from play.,プレイでMAX Point,玩游戏获得MAX Point,玩遊戲獲得MAX Point,tip',
+    "TIP_002,MAX Point? 퀘스트로도 얻어요,MAX Point? Earn it from quests too.,クエストでMAX Point,完成任务获得MAX Point,完成任務獲得MAX Point,tip",
+    "TIP_003,MAX Point? 퀘스트로도 얻어요,MAX Point? Earn it from quests too.,曲をクリアでMAX Point,完成任务获得MAX Point,完成任務獲得MAX Point,tip",
+    "TIP_004,이어폰을 써 보세요,Try earphones.,イヤホン,耳机,耳機,tip",
+    "QUEST_REWARD_001,퀘스트 보상 MAX Point,Quest reward: MAX Point,報酬,奖励,獎勵,quest",
+    "NOTE_002,요청,A request for MAX Point,要求,请求,請求,note",
+]
+WORDS_TABLE = "﻿" + "\r\n".join([WORDS_HEADER] + WORDS_ROWS)
+
+
+class WordsEditTest(unittest.TestCase):
+    """The game's loading tips that send a player to quests for MAX Point (this server has none) take the words of a tip of
+    their kind that says where MAX Point comes from, in every language; nothing else of the table changes (GAME-161)."""
+
+    def test_the_quest_tips_take_the_words_of_the_max_point_tip(self):
+        new, changed = patch_apk.quest_free_words(WORDS_TABLE[1:])
+        self.assertEqual(changed, 2)
+        lines, old = new.split("\r\n"), WORDS_TABLE[1:].split("\r\n")
+        # The two tips: their keys and notes kept, the first tip's words in every language, quoted as it is quoted.
+        self.assertEqual(lines[2], 'TIP_002,"맥스 포인트는 플레이로, 모아요",Max Points come from play.,プレイでMAX Point,玩游戏获得MAX Point,玩遊戲獲得MAX Point,tip')
+        self.assertEqual(lines[3], lines[2].replace("TIP_002", "TIP_003"))
+        # Every other line as it was, the line ends too, none after the last.
+        self.assertEqual([line for i, line in enumerate(lines) if i not in (2, 3)], [line for i, line in enumerate(old) if i not in (2, 3)])
+        self.assertFalse(new.endswith("\r\n"))
+        # A quest of another kind (no tip on where MAX Point comes from among its own) and a request are no tips to change.
+        self.assertIn("QUEST_REWARD_001,퀘스트 보상 MAX Point", new)
+        self.assertIn("A request for MAX Point", new)
+
+    def test_a_table_of_another_form_or_without_a_tip_to_take_stays(self):
+        # No columns of words: a song list.
+        self.assertEqual(patch_apk.quest_free_words("song_id,name\r\n1,quest MAX Point"), ("song_id,name\r\n1,quest MAX Point", 0))
+        # No tip of the kind that says where MAX Point comes from without quests.
+        alone = "\r\n".join([WORDS_HEADER, WORDS_ROWS[1], WORDS_ROWS[3]])
+        self.assertEqual(patch_apk.quest_free_words(alone), (alone, 0))
+        # A field that holds a line break: not read a line at a time.
+        broken = WORDS_TABLE[1:].replace("Max Points come from play.", '"Max Points\r\ncome from play."')
+        self.assertEqual(patch_apk.quest_free_words(broken), (broken, 0))
+
+    def test_the_build_writes_the_table_back_as_it_was_but_the_tips(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(patch_apk, "log") as log:
+            folder = os.path.join(d, "assets", "words")
+            os.makedirs(folder)
+            path = os.path.join(folder, "table.csv")
+            with open(path, "wb") as f:
+                f.write(WORDS_TABLE.encode("utf-8"))
+            # A table in another encoding, which is none of the game's words, is left alone.
+            with open(os.path.join(folder, "other.csv"), "wb") as f:
+                f.write(b"\xff\xfeq\x00")
+            patch_apk.patch_words(d)
+            with open(path, "rb") as f:
+                after = f.read()
+            with open(os.path.join(folder, "other.csv"), "rb") as f:
+                self.assertEqual(f.read(), b"\xff\xfeq\x00")
+        self.assertTrue(after.startswith(b"\xef\xbb\xbf"))
+        self.assertEqual(after.decode("utf-8")[1:], patch_apk.quest_free_words(WORDS_TABLE[1:])[0])
+        self.assertIn("2 tips", " ".join(str(c) for c in log.call_args_list))
+
+
 if __name__ == "__main__":
     unittest.main()
 

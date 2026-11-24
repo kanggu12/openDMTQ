@@ -75,6 +75,35 @@ class RealClientTest(unittest.TestCase):
                     # apply() raises for an object that is not there; the file keeps its size.
                     self.assertEqual(len(unity_assets.apply(data, edits)), len(data), name)
 
+    def test_the_loading_tips_that_send_players_to_quests_are_found_and_alone_changed(self):
+        # GAME-161: the client's tables of words hold tips that send a player to quests for MAX Point (this server has
+        # none); the words edit finds them by their words and changes those lines alone, each then free of quests.
+        for path, apk in self.apks.items():
+            with self.subTest(client=os.path.basename(path)):
+                found = 0
+                for name in apk.namelist():
+                    if not name.endswith(".csv"):
+                        continue
+                    raw = apk.read(name)
+                    # As the build reads it: UTF-8 with its byte order mark or not; anything else is no table of words.
+                    try:
+                        text = raw[3:].decode("utf-8") if raw.startswith(b"\xef\xbb\xbf") else raw.decode("utf-8")
+                    except UnicodeDecodeError:
+                        continue
+                    new, changed = patch_apk.quest_free_words(text)
+                    if not changed:
+                        continue
+                    eol = "\r\n" if "\r\n" in text else "\n"
+                    before, after = text.split(eol), new.split(eol)
+                    self.assertEqual(len(before), len(after), name)
+                    lines = [(a, b) for a, b in zip(before, after) if a != b]
+                    self.assertEqual(len(lines), changed, name)
+                    for a, b in lines:
+                        self.assertRegex(a, patch_apk.QUEST_WORDS)
+                        self.assertNotRegex(b, patch_apk.QUEST_WORDS)
+                    found += changed
+                self.assertGreater(found, 0)
+
     def test_what_is_hidden_is_not_already_hidden(self):
         for path, apk in self.apks.items():
             with self.subTest(client=os.path.basename(path)):

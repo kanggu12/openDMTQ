@@ -341,6 +341,10 @@ fetches the images of its screens from the server), so the server reports itself
   the lobby; the social links and Message in the menu; the account rows and Contact Us in the options; the shop's Q
   tab, which is real money through Google Play. The server does its share in its replies: no coupons in
   `service.getInfo` (`src/user.php`), and a price list of one product that is not on sale (`src/platform.php`).
+- **Words** (`patch_words`): two of the tips the loading screens show said that MAX Point comes from quests too, and
+  this server has none; they carry the words of the game's own tip on where MAX Point comes from, in every language.
+  Found by their words in the game's tables of words, not by their keys; the rows stay, so that a tip the game picks by
+  its number still has words.
 - **arm32 runtime:** when the server has a runtime bundle (`data/apk/arm32`: a release's, which the builder gets by itself
   through `runtime.py`, or one `arm32/bundle.sh` made here),
   `pack_arm64.py` keeps `lib/armeabi-v7a` and adds `lib/arm64-v8a` with the runtime, a proxy under each 32-bit
