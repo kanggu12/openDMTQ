@@ -367,6 +367,35 @@ class EveryForm(Played):
         self.assertIn("<server> is at <server>.", files["system/connection-test.txt"])
         self.assertIn("player: v1.2.3.4.5 and ::ffff:1.2.3.4.5", files["launcher/launcher.log"])
 
+    def test_a_server_named_as_a_word_of_opendmtqs_own(self):
+        # The owner named the server OpenDMTQ (its SERVER_NAME): the report's own first line, the log's "OpenDMTQ ...
+        # started" and the program's folder and file stay as they are (main put "<server name>" in each, ten times), and the
+        # name goes where a server's name stands: --server's line, the connection test's, the settings' name and the app's
+        # name. A server named like a word of the player's log ("Live"): left out as it was written, in its own letter
+        # case, and the log's own word stays.
+        self.state.server().update(name="OpenDMTQ", app={"file": "a.apk", "sha256": "0" * 64, "size": 4, "package": PACKAGE,
+                                                         "label": "TECHNIKA Q (OpenDMTQ)", "address": "192.168.1.10:8791"})
+        self.state.server(OTHER).update(name="Live")
+        self.state.save()
+        self.logged("INFO MainThread Connected to OpenDMTQ (%s)." % SERVER,
+                    "INFO MainThread connection test: [ok  ] OpenDMTQ server  OpenDMTQ, OpenDMTQ 0.11.2.",
+                    "INFO MainThread Connected to Live (%s)." % OTHER)
+        with open(player.log_path(PACKAGE), "a", encoding="utf-8") as f:
+            f.write("player: live: asks the server\nplayer: notice: Welcome to Live\n")
+        _path, _left, files = self.make()
+        about, log, game = files["about.txt"], files["launcher/launcher.log"], files["player/player.log"]
+        self.assertTrue(about.startswith("OpenDMTQ report, made "), about[:40])
+        self.assertIn("INFO MainThread OpenDMTQ 0.11.0 started: --sign-in <account>", log)
+        self.assertIn(os.path.join("AppData", "Local", "OpenDMTQ.Client", "OpenDMTQ.exe"), log)
+        for line in ("Connected to <server name> (<server>).", "OpenDMTQ server  <server name>, OpenDMTQ 0.11.2."):
+            self.assertEqual(log.count(line), 2 if line.startswith("Connected") else 1, line)
+        other, server = json.loads(files["settings/settings.json"])["servers"]
+        self.assertEqual((other["name"], server["name"], server["app"]["label"]),
+                         ("<server name>", "<server name>", "TECHNIKA Q (<server name>)"))
+        self.assertIn("player: live: asks the server", game)
+        self.assertIn("player: notice: Welcome to <server name>", game)
+        self.assertNotIn("Live", "\n".join(files.values()))
+
     def test_the_connection_tests_lines_however_they_are_worded(self):
         # Every line of the test that holds an ID, a server's name or a host, as the window logs it and as --test-server
         # says it, with values no settings know: each is left out by the words around it, the words as they are now.

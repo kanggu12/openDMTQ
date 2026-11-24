@@ -16,10 +16,12 @@ report, and OpenDMTQ-cmd.exe --report FILE).
 What is left out is replaced by a word in angle brackets wherever it is found, in every file: the Windows user's name
 and every path with it (the home folder, the temporary folder), every site ID where the launcher writes one (signed in
 with, filled in, typed for a sign-in that failed), every server's address (as written, as host:port, its host, the
-address its app is built for, its folder's name here) and its own name, the sign-in cookies, tokens (an API's, a
-broadcast's upload key, a one-time sign-in link's), this PC's player id (the game's device id), the words typed in the
-game, and the name a sound device is named after (Windows names a Bluetooth headset as its owner's phone named it:
-"Headphones (Sena's AirPods Pro)", "헤드폰(김세나의 Galaxy Buds2 Pro)"). Servers are left out whether the settings know them or not (a server forgotten since, an address typed that
+address its app is built for, its folder's name here) and its own name (where a server's name stands, and as itself
+anywhere else unless it is a word OpenDMTQ writes itself: a server named OpenDMTQ leaves the report's OpenDMTQ alone),
+the sign-in cookies, tokens (an API's, a broadcast's upload key, a one-time sign-in link's), this PC's player id (the
+game's device id), the words typed in the game, and the name a sound device is named after (Windows names a Bluetooth
+headset as its owner's phone named it: "Headphones (Sena's AirPods Pro)", "헤드폰(김세나의 Galaxy Buds2 Pro)").
+Servers are left out whether the settings know them or not (a server forgotten since, an address typed that
 never answered, the last connection test of any address): by their forms (web addresses, IP addresses, host:port), by
 where the launcher writes an address or a name, and each one any file names is left out of all of them. The list of
 what was left out, by kind and how often, is in about.txt and is what the window and the command line say after it is
@@ -124,13 +126,16 @@ SERVER_AT = _shapes(
 # answer ("NAME did not answer; playing on it as known (address)."), a server as one line names it (state.label, NAME
 # (address)) in --status and its ready check ("server: ...") and in --servers (each line "* " or "  " first, after the
 # log's time, level and thread, the name right after: never a blank or a bracket, which the ready check's lines start
-# with). A name holds no angle brackets: those are the report's own words.
+# with), and the settings' own fields: a server's name right after its address, and in its app's name the server's in
+# brackets ("TECHNIKA Q (NAME)"). A name holds no angle brackets: those are the report's own words.
 _IN_BRACKETS = r"(?= \((?:[a-z][a-z0-9+.-]*://|<server>)[^()\n]*\)"
 NAME_AT = _shapes(
     r"(\bConnected to )([^<>\n]+?)%s)" % _IN_BRACKETS,
     r"(^\S+ \S+ [A-Z]+ \S+ )([^<>\n]+?)(?= did not answer; playing on it as known \()",
     r"(\bserver: )([^<>\n]+?)%s$)" % _IN_BRACKETS,
-    r"(^\S+ \S+ [A-Z]+ \S+ [* ] )([^<>\n\[\s][^<>\n]*?)%s$)" % _IN_BRACKETS)
+    r"(^\S+ \S+ [A-Z]+ \S+ [* ] )([^<>\n\[\s][^<>\n]*?)%s$)" % _IN_BRACKETS,
+    r"(\"url\"\s*:\s*\"[^\"\n]*\",\s*\"name\"\s*:\s*\")([^\"<>\n]+)(?=\")",
+    r"(\"label\"\s*:\s*\"[^\"\n(]*\()([^\"()<>\n]+)(?=\)\")")
 # A site ID where it stands in a line: up to a blank or a mark no ID has, and never ending on a period (the sentence's).
 _ID = r"[^\s,;:()<>\"']*[^\s,;:()<>\"'.]"
 # Where the launcher writes a site ID, whatever it is: a sign-in that failed, with the ID as typed (to the error after
@@ -188,6 +193,30 @@ def _worded():
     return found
 
 
+# What OpenDMTQ writes itself, as one text once it is made (_own_text): a server named as one of its words or phrases
+# ("OpenDMTQ", "OpenDMTQ server", "Player") is left out only where a server's name stands.
+_OWN = []
+
+
+def _own_text():
+    """OpenDMTQ's own words as one text: the launcher's words in English (its log and its command line say them), the
+    report's own lines, its programs' names and the log's levels and thread."""
+    if not _OWN:
+        from opendmtq_client import i18n
+        words = [english for english, _korean in i18n.TEXT.values()]
+        words += ["OpenDMTQ report, made", "launcher: player: Windows: graphics:", "INFO WARNING ERROR MainThread",
+                  "OpenDMTQ.Client OpenDMTQ.exe OpenDMTQ-cmd.exe OpenDMTQ-Player.exe OpenDMTQ-Setup.exe"]
+        _OWN.append("\n".join(words))
+    return _OWN[0]
+
+
+def own_word(name):
+    """True when a server's name is a word or a phrase OpenDMTQ writes itself, in any letter case: left out as a word
+    wherever it is, such a name would take OpenDMTQ's own words with it ("OpenDMTQ report", "OpenDMTQ 0.11.2 started",
+    its programs' folder)."""
+    return re.search(r"(?<![\w.-])%s(?![\w-])" % re.escape(name), _own_text(), re.I) is not None
+
+
 def _ipv6(text):
     """True when `text` is an IPv6 address as people write one: with "::" or all eight parts, and a digit in it (a name
     of hex letters alone, such as face::add, is a program's)."""
@@ -212,21 +241,31 @@ class Scrub:
         # The connection test's lines, worded as they are now.
         self.worded = _worded()
 
-    def add(self, kind, value, whole=False):
+    def add(self, kind, value, whole=False, case=False):
         """Leave out `value` (a text) as `kind` wherever it is, in any letter case (Windows' paths and names, an
-        address's host): as a whole word only with `whole`, neither "a1" in "data1" nor 10.0.0.5 in 110.0.0.5."""
+        address's host), or in its own alone with `case`: as a whole word only with `whole`, neither "a1" in "data1" nor
+        10.0.0.5 in 110.0.0.5."""
         value = (value or "").strip()
-        if len(value) < 2 or value in LEFT or (kind, value.lower(), whole) in self.known:
+        known = (kind, value if case else value.lower(), whole)
+        if len(value) < 2 or value in LEFT or known in self.known:
             # One letter is in every word: nothing that short names anyone; a word of the report's own, or one known.
             return
-        self.known.add((kind, value.lower(), whole))
+        self.known.add(known)
         pattern = r"(?<![\w.-])%s(?![\w-])" % re.escape(value) if whole else re.escape(value)
-        self.pattern(kind, pattern, WORDS[kind], len(value))
+        self.pattern(kind, pattern, WORDS[kind], len(value), flags=0 if case else re.I)
 
-    def pattern(self, kind, pattern, word, length):
-        """Leave out what `pattern` (a regular expression, any letter case) finds as `kind`, replaced by `word` (which may
-        keep the pattern's groups: \\1)."""
-        self.found.append((re.compile(pattern, re.I), word, kind, length))
+    def name(self, value):
+        """A server's own name, left out wherever it is written as itself (a whole word or phrase, in its own letter
+        case: as the server gave it), unless OpenDMTQ writes the same word or phrase itself (own_word). Such a name is
+        left out only where a server's name stands (NAME_AT, the connection test's lines), as a site ID is."""
+        value = (value or "").strip()
+        if value and not own_word(value):
+            self.add("server_name", value, whole=True, case=True)
+
+    def pattern(self, kind, pattern, word, length, flags=re.I):
+        """Leave out what `pattern` (a regular expression, any letter case unless `flags` say otherwise) finds as `kind`,
+        replaced by `word` (which may keep the pattern's groups: \\1)."""
+        self.found.append((re.compile(pattern, flags), word, kind, length))
         # The longest first: a server's whole address before its host alone.
         self.found.sort(key=lambda item: -item[3])
 
@@ -279,13 +318,13 @@ class Scrub:
                 self.server(match.group(2))
         for pattern in NAME_AT:
             for match in pattern.finditer(text):
-                self.add("server_name", match.group(2), whole=True)
+                self.name(match.group(2))
         for pattern, kind in self.worded:
             for match in pattern.finditer(text):
                 if kind == "server":
                     self.server(match.group(2))
                 elif kind == "server_name":
-                    self.add("server_name", match.group(2), whole=True)
+                    self.name(match.group(2))
 
     def __call__(self, text):
         """`text` with everything left out, each kind counted: what this PC and the files made known, then what stands
@@ -375,8 +414,9 @@ def _users(scrub):
 
 def _servers(scrub, state):
     """Every server this launcher knows: its address as written, its host and port, its host, the address its app is
-    built for and its folder's name here (host-port), its own name. Its site IDs are left out where an ID is written,
-    as every ID is (ACCOUNT_AT): a whole word elsewhere may be a word of the logs' own (an ID "player")."""
+    built for and its folder's name here (host-port), its own name (Scrub.name: where a name stands, and as itself
+    elsewhere unless it is a word of OpenDMTQ's own). Its site IDs are left out where an ID is written, as every ID is
+    (ACCOUNT_AT): a whole word elsewhere may be a word of the logs' own (an ID "player")."""
     for server in state.servers:
         url = server.get("url") or ""
         parts = urllib.parse.urlsplit(url)
@@ -389,7 +429,7 @@ def _servers(scrub, state):
         scrub.add("server", address.replace(":", "-"), whole=True)
         scrub.add("server", apps.key(url) if url else "", whole=True)
         if st.has_own_name(server):
-            scrub.add("server_name", server.get("name") or "")
+            scrub.name(server.get("name") or "")
 
 
 def _tested(scrub, tested):
@@ -406,7 +446,7 @@ def _tested(scrub, tested):
         name = str(params.get("name") or "") if step.key == "server" else ""
         # A server without a name of its own calls itself by its address: left out as the address it is.
         if name and ("server", name.lower(), True) not in scrub.known:
-            scrub.add("server_name", name, whole=True)
+            scrub.name(name)
 
 
 def _devices(scrub):
