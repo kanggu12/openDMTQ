@@ -217,17 +217,36 @@ def restart_server():
         not_healthy()
 
 
+def on_loopback(values):
+    """True when this PC reaches the server's one port on its loopback (checks.local_address): published on every address,
+    or on a loopback one alone (BIND_ADDRESS). False for a port published on one other address (BIND_ADDRESS, a LAN
+    address on a machine the internet reaches): a visit from this PC there comes from that address, and the server takes
+    it for one from elsewhere (only its stack's gateway, through which Docker passes a visit to localhost, is the server
+    PC's own)."""
+    import ipaddress
+    try:
+        return ipaddress.ip_address(checks.local_address(values)).is_loopback
+    except ValueError:
+        # A name in BIND_ADDRESS, which Docker would refuse: no loopback to count on.
+        return False
+
+
 def admin_address(values):
-    """host:port where this PC reaches the admin pages: the server's one port, on loopback (a visit to localhost stays on
-    plain HTTP and counts as the server PC's own, server/entrypoint.sh)."""
-    return f"127.0.0.1:{env.listen_port(values)}"
+    """host:port where this PC reaches the admin pages on the server's one port over plain HTTP, or None where it has no
+    such door: on its loopback (a visit to localhost stays on plain HTTP and counts as the server PC's own,
+    server/entrypoint.sh), or at BIND_ADDRESS for a local network address, whose pages open from anywhere there; none
+    for a port on one other address alone with the pages kept off the local network's plain HTTP."""
+    public = values.get("ADMIN_ON_PUBLIC_PORT", "yes") == "yes"
+    if on_loopback(values) or (public and env.is_lan_only(values.get("PUBLIC_HOST", ""))):
+        return f"{checks.local_address(values)}:{env.listen_port(values)}"
+    return None
 
 
 def admin_link(values):
     """The admin pages' address, to print: on the server's one port, at the address phones use on a local network; on
     an internet address over HTTPS when they are on the public port, else on this PC as localhost, never through a
-    proxy; off where Docker hands the server every visit from one address (Docker Desktop, rootless Docker), with the
-    way to have them."""
+    proxy; off where Docker hands the server every visit from one address (Docker Desktop, rootless Docker), or where
+    the port is published on one other address than this PC's loopback (BIND_ADDRESS), with the way to have them."""
     host = values.get("PUBLIC_HOST", "")
     public = values.get("ADMIN_ON_PUBLIC_PORT", "yes") == "yes"
     if public and env.is_lan_only(host):
@@ -238,8 +257,28 @@ def admin_link(values):
     if kind:
         return (f"off ({kind} cannot tell this PC's visits from the internet's; ./opendmtq expose "
                 f"{env.split(host)[0]} --admin-public puts them on the public port over HTTPS)")
-    return (f"http://localhost:{env.listen_port(values)}/opendmtq/admin/ on this PC (a visit through a proxy is one "
+    if not on_loopback(values):
+        return (f"off (the port is published on {values.get('BIND_ADDRESS')} alone, where a visit from this PC counts as "
+                f"one from elsewhere; ./opendmtq expose {env.split(host)[0]} --admin-public puts them on the public port "
+                "over HTTPS)")
+    # On a loopback address of its own (BIND_ADDRESS=127.0.0.2), there; else localhost.
+    local = checks.local_address(values)
+    where = "localhost" if local == "127.0.0.1" else local
+    return (f"http://{where}:{env.listen_port(values)}/opendmtq/admin/ on this PC (a visit through a proxy is one "
             "from elsewhere: --admin-public puts them on the public port over HTTPS)")
+
+
+def admin_answers(values):
+    """True once the admin pages answer: at the door this PC has to them (admin_address), else the admin service itself,
+    asked from its own container."""
+    door = admin_address(values)
+    if door:
+        return checks.http(f"http://{door}/opendmtq/admin/login")[0] == 200
+    import subprocess
+    r = subprocess.run(["docker", "exec", system.container("admin"), "python3", "-c",
+                        "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/opendmtq/admin/login', timeout=3)"],
+                       capture_output=True, text=True)
+    return r.returncode == 0
 
 
 def address_lines(host, values):
@@ -354,9 +393,10 @@ def cmd_up(args):
         ok(f"HTTPS on the same port: https://{env.https_address(host)}/  (own certificate: browsers warn "
            f"once; a phone that installs http://{host}/ca.crt does not; its fingerprint: ./opendmtq doctor)")
     values = env.load(ENV_FILE)
-    # The admin service starts a few seconds after the server; wait so the link works at once.
+    # The admin service starts a few seconds after the server; wait so the link works at once (at this PC's door to
+    # them, the address BIND_ADDRESS narrows the port to among them, or the service itself where this PC has none).
     for _ in range(30):
-        if checks.http(f"http://{admin_address(values)}/opendmtq/admin/login")[0] == 200:
+        if admin_answers(values):
             break
         time.sleep(1)
     else:

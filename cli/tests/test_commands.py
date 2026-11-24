@@ -831,6 +831,42 @@ class MessageTest(unittest.TestCase):
             self.assertIn("http://127.0.0.1:8790/opendmtq/admin/login", sb.urls)
             self.assertNotIn("9791", sb.output())
 
+    def test_bind_address_is_where_up_waits_and_what_the_link_says(self):
+        # BIND_ADDRESS, as docs/troubleshooting.md has a Linux owner set it, publishes the port on that address alone
+        # (CLI-92; main waited on 127.0.0.1, where nothing answered, for 30 s and said the admin pages were not answering,
+        # and printed http://localhost:<port>/ for an exposed server, which answered nothing either).
+        lan = "PUBLIC_HOST=192.168.0.10:8790\nLISTEN_PORT=8790\nBIND_ADDRESS=192.168.0.10\nADMIN_PASSWORD=x\n"
+        with Sandbox(lan) as sb:
+            game_data(sb)
+            with mock.patch.object(app.time, "sleep"):
+                self.assertEqual(sb.call(app.cmd_up), 0, sb.output())
+            self.assertIn("http://192.168.0.10:8790/opendmtq/admin/login", sb.urls)
+            self.assertNotIn("http://127.0.0.1:8790/opendmtq/admin/login", sb.urls)
+            self.assertIn("http://192.168.0.10:8790/opendmtq/admin/", sb.output())
+            self.assertNotIn("not answering", sb.output())
+        # Exposed, the pages kept to the server PC: a visit from this PC to that address counts as one from elsewhere, so
+        # this PC has no door to them; up asks the admin service itself, and the link says how to have them.
+        exposed = ("PUBLIC_HOST=game.example.com:8790\nLISTEN_PORT=8790\nADMIN_ON_PUBLIC_PORT=no\nBIND_ADDRESS=192.168.0.10\n"
+                   "ADMIN_PASSWORD=x\n")
+        with Sandbox(exposed) as sb:
+            game_data(sb)
+            sb.programs[("docker", "exec")] = done(0)
+            with mock.patch.object(app.time, "sleep"):
+                self.assertEqual(sb.call(app.cmd_up), 0, sb.output())
+            self.assertEqual([u for u in sb.urls if u.endswith("/opendmtq/admin/login")], [])
+            self.assertIn("off (the port is published on 192.168.0.10 alone, where a visit from this PC counts as one from "
+                          "elsewhere; ./opendmtq expose game.example.com --admin-public puts them on the public port over HTTPS)",
+                          sb.output())
+            self.assertNotIn("localhost:8790", sb.output())
+            self.assertNotIn("not answering", sb.output())
+        # On loopback alone: the link and the wait there.
+        with Sandbox(exposed.replace("BIND_ADDRESS=192.168.0.10", "BIND_ADDRESS=127.0.0.1")) as sb:
+            game_data(sb)
+            with mock.patch.object(app.time, "sleep"):
+                self.assertEqual(sb.call(app.cmd_up), 0, sb.output())
+            self.assertIn("http://127.0.0.1:8790/opendmtq/admin/login", sb.urls)
+            self.assertIn("http://localhost:8790/opendmtq/admin/ on this PC", sb.output())
+
     def test_a_server_on_port_80_moves_to_its_admin_pages_port(self):
         # Set up before 0.11.0 on port 80 (no LISTEN_PORT, an address without a port): up moves it to the port its admin
         # pages had, here 9791 and then 8791 (the first free after a taken one), as `port` moves one; the site's start

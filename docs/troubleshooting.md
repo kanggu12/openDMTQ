@@ -107,8 +107,10 @@ When the game does not start or shows no songs, this chart leads to the right se
   declined) and goes on; run `./opendmtq firewall` afterwards, or `cli/firewall.ps1 -Port <port>` (with `-Internet` when
   exposed) in an administrator PowerShell.
 - Linux: Docker-published ports bypass ufw, so a ufw rule neither opens nor closes the server's port. If the machine is
-  reachable from outside your home network, set `BIND_ADDRESS` in `.env` to its LAN address. A host install's Apache
-  is not Docker's: there the system's firewall applies as usual.
+  reachable from outside your home network, set `BIND_ADDRESS` in `.env` to its LAN address. A server exposed to the
+  internet then has its admin pages on the public port over HTTPS alone (`./opendmtq expose <name> --admin-public`),
+  as `up` and `status` say: a visit from the PC to its LAN address counts as one from elsewhere. A host install's
+  Apache is not Docker's: there the system's firewall applies as usual.
 - The port already used by something else. With Docker Compose, `./opendmtq up` then fails to start the edge proxy,
   the small program that holds the server's public port. Stop the other program, or move the server to another port
   with `./opendmtq port <port>` (`OpenDMTQ.exe port <port>`, or the admin pages' **Server** page): the app is built
