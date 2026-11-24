@@ -4,8 +4,8 @@ For the server's owner: by default the server is reachable on your local network
 name that points at your public IP and forward one TCP port to it.
 
 This guide is for Docker Compose, which brings the HTTPS the site's sign-in needs on the internet. A host install and
-the Windows bundle have no HTTPS. Their `host` command takes a host name too (`./opendmtq host myhome.example.com:8790`
-on a host install), but passwords would then cross the internet in clear.
+the Windows bundle have no HTTPS: their `host` command takes a host name too (`./opendmtq host myhome.example.com:8790`
+on a host install), and their sign-ins then go over the internet in plain HTTP.
 
 ## What you need
 

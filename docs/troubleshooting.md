@@ -133,11 +133,11 @@ When the game does not start or shows no songs, this chart leads to the right se
 
 ### The app installs but cannot connect
 
-- **The PC's address changed**, after a router restart for example: the server keeps using the old one. Give it the
-  new address with `./opendmtq host <new address>` (on Windows `OpenDMTQ.exe host <new address>`, then close and
-  start `OpenDMTQ.exe` again), and install the new app on the phones over the old one. A DHCP reservation for the PC
-  in the router's settings keeps its address from changing. `./opendmtq doctor` and `./opendmtq setup` notice a
-  changed address, and `import` and `restore` say so without changing it.
+- **The PC's address changed**, after a router restart for example: the server keeps using the old one. Give it the new
+  address with `./opendmtq host <new address>` (on Windows `OpenDMTQ.exe host <new address>`, then close and start
+  `OpenDMTQ.exe` again), and install the new app on the phones over the old one. A router that keeps an address for the
+  PC (a DHCP reservation in its settings) gives it the same one after a restart. `./opendmtq doctor` and
+  `./opendmtq setup` notice a changed address, and `import` and `restore` say so without changing it.
 - **The server moved to another port** (`port`, or [the update off port 80](install.md#the-servers-port)): phones
   install the app built for the new port, over the old one, from the site's download page at the new address.
 - `./opendmtq check` (`OpenDMTQ.exe check`) walks the same path the app takes. If it passes and the phone still

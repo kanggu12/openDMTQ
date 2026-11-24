@@ -967,8 +967,8 @@ erDiagram
 unchanged; `Play`'s one column more, `keys`, comes last, with 0 for every row that was there. The
 database runs in SQLite's write-ahead mode where the disk allows it, tried first on a scratch file in the same folder:
 a disk that cannot do it (a Windows drive under WSL, some network disks) stays in the older mode, which is slower.
-`dmtq.db3-wal` and `dmtq.db3-shm` belong to it: copy the database with `./opendmtq backup` or the admin pages, never by
-hand.
+`dmtq.db3-wal` and `dmtq.db3-shm` belong to it: `./opendmtq backup` and the admin pages copy the database with SQLite's
+own backup, which takes in what they hold, where a copy of `dmtq.db3` alone, made while the server runs, can lack it.
 
 ## Security model
 

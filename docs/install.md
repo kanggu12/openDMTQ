@@ -217,8 +217,8 @@ differs, and phones install the app it builds.
 
 ## Settings
 
-The setup writes `.env` beside `opendmtq`. These are the lines it may hold; edit by hand only for what no command sets,
-then restart.
+The setup writes `.env` beside `opendmtq`. These are the lines it may hold, each with what sets it; a line set by hand
+counts from the server's next start.
 
 | Line | What it is | Set by |
 |---|---|---|
@@ -282,14 +282,13 @@ The first says `Signature Verified Successfully`, the second `OK` for each file 
 
 ## What it runs on
 
-| Server | Minimum | Recommended |
-|---|---|---|
-| **Computer** | 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker; 2 GB of memory | 2 cores, 4 GB |
-| **Disk** | 1 GB without the songs | 7 GB with every song |
+The server runs on 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker, with 2 GB of memory and 1 GB of
+disk without the songs, 7 GB with every song.
 
-At rest the server takes about 170 MB of memory, and up to 1.6 GB for half a minute while it builds the app. The client
-data takes about 120 MB and the song data 4.5 GB; each app build about 110 MB, the last ten kept. Broadcast recordings
-take up to 20 GB more. What the players' phones and PCs need: [which devices](play.md#which-devices).
+At rest the server takes about 170 MB of memory, and up to 1.6 GB for half a minute while it builds the app; on two
+cores it answers hundreds of game requests a second ([measured](testing.md#measurements)). The client data takes about
+120 MB and the song data 4.5 GB; each app build about 110 MB, the last ten kept. Broadcast recordings take up to 20 GB
+more. What the players' phones and PCs need: [which devices](play.md#which-devices).
 
 Tested on Windows Server 2022 and Wine, Debian 12, Ubuntu 24.04, Docker on Linux and a three-node Kubernetes cluster,
 with a Galaxy S26 Ultra (Android 17, no 32-bit support) and the Android 11 emulator.

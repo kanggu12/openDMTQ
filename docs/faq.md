@@ -61,10 +61,10 @@ Only while people play. The server runs while its window is open on Windows, and
 ([everyday use](install.md#everyday-use)).
 
 **How big a computer does it need?**
-2 GB of memory at least; two processor cores and 4 GB are recommended, with room for building the app. At rest the
-server takes about 170 MB, and two cores serve hundreds of requests a second
-([measured](../README.md#fast-on-little-hardware)). Disk: about 1 GB, plus the songs.
-[What it runs on](install.md#what-it-runs-on) has the details, and [which devices](play.md#which-devices) the players'.
+2 GB of memory: at rest the server takes about 170 MB, and building the app up to 1.6 GB for half a minute. Two
+processor cores serve hundreds of requests a second ([measured](../README.md#fast-on-little-hardware)). Disk: about
+1 GB, plus the songs. [What it runs on](install.md#what-it-runs-on) has the details, and
+[which devices](play.md#which-devices) the players'.
 
 **What do other players have to do?**
 Each needs an account: make them in the setup or on the **Accounts** page, which gives the message to send. The rest is

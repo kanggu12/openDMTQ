@@ -154,8 +154,8 @@ and the website from one address and port. The game server is OpenDMTQ's own cod
 
 ## What it runs on
 
-- **The server:** 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker, with 2 GB of memory (2 cores and
-  4 GB recommended) and 1 GB of disk, 7 GB with every song.
+- **The server:** 64-bit Windows 10 or 11, Debian 12, Ubuntu 24.04, macOS, or Docker, with 2 GB of memory (the app's
+  build takes up to 1.6 GB of it for half a minute) and 1 GB of disk, 7 GB with every song.
 - **Phones:** Android 5.0 or newer, 8 or newer to broadcast.
 - **PCs:** the PC client on 64-bit Windows 10 or 11, or Linux with Wine 11, with an x64 processor (Intel or AMD), a
   graphics card with Direct3D 11, 1 GB of free memory and 390 MB of disk; the keyboard plays the lanes, and a touch

@@ -136,10 +136,8 @@ not on the router (`admin.onPublicPort`). Behind a NodePort, as here, the server
 address for every visitor, so the per-address sign-in limits are shared by everyone who comes in
 through that node.
 
-Known kind issue: after a node container is stopped and started, its kube-proxy can fail with
-"too many open files" until the host's inotify limits are raised
-(`sudo sysctl fs.inotify.max_user_instances=8192 fs.inotify.max_user_watches=524288`), as the kind
-documentation recommends.
+After a node container is stopped and started, its kube-proxy can fail with "too many open files" until the host's
+inotify limits are raised (`sudo sysctl fs.inotify.max_user_instances=8192 fs.inotify.max_user_watches=524288`).
 
 ## Design
 

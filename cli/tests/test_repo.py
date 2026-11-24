@@ -168,6 +168,29 @@ class AdviceTest(unittest.TestCase):
                 self.assertNotIn(phrase, kept, f"{os.path.relpath(path, ROOT)}: {phrase}")
 
 
+class GuidesFactsTest(unittest.TestCase):
+    def test_the_guides_state_facts_not_advice(self):
+        # DEP-134: the README and the guides say what is so, and what a reader must do to go on as the step; no
+        # recommendation, warning or advice beside it (the owner's rule, as AdviceTest holds the pages and programs to it).
+        # main recommended two cores and 4 GB in three places and Android 8 in a table, warned that passwords would then
+        # cross the internet in clear, said to copy the database never by hand and to edit .env by hand only for what no
+        # command sets, and passed on what another project's guide recommends. The test cases say what a test saw.
+        phrases = (r"(?<!install-)\brecommend", r"\bnever by hand\b", r"\bby hand only\b", r"\bwould then\b",
+                   r"\bKnown kind issue\b", r"\bat your own risk\b", r"\bmake sure\b")
+        guides = [p for p in glob.glob(os.path.join(ROOT, "docs", "*.md")) if not p.endswith("test-cases.md")]
+        self.assertGreater(len(guides), 15)
+        for path in [os.path.join(ROOT, "README.md")] + guides:
+            with open(path, encoding="utf-8") as f:
+                text = " ".join(f.read().split())
+            for phrase in phrases:
+                self.assertIsNone(re.search(phrase, text, re.I), f"{os.path.relpath(path, ROOT)}: {phrase}")
+        # The facts that stood behind them stay: the memory the app's build takes, and the requests two cores answer.
+        with open(os.path.join(ROOT, "README.md"), encoding="utf-8") as f:
+            self.assertIn("the app's build takes up to 1.6 GB of it for half a minute", " ".join(f.read().split()))
+        with open(os.path.join(ROOT, "docs", "install.md"), encoding="utf-8") as f:
+            self.assertIn("on two cores it answers hundreds of game requests a second", " ".join(f.read().split()))
+
+
 class PlayerRateTest(unittest.TestCase):
     def test_the_readme_says_the_players_own_limit(self):
         # The player takes any frame limit up to its own most (arm32/desktop/settings.cpp) and follows the display's
