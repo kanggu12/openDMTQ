@@ -800,6 +800,40 @@ if (document.getElementById('tiles')) {
 (() => {
   const box = document.getElementById('log-rows'), follow = document.getElementById('log-follow');
   if (!box || !follow) return;
+  // On a phone the list a page of 50 at a time (a laptop's has a box of its own that scrolls): all of them in one column
+  // made the page 48 screens long. Newer and Older under it, as the Plays tab has them; the newest page first, and kept
+  // while new requests come in. The list's top is brought into view at each other page.
+  const PER = 50, phone = matchMedia('(max-width: 700px)');
+  let page = 0;
+  const pager = document.createElement('p');
+  pager.className = 'pager';
+  const newer = document.createElement('button'), older = document.createElement('button'), where = document.createElement('span');
+  newer.type = older.type = 'button';
+  newer.className = older.className = 'btn btn-sm';
+  newer.textContent = box.dataset.newer;
+  older.textContent = box.dataset.older;
+  where.className = 'meta-inline';
+  pager.append(newer, where, older);
+  const paged = () => {
+    const rows = box.querySelectorAll('tbody tr');
+    const pages = Math.max(1, Math.ceil(rows.length / PER));
+    page = Math.min(page, pages - 1);
+    rows.forEach((row, i) => row.classList.toggle('paged-out', phone.matches && Math.floor(i / PER) !== page));
+    if (!phone.matches || pages < 2) { pager.remove(); return; }
+    where.textContent = `${page + 1} / ${pages}`;
+    newer.hidden = page === 0;
+    older.hidden = page === pages - 1;
+    box.after(pager);
+  };
+  const turn = by => {
+    page += by;
+    paged();
+    box.scrollIntoView({ block: 'start' });
+  };
+  newer.addEventListener('click', () => turn(-1));
+  older.addEventListener('click', () => turn(1));
+  phone.addEventListener('change', paged);
+  paged();
   const url = () => { const u = new URL(location.href); u.searchParams.set('rows', '1'); return u; };
   try { follow.checked = !!localStorage.getItem('opendmtq.follow'); } catch (_) { /* No storage here. */ }
   follow.addEventListener('change', () => { try { localStorage.setItem('opendmtq.follow', follow.checked ? '1' : ''); } catch (_) { /* No storage here. */ } });
@@ -815,6 +849,7 @@ if (document.getElementById('tiles')) {
       if (r.redirected || !r.ok) { location.reload(); return; }
       box.innerHTML = await r.text();
       have = r.headers.get('ETag') || '';
+      paged();
     } catch (_) { /* The next look. */ }
   }, 4000);
   box.addEventListener('click', e => {

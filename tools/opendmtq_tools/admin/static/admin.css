@@ -672,6 +672,8 @@ table.tokens .token-name { overflow-wrap: anywhere; }
 }
 /* A page's way to the next page of a long list. */
 .pager { display: flex; justify-content: center; align-items: center; gap: 12px; margin: 14px 0 0; }
+/* The requests on a phone, a page at a time (admin.js): the others out of the column. */
+@media (max-width: 700px) { #log-rows tr.paged-out { display: none; } }
 @media (max-width: 620px) {
   .log-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .log-filters input[type=search] { grid-column: 1 / -1; }

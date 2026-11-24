@@ -31,8 +31,9 @@
     {% if q or status or kind %}<a class="btn" href="{{ url_for('logs_page') }}">{{ t('logs.clear') }}</a>{% endif %}
     <label class="check"><input type="checkbox" id="log-follow"> {{ t('logs.follow') }}</label>
   </form>
-  {# The newest requests (log_rows.html), with the tag admin.js asks with while it follows them (data-have). #}
-  <div id="log-rows" data-have="{{ listed_tag }}">{{ listed }}</div>
+  {# The newest requests (log_rows.html), with the tag admin.js asks with while it follows them (data-have). On a phone
+     admin.js shows them a page of 50 at a time, as the Plays tab pages its list, with that tab's words for its pager. #}
+  <div id="log-rows" data-have="{{ listed_tag }}" data-newer="{{ t('logs.newer') }}" data-older="{{ t('logs.older') }}">{{ listed }}</div>
 </section>
 {% elif tab == 'plays' %}
 <section class="card">

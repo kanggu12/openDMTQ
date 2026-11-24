@@ -1128,6 +1128,41 @@ async function bandClear(contexts) {
   }
 }
 
+// The Logs page's requests on a phone, with the hundreds of requests the stages before made: a page of 50 at a time, its
+// pager under it (Newer, where it is, Older), Older showing the next 50 and Newer the first again, and the page a few
+// screens long; on a laptop the whole list in its own box, no pager. Before: all 400 in the page on a phone, 35,640 px.
+async function requestsPaged(contexts) {
+  const page = await contexts.signed.newPage();
+  await page.setViewport({ width: 360, height: 740, isMobile: true, hasTouch: true });
+  await page.setCookie({ name: 'opendmtq_lang', value: 'en', url: A });
+  await page.goto(`${A}/logs`, { waitUntil: 'domcontentloaded' });
+  const look = () => page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#log-rows tbody tr')];
+    const shown = rows.filter(r => r.getClientRects().length);
+    const pager = document.querySelector('#log-rows + .pager');
+    return { all: rows.length, shown: shown.length, first: shown.length ? rows.indexOf(shown[0]) : -1, tall: document.documentElement.scrollHeight,
+      where: pager ? pager.querySelector('.meta-inline').textContent : '', buttons: pager ? [...pager.querySelectorAll('button')].filter(b => !b.hidden).map(b => b.textContent) : [] };
+  });
+  const first = await look();
+  check('on a phone the Logs page shows the requests 50 at a time, Older and Newer under them',
+    first.all > 100 && first.shown === 50 && first.first === 0 && first.where === `1 / ${Math.ceil(first.all / 50)}` && first.buttons.join() === 'Older' && first.tall < 12000,
+    JSON.stringify(first));
+  // No pager (before): said, and on to the laptop's look.
+  if (!await page.$('#log-rows + .pager')) check('Older shows the next 50 and Newer the first again', false, 'no pager');
+  else {
+  await page.click('#log-rows + .pager button:not([hidden]):last-child');
+  const next = await look();
+  await page.click('#log-rows + .pager button:not([hidden])');
+  const back = await look();
+  check('Older shows the next 50 and Newer the first again', next.first === 50 && next.shown === 50 && next.buttons.join() === 'Newer,Older' && back.first === 0,
+    JSON.stringify([next, back]));
+  }
+  await page.setViewport({ width: 1280, height: 800 });
+  const wide = await look();
+  check('on a laptop the Logs page lists them all in its own box, no pager', wide.shown === wide.all && wide.where === '', JSON.stringify(wide));
+  await page.close();
+}
+
 // A link in a sentence is drawn in the sentence's own colour, told by its underline: the section's colour is the screen's
 // main button's. Every page of the patterns' list, at a phone's width and a laptop's: each link that stands inline among
 // loose words of its own line's box (a sentence, not a list's name or a cell's) has the colour of the words around it.
@@ -3259,6 +3294,7 @@ async function myPage(contexts) {
   } else if (stage === 'patterns') {
     await textLinks(contexts);
     await bandClear(contexts);
+    await requestsPaged(contexts);
     await hoverOnly(contexts);
     await inPlace(contexts);
     await formsLook(contexts);
