@@ -274,7 +274,15 @@ if (!odq_sign_in_table($db)) {
     fwrite(STDERR, "opendmtq: cannot add the game's sign-ins to the database: " . $db->lastErrorMsg() . "\n");
     exit(1);
 }
+// The highest player number ever handed out (src/account.php): a new account takes the one after it, never a deleted
+// player's. A database from before it starts from the highest number it shows was handed out (its players, the players
+// its sign-ins and its site accounts name), so that a player deleted before keeps their number too.
 require_once __DIR__ . '/../src/account.php';
+if (!odq_number_table($db)) {
+    // Without it no new phone gets an account: the server does not start, and says why.
+    fwrite(STDERR, "opendmtq: cannot add the players' numbers to the database: " . $db->lastErrorMsg() . "\n");
+    exit(1);
+}
 // Transfer codes made from a player's number, as earlier servers made every code (anyone who knows the number, which the
 // rankings show, works it out): each gets a random one in its place. The new code shows in the game's OPTION.
 $replaced = odq_replace_number_codes($db);

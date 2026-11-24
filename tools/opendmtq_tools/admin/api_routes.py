@@ -89,7 +89,8 @@ KEYS_BEST = "True when the play that set it was played with the keyboard of the 
 
 # A player's own token of who a number belongs to (?seen=), for the players' writes.
 SEEN = Field("seen", "string", "The player's seen value from the list. When given, the change happens only while the number "
-             "still belongs to the same player (409 stale otherwise). A deleted player's number goes to the next new phone.",
+             "still belongs to the same player (409 stale otherwise). A number is never handed out again, but a restore brings "
+             "back the backup's players.",
              optional=True)
 
 # The objects the API answers with, by name.
@@ -1087,7 +1088,8 @@ ROUTES = [
           "A backup is made first; without it nothing changes.", query=[SEEN], answer="PlayerReset",
           errors=[(404, "player_not_found", "No such player."), (409, "stale", "The number belongs to someone else now."),
                   (500, "backup_failed", "The backup could not be made (the message says why).")]),
-    Route("DELETE", "/players/{player}", "write", "player_delete", "Players", "Deletes a player, with their records, broadcast and recordings.",
+    Route("DELETE", "/players/{player}", "write", "player_delete", "Players", "Deletes a player, with their records, broadcast, recordings and "
+          "game sign-ins; their number is never handed out again.",
           "A backup is made first; without it nothing changes.", query=[SEEN], answer="PlayerDeleted",
           errors=[(404, "player_not_found", "No such player."), (409, "stale", "The number belongs to someone else now."),
                   (500, "backup_failed", "The backup could not be made (the message says why).")]),

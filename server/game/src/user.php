@@ -13,10 +13,11 @@ require_once __DIR__ . '/account.php';
 /*
  * user.loginV2 [accessToken, nickName, profileImg, version, os, area]: the game's own login, right after the
  * platform login (platform.php) gave the client an access token "<puid>|576|<device>|<server>|<token>|<time>".
- * Only a token the platform login handed out for that account is taken (signin.php); the game's code it does not know
- * (SVC.05401) answers any other, which opens its own popup, whose CLOSE ends the game: the next start signs in anew.
- * The token's puid names the account; an unknown one gets a new account here. The reply gives the client its player id
- * (guid) and the key it signs its requests with, a key of this sign-in's own.
+ * Only a token the platform login handed out and noted for that account is taken (signin.php); the game's code it does
+ * not know (SVC.05401) answers any other, which opens its own popup, whose CLOSE ends the game: the next start signs in
+ * anew. So does a token whose account is gone (the owner deleted the player after the platform login): the next start's
+ * platform login makes the phone a new account, with a number of its own (account.php). The reply gives the client its
+ * player id (guid) and the key it signs its requests with, a key of this sign-in's own.
  */
 function odq_user_login(array $p)
 {
@@ -27,22 +28,13 @@ function odq_user_login(array $p)
     $token = $parts[4] ?? null;
     $time = $parts[5] ?? null;
     if ($puid === '' || !odq_sign_in_known($access, $puid)) {
-        return odq_error('SVC.05401', 'OpenDMTQ: this server did not hand out this sign-in');
+        return odq_error('SVC.05401', 'OpenDMTQ: this server has no note of this sign-in');
     }
     $member = odq_member_by('puid', $puid);
     $guid = $member ? (string)$member['guid'] : '';
-    // No account for the token's puid (the owner deleted the player after the platform login): made now, with the puid as
-    // its guid.
+    // No player for the token's account: never one made here with the account's number, which was the deleted player's.
     if ($guid === '' || $guid === '0') {
-        $db = odq_db();
-        $id = (int)$db->querySingle('SELECT MAX(id) + 1 FROM Member') ?: 1;
-        $q = $db->prepare("INSERT INTO Member (id, nickname, guid, puid, code) VALUES (:id, 'NewUser', :puid, :puid, :code)");
-        $q->bindValue(':id', $id, SQLITE3_INTEGER);
-        $q->bindValue(':puid', $puid, SQLITE3_TEXT);
-        // The transfer code a player can type on another phone (user.setConnectUuid).
-        $q->bindValue(':code', substr(md5("CODE_$id"), -10), SQLITE3_TEXT);
-        @$q->execute();
-        $guid = $puid;
+        return odq_error('SVC.05401', 'OpenDMTQ: the account of this sign-in is gone; the next start makes a new one');
     }
     // The key this sign-in signs with, kept with it (signin.php): the signature then tells this player's game.
     $key = odq_sign_in_key($access, odq_intval($guid));

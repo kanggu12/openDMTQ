@@ -1866,6 +1866,32 @@ class SafetyTest(unittest.TestCase):
                 with sqlite3.connect(install.path("state/dmtq.db3")) as con:
                     self.assertEqual(con.execute("SELECT user_id, achievement_id FROM AchievementDate").fetchall(), [(8, 1)], action)
 
+    def test_a_deletion_takes_the_players_game_sign_ins_and_keeps_their_number_taken(self):
+        # Player 7 has two phones (a transfer code moved account 9 onto them): the game's sign-ins of both, by the player
+        # and by either phone's account, go with them, and nobody else's. Their number stays taken in the game server's
+        # count of the highest number handed out (here behind it, as a database restored from a backup can be), so that no
+        # new phone gets it and with it a key or a site account of theirs.
+        with Install() as install:
+            self.database(install)
+            with sqlite3.connect(install.path("state/dmtq.db3")) as con:
+                con.execute("UPDATE Member SET puid = '7'")
+                con.execute("INSERT INTO Member (id, nickname, guid, puid, udid) VALUES (9, 'Doyun', '7', '9', 'b')")
+                con.execute("INSERT INTO Member (id, nickname, guid, puid, udid) VALUES (8, 'Mina', '8', '8', 'c')")
+                for statement in admin.backups.SIGN_IN_TABLE:
+                    con.execute(statement)
+                con.executemany("INSERT INTO SignIn (access, puid, at, key, guid) VALUES (?, ?, 1, ?, ?)",
+                                [("seven", "7", "k7", 7), ("nine-noted", "9", None, None), ("nine", "9", "k9", 7), ("eight", "8", "k8", 8)])
+                con.execute("CREATE TABLE MemberNumber (last INTEGER NOT NULL)")
+                con.execute("INSERT INTO MemberNumber VALUES (6)")
+                seen = admin.players.player_seen(con, 7)
+            install.sign_in()
+            csrf = re.search(r'name="csrf" value="([^"]*)"', install.client.get("/opendmtq/admin/backups").get_data(as_text=True)).group(1)
+            install.client.post("/opendmtq/admin/players/7", data={"csrf": csrf, "action": "delete", "seen": seen})
+            with sqlite3.connect(install.path("state/dmtq.db3")) as con:
+                self.assertEqual(con.execute("SELECT guid FROM Member").fetchall(), [("8",)])
+                self.assertEqual(con.execute("SELECT access FROM SignIn").fetchall(), [("eight",)])
+                self.assertEqual(con.execute("SELECT last FROM MemberNumber").fetchall(), [(7,)])
+
     def test_no_build_is_deleted_while_it_is_not_clear_which_is_on_offer(self):
         with Install() as install:
             install.sign_in()

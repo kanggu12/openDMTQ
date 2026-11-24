@@ -41,10 +41,10 @@ function odq_raw_form(string $body): array
 /*
  * POST /api/accounts/v3/global/login_dmq (the Android SDK) and /accounts/v3/global/login_dmq (the old iOS SDK and
  * ./opendmtq check): the platform login. The phone's device id (udid) is its account: a new one gets a new
- * account, with a random transfer code (account.php), in one transaction so that two phones starting together never share
- * one. The reply's access token carries the account's puid, which the game's own login (user.loginV2) then reads; it is
- * noted with the account in the same transaction (signin.php), and the game's login takes no token the platform login did
- * not hand out.
+ * account, with a number never handed out before and a random transfer code (account.php), in one transaction so that two
+ * phones starting together never share one. The reply's access token carries the account's puid, which the game's own
+ * login (user.loginV2) then reads; it is noted with the account in the same transaction (signin.php), and the game's
+ * login takes no token the platform login did not hand out.
  *
  * $old: the /accounts path, whose reply text differs slightly, as it always has.
  */
@@ -70,8 +70,8 @@ function odq_platform_login(string $body, bool $old): void
         if ($row) {
             $puid = (string)$row['puid'];
         } else {
-            // A new account: the next number, which is its puid and its guid too.
-            $id = (int)$db->querySingle('SELECT MAX(id) + 1 FROM Member') ?: 1;
+            // A new account: the next number (never a deleted player's), which is its puid and its guid too.
+            $id = odq_next_number($db);
             $w = $db->prepare("INSERT INTO Member (id, nickname, guid, puid, udid, code) VALUES (:id, ' ', :p, :p, :u, :c)");
             $w->bindValue(':id', $id, SQLITE3_INTEGER);
             $w->bindValue(':p', (string)$id, SQLITE3_TEXT);

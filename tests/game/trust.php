@@ -17,7 +17,8 @@
  *   - the transfer code's two calls, the name and the items equipped are the player's own game's alone; a transfer code is
  *     random, never one made from the player's number (such a code is replaced at a start, and never shown or taken), and
  *     moves a phone onto the player under the player's name;
- *   - the live view takes a song's start and its end from the player's own game alone.
+ *   - the live view takes a song's start and its end from the player's own game alone;
+ *   - a player's number is never handed out again, and a sign-in whose account is gone signs nobody in.
  *
  * Usage: php tests/game/trust.php <database file> <base address of the server>      (exit status 0 when every check passed)
  */
@@ -394,5 +395,23 @@ $still = $playing();
 call($base, $pia_key, 'game.getUserAsset', [$pia]);
 check("GAME-144 the player's own start puts them in a song, and only their own game's next call after it takes them out",
     $in === '1 1' && $still === '1 1' && $playing() === '0 1', json_encode([$in, $still, $playing()]));
+
+// ------------------------------------------------------------------ GAME-145: a player's number is never handed out again
+
+// Quinn, the newest player, with a sign-in of their game; then their account gone (as the Players page deletes a player, or a
+// database of before left it without its sign-ins going): the next new phone's number is past Quinn's.
+[$quinn] = sign_in($base, 'trust-quinn');
+[, $raw] = post("$base/api/accounts/v3/global/login_dmq", 'app_id=576&udid=trust-quinn&device_cd=ANDROID', ['Content-Type: application/x-www-form-urlencoded']);
+$quinn_token = (string)(json_decode($raw, true)['value']['access_token'] ?? '');
+$db->exec("DELETE FROM Member WHERE guid = '$quinn'");
+[$next] = sign_in($base, 'trust-after-quinn');
+check('GAME-145 the newest player gone, a new phone gets a number past theirs, and the highest number handed out is kept',
+    $quinn > 0 && $next === $quinn + 1 && (int)@$db->querySingle('SELECT MAX(last) FROM MemberNumber') === $next,
+    json_encode([$quinn, $next, @$db->querySingle('SELECT MAX(last) FROM MemberNumber')]));
+// Quinn's sign-in of before, its account gone: the game's login refuses it, and makes no account with Quinn's number.
+$refused = call($base, '', 'user.loginV2', [$quinn_token, ' ', '', '1.3.4', 'ANDROID', 'KR']);
+check("GAME-145 a sign-in whose account is gone is refused by the game's login (SVC.05401), no account made with its number",
+    ($refused['error']['code'] ?? null) === 'SVC.05401' && (int)$db->querySingle("SELECT COUNT(*) FROM Member WHERE guid = '$quinn'") === 0,
+    json_encode([$refused, $db->querySingle("SELECT COUNT(*) FROM Member WHERE guid = '$quinn'")]));
 
 exit($failures ? 1 : 0);

@@ -26,9 +26,10 @@ def player_label(con, guid):
 
 
 def player_seen(con, guid):
-    """Who a player number belongs to, as a short token of its device ids; None when nobody has it. The game gives a
-    new phone the next free number, so the number of a deleted player comes back: a page left open must not reset or
-    delete someone else, after a confirmation that named the one before. The forms send what they saw."""
+    """Who a player number belongs to, as a short token of its device ids; None when nobody has it. The game never hands a
+    number out again, but a player's phones change (a transfer code moves one onto the player) and a restore brings back
+    the backup's players: a page left open must not reset or delete anyone but the one its confirmation named. The forms
+    send what they saw."""
     rows = con.execute("SELECT udid FROM Member WHERE CAST(guid AS INTEGER) = ? ORDER BY id", (guid,)).fetchall()
     return seen_token([r[0] for r in rows]) if rows else None
 
@@ -216,8 +217,26 @@ def act(pid, action, seen, name=""):
             except sqlite3.OperationalError:
                 pass
             if action == "delete":
+                # The accounts of the player's phones (a transfer code leaves more than one), read before their rows go; a
+                # table without the column (a database older than the platform's accounts) has none to read.
+                try:
+                    puids = [str(r[0]) for r in con.execute("SELECT puid FROM Member WHERE CAST(guid AS INTEGER) = ? AND puid IS NOT NULL", (pid,))]
+                except sqlite3.OperationalError:
+                    puids = []
                 con.execute("DELETE FROM Member WHERE CAST(guid AS INTEGER) = ?", (pid,))
-                # Their game state and a ban go with them: a new phone that gets the number back starts as a new player.
+                # Their game's sign-ins go with them, by the player and by each phone's account: no key of theirs signs for
+                # anyone, nor a sign-in of theirs makes a game login (a database from before the table has none).
+                try:
+                    con.execute(f"DELETE FROM SignIn WHERE guid = ? OR puid IN ({', '.join('?' for _ in puids)})", (pid, *puids))
+                except sqlite3.OperationalError:
+                    pass
+                # Their number stays taken: the server hands out none it handed out before (MemberNumber, the game
+                # server's server/game/src/account.php; a database from before the table gets it at the server's start).
+                try:
+                    con.execute("UPDATE MemberNumber SET last = MAX(last, ?)", (pid,))
+                except sqlite3.OperationalError:
+                    pass
+                # Their game state and a ban go with them.
                 from . import game
                 game.forget(con, pid)
             # The charts whose #1 the Discord and Slack messages knew as theirs: held by the next now.

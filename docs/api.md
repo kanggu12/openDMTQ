@@ -118,9 +118,10 @@ picker opens instead.
 | `503` | The admin pages are off, or the database or the game server cannot be reached | `admin_off`, `database_unavailable`, `server_down`, `server_unwell` |
 
 `409 already_so` is what the pages do nothing for: enabling an account that is enabled, linking an account to the player
-it is linked to. `409 stale` comes from a player's number that went to someone else (a deleted player's number goes to
-the next new phone): send the player's `seen` value as `?seen=` with a change, and it happens only while the number
-still belongs to the player you saw.
+it is linked to. `409 stale` comes from a player's number that names someone else than you saw (a number is never
+handed out again, but a transfer code moves a phone onto a player and a restore brings back the backup's players): send
+the player's `seen` value as `?seen=` with a change, and it happens only while the number still belongs to the player
+you saw.
 
 ## Jobs
 
@@ -983,7 +984,7 @@ The Players page.
 | [`GET /players/{player}`](#get-playersplayer) | read | One player. |
 | [`POST /players/{player}/rename`](#post-playersplayerrename) | write | Renames a player, on every phone of theirs. |
 | [`POST /players/{player}/reset`](#post-playersplayerreset) | write | Resets a player's records: their scores, plays and achievements. |
-| [`DELETE /players/{player}`](#delete-playersplayer) | write | Deletes a player, with their records, broadcast and recordings. |
+| [`DELETE /players/{player}`](#delete-playersplayer) | write | Deletes a player, with their records, broadcast, recordings and game sign-ins; their number is never handed out again. |
 | [`POST /players/{player}/live`](#post-playersplayerlive) | write | Turns a player's broadcast on. |
 | [`DELETE /players/{player}/live`](#delete-playersplayerlive) | write | Turns a player's broadcast off. |
 | [`GET /players/{player}/game`](#get-playersplayergame) | read | A player's game state: currencies, level, items, ban, purchases. |
@@ -1033,7 +1034,7 @@ Renames a player, on every phone of theirs.
 Parameters:
 
 - `player` (path, integer): A player's number (the game's player id, which the site's player.php?id= takes too).
-- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A deleted player's number goes to the next new phone.
+- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A number is never handed out again, but a restore brings back the backup's players.
 
 Body (JSON):
 
@@ -1055,7 +1056,7 @@ Resets a player's records: their scores, plays and achievements. A backup is mad
 Parameters:
 
 - `player` (path, integer): A player's number (the game's player id, which the site's player.php?id= takes too).
-- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A deleted player's number goes to the next new phone.
+- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A number is never handed out again, but a restore brings back the backup's players.
 
 Answer: `200` with [PlayerReset](#playerreset).
 
@@ -1067,12 +1068,12 @@ Refusals:
 
 #### `DELETE /players/{player}`
 
-Deletes a player, with their records, broadcast and recordings. A backup is made first; without it nothing changes.
+Deletes a player, with their records, broadcast, recordings and game sign-ins; their number is never handed out again. A backup is made first; without it nothing changes.
 
 Parameters:
 
 - `player` (path, integer): A player's number (the game's player id, which the site's player.php?id= takes too).
-- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A deleted player's number goes to the next new phone.
+- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A number is never handed out again, but a restore brings back the backup's players.
 
 Answer: `200` with [PlayerDeleted](#playerdeleted).
 
@@ -1089,7 +1090,7 @@ Turns a player's broadcast on. The phone gets a new upload key and a notice betw
 Parameters:
 
 - `player` (path, integer): A player's number (the game's player id, which the site's player.php?id= takes too).
-- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A deleted player's number goes to the next new phone.
+- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A number is never handed out again, but a restore brings back the backup's players.
 
 Answer: `200` with [PlayerAnswer](#playeranswer).
 
@@ -1105,7 +1106,7 @@ Turns a player's broadcast off. The phone's next upload is refused, the live win
 Parameters:
 
 - `player` (path, integer): A player's number (the game's player id, which the site's player.php?id= takes too).
-- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A deleted player's number goes to the next new phone.
+- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A number is never handed out again, but a restore brings back the backup's players.
 
 Answer: `200` with [PlayerAnswer](#playeranswer).
 
@@ -1135,7 +1136,7 @@ Sets a player's MAX POINT or Q POINT, or adds to it or takes from it. Within wha
 Parameters:
 
 - `player` (path, integer): A player's number (the game's player id, which the site's player.php?id= takes too).
-- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A deleted player's number goes to the next new phone.
+- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A number is never handed out again, but a restore brings back the backup's players.
 
 Body (JSON):
 
@@ -1160,7 +1161,7 @@ Makes a player's currency unlimited. The game is told they have 99,999,999 of ea
 Parameters:
 
 - `player` (path, integer): A player's number (the game's player id, which the site's player.php?id= takes too).
-- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A deleted player's number goes to the next new phone.
+- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A number is never handed out again, but a restore brings back the backup's players.
 
 Answer: `200` with [PlayerGameAnswer](#playergameanswer).
 
@@ -1176,7 +1177,7 @@ Turns a player's own unlimited currency off: the game shows their own balance ag
 Parameters:
 
 - `player` (path, integer): A player's number (the game's player id, which the site's player.php?id= takes too).
-- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A deleted player's number goes to the next new phone.
+- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A number is never handed out again, but a restore brings back the backup's players.
 
 Answer: `200` with [PlayerGameAnswer](#playergameanswer).
 
@@ -1192,7 +1193,7 @@ Sets a player's level or their experience. A level sets the experience to that l
 Parameters:
 
 - `player` (path, integer): A player's number (the game's player id, which the site's player.php?id= takes too).
-- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A deleted player's number goes to the next new phone.
+- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A number is never handed out again, but a restore brings back the backup's players.
 
 Body (JSON):
 
@@ -1217,7 +1218,7 @@ Parameters:
 
 - `player` (path, integer): A player's number (the game's player id, which the site's player.php?id= takes too).
 - `item` (path, integer): An item's id, as a player's game state lists it (items).
-- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A deleted player's number goes to the next new phone.
+- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A number is never handed out again, but a restore brings back the backup's players.
 
 Answer: `200` with [PlayerGameAnswer](#playergameanswer).
 
@@ -1235,7 +1236,7 @@ Parameters:
 
 - `player` (path, integer): A player's number (the game's player id, which the site's player.php?id= takes too).
 - `item` (path, integer): An item's id, as a player's game state lists it (items).
-- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A deleted player's number goes to the next new phone.
+- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A number is never handed out again, but a restore brings back the backup's players.
 
 Answer: `200` with [PlayerGameAnswer](#playergameanswer).
 
@@ -1252,7 +1253,7 @@ Bans a player, with a reason and an end. The game refuses their sign-in and ever
 Parameters:
 
 - `player` (path, integer): A player's number (the game's player id, which the site's player.php?id= takes too).
-- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A deleted player's number goes to the next new phone.
+- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A number is never handed out again, but a restore brings back the backup's players.
 
 Body (JSON):
 
@@ -1277,7 +1278,7 @@ Lifts a player's ban.
 Parameters:
 
 - `player` (path, integer): A player's number (the game's player id, which the site's player.php?id= takes too).
-- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A deleted player's number goes to the next new phone.
+- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A number is never handed out again, but a restore brings back the backup's players.
 
 Answer: `200` with [PlayerGameAnswer](#playergameanswer).
 
@@ -1293,7 +1294,7 @@ Resets a player's game state to what a new player starts with: currencies, level
 Parameters:
 
 - `player` (path, integer): A player's number (the game's player id, which the site's player.php?id= takes too).
-- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A deleted player's number goes to the next new phone.
+- `seen` (query, string, optional): The player's seen value from the list. When given, the change happens only while the number still belongs to the same player (409 stale otherwise). A number is never handed out again, but a restore brings back the backup's players.
 
 Answer: `200` with [PlayerGameReset](#playergamereset).
 
