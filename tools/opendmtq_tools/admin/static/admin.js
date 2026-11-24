@@ -262,6 +262,8 @@ document.addEventListener('submit', e => {
     form.requestSubmit(button || undefined);
   };
   ask.showModal();
+  // A band of words up meanwhile stays over the question, readable, not dimmed under its scrim.
+  bandOnTop();
   // The field first, where there is one: the keyboard types the word at once.
   if (word) field.focus();
 });
@@ -302,7 +304,10 @@ document.addEventListener('submit', e => {
   // After a change the page comes back as it was: same place in the list, same search (the end of this file).
   if (form.method === 'post') {
     const search = document.querySelector('input[type=search]');
-    sessionStorage.setItem('odq-back', JSON.stringify({ path: location.pathname, y: scrollY, q: search ? search.value : '' }));
+    // And where the button pressed stood on the screen, for the band of the answer's words to keep clear of it.
+    const at = button ? button.getBoundingClientRect() : null;
+    sessionStorage.setItem('odq-back', JSON.stringify({ path: location.pathname, y: scrollY, q: search ? search.value : '',
+      pressed: at ? { top: at.top, bottom: at.bottom } : null }));
   }
 });
 // Back to a page whose form was sent: it may be shown again as it was, and works again.
@@ -932,7 +937,13 @@ for (const el of document.querySelectorAll('[data-reload]')) setTimeout(() => lo
 // lines) stand one under another in one place under the bar, each in its own colour: each laid over the last, only the
 // last could be read. A press takes them away (each one's cross says so), and they go together by themselves, sooner
 // when all went well, later the more there are to read.
-function band(said) {
+// The band is on the page's top layer (a popover the page shows and hides itself), at the bar's foot where the bar stays on
+// the screen (--under-bar, measured as it shows), at the screen's foot where the bar goes with the page: a question that
+// opens while it shows stands under it, not over it (it was dimmed under the question's scrim). A browser without popovers
+// keeps it in the bar, as before. pressed: where the button pressed for this answer stood on the screen (its top and
+// foot), when there was one: at the screen's foot the band stands at the screen's top for this answer instead, where it
+// would have covered that button and what it changed.
+function band(said, pressed) {
   const words = document.createElement('span');
   words.className = 'wrap';
   words.append(...said.childNodes);
@@ -945,14 +956,26 @@ function band(said) {
     stack = document.createElement('div');
     stack.className = 'said-stack';
     stack.addEventListener('click', () => stack.remove());
+    if ('showPopover' in HTMLElement.prototype) stack.popover = 'manual';
     bar.append(stack);
   }
   stack.append(said);
+  bandOnTop(stack);
+  // At the screen's foot over the button just pressed: at its top for this answer.
+  const at = stack.getBoundingClientRect();
+  if (pressed && Math.abs(at.bottom - innerHeight) < 2 && pressed.bottom > at.top - 8) stack.classList.add('at-top');
   // Five seconds for one good message, fifteen when one went wrong, and two more for each further line to read.
   const lines = stack.querySelectorAll('.flash.float');
   const wait = ([...lines].every(m => m.classList.contains('ok')) ? 5000 : 15000) + 2000 * (lines.length - 1);
   clearTimeout(stack.leaving);
   stack.leaving = setTimeout(() => stack.remove(), wait);
+}
+// The band shown, or shown again, on the top of the page's top layer: over whatever opened there before it (a question).
+function bandOnTop(stack = document.querySelector('.bar > .said-stack')) {
+  if (!stack || !stack.popover) return;
+  stack.style.setProperty('--under-bar', `${Math.max(0, stack.parentElement.getBoundingClientRect().bottom)}px`);
+  if (stack.matches(':popover-open')) stack.hidePopover();
+  stack.showPopover();
 }
 
 // A switch or a small change (a form marked data-inplace) changes the page where it is: sent in the background, the page as
@@ -965,9 +988,9 @@ function band(said) {
 (() => {
   // The message at the foot of the screen, as the pages float the server's words: a press takes it away, and it goes by
   // itself, a good one sooner.
-  const say = doc => {
+  const say = (doc, pressed) => {
     for (const old of document.querySelectorAll('.flash[data-said]')) old.remove();
-    for (const m of doc.querySelectorAll('.flash[data-said]')) band(document.importNode(m, true));
+    for (const m of doc.querySelectorAll('.flash[data-said]')) band(document.importNode(m, true), pressed);
   };
   // The parts that changed, put in place; the focus kept on the same control of a part that was replaced.
   const swap = doc => {
@@ -1041,8 +1064,10 @@ function band(said) {
     // An answer without any of the parts this changes in place (the service's own error page, or a list now empty): the
     // page as it would have come.
     if (!doc.querySelector('[data-region][id]')) { document.open(); document.write(html); document.close(); window.odqChanges = (window.odqChanges || 0) + 1; return; }
+    // Where the button pressed stands (the page does not move, and its new self stands there too).
+    const pressed = button && button.isConnected ? button.getBoundingClientRect() : null;
     swap(doc);
-    say(doc);
+    say(doc, pressed);
     // How many changes the page has made in place: the pages' tests wait for the next one.
     window.odqChanges = (window.odqChanges || 0) + 1;
   });
@@ -1076,7 +1101,7 @@ function band(said) {
   // top. A good one leaves by itself.
   if (scrollY > 0) {
     // The band under the bar, as a change made in place says it.
-    for (const m of document.querySelectorAll('main .flash[data-said]')) band(m);
+    for (const m of document.querySelectorAll('main .flash[data-said]')) band(m, back.pressed);
   }
   // An answer about one card (the Server page's port, name, password: its address names the card): the card's top just
   // under the bar and the band, where it lay under them, its heading and first lines hidden.

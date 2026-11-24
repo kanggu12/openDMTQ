@@ -1057,6 +1057,77 @@ const PATTERN_PAGES = [
   ['admin-backups', `${A}/backups`], ['admin-app', `${A}/app`],
 ];
 
+// The band of the server's words after a change made in place, at a phone's width held upright and a laptop's: a press at
+// the screen's foot (the last player's broadcast switch, the page scrolled to it) leaves the button and the row's new
+// state in sight, the band at the screen's top for that answer; and a question asked while the band is up (a player's
+// Reset, from its More) opens under the band, which stays whole and on top. Each switch is put back. Before: on a phone
+// the band at the foot covered the switch just pressed and its new state, and a question put the band under its scrim.
+async function bandClear(contexts) {
+  for (const [width, height] of [[390, 740], [1280, 800]]) {
+    const page = await contexts.signed.newPage();
+    await page.setViewport({ width, height, ...(width < 700 ? { isMobile: true, hasTouch: true } : {}) });
+    await page.goto(`${A}/players`, { waitUntil: 'domcontentloaded' });
+    const at = `${width}px`;
+    const switchOf = 'table.players tbody tr:last-child button[form=player-switch]';
+    const press = async () => {
+      await page.$eval(switchOf, e => e.scrollIntoView({ block: 'end' }));
+      await pause(200);
+      await settle(page, () => (width < 700 ? page.tap(switchOf) : page.click(switchOf)));
+      await page.waitForSelector('.said-stack .flash.float', { timeout: 8000 }).catch(() => {});
+      await pause(400);
+    };
+    await press();
+    const seen = await page.evaluate(sel => {
+      const stack = document.querySelector('.said-stack'), button = document.querySelector(sel);
+      if (!stack || !button) return { stack: !!stack, button: !!button };
+      const s = stack.getBoundingClientRect(), b = button.getBoundingClientRect(), row = button.closest('tr').querySelector('.live-state').getBoundingClientRect();
+      const meets = r => r.bottom > s.top && r.top < s.bottom;
+      return { band: [Math.round(s.top), Math.round(s.bottom)], button: [Math.round(b.top), Math.round(b.bottom)], covers: meets(b) || meets(row) };
+    }, switchOf);
+    check(`the band of an answer leaves the switch just pressed and its new state in sight (${at})`, seen.band && !seen.covers, JSON.stringify(seen));
+    // A question while the band is up: the last player's Reset, under its More. The modal question leaves nothing outside
+    // it to point at (the browser's own inertness), so what shows is read from the pixels: the band's light before the
+    // question and with it open, the same where the band is over the question's scrim, two thirds darker under it.
+    const light = async () => {
+      // The band's place in the window, read from a picture of the window as it is (not of the page, which a clip asks).
+      const r = await page.$eval('.said-stack', e => { const b = e.getBoundingClientRect(); return { x: b.left + 4, y: b.top + 4, width: Math.min(200, b.width - 8), height: Math.max(1, b.height - 8) }; }).catch(() => null);
+      if (!r) return 0;
+      const png = await page.screenshot({ encoding: 'base64', captureBeyondViewport: false });
+      return page.evaluate(async (b64, r) => {
+        const img = new Image();
+        img.src = `data:image/png;base64,${b64}`;
+        await img.decode();
+        const c = document.createElement('canvas');
+        c.width = img.width;
+        c.height = img.height;
+        const g = c.getContext('2d');
+        g.drawImage(img, 0, 0);
+        const k = img.width / innerWidth;
+        const d = g.getImageData(Math.round(r.x * k), Math.round(r.y * k), Math.max(1, Math.round(r.width * k)), Math.max(1, Math.round(r.height * k))).data;
+        let sum = 0;
+        for (let i = 0; i < d.length; i += 4) sum += d[i] + d[i + 1] + d[i + 2];
+        return sum / (d.length / 4) / 3;
+      }, png, r);
+    };
+    const lit = await light();
+    await page.$eval('table.players tbody tr:last-child .row-more > summary', s => s.click());
+    await page.waitForSelector('table.players tbody tr:last-child .row-more[open] button[value=reset]', { timeout: 5000 });
+    await page.$eval('table.players tbody tr:last-child .row-more[open] button[value=reset]', b => b.click());
+    await page.waitForSelector('#ask[open]', { timeout: 5000 }).catch(() => {});
+    await pause(300);
+    const asked = await light();
+    check(`a question asked while the band is up opens under it, the band as bright as before (${at})`, !!(await page.$('#ask[open]')) && lit > 0 && asked >= lit * 0.9,
+      `${lit.toFixed(1)} -> ${asked.toFixed(1)}`);
+    if (await page.$('#ask[open]')) await page.click('#ask [value=no]');
+    await page.evaluate(() => { for (const d of document.querySelectorAll('.row-more[open]')) d.open = false; });
+    // The switch as it was (the band taken away first, as a press on it does: where it covers the switch, the press is
+    // its).
+    await page.evaluate(() => { for (const s of document.querySelectorAll('.said-stack')) s.remove(); });
+    await press();
+    await page.close();
+  }
+}
+
 // A link in a sentence is drawn in the sentence's own colour, told by its underline: the section's colour is the screen's
 // main button's. Every page of the patterns' list, at a phone's width and a laptop's: each link that stands inline among
 // loose words of its own line's box (a sentence, not a list's name or a cell's) has the colour of the words around it.
@@ -3187,6 +3258,7 @@ async function myPage(contexts) {
     await myPage(contexts);
   } else if (stage === 'patterns') {
     await textLinks(contexts);
+    await bandClear(contexts);
     await hoverOnly(contexts);
     await inPlace(contexts);
     await formsLook(contexts);

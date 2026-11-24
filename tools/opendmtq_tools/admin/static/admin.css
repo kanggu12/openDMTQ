@@ -44,6 +44,12 @@ body[data-section="admin"] { --gap: 14px; }
   .bar:has(.nav.pages) .said-stack { position: fixed; z-index: 6; top: auto; bottom: 0; box-shadow: 0 -12px 26px -12px rgba(0, 0, 0, 0.8); }
   /* The last message clear of a phone's home bar, as the page's own foot is. */
   .bar:has(.nav.pages) .said-stack > .flash.float:last-child { padding-bottom: calc(11px + env(safe-area-inset-bottom)); }
+  /* The button just pressed at the screen's foot (admin.js): the answer's words at the screen's top for it, clear of the
+     button and of what it changed (at the foot they covered both), its shadow cast downward, the first line clear of a
+     phone's notch. */
+  .bar:has(.nav.pages) .said-stack.at-top { top: 0; bottom: auto; box-shadow: 0 12px 26px -12px rgba(0, 0, 0, 0.8); }
+  .bar:has(.nav.pages) .said-stack.at-top > .flash.float:last-child { padding-bottom: 11px; }
+  .bar:has(.nav.pages) .said-stack.at-top > .flash.float:first-child { padding-top: calc(11px + env(safe-area-inset-top)); }
 }
 /* On its side there is width for five a row: the ten pages in two even rows, the lower one under the wordmark's row. */
 @media (max-width: 720px) and (orientation: landscape) {
@@ -69,6 +75,9 @@ body[data-section="admin"] { --gap: 14px; }
    the message's own, opaque; its words start where the page's text does, and its cross at the end says a press takes it
    away. */
 .bar .said-stack { position: absolute; z-index: 1; left: 0; right: 0; top: 100%; box-shadow: 0 12px 26px -12px rgba(0, 0, 0, 0.8); }
+/* On the page's top layer (admin.js shows it there, over a question that opens meanwhile): fixed at the bar's foot
+   (--under-bar), none of a popover's own frame, centring or scroll. */
+.bar .said-stack:popover-open { position: fixed; inset: var(--under-bar, 0) 0 auto; width: auto; height: auto; margin: 0; padding: 0; border: 0; overflow: visible; color: inherit; background: none; }
 /* Each message of the place, one under another in it, its top edge lit as the bar's glass. */
 .bar .flash.float { margin: 0; padding: 11px 0; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06); }
 .bar .flash.float > .wrap { display: block; position: relative; padding-right: 58px; }
