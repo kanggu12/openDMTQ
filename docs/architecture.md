@@ -136,6 +136,7 @@ more, its FREE PASS, and goes on without it (`rpc.php`). It needs PHP 8.1 or new
 | `src/shop.php` | The `shop.*` methods: what the shop still sells, paid for with MAX POINT or Q and kept |
 | `src/user.php` | The `user.*` methods, the news, the mail and `service.getInfo` |
 | `src/platform.php` | The platform SDK: its login (one account per phone), push registration, price list, reports |
+| `src/account.php` | What an account gets: its number, never handed out again, and its random transfer code |
 | `src/live.php` | Who is in a song, for the live view (watches the game's own calls) |
 | `src/content.php` | The song list and the facts of the client's tables (`data/custom/songList.json`, `catalog.json`) |
 | `src/config.php`, `src/db.php`, `src/util.php` | Folders and addresses from the environment, the database handle, number rules and where a month's rankings begin (the site's months too) |
@@ -162,12 +163,23 @@ What the replies rely on, as the client behaves:
   its login reply gave and the body (before its login, of the body alone). Each sign-in has a key of its own: the platform
   login notes the access token it hands out (`SignIn`, its SHA-256), the game's login (`user.loginV2`) takes only such a
   token, for the account it names, and gives a random key, the same at a second login with that token (the game logs in
-  twice at its start); another token is refused with `SVC.05401`, a code the client does not know (its own popup, whose
-  CLOSE ends the game; the next start signs in anew). A batch with a chart's start (`game.getPreviewPlayInfo`, which
-  takes the chart's price), a save or a shop call that names a player is taken only signed with the key of a sign-in of
-  that player (`403` otherwise); such a call that names nobody runs as any call. The game also sends the key and an API
-  token in headers named with an underscore (`SECRET_KEY`, `API_TOKEN`), which nothing reads: a proxy drops such headers.
-  An account keeps its newest eight sign-ins (a phone signs in at every start), and a restore keeps the sign-ins of now.
+  twice at its start; two logins at the same moment get the one key the sign-in keeps); another token, or one whose
+  account is gone, is refused with `SVC.05401`, a code the client does not know (its own popup, whose CLOSE ends the
+  game; the next start signs in anew). A batch with a chart's start (`game.getPreviewPlayInfo`, which takes the chart's
+  price), a save, a shop call, the items equipped (`game.setSlotItem`), the name (`user.setNickname`) or one of the
+  transfer code's two calls (`user.getConnectUuid`, `user.setConnectUuid`) that names a player is taken only signed
+  with the key of a sign-in of that player (`403` otherwise); such a call that names nobody runs as any call. The game
+  also sends the key and an API token in headers named with an underscore (`SECRET_KEY`, `API_TOKEN`), which nothing
+  reads: a proxy drops such headers. An account keeps its newest eight sign-ins (a phone signs in at every start), and a
+  restore keeps the sign-ins of now. With the data disk full the platform login still answers an existing account, its
+  token not noted, so that the game's own login refuses it with the game's own popup (no answer left the game waiting on
+  its first screen); a new phone's account cannot be kept then, and gets `503`.
+- **Accounts** (`src/account.php`). Each phone's account gets a number, its player id and the platform's account id at
+  first: one past the highest ever handed out (`MemberNumber`), so a deleted player's number never comes back to another
+  phone; the Players page's Delete takes the player's sign-ins too. Its transfer code (the game's OPTION shows it) is ten
+  random hex digits; typed on another phone (OPTION, the transfer code's input), it moves that phone's account onto the
+  player, with the player's name, and the game restarts as them. Codes made from a player's number, as servers before
+  0.11.3 made every code, are replaced at a start, and the transfer code's calls never show or take one.
 - **Size.** A request holds at most 64 calls (the game's largest batch, right after its login, has 14) and a body of at
   most 2 MB, as the Helm chart's router lets through: a larger one is refused whole (`413`) before any call runs.
 - **Saving a play.** The score, the accuracy and the grade are worked out from the counts of each judgement, as the
@@ -907,6 +919,9 @@ erDiagram
     TEXT name PK "unlimited, start_mpoint, start_qpoint, start_level"
     TEXT value
   }
+  MemberNumber {
+    INTEGER last "the highest player number handed out"
+  }
   SignIn {
     TEXT access PK "SHA-256 of the access token the platform login handed out"
     TEXT puid "the account"
@@ -962,6 +977,7 @@ erDiagram
 | `PlayerState`, `PlayerItem`, `PlayerUnlock`, `PlayerPurchase`, `PlayerBan` | Each player's game state beyond their scores: the currencies, the experience, their own unlimited switch, the items given, taken and bought, what a level unlock opened, a year of purchases, a ban |
 | `GameSetting` | The server's game settings: unlimited currency for everyone, and what a new player starts with |
 | `SignIn` | The game's sign-ins, each account's newest eight: the SHA-256 of the access token the platform login handed out, the key the game's login gave for it, the player, and the play that game started last |
+| `MemberNumber` | The highest player number handed out, one row: a new account takes the one after it, never a deleted player's |
 | `Webhook`, `WebhookMessage`, `WebhookState`, `WebhookTop` | The Notices page's Discord and Slack webhooks, the queue of their messages, and what the sending loop knew at its last look that found something new (each chart's #1 among it): a look that finds nothing writes nothing |
 
 `Member` and `Play` keep the names and types of the tables earlier DMTQ servers used, so their databases open
