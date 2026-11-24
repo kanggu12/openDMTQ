@@ -46,7 +46,7 @@ import zlib
 
 import lz4.block
 
-from . import filelock, jacket_atlas, song_files, strings
+from . import client_marks, filelock, jacket_atlas, song_files, strings
 
 # The imported content (read only) and the writable custom folder (container paths).
 CONTENT = os.environ.get("OPENDMTQ_CONTENT", "/srv/content")
@@ -74,8 +74,9 @@ GEAR_KINDS = ("C", "F", "N", "K")
 # First ids handed to added songs and charts, far above the shipped ones (191 and 1320).
 FIRST_SONG_ID = 1001
 FIRST_PATTERN_ID = 20001
-# The shipped jacket atlas that added songs' bundles are made from: any would do, all have one layout.
-TILE_TEMPLATE = "dlc/d3_e33.unity3d"
+# The shipped jacket atlas that added songs' bundles are made from, by its path in the patch folder: any would do, all
+# have one layout. Its name is the client's (client_marks keeps the client's names, read by their role).
+TILE_TEMPLATE = client_marks.TILE_TEMPLATE
 # Product ids of added songs: above every shipped one (the highest is 1080020).
 PRODUCT_ID_BASE = 2000000
 # The shop categories every shipped song's product is listed in (the music shop, old and new): the

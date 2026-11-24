@@ -306,10 +306,11 @@ fetches the images of its screens from the server), so the server reports itself
 </p>
 
 - **The client's names** (`client_marks.py`): the original client's addresses and package, the SDK's and the screens'
-  edits, the runtime's tweaks and the names the runtime and the player look up in the game's code are one table there,
-  compressed and encoded, read by what each is for; the runtime's and the player's are written from it into
-  `arm32/src/client_names.h` (`python3 -m opendmtq_tools.client_marks --cpp`), and a repository test checks that the
-  two agree. The rest of the code, its log, its comments and its tests say what each is for.
+  edits, the runtime's tweaks, the bundle of its data that added songs' tiles are made from (`songs.py`) and the names
+  the runtime and the player look up in the game's code are one table there, compressed and encoded, read by what each
+  is for; the runtime's and the player's are written from it into `arm32/src/client_names.h`
+  (`python3 -m opendmtq_tools.client_marks --cpp`), and a repository test checks that the two agree. The rest of the
+  code, its log, its comments and its tests say what each is for.
 - **Which client** (`inspect`): from its contents, never its name. The original has the official game RPC literal. A
   copy changed for another server has the same literal with another host; every literal and SDK string on that host
   is pointed at this server (`address_edits`, `redirect_smali`), and an SDK edit it already has counts as made. An app

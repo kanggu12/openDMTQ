@@ -1,6 +1,7 @@
 """The client's own names, for the patcher, the importer and their tests: the game's addresses as the original client
 has them, its package name, the parts of its platform SDK and of its screens the patcher edits, the runtime's tweaks of
-its code, and the names the runtime and the player look up in its code (written into arm32/src/client_names.h). The
+its code, the bundle of its data that added songs' tiles are made from, and the names the runtime and the player look up
+in its code (written into arm32/src/client_names.h). The
 repository's text names none of the game's servers, its app or its code (the owner's rule for every page, comment, test
 and name of the project), so they are kept here as one table, compressed (zlib) and base64-encoded, and read by their
 role: the rest of the code says what each is for, never what it is called.
@@ -15,8 +16,8 @@ import sys
 import textwrap
 import zlib
 
-# The table: {"rpc_hosts", "addresses", "package", "sdk_edits", "screen_edits", "screen_needs", "tweaks", "player"},
-# compressed and encoded (how it is made: main() below).
+# The table: {"rpc_hosts", "addresses", "package", "sdk_edits", "screen_edits", "screen_needs", "tweaks",
+# "tile_template", "player"}, compressed and encoded (how it is made: main() below).
 _TABLE = (
     "eNrdW3lv2zgW/yqCZ4DJAE58X2lRIE3TNp0cbux0ZtEUBi3RNmuZVEXablr0u+97j5Is2bLjZFossPvHpJbI37svUvu9wDwv5FpzXTj+XpgYExyX"
     "SsGMyXHgz/WRq2aF4/jx94nS5kehGP9eLpdHkivJAoELS/B3fTE9+1EsBMydsjGH17AQNy3FNyENDyU3R2M240eGuxMppuzLYDxgQCPw2T0PC8cf"
@@ -63,8 +64,9 @@ _TABLE = (
     "7bTiKDoKoItU4O/E+a+CTiKyVAc9F53y13K8KuR4yZ5EMD1PZ/1EgRJTrrMM8dBC/gIF9tJSbgqJtk2LWY+FZCGbORg+dwWPGXZHDvabsz1x7aPy"
     "/wUzKWsswLlThoBAJELxTRVMKpx6mTdKjX3uRF+QPiZPromdd294kB+MHx9WRzOrjgqqI24FEpXkgmc3UtnwYayKN318olX/r8TDn5IvD3FgY/gx"
     "OkZ0XlbnX11OQ2zpkoVTbvDy8ix+liBrUE4S/pV8pJnyOMRyGKrwFP4JCRmmmsHZzc2ge/KfwZvr6zcXZ4Or6/6gd9vtXt/0z14d7wOz1rR4IkQm"
-    "vqM8i8qPpwh1+OI5firx4mAf8mjXtdxYyeTGiK8oJ6Sq1EZ0Jd3Uu9711SWT0LKHwIwFuJbkd+SByG5eqV496U9CtcRLhxR/OWnhU7FglpxNYRov"
-    "4LXYbOjfH57ijWvgHDofWCgQ4zX+vxTw8ALPKiB9z9jX14H+AKlkFOg7+aiN13OD14Dp/YUf/wUNr1N9"
+    "vqM8i8qPpwh1+OI5firx4mAf8mjXtdxYyeTGiK8oJ6Sq1EZ0Jd3Uu9711SWT0LKHwIwFuJbkd+SByG5eqV496U9CtcRLhxR/OWnhE35Y6UPlh4Lm"
+    "4wfQxwXPd0tebcBrtaPoqxj8+nLJ2RRG9gLenc2G/v3hKV7LBs6h84GFAgm9xv8rA55w4IEG5PgZ+/o60B8g34wCfScftfF6bvCuML2/8OO/e0hf"
+    "9Q=="
 )
 
 
@@ -93,6 +95,9 @@ SCREEN_NEEDS = dict(_MARKS["screen_needs"])
 # The runtime's tweaks file's lines for the game's frame caps:
 # <assembly> <namespace or -> <class> <field> <value or fps>.
 TWEAKS = _MARKS["tweaks"]
+# The shipped jacket atlas's bundle that added songs' tile bundles are made from (any would do: all have one layout), by
+# its path in the client data's patch folder (songs.py).
+TILE_TEMPLATE = _MARKS["tile_template"]
 # The names the runtime and the player look up in the game's code and define for its SDKs, in the header's order: (its
 # constant, what it is for, the name); a heading has no constant and no name, only its words.
 PLAYER = [tuple(entry) for entry in _MARKS["player"]]

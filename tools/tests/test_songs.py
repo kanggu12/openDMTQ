@@ -694,7 +694,7 @@ class KeptTileTest(LibraryCase):
         songs.rebuild()
         # The same layout, with another object beside the texture and the atlas.
         other = jacket_atlas._write_bundle((6, b"5.x.x", b"5.6.5p2"), 0x43, b"CAB-" + b"1" * 32, tja._serialized(
-            [(21, b"another material"), (28, tja._texture()), (114, tja._atlas(["e33_a"]))]))
+            [(21, b"another material"), (28, tja._texture()), (114, tja._atlas(["e900_a"]))]))
         with open(os.path.join(self.patch, songs.TILE_TEMPLATE + ".lz4"), "wb") as f:
             f.write(songs.stored_encode(other))
         with self.building() as build:

@@ -504,7 +504,8 @@ class OriginalNamesTest(unittest.TestCase):
 
     # The first 16 hex digits of the SHA-256 of each word in lower case. NAMES, refused in every file: the original
     # hosts' labels and the platform's, the SDK's name, the original app's package, another edition of the game, and
-    # classes, namespaces, methods and fields of the game's code, of its platform's SDK and of its own plugins.
+    # classes, namespaces, methods and fields of the game's code, of its platform's SDK and of its own plugins, and the
+    # shipped bundle the added songs' tiles are made from (the songs' code reads its name from client_marks).
     NAMES = {
         "d6346b9af21aa4ed", "2afe30a2bd45057c", "80db63946107faba", "368d8e31a31df004", "2ae3f64dcdf74642",
         "699b0abdb612e9e7", "3949fb706769665e", "21e87c9ee4d3d311", "10190bd54cc85dab", "a72c2dc8615e4f9c",
@@ -517,7 +518,7 @@ class OriginalNamesTest(unittest.TestCase):
         "ea7d325704aae6e0", "085758866bafc839", "45f82add335a4e84", "ff9fe74e651359f4", "a059d5a3311523d2",
         "e2021168280ad242", "27cff103a57227e4", "e27e7a215113fff9", "a6faad178c4d3037", "d707471e11bc2920",
         "6c48b84ce1677c6a", "26286318a778dc27", "0ae9bb2b7c69db7a", "97e1000e4c7d506c", "d520944fb3e43fca",
-        "e0ab14225016f86a", "aa832ceb753844fa",
+        "e0ab14225016f86a", "aa832ceb753844fa", "a311be37dd5a6251",
     }
     # DATA, refused in the pages only: the client's table files and a column of one, and the patch manifest's name, the
     # protocol's own names, which the server serves and the tools read by them.
@@ -639,13 +640,16 @@ class OriginalNamesTest(unittest.TestCase):
 
     def test_the_tree_check_finds_what_it_is_for(self):
         # Made of parts, as above: the SDK's class by its path, the game's input class looked up by name, the key of a
-        # song's addresses quoted whole in a reply and the same key read unquoted. The first two and the last are found;
-        # the quoted key, the protocol's own, and a table file the server serves by its name are not.
+        # song's addresses quoted whole in a reply, the same key read unquoted, a table file the server serves by its
+        # name, the shipped bundle the added songs' tiles are made from, and a made-up atlas's bundle past the shipped
+        # ones. The first two, the fourth and the sixth are found; the quoted key, the protocol's own, the table file
+        # and the made-up bundle are not.
         code = ['jvm::define("com/' + "pm" + "ang" + 'plus/unity3d/Facade");', 'klass("", "DMQ' + 'Input");',
-                "return ['" + "pm" + "ang' => $files];", "url." + "pm" + "ang", 'open("song' + '_song.csv")']
-        self.assertEqual(self.refused("\n".join(code), tree=True), [1, 2, 4])
-        # The same lines in a page: the quoted key and the table file are refused there too.
-        self.assertEqual(self.refused("\n".join(code)), [1, 2, 3, 4, 5])
+                "return ['" + "pm" + "ang' => $files];", "url." + "pm" + "ang", 'open("song' + '_song.csv")',
+                'TILE = "dlc/d3_e' + '33.unity3d"', 'made = "dlc/d3_e900.unity3d"']
+        self.assertEqual(self.refused("\n".join(code), tree=True), [1, 2, 4, 6])
+        # The same lines in a page: the quoted key, the table file and any atlas's bundle by its number are refused there.
+        self.assertEqual(self.refused("\n".join(code)), [1, 2, 3, 4, 5, 6, 7])
 
 
 class ClientNamesTest(unittest.TestCase):

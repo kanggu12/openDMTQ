@@ -25,8 +25,9 @@ def _string(text):
 
 
 def _texture():
-    # Name, width, height, image size, format, mip count; flags and settings; image; stream data.
-    return (_string("d3_e33") + struct.pack("<iiiii", 512, 512, len(OLD_PIXELS), 47, 1) + bytes(40)
+    # Name (a made-up atlas's, numbered past the shipped ones and below the added songs'), width, height, image size,
+    # format, mip count; flags and settings; image; stream data.
+    return (_string("d3_e900") + struct.pack("<iiiii", 512, 512, len(OLD_PIXELS), 47, 1) + bytes(40)
             + struct.pack("<I", len(OLD_PIXELS)) + OLD_PIXELS + bytes(jacket_atlas.STREAM_DATA_SIZE))
 
 
@@ -67,7 +68,7 @@ OTHER = b"keep me as I am"
 
 
 def _template():
-    payload = _serialized([(21, OTHER), (28, _texture()), (114, _atlas(["e33_a", "e33_bb", "e33_ccc"]))])
+    payload = _serialized([(21, OTHER), (28, _texture()), (114, _atlas(["e900_a", "e900_bb", "e900_ccc"]))])
     # The same form as the shipped bundles: this writer is tested against UnityPy on a real one.
     return jacket_atlas._write_bundle((6, b"5.x.x", b"5.6.5p2"), 0x43, b"CAB-" + b"0" * 32, payload)
 
@@ -126,7 +127,7 @@ class BuildTest(unittest.TestCase):
 
     def test_atlas_lists_only_the_new_sprite_and_keeps_what_follows(self):
         raw = self._of(114)
-        old = _atlas(["e33_a", "e33_bb", "e33_ccc"])
+        old = _atlas(["e900_a", "e900_bb", "e900_ccc"])
         # Same bytes up to the list, and from mPixelSize on.
         list_at = 12 + 4 + 12 + 4 + 12
         self.assertEqual(raw[:list_at], old[:list_at])
@@ -162,7 +163,7 @@ class BuildTest(unittest.TestCase):
             jacket_atlas._texture_bytes(streamed, b"x" * 4)
         # An atlas whose list does not end in mPixelSize 1.0 is not one this code understands.
         with self.assertRaises((jacket_atlas.AtlasError, struct.error)):
-            jacket_atlas._atlas_bytes(_atlas(["e33_a"])[:-24] + bytes(24), "e1_x")
+            jacket_atlas._atlas_bytes(_atlas(["e900_a"])[:-24] + bytes(24), "e1001_x")
         with self.assertRaises(jacket_atlas.AtlasError):
             jacket_atlas.tile_pixels(b"not an image")
 
@@ -203,7 +204,9 @@ class RebuildTest(unittest.TestCase):
         with open(os.path.join(self.patch, "patch_new.csv.lz4"), "wb") as f:
             f.write(songs.lz4_encode(b"\xef\xbb\xbffile_name,file_size\r\n"))
         os.makedirs(os.path.join(self.patch, "dlc"))
-        self._template_path = os.path.join(self.patch, "dlc", "d3_e33.unity3d.lz4")
+        # The template where the import leaves it, at its path as the songs' code reads it (the client's name, kept in
+        # client_marks): a made-up one is written there.
+        self._template_path = os.path.join(self.patch, songs.TILE_TEMPLATE + ".lz4")
         with open(self._template_path, "wb") as f:
             f.write(songs.stored_encode(_template()))
         # One added song, as _add_package leaves it.
