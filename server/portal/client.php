@@ -11,6 +11,9 @@
                               (My page on the site): {"url", "page", "expires"} (signed in)
      GET  client.php?records  the account's player's latest plays and best records, each with its place on the chart
                               and the keyboard's mark, as the player's page lists them (signed in)
+     POST client.php?claim    device: the PC's game player linked to the account, at the launcher's first PLAY, when
+                              the account has no player and that player no account (client_claim): {"linked", "now",
+                              "player"} or {"linked": false, "why"} (signed in; from 0.11.3)
 
    The app itself comes from /apk with the cookie, as a phone's browser gets it. */
 require __DIR__ . '/lib.php';
@@ -134,7 +137,92 @@ if (isset($_GET['records'])) {
         + client_records($db, $me));
 }
 
+if (isset($_GET['claim'])) {
+    // A link is a change: asked for with a POST, as client.php?signin is.
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        answer(405, ['error' => 'post']);
+    }
+    $who = site_user();
+    if ($who === null) {
+        answer(403, ['error' => 'signin']);
+    }
+    $claimed = client_claim($who, (string)($_POST['device'] ?? ''));
+    if ($claimed === null) {
+        answer(503, ['error' => 'down']);
+    }
+    answer(200, $claimed);
+}
+
 answer(404, ['error' => 'unknown']);
+
+/* The signed-in account $who linked to the game player who plays by $device on this server, at the PC client's first
+   PLAY: $device is the id the PC's game signs in by (its platform login's udid), which makes whoever holds it that player
+   in the game. Linked only when the account has no player and that player has no account either; never the owner's
+   account (kept in .env, linked to no player) or a banned player's. One statement makes the link and checks both, so
+   that two launchers at once never link one player twice. ['linked' => true, 'now' => true when this call made it,
+   'player' => ['id', 'name']] for an account that has its player; ['linked' => false, 'why' => 'none' (no player plays by
+   that id yet), 'taken' (another account has that player), 'owner' or 'banned']; null when the database cannot be
+   written. A link made goes in the admin pages' log of changes, as MY PAGE's changes do. */
+function client_claim(string $who, string $device): ?array
+{
+    // The database that writes and the change log's line, as MY PAGE has them.
+    require_once __DIR__ . '/me_lib.php';
+    $owner = site_owner();
+    if ($owner !== null && strcasecmp($owner['name'], $who) === 0) {
+        return ['linked' => false, 'why' => 'owner'];
+    }
+    $db = me_db_write();
+    if ($db === null) {
+        return null;
+    }
+    // The player of a name, as the site names one: a new player's blank nickname as its number.
+    $named = function (int $guid) use ($db): array {
+        $row = rows($db, 'SELECT nickname FROM Member WHERE CAST(guid AS INTEGER) = :g ORDER BY (id = :g) DESC, id ASC LIMIT 1',
+            [':g' => $guid])[0] ?? [];
+        return ['id' => $guid, 'name' => player_name(['nickname' => $row['nickname'] ?? '', 'id' => $guid])];
+    };
+    $mine = rows($db, 'SELECT guid FROM SiteUser WHERE name = :name', [':name' => $who])[0] ?? null;
+    if ($mine === null) {
+        // Not an account of the table (it went a moment ago): nothing to link.
+        return ['linked' => false, 'why' => 'none'];
+    }
+    if ($mine['guid'] !== null) {
+        // Linked already, by the owner or an earlier PLAY: as it is.
+        return ['linked' => true, 'now' => false, 'player' => $named((int)$mine['guid'])];
+    }
+    // The player the game of this id signs in as, as its platform login finds the account (the first row of the id), a
+    // player of the server's (never the server's own check account); an id of no form a phone or a PC gives is nobody's.
+    $found = preg_match('/^[A-Za-z0-9_-]{1,64}$/', $device) ? rows($db,
+        'SELECT CAST(guid AS INTEGER) AS guid FROM Member WHERE udid = :u AND udid IS NOT :check AND guid IS NOT NULL ORDER BY rowid LIMIT 1',
+        [':u' => $device, ':check' => CHECK_UDID])[0] ?? null : null;
+    if ($found === null || (int)$found['guid'] <= 0) {
+        return ['linked' => false, 'why' => 'none'];
+    }
+    $guid = (int)$found['guid'];
+    if (odq_ban_of($guid, $db) !== null) {
+        // Linked, the account would be refused as the player is: the owner links one by hand on the Accounts page.
+        return ['linked' => false, 'why' => 'banned'];
+    }
+    $q = @$db->prepare('UPDATE SiteUser SET guid = :g WHERE name = :name AND guid IS NULL
+                         AND NOT EXISTS (SELECT 1 FROM SiteUser WHERE guid = :g)');
+    if (!$q) {
+        return null;
+    }
+    $q->bindValue(':g', $guid, SQLITE3_INTEGER);
+    $q->bindValue(':name', $who, SQLITE3_TEXT);
+    if (!@$q->execute()) {
+        return null;
+    }
+    if ($db->changes() === 1) {
+        $player = $named($guid);
+        me_note('site:claim', $who . ' > ' . $player['name'], $who);
+        return ['linked' => true, 'now' => true, 'player' => $player];
+    }
+    // Not made: the account got its player meanwhile (another launcher's PLAY), or that player has an account.
+    $mine = rows($db, 'SELECT guid FROM SiteUser WHERE name = :name', [':name' => $who])[0] ?? null;
+    return $mine !== null && $mine['guid'] !== null ? ['linked' => true, 'now' => false, 'player' => $named((int)$mine['guid'])]
+        : ['linked' => false, 'why' => 'taken'];
+}
 
 /* A player's latest plays and best records as the PC client shows them, CLIENT_RECORDS of each: the chart (its song's
    title and its name in the game's words), the score, the grade, whether the keyboard played it, and the player's place

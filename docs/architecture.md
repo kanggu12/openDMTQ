@@ -78,8 +78,10 @@ and `?app` describes the app on offer to a signed-in player, which the client th
 `/apk`. With that sign-in, `?link` gives a one-time link that signs a browser in to the same account once, within a
 minute, and opens MY PAGE (`/opendmtq/login.php?once=...`, kept beside the database in `signin-links/` by the SHA-256 of
 its token, which is written nowhere; the admin API makes the same for its token's admin, `POST /site/link`), and
-`?records` the account's player's latest plays and best records, each with its place on its chart. Its updates are
-under [The PC client](#the-pc-client).
+`?records` the account's player's latest plays and best records, each with its place on its chart. At the launcher's
+first PLAY, `?claim` links an account that has no player to the PC's game player, named by the id the PC's game signs
+in by, when that player has no account either (never the owner's account or a banned player; one statement checks
+both and links, and the link goes in the change log). Its updates are under [The PC client](#the-pc-client).
 
 ## How a request is answered
 

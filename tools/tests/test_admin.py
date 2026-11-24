@@ -1537,9 +1537,12 @@ class ChangeLogPageTest(unittest.TestCase):
         # library must be there.
         if not os.path.isfile(os.path.join(portal, "lib.php")):
             self.skipTest("the portal is not at hand")
-        with open(os.path.join(portal, "me_lib.php"), encoding="utf-8") as f:
-            codes = set(re.findall(r"me_note\('([a-z]+:[a-z-]+)'", f.read()))
-        self.assertEqual(codes, {"site:password", "site:id", "site:signout"})
+        codes = set()
+        # MY PAGE's, and the PC client's link of an account to its PC's game player (client.php client_claim).
+        for name in ("me_lib.php", "client.php"):
+            with open(os.path.join(portal, name), encoding="utf-8") as f:
+                codes |= set(re.findall(r"me_note\('([a-z]+:[a-z-]+)'", f.read()))
+        self.assertEqual(codes, {"site:password", "site:id", "site:signout", "site:claim"})
         for code in codes:
             for lang in ("en", "ko"):
                 self.assertIn(admin.logs.CHANGE_WORDS[code], admin.strings.STRINGS[lang], code)

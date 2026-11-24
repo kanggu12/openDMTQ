@@ -2448,6 +2448,9 @@ GET_ARGS = {
     "client.php?app": ("view", "app_get"),
     "client.php?link": "the PC client's one-time sign-in link, by the site's cookie: POST /site/link makes one by a token",
     "client.php?records": ("view", "site_player", "site_player_records"),
+    "client.php?claim": "the PC client's link of its sign-in's account to the PC's game player at its first PLAY, by the "
+                        "site's cookie and the id the PC's game signs in by: POST /accounts/{account}/link links any "
+                        "account by a token",
     "login.php?once": "a one-time sign-in link opened in a browser: the API takes a token instead",
     "me.php?tab": "a signed-in player's own page's tabs, which its JSON twin takes too: the API's site routes give any player's",
     "me.php?page": "a page of a signed-in player's own plays or records, by the site's cookie: the API's site routes page any player's",

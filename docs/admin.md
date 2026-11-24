@@ -61,7 +61,9 @@ without sign-in: the sign-in page with its language switch, the licenses, the he
 browser stays signed in for 30 days; a new password, a new ID, or the account disabled, deleted or its player banned,
 ends its sign-ins at the next page. A player changes their own password and ID, and signs out everywhere else, on MY
 PAGE, with their current password and under the sign-in's limit on wrong ones; the account's game player, its note and
-its admin rights stay the owner's to set. Each such change is in the log of changes, by the account. For an account that
+its admin rights stay the owner's to set. Each such change is in the log of changes, by the account. The PC client makes
+one link itself: at its first PLAY, an account that has no game player is linked to the PC's game player when that
+player has no account either (never the owner's account or a banned player), in the log of changes too. For an account that
 also opens the admin pages, each of the three ends its sign-ins there too. The owner's account, whose ID and password
 are the server's, has Sign out everywhere else there, and the way to the Server page for its password.
 

@@ -80,6 +80,8 @@ CHANGE_WORDS = {
     "server:password": "change.server_password", "server:name": "change.server_name",
     # What a player changed of their own account on the site's MY PAGE (server/portal/me_lib.php writes these lines).
     "site:password": "change.site_password", "site:id": "change.site_id", "site:signout": "change.site_signout",
+    # The PC client's first PLAY linking the account to the PC's game player (server/portal/client.php client_claim).
+    "site:claim": "change.site_claim",
 }
 
 

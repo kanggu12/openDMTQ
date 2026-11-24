@@ -1170,6 +1170,7 @@ STRINGS = {
         "change.site_password": "Changed their password on the site",
         "change.site_id": "Changed their ID on the site",
         "change.site_signout": "Signed out everywhere else on the site",
+        "change.site_claim": "Linked their account to the game player on their PC",
         # Logs.
         "logs.title": "Logs",
         "logs.heading": "Requests",
@@ -2432,6 +2433,7 @@ STRINGS = {
         "change.site_password": "사이트에서 자기 비밀번호 변경",
         "change.site_id": "사이트에서 자기 아이디 변경",
         "change.site_signout": "사이트에서 다른 곳 모두 로그아웃",
+        "change.site_claim": "자기 계정을 자기 PC의 게임 플레이어와 연결",
         "logs.title": "로그",
         "logs.heading": "요청",
         "logs.filter": "필터",
