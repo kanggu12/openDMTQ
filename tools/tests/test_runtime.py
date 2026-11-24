@@ -538,6 +538,21 @@ class TrickleTest(unittest.TestCase):
                 client_updates._download(url, os.path.join(self._tmp.name, "package.nupkg"), 1000)
         self.assertLess(time.monotonic() - began, 4)
 
+    def test_the_installer_for_windows_stops_at_its_deadline_and_leaves_nothing(self):
+        from opendmtq_tools import windows_client
+        path = os.path.join(self._tmp.name, "installer.exe")
+        with trickling(b"v" * 400, 0.02) as url, mock.patch.object(runtime, "FILE_SECONDS", 0.5, create=True), \
+                mock.patch.object(windows_client, "wanted_release", return_value=("1.2.3", {})), \
+                mock.patch.object(windows_client.runtime, "release_url", return_value=url), \
+                mock.patch("builtins.print"):
+            began = time.monotonic()
+            # runtime.Late, an OSError as a download's failures are; main read on and called the file damaged.
+            with self.assertRaises(OSError):
+                windows_client.fetch(None, path)
+        self.assertLess(time.monotonic() - began, 4)
+        # Neither the installer nor the part of it that came.
+        self.assertEqual(os.listdir(self._tmp.name), [])
+
     def test_a_file_that_comes_in_time_comes_whole(self):
         with trickling(b"w" * 50, 0.001) as url, mock.patch.object(runtime, "log"):
             path = os.path.join(self._tmp.name, "runtime.zip")
