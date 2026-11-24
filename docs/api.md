@@ -112,7 +112,7 @@ picker opens instead.
 | `412` | A download's `If-Match` names another file than the one there now | `precondition_failed` |
 | `413` | An upload over its limit | `too_large` |
 | `416` | The part of a download that `Range` asks for begins past its end | `range_not_satisfiable` |
-| `422` | A file that fails its checks | `package_refused`, `not_backup` |
+| `422` | A file that fails its checks | `package_refused`, `not_backup`, `backup_changed` |
 | `429` | A wrong token, after too many wrong tokens or passwords from here | `throttled` |
 | `500` | It could not be done here (the message says why) | `backup_failed`, `upload_failed`, `stop_failed`, `song_action_failed`, `internal_error` |
 | `503` | The admin pages are off, or the database or the game server cannot be reached | `admin_off`, `database_unavailable`, `server_down`, `server_unwell` |
@@ -1785,6 +1785,7 @@ Refusals:
 - `400 no_file`: No .tar.gz in the file field.
 - `413 too_large`: Over 1 GB.
 - `422 not_backup`: Not a backup: no database in it.
+- `422 backup_changed`: Its bytes changed, or it was cut short, after it was made (its gzip check fails).
 - `500 upload_failed`: It could not be kept (a full disk).
 
 #### `GET /backups/auto`

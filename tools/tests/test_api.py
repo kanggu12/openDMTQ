@@ -1476,6 +1476,34 @@ class FilesTest(unittest.TestCase):
             r = inst.client.post(V1 + "/maintenance", data=b"x" * (admin.core.MAX_SIGNED_OUT + 10), content_type="application/json")
             self.assertEqual(r.status_code, 401)
 
+    def test_a_backup_whose_bytes_changed_on_the_way_is_not_kept(self):
+        # An upload is read to its end before it joins the list: its gzip check says whether its bytes are the ones it was
+        # made with (main kept a changed one, and its restore put the change live). The Backups page says the same
+        # (ADM-221, API-100).
+        from tests.test_admin import RestoreRefusesAndRescuesTest
+        with Server() as inst:
+            _, good, changed = RestoreRefusesAndRescuesTest.changed_copies(inst)
+            before = [b["name"] for b in inst.ask("GET", "/backups").get_json()["items"]]
+            for what, data in changed.items():
+                r = inst.ask("POST", "/backups/upload", data={"file": (io.BytesIO(data), "moved.tar.gz")},
+                             content_type="multipart/form-data")
+                self.assertEqual((r.status_code, r.get_json()["error"]["code"]), (422, "backup_changed"), what)
+                self.assertEqual(r.get_json()["error"]["message"],
+                                 "That file changed or was cut short after it was made, so it was not kept.", what)
+            self.assertEqual([b["name"] for b in inst.ask("GET", "/backups").get_json()["items"]], before)
+            self.assertEqual(sorted(os.listdir(admin.core.BACKUPS)), sorted(before))
+            inst.sign_in()
+            inst.client.get("/opendmtq/admin/backups")
+            with inst.client.session_transaction(path="/opendmtq/admin/") as sess:
+                csrf = sess["csrf"]
+            page = inst.client.post("/opendmtq/admin/backups", data={"csrf": csrf, "action": "upload",
+                                                                     "file": (io.BytesIO(changed["its check"]), "moved.tar.gz")},
+                                    content_type="multipart/form-data", follow_redirects=True).get_data(as_text=True)
+            self.assertIn("That file changed or was cut short after it was made, so it was not kept.", page)
+            # As it was made, it goes up.
+            r = inst.ask("POST", "/backups/upload", data={"file": (io.BytesIO(good), "moved.tar.gz")}, content_type="multipart/form-data")
+            self.assertEqual(r.status_code, 201, r.get_data(as_text=True))
+
     def test_a_backup_goes_up_and_comes_down_the_same(self):
         with Server() as inst:
             with open(inst.path(f"backups/{Server.names['backup']}"), "rb") as f:

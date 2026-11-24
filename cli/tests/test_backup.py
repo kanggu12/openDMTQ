@@ -402,6 +402,32 @@ class RealDatabaseTest(unittest.TestCase):
             with open(os.path.join(tmp, "good.db3"), "rb") as f:
                 self.assertIsNone(self.problem_of(f.read()))
 
+    def test_an_archive_whose_bytes_changed_after_it_was_made_is_refused(self):
+        # Read to its end before anything changes: its gzip check (a byte of it changed, or its second half gone) says the
+        # archive is not the one that was made, which tar alone, stopping at its own end, never read (CLI-90; main restored
+        # a changed one). The same archive as it was made passes.
+        with Sandbox() as sb:
+            sb.write("data/state/dmtq.db3", b"current")
+            name = sb.archive("data/backups/opendmtq-20260101-120000-manual.tar.gz", {"dmtq.db3": b"the backup's database " * 300})
+            path = os.path.join(sb.data, "backups", name)
+            with open(path, "rb") as f:
+                good = f.read()
+            for what, data in (("its check", good[:-8] + bytes([good[-8] ^ 0xFF]) + good[-7:]),
+                               ("its second half gone", good[: len(good) // 2])):
+                with open(path, "wb") as f:
+                    f.write(data)
+                self.assertEqual(sb.call(app.cmd_restore, name=name, with_key=False), 1, what)
+                self.assertIn(f"{name} cannot be restored: it changed or was cut short after it was made", sb.output(), what)
+                self.assertEqual(sb.read("data/state/dmtq.db3"), b"current", what)
+                self.assertEqual(sb.backups(), [name], what)
+            with open(path, "wb") as f:
+                f.write(good)
+            self.assertIsNone(backup.changed_since_made(path))
+            # A file that is no gzip stream at all is tar's to refuse, as before.
+            with open(path, "wb") as f:
+                f.write(b"not an archive")
+            self.assertIsNone(backup.changed_since_made(path))
+
     def test_a_refused_archive_changes_nothing(self):
         with Sandbox() as sb:
             sb.write("data/state/dmtq.db3", b"current")

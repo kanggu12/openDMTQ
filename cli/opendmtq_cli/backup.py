@@ -152,16 +152,46 @@ def prune(protect=None):
             os.remove(os.path.join(BACKUPS, old))
 
 
+# How much of an archive is read at a time on the way to its end, where the gzip stream's check is.
+READ_PIECE = 1024 * 1024
+
+
+def changed_since_made(path):
+    """Words for an archive whose gzip stream does not check out to its end, or None when it reads whole (and for a file
+    that is no gzip stream at all, which tar then refuses). The check is the CRC-32 and the length at the stream's end,
+    which tar alone never reads, as it stops at the tar's own end: with many added songs an archive is stored
+    uncompressed, and a byte of the database changed after it was made would go live. The admin pages read a backup the
+    same way before they keep or restore it (tools/opendmtq_tools/admin/backups.py, read_whole)."""
+    import gzip
+    try:
+        with open(path, "rb") as raw:
+            # Every gzip stream starts with these two bytes.
+            if raw.read(2) != b"\x1f\x8b":
+                return None
+            raw.seek(0)
+            with gzip.GzipFile(fileobj=raw, mode="rb") as stream:
+                while stream.read(READ_PIECE):
+                    pass
+    except (gzip.BadGzipFile, EOFError, zlib.error):
+        return "it changed or was cut short after it was made"
+    return None
+
+
 def locate(name):
     """The archive to restore: a name from `opendmtq backups`, or the path of one copied here.
 
-    Stops, before anything has changed, when there is no such file or it holds no database.
+    Stops, before anything has changed, when there is no such file, it changed or was cut short after it was made, or it
+    holds no database.
     """
     path = os.path.join(BACKUPS, name)
     if os.sep in name or not os.path.isfile(path):
         path = os.path.abspath(os.path.expanduser(name))
     if not os.path.isfile(path):
         system.die(f"no such backup: {name} (./opendmtq backups lists them)")
+    # Read to its end first: the archive's own check says whether its bytes are the ones it was made with.
+    changed = changed_since_made(path)
+    if changed:
+        system.die(f"{name} cannot be restored: {changed}")
     try:
         with tarfile.open(path) as tar:
             has_db = any(m.name == "dmtq.db3" and m.isfile() for m in tar.getmembers())

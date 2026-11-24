@@ -2524,6 +2524,55 @@ class RestoreRefusesAndRescuesTest(unittest.TestCase):
             self.assertTrue(os.path.isfile(inst.path("custom/songs/9001/9001.webm")))
             self.assertEqual([n for n in os.listdir(admin.core.BACKUPS) if not n.endswith(".tar.gz")], [])
 
+    @staticmethod
+    def changed_copies(inst):
+        """A backup stored as it is (as one with more added songs than STORE_ONLY_FROM is), a player's name in its bytes,
+        and copies of it changed after it was made: a letter of that name, a byte a third of the way in, its check at the
+        end, its second half gone. Returns (its name, the good bytes, {what changed: the bytes})."""
+        # The server's own players where it has them (the API's tests), else one.
+        with sqlite3.connect(admin.core.DB) as con:
+            has_players = con.execute("SELECT 1 FROM sqlite_master WHERE name = 'Member'").fetchone()
+        if not has_players:
+            old_game_database(admin.core.DB, [])
+            member_rows(admin.core.DB, [(7, "Sena", "a")])
+        with sqlite3.connect(admin.core.DB) as con:
+            con.execute("UPDATE Member SET nickname = 'SenaProbeName' WHERE id = 7")
+        with mock.patch.object(admin.backups, "STORE_ONLY_FROM", -1):
+            name = admin.backups.make_backup("manual")
+        with open(inst.path(f"backups/{name}"), "rb") as f:
+            good = f.read()
+        at, third = good.find(b"SenaProbeName"), len(good) // 3
+        assert at > 0, "the name is not in the archive's bytes: it was compressed"
+        return name, good, {"a letter of the name": good[:at] + b"SenaProbeNamf" + good[at + 13:],
+                            "a byte a third in": good[:third] + bytes([good[third] ^ 0xFF]) + good[third + 1:],
+                            "its check": good[:-8] + bytes([good[-8] ^ 0xFF]) + good[-7:],
+                            "its second half gone": good[:len(good) // 2]}
+
+    def test_a_backup_whose_bytes_changed_after_it_was_made_is_not_restored(self):
+        # Nothing read the archive's gzip check (tar stops at its own end): a backup stored as it is, a letter of a
+        # player's name changed in it, was restored "done" with the changed name, its database passing its own check.
+        # Each copy is refused in words, in both languages, and the live database stays as it is (ADM-221).
+        with Install() as inst:
+            name, _, changed = self.changed_copies(inst)
+            with sqlite3.connect(admin.core.DB) as con:
+                con.execute("UPDATE Member SET nickname = 'Now'")
+            for i, (what, data) in enumerate(changed.items()):
+                copy = f"opendmtq-server-backup-2026010{i}-000000-uploaded.tar.gz"
+                with open(inst.path(f"backups/{copy}"), "wb") as f:
+                    f.write(data)
+                said, done = admin.backups.restore_backup(copy, inst.path(f"backups/{copy}"))
+                self.assertFalse(done, what)
+                self.assertEqual(said, [("bad", "Not restored: that archive changed or was cut short after it was made.")], what)
+                with sqlite3.connect(admin.core.DB) as con:
+                    self.assertEqual(con.execute("SELECT nickname FROM Member").fetchall(), [("Now",)], what)
+            csrf = page_token(inst)
+            inst.client.get("/opendmtq/admin/lang?to=ko")
+            inst.client.post(f"/opendmtq/admin/backups/{copy}", data={"csrf": csrf, "action": "restore"})
+            self.assertIn("복원하지 않았습니다: 압축 파일이 만들어진 뒤에 바뀌었거나 잘렸습니다.",
+                          inst.client.get("/opendmtq/admin/backups").get_data(as_text=True))
+            # The backup as it was made restores.
+            self.assertTrue(admin.backups.restore_backup(name, inst.path(f"backups/{name}"))[1])
+
     def test_what_a_stopped_backup_or_restore_left_beside_the_backups_goes_at_the_next_start(self):
         # Its folder with what it unpacked, as old as a .part left by a stopped backup: cleared; one at work now stays.
         with Install() as inst:

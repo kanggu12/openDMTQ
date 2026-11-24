@@ -2,6 +2,7 @@
 (create, upload, delete, restore_backup, set_auto) that the API calls as well (api.py)."""
 
 import datetime
+import gzip
 import hashlib
 import os
 import re
@@ -188,6 +189,86 @@ def work_folder(prefix):
     when the work ends: a TemporaryDirectory there."""
     os.makedirs(core.BACKUPS, exist_ok=True)
     return tempfile.TemporaryDirectory(dir=core.BACKUPS, prefix=prefix)
+
+
+# How much of an archive is read at a time on the way to its end, where the gzip stream's check is.
+READ_PIECE = 1024 * 1024
+
+# Extraction as the tar module will do it by default from Python 3.14: plain files and folders within the folder only,
+# without the modes no backup needs (Python 3.12 and later; the older ones extract as before, the members picked below).
+EXTRACT = {"filter": "data"} if hasattr(tarfile, "data_filter") else {}
+
+
+class ChangedArchive(Exception):
+    """A backup archive whose bytes changed, or that was cut short, after it was made: its gzip stream does not check
+    out (its CRC-32 and length at its end, or a stream that ends early)."""
+
+
+def restorable(member):
+    """Whether a restore takes this member of an archive: the database, and the added songs (plain files and folders under
+    custom/, with no part that leads out of it)."""
+    if member.name == "dmtq.db3":
+        return member.isfile()
+    return (member.name == "custom" or member.name.startswith("custom/")) and ".." not in member.name \
+        and (member.isfile() or member.isdir())
+
+
+def tar_begins(raw):
+    """Whether the gzip stream in raw (read from its start) begins with a tar's header: the file was an archive when it was
+    made, whatever happened to it since."""
+    try:
+        with gzip.GzipFile(fileobj=raw, mode="rb") as stream:
+            head = stream.read(tarfile.BLOCKSIZE)
+        tarfile.TarInfo.frombuf(head, tarfile.ENCODING, "surrogateescape")
+        return True
+    except (OSError, EOFError, zlib.error, tarfile.HeaderError):
+        return False
+
+
+def read_whole(path, into=None):
+    """Reads a backup archive from its first byte to its last, and returns whether it holds the database (dmtq.db3).
+    The tar module alone stops at the tar's own end and never reads the gzip stream's check after it: with more than
+    STORE_ONLY_FROM of added songs an archive is stored uncompressed, and a changed byte of the database went live. into:
+    a folder the database and the added songs (restorable()) are unpacked into on the way, in the same read. Raises
+    ChangedArchive for an archive whose check fails or that ends short, and tarfile.ReadError for a file that is no
+    gzip stream of a tar at all."""
+    has_db = False
+    with open(path, "rb") as raw:
+        # Every gzip stream starts with these two bytes: a file without them is no backup, not a changed one.
+        if raw.read(2) != b"\x1f\x8b":
+            raise tarfile.ReadError("not a gzip stream")
+        raw.seek(0)
+        # Whether it began as an archive: tar reads ten kilobytes at a time, and one cut short in its first ones fails
+        # before tar sees a header at all.
+        began = tar_begins(raw)
+        raw.seek(0)
+        not_tar = None
+        try:
+            with gzip.GzipFile(fileobj=raw, mode="rb") as stream:
+                try:
+                    # In the order the members come, as a stream: nothing is read twice.
+                    with tarfile.open(fileobj=stream, mode="r|") as tar:
+                        for member in tar:
+                            has_db = has_db or (member.name == "dmtq.db3" and member.isfile())
+                            if into is not None and restorable(member):
+                                tar.extract(member, into, **EXTRACT)
+                except tarfile.ReadError as e:
+                    # No tar in a whole gzip stream, or one whose header a changed byte broke: the stream's check says
+                    # which, once it is read to its end below.
+                    not_tar = e
+                # What tar did not read: the padding after its end, and the gzip stream's own end with its check.
+                while stream.read(READ_PIECE):
+                    pass
+        except (gzip.BadGzipFile, EOFError, zlib.error) as e:
+            # A stream that began as an archive, or whose header a changed byte spoiled, is a backup changed or cut short
+            # after it was made; one with no archive in it at all (a few stray bytes after the two that start every gzip
+            # stream) is none.
+            if began or not_tar is not None:
+                raise ChangedArchive(str(e)) from e
+            raise tarfile.ReadError(str(e)) from e
+    if not_tar is not None:
+        raise not_tar
+    return has_db
 
 
 def make_backup(reason, protect=None):
@@ -436,10 +517,15 @@ def upload(storage):
         os.makedirs(core.BACKUPS, exist_ok=True)
         with private_file(path) as out:
             storage.save(out)
+        # Read whole before it joins the list: one whose bytes changed on the way is refused here, not restored later.
         try:
-            with tarfile.open(path) as archive:
-                archive.getmember("dmtq.db3")
-        except (tarfile.TarError, KeyError, EOFError):
+            has_db = read_whole(path)
+        except ChangedArchive:
+            os.remove(path)
+            raise Refused(422, "backup_changed", t("bak.not_whole"))
+        except (tarfile.TarError, EOFError):
+            has_db = False
+        if not has_db:
             os.remove(path)
             raise Refused(422, "not_backup", t("bak.not_backup"))
     except OSError as e:
@@ -576,17 +662,14 @@ def restore_backup(name, path):
         return [("bad", t("bak.not_restored", detail=why(e)))], False
     with work as tmp:
         try:
-            with tarfile.open(path) as tar:
-                member = next((m for m in tar.getmembers() if m.name == "dmtq.db3" and m.isfile()), None)
-                if not member:
-                    raise ValueError(tp("bak.no_db"))
-                tar.extract(member, tmp)
-                # Added songs, if the backup has them: plain files and folders under custom/ only.
-                extra = [m for m in tar.getmembers() if (m.name == "custom" or m.name.startswith("custom/")) and ".." not in m.name
-                         and (m.isfile() or m.isdir())]
-                tar.extractall(tmp, members=extra)
+            # The database and the added songs (if the backup has them), read to the archive's end: one whose bytes
+            # changed after it was made is refused before anything of the live server changes.
+            if not read_whole(path, into=tmp):
+                raise ValueError(tp("bak.no_db"))
             restored = os.path.join(tmp, "dmtq.db3")
             check_restorable(restored)
+        except ChangedArchive:
+            return [("bad", t("bak.not_restored", detail=tp("bak.changed")))], False
         except ValueError as e:
             return [("bad", t("bak.not_restored", detail=str(e)))], False
         except sqlite3.DatabaseError:
