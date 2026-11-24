@@ -481,6 +481,18 @@ class OneWordingTest(unittest.TestCase):
                         "in Downloads and on the Desktop, and on Windows"):
                 self.assertNotIn(old, text, os.path.relpath(path, ROOT))
 
+    def test_the_account_transfer_is_told_in_the_games_own_words(self):
+        # DEP-139: the game's OPTION shows the player's TRANSFER CODE, and the arrow beside it opens the transfer code's
+        # input on the other device, which takes it with Select and starts the game again as that player (under Wine,
+        # GAME-148's run). The phone's and the PC's guides say so (main named two buttons the game has not).
+        for page in ("play.md", "windows-player.md"):
+            with open(os.path.join(ROOT, "docs", page), encoding="utf-8") as f:
+                text = " ".join(f.read().split())
+            self.assertIn("**OPTION** shows its **TRANSFER CODE**", text, page)
+            self.assertIn("the arrow beside the code opens the transfer code's input, which takes it with **Select**", text, page)
+            for gone in ("CONNECT ACCOUNT", "RESTORE DATA"):
+                self.assertNotIn(gone, text, page)
+
 
 class OriginalNamesTest(unittest.TestCase):
     """DEP-130: the README and the guides, their figures among them, name none of the game's own: its original hosts,

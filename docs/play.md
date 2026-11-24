@@ -102,8 +102,9 @@ that score), and beside a total says how many such scores it counts; the ranking
 - **New songs** reach the game at its next start, which downloads what changed.
 - **Other servers' apps**, and the original game, stay installed next to this one: each is an app of its own.
 - **Another phone, or a PC:** each device is a player of its own on the server. The game's account transfer carries a
-  player and its records over: on the device that has the player, **OPTION**, **CONNECT ACCOUNT** shows a code; on the
-  other, **OPTION**, **RESTORE DATA** takes it.
+  player and its records over: on the device that has the player, **OPTION** shows its **TRANSFER CODE**; on the other,
+  **OPTION**, the arrow beside the code opens the transfer code's input, which takes it with **Select**, and the game
+  starts again as that player.
 - **Uninstalling the app** deletes the game's data on the phone; a new install downloads it again.
 
 ## My page
