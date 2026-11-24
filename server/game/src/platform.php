@@ -9,6 +9,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/signin.php';
 require_once __DIR__ . '/account.php';
+require_once __DIR__ . '/device.php';
 
 /* The SDK's plain success. */
 const OPENDMTQ_API_OK = ['value' => true, 'result_code' => '000', 'result_msg' => 'API_OK'];
@@ -95,6 +96,8 @@ function odq_platform_login(string $body, bool $old): void
         // The token this login hands out, noted with the account: the game's login takes no other (signin.php).
         $token = "$puid|576|IPHONE|KR|$random|$t";
         odq_sign_in_note($db, $puid, $token);
+        // The kind of device it signs in from, for the owner's Accounts page (device.php).
+        odq_device_note($db, $puid, (string)($_SERVER['HTTP_USER_AGENT'] ?? ''));
         if (!@$db->exec('COMMIT')) {
             throw new RuntimeException($db->lastErrorMsg());
         }

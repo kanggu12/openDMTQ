@@ -92,4 +92,13 @@ foreach ([['player_game:max', 'W: 999,999 → 2,000', 999999, 2000], ['player_ga
                          'who' => 'admin', 'player' => 6, 'before' => $before, 'after' => $after], JSON_UNESCAPED_UNICODE) . "\n";
 }
 file_put_contents('/data/changes.log', $log, FILE_APPEND);
+// The kind of device each signs in from, as the platform's login notes it (src/device.php): the two who play with the
+// keyboard on the PC client, the rest on phones, and the one with no plays never signed in since it came (no kind): the
+// Accounts page's lists name each with it.
+$db->exec('CREATE TABLE IF NOT EXISTS PlayerDevice (puid TEXT PRIMARY KEY, kind TEXT NOT NULL, at INTEGER NOT NULL)');
+foreach (array_keys($players) as $i) {
+    if ($i + 1 !== 10) {
+        $db->exec("INSERT OR REPLACE INTO PlayerDevice (puid, kind, at) VALUES ('puid-" . ($i + 1) . "', '" . (in_array($i + 1, [2, 3], true) ? 'pc' : 'android') . "', $now)");
+    }
+}
 echo 'seed: ' . count($players) . ' players, ' . $db->querySingle('SELECT COUNT(*) FROM PlayLog') . " plays\n";

@@ -6,8 +6,8 @@
 # Usage: tests/game/protocol.sh        (PORT, default 18701; KEEP=1 leaves the server up; NO_BUILD=1 uses the image
 #                                       already tagged opendmtq-server:TAG)
 # Also runs tests/game/lock.php, tests/game/names.php, tests/game/keys.php, tests/game/state.php, tests/game/trust.php,
-# tests/game/moved.php, tests/game/claim.php and tests/game/signin.php on the same database, and fails on any PHP warning
-# in the server's log.
+# tests/game/moved.php, tests/game/claim.php, tests/game/signin.php and tests/game/device.php on the same database, and
+# fails on any PHP warning in the server's log.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -98,6 +98,9 @@ docker exec -i "$NAME" php -- /data/dmtq.db3 http://127.0.0.1:8080 < "$ROOT/test
 # account switched off, inside the running server, on its database and state folder. After the other sign-ins: its tries
 # count toward the limit on one address's failures.
 docker exec -i "$NAME" php -- /data/dmtq.db3 http://127.0.0.1:8080 < "$ROOT/tests/game/signin.php" || failed=1
+# The kind of device an account signs in from, as the platform's login notes it for the owner's Accounts page
+# (tests/game/device.php).
+docker exec -i "$NAME" php -- /data/dmtq.db3 http://127.0.0.1:8080 < "$ROOT/tests/game/device.php" || failed=1
 # The monthly rankings read the play log from one index alone (PlayLog_board, setup-db.php), never the table once per
 # play: the plan SQLite makes of the statement the server runs (odq_month_board_sql()), for TOTAL and a line's tab, on
 # the server's own database.

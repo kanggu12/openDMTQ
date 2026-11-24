@@ -2935,7 +2935,16 @@ The accounts.
 
 - `items` (list of [Account](#account)): Every account, by ID.
 - `owner` (string): The owner's ID (ADMIN_USER in .env), which is no account of the list.
-- `players` (list of [PlayerChoice](#playerchoice)): The game's players an account can be linked to.
+- `players` (list of [AccountPlayer](#accountplayer)): The game's players an account can be linked to.
+
+#### AccountPlayer
+
+A game player to link an account to, as the Accounts page's lists show them.
+
+- `id` (integer): Their number.
+- `name` (string): Their name, with the number when two share it.
+- `device` (string, or null): The kind of device they last signed in from: pc (the PC client) or android.
+- `last_play` (integer, or null): When they last played (Unix time).
 
 #### PlayerChoice
 

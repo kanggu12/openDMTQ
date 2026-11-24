@@ -995,10 +995,14 @@ def with_password(name, password):
 
 @handler
 def accounts_list(args):
-    """GET /accounts: the Accounts page's list, with the players an account can be linked to."""
+    """GET /accounts: the Accounts page's list, with the players an account can be linked to, each with the kind of device
+    it signs in from and its last play, as the page's lists show them."""
     rows, choices = account_rows()
+    with db() as con:
+        details = accounts.player_details(con)
     return {"items": [account_view(r, choices) for r in rows], "owner": core.ADMIN_USER,
-            "players": [{"id": guid, "name": name} for guid, name in choices]}
+            "players": [{"id": guid, "name": name, "device": details.get(guid, (None, None))[0], "last_play": details.get(guid, (None, None))[1]}
+                        for guid, name in choices]}
 
 
 @handler

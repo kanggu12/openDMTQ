@@ -461,9 +461,31 @@ function fillChoices(root) {
     select.replaceChildren(list.content.cloneNode(true));
     select.value = kept;
     if (select.selectedIndex < 0) select.selectedIndex = 0;
+    shortChoice(select);
   }
 }
+// The Accounts page's lists of players (data-details): while one is chosen from, each player with their kind of device and
+// their last play (data-long), so that the many NewUser can be told apart; at rest the one chosen by their name alone
+// (data-name), which the list's box has room for. Opened by a press or the keyboard's keys that open a list; at rest again
+// once a player is chosen or the list is left.
+function shortChoice(select) {
+  if (select.dataset.details === undefined) return;
+  for (const o of select.options) if (o.dataset.long) o.textContent = o.selected ? o.dataset.name : o.dataset.long;
+}
+function longChoice(select) {
+  for (const o of select.options) if (o.dataset.long) o.textContent = o.dataset.long;
+}
+(() => {
+  const list = e => e.target.closest && e.target.closest('select[data-details]');
+  document.addEventListener('pointerdown', e => { const s = list(e); if (s) longChoice(s); }, true);
+  document.addEventListener('keydown', e => {
+    const s = list(e);
+    if (s && (e.key === ' ' || e.key === 'Enter' || e.key === 'F4' || (e.altKey && /^Arrow(Down|Up)$/.test(e.key)))) longChoice(s);
+  }, true);
+  for (const type of ['change', 'focusout']) document.addEventListener(type, e => { const s = list(e); if (s) shortChoice(s); }, true);
+})();
 fillChoices(document);
+for (const select of document.querySelectorAll('select[data-details]:not([data-choice])')) shortChoice(select);
 
 // A button with data-copy copies what the element it names holds. Over plain HTTP the browser only has the older way.
 document.addEventListener('click', async e => {

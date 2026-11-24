@@ -43,8 +43,9 @@
     <div class="field"><label for="acc-password">{{ t('acc.password') }}</label><span class="slot pw"><input class="input" id="acc-password" name="password" type="password" minlength="6" maxlength="64" autocomplete="new-password" placeholder="{{ t('acc.password_hint') }}" data-bad="{{ tp('acc.bad_password') }}"><button type="button" class="pw-toggle" aria-controls="acc-password" aria-label="{{ t('login.show_password') }}" data-show="{{ t('login.show') }}" data-hide="{{ t('login.hide') }}" data-show-label="{{ t('login.show_password') }}" data-hide-label="{{ t('login.hide_password') }}" hidden>{{ t('login.show') }}</button></span></div>
     <div class="field"><label for="acc-password2">{{ t('acc.password2') }}</label><span class="slot pw"><input class="input" id="acc-password2" name="password2" type="password" data-same="password" data-same-bad="{{ tp('acc.mismatch') }}" minlength="6" maxlength="64" autocomplete="new-password" data-bad="{{ tp('acc.bad_password') }}"><button type="button" class="pw-toggle" aria-controls="acc-password2" aria-label="{{ t('login.show_password') }}" data-show="{{ t('login.show') }}" data-hide="{{ t('login.hide') }}" data-show-label="{{ t('login.show_password') }}" data-hide-label="{{ t('login.hide_password') }}" hidden>{{ t('login.show') }}</button></span></div>
     <label class="field">{{ t('acc.note') }} <input class="input" name="note" maxlength="40" placeholder="{{ t('acc.note_hint') }}"></label>
-    {# The game player the account is, when known: the site then shows their own name and marks their rows. #}
-    <label class="field">{{ t('acc.player') }} <select class="input" name="player"><option value="">{{ t('acc.player_none') }}</option>{% for id, name in players %}<option value="{{ id }}">{{ name }}</option>{% endfor %}</select></label>
+    {# The game player the account is, when known: the site then shows their own name and marks their rows. Each named with
+       their device and their last play while the list is chosen from (data-long, admin.js), by the name at rest. #}
+    <label class="field">{{ t('acc.player') }} <select class="input" name="player" data-details><option value="">{{ t('acc.player_none') }}</option>{% for p in players %}<option value="{{ p.id }}" data-name="{{ p.name }}" data-long="{{ p.line }}">{{ p.name }}</option>{% endfor %}</select></label>
     {# The rights and the button together, in the last place of the grid. #}
     <div class="account-go"><label class="check"><input type="checkbox" name="admin" value="1"> {{ t('acc.admin') }}</label>
     <button class="btn btn-primary">{{ t('acc.create') }}</button></div>
@@ -57,8 +58,7 @@
   {% else %}
   {# Every player to link an account to, once on the page: admin.js puts this list into each row's choice (data-choice),
      which the page sends with only the player it is now. Repeated in every row, it grew as accounts times players. #}
-  <template id="player-choice"><option value="">{{ t('acc.player_none') }}</option>{% for id, name in players %}<option value="{{ id }}">{{ name }}</option>{% endfor %}</template>
-  {% set names = dict(players) %}
+  <template id="player-choice"><option value="">{{ t('acc.player_none') }}</option>{% for p in players %}<option value="{{ p.id }}" data-name="{{ p.name }}" data-long="{{ p.line }}">{{ p.name }}</option>{% endfor %}</template>
   <div class="table-scroll"><table class="data accounts">
     <thead><tr><th>{{ t('acc.id') }}</th><th>{{ t('acc.player') }}</th><th>{{ t('acc.th_rights') }}</th><th>{{ t('acc.th_last') }}</th><th>{{ t('acc.th_state') }}</th><th></th></tr></thead>
     <tbody>
@@ -70,7 +70,7 @@
         <td class="primary"><span class="account-id" data-tip="{{ t('acc.made_on', when=a.created_at|rec_date) }}" tabindex="0">{{ a.name }}</span>{% if a.note %}<span class="runtime">{{ a.note }}</span>{% endif %}</td>
         {# The player it is, changed here at any time: the list comes from the template above. One that is no player now
            (deleted since) reads as none, as before. #}
-        <td data-label="{{ t('acc.player') }}" class="account-player"><form method="post" class="account-link" data-inplace><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="link"><input type="hidden" name="name" value="{{ a.name }}"><select class="input" name="player" data-choice="player-choice" aria-label="{{ t('acc.player') }}: {{ a.name }}">{% if a.guid in names %}<option value="{{ a.guid }}" selected>{{ names[a.guid] }}</option>{% else %}<option value="" selected>{{ t('acc.player_none') }}</option>{% endif %}</select><button class="btn btn-sm">{{ t('acc.link') }}</button></form></td>
+        <td data-label="{{ t('acc.player') }}" class="account-player"><form method="post" class="account-link" data-inplace><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="link"><input type="hidden" name="name" value="{{ a.name }}"><select class="input" name="player" data-choice="player-choice" data-details aria-label="{{ t('acc.player') }}: {{ a.name }}">{% if a.guid in names %}<option value="{{ a.guid }}" selected>{{ names[a.guid] }}</option>{% else %}<option value="" selected>{{ t('acc.player_none') }}</option>{% endif %}</select><button class="btn btn-sm">{{ t('acc.link') }}</button></form></td>
         <td data-label="{{ t('acc.th_rights') }}" class="account-rights">{{ t('acc.rights_admin') if a.admin else t('acc.rights_site') }}</td>
         <td data-label="{{ t('acc.th_last') }}" class="date">{% if a.signed_in_at %}<span data-tip="{{ a.signed_in_at|rec_date }}" tabindex="0">{{ a.last }}</span>{% else %}{{ t('acc.never') }}{% endif %}</td>
         <td data-label="{{ t('acc.th_state') }}"><span class="account-state"><span class="lamp {{ 'off' if a.off else 'on' }}"></span>{{ t('acc.state_off') if a.off else t('acc.state_on') }}</span></td>

@@ -3209,6 +3209,37 @@ class AccountLinkTest(unittest.TestCase):
             page = inst.client.get("/opendmtq/admin/accounts").get_data(as_text=True)
             self.assertNotIn('<option value="7" selected>', page)
 
+    def test_the_lists_name_each_player_with_their_device_and_last_play(self):
+        # Every new player is NewUser: the lists an account is linked from (the form's, each row's, the API's) carry each
+        # player's kind of device, as the platform's login noted it last (PlayerDevice, server/game/src/device.php), and
+        # their last play (ADM-254).
+        with Install() as inst:
+            self.server(inst)
+            now = int(time.time())
+            with sqlite3.connect(admin.core.DB) as con:
+                con.execute("UPDATE Member SET puid = CAST(id AS TEXT)")
+                con.execute("CREATE TABLE PlayerDevice (puid TEXT PRIMARY KEY, kind TEXT NOT NULL, at INTEGER NOT NULL)")
+                # Sena on a phone, then on the PC client: the newest login's kind. Twin (9) on a phone, never played.
+                con.executemany("INSERT INTO PlayerDevice VALUES (?, ?, ?)", [("7", "android", now - 7200), ("9", "android", now - 50)])
+                con.execute("INSERT OR REPLACE INTO PlayerDevice VALUES ('7', 'pc', ?)", (now - 60,))
+                con.execute("CREATE TABLE PlayLog (id INTEGER PRIMARY KEY, user_id INTEGER, pattern_id INTEGER, score INTEGER, grade TEXT, "
+                            "judgement INTEGER, is_record INTEGER, played_at INTEGER)")
+                con.executemany("INSERT INTO PlayLog (user_id, pattern_id, score, grade, judgement, is_record, played_at) VALUES (7, 1, 1, 'A', 900, 1, ?)",
+                                [(now - 3 * 86400,), (now - 3 * 3600,)])
+            page = inst.client.get("/opendmtq/admin/accounts").get_data(as_text=True)
+            self.assertIn('<option value="7" data-name="Sena" data-long="Sena · PC · last played 3 h ago">Sena</option>', page)
+            self.assertIn('<option value="9" data-name="Twin (9)" data-long="Twin (9) · Android · no plays yet">Twin (9)</option>', page)
+            self.assertIn('<option value="10" data-name="Twin (10)" data-long="Twin (10) · no plays yet">Twin (10)</option>', page)
+            inst.client.set_cookie("opendmtq_lang", "ko")
+            page = inst.client.get("/opendmtq/admin/accounts").get_data(as_text=True)
+            self.assertIn('data-long="Sena · PC · 최근 플레이 3시간 전"', page)
+            self.assertIn('data-long="Twin (9) · Android · 플레이 기록 없음"', page)
+            # The API's list (GET /accounts), as its route answers it.
+            with admin.app.test_request_context():
+                listed = {p["id"]: p for p in admin.api.accounts_list({})["players"]}
+            self.assertEqual((listed[7]["device"], listed[7]["last_play"], listed[9]["device"], listed[9]["last_play"], listed[10]["device"]),
+                             ("pc", now - 3 * 3600, "android", None, None))
+
     def test_a_player_there_is_not_is_refused(self):
         with Install() as inst:
             self.server(inst)

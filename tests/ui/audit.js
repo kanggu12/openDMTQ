@@ -774,6 +774,39 @@ async function serverForms(contexts) {
   }
 }
 
+// The Accounts page's lists of players to link an account to (seed.php notes each player's kind of device as the platform's
+// login does), on a laptop and a phone: while the form's list is opened, each player named with their device and their
+// last play, a player with neither said so; at rest each list shows the name alone, as its box has room for. Before: names
+// alone, every new player a NewUser like the others.
+async function playerLists(contexts) {
+  for (const [width, height] of [[1280, 800], [360, 740]]) {
+    const page = await contexts.signed.newPage();
+    await page.setViewport({ width, height, ...(width < 700 ? { isMobile: true, hasTouch: true } : {}) });
+    await page.setCookie({ name: 'opendmtq_lang', value: 'en', url: A });
+    await page.goto(`${A}/accounts`, { waitUntil: 'domcontentloaded' });
+    const list = '.account-form select[name=player]';
+    const texts = () => page.$$eval(`${list} option`, os => os.map(o => o.textContent));
+    // What the list's box shows at rest: the player chosen (none yet), by the name alone.
+    const atRest = await page.$eval(list, s => s.selectedOptions[0].textContent);
+    await page.$eval(list, s => s.scrollIntoView({ block: 'center' }));
+    const box = await (await page.$(list)).boundingBox();
+    // A press on it, as a list is opened (the browser's own list then shows these words).
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    const open = await texts();
+    await page.mouse.up();
+    await page.keyboard.press('Escape');
+    await page.$eval(list, s => s.blur());
+    const after = await page.$eval(list, s => s.selectedOptions[0].textContent);
+    const rows = await page.$$eval('table.accounts select[name=player]', ss => ss.map(s => s.selectedOptions[0].textContent));
+    check(`the Accounts page's lists name each player with their device and last play while chosen from, by the name at rest (${width}px)`,
+      open.some(t => /^민호 · PC · last played /.test(t)) && open.some(t => /^Sena · Android · last played /.test(t)) && open.includes('NoPlaysYet · no plays yet')
+      && atRest === 'Not linked' && after === 'Not linked' && rows.length > 0 && rows.every(t => !t.includes(' · ')),
+      JSON.stringify({ open: open.slice(0, 4), atRest, after, rows }));
+    await page.close();
+  }
+}
+
 // The setup's list of what it found on the server PC (run.sh puts them in the owner's home): the folder of the game's
 // files with no songs in it is named the client data folder, as the look at it says, and its row asks nothing about songs;
 // an archive that cannot be read leaves its row with no Import to press and no choice of songs once the look says so.
@@ -1285,7 +1318,7 @@ async function textLinks(contexts) {
       await page.close();
     }
   }
-  check('a link in a sentence has the colour of its words, the section\'s colour left to the main button', misses.length === 0, misses.slice(0, 8).join(' ; '));
+  check("a link in a sentence has the colour of its words, the section's colour left to the main button", misses.length === 0, misses.slice(0, 8).join(' ; '));
 }
 
 // P1: nothing said only under a mouse pointer. No title anywhere on the pages (a title shows to a mouse alone: a finger and
@@ -3387,6 +3420,7 @@ async function myPage(contexts) {
     await gameFlows(contexts);
     await adminFlows(contexts);
     await rowMore(contexts);
+    await playerLists(contexts);
     await serverForms(contexts);
     await setupFound(contexts);
     await webhookFlows(contexts);

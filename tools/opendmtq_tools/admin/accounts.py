@@ -69,6 +69,42 @@ def show_once(name, password, note, word):
     return redirect(url_for("accounts_page"))
 
 
+def player_details(con):
+    """Each game player's kind of device and last play, for the lists an account is linked from (the page's and the API's):
+    {guid: (kind or None, last play or None)}. Every new player is NewUser: these tell them apart. The kind is the one
+    the platform's login noted last for any of the player's devices (PlayerDevice, server/game/src/device.php), "pc" or
+    "android"; nothing of a table the database does not have yet (no login since it came, no plays)."""
+    last, kinds = {}, {}
+    try:
+        last = {guid: at for guid, at in con.execute("SELECT user_id, MAX(played_at) FROM PlayLog GROUP BY user_id")}
+    except sqlite3.OperationalError:
+        pass
+    try:
+        # The oldest first: the newest login's kind is the one kept for a player of several devices.
+        for guid, kind in con.execute("SELECT CAST(m.guid AS INTEGER), d.kind FROM PlayerDevice d JOIN Member m ON m.puid = d.puid "
+                                      "WHERE m.guid IS NOT NULL ORDER BY d.at"):
+            kinds[guid] = kind
+    except sqlite3.OperationalError:
+        pass
+    return {guid: (kinds.get(guid), last.get(guid)) for guid in set(kinds) | set(last)}
+
+
+# The words for each kind of device a player's line names.
+DEVICE_WORDS = {"pc": "acc.device_pc", "android": "acc.device_android"}
+
+
+def player_lines(players, details):
+    """The Accounts page's players to link an account to: their number, their name, and the line their list shows while it
+    is chosen from, the name with the kind of device and the last play beside it (Sena · Android · last played 3 h ago)."""
+    out = []
+    for guid, name in players:
+        kind, last = details.get(guid, (None, None))
+        parts = [name] + ([t(DEVICE_WORDS[kind])] if kind in DEVICE_WORDS else [])
+        parts.append(t("acc.played", ago=ago(last)) if last else t("acc.not_played"))
+        out.append({"id": guid, "name": name, "line": " · ".join(parts)})
+    return out
+
+
 @app.route(BASE + "/accounts", methods=["GET", "POST"])
 def accounts_page():
     """The site's accounts: made here and nowhere else, each with its ID and password, some with admin rights."""
@@ -81,8 +117,8 @@ def accounts_page():
     try:
         with db() as con:
             auth.account_table(con)
-            # The game's players, to link an account to the one it is.
-            players = auth.game_players(con)
+            # The game's players, to link an account to the one it is, each with their device and their last play.
+            players = player_lines(auth.game_players(con), player_details(con))
             # When each last signed in, as long ago as that was; the moment itself under the pointer.
             # The setup's note in the reader's language.
             rows = [dict(r, last=ago(r["signed_in_at"]) if r["signed_in_at"] else "", note=note_words(r["note"]))
@@ -92,8 +128,9 @@ def accounts_page():
     except sqlite3.Error:
         broken = True
     message = apps.invite_text(apps.friends_address(core.server_health()), shown["name"], shown["password"]) if shown else ""
+    # Each player's name by their number, for the player a row is linked to now.
     return render_template("accounts.html", accounts=rows, broken=broken, shown=shown, message=message, owner=core.ADMIN_USER, players=players,
-                           tokens=listed_tokens, shown_token=shown_token, scopes=tokens.SCOPES)
+                           names={p["id"]: p["name"] for p in players}, tokens=listed_tokens, shown_token=shown_token, scopes=tokens.SCOPES)
 
 
 def accounts_action():

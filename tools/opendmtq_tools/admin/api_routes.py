@@ -506,7 +506,11 @@ SHAPES = {
     "AccountList": Shape("The accounts.", [
         Field("items", "[Account]", "Every account, by ID."),
         Field("owner", "string", "The owner's ID (ADMIN_USER in .env), which is no account of the list."),
-        Field("players", "[PlayerChoice]", "The game's players an account can be linked to.")]),
+        Field("players", "[AccountPlayer]", "The game's players an account can be linked to.")]),
+    "AccountPlayer": Shape("A game player to link an account to, as the Accounts page's lists show them.", [
+        Field("id", "integer", "Their number."), Field("name", "string", "Their name, with the number when two share it."),
+        Field("device", "string", "The kind of device they last signed in from: pc (the PC client) or android.", nullable=True),
+        Field("last_play", "integer", "When they last played (Unix time).", nullable=True)]),
     "PlayerChoice": Shape("A game player to link to.", [Field("id", "integer", "Their number."), Field("name", "string", "Their name, with the number when two share it.")]),
     "AccountAnswer": Shape("An account.", [Field("account", "Account", "The account.")]),
     "AccountPassword": Shape("An account with its password, shown this once.", [
