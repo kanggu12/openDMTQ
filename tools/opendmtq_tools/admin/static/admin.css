@@ -23,7 +23,9 @@ body[data-section="admin"] { --gap: 14px; }
   .nav.pages { order: 3; flex: 0 0 100%; min-height: 42px; margin-inline: -8px; }
   .nav.pages > a.on::after { inset: auto 6px 0; }
 }
-@media (max-width: 720px) and (orientation: portrait) {
+/* Held either way: on its side the one row of pages ran past the screen's edge below 620 px (Logs out of view, with no
+   sign there was more), so it is laid out as upright, in even rows that keep every page in view. */
+@media (max-width: 720px) {
   /* The public site's menu at the thumb has four places; the console's ten pages stay on the bar, in three even rows so
      that none is out of view or alone on a row, and the bar goes away with the page so that it does not take a third of
      the screen. */
@@ -42,6 +44,11 @@ body[data-section="admin"] { --gap: 14px; }
   .bar:has(.nav.pages) .said-stack { position: fixed; z-index: 6; top: auto; bottom: 0; box-shadow: 0 -12px 26px -12px rgba(0, 0, 0, 0.8); }
   /* The last message clear of a phone's home bar, as the page's own foot is. */
   .bar:has(.nav.pages) .said-stack > .flash.float:last-child { padding-bottom: calc(11px + env(safe-area-inset-bottom)); }
+}
+/* On its side there is width for five a row: the ten pages in two even rows, the lower one under the wordmark's row. */
+@media (max-width: 720px) and (orientation: landscape) {
+  .bar .nav.pages { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .bar .nav.pages > a:nth-child(4n+1):nth-last-child(2), .bar .nav.pages > a:nth-child(4n+2):nth-last-child(1) { grid-column: auto; }
 }
 
 /* A message about what just happened. */

@@ -284,8 +284,10 @@ img { max-width: 100%; }
 
 /* Phones and tablets held upright (up to 900 px): the sections go to a bar at the thumb, and the top keeps the wordmark
    and the keys; the five sections, the languages, the profile and Sign out do not fit across one row below that. A
-   screen on its side keeps them in the top bar, as the bottom one would cover what little height there is, with the
-   sections in a smaller face up to 1000 px so that they fit there. (The admin pages keep their own menu: .nav.pages.) */
+   screen on its side keeps them in the top bar from 760 px, with the sections in a smaller face up to 1000 px so that
+   they fit there; narrower on its side (a phone on its side, a laptop at 200 %) they go to the thumb as well: in the top
+   row the last of them ran under the language keys (SONGS under KOR at 640 px with LIVE on, a press on it switching the
+   language). (The admin pages keep their own menu: .nav.pages.) */
 .tabbar { display: none; }
 @media (max-width: 900px) { .state { font-size: 0; gap: 0; } }
 @media (max-width: 1000px) { .nav > a { padding: 0 8px; font-size: var(--t-xs); } }
@@ -296,7 +298,8 @@ img { max-width: 100%; }
   .logo { --mark: 22px; }
 }
 @media (max-width: 720px) { .bar-in { min-height: 52px; } }
-@media (max-width: 900px) and (orientation: portrait) {
+/* Upright up to 900 px; any way round below 760 px (the sideways screens whose top row cannot hold the sections). */
+@media (max-width: 900px) and (orientation: portrait), (max-width: 759px) {
   .bar .nav:not(.pages) { display: none; }
   .tabbar {
     position: fixed;
@@ -1704,6 +1707,11 @@ a.auth-who:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; 
   .live-stage { width: min(100%, calc(100svh * var(--ar))); }
   /* The picture takes the whole height: the bar goes with the page, not over the picture's LIVE mark. */
   body[data-section="live"] .bar { position: static; }
+}
+/* Narrower than 760 px the sections are at the thumb (above): the picture takes the height above that bar (its 54 px keys
+   and the line along its top), and brought into view (live.js) it stands right above it, its controls clear of the bar. */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 759px) {
+  .live-stage { width: min(100%, calc((100svh - 55px - env(safe-area-inset-bottom)) * var(--ar))); scroll-margin-bottom: calc(55px + env(safe-area-inset-bottom)); }
 }
 
 /* The licenses page: three columns of words, and a license's own text folded away. */

@@ -418,6 +418,67 @@ async function noAppYet(contexts) {
   await page.close();
 }
 
+// The bars on screens held sideways, from a phone on its side to a laptop at 200 % (600 to 1000 px wide, 360 and 400
+// tall), in both languages, with LIVE and its count in the site's menu (the widest it gets): the site's sections either
+// all in the top row, each one's words 8 px or more clear of the keys at its end and its middle its own to press, or all at
+// the thumb, each pressed where it is; the admin pages' ten pages all in view, none past the row's edge. Before: from 600
+// to 700 px the site's last section ran under the language keys (a press on SONGS switched the language), and below 620
+// px the admin pages' Logs lay past the screen's edge with no sign there was more. One page each, its window resized.
+async function barsSideways(contexts) {
+  const misses = [];
+  let views = 0;
+  for (const lang of ['en', 'ko']) {
+    for (const url of [`${P}/ranking.php`, `${A}/players`]) {
+      const page = await contexts.signed.newPage();
+      await page.setViewport({ width: 1000, height: 400 });
+      await page.setCookie({ name: 'opendmtq_lang', value: lang, url });
+      await page.goto(url, { waitUntil: 'networkidle2' });
+      for (let width = 600; width <= 1000; width += 20) {
+        for (const height of [360, 400]) {
+          await page.setViewport({ width, height });
+          views++;
+          const miss = await page.evaluate(() => {
+            const shown = el => !!el && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0;
+            const words = a => { const r = document.createRange(); r.selectNodeContents(a); return [...r.getClientRects()].filter(x => x.width > 0.5); };
+            const own = a => { const b = a.getBoundingClientRect(); const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return hit && a.contains(hit) ? '' : `${a.textContent.trim()} is under ${hit ? hit.tagName.toLowerCase() + (typeof hit.className === 'string' && hit.className ? '.' + hit.className.split(' ')[0] : '') : 'nothing'}`; };
+            if (document.documentElement.scrollWidth > innerWidth) return `the page is ${document.documentElement.scrollWidth} px wide`;
+            const pages = document.querySelector('.bar .nav.pages');
+            if (pages) {
+              // The admin pages: every page whole inside the row (and the window), nothing reached only by scrolling it.
+              const row = pages.getBoundingClientRect();
+              for (const a of pages.querySelectorAll('a')) {
+                const b = a.getBoundingClientRect();
+                if (b.left < Math.max(0, row.left) - 1 || b.right > Math.min(innerWidth, row.right) + 1) return `${a.textContent.trim()} at ${Math.round(b.left)}..${Math.round(b.right)}, past the row's edge (${Math.round(row.left)}..${Math.round(row.right)})`;
+              }
+              return '';
+            }
+            const nav = document.querySelector('.bar .nav'), tab = document.querySelector('.tabbar'), keys = document.querySelector('.bar-end');
+            if (!shown(nav)) {
+              if (!shown(tab)) return 'the sections are nowhere';
+              for (const a of tab.querySelectorAll('a')) { const o = own(a); if (o) return `at the thumb: ${o}`; }
+              return '';
+            }
+            const edge = keys.getBoundingClientRect().left;
+            for (const a of nav.querySelectorAll('a')) {
+              const right = Math.max(...words(a).map(r => r.right));
+              if (right > edge - 8) return `${a.textContent.trim().replace(/\s+/g, ' ')} ends at ${Math.round(right)}, the keys start at ${Math.round(edge)}`;
+              const o = own(a);
+              if (o) return o;
+            }
+            return '';
+          });
+          if (miss) misses.push(`${url.includes('/admin') ? 'admin' : 'site'} ${lang} ${width}x${height}: ${miss}`);
+        }
+      }
+      // What the views between were like, at the narrowest: a picture for people to look at.
+      await page.setViewport({ width: 640, height: 360 });
+      await page.screenshot({ path: path.join(OUT, 'shots', `sideways-${url.includes('/admin') ? 'admin' : 'site'}-${lang}-640x360.jpg`), type: 'jpeg', quality: 72 });
+      await page.close();
+    }
+  }
+  check(`on screens held sideways the bars keep every section whole, clear of the keys and its own to press (${views} views)`, misses.length === 0, misses.slice(0, 8).join(' ; '));
+}
+
 // The checker itself: one of each thing it looks for must be seen.
 async function self(contexts) {
   const page = await contexts.anon.newPage();
@@ -2829,6 +2890,8 @@ async function myPage(contexts) {
     check('the home page takes pictures of the broadcasts on the screen only, and not again for minutes',
       below && unseen === 0 && pictured && taken > 0 && pieces.length === taken, `${below} ${unseen} ${pictured} ${taken} ${pieces.length}`);
     await home.close();
+    // With LIVE's count in the menu, as wide as the site's bar gets.
+    await barsSideways(contexts);
     await sweep(contexts, AIR, FEW_WIDTHS);
   } else if (stage === 'maint') {
     // On, by the owner's own form; a long message, so that it has to wrap.
