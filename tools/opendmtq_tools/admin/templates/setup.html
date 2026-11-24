@@ -21,8 +21,9 @@
 {% endmacro %}
 
 {# The import form for one folder or file: its path, the songs or not, and the button. The choice only where the files
-   may hold both the client data and the song data: an app has no songs, the songs alone are nothing but songs. The
-   button plain: a list has one for each file and folder, and the step's one primary button is the way on (Next). #}
+   may hold both the client data and the song data: an app has no songs, the client data alone none either, the songs
+   alone are nothing but songs. The button plain: a list has one for each file and folder, and the step's one primary
+   button is the way on (Next). A row whose files are all of no use loses both once that is known (admin.js). #}
 {% macro import_form(path, label, choice=True) %}
 <form method="post" action="{{ url_for('setup_import') }}" class="setup-import">
   <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="path" value="{{ path }}">
@@ -70,7 +71,7 @@
             {% if f.songs_tree %}{% set songs_path %}<span class="setup-file">{{ f.songs_tree }}</span>{% endset %}<li><span class="setup-tree">{{ t('setup.found_tree_songs', path=songs_path) }}</span> {{ what(f.songs_tree) }}</li>{% endif %}
           </ul>
         </div>
-        {{ import_form(f.path, t('setup.import'), f.tree or f.archives) }}
+        {{ import_form(f.path, t('setup.import'), f.tree_kind == 'whole' or (f.tree and f.songs_tree) or f.archives) }}
       </li>
       {% endfor %}
     </ul>
@@ -107,7 +108,7 @@
       {% else %}
       <p class="empty">{{ t('setup.empty_folder') }}</p>
       {% endif %}
-      <div class="btn-line">{{ import_form(listing.path, t('setup.import_here'), listing.tree or not listing.songs_tree) }}</div>
+      <div class="btn-line">{{ import_form(listing.path, t('setup.import_here'), listing.tree_kind == 'whole' or (listing.tree and listing.songs_tree) or not (listing.tree or listing.songs_tree)) }}</div>
     </div>
     {% endif %}
   {% else %}

@@ -604,6 +604,34 @@ async function hallOfFame(contexts) {
   }
 }
 
+// The setup's list of what it found on the server PC (run.sh puts them in the owner's home): the folder of the game's
+// files with no songs in it is named the client data folder, as the look at it says, and its row asks nothing about songs;
+// an archive that cannot be read leaves its row with no Import to press and no choice of songs once the look says so.
+// Before: "Client data and song data folder" beside "client data alone: no song data", and "Import the songs too" ticked
+// on both rows, the second beside an archive nothing can be imported from.
+async function setupFound(contexts) {
+  const page = await contexts.signed.newPage();
+  await page.setViewport({ width: 1280, height: 900 });
+  await page.setCookie({ name: 'opendmtq_lang', value: 'en', url: A });
+  await page.goto(`${A}/setup?step=files`, { waitUntil: 'domcontentloaded' });
+  // Every file's look answered (admin.js asks two at a time).
+  const looked = await until(page, () => [...document.querySelectorAll('.setup-found [data-what]')].every(w => w.matches('.ok, .bad')), null, 30000);
+  const rows = await page.$$eval('.setup-found > li', all => all.map(li => ({
+    path: li.querySelector('.setup-path').textContent.trim(),
+    trees: [...li.querySelectorAll('.setup-tree')].map(t => t.textContent.trim().split(':')[0]),
+    songs: [...li.querySelectorAll('label.check')].filter(l => !l.hidden && l.getClientRects().length).length,
+    pressable: [...li.querySelectorAll('button')].filter(b => !b.disabled).length,
+    files: [...li.querySelectorAll('.setup-file')].map(f => f.textContent.trim()),
+  })));
+  const alone = rows.find(r => r.path.endsWith('/Downloads/DMTQ')) || {};
+  const archive = rows.find(r => r.files.some(f => f.startsWith('dmtq-files.rar'))) || {};
+  check('the setup names the folder it found by what it holds and offers its songs only where there may be some',
+    looked && alone.trees && alone.trees[0] === 'Client data folder' && alone.songs === 0 && alone.pressable === 1, JSON.stringify(alone));
+  check('an archive that cannot be read leaves its row with nothing to press and no choice of songs',
+    looked && archive.pressable === 0 && archive.songs === 0, JSON.stringify(archive));
+  await page.close();
+}
+
 // The checker itself: one of each thing it looks for must be seen.
 async function self(contexts) {
   const page = await contexts.anon.newPage();
@@ -3078,6 +3106,7 @@ async function myPage(contexts) {
     // have none of the items run.sh's stand-in catalog gives a player's page.
     await gameFlows(contexts);
     await adminFlows(contexts);
+    await setupFound(contexts);
     await webhookFlows(contexts);
     await repairSaid(contexts);
   } else if (stage === 'mine') {

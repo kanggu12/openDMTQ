@@ -410,11 +410,14 @@ def look_in(folder, listed=None):
 
 
 def tree_kind(tree):
-    """What a folder of the game's files holds, for its label: "whole", "game" (the client data alone) or "songs"."""
+    """What a folder of the game's files holds, for its label: "whole", "game" (the client data alone) or "songs". The
+    game host's folder is whole only with its songs' folder in it: without one it holds the client data alone, and was
+    named the client data and song data folder beside a look that found no song data in it."""
     if tree is None:
         return None
-    if importer.whole_host_folder(tree):
-        return "whole"
+    host = importer.whole_host_folder(tree)
+    if host:
+        return "whole" if importer.dmq_of(host) else "game"
     return "game" if importer.host_folder(tree) else "songs"
 
 

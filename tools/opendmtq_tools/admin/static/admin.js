@@ -834,9 +834,13 @@ document.addEventListener('click', e => {
       const j = await r.json();
       el.textContent = j.text;
       el.classList.add(j.ok ? 'ok' : 'bad');
-      // A file of no use here: its own import button goes (the import would find nothing in it).
-      const own = el.closest('li.file');
-      if (!j.ok && own) for (const b of own.querySelectorAll('button')) b.disabled = true;
+      // A file of no use here: its own import goes (the import would find nothing in it), and the choice of its songs
+      // with it, which would do nothing. In the list of what was found, a row goes once none of its files is of use.
+      const own = el.closest('li.file') || el.closest('.setup-found > li');
+      if (!j.ok && own && ![...own.querySelectorAll('[data-what]')].some(w => !w.classList.contains('bad'))) {
+        for (const b of own.querySelectorAll('button')) b.disabled = true;
+        for (const choice of own.querySelectorAll('.setup-import label.check')) choice.hidden = true;
+      }
     } catch (e) {
       el.textContent = '';
     }

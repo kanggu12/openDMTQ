@@ -363,6 +363,26 @@ class FilesOnThisPcTest(unittest.TestCase):
             self.assertEqual(setup.what_words(setup.what_is(inst.path("home/Downloads/DMTQ/songs"))),
                              "Song data alone: 1 song")
 
+    def test_a_found_folder_is_named_by_what_it_holds_and_offers_its_songs_only_with_some(self):
+        # The game host's folder with no songs' folder in it holds the client data alone: named so, as the look at it
+        # says, and its row asks nothing about songs; with its songs' folder it is both, and the row asks (ADM-245).
+        with HostInstall() as inst:
+            game_folder(inst.path("home/Downloads/DMTQ/dmtq"))
+            os.makedirs(inst.path("home/Documents/full/dmqglb.mb.pmang.com/patch/phone_new"))
+            os.makedirs(inst.path("home/Documents/full/dmqglb.mb.pmang.com/DMQ/Songs/1"))
+            inst.write("home/Documents/full/dmqglb.mb.pmang.com/DMQ/Songs/1/1.fpk", "m")
+            self.assertEqual(setup.look_in(inst.path("home/Downloads/DMTQ"))["tree_kind"], "game")
+            self.assertEqual(setup.look_in(inst.path("home/Documents"))["tree_kind"], "whole")
+            inst.sign_in()
+            page = inst.page(BASE + "/setup?step=files")
+            rows = re.findall(r'<li>\s*<div class="setup-found-what">(.*?)</form>', page, re.S)
+            alone = next(r for r in rows if "home/Downloads/DMTQ" in r)
+            both = next(r for r in rows if "home/Documents" in r)
+            self.assertIn('<span class="setup-tree">Client data folder: ', alone)
+            self.assertNotIn('name="songs" value="yes" checked', alone)
+            self.assertIn('<span class="setup-tree">Client data and song data folder: ', both)
+            self.assertIn('name="songs" value="yes" checked', both)
+
     def test_the_search_asks_each_folder_once(self):
         # The setup searches the home folders at each look at the page: each folder costs one question.
         with HostInstall() as inst:
@@ -625,6 +645,11 @@ class FilesOnThisPcTest(unittest.TestCase):
         with HostInstall() as inst:
             tree = game_folder(inst.path("home/Downloads/dmtq"))
             inst.sign_in()
+            # The game host's folder without its songs' folder: the client data alone, as the look at it says (ADM-245).
+            self.assertIn("This folder holds the client data.", inst.page(BASE + f"/setup?step=files&dir={tree}"))
+            # With it: both.
+            os.makedirs(os.path.join(tree, "dmqglb.mb.pmang.com", "DMQ", "Songs", "1"))
+            inst.write("home/Downloads/dmtq/dmqglb.mb.pmang.com/DMQ/Songs/1/1.fpk", "m")
             self.assertIn("This folder holds the client data and the song data.",
                           inst.page(BASE + f"/setup?step=files&dir={tree}"))
             self.assertEqual(setup.game_folder_in(inst.path("home/Downloads")), tree)
