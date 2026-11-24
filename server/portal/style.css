@@ -1067,8 +1067,11 @@ td.actions { width: 1%; text-align: right; }
    is the place at the left and the name and score beside it, so that the box is full whatever its width. Phones: first
    across the width. */
 /* The hall of fame: a box per month before, newest first, each with its first three in the podium's numbers. */
-.past-months { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 14px; }
-.past-month { padding: 14px 16px 12px; background: var(--rail); }
+/* The hall of fame: the months as columns of the card itself, spread across all of its width (as many in a row as have
+   300 px, so that a long name keeps to a line), each its heading and its three places. No box of its own in the card:
+   filled boxes there were cards in a card, two of them on its left half with the right half empty. */
+.past-months { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 22px 40px; }
+.past-month { min-width: 0; }
 .past-month h3 { margin: 0 0 10px; font-size: var(--t-md); color: var(--chalk); }
 .past-top { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .past-top li { display: grid; grid-template-columns: 1.6em minmax(0, 1fr) auto; align-items: baseline; gap: 8px; }

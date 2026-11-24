@@ -573,6 +573,37 @@ async function backgroundClear(contexts) {
     misses.slice(0, 8).join(' ; '));
 }
 
+// The hall of fame (the Rankings page's This month tab: the months before) at a laptop's width and a phone's, in both
+// languages: its months are columns of the card itself, no fill, edge or shadow of their own (no box in the card), and side
+// by side they run across all of the card's room, the last one ending where that room does. Before: each month a filled
+// box, the two of them on the card's left half (589 of 1192 px), its right half empty.
+async function hallOfFame(contexts) {
+  for (const [width, height] of [[1280, 900], [360, 740]]) {
+    for (const lang of ['en', 'ko']) {
+      const page = await contexts.signed.newPage();
+      await page.setViewport({ width, height, ...(width < 700 ? { isMobile: true, hasTouch: true } : {}) });
+      await page.setCookie({ name: 'opendmtq_lang', value: lang, url: P });
+      await page.goto(`${P}/ranking.php?sort=month`, { waitUntil: 'networkidle2' });
+      const seen = await page.evaluate(() => {
+        const months = [...document.querySelectorAll('.past-month')];
+        if (!months.length) return { months: 0 };
+        const card = months[0].closest('.card'), cs = getComputedStyle(card);
+        const room = card.getBoundingClientRect().right - parseFloat(cs.paddingRight) - parseFloat(cs.borderRightWidth);
+        // A box of its own: a fill, an edge or a shadow.
+        const boxed = months.filter(m => {
+          const s = getComputedStyle(m);
+          return s.backgroundImage !== 'none' || !/^(transparent|rgba\(0, 0, 0, 0\))$/.test(s.backgroundColor) || parseFloat(s.borderLeftWidth) > 0
+            || parseFloat(s.borderTopWidth) > 0 || s.boxShadow !== 'none';
+        }).length;
+        return { months: months.length, boxed, right: Math.round(Math.max(...months.map(m => m.getBoundingClientRect().right))), room: Math.round(room) };
+      });
+      check(`the hall of fame's months are columns of its card across all of its room, no box of their own (${width}px, ${lang})`,
+        seen.months >= 1 && seen.boxed === 0 && Math.abs(seen.right - seen.room) <= 2, JSON.stringify(seen));
+      await page.close();
+    }
+  }
+}
+
 // The checker itself: one of each thing it looks for must be seen.
 async function self(contexts) {
   const page = await contexts.anon.newPage();
@@ -2930,6 +2961,7 @@ async function myPage(contexts) {
   } else if (stage === 'full') {
     await sweep(contexts, FULL, ALL_WIDTHS);
     await backgroundClear(contexts);
+    await hallOfFame(contexts);
   } else if (stage === 'keys') {
     await keyboardMarks(contexts);
   } else if (stage === 'thispc') {
