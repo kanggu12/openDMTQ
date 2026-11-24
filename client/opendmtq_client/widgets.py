@@ -528,6 +528,11 @@ class ScrollArea(tk.Frame):
         px = self.ui.px
         return px(self.MARGIN) + max(1, self._column(max(1, self.canvas.winfo_width()))) + px(self.SHARD_CLEAR)
 
+    def shard_keep(self):
+        """Boxes on the page that no shard may reach, their clear room in them (art.shard_mask's `keep`): none on the
+        launcher's pages, whose window buttons are Windows' own (the installer's page has its header's, PageArea)."""
+        return ()
+
     def _on_resize(self, event):
         px = self.ui.px
         # The column between the margins; labels wrap to their own box (follow_width).
@@ -653,7 +658,8 @@ class ScrollArea(tk.Frame):
         height = (height + step - 1) // step * step
         self._backdrop_size = (width, height)
         # The shards in the margin right of the content column (shard_room), which follows the width alone.
-        picture = art.backdrop(width, height, self.ui.scale, offset=self.offset, top=self.light, room=self.shard_room())
+        picture = art.backdrop(width, height, self.ui.scale, offset=self.offset, top=self.light, room=self.shard_room(),
+                               keep=self.shard_keep())
         # The picture shown until now, kept until every canvas of the field shows the new one: Tk empties an image the
         # moment Python forgets it, and a canvas still showing it would be drawn empty.
         before = getattr(self, "_backdrop_image", None)

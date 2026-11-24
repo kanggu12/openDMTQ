@@ -202,6 +202,14 @@ def maintenance(have, here):
     return ["open", "repair", "uninstall"]
 
 
+def server_words(server):
+    """The server an installer brings, as its Install page names it: its name and its address after it, or its address
+    alone when it has no name of its own (a site without SERVER_NAME calls itself by its address, which was said twice:
+    "192.168.1.10:8791  ·  http://192.168.1.10:8791")."""
+    from opendmtq_client import state as st
+    return "%s  ·  %s" % (server["name"], server["url"]) if st.has_own_name(server) else server["url"]
+
+
 def path_lines(font, path, room):
     """A path as lines no wider than `room` pixels in `font` (a Tk font), each broken after a separator (\\ or /), a
     folder's name kept whole; a name wider than the room alone has a line of its own (Tk then wraps it where it must)."""
@@ -276,6 +284,20 @@ class Installer:
     do on a PC with OpenDMTQ) or "uninstall" (Windows' Settings, Apps: the uninstall's own page, for the program in
     `folder`)."""
 
+    @property
+    def busy(self):
+        """Whether work is under way (Velopack's setup or uninstaller, the data being deleted): the window stays until
+        it ends."""
+        return getattr(self, "_busy", False)
+
+    @busy.setter
+    def busy(self, on):
+        # The header's close button dimmed while it is (it cannot close the window then), pressable again after.
+        self._busy = bool(on)
+        header = getattr(getattr(self, "window", None), "header", None)
+        if header is not None:
+            header.buttons[1].enable(not self._busy)
+
     def __init__(self, start="ask", folder=None):
         from opendmtq_client import setup_window
         self.ui_module = setup_window
@@ -346,9 +368,14 @@ class Installer:
 
         def update():
             rows = []
-            if closes() and launcher_open():
+            closing, game = closes() and launcher_open(), game_running()
+            if closing and game:
+                # Both in one line: the page fits its window whole (two lines and their gap ran the card under the
+                # strip, a scroll bar at the window's edge).
+                rows.append(("change", w("setup.notice.both")))
+            elif closing:
                 rows.append(("change", w("setup.closing")))
-            if game_running():
+            elif game:
                 rows.append(("change", w("setup.notice.game")))
             if rows == shown["rows"] or not frame.winfo_exists():
                 return
@@ -384,9 +411,7 @@ class Installer:
         rows = [(w("setup.row.program"), self.folder, True), (w("setup.row.shortcuts"), w("setup.row.shortcuts.where")),
                 (w("setup.row.rights"), w("setup.row.rights.what"))]
         if self.server:
-            # Its name, and its address after it when it has one of its own.
-            name, url = self.server["name"], self.server["url"]
-            rows.append((w("setup.row.server"), name if name == url else "%s  ·  %s" % (name, url)))
+            rows.append((w("setup.row.server"), server_words(self.server)))
         self._facts(card.body, rows)
         # The project's notice at the card's foot, as the site and the launcher have it.
         self.window.notice(card.body)
@@ -914,7 +939,9 @@ class Installer:
     def _close(self):
         if self.busy:
             # Velopack is writing or removing files, or the data is being deleted: the window stays until it is done
-            # (or the time limit stops it).
+            # (or the time limit stops it), and says so where the work's line is (main answered the close button and
+            # Alt+F4 with nothing at all).
+            self.window.say(self.words("setup.busy.close"))
             return
         self.root.destroy()
 

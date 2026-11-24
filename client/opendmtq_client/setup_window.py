@@ -159,8 +159,10 @@ class SetupWindow:
         self.page_area = PageArea(right, ui, offset=self.header.tall, light=px(PAGE_LIGHT),
                                   on_moved=self.header.moved)
         self.page_area.pack(side="top", fill="both", expand=True)
-        # The header's picture is the page's first rows: its shards in the same room right of the page's column.
+        # The header's picture is the page's first rows: its shards in the same room right of the page's column, and both
+        # keep clear of the header's window buttons (the same shards left out of both, never one cut at their seam).
         self.header.room = self.page_area.shard_room
+        self.page_area.keep = self.header.button_boxes
         # Tab goes as the window reads its work: the page, the strip's buttons, then the window's own minimise and close
         # (Tk follows the order of making: the strip, made first so that it holds the foot, and the header, made before
         # the page so that it holds the top, are raised after the page in that order).
@@ -304,9 +306,16 @@ class SetupWindow:
 
 class PageArea(widgets.ScrollArea):
     """The page under the header: the header holds the page's title, so the line under the title starts at the area's
-    top, where the title's foot is, as it did under the title on the launcher's pages."""
+    top, where the title's foot is, as it did under the title on the launcher's pages. Its shards keep clear of the
+    header's window buttons as the header's do (`keep`: the header's button_boxes, set once both are made)."""
 
     TOP = 0
+    # The header's button_boxes, set by the window once the header and the page are made.
+    keep = None
+
+    def shard_keep(self):
+        # The header's buttons as boxes at the page's width (the header is as wide as the page under it).
+        return self.keep(max(1, self.canvas.winfo_width())) if self.keep is not None else ()
 
 
 class Header(tk.Canvas):
@@ -352,6 +361,14 @@ class Header(tk.Canvas):
         size, gap, right = px(BUTTON), px(BUTTON_GAP), width - px(BUTTON_RIGHT)
         return [(right - 2 * size - gap, px(BUTTON_TOP)), (right - size, px(BUTTON_TOP))]
 
+    def button_boxes(self, width):
+        """The window buttons on a header `width` wide as boxes on the page (the header is its first rows), each with the
+        room a shard keeps from a card round it (widgets.ScrollArea.SHARD_CLEAR): no shard reaches them (art.shard_mask),
+        where the big one ran through the close button's cut corner and a slim one pointed at its foot."""
+        px = self.ui.px
+        size, clear = px(BUTTON), px(widgets.ScrollArea.SHARD_CLEAR)
+        return [(x - clear, y - clear, x + size + clear, y + size + clear) for x, y in self.places(width)]
+
     def _title_picture(self, room):
         """The title's picture and its baseline, at the site's size, or smaller until it fits `room` pixels."""
         key = (self.title, room)
@@ -378,7 +395,7 @@ class Header(tk.Canvas):
             # The page's own picture, its first rows: the page area under it draws the rest (its offset), its shards
             # in the same room.
             picture = art.backdrop(width, height, self.ui.scale, offset=0, top=self.light,
-                                   room=self.room() if self.room is not None else None)
+                                   room=self.room() if self.room is not None else None, keep=self.button_boxes(width))
         places = self.places(width)
         self.title_box = self.title_picture = None
         if self.title:
@@ -411,8 +428,9 @@ class WindowButton(tk.Canvas):
         super().__init__(parent, width=size, height=size, bg=theme.BG, highlightthickness=0, bd=0, cursor="hand2",
                          takefocus=1)
         self.ui, self.glyph, self.command, self.words = ui, glyph, command, words
-        # Its look now: under the pointer or pressed or neither, and whether the keyboard is on it.
-        self.state, self.focused = "normal", False
+        # Its look now: under the pointer or pressed or neither, and whether the keyboard is on it; whether it can be
+        # pressed (the close button cannot while the installer works: enable()).
+        self.state, self.focused, self.enabled = "normal", False, True
         # The header's pixels it lies on, and its faces drawn over them.
         self.under, self._faces, self._item = None, {}, None
         # The spacing checks measure it as the button it is (tests/ui/spacing.py).
@@ -432,6 +450,14 @@ class WindowButton(tk.Canvas):
         self.under, self._faces = picture, {}
         self._paint(self.state)
 
+    def enable(self, on):
+        """Pressable, or not: dimmed (flat metal, the faintest glyph, no red under the pointer, the arrow for a pointer,
+        Tab past it) while the installer works, as the window cannot close then. A click or a key on it still goes to
+        the window's close, which says why it stays (Installer._close)."""
+        self.enabled = bool(on)
+        self.configure(cursor="hand2" if self.enabled else "arrow", takefocus=1 if self.enabled else 0)
+        self._paint("normal")
+
     def face(self, state, focused):
         """The button's picture in a state, with the keyboard's ring or without."""
         key = (state, focused)
@@ -442,7 +468,8 @@ class WindowButton(tk.Canvas):
 
     def _paint(self, state):
         self.state = state
-        picture = self.face(state, self.focused)
+        # Dimmed, it keeps its one look whatever the pointer does.
+        picture = self.face(state if self.enabled else "disabled", self.focused and self.enabled)
         self._image = ImageTk.PhotoImage(picture, master=self)
         if self._item is None:
             self._item = self.create_image(0, 0, image=self._image, anchor="nw")

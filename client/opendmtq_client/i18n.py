@@ -743,8 +743,8 @@ TEXT = {
     "setup.opt.repair.line": ("Installs {v} again, every file of the program put back as it came. Your servers, sign-ins and settings stay.",
                               "{v} 버전을 다시 설치해 프로그램 파일을 모두 처음 그대로 되돌립니다. 서버와 로그인 정보, 설정은 그대로 둡니다."),
     "setup.opt.uninstall": ("Uninstall", "제거"),
-    "setup.opt.uninstall.line": ("Removes OpenDMTQ from this PC. You choose next whether your data stays.",
-                                 "이 PC에서 OpenDMTQ를 제거합니다. 데이터를 남길지는 다음 화면에서 고릅니다."),
+    "setup.opt.uninstall.line": ("Removes OpenDMTQ. You choose next whether your data stays.",
+                                 "OpenDMTQ를 제거합니다. 데이터를 남길지는 다음 화면에서 고릅니다."),
     "setup.next": ("Next", "다음"),
     "setup.previous": ("Back", "뒤로"),
     # The uninstall's choice: the data kept or deleted, each with its size.
@@ -768,6 +768,8 @@ TEXT = {
     "setup.stage.data": ("Deleting the data on this PC", "이 PC의 데이터 지우기"),
     "setup.stage.logs": ("Clearing OpenDMTQ's logs", "OpenDMTQ 로그 지우기"),
     "setup.working.stay": ("This takes a few seconds.", "몇 초면 끝납니다."),
+    # The window asked to close (its close button, Alt+F4, the taskbar) while the work goes on.
+    "setup.busy.close": ("The window can be closed once this is done.", "작업이 끝나면 창을 닫을 수 있습니다."),
     # What came of it.
     "setup.done.program": ("The program is in {folder}.", "프로그램은 {folder}에 있습니다."),
     "setup.done.shortcuts": ("Its shortcuts are on the desktop and in the Start menu.", "바로 가기는 바탕 화면과 시작 메뉴에 있습니다."),
@@ -789,6 +791,10 @@ TEXT = {
     "setup.not_installed": ("There is no OpenDMTQ installed in {folder}.", "{folder}에 설치된 OpenDMTQ가 없습니다."),
     "setup.notice.game": ("The game is open: repairing, updating and uninstalling wait until it closes.",
                           "게임이 열려 있습니다. 복구, 업데이트, 제거는 게임을 닫은 뒤에 진행됩니다."),
+    # The launcher's line and the game's in one, while both are open.
+    "setup.notice.both": ("The launcher and the game are open: the launcher closes first, and repairing, updating and "
+                          "uninstalling wait until the game closes.",
+                          "런처와 게임이 열려 있습니다. 런처는 먼저 닫히고, 복구, 업데이트, 제거는 게임을 닫은 뒤에 진행됩니다."),
     "setup.waiting": ("Waiting for the game to close...", "게임이 닫히기를 기다리는 중..."),
     "setup.game.install": ("Installing replaces the game program: it waits until the game is closed.",
                            "설치하면 게임 프로그램이 바뀌므로 게임이 닫힐 때까지 기다립니다."),

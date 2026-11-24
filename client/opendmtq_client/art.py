@@ -225,7 +225,7 @@ TOPS_KEPT = 4
 _tops = collections.OrderedDict()
 
 
-def backdrop(width, height, scale=1.0, accent=theme.OK, offset=0, top=None, room=None):
+def backdrop(width, height, scale=1.0, accent=theme.OK, offset=0, top=None, room=None, keep=()):
     """The page behind the cards, as the site's: its field with the faint perforated metal all over, two pale panes and
     the accent's light at the top (body::before), and the green shards at the left and right edges (.facets); with a
     `room` (an x on the page), the shards stand right of it only (shard_mask).
@@ -236,6 +236,7 @@ def backdrop(width, height, scale=1.0, accent=theme.OK, offset=0, top=None, room
 
     The rows the light and the shards reach are cut from the page's top as drawn once for this width and look (_top);
     the rows under them are the field alone. Either way the picture is the one _whole() draws, pixel for pixel.
+    `keep`: boxes on the page no shard may reach (shard_mask), the same for every part of one page.
     """
     width, height = max(1, int(width)), max(1, int(height))
     offset = max(0, int(offset))
@@ -245,7 +246,7 @@ def backdrop(width, height, scale=1.0, accent=theme.OK, offset=0, top=None, room
     if offset >= reach:
         # All of it under the top: the field and its dots, which cost little to draw.
         return _field(width, height, scale, offset)
-    whole = _top(width, scale, accent, top_h, reach, room)
+    whole = _top(width, scale, accent, top_h, reach, room, tuple(tuple(box) for box in keep))
     if offset + height <= reach:
         # All of it in the top: its rows, as a picture of its own (the caller may draw on it).
         return whole.crop((0, offset, width, offset + height))
@@ -256,13 +257,13 @@ def backdrop(width, height, scale=1.0, accent=theme.OK, offset=0, top=None, room
     return img
 
 
-def _top(width, scale, accent, top_h, reach, room=None):
+def _top(width, scale, accent, top_h, reach, room=None, keep=()):
     """The page's first `reach` rows drawn whole, kept for the next picture of the same width and look."""
-    key = (width, scale, accent, top_h, room)
+    key = (width, scale, accent, top_h, room, keep)
     # Taken out and put back last: the one used longest ago goes first.
     found = _tops.pop(key, None)
     if found is None:
-        found = _whole(width, reach, scale, accent, 0, top_h, room)
+        found = _whole(width, reach, scale, accent, 0, top_h, room, keep)
     _tops[key] = found
     while len(_tops) > TOPS_KEPT:
         # The oldest goes, so the kept pictures never hold more than a few widths' worth.
@@ -290,13 +291,15 @@ def _field(width, height, scale, offset):
     return img
 
 
-def shard_mask(width, height, scale=1.0, offset=0, room=None):
+def shard_mask(width, height, scale=1.0, offset=0, room=None, keep=()):
     """How much of the shards' light lies on each pixel of the page's picture from `offset` down, `height` tall (an L
     picture, 0 none, 255 whole): 900 CSS pixels tall from the page's top, fading out downwards. Without a `room`, the
     site's shards at both edges, stretched to the page's width (.facets). With one (an x on the page: the content column
     and its clear room end there, widgets.ScrollArea.shard_room), the right-hand ones alone, standing right of it: as
     the site has them while the margin is as wide, else fitted into it (the same height, narrower), so that no shard
-    reaches under a card or between two."""
+    reaches under a card or between two. `keep`: boxes (x0, y0, x1, y1 on the page, their clear room in them) that no
+    shard may reach, the installer's window buttons at its header's right: a shard that would is left out whole,
+    never cut along the box (its edge would end there)."""
     span = int(900 * scale)
     mask = Image.new("L", (width, height), 0)
     if offset >= span:
@@ -321,6 +324,9 @@ def shard_mask(width, height, scale=1.0, offset=0, room=None):
         layer = Image.new("L", big.size, 0)
         ImageDraw.Draw(layer).polygon([(place(x) * k, y / 900.0 * span * k) for x, y in points],
                                       fill=int(255 * opacity))
+        if any(layer.crop(tuple(int(v * k) for v in box)).getbbox() for box in keep):
+            # It would reach a box kept clear: left out whole.
+            continue
         big = Image.composite(layer, big, layer)
     big = big.resize((width, span), Image.LANCZOS)
     down = Image.linear_gradient("L").resize((1, span)).point(lambda v: 255 - v)
@@ -332,7 +338,7 @@ def shard_mask(width, height, scale=1.0, offset=0, room=None):
     return mask
 
 
-def _whole(width, height, scale, accent, offset, top_h, room=None):
+def _whole(width, height, scale, accent, offset, top_h, room=None, keep=()):
     """The page's picture from `offset` down, every layer drawn for every row: the field, the lit top while `offset`
     is above `top_h`, the shards in the first 900 CSS pixels (shard_mask). backdrop() keeps its top; the tests compare
     the two."""
@@ -376,7 +382,7 @@ def _whole(width, height, scale, accent, offset, top_h, room=None):
     span = int(900 * scale)
     if offset < span:
         rows = (offset, min(span, offset + height))
-        mask = shard_mask(width, rows[1] - rows[0], scale, offset, room)
+        mask = shard_mask(width, rows[1] - rows[0], scale, offset, room, keep)
         colour = _vertical((width, span), ((0.0, _mix(accent, "#ffffff", 0.12)), (1.0, _mix(accent, "#000000", 0.30))))
         part = img.crop((0, 0, width, rows[1] - rows[0]))
         part.paste(colour.crop((0, rows[0], width, rows[1])), (0, 0), mask)
@@ -983,9 +989,10 @@ def _button_face(size, margin, look, state, focused, scale, under, bg):
 
 
 # The glyphs' colours on the window's buttons: quiet at rest, as bright as words under the pointer and with the
-# keyboard, the dark ink on the close button's red.
+# keyboard, the dark ink on the close button's red, the faintest grey while the button cannot be pressed (the close
+# button while the installer works).
 WINDOW_GLYPH = {"normal": theme.MUTED, "hover": theme.TEXT, "pressed": theme.TEXT, "focus": theme.TEXT,
-                "danger": BUTTON_LOOKS["danger_quiet"]["hover_text"]}
+                "danger": BUTTON_LOOKS["danger_quiet"]["hover_text"], "disabled": theme.FAINT}
 
 
 def window_button(size, glyph, state, focused, scale=1.0, under=None, bg=None):
@@ -995,10 +1002,13 @@ def window_button(size, glyph, state, focused, scale=1.0, under=None, bg=None):
     Its glyph as the overlay bar draws its own, a little smaller for a smaller button: minimise a bar across (12 px at
     100 %), close an X with round ends (10 px across), 2 px strokes. `under` is the picture the button lies on (its cut
     corners show it), else `bg` a plain colour."""
+    # `state` "disabled": flat metal and the faintest glyph, never the red, whatever the pointer does.
     danger = glyph == "close" and state in ("hover", "pressed")
     img = button_face((size, size), 0, "danger_quiet" if danger else "neutral", state, focused, scale, under=under,
                       bg=bg)
     ink = WINDOW_GLYPH["danger"] if danger else WINDOW_GLYPH["focus" if focused and state == "normal" else state]
+    if state == "disabled":
+        ink = WINDOW_GLYPH["disabled"]
     # Strokes of whole pixels, 2 at 100 %, so that the bar stays crisp.
     stroke = max(2, int(round(2 * scale)))
     mask = Image.new("L", (size, size), 0)

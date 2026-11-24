@@ -105,6 +105,14 @@ def measure(window, name, problems):
                 problems.append("%s: text under the strip: %r" % (name, w.cget("text")[:40]))
     if window.page_area.canvas.winfo_rooty() + window.page_area.canvas.winfo_height() > strip_top + 1:
         problems.append("%s: the page runs under the strip" % name)
+    # At the window's own size (800 x 540, at any scaling) a page fits it whole: no scroll bar (main's choose page with
+    # the launcher and the game both open ran its card under the strip, a scroll bar at its edge). A small screen's
+    # smaller window may scroll.
+    from opendmtq_client import setup_window
+    px = window.ui.px
+    if (root.winfo_width(), root.winfo_height()) == (px(setup_window.WIDTH), px(setup_window.HEIGHT)) and \
+            window.page_area.bar.winfo_ismapped():
+        problems.append("%s: the page needs a scroll bar at the window's own size" % name)
     # The launcher's own measure of boxes and room (tests/ui/spacing.py): nothing touching, words inside their card's
     # padding, the gaps on the spacing scale.
     problems.extend(spacing.check(root, window.ui, name))
@@ -364,6 +372,18 @@ def main():
 
     run("install-long-folder", lambda: installer.Installer(folder=long_folder), [program_row])
 
+    # A server that calls itself by its address (no name of its own): said once (main: "192.168.1.10:8791  ·
+    # http://192.168.1.10:8791").
+    def server_once(made):
+        said = [w.cget("text") for w in widgets_of(made.root) if w.winfo_class() == "Label" and w.winfo_ismapped()]
+        rows = [text for text in said if "192.168.1.10" in text]
+        if rows != ["http://192.168.1.10:8791"]:
+            problems.append("setup-%s: a server with no name of its own is said as %r" % (tag, rows))
+
+    with mock.patch.object(installer, "brought", return_value={"url": "http://192.168.1.10:8791",
+                                                               "name": "192.168.1.10:8791"}):
+        run("install-unnamed", installer.Installer, [server_once])
+
     def setup_runs(path):
         """Velopack's setup as it runs: its log written (to the path the installer names), the program's folder filling
         a little at each look."""
@@ -398,6 +418,15 @@ def main():
             problems.append("setup-%s: the close button closed the window while the install was under way" % tag)
             return
         settle(made.root, 0.3)
+        # Said: the close button dimmed while the work goes on, and a press of it (or Alt+F4) answered on the strip's
+        # line (main: the button looked pressable and nothing answered).
+        from opendmtq_client import i18n
+        if getattr(button, "enabled", True):
+            problems.append("setup-%s: the close button looks pressable while the install is under way" % tag)
+        said = made.words("setup.busy.close") if "setup.busy.close" in i18n.TEXT else None
+        if said is None or made.window.note.cget("text") != said:
+            problems.append("setup-%s: a close while the install is under way is answered with %r" % (
+                tag, made.window.note.cget("text")))
 
     with mock.patch.object(installer, "run_setup", setup_runs):
         run("installing", installer.Installer, [lambda made: made.work("install"), lambda made: settle(made.root, 1.5),
@@ -569,6 +598,11 @@ def main():
         notice[what] = on
         settle(made.root, 1.6)
         words = made.words("setup.closing" if what == "launcher" else "setup.notice.game")
+        if notice["launcher"] and notice["game"] and expect:
+            # Both open (the launcher's line wanted): their one line, which keeps the page within its window (a launcher
+            # without such a line said them in two, and this check finds its one line missing).
+            from opendmtq_client import i18n
+            words = made.words("setup.notice.both") if "setup.notice.both" in i18n.TEXT else None
         if (words in said(made)) != expect:
             problems.append("setup-%s: the notice that the %s is open %s after it %s" % (
                 tag, what, "did not show" if expect else "stayed", "opened" if on else "closed"))

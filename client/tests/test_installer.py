@@ -109,6 +109,15 @@ class Installer(unittest.TestCase):
             else:
                 os.environ["OPENDMTQ_SETUP_FILE"] = saved
 
+    def test_the_server_is_named_once(self):
+        # Its name and its address, or its address alone when it calls itself by its address (main said that server
+        # twice on the Install page: "192.168.1.10:8791  ·  http://192.168.1.10:8791").
+        self.assertEqual(installer.server_words({"url": "http://192.168.1.10:8791", "name": "Club Night"}),
+                         "Club Night  ·  http://192.168.1.10:8791")
+        for name in ("192.168.1.10:8791", "192.168.1.10", "http://192.168.1.10:8791", ""):
+            self.assertEqual(installer.server_words({"url": "http://192.168.1.10:8791", "name": name}),
+                             "http://192.168.1.10:8791", name)
+
     def test_the_install_folder_is_apart_from_the_players_data(self):
         saved = os.environ.get("LOCALAPPDATA")
         os.environ["LOCALAPPDATA"] = os.path.join(os.sep, "local")

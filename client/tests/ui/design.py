@@ -588,8 +588,17 @@ def _site_shards(width, height, scale, offset):
     return mask
 
 
+def _shards(width, height, scale, offset, room, keep):
+    """The shards a picture of the page draws from `offset` down (art.shard_mask), the boxes it keeps them from given
+    as the launcher gives them (none to a launcher that keeps none)."""
+    if keep:
+        return art.shard_mask(width, height, scale, offset, room, keep)
+    return art.shard_mask(width, height, scale, offset, room)
+
+
 def background(root, ui, name):
-    """No shard within SHARD_CLEAR of the content column under the heading, or of any card, down the whole page."""
+    """No shard within SHARD_CLEAR of the content column under the heading, or of any card, down the whole page, or of
+    the window's own buttons (the installer's header, whose picture is the page's first rows)."""
     from PIL import Image
     problems = []
     for area in _page_areas(root):
@@ -598,8 +607,9 @@ def background(root, ui, name):
             continue
         width, height = picture.size
         # The shards the area drew, by the drawing's own geometry.
+        kept_clear = area.shard_keep() if hasattr(area, "shard_keep") else ()
         if hasattr(art, "shard_mask"):
-            mask = art.shard_mask(width, height, ui.scale, area.offset, area.shard_room())
+            mask = _shards(width, height, ui.scale, area.offset, area.shard_room(), kept_clear)
         else:
             mask = _site_shards(width, height, ui.scale, area.offset)
         seen = mask.point(lambda v: 255 if v >= SHARD_SEEN else 0)
@@ -624,6 +634,26 @@ def background(root, ui, name):
         if box:
             problems.append("%s: %d px of the page's shards stand within %d px of the content column or a card "
                             "(page pixels %r)" % (name, hit.histogram()[255], SHARD_CLEAR, box))
+    # The window's own buttons in a header that shows the page's first rows (main: the big shard's edge ran through
+    # the close button's cut corner, and a slim one's tip pointed at its foot, on every page of the installer).
+    for button in [w for w in _all(root) if getattr(w, "odq_button", False) and _mapped(w)]:
+        header = button.master
+        if getattr(header, "moved_off", False) or not hasattr(art, "shard_mask"):
+            # Drawn as the strip's own colour once the page has moved from its top: no shards there then.
+            continue
+        width, tall = max(1, header.winfo_width()), max(1, header.winfo_height())
+        room = getattr(header, "room", None)
+        boxes = header.button_boxes(width) if hasattr(header, "button_boxes") else ()
+        seen = _shards(width, tall, ui.scale, 0, room() if room is not None else None, boxes).point(
+            lambda v: 255 if v >= SHARD_SEEN else 0)
+        clear = ui.px(SHARD_CLEAR)
+        x, y = button.winfo_rootx() - header.winfo_rootx(), button.winfo_rooty() - header.winfo_rooty()
+        box = (max(0, x - clear), max(0, y - clear), min(width, x + button.winfo_width() + clear),
+               min(tall, y + button.winfo_height() + clear))
+        hit = seen.crop(box)
+        if hit.getbbox():
+            problems.append("%s: %d px of the page's shards stand within %d px of the window's %r button" % (
+                name, hit.histogram()[255], SHARD_CLEAR, getattr(button, "words", "")))
     return problems
 
 
