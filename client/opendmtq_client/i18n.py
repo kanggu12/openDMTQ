@@ -242,8 +242,14 @@ TEXT = {
     "check.app": ("The server's app", "서버의 앱"),
     "check.app_update": ("A newer app on the server", "서버에 새 앱이 있음"),
     "check.player.missing": ("not found: run the installer again", "없음. 설치 프로그램을 다시 실행하세요"),
+    # What a row that is not fine says of its state, before the way to fix it (Repair, the connection test, ONLINE).
+    "check.player.none": ("not found", "없음"),
     "check.player.repair": ("Repair", "복구"),
     "check.server.down": ("not answering", "응답 없음"),
+    "check.server.none": ("none yet", "아직 없음"),
+    "check.account.none": ("not signed in", "로그인하지 않음"),
+    "check.account.ended": ("sign-in ended", "로그인 만료"),
+    "check.app.none": ("not on this PC", "이 PC에 없음"),
     "check.running": ("The game is open: close it first", "게임이 열려 있습니다. 먼저 닫으세요"),
 
     # ------------------------------------------------------------------------------------------- screen

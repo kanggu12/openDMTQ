@@ -2365,9 +2365,10 @@ class RowList(tk.Frame):
 
 def check_line(parent, ui, state, text, action_text=None, action=None, bg=theme.PANEL, value=None, column=None):
     """A ready-check row as the site's state rows: a small lamp (a lime dot fine, a yellow ring will change, a red dot a
-    problem), the words, and the value or the way to fix it. With `column` (the widest name of the rows it stands
-    among, in pixels: check_names), the words keep a names column and the value or the way to fix it stands after it,
-    by its name, as a setting's control does; without, at the row's right end."""
+    problem), the words, then what the row says of its state (`value`) and the way to fix it (a link), the link after
+    the value on its line. With `column` (the widest name of the rows it stands among, in pixels: check_names), the
+    words keep a names column and the value and the way to fix it stand after it, by their name, as a setting's control
+    does; without, right after the words (never at the row's far end, away from the words they belong to)."""
     row = tk.Frame(parent, bg=bg)
     colour = {"ok": theme.OK, "change": theme.WARN, "bad": theme.BAD}[state]
     # What will change is a ring, so that it is told from what is fine by its shape too, not by its colour alone.
@@ -2387,44 +2388,57 @@ def check_line(parent, ui, state, text, action_text=None, action=None, bg=theme.
 
     if column:
         # In a grid: the lamp, the words in the names column (the lamp's gap before them, the column's own room after
-        # them), then the value or the way to fix it, which takes the rest of the row and wraps there.
+        # them), then the value, which wraps in the rest of the row, and the way to fix it after the value (a value and
+        # its action on one line, VALUE_LINK apart), or in the value's place when the row says no value.
         light.grid(row=0, column=0, sticky="n", pady=(ui.px(1), 0))
         words = tk.Label(row, text=text, font=ui.fonts.body, fg=theme.TEXT, bg=bg, anchor="w", justify="left")
-        if action_text and action:
-            what = link(row, ui, action_text, action, bg=bg)
-            font = ui.fonts.body_bold
-        elif value:
-            # Wrapped in the room right of the names column: the lamp and the words are counted as they stand beside it,
-            # the column's own room past the words on top.
-            what = label(row, ui, value, fg=theme.MUTED, bg=bg, beside=(light, words),
+        fix = link(row, ui, action_text, action, bg=bg) if action_text and action else None
+        what = None
+        if value:
+            # Wrapped in the room right of the names column: the lamp, the words and the link are counted as they stand
+            # beside it, the column's own room past the words on top.
+            what = label(row, ui, value, fg=theme.MUTED, bg=bg, beside=(light, words) + ((fix,) if fix else ()),
                          wrap_margin=max(0, column - words.winfo_reqwidth()) / max(1.0, ui.scale))
-            font = ui.fonts.body
-        else:
-            what, font = None, None
-        if what is None:
+        if what is None and fix is None:
             # Nothing after the words (a game that is open): they take the whole row.
-            words.grid(row=0, column=1, columnspan=2, sticky="nw", padx=(ui.px(6), 0),
+            words.grid(row=0, column=1, columnspan=3, sticky="nw", padx=(ui.px(6), 0),
                        pady=(at_middle(words, ui.fonts.body), 0))
         else:
             words.grid(row=0, column=1, sticky="nw", padx=(ui.px(6), 0), pady=(at_middle(words, ui.fonts.body), 0))
-            what.grid(row=0, column=2, sticky="nw", pady=(at_middle(what, font), 0))
-        # The names column: the lamp's gap and the widest name with its room after it; the value's column the rest.
+            if what is not None:
+                what.grid(row=0, column=2, sticky="nw", pady=(at_middle(what, ui.fonts.body), 0))
+            if fix is not None:
+                # After the value, VALUE_LINK apart; at the value's place when there is none.
+                fix.grid(row=0, column=3 if what is not None else 2, sticky="nw",
+                         padx=(ui.px(VALUE_LINK) if what is not None else 0, 0),
+                         pady=(at_middle(fix, ui.fonts.body_bold), 0))
+        # The names column: the lamp's gap and the widest name with its room after it; the value and the link take the
+        # rest, the room left after them at the row's end.
         row.columnconfigure(1, minsize=ui.px(6) + column)
-        row.columnconfigure(2, weight=1)
+        row.columnconfigure(4, weight=1)
         return row
     light.pack(side="left", anchor="n", pady=(ui.px(1), 0))
-    if action_text and action:
-        # The way to fix it, reached by the mouse or the keyboard.
-        fix = link(row, ui, action_text, action, bg=bg)
-        fix.pack(side="right", anchor="n", pady=(at_middle(fix, ui.fonts.body_bold), 0))
-        beside.append(fix)
-    elif value:
-        what = tk.Label(row, text=value, font=ui.fonts.body, fg=theme.MUTED, bg=bg)
-        what.pack(side="right", anchor="n", pady=(at_middle(what, ui.fonts.body), 0))
-        beside.append(what)
+    # The words first, then what the row says and the way to fix it right after them, on the words' first line: a
+    # value by the words it belongs to, never at the row's far end (the Sound page's last game said "3 gaps" at the
+    # card's edge, away from its words).
     words = label(row, ui, text, fg=theme.TEXT, bg=bg, wrap_margin=24, beside=beside)
-    words.pack(side="left", fill="x", anchor="n", padx=(ui.px(6), 0), pady=(at_middle(words, ui.fonts.body), 0))
+    words.pack(side="left", anchor="n", padx=(ui.px(6), 0), pady=(at_middle(words, ui.fonts.body), 0))
+    if value:
+        what = tk.Label(row, text=value, font=ui.fonts.body, fg=theme.MUTED, bg=bg)
+        what.pack(side="left", anchor="n", padx=(ui.px(VALUE_LINK), 0), pady=(at_middle(what, ui.fonts.body), 0))
+        # The words wrap in the room the value leaves them (its gap counted with it, as its own padding).
+        beside.append(what)
+    if action_text and action:
+        # The way to fix it, reached by the mouse or the keyboard, after the words (and the value).
+        fix = link(row, ui, action_text, action, bg=bg)
+        fix.pack(side="left", anchor="n", padx=(ui.px(VALUE_LINK), 0), pady=(at_middle(fix, ui.fonts.body_bold), 0))
+        beside.append(fix)
     return row
+
+
+# The room between a state row's value and the way to fix it after it, and between a row's words and its value when the
+# row keeps no names column (logical pixels): a value and its action on one line, as the forms keep them (16).
+VALUE_LINK = 16
 
 
 def check_names(ui, names):

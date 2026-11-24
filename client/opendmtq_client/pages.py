@@ -693,8 +693,11 @@ def refresh_checks(app):
     from opendmtq_client import installed
     # Asked once for every row: whether this launcher was installed, so that its player can be put back by Repair.
     root = installed.root()
+    # Whether this PC's sign-in on the server ran out (an account it signed in as before), for the sign-in's row.
+    server = app.state.server()
+    ended = bool(server and server.get("account") and not app.state.signed_in(server))
     rows = [(check, check_row(check, w, on_play=app.page == "play" and app.guide is None, in_guide=app.guide is not None,
-                              installed=bool(root))) for check in checks]
+                              installed=bool(root), ended=ended)) for check in checks]
     # The whole check's light, its worst row's: a problem, then something that will change, else fine.
     states = [row["state"] for _check, row in rows]
     _paint_check_light(app, "bad" if "bad" in states else "change" if "change" in states else "ok")
@@ -735,14 +738,17 @@ CHECK_GAP = 8
 CHECK_NAMES = ("player", "server", "account", "app", "app_update")
 
 
-def check_row(check, w, on_play=False, in_guide=False, installed=False):
-    """How a ready-check row says one check: {"state": "ok", "change" or "bad", "value": words at the right end or None,
-    "link": the link's words or None, "go": "repair", a page's name or None}. A link is named after where it leads, as
-    Help's lines name their pages: the page's name in the menu ("ONLINE ›"), or Repair, which runs at once."""
+def check_row(check, w, on_play=False, in_guide=False, installed=False, ended=False):
+    """How a ready-check row says one check: {"state": "ok", "change" or "bad", "value": what the row says of it, or
+    None, "link": the link's words or None, "go": "repair", a page's name or None}. A row that is not fine says what is
+    wrong as its value, and the way to fix it follows (main showed a lamp and "ONLINE ›" alone for a sign-in or an app
+    that is not there). A link is named after where it leads, as Help's lines name their pages: the page's name in the
+    menu ("ONLINE ›"), the connection test, or Repair, which runs at once. `ended`: the sign-in this PC had on the server
+    ran out (or its password changed), where none was ever made otherwise."""
     row = {"state": "ok", "value": None, "link": None, "go": None}
     if not check.ok and check.key == "player" and installed:
         # The player comes with the launcher: the installed one puts it back from its package, at once.
-        row.update(state="bad", link=w("check.player.repair"), go="repair")
+        row.update(state="bad", value=w("check.player.none"), link=w("check.player.repair"), go="repair")
     elif not check.ok and check.key == "player":
         # A copied folder: installing brings the player back, and no page here can.
         row.update(state="bad", value=w("check.player.missing"))
@@ -758,13 +764,18 @@ def check_row(check, w, on_play=False, in_guide=False, installed=False):
     elif not check.blocks and check.key == "server":
         # The server does not answer: PLAY still plays this PC's app; the connection test says where the way to it stops
         # (none in the guide, which has no Online page to show it on).
-        if in_guide:
-            row.update(state="change", value=w("check.server.down"))
-        else:
-            row.update(state="change", link=w("check.server.test"), go="test")
+        row.update(state="change", value=w("check.server.down"))
+        if not in_guide:
+            row.update(link=w("check.server.test"), go="test")
     else:
         # What stops PLAY is a problem; the rest will change once the player sees to it.
         row["state"] = "bad" if check.key in actions.BLOCKING else "change"
+        # What is wrong, in a word: no server chosen, no sign-in (or one that ended), no app on this PC; a newer app on
+        # the server says its date, as the app's own row does.
+        row["value"] = {"server": w("check.server.none"),
+                        "account": w("check.account.ended" if ended else "check.account.none"),
+                        "app": w("check.app.none"),
+                        "app_update": check.detail}.get(check.key)
         if check.page and not in_guide:
             # The page that sees to it, by the menu's own name; the guide has no menu to go to, so no link there.
             row.update(link=TITLES[check.page], go=check.page)

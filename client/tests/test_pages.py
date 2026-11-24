@@ -47,9 +47,32 @@ class CheckRow(unittest.TestCase):
         self.assertEqual((fetched["state"], fetched["value"], fetched["link"]), ("change", EN("play.will_get"), None))
         silent = pages.check_row(actions.Check("server", False, "no answer", page="online", blocks=False), EN)
         self.assertEqual((silent["state"], silent["value"], silent["link"], silent["go"]),
-                         ("change", None, EN("check.server.test"), "test"))
+                         ("change", EN("check.server.down"), EN("check.server.test"), "test"))
         silent = pages.check_row(actions.Check("server", False, "no answer", page="online", blocks=False), EN, in_guide=True)
         self.assertEqual((silent["state"], silent["value"], silent["link"]), ("change", EN("check.server.down"), None))
+
+    def test_a_row_that_is_not_fine_says_what_is_wrong_before_its_link(self):
+        # Each row that is not fine says its state in words as its value, the way to fix it after it (main showed a lamp
+        # and "ONLINE ›" alone for the sign-in and the app, and "Test connection ›" alone for a server that does not
+        # answer: the status line sent a player to a check that named no problem), in both languages, on PLAY, Help and
+        # the guide (which has no link).
+        cases = ((actions.Check("account", False, "not signed in", page="online"), False, "check.account.none"),
+                 (actions.Check("account", False, "player1", page="online"), True, "check.account.ended"),
+                 (actions.Check("app", False, "not downloaded", page="online"), False, "check.app.none"),
+                 (actions.Check("server", False, "no server chosen", page="online"), False, "check.server.none"),
+                 (actions.Check("server", False, "no answer", page="online", blocks=False), False, "check.server.down"))
+        for check, ended, key in cases:
+            for words in (EN, KO):
+                for on_play, in_guide in ((True, False), (False, False), (False, True)):
+                    row = pages.check_row(check, words, on_play=on_play, in_guide=in_guide, ended=ended)
+                    self.assertEqual(row["value"], words(key), (key, words.language, in_guide))
+                    self.assertEqual(row["link"] is None, in_guide, (key, words.language, in_guide))
+        # A newer app on the server that PLAY cannot get yet says its date, as the app's own row does.
+        newer = actions.Check("app_update", False, "2026-11-20 01:02", page="online")
+        self.assertEqual(pages.check_row(newer, EN)["value"], "2026-11-20 01:02")
+        # The installed launcher's missing player: what is wrong, then Repair.
+        row = pages.check_row(actions.Check("player", False, "missing"), KO, installed=True)
+        self.assertEqual((row["value"], row["link"]), (KO("check.player.none"), KO("check.player.repair")))
 
     def test_a_fine_row_names_what_it_is_about(self):
         # On PLAY the server card above names the server and the account: only the app's date at the row's end.

@@ -204,6 +204,77 @@ def main():
     # Help's checks: their values in their column after the names, on the lamp's line too.
     state_rows_on_one_line("help")
 
+    # ---- What a state row says stands by the words it belongs to (DESIGN.md's state rows): the values of a list's rows
+    # start on one line, the column after their names; a row alone has its value right after its words, a value's gap
+    # (16) from them, never at the card's far end (the Sound page's last game said "3 gaps" there). A row that leads to
+    # a page or a tool says first what is wrong (main: the sign-in and the app showed a lamp and "ONLINE ›" alone).
+    def state_rows(page):
+        """Each state row on the page (a frame with one lamp and words, made by widgets.check_line), as (row, lamp, its
+        labels left to right: the words, the value, the link)."""
+        found = []
+        for frame in shots.widgets_of(app.body.inner):
+            if not isinstance(frame, tk.Frame):
+                continue
+            slaves = [x for x in frame.pack_slaves() + frame.grid_slaves() if x.winfo_ismapped()]
+            lamps = [x for x in slaves if hasattr(x, "odq_picture") and isinstance(x, tk.Label)]
+            texts = sorted((x for x in slaves if isinstance(x, tk.Label) and x not in lamps and x.cget("text")),
+                           key=lambda x: x.winfo_rootx())
+            if len(lamps) == 1 and texts:
+                found.append((frame, lamps[0], texts))
+        return found
+
+    def values_by_their_names(page, said):
+        rows = [r for r in state_rows(page) if len(r[2]) > 1]
+        if not rows:
+            problems.append("%s%s: no state rows with a value" % (page, said))
+        lists = {}
+        for frame, _lamp, texts in rows:
+            lists.setdefault(str(frame.master), []).append(texts)
+        for texts_of in lists.values():
+            if len(texts_of) > 1:
+                # A list: its values (or links) from one line.
+                starts = sorted({texts[1].winfo_rootx() for texts in texts_of})
+                if starts[-1] - starts[0] > 1:
+                    problems.append("%s%s: a list's values start at %r, not on one line" % (page, said, starts))
+                continue
+            words, value = texts_of[0][0], texts_of[0][1]
+            gap = value.winfo_rootx() - (words.winfo_rootx() + words.winfo_width())
+            if abs(gap - app.ui.px(16)) > 1:
+                problems.append("%s%s: the value %r stands %d px after its words %r, not 16" % (
+                    page, said, value.cget("text")[:20], gap, words.cget("text")[:30]))
+        for frame, _lamp, texts in state_rows(page):
+            links = [x for x in texts if str(x.cget("cursor")) == "hand2"]
+            if links and len(texts) < 3:
+                problems.append("%s%s: the state row %r leads to %r and says nothing of what is wrong" % (
+                    page, said, texts[0].cget("text")[:30], links[0].cget("text")))
+
+    # The Sound page's last game's sound, as the player leaves it at a game's end.
+    from opendmtq_client import apps, player
+    from tests.base import SOUND_RESULT
+    with open(player.result_path(), "w", encoding="utf-8") as f:
+        f.write(SOUND_RESULT.replace("gaps=0\ngame_gaps=0", "gaps=1\ngame_gaps=2"))
+    app.nav_go("sound")
+    shots.settle(app, 6, until=lambda: app.devices is not None)
+    shots.settle(app)
+    values_by_their_names("sound", "")
+    # In view for its picture, as a person scrolls to it.
+    found = [r for r in state_rows("sound") if len(r[2]) > 1]
+    if found:
+        app.body.show_widget(found[0][0])
+        shots.settle(app, 0.5)
+    shots.shot(app.root, out, "rows-%s-sound-last-gaps" % args.lang)
+    # PLAY and Help with the sign-in gone and no app on this PC: the rows that are not fine, each saying what is wrong
+    # before its link (a red row for the app, which PLAY cannot get without a sign-in).
+    app.state.forget_sign_in()
+    apps.remove(app.state.current)
+    app.state.save()
+    app.refresh_checks(force=True)
+    for page in ("play", "help"):
+        app.nav_go(page)
+        shots.settle(app)
+        values_by_their_names(page, " with no sign-in and no app")
+        shots.shot(app.root, out, "rows-%s-%s-not-ready" % (args.lang, page))
+
     # ---- A choice that brings or takes a row (Mode a window's size, the FPS counter its corner, keyboard play the
     # lanes) keeps its own row as tall whichever is chosen: its hint keeps the room of the longer of its words
     # (widgets.keep_room). Mode's hint in Korean was two lines for full screen and one for a window: the window's size
