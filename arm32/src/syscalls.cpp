@@ -761,13 +761,17 @@ void install_interrupt_handler() {
 #endif
 
 int Process::send_signal(int tid, int sig) {
-    if (sig < 1 || sig > 64) return -EINVAL;
+    // A signal the kernel does not know: EINVAL, but for a thread only once the thread is found, as the kernel looks for
+    // the thread first (tkill and tgkill of a thread there is not answer ESRCH whatever the signal).
+    const bool known = sig >= 1 && sig <= 64;
+    if (!tid && !known) return -EINVAL;
     Thread* target = nullptr;
     {
         std::lock_guard<std::mutex> g(threads_lock);
         if (tid) {
             auto it = threads.find(tid);
             if (it == threads.end()) return -ESRCH;
+            if (!known) return -EINVAL;
             target = it->second;
         } else {
             // Process-directed: the first thread not blocking it, else the first thread.
@@ -1704,10 +1708,15 @@ std::uint32_t do_syscall(Thread& t, std::uint32_t nr) {
         // 0 is the whole process to send_signal, and the C library's pthread_kill passes 0 for a thread that has ended and
         // is not joined yet (the kernel cleared its ID): another thread of the process got that signal.
         if (tid <= 0 || (nr == 268 && static_cast<int>(a0) <= 0)) return err(EINVAL);
+        // The guest's threads are all of one group, this process's: a thread named with another group's ID is no thread
+        // of it, and the kernel answers ESRCH and sends nothing, for the signal 0 too (the C library names its own,
+        // getpid(), which is_own_pid takes in either of its forms).
+        if (nr == 268 && !is_own_pid(p, static_cast<int>(a0))) return err(ESRCH);
         if (sig == 0) {
             std::lock_guard<std::mutex> g(p.threads_lock);
             return p.threads.count(tid) ? 0 : err(ESRCH);
         }
+        // ESRCH for a thread there is not before EINVAL for a signal there is not, as the kernel answers (send_signal).
         return static_cast<std::uint32_t>(p.send_signal(tid, sig));
     }
     case 67: {  // sigaction (old): handler, 32-bit mask, flags, restorer

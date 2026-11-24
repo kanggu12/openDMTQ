@@ -191,10 +191,10 @@ struct Process {
     std::map<int, Thread*> threads;
     std::mutex threads_lock;
 
-    // The process id the guest's C library works with, 0 when it is the host's. The library takes
-    // its main thread's id for the process id at start-up, and in an app the main thread is the
-    // agent's own host thread, not the host process's. Calls naming this process (kill,
-    // /proc/<pid>/) accept both.
+    // The process id the guest's C library works with, 0 until its main thread is made. The library
+    // takes its main thread's id for the process id at start-up, and in an app the main thread is the
+    // agent's own host thread, not the host process's; on Windows no thread's id is its process's.
+    // Calls naming this process (kill, tgkill, /proc/<pid>/) accept both.
     std::atomic<int> guest_pid{0};
 
     // Maps a guest path to the host path to open (sysroot redirection, virtual /proc files).

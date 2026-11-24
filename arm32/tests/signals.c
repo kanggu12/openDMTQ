@@ -1,7 +1,8 @@
 // Guest signals: a handler on the same thread, a handler on another thread blocked in a futex,
-// floats surviving a handler, a thread ID that names no thread, and the suspend/resume handshake
-// Boehm GC uses to stop threads.
+// floats surviving a handler, a thread ID that names no thread, a thread of another thread group,
+// and the suspend/resume handshake Boehm GC uses to stop threads.
 #include <errno.h>
+#include <limits.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <signal.h>
@@ -88,6 +89,33 @@ int main(void) {
     CHECK("a thread ID of 0 or below names no thread",
           r0 == -1 && e0 == EINVAL && r1 == -1 && e1 == EINVAL && r2 == -1 && e2 == EINVAL && self_hits == hits_before);
     // The checks below count the handler's runs from here, whatever this one found.
+    self_hits = hits_before;
+
+    // A thread named with another thread group's ID is none of this process's: tgkill answers ESRCH and sends nothing,
+    // for the signal 0 too. A thread there is not is ESRCH whatever the signal, as the kernel looks for the thread before
+    // the signal; a signal there is not, to a thread there is, EINVAL. INT_MAX is above every ID Linux hands out (4,194,304
+    // at most). The process names itself by getpid(), for tgkill and kill alike, as the C library's raise() and
+    // pthread_kill() do: these must still work.
+    long me = syscall(__NR_gettid);
+    long g0 = syscall(__NR_tgkill, INT_MAX, me, 0);
+    int ge0 = errno;
+    long g1 = syscall(__NR_tgkill, INT_MAX, me, SIGUSR1);
+    int ge1 = errno;
+    long g2 = syscall(__NR_tkill, INT_MAX, 65);
+    int ge2 = errno;
+    long g3 = syscall(__NR_tgkill, getpid(), INT_MAX, 65);
+    int ge3 = errno;
+    long g4 = syscall(__NR_tgkill, getpid(), me, 65);
+    int ge4 = errno;
+    long g5 = syscall(__NR_tgkill, getpid(), me, 0);
+    int g6 = kill(getpid(), 0);
+    // A signal that went anyway would have reached this thread by now.
+    usleep(20000);
+    CHECK("a thread of another thread group is none of this one's",
+          g0 == -1 && ge0 == ESRCH && g1 == -1 && ge1 == ESRCH && self_hits == hits_before);
+    CHECK("a thread there is not before a signal there is not",
+          g2 == -1 && ge2 == ESRCH && g3 == -1 && ge3 == ESRCH && g4 == -1 && ge4 == EINVAL);
+    CHECK("this process by its own ID", g5 == 0 && g6 == 0);
     self_hits = hits_before;
 
     struct sigaction alarm_action;

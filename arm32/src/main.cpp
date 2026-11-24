@@ -118,6 +118,10 @@ int main(int argc, char** argv) {
         return 1;
     }
     Thread main_thread(proc, static_cast<int>(gettid()));
+    // The guest's C library takes its main thread's id for the process id (set_tid_address's answer): on Linux that is the
+    // host's process id too, on Windows a thread's id is never its process's, and calls that name this process (kill,
+    // tgkill) know it by this.
+    proc.guest_pid.store(main_thread.tid);
     main_thread.regs()[13] = entry.sp;
     main_thread.regs()[15] = entry.pc;
     // User mode, ARM or Thumb state as the entry address says.
