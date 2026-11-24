@@ -298,12 +298,11 @@ TEXT = {
     "screen.counter.position.top_right": ("Top right", "오른쪽 위"),
     "screen.counter.position.bottom_left": ("Bottom left", "왼쪽 아래"),
     "screen.counter.position.bottom_right": ("Bottom right", "오른쪽 아래"),
-    # Where the counter really stands: the corner chosen in a song, clear of the game's buttons; in the menus under the
-    # game's header at the top right, where the game leaves room there (the player places it so, overlay_win32.cpp).
-    "screen.counter.position.hint": ("In a song it stands in this corner, clear of the game's buttons; in the menus, at "
-                                     "the top right under the game's header where the game leaves room there.",
-                                     "곡 중에는 고른 모서리에서 게임 버튼을 피해 표시되고, 메뉴에서는 자리가 있으면 게임 "
-                                     "위쪽 표시줄 아래 오른쪽에 표시됩니다."),
+    # Where the counter really stands: the corner chosen in a song, clear of the game's buttons; in the menus it waits,
+    # since no place there is clear of the game's own on every screen (the player places it so, overlay_scale.h).
+    "screen.counter.position.hint": ("In a song it stands in this corner, clear of the game's buttons; in the menus it is not "
+                                     "shown.",
+                                     "곡 중에는 고른 모서리에서 게임 버튼을 피해 표시되고, 메뉴에서는 표시되지 않습니다."),
     "screen.picture": ("Quality", "화질"),
     "screen.scale": ("Render scale", "렌더 배율"),
     "screen.scale.full": ("100% (sharpest)", "100%(가장 선명)"),
