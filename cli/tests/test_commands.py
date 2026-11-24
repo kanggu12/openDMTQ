@@ -927,13 +927,28 @@ class MessageTest(unittest.TestCase):
         # .env, then died on the notes with a traceback, and the next start no longer moved, so nothing ever said it (DEP-112).
         # Now the way to take data/ back comes first and nothing moves; notes that cannot be written leave .env as it was.
         env_text = "PUBLIC_HOST=192.168.0.10\nADMIN_PORT=8791\nADMIN_PASSWORD=x\n"
+        real_stat = os.stat
+
+        def as_left(path, *args, **kwargs):
+            """os.stat, with data/state www-data's (uid 33), as the earlier run with sudo left it: whoever runs the test
+            owns the folder it makes (root here, the runner's own user in CI), and only an owner other than the server's
+            user is the story."""
+            found = real_stat(path, *args, **kwargs)
+            if os.fspath(path) != sb.path("data/state"):
+                return found
+            # st_uid is the fifth of the ten fields a stat result is made from; the rest stay the folder's own.
+            fields = list(found[:10])
+            fields[4] = 33
+            return os.stat_result(fields)
+
         with Sandbox(env_text) as sb, mock.patch.object(system.os, "getuid", return_value=1000), \
                 mock.patch.object(system.os, "getgid", return_value=1000):
             game_data(sb)
             # data/state as the earlier run left it: there, and not this user's.
             os.makedirs(sb.path("data/state"), exist_ok=True)
-            self.assertEqual(sb.call(app.cmd_up), 1, sb.output())
-            self.assertIn("data/state belongs to uid 0, but the server runs as uid 1000", sb.output())
+            with mock.patch.object(system.os, "stat", side_effect=as_left):
+                self.assertEqual(sb.call(app.cmd_up), 1, sb.output())
+            self.assertIn("data/state belongs to uid 33, but the server runs as uid 1000", sb.output())
             self.assertIn("sudo chown -R 1000:1000", sb.output())
             self.assertEqual(sb.read(".env"), env_text.encode())
             self.assertFalse(os.path.exists(sb.path("data/state/port-moved.json")))

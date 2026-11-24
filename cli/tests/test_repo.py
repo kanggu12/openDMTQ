@@ -1099,6 +1099,11 @@ class GetScriptTest(unittest.TestCase):
         self.stubs = os.path.join(self.root, "stubs")
         os.makedirs(self.stubs)
         self.stub("id", '#!/bin/sh\ncase "$1" in -u) echo 1000 ;; -un) echo player ;; *) echo "uid=1000(player)" ;; esac\n')
+        # And sudo, as a desktop Linux has it, in a folder of its own: the system without it leaves that folder out. The
+        # line only looks for it (the stand-in install below asks nothing of it), so a call to it is said and fails;
+        # without it the line stops where a machine with no sudo stops (a CI job's container has none).
+        self.sudo = os.path.join(self.root, "sudo")
+        self.stub("sudo", '#!/bin/sh\necho "sudo was asked: $*" >&2\nexit 1\n', self.sudo)
 
     def stub(self, name, text, folder=None):
         path = os.path.join(folder or self.stubs, name)
@@ -1120,7 +1125,7 @@ class GetScriptTest(unittest.TestCase):
 
     def line(self, path=None, tag=None):
         """The line run as a pipe runs it: (its exit code, what it printed)."""
-        env = {"HOME": self.root, "PATH": path or f"{self.stubs}:{os.environ['PATH']}", "OPENDMTQ_DIR": os.path.join(self.root, "openDMTQ"),
+        env = {"HOME": self.root, "PATH": path or f"{self.stubs}:{self.sudo}:{os.environ['PATH']}", "OPENDMTQ_DIR": os.path.join(self.root, "openDMTQ"),
                "OPENDMTQ_TARBALL": "file://" + self.release()}
         if tag:
             env["OPENDMTQ_TARBALL_TAG"] = tag
