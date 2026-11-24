@@ -52,6 +52,14 @@ enum class Weight { kRegular, kSemiBold, kBold };
 // there); DMTQ Wide, the launcher's wordmark face, likewise (Windows' UI face in bold where not).
 std::unique_ptr<Gdiplus::Font> font(Weight weight, float px, bool korean);
 std::unique_ptr<Gdiplus::Font> wide_font(float px);
+// The ascent of the face font() draws that weight in at `px` pixels, and of wide_font()'s: from the top of a line, where
+// GDI+ sets words drawn at a point, down to its baseline (the family's cell ascent over its em, times the size), so that
+// words of two faces can stand on one baseline. Read from the family the overlay makes the font from, never from a font:
+// on Windows, Font::GetFamily hands back a private collection's own family, and the FontFamily it fills deletes that
+// family when it goes, so the next words drawn in the face read freed memory (the player ended so the moment the FPS
+// counter first drew; Wine's GDI+ copies the family and never showed it).
+float face_ascent(Weight weight, float px, bool korean);
+float wide_ascent(float px);
 // Loads the player's own faces from fonts\ beside the program, once, after GDI+ has started; whether they were there.
 bool load_fonts();
 // The name of the face font() draws that weight in for the language (Pretendard's, or Windows' own where the player's

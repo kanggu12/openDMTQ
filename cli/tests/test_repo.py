@@ -1226,6 +1226,23 @@ class ChildOutputTest(unittest.TestCase):
                 self.assertIn('errors="replace"', call, f"{rel}: {call}")
 
 
+class OverlayFacesTest(unittest.TestCase):
+    """The player's overlay draws its words in faces it loads into private font collections. On Windows, Font::GetFamily
+    hands back such a collection's own family, and the FontFamily it fills deletes that family when it goes: the next words
+    drawn in the face read freed memory and the player ends (an access violation the moment the FPS counter first drew,
+    in 0.11.2 before its release). Wine's GDI+ copies the family instead, so only a real Windows shows it: it is checked
+    here."""
+
+    def test_the_overlay_never_reads_a_fonts_family_back(self):
+        found = []
+        for path in sorted(glob.glob(os.path.join(ROOT, "arm32", "desktop", "*.cpp")) + glob.glob(os.path.join(ROOT, "arm32", "desktop", "*.h"))):
+            with open(path, encoding="utf-8") as f:
+                # Code alone: a comment may name it (glasstest.cpp says why it reads faces back by their pixels).
+                code = [line.split("//", 1)[0] for line in f.read().splitlines()]
+            found += [f"{os.path.relpath(path, ROOT)}:{n}" for n, line in enumerate(code, 1) if re.search(r"\bGetFamily\(", line)]
+        self.assertEqual(found, [], "Font::GetFamily on a private collection's font frees its family on Windows")
+
+
 class ImporterTest(unittest.TestCase):
     """The import opens the owner's archives with 7-Zip: what its container must not see."""
 

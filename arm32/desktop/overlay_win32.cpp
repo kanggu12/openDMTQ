@@ -319,18 +319,6 @@ RectF measure(const std::wstring& text, const Font& f) {
     return box;
 }
 
-// A face's ascent at its size: from the top of its line, where GDI+ sets words drawn at a point, down to its baseline
-// (the family's cell ascent over its em, times the font's size in pixels), so that words of two faces can stand on one
-// baseline.
-float ascent(const Font& f) {
-    FontFamily family;
-    f.GetFamily(&family);
-    const INT style = f.GetStyle();
-    const UINT16 em = family.GetEmHeight(style);
-    // A family that gives no em (none found): the size itself, a line's top no lower than its words.
-    return em ? f.GetSize() * static_cast<float>(family.GetCellAscent(style)) / static_cast<float>(em) : f.GetSize();
-}
-
 // The probe's note of words drawn (or that would be), opaque ones only: a faint one under them is no words of its own;
 // `cut` when they did not fit their box.
 void note_words(RectF box, const Color& colour, bool cut = false) {
@@ -692,9 +680,9 @@ RECT window_around(int gx, int gy, int gw, int gh) {
 }
 
 // A number set in tabular figures: each digit in the middle of a cell `cell` wide, any other character (a full stop, a
-// dash) in its own advance, the whole right-aligned on `right` with its baseline at `base`: its digits keep their
-// places as the number changes.
-void tabular(Graphics& g, const std::wstring& text, const Font& f, float cell, float right, float base, const Color& colour) {
+// dash) in its own advance, the whole right-aligned on `right` with its baseline at `base`, the face's `ascent` above
+// it (overlay_glass.h's face_ascent and wide_ascent): its digits keep their places as the number changes.
+void tabular(Graphics& g, const std::wstring& text, const Font& f, float ascent, float cell, float right, float base, const Color& colour) {
     // Each character's room, and the whole's.
     std::vector<float> room;
     float whole = 0;
@@ -705,7 +693,7 @@ void tabular(Graphics& g, const std::wstring& text, const Font& f, float cell, f
     // From the column's right edge back by the whole, each character on the middle of its room, its line's top above the
     // baseline by the face's ascent.
     float x = right - whole;
-    const float top = base - ascent(f);
+    const float top = base - ascent;
     for (std::size_t i = 0; i < text.size(); ++i) {
         const std::wstring one(1, text[i]);
         say(g, one, f, colour, PointF(x + (room[i] - measure(one, f).Width) / 2, top));
@@ -747,15 +735,17 @@ void fps_look(Paint& p, int fps, float ms, int corner, bool lit) {
     bevel(*g, glass, radius, 40, 90);
     auto figure_font = wide_font(fpx(kCounterFigure));
     auto small = counter_small();
+    // The faces' ascents, from the families the fonts were made from (never read back from a font: overlay_glass.h).
+    const float figure_ascent = wide_ascent(fpx(kCounterFigure)), small_ascent = face_ascent(Weight::kSemiBold, counter_small_px(scale()), false);
     // The frames a second: the figure, lime while they keep the display's rate.
     const Color& figure_colour = lit ? tone::kLime : tone::kPrimary;
-    tabular(*g, figure, *figure_font, faces.figure_cell, glass.X + l.numbers_right, glass.Y + l.figure_base, figure_colour);
+    tabular(*g, figure, *figure_font, figure_ascent, faces.figure_cell, glass.X + l.numbers_right, glass.Y + l.figure_base, figure_colour);
     // Its unit after it on the figure's baseline, quiet.
-    say(*g, L"FPS", *small, tone::kSecondary, PointF(glass.X + l.units_left, glass.Y + l.figure_base - ascent(*small)));
+    say(*g, L"FPS", *small, tone::kSecondary, PointF(glass.X + l.units_left, glass.Y + l.figure_base - small_ascent));
     // The mean frame time under it in the same column, and its unit in the units' column; dashes with none to give (not
     // measured yet, or no frame in the last second).
-    tabular(*g, wide(counter_time(fps, ms)), *small, faces.small_cell, glass.X + l.numbers_right, glass.Y + l.small_base, tone::kSecondary);
-    say(*g, L"ms", *small, tone::kSecondary, PointF(glass.X + l.units_left, glass.Y + l.small_base - ascent(*small)));
+    tabular(*g, wide(counter_time(fps, ms)), *small, small_ascent, faces.small_cell, glass.X + l.numbers_right, glass.Y + l.small_base, tone::kSecondary);
+    say(*g, L"ms", *small, tone::kSecondary, PointF(glass.X + l.units_left, glass.Y + l.small_base - small_ascent));
     // The words' zone: the glass's inside, as dark as its small grey words need over the frame behind it.
     const float pad_x = fpx(kCounterPadX), pad_y = fpx(kCounterPadY);
     look.zones = {Look::Zone{glass.X + pad_x / 2, glass.Y + pad_y / 2, glass.X + glass.Width - pad_x / 2, glass.Y + glass.Height - pad_y / 2, kCounterUnder}};

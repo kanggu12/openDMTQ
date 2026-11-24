@@ -347,6 +347,31 @@ std::unique_ptr<Font> wide_font(float px) {
     return std::make_unique<Font>(&windows_face(false), static_cast<REAL>(px), FontStyleBold, UnitPixel);
 }
 
+namespace {
+
+// A family's ascent at `px` in `style`: its cell ascent over its em, times the size; the size itself where it gives no
+// em (none found), a line's top no lower than its words. The family is the overlay's own (or Windows' kept one), which
+// lives as long as the player.
+float family_ascent(const FontFamily& family, INT style, float px) {
+    const UINT16 em = family.GetEmHeight(style);
+    return em ? px * static_cast<float>(family.GetCellAscent(style)) / static_cast<float>(em) : px;
+}
+
+}  // namespace
+
+float face_ascent(Weight weight, float px, bool korean) {
+    // As font() picks its family and style: the player's own face of that weight, else Windows' own for the script.
+    const FontFamily* family = weight == Weight::kBold ? g_bold.get() : weight == Weight::kSemiBold ? g_semibold.get() : g_regular.get();
+    if (family) return family_ascent(*family, weight == Weight::kBold ? FontStyleBold : FontStyleRegular, px);
+    return family_ascent(windows_face(korean), weight == Weight::kRegular ? FontStyleRegular : FontStyleBold, px);
+}
+
+float wide_ascent(float px) {
+    // As wide_font() picks them: DMTQ Wide's one face, else Windows' own in bold.
+    if (g_wide) return family_ascent(*g_wide, FontStyleRegular, px);
+    return family_ascent(windows_face(false), FontStyleBold, px);
+}
+
 // ---- the frame behind a piece
 
 namespace {

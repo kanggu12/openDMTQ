@@ -133,6 +133,34 @@ int main() {
             check(wide && same(L"OPEN DMTQ", *player::overlay::wide_font(15), Gdiplus::Font(wide, 15, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel)),
                   "the bar's name in words is drawn as DMTQ Wide's file draws it");
         }
+        // The faces' ascents, as the FPS counter sets its rows on one baseline: read from the overlay's own families, never
+        // from a font (WIN-359: on Windows, Font::GetFamily on a font of a private collection freed its family, and the
+        // counter's next words read freed memory). Pretendard's cell ascent, 1949 of its 2048 units (its file's), and DMTQ
+        // Wide's, 1165 of its 1000 (1135 in its other table); give or take a unit. And the faces draw their
+        // words as their files do after their ascents were read many times, as the counter reads them twice a second.
+        {
+            using player::overlay::face_ascent;
+            using player::overlay::wide_ascent;
+            const float semibold = face_ascent(Weight::kSemiBold, 2048, false), regular = face_ascent(Weight::kRegular, 2048, true);
+            const float figure = wide_ascent(1000);
+            const bool wide_ok = figure >= 1134.0f && figure <= 1166.0f;
+            if (std::fabs(semibold - 1949) > 1.5f || std::fabs(regular - 1949) > 1.5f || !wide_ok) {
+                std::printf("  ascents: Pretendard SemiBold %.1f, Regular %.1f of 2048; DMTQ Wide %.1f of 1000\n", static_cast<double>(semibold),
+                            static_cast<double>(regular), static_cast<double>(figure));
+            }
+            check(std::fabs(semibold - 1949) <= 1.5f && std::fabs(regular - 1949) <= 1.5f && wide_ok,
+                  "the faces' ascents read from the overlay's own families: Pretendard's 1949 of 2048, DMTQ Wide's 1135 to 1165 of 1000");
+            for (int i = 0; i < 200; ++i) {
+                face_ascent(Weight::kSemiBold, 11.0f + static_cast<float>(i % 9), false);
+                wide_ascent(18.0f + static_cast<float>(i % 9));
+            }
+            const Gdiplus::FontFamily* semibold_file = file_face(L"Pretendard-SemiBold.ttf");
+            const Gdiplus::FontFamily* wide_file = file_face(L"DMTQWide-ExtraBold.ttf");
+            check(semibold_file && wide_file &&
+                      same(L"16.7 ms FPS", *player::overlay::font(Weight::kSemiBold, 24, false), Gdiplus::Font(semibold_file, 24, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel)) &&
+                      same(L"240", *player::overlay::wide_font(24), Gdiplus::Font(wide_file, 24, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel)),
+                  "the counter's faces draw as their files do after their ascents were read 200 times");
+        }
         // The words themselves, each character drawn in each weight, against a character no face of the player's has (a
         // private use one): a face without Hangul draws every syllable as that same box (or blank), Pretendard each as its
         // own glyph, with ink.
