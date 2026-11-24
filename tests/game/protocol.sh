@@ -227,6 +227,43 @@ else
   echo "FAIL a sign-in with another phone's sign-in written meanwhile: $crowd"
   failed=1
 fi
+# Two game logins with one access token at the same moment: the other login's key written (through a second handle, as a
+# second request's write) just as this login writes its own (an authorizer of the server's own handle sees the write being
+# made). Both replies then hold the one key the sign-in keeps: the first written stays, and this login hands out that one.
+# Two keys handed out left one of the two games refused at its next start, purchase or save.
+# shellcheck disable=SC2016  # PHP code: its $variables are PHP's, not the shell's.
+crossed=$(docker exec "$NAME" php -r '
+  require "/opt/opendmtq/game/src/rpc.php";
+  $db = odq_db();
+  odq_sign_in_table($db);
+  $access = "9313|576|ANDROID|KR|crossed|1";
+  $w = $db->prepare("INSERT OR REPLACE INTO SignIn (access, puid, at) VALUES (:a, :p, :t)");
+  $w->bindValue(":a", hash("sha256", $access));
+  $w->bindValue(":p", "9313");
+  $w->bindValue(":t", time());
+  $w->execute();
+  $w->close();
+  $other = new SQLite3(odq_db_path());
+  $other->busyTimeout(5000);
+  $wrote = false;
+  $db->setAuthorizer(function (int $action, ...$what) use ($other, $access, &$wrote) {
+      if (!$wrote && $action === SQLite3::UPDATE && $what[0] === "SignIn") {
+          $wrote = true;
+          // The other login of the same token, its key written and committed first.
+          $other->exec("UPDATE SignIn SET key = \x27the-other-login-key\x27, guid = 9313 WHERE access = \x27" . hash("sha256", $access) . "\x27");
+      }
+      return SQLite3::OK;
+  });
+  $key = odq_sign_in_key($access, 9313);
+  $db->setAuthorizer(null);
+  $kept = $db->querySingle("SELECT key FROM SignIn WHERE access = \x27" . hash("sha256", $access) . "\x27");
+  echo $wrote ? "" : "no crossing ", $key === $kept && $key === "the-other-login-key" ? "one key" : "two keys: this login handed out " . var_export($key, true) . ", the sign-in keeps " . var_export($kept, true);' 2>&1) || true
+if [ "$crossed" = "one key" ]; then
+  echo "PASS two game logins with one token at the same moment hand out the one key the sign-in keeps"
+else
+  echo "FAIL two game logins with one token at the same moment: $crossed"
+  failed=1
+fi
 # A page of the site opens the database once and works out the signed-in player's figures once, whoever asks: the header
 # (the name and place at the top of every page) and MY PAGE (its profile, its account, its places) asked three times each.
 # The reads SQLite makes of the best scores' table, as an authorizer sees each statement made, on the server's database.

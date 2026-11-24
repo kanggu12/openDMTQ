@@ -90,11 +90,30 @@ function odq_sign_in_known(string $access, string $puid): bool
 /*
  * The game's login of the access token $access (one the platform's login handed out) as player $guid: the key the game is
  * to sign with, made at its first login and the same at each login after it with that token (the game logs in twice at its
- * start, with the same token); null when the database does not take it.
+ * start, with the same token); null when the database does not take it, or the platform's login did not hand the token out.
+ * Two logins with one token at the same moment hand out one key: the first written stays, and each reads back what was
+ * written, so that neither reply's key is one the server no longer has.
  */
 function odq_sign_in_key(string $access, int $guid): ?string
 {
     $db = odq_db();
+    // A key of its own for this sign-in, 32 hex characters, random: written only where the sign-in has none yet (an empty
+    // one counts as none), in the same statement that looks, so that no other login can write between the look and the
+    // write. No read comes before it: a read still open holds this handle's view of the database from its start, and the
+    // write then fails at once ("database is locked") whenever another phone's sign-in wrote meanwhile, where it would
+    // wait its turn (eight phones signing in at once lost some of their sign-ins).
+    $w = @$db->prepare("UPDATE SignIn SET key = COALESCE(NULLIF(key, ''), :k), guid = :g WHERE access = :a");
+    if (!$w) {
+        return null;
+    }
+    $w->bindValue(':k', bin2hex(random_bytes(16)), SQLITE3_TEXT);
+    $w->bindValue(':g', $guid, SQLITE3_INTEGER);
+    $w->bindValue(':a', hash('sha256', $access), SQLITE3_TEXT);
+    // Not taken, or no such sign-in (gone since the look the login made: the account's newest ones are kept).
+    if (!@$w->execute() || $db->changes() !== 1) {
+        return null;
+    }
+    // The key the sign-in holds now: this login's, or the one another login wrote first.
     $q = @$db->prepare('SELECT key FROM SignIn WHERE access = :a');
     if (!$q) {
         return null;
@@ -102,25 +121,11 @@ function odq_sign_in_key(string $access, int $guid): ?string
     $q->bindValue(':a', hash('sha256', $access), SQLITE3_TEXT);
     $r = @$q->execute();
     $row = $r ? $r->fetchArray(SQLITE3_ASSOC) : false;
-    // The read ended before the write below: a read still open holds this handle's view of the database from its start,
-    // and its write then fails at once ("database is locked") whenever another phone's sign-in wrote meanwhile, where it
-    // would wait its turn (eight phones signing in at once lost some of their sign-ins).
+    // Ended at once, as the rule above has it for every read of this handle before the request's next write.
     if ($r) {
         $r->finalize();
     }
-    if (!$row) {
-        return null;
-    }
-    // A key of its own for this sign-in: 32 hex characters, random.
-    $key = is_string($row['key']) && $row['key'] !== '' ? $row['key'] : bin2hex(random_bytes(16));
-    $w = @$db->prepare('UPDATE SignIn SET key = :k, guid = :g WHERE access = :a');
-    if (!$w) {
-        return null;
-    }
-    $w->bindValue(':k', $key, SQLITE3_TEXT);
-    $w->bindValue(':g', $guid, SQLITE3_INTEGER);
-    $w->bindValue(':a', hash('sha256', $access), SQLITE3_TEXT);
-    return @$w->execute() ? $key : null;
+    return $row && is_string($row['key']) && $row['key'] !== '' ? $row['key'] : null;
 }
 
 // The calls of a player's that the game's signature guards besides the shop's and the saves': a chart's start, which takes
