@@ -479,6 +479,100 @@ async function barsSideways(contexts) {
   check(`on screens held sideways the bars keep every section whole, clear of the keys and its own to press (${views} views)`, misses.length === 0, misses.slice(0, 8).join(' ; '));
 }
 
+// The background at the top of every page against its content column, at seven widths from a phone's to a large monitor's:
+// the shards (.facets) and the lit panes (body::before), each drawn alone (the page's content and its perforation hidden)
+// and read back pixel by pixel. No shard's light anywhere within 16 px of the column (so none under a card, at its edge or
+// in its cut corner, nor at a key of the bar, which stand in it), and no pane's edge in it: no step of more than 5 levels
+// between two pixels side by side or one under the other. What is drawn is measured, whatever draws it. Both scroll with
+// the page, so the top of it, whole, is every place they can be. Before: the shards stood in cards' cut corners and ended
+// at their edges on 50 of 147 views, and the panes' edges ran down through the column on every page.
+const BACKGROUND_PAGES = [
+  ['home', `${P}/`], ['rankings', `${P}/ranking.php`], ['rankings-month', `${P}/ranking.php?sort=month`], ['songs', `${P}/songs.php`],
+  ['song', `${P}/song.php?id=1`], ['player', `${P}/player.php?id=1`], ['live', `${P}/live.php`], ['download', `${P}/download.php`],
+  ['my page', `${P}/me.php`], ['licenses', `${P}/licenses.php`],
+  ['admin-status', `${A}/`], ['admin-app', `${A}/app`], ['admin-songs', `${A}/songs`], ['admin-players', `${A}/players`],
+  ['admin-player', `${A}/players/1`], ['admin-accounts', `${A}/accounts`], ['admin-recordings', `${A}/recordings`],
+  ['admin-backups', `${A}/backups`], ['admin-notices', `${A}/maintenance`], ['admin-server', `${A}/server`],
+  ['admin-requests', `${A}/logs`], ['admin-setup', `${A}/setup?step=files`],
+];
+async function backgroundClear(contexts) {
+  const misses = [];
+  let views = 0;
+  // A page of its own reads the pictures back (a canvas), with nothing else on it.
+  const reader = await contexts.anon.newPage();
+  await reader.setContent('<canvas></canvas>');
+  const read = (png, band, mode) => reader.evaluate(async (b64, band, mode) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${b64}`;
+    await img.decode();
+    const c = document.querySelector('canvas');
+    c.width = img.width;
+    c.height = img.height;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    // The band's pixels: from its left edge up to the one before its right edge (a shard may start at that edge).
+    const x0 = Math.max(0, Math.floor(band[0])), x1 = Math.min(c.width - 1, Math.ceil(band[1]) - 1);
+    const at = (x, y) => (y * c.width + x) * 4;
+    let found = 0, first = '';
+    for (let y = 0; y < c.height; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const i = at(x, y);
+        let hit;
+        if (mode === 'shards') {
+          // Anything but the page's own field (#11151a): a shard's light.
+          hit = Math.abs(d[i] - 17) + Math.abs(d[i + 1] - 21) + Math.abs(d[i + 2] - 26) > 6;
+        } else {
+          // A step from this pixel to the next one across or down: an edge, where a light ends on a line. More than the
+          // browser's own dithering of a smooth light (2 levels either way, so steps of 4), less than the panes' old edge
+          // (14 levels where it was whole).
+          const step = j => Math.max(Math.abs(d[i] - d[j]), Math.abs(d[i + 1] - d[j + 1]), Math.abs(d[i + 2] - d[j + 2]));
+          hit = (x < x1 && step(at(x + 1, y)) > 5) || (y + 1 < c.height && step(at(x, y + 1)) > 5);
+        }
+        if (hit && !found++) first = `${x},${y} rgb(${d[i]},${d[i + 1]},${d[i + 2]})`;
+      }
+    }
+    return { found, first };
+  }, png, band, mode);
+  for (const [name, url] of BACKGROUND_PAGES) {
+    const page = await contexts.signed.newPage();
+    await page.setViewport({ width: 1280, height: 900 });
+    await page.setCookie({ name: 'opendmtq_lang', value: 'en', url });
+    await page.goto(url, { waitUntil: 'networkidle2' });
+    // The motion as a page arrives, at rest.
+    await page.waitForFunction(() => !document.documentElement.classList.contains('arriving'), { timeout: 3000, polling: 100 }).catch(() => {});
+    for (const width of [360, 640, 744, 1024, 1280, 1440, 1920]) {
+      await page.setViewport({ width, height: 900 });
+      await page.evaluate(() => scrollTo(0, 0));
+      // The column the page's content stands in: its main's own room inside its padding (the bar's is the same).
+      const column = await page.evaluate(() => {
+        const main = document.querySelector('main.wrap');
+        const r = main.getBoundingClientRect(), s = getComputedStyle(main);
+        return [r.left + parseFloat(s.paddingLeft), r.right - parseFloat(s.paddingRight)];
+      });
+      const band = [column[0] - 16, column[1] + 16];
+      for (const mode of ['shards', 'panes']) {
+        views++;
+        await page.evaluate(mode => {
+          let style = document.getElementById('background-alone');
+          if (!style) { style = document.createElement('style'); style.id = 'background-alone'; document.head.append(style); }
+          // The content and the perforation out of the way; then the one of the two being measured.
+          style.textContent = `body > *:not(.facets) { visibility: hidden !important; } body { background-image: none !important; }
+            ${mode === 'shards' ? 'body::before { display: none !important; }' : '.facets { display: none !important; }'}`;
+        }, mode);
+        const png = await page.screenshot({ encoding: 'base64' });
+        const seen = await read(png, band, mode);
+        if (seen.found) misses.push(`${name} ${width}: ${mode === 'shards' ? 'a shard' : "a pane's edge"} within the column (${Math.round(band[0])}..${Math.round(band[1])}) at ${seen.first}, ${seen.found} px`);
+      }
+      await page.evaluate(() => document.getElementById('background-alone').remove());
+    }
+    await page.close();
+  }
+  await reader.close();
+  check(`no shard and no pane's edge in the content column, at its cards or the bar's keys, on every page at every width (${views} views)`, misses.length === 0,
+    misses.slice(0, 8).join(' ; '));
+}
+
 // The checker itself: one of each thing it looks for must be seen.
 async function self(contexts) {
   const page = await contexts.anon.newPage();
@@ -2835,6 +2929,7 @@ async function myPage(contexts) {
     await sweep(contexts, EMPTY, FEW_WIDTHS);
   } else if (stage === 'full') {
     await sweep(contexts, FULL, ALL_WIDTHS);
+    await backgroundClear(contexts);
   } else if (stage === 'keys') {
     await keyboardMarks(contexts);
   } else if (stage === 'thispc') {

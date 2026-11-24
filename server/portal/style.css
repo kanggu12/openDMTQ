@@ -115,7 +115,9 @@ body {
   letter-spacing: -0.006em;
 }
 /* Behind everything at the top of each page, as on the game's menus: two big dark panes meeting, with the section's light
-   coming down between them. A fixed height, so it scrolls away with the page and paints once. */
+   coming down between them. A fixed height, so it scrolls away with the page and paints once. The panes' light fades out
+   across a wide band rather than ending on a line: that line ran down through the bar, the headings and the cards' glass,
+   and ended on their edges. */
 body::before {
   content: "";
   position: absolute;
@@ -124,15 +126,21 @@ body::before {
   height: 620px;
   pointer-events: none;
   background:
-    linear-gradient(115deg, rgba(255, 255, 255, 0.055) 0 22%, transparent 22.1%),
-    linear-gradient(245deg, rgba(255, 255, 255, 0.04) 0 16%, transparent 16.1%),
+    linear-gradient(115deg, rgba(255, 255, 255, 0.055) 0 12%, transparent 30%),
+    linear-gradient(245deg, rgba(255, 255, 255, 0.04) 0 8%, transparent 24%),
     radial-gradient(ellipse 70% 100% at 50% -20%, color-mix(in srgb, var(--accent) 17%, transparent), transparent 70%);
   -webkit-mask-image: linear-gradient(180deg, #000 45%, transparent);
   mask-image: linear-gradient(180deg, #000 45%, transparent);
 }
 /* The Technika shards at both edges of the page, in the section's colour: what the frosted panels pick up a little of.
-   One element: the colour is its background, the shapes (each with its own strength, all fading downwards) its mask. */
+   One element: the colour is its background, the shapes (each with its own strength, all fading downwards) its mask, the
+   left-hand ones and the right-hand ones each a layer of it. They stand outside the content column only, 16 px clear of
+   it (--room: the margin beside the column, less that), so that none runs under a card, ends at a card's edge or in its
+   cut corner, or reaches a key of the bar: as wide as the site's 1440 px drawing has them (176 and 150 of its 1440)
+   where the margin has that room, narrower where it has not, the same height. Where the margin leaves them less than
+   24 px they are not drawn: that narrow, a shard reads as a stripe along the window's edge. */
 .facets {
+  --room: max(0px, (100% - 1192px) / 2 - 16px);
   position: absolute;
   z-index: -1;
   inset: 0 0 auto;
@@ -141,9 +149,12 @@ body::before {
   height: min(900px, 100%);
   pointer-events: none;
   background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff), color-mix(in srgb, var(--accent) 70%, #000));
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='f' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23fff' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='url(%23f)'%3E%3Cpath opacity='.75' d='M1440 60 1330 0h110z'/%3E%3Cpath opacity='.62' d='M1290 70 1440 250v170l-95-120z'/%3E%3Cpath opacity='.34' d='M1345 300 1440 420v250l-40-190z'/%3E%3Cpath opacity='.72' d='M0 250 112 470 0 425z'/%3E%3Cpath opacity='.3' d='M0 425 112 470 176 900H0z'/%3E%3Cpath opacity='.16' d='M1400 480 1440 670v230h-96z'/%3E%3C/g%3E%3C/svg%3E") top / 100% 900px no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 900' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='f' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23fff' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='url(%23f)'%3E%3Cpath opacity='.75' d='M1440 60 1330 0h110z'/%3E%3Cpath opacity='.62' d='M1290 70 1440 250v170l-95-120z'/%3E%3Cpath opacity='.34' d='M1345 300 1440 420v250l-40-190z'/%3E%3Cpath opacity='.72' d='M0 250 112 470 0 425z'/%3E%3Cpath opacity='.3' d='M0 425 112 470 176 900H0z'/%3E%3Cpath opacity='.16' d='M1400 480 1440 670v230h-96z'/%3E%3C/g%3E%3C/svg%3E") top / 100% 900px no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 176 900' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='f' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23fff' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='url(%23f)'%3E%3Cpath opacity='.72' d='M0 250 112 470 0 425z'/%3E%3Cpath opacity='.3' d='M0 425 112 470 176 900H0z'/%3E%3C/g%3E%3C/svg%3E") left top / min(12.2223%, var(--room)) 900px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='1290 0 150 900' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='f' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23fff' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='url(%23f)'%3E%3Cpath opacity='.75' d='M1440 60 1330 0h110z'/%3E%3Cpath opacity='.62' d='M1290 70 1440 250v170l-95-120z'/%3E%3Cpath opacity='.34' d='M1345 300 1440 420v250l-40-190z'/%3E%3Cpath opacity='.16' d='M1400 480 1440 670v230h-96z'/%3E%3C/g%3E%3C/svg%3E") right top / min(10.4167%, var(--room)) 900px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 176 900' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='f' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23fff' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='url(%23f)'%3E%3Cpath opacity='.72' d='M0 250 112 470 0 425z'/%3E%3Cpath opacity='.3' d='M0 425 112 470 176 900H0z'/%3E%3C/g%3E%3C/svg%3E") left top / min(12.2223%, var(--room)) 900px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='1290 0 150 900' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='f' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop stop-color='%23fff'/%3E%3Cstop offset='1' stop-color='%23fff' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='url(%23f)'%3E%3Cpath opacity='.75' d='M1440 60 1330 0h110z'/%3E%3Cpath opacity='.62' d='M1290 70 1440 250v170l-95-120z'/%3E%3Cpath opacity='.34' d='M1345 300 1440 420v250l-40-190z'/%3E%3Cpath opacity='.16' d='M1400 480 1440 670v230h-96z'/%3E%3C/g%3E%3C/svg%3E") right top / min(10.4167%, var(--room)) 900px no-repeat;
 }
+@media (max-width: 1271px) { .facets { display: none; } }
 
 /* The front page's stage covers that part of the page, and the shards' lower ends would start from nothing under it. */
 body:has(.stage) .facets { display: none; }
