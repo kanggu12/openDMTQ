@@ -540,11 +540,14 @@ def _get_app(state):
 def _play(state):
     """--play: as the window's PLAY, with the game's end waited for (the installer waits for it meanwhile)."""
     from opendmtq_client import playing
+    # The 8 MB step of the download said last: the pieces come in as they arrive, a megabyte or a little more each.
+    said = {"step": -1}
 
     def report(step, done=None, total=None):
         if step == "download":
             # A line about every 8 MB, and the last.
-            if done == total or done % (8 << 20) < (1 << 20):
+            if done == total or done // (8 << 20) != said["step"]:
+                said["step"] = done // (8 << 20)
                 _say_downloading(done, total)
         else:
             _say("  " + {"app": "asking the server for its app", "starting": "starting the game",

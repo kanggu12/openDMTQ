@@ -151,10 +151,11 @@ class Source:
         """What a request goes through: for a server, the launcher's own (the server's certificate authority trusted
         for it alone, no redirect followed: server.py); for GitHub, one that follows GitHub's redirects to its file
         store, checked against Windows' own authorities."""
+        from opendmtq_client import server as srv
         if self.kind == "server":
-            from opendmtq_client import server as srv
             return srv._opener(self.base)
-        return urllib.request.build_opener()
+        # GitHub's: its answers kept to their deadlines as a server's are (server.within), its redirects followed.
+        return srv.build_opener()
 
 
 class Release:
@@ -199,10 +200,11 @@ def _request(url, method=None):
 
 def _read(source, name, version, limit):
     """A release's small file (the feed, the checksums, the signature) as bytes, at most `limit` and one more (a file
-    longer than that is none of these). Missing for a 404."""
+    longer than that is none of these), whole within READ_SECONDS however it trickles in. Missing for a 404."""
+    from opendmtq_client import server as srv
     request = _request(source.url(name, version))
     try:
-        with source.opener().open(request, timeout=READ_SECONDS) as response:
+        with srv.within(READ_SECONDS), source.opener().open(request, timeout=READ_SECONDS) as response:
             return response.read(limit + 1)
     except urllib.error.HTTPError as e:
         if e.code == 404:
@@ -262,9 +264,11 @@ def release(source, version=None):
 
 def _latest_tag(source):
     """The latest release's version on GitHub (1.2.3): its /releases/latest leads to the tag's page, whose address names
-    it. A HEAD request, as the servers' tools ask (no API, whose limit for unnamed callers a shared address runs into)."""
+    it. A HEAD request, as the servers' tools ask (no API, whose limit for unnamed callers a shared address runs into),
+    answered within READ_SECONDS however it trickles in, its redirects too."""
+    from opendmtq_client import server as srv
     request = _request(source.base + "/releases/latest", method="HEAD")
-    with source.opener().open(request, timeout=READ_SECONDS) as response:
+    with srv.within(READ_SECONDS), source.opener().open(request, timeout=READ_SECONDS) as response:
         where = response.geturl()
     found = re.search(r"/releases/tag/v(%s)/?$" % VERSION.pattern, where)
     if not found:
@@ -483,23 +487,27 @@ def _fetch(result, asset, folder):
     """One package of the release fetched into the launcher's own folder; returns its path. It stops at the size the
     feed gives and at FILE_SECONDS: a feed is never given the whole disk or the whole day. A download that fails says
     so in words."""
+    from opendmtq_client import server as srv
     name, size = asset["FileName"], asset["Size"]
     path = os.path.join(folder, name)
-    started = time.monotonic()
     request = _request(result.source.url(name, result.version))
     try:
-        with result.source.opener().open(request, timeout=READ_SECONDS) as response, open(path, "wb") as out:
+        # The whole file within FILE_SECONDS, however it trickles in: every read waits only for what is left of them
+        # (server.within), where a time checked between reads of a megabyte waited on a megabyte coming a byte at a time.
+        with srv.within(FILE_SECONDS), result.source.opener().open(request, timeout=READ_SECONDS) as response, \
+                open(path, "wb") as out:
             done = 0
             # A megabyte at a time: a package is tens of megabytes.
             for piece in iter(lambda: response.read(1 << 20), b""):
                 done += len(piece)
                 if done > size:
                     raise OSError("%s is larger than the feed says (%d bytes and more)" % (name, done))
-                if time.monotonic() - started > FILE_SECONDS:
-                    raise OSError("%s took longer than %d seconds" % (name, FILE_SECONDS))
                 out.write(piece)
     except Exception as e:  # noqa: BLE001  (the network's errors are of many kinds; each ends the same way)
-        log.warning("could not fetch %s from %s: %s", name, result.source.base, e)
+        # Its deadline passed: in a read of the file, or of the answer's start (which urllib hands on as its reason).
+        late = isinstance(e, srv.Late) or isinstance(getattr(e, "reason", None), srv.Late)
+        log.warning("could not fetch %s from %s: %s", name, result.source.base,
+                    "it took longer than %d seconds" % FILE_SECONDS if late else e)
         raise UpdateError("the update to %s could not be downloaded" % result.version, "error.update.download",
                           v=result.version) from e
     return path

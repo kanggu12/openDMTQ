@@ -374,7 +374,9 @@ The installer (`client/packaging/windows`, Velopack) puts the launcher and the p
 Run again, it offers to open, repair, update or uninstall the PC client, and Windows' Apps opens the same uninstall
 (`setup_window.py`, `removal.py`). The launcher (`client/opendmtq_client`) is the person's side: it talks to the site
 through `client.php` and `/apk` (above), keeps each server's app, and writes the player's settings into a file it starts
-the player with. Its pages run down a menu column on the left; each setting changes its own row only. The player
+the player with. Each of its answers, and each update package it fetches, comes whole within its own time however a
+server trickles it in (`server.within`: every read waits only for what is left of that time, the TLS handshake and the
+headers too). Its pages run down a menu column on the left; each setting changes its own row only. The player
 (`arm32/desktop`) is the game's side: the server's app on the arm32 runtime, its picture, sound, video, overlay and
 broadcasts; its requests reach the server as a phone's do. What each does for a player is in [the PC
 client](windows-player.md); how each works is below.

@@ -20,8 +20,13 @@ without a sign-in to its sign-in page, which here means the sign-in ended.
 
 HTTPS is checked against Windows' own certificate authorities, and for a server that brought its own authority (an
 installer downloaded from its site over HTTPS carries it, preset.py) against that one as well, for that server alone.
+
+Each answer has its deadline (within): a server that sends its answer a byte at a time keeps every single read within
+its wait, so a limit counted between reads never ends it. Inside within(seconds) every read of the thread's requests
+waits only for what is left of those seconds, whatever it reads (the TLS handshake, the headers, the body).
 """
 
+import contextlib
 import hashlib
 import http.client
 import http.cookies
@@ -31,6 +36,7 @@ import re
 import socket
 import ssl
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -112,7 +118,116 @@ class _Stay(urllib.request.HTTPRedirectHandler):
         return None
 
 
-_OPENER = urllib.request.build_opener(_Stay)
+# ---------------------------------------------------------------------------------- one deadline for a whole answer
+
+# The deadline of the answer each thread waits for now (time.monotonic()), or none: within() sets it.
+_deadline = threading.local()
+
+
+class Late(TimeoutError):
+    """An answer that had not come whole by its deadline (within)."""
+
+
+@contextlib.contextmanager
+def within(seconds):
+    """The answers of the thread's requests made inside, each whole within `seconds` from now: a read waits only for
+    what is left of them (an earlier deadline of the same thread stays, being sooner)."""
+    before = getattr(_deadline, "at", None)
+    at = time.monotonic() + seconds
+    _deadline.at = at if before is None else min(before, at)
+    try:
+        yield
+    finally:
+        _deadline.at = before
+
+
+def _wait_left(sock):
+    """Before a read of a timed socket: its wait cut to what is left of its thread's deadline, never longer than the
+    request's own timeout (kept from the socket's first read); Late once nothing is left. Nothing outside within()."""
+    own = getattr(sock, "odq_timeout", False)
+    if own is False:
+        # The request's own wait for a read, as the connection set it, before any deadline cut it.
+        own = sock.odq_timeout = sock.gettimeout()
+    at = getattr(_deadline, "at", None)
+    if at is None:
+        # No deadline: the request's own wait again (a socket a deadline cut earlier waits as it was made to).
+        sock.settimeout(own)
+        return
+    left = at - time.monotonic()
+    if left <= 0:
+        raise Late("the answer had not come whole in its time")
+    sock.settimeout(left if own is None else min(left, own))
+
+
+class _TimedSocket(socket.socket):
+    """A plain connection's socket whose every read waits only for what is left of its thread's deadline."""
+
+    def recv_into(self, buffer, nbytes=0, flags=0):
+        _wait_left(self)
+        return super().recv_into(buffer, nbytes, flags)
+
+
+class _TimedTLS(ssl.SSLSocket):
+    """The same over TLS (a context's sslsocket_class): the handshake, and every read after it."""
+
+    def do_handshake(self, block=False):
+        _wait_left(self)
+        return super().do_handshake(block)
+
+    def recv_into(self, buffer, nbytes=None, flags=0):
+        _wait_left(self)
+        return super().recv_into(buffer, nbytes, flags)
+
+
+class _Timed(http.client.HTTPConnection):
+    """A connection whose socket is a timed one (_TimedSocket), made so as soon as it is connected."""
+
+    def connect(self):
+        super().connect()
+        plain = self.sock
+        # The same connection, its socket's number handed to the timed socket; its wait as the request set it.
+        wait = plain.gettimeout()
+        self.sock = _TimedSocket(plain.family, plain.type, plain.proto, fileno=plain.detach())
+        self.sock.settimeout(wait)
+
+
+class _TimedHTTPS(http.client.HTTPSConnection, _Timed):
+    """The same over HTTPS: HTTPSConnection.connect wraps the timed socket _Timed.connect leaves (the order of the
+    classes puts _Timed.connect under it), in a TLS socket of its context's class (_TimedTLS)."""
+
+
+def _timed_context(context=None):
+    """A TLS context (Windows' authorities when none is given) whose sockets are timed ones."""
+    context = context or ssl.create_default_context()
+    context.sslsocket_class = _TimedTLS
+    return context
+
+
+class _TimedHTTPHandler(urllib.request.HTTPHandler):
+    """Plain HTTP over timed connections."""
+
+    def http_open(self, req):
+        return self.do_open(_Timed, req)
+
+
+class _TimedHTTPSHandler(urllib.request.HTTPSHandler):
+    """HTTPS over timed connections, with `context` (a _timed_context)."""
+
+    def __init__(self, context):
+        super().__init__(context=context)
+        self.odq_context = context
+
+    def https_open(self, req):
+        return self.do_open(_TimedHTTPS, req, context=self.odq_context)
+
+
+def build_opener(*handlers, context=None):
+    """An opener whose answers keep their deadlines (within), with these handlers and this TLS context (Windows'
+    authorities when none is given); one that follows redirects without _Stay among them (GitHub's file store)."""
+    return urllib.request.build_opener(_TimedHTTPHandler(), _TimedHTTPSHandler(_timed_context(context)), *handlers)
+
+
+_OPENER = build_opener(_Stay)
 # The openers for servers with an authority of their own, by (address, authority): made once each, as each context
 # reads Windows' certificate stores.
 _OWN_OPENERS = {}
@@ -174,7 +289,7 @@ def _opener(base, ca=None):
         except (ssl.SSLError, ValueError):
             # Not a certificate after all: Windows' authorities alone, as for any other server.
             return _OPENER
-        opener = urllib.request.build_opener(_Stay, urllib.request.HTTPSHandler(context=context))
+        opener = build_opener(_Stay, context=context)
         _OWN_OPENERS[(base, ca)] = opener
     return opener
 
@@ -210,12 +325,16 @@ def _unreachable(base, e):
 
 def _call(base, path, data=None, cookie=None, timeout=TIMEOUT, ca=None):
     """One request to the site; (status, its JSON answer, its headers). A status of 400 or more comes back as well.
-    `ca`: an authority to check its certificate with when `base` has none of its own (_opener)."""
+    The whole answer comes within `timeout` (within), however it trickles in. `ca`: an authority to check its
+    certificate with when `base` has none of its own (_opener)."""
     try:
-        with _opener(base, ca).open(_request(base + path, data, cookie), timeout=timeout) as response:
-            body, status, headers = response.read(), response.status, response.headers
-    except urllib.error.HTTPError as e:
-        body, status, headers = e.read(), e.code, e.headers
+        with within(timeout):
+            try:
+                with _opener(base, ca).open(_request(base + path, data, cookie), timeout=timeout) as response:
+                    body, status, headers = response.read(), response.status, response.headers
+            except urllib.error.HTTPError as e:
+                # A refusal's own words come by the same deadline.
+                body, status, headers = e.read(), e.code, e.headers
     except http.client.InvalidURL:
         # An address HTTP refuses (one a launcher kept before normalize() looked at hosts): no address, said as such.
         raise _not_an_address(base) from None
@@ -413,7 +532,7 @@ def download_app(base, cookie, info, folder, progress=None, cancel=None):
     target = os.path.join(folder, info["file"])
     part = target + ".part"
     digest = hashlib.sha256()
-    done = 0
+    done = told = 0
     try:
         with _opener(base).open(_request(base + "/apk", cookie=cookie), timeout=DOWNLOAD_TIMEOUT) as response:
             kind = (response.headers.get("Content-Type") or "").split(";")[0].strip()
@@ -424,7 +543,9 @@ def download_app(base, cookie, info, folder, progress=None, cancel=None):
                 while True:
                     if cancel is not None and cancel.is_set():
                         raise Cancelled()
-                    piece = response.read(PIECE)
+                    # What has come, up to a piece: never a wait for a whole piece, so that a server sending its
+                    # answer a few bytes at a time still hears Cancel at once.
+                    piece = response.read1(PIECE)
                     if not piece:
                         break
                     done += len(piece)
@@ -433,7 +554,9 @@ def download_app(base, cookie, info, folder, progress=None, cancel=None):
                         raise ServerError("the app arrived damaged; try again", "error.app.damaged")
                     f.write(piece)
                     digest.update(piece)
-                    if progress:
+                    if progress and (done - told >= PIECE or done == info["size"]):
+                        # Told a piece at a time, and at the end, as before: the window draws each.
+                        told = done
                         progress(done, info["size"])
                 f.flush()
                 os.fsync(f.fileno())

@@ -514,6 +514,27 @@ class Words(Updates):
                          "Stand-in의 업데이트는 OpenDMTQ 프로젝트가 서명한 것이 아니어서 설치하지 않습니다.")
 
 
+class Trickled(Folder):
+    """A package from a server's /updates/ or GitHub's releases sent a byte at a time, each byte within a read's wait:
+    given up at FILE_SECONDS, never given the whole day (main: for as long as the server trickled, here 5 s)."""
+
+    def test_a_package_that_trickles_in_is_given_up_in_time(self):
+        from tests.test_server import Trickling, timed
+        server = Trickling(what="body", kind="application/octet-stream")
+        self.addCleanup(server.stop)
+        folder = os.path.join(self.home, "fetched")
+        os.makedirs(folder)
+        asset = {"FileName": "opendmtq.client-9.9.9-full.nupkg", "Size": 2 << 20}
+        # A second for the whole file, two for a read: the reads of a byte each come well within theirs.
+        with mock.patch.object(updates, "FILE_SECONDS", 1), mock.patch.object(updates, "READ_SECONDS", 2):
+            for source in (updates.Source("server", server.base), updates.Source("github", server.base)):
+                result = updates.Result("available", version="9.9.9", source=source)
+                took, out = timed(lambda: updates._fetch(result, asset, folder))
+                self.assertIsInstance(out, updates.UpdateError, source.kind)
+                self.assertEqual(out.key, "error.update.download")
+                self.assertLess(took, 2.5, source.kind)
+
+
 class ShownVersion(unittest.TestCase):
     """WIN-125: the version the launcher shows."""
 

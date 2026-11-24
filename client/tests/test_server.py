@@ -328,3 +328,123 @@ class OwnAuthority(Folder):
         preset.hand_over({"url": self.base, "name": "Over HTTPS", "ca": self.authority(self.mine)})
         self.assertEqual(preset.take()["ca"], self.authority(self.mine))
         self.assertEqual(srv.about(self.base)["name"], "Over HTTPS")
+
+
+class Trickling:
+    """A server that sends its answer a byte at a time, each within any read's wait (DRIP seconds apart), for at most
+    LASTS seconds, then closes: its headers at once and its body trickling ("body", the app's download's too), or its
+    status line and headers trickling ("head"); over HTTPS with the certificate in `tls` (tls.ensure's folder)."""
+
+    DRIP, LASTS = 0.1, 5.0
+
+    def __init__(self, what="body", tls=None, kind="application/json", size=2 << 20):
+        import http.server
+        trickle = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                # Quiet: the test's own output only.
+                pass
+
+            def do_HEAD(self):
+                # The connection test's heads of its downloads: the headers alone, trickling as asked.
+                self.do_GET(body=False)
+
+            def do_GET(self, body=True):
+                head = ("HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n" % (kind, size)).encode()
+                started = time.monotonic()
+                try:
+                    if what == "body":
+                        # The status line and the headers at once, as a server that answers starts to.
+                        self.wfile.write(head)
+                        rest = b"x" * size if body else b""
+                    else:
+                        rest = head + (b"x" * size if body else b"")
+                    for i in range(len(rest)):
+                        if time.monotonic() - started > trickle.LASTS:
+                            break
+                        self.wfile.write(rest[i:i + 1])
+                        self.wfile.flush()
+                        time.sleep(trickle.DRIP)
+                except OSError:
+                    # The launcher went: nothing more to send.
+                    pass
+                # Never the rest: the connection ends with the answer cut short.
+                self.close_connection = True
+
+        self.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        if tls is not None:
+            import ssl
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.load_cert_chain(os.path.join(tls, "serve", "server.crt"), os.path.join(tls, "serve", "server.key"))
+            self.httpd.socket = context.wrap_socket(self.httpd.socket, server_side=True)
+        self.base = "%s://127.0.0.1:%d" % ("https" if tls else "http", self.httpd.server_address[1])
+        threading.Thread(target=self.httpd.serve_forever, kwargs={"poll_interval": stub.POLL}, daemon=True).start()
+
+    def stop(self):
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+
+def timed(job):
+    """How a job went and how long it took: (seconds, what it returned or the error it raised)."""
+    started = time.monotonic()
+    try:
+        out = job()
+    except Exception as e:  # noqa: BLE001  (the test looks at which)
+        out = e
+    return time.monotonic() - started, out
+
+
+class Deadlines(Folder):
+    """One deadline for a whole answer (server.within): a server that trickles its answer a byte at a time, each byte
+    within any read's wait, is given up at the wait of the answer, whether its body trickles, or its status line and
+    headers, over plain HTTP or HTTPS; and the app's download, which may take as long as it needs, hears Cancel at
+    once while pieces trickle in (main: each went on for as long as the server trickled, here 5 s)."""
+
+    def trickling(self, **kw):
+        server = Trickling(**kw)
+        self.addCleanup(server.stop)
+        return server
+
+    def given_up(self, server, wait=1):
+        """The server's word on itself asked with a wait of `wait` seconds: given up in time, said as no answer in time."""
+        took, out = timed(lambda: srv.about(server.base, timeout=wait))
+        self.assertLess(took, wait + 1.0, out)
+        self.assertIsInstance(out, srv.ServerError)
+        self.assertEqual(out.key, "error.server.timeout", out)
+
+    def test_an_answer_whose_body_trickles_in(self):
+        self.given_up(self.trickling(what="body"))
+
+    def test_an_answer_whose_headers_trickle_in(self):
+        self.given_up(self.trickling(what="head"))
+
+    def test_over_https_too(self):
+        tls = _tls_tool()
+        if tls is None:
+            self.skipTest("needs openssl and tools/opendmtq_tools/tls.py")
+        folder = os.path.join(self.home, "https")
+        tls.ensure(folder, "127.0.0.1")
+        server = self.trickling(what="body", tls=folder)
+        with open(os.path.join(folder, "public", "ca.crt"), encoding="utf-8") as f:
+            srv.trust(server.base, f.read().strip())
+        self.given_up(server)
+
+    def test_an_answer_in_time_is_taken_as_before(self):
+        # The deadline cuts each read's wait to what is left of it, nothing more: a server that answers is read whole,
+        # and outside a deadline a socket waits as its request said.
+        site = stub.Site().start()
+        self.addCleanup(site.stop)
+        self.assertEqual(srv.about(site.url, timeout=1)["name"], "Stand-in")
+        self.assertIsNone(getattr(srv._deadline, "at", None))
+
+    def test_the_apps_download_hears_cancel_while_pieces_trickle_in(self):
+        server = self.trickling(what="body", kind="application/vnd.android.package-archive", size=2 << 20)
+        info = {"file": "app.apk", "size": 2 << 20, "sha256": "0" * 64, "package": "app.example.stand.in"}
+        cancel = threading.Event()
+        threading.Timer(0.3, cancel.set).start()
+        took, out = timed(lambda: srv.download_app(server.base, "", info, os.path.join(self.home, "app"), cancel=cancel))
+        self.assertIsInstance(out, srv.Cancelled)
+        self.assertLess(took, 1.5)
+        self.assertEqual(os.listdir(os.path.join(self.home, "app")), [])
