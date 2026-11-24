@@ -1018,9 +1018,13 @@ function band(said, pressed) {
   }
   stack.append(said);
   bandOnTop(stack);
-  // At the screen's foot over the button just pressed: at its top for this answer.
+  // At the screen's foot (a phone's) over the button just pressed: at the screen's top for this answer, when the top
+  // leaves the button clear. A band as tall as the room above the button too (a repair's seven steps over a button in the
+  // middle) stays at the foot, where an answer's words stand: at the top it would cover as much. Weighed again from the
+  // foot with each line the answer adds, so the whole answer decides, and an earlier answer's place is not kept.
+  stack.classList.remove('at-top');
   const at = stack.getBoundingClientRect();
-  if (pressed && Math.abs(at.bottom - innerHeight) < 2 && pressed.bottom > at.top - 8) stack.classList.add('at-top');
+  if (pressed && Math.abs(at.bottom - innerHeight) < 2 && pressed.bottom > at.top - 8 && at.height + 8 <= pressed.top) stack.classList.add('at-top');
   // Five seconds for one good message, fifteen when one went wrong, and two more for each further line to read.
   const lines = stack.querySelectorAll('.flash.float');
   const wait = ([...lines].every(m => m.classList.contains('ok')) ? 5000 : 15000) + 2000 * (lines.length - 1);
@@ -1156,13 +1160,15 @@ function bandOnTop(stack = document.querySelector('.bar > .said-stack')) {
   if (!back || back.path !== location.pathname) return;
   const search = document.querySelector('input[type=search]');
   if (search && back.q) { search.value = back.q; search.dispatchEvent(new Event('input')); }
-  scrollTo(0, back.y);
   // Further down the page, the message about what was done comes as a band under the bar: it would be out of sight at the
-  // top. A good one leaves by itself.
-  if (scrollY > 0) {
+  // top. A good one leaves by itself. Floated before the page goes back to where it was: left at the page's top until
+  // then, the messages pushed everything under them down by their own height and gaps, and the page came back that much
+  // short (a repair's seven steps: its button about 410 px lower, on a phone out of sight under the band).
+  if (back.y > 0) {
     // The band under the bar, as a change made in place says it.
     for (const m of document.querySelectorAll('main .flash[data-said]')) band(m, back.pressed);
   }
+  scrollTo(0, back.y);
   // An answer about one card (the Server page's port, name, password: its address names the card): the card's top just
   // under the bar and the band, where it lay under them, its heading and first lines hidden.
   const card = location.hash.length > 1 && document.getElementById(decodeURIComponent(location.hash.slice(1)));

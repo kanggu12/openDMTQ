@@ -2612,17 +2612,22 @@ async function gameFlows(contexts) {
 // The repair's answer, pressed from its card on a laptop's screen (the page comes back there): every step it took said,
 // each one in sight and none laid over another (they were bands on one spot under the bar, the last alone readable)
 // (ADM-198). It takes the song list afresh from the stand-in files, as the admin flows' hidden song does: run.sh writes
-// the stand-in catalog again before MY PAGE.
+// the stand-in catalog again before MY PAGE. The page comes back where it was, on a laptop and on a phone: the button
+// where it was pressed (it came back about 410 px lower, the steps kept at the page's top until the page had gone back).
 async function repairSaid(contexts) {
+  // Where the repair's button stands on the screen: its top.
+  const buttonAt = p => p.$eval('#repair button', b => Math.round(b.getBoundingClientRect().top));
   const page = await contexts.signed.newPage();
   await page.setViewport({ width: 1280, height: 900 });
   await page.goto(`${A}/server`, { waitUntil: 'domcontentloaded' });
   await page.$eval('#repair button', b => b.scrollIntoView({ block: 'center' }));
+  const pressedAt = await buttonAt(page);
   await settle(page, () => page.click('#repair button'));
   // Its words, under the bar where the page came back further down, or at the page's top after a longer repair followed
   // on the page: five steps at least.
   await page.waitForFunction(() => document.querySelectorAll('.flash[data-said]').length >= 5, { timeout: 30000 }).catch(() => {});
   await pause(300);
+  const backAt = await buttonAt(page);
   const lines = await page.$$eval('.flash[data-said]', els => els.map(e => {
     const r = e.getBoundingClientRect();
     return { text: e.textContent.trim().slice(0, 50), top: Math.round(r.top), bottom: Math.round(r.bottom) };
@@ -2637,13 +2642,21 @@ async function repairSaid(contexts) {
   await page.close();
   // On a phone held upright the bar goes away with the page, so the steps stand at the foot of the screen, each in sight
   // one under another, the last on the screen's edge (under the bar they stood at the page's own foot, out of sight).
+  // Seven steps are taller than the room above the button in the middle of the screen: at the screen's top they would
+  // cover it as much as at the foot, so they stay at the foot (they went to the top, weighed against where the button
+  // stood before the page came back short).
   const phone = await contexts.signed.newPage();
   await phone.setViewport({ width: 360, height: 780, isMobile: true, hasTouch: true });
   await phone.goto(`${A}/server`, { waitUntil: 'domcontentloaded' });
   await phone.$eval('#repair button', b => b.scrollIntoView({ block: 'center' }));
+  const phonePressedAt = await buttonAt(phone);
   await settle(phone, () => phone.click('#repair button'));
   await phone.waitForFunction(() => document.querySelectorAll('.flash[data-said]').length >= 5, { timeout: 30000 }).catch(() => {});
   await pause(300);
+  const phoneBackAt = await buttonAt(phone);
+  check('the page comes back from the repair where it was, its button where it was pressed, on a laptop and a phone',
+    Math.abs(backAt - pressedAt) <= 2 && Math.abs(phoneBackAt - phonePressedAt) <= 2,
+    `1280px: pressed at ${pressedAt}, back at ${backAt}; 360px: pressed at ${phonePressedAt}, back at ${phoneBackAt}`);
   const held = await phone.$$eval('.flash[data-said]', els => els.map(e => {
     const r = e.getBoundingClientRect();
     return { top: Math.round(r.top), bottom: Math.round(r.bottom) };
