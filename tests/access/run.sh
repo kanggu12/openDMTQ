@@ -128,6 +128,19 @@ else
   fail "what the admin service sees: $seen"
 fi
 
+echo "-- exposed at a router's own port (PUBLIC_HOST=game.example.com:8443, the server's own LISTEN_PORT=8790): the refusals name the server's own"
+site -e ADMIN_ON_PUBLIC_PORT=no -e ADMIN_LOCAL=gateway -e PUBLIC_HOST=game.example.com:8443 -e LISTEN_PORT=8790
+for door in 8081 8443; do
+  # Where the admin pages open on the server PC: its own port, where a visit to localhost arrives (main named the router's
+  # 8443, where nothing answers on the server PC).
+  said=$(visit "$door" "$OUTSIDE" /opendmtq/admin/login)
+  if [ "$said" = "403 The admin pages open on the server PC: http://localhost:8790/opendmtq/admin/" ]; then
+    pass "door $door, from elsewhere, the admin pages' refusal names port 8790"
+  else
+    fail "door $door, from elsewhere, the admin pages' refusal: $said"
+  fi
+done
+
 echo "-- exposed, every visit from the gateway's address (ADMIN_LOCAL=none: Docker Desktop, rootless Docker)"
 site -e ADMIN_ON_PUBLIC_PORT=no -e ADMIN_LOCAL=none
 for door in 8081 8443; do

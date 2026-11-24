@@ -40,6 +40,9 @@ services:
       # gateway: a visit from this stack's network gateway is the server PC's own (Docker Engine); the CLI says none under
       # Docker Desktop, which passes every visit that way.
       ADMIN_LOCAL: ${ADMIN_LOCAL:-none}
+      # The server's own port, as the edge publishes it (below): where the server's refusals say the admin pages and the
+      # API open on the server PC (the address's port may be a router's, forwarded to it).
+      LISTEN_PORT: ${LISTEN_PORT:-8791}
       TZ: ${TZ:-UTC}
     # No published port: phones and browsers come in through the edge service below.
     volumes:

@@ -51,6 +51,9 @@ case "$PUBLIC_HOST" in
     *) OPENDMTQ_NAME=$PUBLIC_HOST; OPENDMTQ_PORT=80 ;;
 esac
 export OPENDMTQ_NAME OPENDMTQ_PORT
+# The server's own port, where it answers on the server PC (Docker Compose and the Helm chart give it): the address's
+# port may be a router's, which a visit to localhost does not reach. Without it, the address's.
+OWN_PORT=${LISTEN_PORT:-$OPENDMTQ_PORT}
 
 # Only the server PC may use the admin pages and the API on this door (written into the doors' configuration); anyone
 # else is told where they open. A visit with a header that a proxy adds to say whom it passes on is one from elsewhere
@@ -64,7 +67,7 @@ local_only() {
         Require ip $LOCAL_FROM
         Require expr "$NOT_FORWARDED"
     </RequireAll>
-    ErrorDocument 403 "The admin pages open on the server PC: http://localhost:$OPENDMTQ_PORT/opendmtq/admin/"
+    ErrorDocument 403 "The admin pages open on the server PC: http://localhost:$OWN_PORT/opendmtq/admin/"
 </LocationMatch>
 <LocationMatch "^/opendmtq/api(/|\$)">
     <RequireAll>
@@ -231,7 +234,7 @@ if [ -f "$PASS" ]; then
         ErrorDocument 403 "$(api_refusal use_https "This address takes the API over HTTPS only: https://$OPENDMTQ_NAME:$OPENDMTQ_PORT/opendmtq/api/v1/")"
     </If>
     <Else>
-        ErrorDocument 403 "$(api_refusal no_https "The API needs HTTPS on this address, and it is not working. Run ./opendmtq up (or ./opendmtq doctor) on the server PC, or use http://localhost:$OPENDMTQ_PORT/opendmtq/api/v1/ there. In Kubernetes, use kubectl port-forward to port 8000 of the api pod.")"
+        ErrorDocument 403 "$(api_refusal no_https "The API needs HTTPS on this address, and it is not working. Run ./opendmtq up (or ./opendmtq doctor) on the server PC, or use http://localhost:$OWN_PORT/opendmtq/api/v1/ there. In Kubernetes, use kubectl port-forward to port 8000 of the api pod.")"
     </Else>
 </LocationMatch>
 CONF
