@@ -9,9 +9,9 @@ from opendmtq_tools import il2cpp
 class Il2cppTest(unittest.TestCase):
     def test_replace_shrinks_only_the_target(self):
         # Three literals back to back, the middle one is edited.
-        data = il2cpp.build(["before", "https://dmqglb.mb.pmang.com/DMQ/rpc", "after"])
+        data = il2cpp.build(["before", "https://game.example.com/DMQ/rpc", "after"])
         m = il2cpp.Metadata(data)
-        m.replace("https://dmqglb.mb.pmang.com/DMQ/rpc", "http://10.0.0.5/DMQ/rpc")
+        m.replace("https://game.example.com/DMQ/rpc", "http://10.0.0.5/DMQ/rpc")
         # Re-read from bytes, as the game would.
         out = il2cpp.Metadata(m.tobytes())
         self.assertEqual(out.literal(1), b"http://10.0.0.5/DMQ/rpc")
@@ -21,9 +21,9 @@ class Il2cppTest(unittest.TestCase):
         self.assertEqual(len(m.tobytes()), len(data))
 
     def test_longer_replacement_is_appended_and_later_sections_shift(self):
-        data = il2cpp.build(["one", "http://pmangplus.com", "three"], tail=b"TAILDATA")
+        data = il2cpp.build(["one", "http://platform.example.com", "three"], tail=b"TAILDATA")
         m = il2cpp.Metadata(data)
-        m.replace("http://pmangplus.com", "http://192.168.219.100")
+        m.replace("http://platform.example.com", "http://192.168.219.100")
         out = m.tobytes()
         o = il2cpp.Metadata(out)
         # The long literal reads back whole; the others are unchanged.

@@ -12,20 +12,22 @@ import unittest
 import zipfile
 from unittest import mock
 
-from opendmtq_tools import axml, il2cpp, patch_apk, unity_assets
+from opendmtq_tools import axml, client_marks, il2cpp, patch_apk, unity_assets
 
 HOST = "192.168.0.10"
 NS = "http://schemas.android.com/apk/res/android"
 NO_INDEX = 0xFFFFFFFF
-# The official addresses of the original client, and those of a made-up other server.
-ORIGINAL = [patch_apk.MARKER, "https://dmqglb-dq.mb.pmang.com/DMQ/rpc", "http://www.neonapi.com/api", "http://pmangplus.com"]
+# The official addresses of the original client (client_marks: its two RPC addresses, its API base and its web base),
+# and those of a made-up other server.
+ORIGINAL = [patch_apk.MARKER, f"https://{patch_apk.OFFICIAL_RPC_HOSTS[1]}/DMQ/rpc", client_marks.API_BASE,
+            client_marks.WEB_BASE]
 OTHER = ["http://play.example.net/DMQ/rpc", "http://play.example.net/DMQ/rpc", "http://play.example.net/api",
          "http://play.example.net"]
-# Literals every client has besides: a policy page that stays as it is.
-COMMON = ["Startup", "http://www.pmangplus.com/mobile/policies/tos"]
+# Literals every client has besides: a policy page on the official web host's www name, which stays as it is.
+COMMON = ["Startup", "http://www." + client_marks.WEB_BASE.split("//", 1)[1] + "/mobile/policies/tos"]
 
 
-def manifest(package="com.neowizinternet.game.technikaq_g_a", version="1.3.4", code=1661):
+def manifest(package=client_marks.PACKAGE, version="1.3.4", code=1661):
     """A binary <manifest package=... android:versionCode=... android:versionName=...> with an empty <application>."""
     strings = ["versionCode", "versionName", "package", "android", NS, "manifest", "application", version, package]
     ids = [axml.ATTR_VERSION_CODE, axml.ATTR_VERSION_NAME]
@@ -62,7 +64,7 @@ def manifest(package="com.neowizinternet.game.technikaq_g_a", version="1.3.4", c
     return struct.pack("<HHI", 3, 8, 8 + len(body)) + body
 
 
-def apk(path, literals=None, dex=b"dex\n035\0Lcom/pmangplus/core/PPCore;", game_code=b"game code", **info):
+def apk(path, literals=None, dex=b"dex\n035\0Lcom/example/platform/Core;", game_code=b"game code", **info):
     """A small APK at path: its manifest (info: package, version, code), code, metadata (when literals are given) and
     game code."""
     with zipfile.ZipFile(path, "w") as z:
@@ -185,8 +187,10 @@ class AddressTest(unittest.TestCase):
         # A changed client often has the same edits: its addresses (pointed here by redirect_smali) and plain HTTP.
         with tempfile.TemporaryDirectory() as d, mock.patch.object(patch_apk, "log") as log:
             files = {}
+            # The SDK's addresses and its plain HTTP (client_marks' kinds): what a changed client has already.
+            by_hand = {rel for _, kind, rel, *_ in client_marks.SDK_EDITS if kind in ("address", "scheme")}
             for rel, old, new, expected in patch_apk.smali_edits(HOST):
-                done_by_hand = rel.endswith(("ApiHost.smali", "PPCore.smali", "PPCustomerCenter.smali", "RequestProcessor.smali"))
+                done_by_hand = rel in by_hand
                 files.setdefault(rel, []).append((new if done_by_hand else old) * expected)
             for rel, parts in files.items():
                 path = os.path.join(d, "smali", rel)
@@ -196,8 +200,9 @@ class AddressTest(unittest.TestCase):
             patch_apk.patch_smali(d, HOST)
             said = " ".join(str(c) for c in log.call_args_list)
             self.assertIn("already", said)
-            with open(os.path.join(d, "smali", "com/pmangplus/core/internal/request/RequestProcessor$ApiHost.smali"),
-                      encoding="utf-8") as f:
+            # The SDK's host table's file, by the edit of its API host.
+            hosts = next(edit[2] for edit in client_marks.SDK_EDITS if edit[0] == "the SDK's API host")
+            with open(os.path.join(d, "smali", hosts), encoding="utf-8") as f:
                 self.assertEqual(f.read().count(f'"{HOST}"'), 2)
 
     def test_a_package_name_of_its_own_is_replaced(self):
@@ -308,11 +313,12 @@ class ScreenNeedsTest(unittest.TestCase):
     """A screen edit that goes with a code edit stays out when the code edit did not fit (another client version)."""
 
     def test_the_shop_tab_stays_when_the_shop_still_opens_on_it(self):
-        objects = [(1, "Shop2Scene", 0, True, (0, 0)), (2, "UI_Tab", 1, True, (0, 0)), (3, "Btn_Tab1", 2, True, (0, 0)),
+        # A made-up screen with a shop's tab and another object, under names of its own.
+        objects = [(1, "ShopScreen", 0, True, (0, 0)), (2, "Tabs", 1, True, (0, 0)), (3, "Tab1", 2, True, (0, 0)),
                    (4, "Other", 1, True, (0, 0))]
         data = unity_assets.build(objects)
-        edits = {"screen": [("hide", "Shop2Scene/UI_Tab/Btn_Tab1"), ("hide", "Shop2Scene/Other")]}
-        need = {"Shop2Scene/UI_Tab/": "the shop edit"}
+        edits = {"screen": [("hide", "ShopScreen/Tabs/Tab1"), ("hide", "ShopScreen/Other")]}
+        need = {"ShopScreen/Tabs/": "the shop edit"}
         for code, tab_shown in ((set(), True), ({"the shop edit"}, False)):
             with tempfile.TemporaryDirectory() as d, mock.patch.object(patch_apk, "ASSET_EDITS", edits), \
                     mock.patch.object(patch_apk, "ASSET_NEEDS", need), mock.patch.object(patch_apk, "log"):
@@ -323,8 +329,8 @@ class ScreenNeedsTest(unittest.TestCase):
                 patch_apk.patch_assets(d, code)
                 with open(os.path.join(folder, "screen"), "rb") as f:
                     asset = unity_assets.SerializedFile(f.read())
-                self.assertEqual(asset.is_active("Shop2Scene/UI_Tab/Btn_Tab1"), tab_shown, code)
-                self.assertFalse(asset.is_active("Shop2Scene/Other"))
+                self.assertEqual(asset.is_active("ShopScreen/Tabs/Tab1"), tab_shown, code)
+                self.assertFalse(asset.is_active("ShopScreen/Other"))
 
     def test_every_need_names_a_code_edit(self):
         names = {what for what, _ in patch_apk.IL2CPP_EDITS}

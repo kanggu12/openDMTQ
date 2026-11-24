@@ -567,7 +567,7 @@ jobs:
           test "$(docker run --rm --entrypoint id "opendmtq-server:$TAG" -u)" = 33
           # The patcher's metadata editor runs inside the image.
           docker run --rm --entrypoint python3 "opendmtq-tools:$TAG" -I -c \
-            "from opendmtq_tools import il2cpp; m = il2cpp.Metadata(il2cpp.build(['http://pmangplus.com'])); m.replace('http://pmangplus.com', 'http://192.168.219.100'); print(il2cpp.Metadata(m.tobytes()).literal(0))"
+            "from opendmtq_tools import il2cpp; m = il2cpp.Metadata(il2cpp.build(['http://platform.example.com'])); m.replace('http://platform.example.com', 'http://192.168.219.100'); print(il2cpp.Metadata(m.tobytes()).literal(0))"
           # The admin app imports and answers its sign-in page.
           docker run --rm --entrypoint python3 -e ADMIN_PASSWORD=x "opendmtq-tools:$TAG" -I -c \
             "from opendmtq_tools.admin import app; c = app.test_client(); r = c.get('/opendmtq/admin/login'); assert r.status_code == 200, r.status_code; assert c.get('/opendmtq/admin/').status_code == 302; print('admin ok')"

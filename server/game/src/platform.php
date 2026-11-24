@@ -1,8 +1,8 @@
 <?php
 /*
- * What the game's platform SDK asks (the pmangplus "Neon SDK" inside the app): its login, which makes the
+ * What the game's platform SDK asks (the platform's own SDK inside the app): its login, which makes the
  * player's account, and a handful of reports and lookups that only need to succeed. Every reply is the SDK's
- * JsonResult shape: {"value": .., "result_code": "000", "result_msg": "API_OK"}.
+ * result shape: {"value": .., "result_code": "000", "result_msg": "API_OK"}.
  */
 
 require_once __DIR__ . '/config.php';

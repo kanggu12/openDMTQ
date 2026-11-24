@@ -1,7 +1,7 @@
 <?php
 /*
  * Live view: the player's switch, the phone's segments and the HLS playlist. Used by the phone's
- * endpoints (web/dmqglb.mb.pmang.com/live/*.php) and by the portal's live pages, in one place
+ * endpoints (server/game/live/*.php, at /live/) and by the portal's live pages, in one place
  * because they must agree on what "live now" means. See docs/live.md.
  *
  * On disk, for each player: /data/live/<guid>/

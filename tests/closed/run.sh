@@ -12,6 +12,9 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+# The game host's folder's name, which the import knows the game's files by (tests/game_host.py: the repository's text
+# names none of the game's own).
+GAME_HOST=$(python3 "$ROOT/tests/game_host.py")
 WHAT=${1:-all}
 BUNDLE=${ARM32_BUNDLE:-$ROOT/data/apk/arm32}
 DISTRO=${DISTRO:-ubuntu:24.04}
@@ -98,17 +101,18 @@ docker build -q -t "$SERVER_IMAGE" "$ROOT/server" >/dev/null
 mkdir -p "$KIT/content"
 docker run --rm -u "$(id -u):$(id -g)" -v "$KIT/content:/content" -v "$ROOT/tests/ui:/ui:ro" --entrypoint php "$SERVER_IMAGE" \
   /ui/make_content.php /content >/dev/null
-mkdir -p "$KIT/DMTQ/dmtq/dmqglb.mb.pmang.com" "$KIT/DMTQ/dmtq/_info"
-cp -r "$KIT/content/web/." "$KIT/DMTQ/dmtq/dmqglb.mb.pmang.com/"
+mkdir -p "$KIT/DMTQ/dmtq/$GAME_HOST" "$KIT/DMTQ/dmtq/_info"
+cp -r "$KIT/content/web/." "$KIT/DMTQ/dmtq/$GAME_HOST/"
 cp "$KIT/content/songs.json" "$KIT/DMTQ/dmtq/_info/songList.json"
-python3 - "$KIT/DMTQ/dmtq" <<'PY'
+python3 - "$KIT/DMTQ/dmtq" "$GAME_HOST" <<'PY'
 import json, os, sys
 
-root = sys.argv[1]
+# The folder of the game's files, and the game host's folder's name in it.
+root, host = sys.argv[1], sys.argv[2]
 
 
 def stand_in(rel):
-    path = os.path.join(root, "dmqglb.mb.pmang.com", rel)
+    path = os.path.join(root, host, rel)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     if not os.path.exists(path):
         with open(path, "wb") as f:

@@ -38,10 +38,10 @@ function odq_error(string $code, string $message): OdqReply
     return new OdqReply(null, ['code' => $code, 'message' => $message]);
 }
 
-/* The error for a player id the server has no account for. The client's own message names the platform's id. */
+/* The error for a player id the server has no account for, in the words of the platform's own error for it. */
 function odq_no_account(): OdqReply
 {
-    return odq_error('SVC.05001', 'Error (Invalid pmangplus(member_id) user id)');
+    return odq_error('SVC.05001', 'Error (Invalid platform member_id user id)');
 }
 
 /* game.checkKakao2Global, checkPmang2Global, checkOld2Global [puid]: is there a player of an older edition to bring over? Never. */

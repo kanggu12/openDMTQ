@@ -12,6 +12,9 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+# The game host's folder's name, which the import knows the game's files by (tests/game_host.py: the repository's text
+# names none of the game's own).
+GAME_HOST=$(python3 "$ROOT/tests/game_host.py")
 DISTRO=${DISTRO:-ubuntu:24.04}
 PORT=${PORT:-18711}
 ADMIN=$((PORT + 1))
@@ -96,8 +99,8 @@ expect "opendmtq is on the PATH, and runs the host install" inside "opendmtq --h
 #    with the client beside them when one is given (it is copied in for this run only). Nothing is imported yet: the
 #    setup pages find them there.
 inside "mkdir -p /tmp/content && php OpenDMTQ/tests/ui/make_content.php /tmp/content >/dev/null \
-  && mkdir -p Downloads/DMTQ/dmtq/dmqglb.mb.pmang.com Downloads/DMTQ/dmtq/_info \
-  && cp -r /tmp/content/web/. Downloads/DMTQ/dmtq/dmqglb.mb.pmang.com/ && cp /tmp/content/songs.json Downloads/DMTQ/dmtq/_info/songList.json"
+  && mkdir -p Downloads/DMTQ/dmtq/$GAME_HOST Downloads/DMTQ/dmtq/_info \
+  && cp -r /tmp/content/web/. Downloads/DMTQ/dmtq/$GAME_HOST/ && cp /tmp/content/songs.json Downloads/DMTQ/dmtq/_info/songList.json"
 if [ -n "${APK:-}" ]; then
   docker cp "$APK" "$NAME:/home/player/Downloads/DMTQ/client.apk"
   docker exec "$NAME" chown player /home/player/Downloads/DMTQ/client.apk

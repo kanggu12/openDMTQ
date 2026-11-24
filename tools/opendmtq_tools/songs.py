@@ -86,8 +86,8 @@ SONG_CATEGORIES = ("3", "103")
 def _product_row(header, song_id):
     """An added song's row in product_product, in the form the shipped free songs have (the product
     and platform ids equal, one game point, status N). The game looks up every listed song's product
-    there; without one its song list fails (NullReferenceException in PlaySongSlotView.ApplyDiscInfo)
-    and the game closes at the lobby."""
+    there; without one its song list fails (a NullReferenceException where the list fills in a song's
+    slot) and the game closes at the lobby."""
     pid = PRODUCT_ID_BASE + song_id
     values = {"product_id": pid, "item_id": song_id, "platform_product_id": pid, "store_product_id": "",
               "product_type": "I", "cost_game_point": 1, "cost_game_cash": 0, "status": "N",

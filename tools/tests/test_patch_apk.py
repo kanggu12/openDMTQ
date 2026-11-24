@@ -21,7 +21,7 @@ import time
 import unittest
 from unittest import mock
 
-from opendmtq_tools import unity_assets, builder, patch_apk
+from opendmtq_tools import unity_assets, builder, client_marks, patch_apk
 
 HOST = "192.168.0.10"
 
@@ -583,15 +583,18 @@ class SmaliTest(unittest.TestCase):
                 if new:
                     self.assertIn(new, text, rel)
 
-    def test_a_different_client_is_refused_with_the_file(self):
+    def test_a_different_client_is_refused_with_what_the_edit_does(self):
         with tempfile.TemporaryDirectory() as d, mock.patch.object(patch_apk, "log"):
             self.tree(d)
-            rel = "com/neowiz/externalsdkgbl/ExternalSDK.smali"
+            # The clipboard's edits' file (client_marks), written as a client without those methods has it.
+            rel = next(edit[2] for edit in client_marks.SDK_EDITS if edit[0] == "the clipboard read as empty")
             with open(os.path.join(d, "smali", rel), "w", encoding="utf-8") as f:
                 f.write("a client without the clipboard methods\n")
             with self.assertRaises(SystemExit) as e:
                 patch_apk.patch_smali(d, HOST)
-            self.assertIn("ExternalSDK.smali", str(e.exception))
+            # Said by what the edit does: the file is named after the SDK's code, which no message names.
+            self.assertIn("the clipboard read as empty", str(e.exception))
+            self.assertNotIn(rel.rsplit("/", 1)[-1], str(e.exception))
 
 
 
@@ -678,9 +681,10 @@ class CodeEditTest(unittest.TestCase):
                 self.assertIn(f"the edit ({version})", log.call_args_list[-1].args[0])
 
     def test_the_music_list_keeps_its_page_after_a_download(self):
-        # 1.3.4's UpdateSongList ends by turning the music list to its first page, wherever the song it looked for is: the
-        # edit hands SetPlaySongPage that song's page and List.get_Item the page SetPlaySongPage set, and changes nothing
-        # else there. Each word decoded as the processor reads it, so that a wrong register or offset shows.
+        # 1.3.4's method that brings the music list up to date ends by turning the list to its first page, wherever the
+        # song it looked for is: the edit hands the method that turns the list's page that song's page, and List.get_Item
+        # the page it set, and changes nothing else there. Each word decoded as the processor reads it, so that a wrong
+        # register or offset shows.
         versions = dict(patch_apk.IL2CPP_EDITS)["the music list stays at its page after a download"]
         (_, old, new), = versions["1.3.4"]
         before, after = arm_words(old), arm_words(new)
@@ -689,10 +693,10 @@ class CodeEditTest(unittest.TestCase):
         # The groups from the frame into r4 (sp + 4) become the method's closure (sp + 0x10).
         self.assertEqual(ldr_fields(before[0]), (4, SP, 0x4))
         self.assertEqual(ldr_fields(after[0]), (4, SP, 0x10))
-        # The first page (mov r1, #0) becomes the closure's initialPageIdx, the page of the song it found.
+        # The first page (mov r1, #0) becomes the closure's page of the song it found.
         self.assertEqual(before[4], MOV_R1_0)
         self.assertEqual(ldr_fields(after[4]), (1, 4, 0x8))
-        # The first group (mov r1, #0) becomes currentPage, at 0x2c of the page the method runs on (sl).
+        # The first group (mov r1, #0) becomes the page's current group, at 0x2c of the page the method runs on (sl).
         self.assertEqual(before[10], MOV_R1_0)
         self.assertEqual(ldr_fields(after[10]), (1, SL, 0x2C))
         # The groups from r4 (mov r0, r4) become the groups from the frame, where r4 had them from.

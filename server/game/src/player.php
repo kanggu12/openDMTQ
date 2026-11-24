@@ -17,7 +17,7 @@ require_once __DIR__ . '/content.php';
 require_once __DIR__ . '/util.php';
 
 /*
- * The experience each level starts at, as the client's own level table has it (client 1.3.4, LevelTable.Exp): level 1 at 0,
+ * The experience each level starts at, as the client's own level table has it (client 1.3.4, its experience column): level 1 at 0,
  * level 2 at 10, ..., level 99 at 130,408. The top bar's gauge is the share of the way from the start of the player's level
  * to the next one's, so the level and the experience the game is told must agree: the server keeps the experience and
  * works the level out of it (odq_level_of()), and a level set on the admin pages sets the experience to that level's start.

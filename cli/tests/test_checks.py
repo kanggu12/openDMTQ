@@ -166,7 +166,7 @@ class BuildStatusTest(unittest.TestCase):
         # An app for this address exists, but rebuilding it failed: every up stops on that.
         with Sandbox() as sb:
             install(sb)
-            self.status(sb, state="failed", error="smali ExternalSDK.smali: expected 1 match(es), found 0")
+            self.status(sb, state="failed", error="smali: the clipboard read as empty: expected 1 match(es), found 0; unsupported base APK")
             self.assertEqual(checks.doctor(), 1, sb.output())
             self.assertIn("expected 1 match(es), found 0", sb.output())
             self.assertIn("phones still get OpenDMTQ-x.apk", sb.output())

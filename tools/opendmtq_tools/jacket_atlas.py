@@ -2,16 +2,16 @@
 
 How the game finds a tile's image (Technika Q 1.3.4, libil2cpp):
 
-    product_item.img_url_1            the sprite name, for example e33_paperplanes (ItemInfo.ImageSelectedName)
-    text before the first "_"         e33
-    UI3DlcSprite.AtlasPrefix + that   the atlas name, d3_e33 (UI3DlcSprite.SpriteNameToAtlasName)
-    "dlc/" + atlas + ".unity3d"       a file in the phone's patch folder, opened with WWW("file://...")
-                                      (OnDemandTextureLoader.LoadAsset_Internal)
+    product_item.img_url_1            the sprite name, e<n>_<name> (the item's image name)
+    text before the first "_"         e<n>
+    the atlases' prefix + that        the atlas name, d3_e<n> (the tile sprite's own lookup)
+    "dlc/" + atlas + ".unity3d"       a file in the phone's patch folder, opened with WWW("file://...") (the game's
+                                      loader of textures on demand)
 
 Nothing in that chain lists the atlases: any name works if the patch manifest delivered the file, and
 the loader takes whatever UIAtlas component the bundle holds, by type. So an added song gets its own
 bundle, dlc/d3_e<song id>.unity3d, and the sprite name e<song id>_<name>. Song ids are never reused and
-start above the shipped atlas numbers (0 to 33), so no name meets a shipped one.
+start above the shipped atlases' numbers, so no name meets a shipped one.
 
 The bundle is a shipped jacket atlas with two objects rewritten: the texture and the atlas's sprite list.
 Reusing one keeps the parts OpenDMTQ cannot produce itself (the compiled shader, the material and the
@@ -57,7 +57,7 @@ class AtlasError(Exception):
 
 
 def atlas_name(song_id):
-    """The atlas an added song's sprite resolves to, as UI3DlcSprite.SpriteNameToAtlasName computes it."""
+    """The atlas an added song's sprite resolves to, as the game's tile sprite works it out of the sprite's name."""
     return f"d3_e{song_id}"
 
 

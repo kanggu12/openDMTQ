@@ -156,7 +156,7 @@ function odq_user_use_transfer_code(array $p)
  * board.getNoticeList [code, fromNewsId, limit]: news banners for the lobby. The official server's banners are not
  * this server's to show, so the one entry here has no picture and leads nowhere. One there must be: the client turns
  * the list into an array of entries and closes when the list is empty (an empty JSON list has no element it could
- * take the type from; InvalidCastException in WebResponseProcessor.getNoticeList).
+ * take the type from: an InvalidCastException where the client reads the news list).
  */
 function odq_board_news(array $p)
 {

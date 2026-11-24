@@ -63,9 +63,6 @@ IPA_SUFFIX = ".ipa"
 ARCHIVE_SUFFIXES = (".rar", ".zip", ".7z")
 # This project's own downloads start with its name: the apps it builds, its Windows bundle. They are none of the game's.
 OWN = "opendmtq"
-# Inside a folder of the game's files: the client's patch folder in the game host's folder (importer.host_folder has the
-# other forms).
-GAME_DIR = os.path.join("dmqglb.mb.pmang.com", "patch", "phone_new")
 # What a file or folder is (importer.what_is), kept by its path, size and time: the lists ask for each again at every
 # visit, and an archive's look takes 7-Zip a second. A folder's answer is kept this many seconds only.
 WHAT_LIFE = 60

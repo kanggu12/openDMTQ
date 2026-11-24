@@ -201,7 +201,7 @@ function odq_profiles(array $guids)
 
 /*
  * Reply rows for the given board positions (0-based indexes into $board).
- * Shape: Web.ScoresWithLevel (rank, fluctuation, guid, score, slot_item1, slot_item2, lev,
+ * Shape, as the client reads a ranking's row: (rank, fluctuation, guid, score, slot_item1, slot_item2, lev,
  * display_name); profile_img is the one extra key the official server always sent.
  */
 function odq_rows(array $board, array $indexes)
@@ -263,7 +263,7 @@ function odq_song_patterns($songId, $line)
  * TOTAL, 3/4/5 for its 2/3/4 LINE tabs) and, with guids holding the player's own guid, their own
  * rank (the top bar's RANK and "MY RANK"). The client picks a player's row by guid, so the reply is
  * the asked ranks followed by the asked players' rows that are not among them.
- * Shape: Web.GetLineTopRankWithLevelResponse {ranks: [ScoresWithLevel], rank_day: "YYYYMMDD"}.
+ * Shape, as the client reads it: {ranks: [a ranking's row], rank_day: "YYYYMMDD"}.
  */
 function odq_line_top_rank(array $params)
 {
@@ -296,7 +296,7 @@ function odq_line_top_rank(array $params)
  * game.getLineScoreRangeWithLevel [songId, line, fromRank, count]: a song's ranking on one line (the
  * song's RANK screen, the loading screen's top 5, the result screen's RANKINGS). The fourth value
  * is a count, not a last rank (the client sends toRank - fromRank + 1).
- * Shape: Web.GetLineScoreRangeWithLevelResponse {scores: [ScoresWithLevel]}.
+ * Shape, as the client reads it: {scores: [a ranking's row]}.
  */
 function odq_song_rank_range(array $params)
 {
@@ -315,7 +315,7 @@ function odq_song_rank_range(array $params)
 /*
  * game.getLineScoreMyRankWithLevel [guid, songId, line]: the player's own row in a song's ranking
  * ("MY RANK" on the song's RANK screen); no row when the player is not ranked (OUT OF RANK).
- * Shape: Web.getLineScoreMyRankWithLevelResponse {scores: [ScoresWithLevel]}.
+ * Shape, as the client reads it: {scores: [a ranking's row]}.
  */
 function odq_song_my_rank(array $params)
 {
@@ -335,7 +335,7 @@ function odq_song_my_rank(array $params)
  * of the player one place above (the result screen shows the points still needed to pass them, and
  * "RANK CHANGED" when the rank improved). The client takes the last row that is not the player's
  * as the one to beat, so the order is: the player above, then the player.
- * Shape: Web.GetLineScoreMyRankWithNextResponse {scores: [ScoresWithLevel]}.
+ * Shape, as the client reads it: {scores: [a ranking's row]}.
  */
 function odq_song_my_rank_with_next(array $params)
 {

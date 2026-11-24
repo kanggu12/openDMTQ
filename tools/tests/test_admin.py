@@ -369,7 +369,7 @@ class BuildStatusTest(unittest.TestCase):
         # bundle or key) failed: every ./opendmtq up stops on it, so the owner must see why.
         with Install() as inst:
             inst.app_for(HOST)
-            inst.status(state="failed", error="smali ExternalSDK.smali: expected 1 match(es), found 0")
+            inst.status(state="failed", error="smali: the clipboard read as empty: expected 1 match(es), found 0; unsupported base APK")
             page = self.dashboard(inst)
             self.assertIn("expected 1 match(es), found 0", page)
             self.assertIn("OpenDMTQ-x.apk", page)

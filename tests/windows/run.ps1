@@ -36,9 +36,12 @@ else { Write-Output $help; Fail "OpenDMTQ.exe starts the bundle's Python and the
 $content = Join-Path $env:RUNNER_TEMP "odq-content"
 $game = Join-Path $env:RUNNER_TEMP "odq-game"
 foreach ($d in @($content, $game)) { if (Test-Path $d) { Remove-Item -Recurse -Force $d } }
-New-Item -ItemType Directory -Force -Path $content, "$game\dmqglb.mb.pmang.com", "$game\_info" | Out-Null
+# Under the name of the game host's folder, which the import knows them by (tests/game_host.py: the repository's text
+# names none of the game's own).
+$gameHost = (python (Join-Path $repo "tests\game_host.py")).Trim()
+New-Item -ItemType Directory -Force -Path $content, "$game\$gameHost", "$game\_info" | Out-Null
 & (Join-Path $bundle "runtime\php\php.exe") -n (Join-Path $repo "tests\ui\make_content.php") $content | Out-Null
-Copy-Item -Recurse -Path "$content\web\*" -Destination "$game\dmqglb.mb.pmang.com\"
+Copy-Item -Recurse -Path "$content\web\*" -Destination "$game\$gameHost\"
 Copy-Item -Path "$content\songs.json" -Destination "$game\_info\songList.json"
 # A first start as a person makes it: no .env yet. OpenDMTQ.exe writes one (this PC's address, a free port, a password)
 # and runs the server. Windows' Python lacks some of Linux's calls for that file (no fchmod, no user ids).

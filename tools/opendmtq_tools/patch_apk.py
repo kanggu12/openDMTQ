@@ -2,13 +2,15 @@
 
 The client reaches its backend through two layers:
   * Unity IL2CPP string literals in global-metadata.dat: the game RPC and the platform API.
-  * The Java "pmangplus" SDK in classes.dex: login and platform calls, some forced to HTTPS.
+  * The platform's Java SDK in classes.dex: login and platform calls, some forced to HTTPS.
 
 Both are rewritten to http://HOST. The game keeps to plain HTTP: it would not trust the certificate
 of the server's own authority (the HTTPS on the same port is for browsers). The manifest allows
 cleartext HTTP, so the phone needs no hosts app, proxy or certificate.
 Besides the addresses, a few edits to the SDK, the game code, the game's screens and its words take out what is of
-no use on this server (smali_edits, IL2CPP_EDITS, ASSET_EDITS, patch_words).
+no use on this server (smali_edits, IL2CPP_EDITS, ASSET_EDITS, patch_words). What the client calls its servers, its
+package, its SDK's code and its screens' objects is read from client_marks, which keeps them encoded: this file says
+what each is for.
 
 Usage (inside the tools container): python3 -m opendmtq_tools.patch_apk --host 192.168.0.10 [--base FILE]
 """
@@ -32,7 +34,7 @@ import sys
 import threading
 import zipfile
 
-from . import axml, filelock, il2cpp, pack_arm64, qr, unity_assets
+from . import axml, client_marks, filelock, il2cpp, pack_arm64, qr, unity_assets
 
 # Tool version stamped into the manifest, so a portal can tell which patcher made an APK.
 VERSION = "1.13.0"
@@ -49,12 +51,13 @@ JAVA = pack_arm64.JAVA
 KEYTOOL = os.environ.get("OPENDMTQ_KEYTOOL") or "keytool"
 # IL2CPP metadata inside the APK.
 METADATA = "assets/bin/Data/Managed/Metadata/global-metadata.dat"
-# The literal every original client contains; also how base APKs are recognised.
-MARKER = "https://dmqglb.mb.pmang.com/DMQ/rpc"
-# The game's RPC, the same path on every server: how a client changed for another server is recognised, whatever host it
-# was given there. The original's two hosts for it are not another server.
+# The game's RPC, the same path on every server: a scheme, a host, then /DMQ/rpc. How the client's server address is
+# found, the original's and that of a client changed for another server alike, whatever host it was given there.
 RPC_LITERAL = re.compile(r"(https?://)([^/\s]+)/DMQ/rpc")
-OFFICIAL_RPC_HOSTS = ("dmqglb.mb.pmang.com", "dmqglb-dq.mb.pmang.com")
+# The original client's own hosts for it (client_marks), the live one first: those are no other server.
+OFFICIAL_RPC_HOSTS = client_marks.RPC_HOSTS
+# The literal every original client contains once, its live RPC address: how an original base APK is recognised.
+MARKER = f"https://{OFFICIAL_RPC_HOSTS[0]}/DMQ/rpc"
 # The class this patcher adds to the app (HOOK_SMALI): an app it built has it.
 HOOK_CLASS = b"Lcom/opendmtq/Hook;"
 # The game's code, where the code edits go (IL2CPP_EDITS).
@@ -63,8 +66,8 @@ CODE_FILE = "lib/armeabi-v7a/libil2cpp.so"
 MAX_HOST_LEN = 80
 # IPv4 address or DNS name, optionally with a port.
 HOST_RE = re.compile(r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*(?::[0-9]{1,5})?")
-# The original game's package name.
-BASE_PACKAGE = "com.neowizinternet.game.technikaq_g_a"
+# The original game's package name (client_marks): each server's app has its own after it (package_id).
+BASE_PACKAGE = client_marks.PACKAGE
 # The Android version the app says it was made for (patch_target), and android:usesCleartextTraffic's resource ID.
 TARGET_SDK = 28
 ATTR_CLEARTEXT = 0x010104ec
@@ -78,17 +81,13 @@ WORK = os.environ.get("OPENDMTQ_WORK") or "/tmp/opendmtq-apk"
 RUNTIME_DIR = os.path.join(APK_DIR, "arm32")
 
 
-# The game caps its frame rate in VariableFrameController: maxFpsVal while playing,
-# maxOutgameFpsVal in the menus (the step down when they sit idle is taken out: see IL2CPP_EDITS). Both are
-# 60 in its static constructor; the runtime sets them to the frame rate it runs at ("fps",
-# debug.arm32.framerate), which its window also asks the display for. Only NGUI reads
-# Time.frameCount, to update once per frame; the game logic times itself with Time and the audio.
-# The build adds a line "server <address>": where the runtime's live view asks and sends (see
-# arm32/src/live.cpp).
-ARM32_TWEAKS = """# arm32 runtime tweaks: <assembly> <namespace or -> <class> <field> <value or fps>
-Assembly-CSharp - VariableFrameController maxFpsVal fps
-Assembly-CSharp - VariableFrameController maxOutgameFpsVal fps
-"""
+# The game caps its frame rate in two static fields of its frame rate class: one while playing, one in the menus (the
+# step down when they sit idle is taken out: see IL2CPP_EDITS). Both are 60 in its static constructor; the runtime sets
+# them to the frame rate it runs at ("fps", debug.arm32.framerate), which its window also asks the display for: the
+# tweaks file's two lines for them are client_marks'. Only the game's UI library reads Unity's frame count, to update
+# once per frame; the game logic times itself with Unity's time and the audio. The build adds a line "server <address>":
+# where the runtime's live view asks and sends (see arm32/src/live.cpp).
+ARM32_TWEAKS = "# arm32 runtime tweaks: <assembly> <namespace or -> <class> <field> <value or fps>\n" + client_marks.TWEAKS
 
 
 def server_name(host):
@@ -251,16 +250,11 @@ def is_patchable(path):
 
 
 def metadata_edits(host):
-    """IL2CPP literals: original -> replacement."""
-    return {
-        # Game RPC endpoint, live and the -dq variant; HTTPS becomes HTTP.
-        "https://dmqglb.mb.pmang.com/DMQ/rpc": f"http://{host}/DMQ/rpc",
-        "https://dmqglb-dq.mb.pmang.com/DMQ/rpc": f"http://{host}/DMQ/rpc",
-        # Platform API base used by the Unity side.
-        "http://www.neonapi.com/api": f"http://{host}/api",
-        # Platform web base.
-        "http://pmangplus.com": f"http://{host}",
-    }
+    """The original client's IL2CPP literals: original -> replacement. Its two RPC addresses (the live one and a second of
+    the same form), whose HTTPS becomes HTTP, and its platform API base and web base (client_marks)."""
+    edits = {f"https://{name}/DMQ/rpc": f"http://{host}/DMQ/rpc" for name in OFFICIAL_RPC_HOSTS}
+    edits.update({old: new.replace("{host}", host) for old, new in client_marks.ADDRESSES.items()})
+    return edits
 
 
 def host_pattern(name):
@@ -269,9 +263,16 @@ def host_pattern(name):
 
 
 def address_edits(meta, host):
-    """The literals to rewrite in this client: the official addresses it has, and every address on the hosts of the other
-    server it was changed for (its game RPC, its API and its web base, as the official ones are)."""
-    edits = {old: new for old, new in metadata_edits(host).items() if meta.find(old)}
+    """The literals to rewrite in this client: every RPC address it has, found by its pattern (a scheme, a host, then
+    /DMQ/rpc), the official platform addresses it has, and every address on the hosts of the other server it was changed
+    for (its game RPC, its API and its web base, as the official ones are)."""
+    edits = {}
+    for i in range(len(meta.entries)):
+        text = meta.literal(i).decode("utf-8", "replace")
+        # The game's requests go to this server over plain HTTP, whatever server the client was made or changed for.
+        if RPC_LITERAL.fullmatch(text):
+            edits[text] = f"http://{host}/DMQ/rpc"
+    edits.update({old: new for old, new in metadata_edits(host).items() if meta.find(old)})
     for name in other_hosts(meta):
         pattern = host_pattern(name)
         for i in range(len(meta.entries)):
@@ -282,98 +283,48 @@ def address_edits(meta, host):
     return edits
 
 
+# The edits to the engine's own Java code (Unity's player and FMOD's audio device), which load and call the shim, each
+# with what it does: (what it does, the file under smali/, the text there, the text it becomes, how many times).
+ENGINE_EDITS = [
+    # The shim, for phones that run the game's own 32-bit libraries (arm32/shim/shim.cpp): loaded once
+    # libunity.so is, and called before each render call and after each mix of FMOD's Java output.
+    # Harmless without it: the load only logs, and Hook.ready stays false.
+    ("the shim loaded with the game's libraries", "com/unity3d/player/UnityPlayer.smali",
+     "invoke-static {}, Lcom/unity3d/player/k;->a()V",
+     'invoke-static {}, Lcom/unity3d/player/k;->a()V\n\n    const-string v0, "opendmtq"\n\n'
+     "    invoke-static {v0}, Lcom/unity3d/player/UnityPlayer;->loadLibraryStatic(Ljava/lang/String;)Z", 1),
+    ("the shim called before each render", "com/unity3d/player/UnityPlayer.smali",
+     "invoke-direct {p0}, Lcom/unity3d/player/UnityPlayer;->nativeRender()Z",
+     "invoke-static {}, Lcom/opendmtq/Hook;->render()V\n\n    "
+     "invoke-direct {p0}, Lcom/unity3d/player/UnityPlayer;->nativeRender()Z", 1),
+    ("the shim given each mix of FMOD's sound", "org/fmod/FMODAudioDevice.smali",
+     "invoke-direct {p0, v2}, Lorg/fmod/FMODAudioDevice;->fmodProcess(Ljava/nio/ByteBuffer;)I",
+     "invoke-direct {p0, v2}, Lorg/fmod/FMODAudioDevice;->fmodProcess(Ljava/nio/ByteBuffer;)I\n\n"
+     "    iget-object v2, p0, Lorg/fmod/FMODAudioDevice;->e:Ljava/nio/ByteBuffer;\n\n"
+     "    iget-object v3, p0, Lorg/fmod/FMODAudioDevice;->c:Landroid/media/AudioTrack;\n\n"
+     "    invoke-static {v2, v3}, Lcom/opendmtq/Hook;->mix(Ljava/nio/ByteBuffer;Landroid/media/AudioTrack;)V", 1),
+]
+
+
+def smali_roles():
+    """What each of smali_edits' edits does, in their order: the engine's, then the SDK's (client_marks), whose
+    addresses point at this server and take its log uploads and its customer centre's links off the internet, whose
+    requests are all built as plain HTTP (the server's HTTPS, for browsers, has a certificate the app would not trust),
+    whose sign-in goes straight to the guest login (Google Play Games' cannot succeed for a re-signed app and only put up
+    Google's screens at every start before the same guest login), which opens no Play Games screen after OPTION > Google
+    Play log out, which leaves the clipboard alone (at every sign-in the game read it for a token an older edition of the
+    game left there, took whatever text it found for one and emptied it, and Android 13 and later said so), and which
+    asks Google Play for no local prices of the game's paid items at every start (its screen for that turned the display
+    for a moment; nothing is sold through this server)."""
+    return [edit[0] for edit in ENGINE_EDITS] + [edit[0] for edit in client_marks.SDK_EDITS]
+
+
 def smali_edits(host):
-    """Java SDK edits: (file under smali/, old text, new text, expected count)."""
-    # Shared prefix of the SDK's request classes.
-    req = "com/pmangplus/core/internal/request"
-    return [
-        # The shim, for phones that run the game's own 32-bit libraries (arm32/shim/shim.cpp): loaded once
-        # libunity.so is, and called before each render call and after each mix of FMOD's Java output.
-        # Harmless without it: the load only logs, and Hook.ready stays false.
-        ("com/unity3d/player/UnityPlayer.smali", "invoke-static {}, Lcom/unity3d/player/k;->a()V",
-         'invoke-static {}, Lcom/unity3d/player/k;->a()V\n\n    const-string v0, "opendmtq"\n\n'
-         "    invoke-static {v0}, Lcom/unity3d/player/UnityPlayer;->loadLibraryStatic(Ljava/lang/String;)Z", 1),
-        ("com/unity3d/player/UnityPlayer.smali", "invoke-direct {p0}, Lcom/unity3d/player/UnityPlayer;->nativeRender()Z",
-         "invoke-static {}, Lcom/opendmtq/Hook;->render()V\n\n    "
-         "invoke-direct {p0}, Lcom/unity3d/player/UnityPlayer;->nativeRender()Z", 1),
-        ("org/fmod/FMODAudioDevice.smali", "invoke-direct {p0, v2}, Lorg/fmod/FMODAudioDevice;->fmodProcess(Ljava/nio/ByteBuffer;)I",
-         "invoke-direct {p0, v2}, Lorg/fmod/FMODAudioDevice;->fmodProcess(Ljava/nio/ByteBuffer;)I\n\n"
-         "    iget-object v2, p0, Lorg/fmod/FMODAudioDevice;->e:Ljava/nio/ByteBuffer;\n\n"
-         "    iget-object v3, p0, Lorg/fmod/FMODAudioDevice;->c:Landroid/media/AudioTrack;\n\n"
-         "    invoke-static {v2, v3}, Lcom/opendmtq/Hook;->mix(Ljava/nio/ByteBuffer;Landroid/media/AudioTrack;)V", 1),
-        # REAL host (pmangplus.com) and its static host.
-        (f"{req}/RequestProcessor$ApiHost.smali", '"pmangplus.com"', f'"{host}"', 1),
-        (f"{req}/RequestProcessor$ApiHost.smali", '"static.pmangplus.com"', f'"{host}"', 1),
-        # NEON_REAL host, listed as both host and static host.
-        (f"{req}/RequestProcessor$ApiHost.smali", '"www.neonapi.com/api"', f'"{host}/api"', 2),
-        # Log upload endpoints, so failed sends stay on the LAN.
-        ("com/pmangplus/core/internal/PPCore.smali",
-         '"http://www.neonapi.com/api/logstash/send/transaction"',
-         f'"http://{host}/api/logstash/send/transaction"', 1),
-        ("com/pmangplus/core/internal/PPCore.smali",
-         '"http://www.neonapi.com/api/logstash/send/"', f'"http://{host}/api/logstash/send/"', 1),
-        # Customer-centre web links.
-        ("com/pmangplus/ui/activity/PPCustomerCenter.smali",
-         '"https://www.neonapi.com/www"', f'"http://{host}/www"', 1),
-        ("com/pmangplus/ui/activity/PPCustomerCenter.smali",
-         '"https://www.pmangplus.com"', f'"http://{host}"', 1),
-        # Some SDK requests ask for HTTPS. The app reaches the server over plain HTTP (the server's
-        # HTTPS, for browsers, has a certificate the app would not trust), so build every URL as HTTP.
-        (f"{req}/RequestProcessor.smali",
-         "    invoke-interface {p2}, Lcom/pmangplus/core/internal/request/UrlRequest;"
-         "->getScheme()Lcom/pmangplus/core/internal/request/RequestScheme;\n\n"
-         "    move-result-object v2\n\n"
-         "    invoke-virtual {v2}, Lcom/pmangplus/core/internal/request/RequestScheme;"
-         "->name()Ljava/lang/String;\n\n"
-         "    move-result-object v2\n",
-         '    const-string v2, "HTTP"\n', 1),
-        # Login goes straight to the guest login instead of trying Google Play Games first. That
-        # sign-in cannot succeed for a re-signed APK and only puts up Google's profile or install
-        # dialog at every start before falling back to the same guest login (PPImpl$21.onError).
-        ("com/pmangplus/ui/PPImpl.smali",
-         "    invoke-virtual {p0, v2, p1, v3}, Lcom/pmangplus/ui/PPImpl;->loginByGamePlayId_DMQ"
-         "(Ljava/lang/String;Landroid/app/Activity;Lcom/pmangplus/core/PPCallback;)V\n",
-         "    invoke-virtual {p0, v2, p1, p2}, Lcom/pmangplus/ui/PPImpl;->loginByGuest_share_tq"
-         "(Ljava/lang/String;Landroid/app/Activity;Lcom/pmangplus/core/PPCallback;)V\n", 1),
-        # After OPTION > Google Play log out the SDK opens Google's Play Games sign-out screen, or
-        # on a phone without Play Games its install dialog. The game never signs in there (above),
-        # and the server's answer has already gone to the game, which restarts: both callbacks
-        # (onSuccess, onError) leave the screen out.
-        ("com/pmangplus/ui/PPImpl$19.smali",
-         "    invoke-virtual {v1, v0}, Landroid/app/Activity;->startActivity(Landroid/content/Intent;)V\n",
-         "", 2),
-        # At every sign-in the game reads the clipboard for a token the old Kakao edition left there
-        # (MigrationProcessor.SearchValidKakaoToken, the only user of these two), takes whatever
-        # text it finds for one, and empties the clipboard: the player's own copied text is lost,
-        # and Android 13 and later say it was copied. No Kakao edition hands over to this server,
-        # so the clipboard reads as empty and is never written.
-        ("com/neowiz/externalsdkgbl/ExternalSDK.smali",
-         ".method public static GetClipboard()Ljava/lang/String;\n    .locals 7\n\n    .prologue\n",
-         ".method public static GetClipboard()Ljava/lang/String;\n    .locals 7\n\n    .prologue\n"
-         "    const/4 v0, 0x0\n\n    return-object v0\n\n", 1),
-        ("com/neowiz/externalsdkgbl/ExternalSDK.smali",
-         ".method public static SetClipboard(Ljava/lang/String;)V\n    .locals 4\n"
-         "    .param p0, \"data\"    # Ljava/lang/String;\n\n    .prologue\n",
-         ".method public static SetClipboard(Ljava/lang/String;)V\n    .locals 4\n"
-         "    .param p0, \"data\"    # Ljava/lang/String;\n\n    .prologue\n    return-void\n\n", 1),
-        # Some seconds into every start the SDK opens its own screen to ask Google Play for the
-        # local prices of the game's paid items (PPPurchaseGoogleLocalPrice), which turns the
-        # display for a moment. Nothing is sold through this server: the game gets at once the
-        # answer it gets on a phone without Google Play billing.
-        ("com/pmangplus/ui/PPImpl.smali",
-         ".method public getPriceLocalization(Landroid/app/Activity;[Ljava/lang/String;)V\n    .locals 6\n"
-         "    .param p1, \"activity\"    # Landroid/app/Activity;\n    .param p2, \"list\"    # [Ljava/lang/String;\n\n"
-         "    .prologue\n",
-         ".method public getPriceLocalization(Landroid/app/Activity;[Ljava/lang/String;)V\n    .locals 6\n"
-         "    .param p1, \"activity\"    # Landroid/app/Activity;\n    .param p2, \"list\"    # [Ljava/lang/String;\n\n"
-         "    .prologue\n"
-         "    new-instance v0, Lcom/pmangplus/core/exception/MarketFailException;\n\n"
-         "    sget-object v1, Lcom/pmangplus/core/model/ErrorCode;->API_ERR_PAY_GOOGLE_NOT_SUPPORTED:Lcom/pmangplus/core/model/ErrorCode;\n\n"
-         "    invoke-direct {v0, v1}, Lcom/pmangplus/core/exception/MarketFailException;-><init>(Lcom/pmangplus/core/model/ErrorCode;)V\n\n"
-         "    const/4 v1, 0x0\n\n"
-         "    invoke-static {v1, v0}, Lcom/pmangplus/ui/internal/JSONManager;->invokeOnLocalPriceFail(Ljava/lang/String;Ljava/lang/Throwable;)V\n\n"
-         "    return-void\n\n", 1),
-    ]
+    """Java edits: (file under smali/, old text, new text, expected count), in smali_roles' order."""
+    engine = [(rel, old, new, count) for _, rel, old, new, count in ENGINE_EDITS]
+    # The SDK's: what each becomes names this server ({host}).
+    sdk = [(rel, old, new.replace("{host}", host), count) for _, _, rel, old, new, count in client_marks.SDK_EDITS]
+    return engine + sdk
 
 
 def arm_branch(at, to, link=False):
@@ -383,37 +334,38 @@ def arm_branch(at, to, link=False):
     return ((0xEB if link else 0xEA) << 24 | distance & 0xFFFFFF).to_bytes(4, "little")
 
 
-# The menu frame rate's edit (IL2CPP_EDITS): the ARM code it runs in TopFrame.OnClickMoreGames from 0x10 on (the shop's edit
-# has the 16 bytes before), up to its branch back and its literal. The instruction it took the place of (the rate asked for,
-# r1, kept in r4); the class pointer through the slot VariableFrameController.InitFrameRate reads it from; stop if the class
-# is not set up yet; its static fields (at 0x50 in the runtime's class); stop if there are none; maxOutgameFpsVal (at 0x0c)
-# when that is higher.
+# The menu frame rate's edit (IL2CPP_EDITS): the ARM code it runs in the top bar's handler for the button of the
+# publisher's other games (hidden on every screen: ASSET_EDITS) from 0x10 on (the shop's edit has the 16 bytes before), up
+# to its branch back and its literal. The instruction it took the place of (the rate asked for, r1, kept in r4); the
+# pointer to the game's frame rate class through the slot its set-up reads it from; stop if the class is not set up yet;
+# its static fields (at 0x50 in the runtime's class); stop if there are none; the menus' cap (at 0x0c) when that is
+# higher.
 _KEEP_MENU_RATE = bytes.fromhex(
     "0140a0e1 2c009fe5 00008fe0 000090e5 000090e5 000050e3 0500000a 500090e5 000050e3 0200000a"
     "0c0090e5 000054e1 0040a0b1")
 
 
 def _menu_rate(room, back, slot):
-    """That code at room (TopFrame.OnClickMoreGames + 0x10), its branch back to back (SetTargetFrameRate + 0x10), and the
-    distance from its add (room + 8, which reads the program counter 8 ahead) to slot, the class's place in the GOT."""
+    """That code at room (the other games' handler + 0x10), its branch back to back (the frame rate's setter + 0x10), and
+    the distance from its add (room + 8, which reads the program counter 8 ahead) to slot, the class's place in the GOT."""
     return _KEEP_MENU_RATE + arm_branch(room + 0x34, back) + ((slot - (room + 8 + 8)) & 0xFFFFFFFF).to_bytes(4, "little")
 
 
-# The music list's page edit (IL2CPP_EDITS): the end of SelectPlaySongPage.UpdateSongList in 1.3.4, from +0x570, where
-# the count of the list's pages is back, to the read of its page groups. As the game has it: the groups into r4 (from the
-# method's frame, sp + 4); fewer than one page, return; this; the first page; SetPlaySongPage; the GOT's List.get_Item for
+# The music list's page edit (IL2CPP_EDITS): the end of the music list's rebuild in 1.3.4, from +0x570, where the count
+# of the list's pages is back, to the read of its page groups. As the game has it: the groups into r4 (from the method's
+# frame, sp + 4); fewer than one page, return; this; the first page; the list's page setter; the GOT's List.get_Item for
 # the groups (four instructions); the first group; that method's information; the groups.
 _LIST_END = bytes.fromhex(
     "04409de5 010050e3 0f0000ba 0a00a0e1 0010a0e3 390800eb f8009fe5 f8109fe5 00008fe0 000091e7 0010a0e3 002090e5 0400a0e1")
-# The same with four words changed. r4 gets the method's closure instead (sp + 0x10, <UpdateSongList>c__AnonStorey5),
-# whose initialPageIdx (at 8) is the page of the song the rebuild looked for and found, 0 when it looked for none or did
-# not find it; SetPlaySongPage gets that page in place of the first; List.get_Item gets currentPage (at 0x2c of the
-# page, sl), which SetPlaySongPage has just set to that page within the list's pages; and the groups are read from the
-# frame where r4 had them from. Nothing else of the method moves.
+# The same with four words changed. r4 gets the method's closure instead (sp + 0x10), whose field at 8 is the page of the
+# song the rebuild looked for and found, 0 when it looked for none or did not find it; the page setter gets that page in
+# place of the first; List.get_Item gets the list's current page (at 0x2c of the page, sl), which the page setter has
+# just set to that page within the list's pages; and the groups are read from the frame where r4 had them from. Nothing
+# else of the method moves.
 _LIST_END_KEPT = bytes.fromhex(
     "10409de5 010050e3 0f0000ba 0a00a0e1 081094e5 390800eb f8009fe5 f8109fe5 00008fe0 000091e7 2c109ae5 002090e5 04009de5")
-# 1.3.5's own UpdateSongList keeps the page by itself: r4 set to 1 at the end of the part that looks for the song
-# (+0x3a8), and its end returns before SetPlaySongPage(0) while r4 is set or there are no pages (+0x574: mov r1, #0;
+# 1.3.5's own rebuild keeps the page by itself: r4 set to 1 at the end of the part that looks for the song (+0x3a8),
+# and its end returns before the page setter's turn to page 0 while r4 is set or there are no pages (+0x574: mov r1, #0;
 # cmp r0, #1; movwlt r1, #1; orrs r0, r4, r1; beq to the turn to the first page).
 _LIST_FLAG_135 = bytes.fromhex("0140a0e3")
 _LIST_END_135 = bytes.fromhex("0010a0e3 010050e3 011000b3 010094e1 0100000a")
@@ -426,33 +378,32 @@ _LIST_END_135 = bytes.fromhex("0010a0e3 010050e3 011000b3 010094e1 0100000a")
 # registration's method pointers and SymbolMap-ARMv7's functions), each edit's functions compared instruction by instruction
 # with those of 1.3.4: they are the same but where they reach other code and data, which is all moved, and where noted.
 IL2CPP_EDITS = [
-    # The main menu opens the server's event page (NoticeWebViewPopup, "NOTICE") at every start, and
-    # this server has nothing to announce there. In MainMenu2SceneConfig.OnStart the first
-    # instruction after the ClientAuthInfo check becomes a branch past the notice popup, to the
-    # nickname, how-to-play and start popups that follow; the notice's close callback
-    # (<OnStart>m__0) is empty, and the code after it rewrites every register the skipped part set.
-    # 1.3.5: the same check and popup further on in a longer OnStart (+0x898, to +0xa78). Its close callback is <OnStart>m__2
-    # there, empty too; m__0 and m__1 are new and hold FREE PASS's clock while the popup track runs, set on the track itself.
+    # The main menu opens the server's event page (its web page popup, "NOTICE") at every start, and this server has
+    # nothing to announce there. In the main menu's start method the first instruction after the check of the client's
+    # sign-in information becomes a branch past the notice popup, to the nickname, how-to-play and start popups that
+    # follow; the notice's close callback (the method's first lambda) is empty, and the code after it rewrites every
+    # register the skipped part set. 1.3.5: the same check and popup further on in a longer start method (+0x898, to
+    # +0xa78). Its close callback is the third lambda there, empty too; the first two are new and hold FREE PASS's clock
+    # while the popup track runs, set on the track itself.
     ("main menu skips the NOTICE popup", {
         "1.3.4": [(0xEF40F0, bytes.fromhex("0010a0e3" "ac61f9eb"), arm_branch(0xEF40F0, 0xEF42D0) + bytes.fromhex("ac61f9eb"))],
         "1.3.5": [(0xF39D24, bytes.fromhex("0010a0e3" "815ef9eb"), arm_branch(0xF39D24, 0xF39F04) + bytes.fromhex("815ef9eb"))],
     }),
-    # A new install fetches about 42 MB of client data from this server, and the game first asks "Additional
-    # files will be downloaded" with one button, OK. Login2SceneConfig.ShowStartPatchPopup keeps its
-    # first part, which saves the callback in the small object behind the popup's button, and then
-    # calls that button's own handler (<ShowStartPatchPopup>c__AnonStoreyA.<>m__0, which only
-    # answers true and does not look at which button) instead of building the popup.
+    # A new install fetches about 42 MB of client data from this server, and the game first asks "Additional files will
+    # be downloaded" with one button, OK. The login screen's method that shows that popup keeps its first part, which
+    # saves the callback in the small object behind the popup's button, and then calls that button's own handler (a
+    # lambda of that object, which only answers true and does not look at which button) instead of building the popup.
     ("the game's data download starts without asking", {
         "1.3.4": [(0xCF9250, bytes.fromhex("0500a0e1" "e98f0ceb" "0500a0e1"),
                    bytes.fromhex("0800a0e1") + arm_branch(0xCF9254, 0xCFD45C, link=True) + arm_branch(0xCF9258, 0xCF9618))],
         "1.3.5": [(0xCD9E50, bytes.fromhex("0500a0e1" "8a270eeb" "0500a0e1"),
                    bytes.fromhex("0800a0e1") + arm_branch(0xCD9E54, 0xCDDF90, link=True) + arm_branch(0xCD9E58, 0xCDA218))],
     }),
-    # The shop's Q tab sells only for real money through Google Play, which reaches nothing here
-    # (its tab is hidden in ASSET_EDITS), and the + by the points opens the shop on that tab.
-    # Shop2SceneConfig.SetTabType turns Q into MAX in four instructions kept in the room left by
-    # TopFrame.OnClickMoreGames, a handler whose button is hidden too: compare, swap, the first
-    # instruction it replaced, and back. (The tabs are numbered alike in both versions: Q 0, MAX 1.)
+    # The shop's Q tab sells only for real money through Google Play, which reaches nothing here (its tab is hidden in
+    # ASSET_EDITS), and the + by the points opens the shop on that tab. The shop's tab setter turns Q into MAX in four
+    # instructions kept in the room left by the top bar's handler for the publisher's other games, a handler whose
+    # button is hidden too: compare, swap, the first instruction it replaced, and back. (The tabs are numbered alike in
+    # both versions: Q 0, MAX 1.)
     ("the shop opens on its MAX tab instead of the real-money one", {
         "1.3.4": [(0xD2F4B4, bytes.fromhex("f0482de9"), arm_branch(0xD2F4B4, 0x9D735C)),
                   (0x9D735C, bytes.fromhex("f04d2de9" "18b08de2" "0080a0e1" "a0039fe5"),
@@ -461,20 +412,20 @@ IL2CPP_EDITS = [
                   (0xB4BF90, bytes.fromhex("f04d2de9" "18b08de2" "0080a0e1" "a0039fe5"),
                    bytes.fromhex("000051e3" "0110a003" "f0482de9") + arm_branch(0xB4BF9C, 0xC2C5F0))],
     }),
-    # At every start the game turned its low resolution option on for good (Startup.Initialize writes OptionData's
-    # LowResolutionGrap, whatever was saved, just before LowResolution.Apply reads it), so that on every phone it drew at two
+    # At every start the game turned its low resolution option on for good (its start-up writes the option's saved
+    # field, whatever was saved, just before the low resolution's apply reads it), so that on every phone it drew at two
     # thirds of the panel's height: 960 lines on a 1440 line panel, 720 on 1080. Written off, Apply takes the device's own
     # resolution. A device that then does not keep its frame rate goes back to the low one by itself (arm32/README.md, Resolution),
     # so the option's row is gone from the screen (ASSET_EDITS). Each part ends in the write itself (strb at 0x1a).
-    # 1.3.5 writes it as not iPhoneXAnchorInsetUpdater.IsInsetRequired(), which on Android always answers false (its
+    # 1.3.5 writes it as the negation of its check for an iPhone's notch, which on Android always answers false (its
     # whole code: mov r0, #0; bx lr), so the option is on there too: the negation becomes a zero.
     ("the panel's own resolution", {
         "1.3.4": [(0x9C385C, bytes.fromhex("0110a0e3" "0040a0e3" "1a10c0e5"), bytes.fromhex("0010a0e3" "0040a0e3" "1a10c0e5"))],
         "1.3.5": [(0xB38A04, bytes.fromhex("010020e2" "1a00c5e5"), bytes.fromhex("0000a0e3" "1a00c5e5"))],
     }),
-    # A menu left untouched drops step by step to 18 frames a second (VariableFrameController.AutoAdjustFrameRate, to save
-    # battery on the phones of its day) and jumps back at the next touch, which shows. SetTargetFrameRate now never goes below
-    # the game's cap for menus, maxOutgameFpsVal: 60 on a phone running the game's own libraries, the app's frame rate under
+    # A menu left untouched drops step by step to 18 frames a second (the frame rate class's own adjustment, to save
+    # battery on the phones of its day) and jumps back at the next touch, which shows. The frame rate's setter now never
+    # goes below the game's cap for menus: 60 on a phone running the game's own libraries, the app's frame rate under
     # the runtime, so 120 on a 120 Hz phone (a limit of 60 there judders: a timer's frames stay for two refreshes or three,
     # one frame in five measured on a Galaxy S26 Ultra). In the rest of the same dead handler: _KEEP_MENU_RATE.
     # The runtime's fallback to a lower rate lowers that cap too, so this follows it.
@@ -492,9 +443,9 @@ IL2CPP_EDITS = [
     }),
     # Songs downloaded from the music list (ticked, then DOWNLOAD; or a song's own download) left the list at its first
     # page, wherever the player was. At the download's end the game remembers the first song of the page the player is
-    # at and builds the list again from what is on the device (SelectPlaySongPage.UpdateSongList): the rebuild finds
-    # that song and turns the list to its page, then turned it to the first page every time (SetPlaySongPage(0) with
-    # OnPlaySongCenter of the first page's group); currentPage still held the player's page, so that turn moved the
+    # at and builds the list again from what is on the device (the music list's rebuild): the rebuild finds that song
+    # and turns the list to its page, then turned it to the first page every time (its page setter with page 0, centred
+    # on the first page's group); the list's current page still held the player's page, so that turn moved the
     # list. Its end now goes to the page of the song it found (_LIST_END_KEPT), and to the first page as before when it
     # looked for none: a filter or a sort still opens the list at its start. 1.3.5 keeps the page in its own code: its
     # part only reads that code and writes it back as it is.
@@ -535,14 +486,6 @@ def patch_il2cpp(path):
 
 # Where the game keeps its screens inside the APK.
 ASSET_DIR = "assets/bin/Data"
-# The button on every screen's top bar that lists the publisher's other games: it asks a server
-# that no longer exists and answers "Network connection error".
-_MORE_GAMES = "UI_Top/[CW_100]_BTN_MoreGames"
-# The lobby's list of menu entries, and the main menu's page.
-_LOBBY = "MainMenu2Scene/SelectSongPage/UI_Left/SET_BTN"
-_MENU = "MainMenu2Scene/MenuPage/Contents"
-_OPTIONS = "Option2Scene/Contents/[RQ_3300]_Scroll_view/grid"
-_SHOP_TABS = "Shop2Scene/UI_Tab"
 # The game's project settings (globalgamemanagers, a file with no names in it: the places were found by reading it with the class
 # database for Unity 5.6.5, proven by changing the byte and reading the object again, and are checked against the real clients in
 # tests/test_real_client.py): the object by its Unity class number and its size, the place in it, what is there, what goes
@@ -557,74 +500,29 @@ SETTING_EDITS = {
     "QualitySettings[Fastest].textureQuality": (CLASS_QUALITY_SETTINGS, 612, 68, 1, 0),
 }
 
-# Screens taken apart for this server: file name -> edits. Each menu entry below leads nowhere here:
-# what it did depended on the publisher's services, and what remains closes up around the gap.
-ASSET_EDITS = {
-    "0e6ef57ba72a94141971da1e5474e9c7": [
-        ("hide", f"MainMenu2Scene/SelectSongPage/{_MORE_GAMES}"),
-        # PLAY FOR FREE: ad-paid songs from an ad network; every song is free here, and the page is empty. Client 1.3.5
-        # has a second button of its own for it and turns one of the two on as the lobby opens: both also go off the
-        # screen, to the left.
-        ("hide", f"{_LOBBY}/[CW_250]_BTN_FreeMusic"),
-        ("move", f"{_LOBBY}/[CW_250]_BTN_FreeMusic", -4000, None),
-        ("hide if there", f"{_LOBBY}/[CW_250]_BTN_FreeMusic_Disable"),
-        ("move if there", f"{_LOBBY}/[CW_250]_BTN_FreeMusic_Disable", -4000, None),
-        # MUSIC SHOP: songs for sale; none are, so it is an empty page with a Purchase button.
-        ("hide", f"{_LOBBY}/[CW_250]_BTN_MusicShop"),
-        # PACKAGE: bundles for real money through Google Play.
-        ("hide", f"{_LOBBY}/[CW_250]_BTN_Package"),
-        # QUEST: the server has a fixed answer from 2017, so nothing ever progresses or pays out.
-        ("hide", f"{_LOBBY}/[CW_250]_BTN_QUEST"),
-        # The divider and HOW TO PLAY close up under MUSIC LIST.
-        ("move", f"{_LOBBY}/Line", None, -30),
-        ("move", f"{_LOBBY}/[CW_250]_BTN_HowToPlay", None, -155),
-        # The publisher's Instagram, Facebook and Twitter pages, and the line that advertises them.
-        ("hide", f"{_MENU}/[CW_100]_BTN_Instagram"),
-        ("hide", f"{_MENU}/[CW_100]_BTN_Facebook"),
-        ("hide", f"{_MENU}/[CW_100]_BTN_Twitter"),
-        ("hide", f"{_MENU}/txt_SNS"),
-        # MESSAGE: the mailbox of the publisher's operators; nobody sends anything here.
-        ("hide", f"{_MENU}/[CW_100]_BTN_Message"),
-        # The three entries left, centred.
-        ("move", f"{_MENU}/[CW_100]_BTN_Shop", -363, None),
-        ("move", f"{_MENU}/[CW_100]_BTN_Album", 0, None),
-        ("move", f"{_MENU}/[CW_100]_BTN_Option", 363, None),
-    ],
-    "8157950577fc8f3429896245b26a86c2": [
-        # RESTORE DATA / CONNECT ACCOUNT: asks to write to the publisher's customer centre.
-        ("hide", f"{_OPTIONS}/List_account"),
-        # Google Play game account, Log out: the game never signs in to Google Play here.
-        ("hide", f"{_OPTIONS}/List_logout"),
-        # CONTACT US: the publisher's customer centre.
-        ("hide", f"{_OPTIONS}/List_ask"),
-        # Low resolution graphics: the game wrote it on at every start, whatever was picked here; it is decided by itself now.
-        ("hide", f"{_OPTIONS}/List_low_resolution_graphics"),
-    ],
-    "36c46844b8387b5409454b553046b497": [
-        ("hide", f"Shop2Scene/{_MORE_GAMES}"),
-        # The Q tab: real money through Google Play (see IL2CPP_EDITS). The other three, which take
-        # the points every player has, close up.
-        ("hide", f"{_SHOP_TABS}/Btn_Tab1"),
-        ("move", f"{_SHOP_TABS}/Btn_Tab2", -387, None),
-        ("move", f"{_SHOP_TABS}/Btn_Tab3", 0, None),
-        ("move", f"{_SHOP_TABS}/Btn_Tab4", 387, None),
-    ],
-    # The same button on the other screens with a top bar.
-    "27c6912d68652cd4a9a5a5df6bff95e6": [("hide", f"MusicShop2Scene/MusicShopPage/{_MORE_GAMES}")],
-    "29d8da18d5cb7a542a2acc18fadd4781": [("hide", f"Message2Scene/{_MORE_GAMES}")],
-    "2f132335e85bef340aeb71c03c64c189": [("hide", f"MyPage2Scene/{_MORE_GAMES}")],
-    "350ed6dbd6fc4a640a2788058a7903a6": [("hide", f"Package2Scene/{_MORE_GAMES}")],
-    "588d0dca0ad8d1348be9fb473e4f7f26": [("hide", f"SongRank2Scene/{_MORE_GAMES}")],
-    "6e3ed7e511e97a940a9f6c7ac18caa13": [("hide", f"TotalRank2Scene/{_MORE_GAMES}")],
-    "cb78d9fa3663f9843a96a0784f091717": [("hide", f"Quest2Scene/{_MORE_GAMES}")],
-}
+# Screens taken apart for this server (client_marks): the screen's asset file by its name in the APK -> its edits, each
+# a hide, or a move by x and y, of an object by its path in the scene ("if there": only in a client that has it). Each
+# entry leads nowhere here: what it did depended on the publisher's services, and what remains closes up around the gap.
+#   every screen with a top bar: the button that lists the publisher's other games (it asks a server that no longer
+#     exists and answers "Network connection error");
+#   the lobby: PLAY FOR FREE (ad-paid songs from an ad network; every song is free here, and the page is empty; client
+#     1.3.5 has a second button of its own for it and turns one of the two on as the lobby opens: both also go off the
+#     screen, to the left), MUSIC SHOP (songs for sale; none are, so it is an empty page with a Purchase button), PACKAGE
+#     (bundles for real money through Google Play) and QUEST (the server has a fixed answer from 2017, so nothing ever
+#     progresses or pays out); the divider and HOW TO PLAY close up under MUSIC LIST;
+#   the menu: the publisher's Instagram, Facebook and Twitter pages and the line that advertises them, and MESSAGE (the
+#     mailbox of the publisher's operators; nobody sends anything here); the three entries left, centred;
+#   the options: the account's row (it asks to write to the publisher's customer centre), the Google Play game account's
+#     Log out (the game never signs in to Google Play here), CONTACT US (the publisher's customer centre), and the low
+#     resolution graphics (the game wrote it on at every start, whatever was picked here; it is decided by itself now);
+#   the shop: its Q tab (real money through Google Play, see IL2CPP_EDITS); the other three, which take the points every
+#     player has, close up.
+ASSET_EDITS = client_marks.SCREEN_EDITS
 
 
 # Screen edits that go with a code edit (path prefix -> the code edit's name): a client the code edit does not fit keeps
 # those parts of the screen as they were. The shop's Q tab is hidden only when the shop no longer opens on it.
-ASSET_NEEDS = {
-    f"{_SHOP_TABS}/": "the shop opens on its MAX tab instead of the real-money one",
-}
+ASSET_NEEDS = client_marks.SCREEN_NEEDS
 
 
 def setting_places(data):
@@ -855,7 +753,8 @@ def redirect_smali(root, hosts, host):
             if n:
                 with open(path, "w", encoding="utf-8") as fh:
                     fh.write(new)
-                log(f"  smali     {f}: {n}x address of the other server")
+                # Said by what it is, not by the file: the SDK's files are named after its code.
+                log(f"  smali     {n}x address of the other server in the SDK's code")
                 changed += n
     return changed
 
@@ -867,24 +766,25 @@ def patch_smali(root, host):
     os.makedirs(os.path.dirname(hook), exist_ok=True)
     with open(hook, "w", encoding="utf-8") as f:
         f.write(HOOK_SMALI)
-    for rel, old, new, expected in smali_edits(host):
+    for (rel, old, new, expected), role in zip(smali_edits(host), smali_roles()):
         path = os.path.join(root, "smali", rel)
         try:
             with open(path, encoding="utf-8") as f:
                 text = f.read()
         except FileNotFoundError:
-            raise SystemExit(f"smali {rel}: not in this client; unsupported base APK") from None
+            # Each edit is said by what it does: the files and the text are the client's own names (client_marks).
+            raise SystemExit(f"smali: {role}: not in this client; unsupported base APK") from None
         n = text.count(old)
         if n == 0 and (text.count(new) >= expected if new else True):
             # Made already (by whoever changed the client), or a call to take out that is gone: nothing to do.
-            log(f"  smali     {rel.rsplit('/', 1)[-1]}: already {(new or 'without ' + old).strip()[:48]}")
+            log(f"  smali     {role}: made already")
             continue
         # Any other count means a different client build: stop before producing a half-patched APK.
         if n != expected:
-            raise SystemExit(f"smali {rel}: expected {expected} match(es), found {n}; unsupported base APK")
+            raise SystemExit(f"smali: {role}: expected {expected} match(es), found {n}; unsupported base APK")
         with open(path, "w", encoding="utf-8") as f:
             f.write(text.replace(old, new))
-        log(f"  smali     {rel.rsplit('/', 1)[-1]}: {n}x {old.strip()[:48]}")
+        log(f"  smali     {role}: {n}x")
 
 
 def signed_builds(out_dir):

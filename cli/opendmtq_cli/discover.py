@@ -1,8 +1,10 @@
 """Find the game's files without asking: the usual download folders, Windows ones too on WSL."""
 
+import base64
 import glob
 import os
 import re
+import zlib
 
 # Words the game's files are usually named with. An archive is taken for the game's only with one of them in its
 # name: Downloads holds other archives too, and each would be opened.
@@ -17,8 +19,10 @@ LATER_PART = re.compile(r".+(?:\.part0*(?:[2-9]|\d{2,})\.rar)", re.I)
 # Inside an unpacked folder of the client data and the song data: the client's patch folder in the game host's folder,
 # or in a folder of another name with the songs or the images beside it, or by itself (patch, phone_new: the client
 # data alone, known by a client version's folder with the client's Android tables). The same marks as host_folder in
-# tools/opendmtq_tools/importer.py.
-HOST = "dmqglb.mb.pmang.com"
+# tools/opendmtq_tools/importer.py. The game host's folder by the name the game's own server gave it, kept encoded as
+# tools/opendmtq_tools/client_marks.py keeps the client's names (the repository's text names none of them): its live
+# RPC host's name, compressed and base64-encoded.
+HOST = zlib.decompress(base64.b64decode("eNpLyS1Mz0nSy03SK8hNzEvXS87PBQBIAAcj")).decode("ascii")
 PATCH_DIR = os.path.join("patch", "phone_new")
 GAME_DIR = os.path.join(HOST, PATCH_DIR)
 PATCH_NAME = "phone_new"

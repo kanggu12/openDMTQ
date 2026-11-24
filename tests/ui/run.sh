@@ -12,6 +12,9 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+# The game host's folder's name, which the import knows the game's files by (tests/game_host.py: the repository's text
+# names none of the game's own).
+GAME_HOST=$(python3 "$ROOT/tests/game_host.py")
 UI=$ROOT/tests/ui
 REPORT=$(realpath -m "${1:-$ROOT/_work/ui-report}")
 # NAME_PREFIX and TAG keep a run's containers, network and images apart from another run's on the same machine.
@@ -143,7 +146,7 @@ fi
 echo "PASS the real start script starts on the stand-in game files"
 # The game's files where the setup pages look for them: a client beside a folder of the client data and the song data in
 # Downloads (laid out as one, with nothing in it), an archive of them, and the other folders a home has.
-docker exec "$ADMIN" sh -c 'd=/home/player/Downloads/DMTQ && mkdir -p "$d/dmtq/dmqglb.mb.pmang.com/patch/phone_new" "$d/dmtq/_info" \
+docker exec "$ADMIN" sh -c 'd=/home/player/Downloads/DMTQ && mkdir -p "$d/dmtq/'"$GAME_HOST"'/patch/phone_new" "$d/dmtq/_info" \
   /home/player/Desktop /home/player/Documents /home/player/Downloads/Music && echo "[]" > "$d/dmtq/_info/songList.json" \
   && head -c 4096 /dev/zero > "$d/game.apk" && head -c 2048 /dev/zero > "/home/player/Downloads/dmtq-files.rar"'
 

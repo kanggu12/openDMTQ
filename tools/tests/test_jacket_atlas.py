@@ -85,9 +85,9 @@ class NamesTest(unittest.TestCase):
     def test_names_follow_what_the_client_computes(self):
         sprite = jacket_atlas.sprite_name(1001, "my_song")
         self.assertEqual(sprite, "e1001_my_song")
-        # UI3DlcSprite.SpriteNameToAtlasName: "d3_" and the text before the first underscore.
+        # As the game's tile sprite finds its atlas: "d3_" and the text before the first underscore.
         self.assertEqual(jacket_atlas.atlas_name(1001), "d3_" + sprite.split("_")[0])
-        # OnDemandTextureLoader.LoadAsset_Internal: "dlc/" + atlas + ".unity3d".
+        # As the game's loader of textures on demand opens it: "dlc/" + atlas + ".unity3d".
         self.assertEqual(jacket_atlas.bundle_path(1001), "dlc/d3_e1001.unity3d")
 
 

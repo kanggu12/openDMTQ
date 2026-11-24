@@ -100,9 +100,12 @@ wine cmd /c ver >/dev/null 2>&1 || true
 expect "OpenDMTQ.exe starts the bundle's Python and the host program" sh -c 'wine OpenDMTQ.exe --help 2>&1 | grep -q "Run an OpenDMTQ server without containers"'
 
 # The pages' stand-in game files, laid out like the game's client data and song data.
-mkdir -p /tmp/content /tmp/game/dmqglb.mb.pmang.com /tmp/game/_info
+# Under the name of the game host's folder, which the import knows them by (tests/game_host.py: the repository's text
+# names none of the game's own).
+GAME_HOST=$(python3 /repo/tests/game_host.py)
+mkdir -p /tmp/content "/tmp/game/$GAME_HOST" /tmp/game/_info
 php /repo/tests/ui/make_content.php /tmp/content >/dev/null
-cp -r /tmp/content/web/. /tmp/game/dmqglb.mb.pmang.com/
+cp -r /tmp/content/web/. "/tmp/game/$GAME_HOST/"
 cp /tmp/content/songs.json /tmp/game/_info/songList.json
 # A first start as a person makes it: no .env yet. OpenDMTQ.exe writes one (this PC's address, a free port, a password)
 # and runs the server, the setup pages opened. Windows' Python lacks some of Linux's calls for that file (no fchmod, no

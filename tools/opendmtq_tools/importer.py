@@ -4,12 +4,13 @@ Accepts a folder (or files) holding any mix of:
   * the game's Android client (APK): loose, inside an archive, or in an APK bundle (.xapk, .apks). Kept in
     data/apk/base, the base every phone app of this server is built from: the original, or one changed for another
     server (its build points it at this one). An app OpenDMTQ built is not a base, nor is any other app.
-  * the client data and the song data: the game host's folder (dmqglb.mb.pmang.com, or the same files in a folder of
-    another name, such as the web folder of an OpenDMTQ server's content), loose or in an archive, at any depth, with
-    or without the song list kept beside the folder or in it (_info/songList.json, or songs.json; without one the list
-    is made from the game's own tables). Or part of them, each part apart: the client's patch folder by itself (patch,
-    or phone_new: the client data alone), the songs' folder by itself (DMQ, with the jackets' viewImg and the song list
-    or without). The whole files are taken before parts of them. Copied into data/content in two parts, each on its own:
+  * the client data and the song data: the game host's folder (under the name the game's own server gave it, or the
+    same files in a folder of another name, such as the web folder of an OpenDMTQ server's content), loose or in an
+    archive, at any depth, with or without the song list kept beside the folder or in it (_info/songList.json, or
+    songs.json; without one the list is made from the game's own tables). Or part of them, each part apart: the
+    client's patch folder by itself (patch, or phone_new: the client data alone), the songs' folder by itself (DMQ,
+    with the jackets' viewImg and the song list or without). The whole files are taken before parts of them. Copied
+    into data/content in two parts, each on its own:
       client data  the client's patch folder (its tables, the images of its screens, its fonts, and every song's
                    preview and tiles in the song list), and the pictures of the news and of HOW TO PLAY
       song data    the songs' folder (music and charts), their jackets, and the song list
@@ -38,6 +39,7 @@ import subprocess
 import sys
 import tempfile
 
+from . import client_marks
 from .patch_apk import describe, inspect, sha256
 
 # What to read and where data/ is: compose's mount points, or a host install's own folders.
@@ -46,9 +48,10 @@ IN = os.environ.get("OPENDMTQ_IMPORT_IN", "/in")
 # passes for the container's /in; on a host install IN is that path already. In a container without it: from /in on.
 SHOWN = os.environ.get("IMPORT_SHOWN") or ("" if IN == "/in" else IN)
 DATA = os.environ.get("OPENDMTQ_DATA", "/data")
-# The client data and the song data: the game host's folder, with the client's patch folder in it. An old server kept
-# a song list beside that folder; the list is optional (made from the game's own tables without it).
-HOST = "dmqglb.mb.pmang.com"
+# The client data and the song data: the game host's folder, with the client's patch folder in it, under the name the
+# game's own server gave it, its live RPC host's (client_marks), or any other (host_folder: by what is in it). An old
+# server kept a song list beside that folder; the list is optional (made from the game's own tables without it).
+HOST = client_marks.RPC_HOSTS[0]
 GAME_DIR = HOST + "/patch/phone_new"
 PATCH_DIR = "patch/phone_new"
 SONG_LIST = "_info/songList.json"
@@ -139,7 +142,7 @@ def patch_of(host):
 
 
 def host_folder(path, alone=True, chosen=False):
-    """What stands for the game host's folder in or at path, or None: path/dmqglb.mb.pmang.com, or path itself when it
+    """What stands for the game host's folder in or at path, or None: path/HOST, or path itself when it
     holds the same files under another name (the client's patch folder, and the songs' or the images' folder beside
     it), or path/web in an OpenDMTQ server's content folder. Else, unless alone is False, the client data alone: path,
     when it holds the client's patch folder by itself (patch/phone_new) or is that folder (patch, phone_new). The
@@ -327,7 +330,7 @@ def patch_alone_in(paths):
 
 def tree_in(paths):
     """Where the client data and the song data are inside an archive: (the game host's folder, the song list or None),
-    or None. The folder is the game host's (dmqglb.mb.pmang.com), or one of another name with the same files
+    or None. The folder is the game host's (HOST), or one of another name with the same files
     (whole_tree_in); else the client data alone (patch_alone_in), without a song list: it has no songs."""
     found = whole_tree_in(paths)
     if found:

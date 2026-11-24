@@ -15,7 +15,7 @@ require_once __DIR__ . '/player.php';
 
 /*
  * shop.buyFreeProduct [guid, productId]: buy with MAX POINT, the game's free currency. The client sends here every
- * purchase whose price is in MAX POINT (a product with a MAX POINT cost: ProductInfo.Price's first kind) and sends the
+ * purchase whose price is in MAX POINT (a product with a MAX POINT cost: the first kind of a product's price) and sends the
  * others to buyProductByQPoint. A purchase the player cannot pay for is handled without a popup and changes nothing.
  */
 function odq_shop_buy_free(array $p)

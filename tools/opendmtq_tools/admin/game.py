@@ -18,7 +18,7 @@ from .. import songs
 from . import backups, core, players, recordings
 from .core import Refused, app, BASE, changed, db, same_text, t, tp, why
 
-# The experience each level starts at, as the client's own level table has it (client 1.3.4, LevelTable.Exp): level 1 at
+# The experience each level starts at, as the client's own level table has it (client 1.3.4, its experience column): level 1 at
 # 0, level 99 at 130,408. The game's top bar draws the share of the way from the player's level to the next, so the level
 # and the experience must agree: the experience is kept and the level worked out of it, a level set here sets the
 # experience to that level's start. The same table as OPENDMTQ_LEVEL_EXP in player.php.
@@ -137,7 +137,7 @@ def state(con, pid, game=None):
     out["unlimited"] = out["own_unlimited"] or game["unlimited"]
     out["shown_mpoint"] = POINTS_UNLIMITED if out["unlimited"] else out["mpoint"]
     out["shown_qpoint"] = POINTS_UNLIMITED if out["unlimited"] else out["qpoint"]
-    # The gauge as the game draws it (LevelTable.CalcExpRatio): full at the top level.
+    # The gauge as the game draws it (its level table works out the share): full at the top level.
     out["level_start"] = LEVEL_EXP[out["level"] - 1]
     out["level_next"] = LEVEL_EXP[out["level"]] if out["level"] < LEVEL_TOP else None
     out["gauge"] = 1.0 if out["level_next"] is None else (out["exp"] - out["level_start"]) / (out["level_next"] - out["level_start"])

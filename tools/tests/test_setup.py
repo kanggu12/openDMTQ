@@ -15,6 +15,7 @@ import unittest
 import urllib.parse
 from unittest import mock
 
+from opendmtq_tools import importer
 from tests.test_admin import HAVE_FLASK, HOST, Install, old_game_database
 
 if HAVE_FLASK:
@@ -88,7 +89,7 @@ class HostInstall(Install):
 def game_folder(root):
     """A folder of the client data and the song data as an archive of them unpacks: the patch folder and the song
     list."""
-    os.makedirs(os.path.join(root, setup.GAME_DIR))
+    os.makedirs(os.path.join(root, importer.HOST, "patch", "phone_new"))
     os.makedirs(os.path.join(root, "_info"))
     with open(os.path.join(root, "_info", "songList.json"), "w", encoding="utf-8") as f:
         f.write("[]")
@@ -334,7 +335,7 @@ class FilesOnThisPcTest(unittest.TestCase):
             # A folder that holds the patch folder is looked into: the whole files may be beside it there.
             stuff = inst.path("home/Documents/stuff")
             os.makedirs(os.path.join(stuff, "patch", "phone_new", "1.003.005", "android", "table"))
-            os.makedirs(os.path.join(stuff, "server", "dmqglb.mb.pmang.com", "patch", "phone_new"))
+            os.makedirs(os.path.join(stuff, "server", importer.HOST, "patch", "phone_new"))
             self.assertEqual(setup.game_folder_in(inst.path("home/Documents")), os.path.join(stuff, "server"))
             # A folder gone since it was found is still told apart from the others, by its own path.
             self.assertEqual(setup.same_files(inst.path("home/gone")), os.path.normpath(inst.path("home/gone")))
@@ -368,9 +369,9 @@ class FilesOnThisPcTest(unittest.TestCase):
         # says, and its row asks nothing about songs; with its songs' folder it is both, and the row asks (ADM-245).
         with HostInstall() as inst:
             game_folder(inst.path("home/Downloads/DMTQ/dmtq"))
-            os.makedirs(inst.path("home/Documents/full/dmqglb.mb.pmang.com/patch/phone_new"))
-            os.makedirs(inst.path("home/Documents/full/dmqglb.mb.pmang.com/DMQ/Songs/1"))
-            inst.write("home/Documents/full/dmqglb.mb.pmang.com/DMQ/Songs/1/1.fpk", "m")
+            os.makedirs(inst.path(f"home/Documents/full/{importer.HOST}/patch/phone_new"))
+            os.makedirs(inst.path(f"home/Documents/full/{importer.HOST}/DMQ/Songs/1"))
+            inst.write(f"home/Documents/full/{importer.HOST}/DMQ/Songs/1/1.fpk", "m")
             self.assertEqual(setup.look_in(inst.path("home/Downloads/DMTQ"))["tree_kind"], "game")
             self.assertEqual(setup.look_in(inst.path("home/Documents"))["tree_kind"], "whole")
             inst.sign_in()
@@ -648,8 +649,8 @@ class FilesOnThisPcTest(unittest.TestCase):
             # The game host's folder without its songs' folder: the client data alone, as the look at it says (ADM-245).
             self.assertIn("This folder holds the client data.", inst.page(BASE + f"/setup?step=files&dir={tree}"))
             # With it: both.
-            os.makedirs(os.path.join(tree, "dmqglb.mb.pmang.com", "DMQ", "Songs", "1"))
-            inst.write("home/Downloads/dmtq/dmqglb.mb.pmang.com/DMQ/Songs/1/1.fpk", "m")
+            os.makedirs(os.path.join(tree, importer.HOST, "DMQ", "Songs", "1"))
+            inst.write(f"home/Downloads/dmtq/{importer.HOST}/DMQ/Songs/1/1.fpk", "m")
             self.assertIn("This folder holds the client data and the song data.",
                           inst.page(BASE + f"/setup?step=files&dir={tree}"))
             self.assertEqual(setup.game_folder_in(inst.path("home/Downloads")), tree)

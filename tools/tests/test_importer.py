@@ -20,22 +20,22 @@ def game_folder(root, songs=(1, 2)):
         "_info/songList.json": json.dumps([{"song_id": s, "name": f"song{s}"} for s in songs]),
         "_info/dmtq.db3": "a database of someone else's players",
         "_vendor/controller/GameController.php": "<?php // someone else's program",
-        "dmqglb.mb.pmang.com/DMQ/rpc.php": "<?php // someone else's program",
-        "dmqglb.mb.pmang.com/DMQ/Songs.txt": "a note",
-        "dmqglb.mb.pmang.com/DMQ/Patterns/Patterns.zip": "every chart again",
-        "dmqglb.mb.pmang.com/patch/phone_new/1.003.005/android/patch_new.csv.lz4": "manifest",
-        "dmqglb.mb.pmang.com/patch/phone_new/1.003.005/android/table/us/song_song.csv.lz4": "table",
-        "dmqglb.mb.pmang.com/patch/phone_new/1.003.005/android/dlc/d3_a0.unity3d.lz4": "screen images",
-        "dmqglb.mb.pmang.com/patch/phone_new/1.003.005/android/dlc/d3_e0.unity3d.lz4": "song tiles",
-        "dmqglb.mb.pmang.com/patch/phone_new/1.003.005/android/preview/song1.p.opus.lz4": "preview",
-        "dmqglb.mb.pmang.com/static/dmq/banner/x/howtoplay_play.png": "how to play",
-        "dmqglb.mb.pmang.com/viewImg/news/phone1.png": "news",
-        "dmqglb.mb.pmang.com/viewImg/eye/Song1.png": "jacket in another case",
+        f"{importer.HOST}/DMQ/rpc.php": "<?php // someone else's program",
+        f"{importer.HOST}/DMQ/Songs.txt": "a note",
+        f"{importer.HOST}/DMQ/Patterns/Patterns.zip": "every chart again",
+        f"{importer.HOST}/patch/phone_new/1.003.005/android/patch_new.csv.lz4": "manifest",
+        f"{importer.HOST}/patch/phone_new/1.003.005/android/table/us/song_song.csv.lz4": "table",
+        f"{importer.HOST}/patch/phone_new/1.003.005/android/dlc/d3_a0.unity3d.lz4": "screen images",
+        f"{importer.HOST}/patch/phone_new/1.003.005/android/dlc/d3_e0.unity3d.lz4": "song tiles",
+        f"{importer.HOST}/patch/phone_new/1.003.005/android/preview/song1.p.opus.lz4": "preview",
+        f"{importer.HOST}/static/dmq/banner/x/howtoplay_play.png": "how to play",
+        f"{importer.HOST}/viewImg/news/phone1.png": "news",
+        f"{importer.HOST}/viewImg/eye/Song1.png": "jacket in another case",
     }
     for s in songs:
-        files[f"dmqglb.mb.pmang.com/DMQ/Songs/{s}/{s}.fpk"] = "music"
-        files[f"dmqglb.mb.pmang.com/DMQ/Patterns/{s}"] = "chart"
-        files[f"dmqglb.mb.pmang.com/DMQ/Patterns/{s}_EARPHONE"] = "chart"
+        files[f"{importer.HOST}/DMQ/Songs/{s}/{s}.fpk"] = "music"
+        files[f"{importer.HOST}/DMQ/Patterns/{s}"] = "chart"
+        files[f"{importer.HOST}/DMQ/Patterns/{s}_EARPHONE"] = "chart"
     for rel, text in files.items():
         os.makedirs(os.path.dirname(os.path.join(root, rel)), exist_ok=True)
         with open(os.path.join(root, rel), "w") as f:
