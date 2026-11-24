@@ -388,6 +388,60 @@ class PlayersGuideTest(unittest.TestCase):
             self.assertIn(words, told)
 
 
+class OneWordingTest(unittest.TestCase):
+    """DEP-133: a fact the guides say in more than one place, said the same: the host program's commands as its own
+    command line has them (the lists left out name), and where each setup looks for the game's files (the guides named
+    three places, two or four for the same setup)."""
+
+    @staticmethod
+    def flat(*parts):
+        with open(os.path.join(ROOT, *parts), encoding="utf-8") as f:
+            return " ".join(f.read().split())
+
+    def test_the_host_programs_commands_are_listed_whole(self):
+        with open(os.path.join(ROOT, "host", "opendmtq_host", "cli.py"), encoding="utf-8") as f:
+            commands = set(re.findall(r'add_parser\("([a-z-]+)"', f.read()))
+        self.assertIn("name", commands)
+        # The troubleshooting guide's list of those that are not for Docker Compose only, and the architecture's of the
+        # host program's own: each the program's commands, no more and no less.
+        lists = {
+            "troubleshooting": re.search(r"The commands other than (.*?) \(`expose`", self.flat("docs", "troubleshooting.md")),
+            "architecture": re.search(r"Its commands are (.*?); the others", self.flat("docs", "architecture.md")),
+        }
+        for where, found in lists.items():
+            self.assertIsNotNone(found, where)
+            self.assertEqual(set(re.findall(r"`([a-z-]+)`", found.group(1))), commands, where)
+
+    def test_each_setup_looks_in_the_same_places_in_every_guide(self):
+        # The setup in the browser (the Windows bundle, a host install) and the one in the terminal (Docker), as
+        # tools/opendmtq_tools/admin/setup.py home_folders() and cli/opendmtq_cli/discover.py candidate_dirs() look.
+        browser = "your home folder, Downloads, the Desktop and Documents (OneDrive's too), one folder down in each"
+        terminal = ("the current folder, Downloads and the Desktop (under WSL, every Windows user's too), one folder down "
+                    "in each")
+        for name in ("install.md", "troubleshooting.md"):
+            text = self.flat("docs", name)
+            self.assertIn(browser, text, name)
+            self.assertIn(terminal, text, name)
+        for name in ("admin.md", "songs.md"):
+            self.assertIn(browser, self.flat("docs", name), name)
+        self.assertIn(browser.split(", one folder")[0], self.flat("host", "windows", "README.txt"))
+        # The places the code has, so that a new one is said in the guides too.
+        with open(os.path.join(ROOT, "tools", "opendmtq_tools", "admin", "setup.py"), encoding="utf-8") as f:
+            self.assertIn('names = ["", "Downloads", "Desktop", "Documents", os.path.join("OneDrive", "Desktop"),', f.read())
+        with open(os.path.join(ROOT, "cli", "opendmtq_cli", "discover.py"), encoding="utf-8") as f:
+            code = f.read()
+        self.assertIn("dirs = [os.getcwd()]", code)
+        self.assertIn('glob.glob("/mnt/c/Users/*")', code)
+        # The shorter lists the guides had, nowhere (the test cases say what a test sees, in its words).
+        guides = [p for p in glob.glob(os.path.join(ROOT, "docs", "*.md")) if not p.endswith("test-cases.md")]
+        for path in [os.path.join(ROOT, "README.md")] + guides:
+            with open(path, encoding="utf-8") as f:
+                text = " ".join(f.read().split())
+            for old in ("in Downloads, on the Desktop and in Documents", "in Downloads or on the Desktop by a name",
+                        "in Downloads and on the Desktop, and on Windows"):
+                self.assertNotIn(old, text, os.path.relpath(path, ROOT))
+
+
 class OriginalNamesTest(unittest.TestCase):
     """DEP-130: the README and the guides, their figures among them, name none of the game's own: its original hosts,
     its platform and SDK, its app's package and another edition, its data files, its code, its songs (the owner's rule).

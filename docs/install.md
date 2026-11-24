@@ -24,11 +24,12 @@ the computer needs: [what it runs on](#what-it-runs-on).
 - **The song data**, if you want the songs: the `DMQ` folder with their music and charts, and `viewImg` for the
   jackets. It can come with the client data or later on its own.
 
-The setup finds them by itself in Downloads and on the Desktop, and on Windows and a host install in Documents and your
-home folder too: an archive with `dmtq`, `djmax` or `technika` in its name, an app beside the game's other files or
-named like them, and a folder by what is in it. Files elsewhere: give their folder in the setup (paste its path, or
-click your way to it), or `./opendmtq setup --from <folder>` with Docker. The setup says what each file is before it
-imports anything. [The game's files](game-files.md) has every form it accepts.
+The setup finds them by itself: on Windows and a host install in your home folder, Downloads, the Desktop and Documents
+(OneDrive's too), one folder down in each; with Docker in the current folder, Downloads and the Desktop (under WSL,
+every Windows user's too), one folder down in each. It takes an archive with `dmtq`, `djmax` or `technika` in its name,
+an app beside the game's other files or named like them, and a folder by what is in it. Files elsewhere: give their
+folder in the setup (paste its path, or click your way to it), or `./opendmtq setup --from <folder>`. The setup says
+what each file is before it imports anything. [The game's files](game-files.md) has every form it accepts.
 
 <p align="center">
   <img src="images/setup.jpg" alt="The setup in the browser: the game's Android app, the client data and the song data found in Downloads, each labeled with what it is, with a button to import them" width="100%">
@@ -115,10 +116,9 @@ git clone --branch v0.11.2 --depth 1 https://github.com/kanggu12/openDMTQ.git &&
 ./opendmtq setup
 ```
 
-The setup runs in the terminal: the address phones use, the game's files (found in Downloads or on the Desktop by a
-name with `dmtq`, `djmax` or `technika` in it), the server and its app, and under WSL the Windows firewall rule for the
-server's port (Windows asks for an administrator once). It checks it all and ends with the server's addresses and a QR
-code for phones. Files of another name or in another place:
+The setup runs in the terminal: the address phones use, the game's files (found as [above](#what-you-need)), the server
+and its app, and under WSL the Windows firewall rule for the server's port (Windows asks for an administrator once). It
+checks it all and ends with the server's addresses and a QR code for phones. Files of another name or in another place:
 
 ```sh
 ./opendmtq setup --from ~/games/dmtq

@@ -71,14 +71,14 @@ The admin pages start with a setup of four steps. On a host install and in the W
 the browser the first time, signed in by a one-time link (it works once, from the server PC, within an hour). Later it
 is at `/opendmtq/admin/setup`, and the status page leads there until every step is done.
 
-1. **Game files.** The game's Android app, the client data and the song data, found in Downloads, on the Desktop and in
-   Documents (OneDrive's too), or anywhere else on the PC: type or paste the path of the folder, archive or file, or
-   click your way to it. Each file found or listed says what it is (the app and its version, a copy changed for another
-   server, the client data and the song data with how many songs, the client data or the song data alone, the iPhone
-   app, a part of an archive, one that cannot be read), and one of no use cannot be imported
-   ([the forms each may come in](game-files.md)). The import takes the app and the client data, the songs too when their
-   box is ticked, each from where it is, then makes the song list. The songs can also come later, on their own. Its
-   output shows as it goes.
+1. **Game files.** The game's Android app, the client data and the song data, found in your home folder, Downloads, the
+   Desktop and Documents (OneDrive's too), one folder down in each, or anywhere else on the PC: type or paste the path
+   of the folder, archive or file, or click your way to it. Each file found or listed says what it is (the app and its
+   version, a copy changed for another server, the client data and the song data with how many songs, the client data or
+   the song data alone, the iPhone app, a part of an archive, one that cannot be read), and one of no use cannot be
+   imported ([the forms each may come in](game-files.md)). The import takes the app and the client data, the songs too
+   when their box is ticked, each from where it is, then makes the song list. The songs can also come later, on their
+   own. Its output shows as it goes.
 2. **Address.** The address phones use, which goes into the app: this PC's address on its network, with the server's
    port. A PC with several (wired and Wi-Fi) offers each. A new one is written to `.env`, and the server starts again
    for it.

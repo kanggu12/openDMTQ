@@ -1078,7 +1078,7 @@ A host install (`host/install.sh`, then `./opendmtq setup`) and the Windows bund
 
 - `host/install.sh` leaves a marker, `.host/installed`; from then on the repository's `./opendmtq` passes every command
   to `host/opendmtq_host`. Its commands are `setup`, `run`, `start`, `stop`, `restart`, `status`, `import`, `apk`,
-  `runtime`, `password`, `port`, `host`, `check`, `repair`, `delete-data`, `uninstall` and `service`; the others
+  `runtime`, `password`, `name`, `port`, `host`, `check`, `repair`, `delete-data`, `uninstall` and `service`; the others
   (`up`, `down`, `deploy`, `backup`, `restore`, `expose`, `firewall` and the rest) are for Docker Compose only. On
   Windows the same commands are `OpenDMTQ.exe <command>` in a terminal, and a double click on `OpenDMTQ.exe` runs
   `setup`, then the server.

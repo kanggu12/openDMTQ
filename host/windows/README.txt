@@ -14,9 +14,10 @@ Start
 
 1. Keep this folder somewhere of your own, where it can write (for example C:\OpenDMTQ).
 2. Start OpenDMTQ.exe. The setup opens in your browser.
-3. The setup finds your files in Downloads, on the Desktop or in Documents. If they are elsewhere, paste their path or
-   open their folder. Each file says what it is and whether it can be used. Then the setup takes you through the address
-   phones and PCs use, an account for each player, and the app.
+3. The setup finds your files in your home folder, Downloads, the Desktop and Documents (OneDrive's too), one folder
+   down in each. If they are elsewhere, paste their path or open their folder. Each file says what it is and whether it
+   can be used. Then the setup takes you through the address phones and PCs use, an account for each player, and the
+   app.
 4. When Windows asks whether Apache may use the network, allow it on private networks. If your Wi-Fi is set as a public
    network, phones and other PCs cannot connect: in Settings, Network & internet, open your Wi-Fi and choose Private.
 5. On a phone on the same Wi-Fi, open the address the setup shows, sign in with the player's account, tap "Download app

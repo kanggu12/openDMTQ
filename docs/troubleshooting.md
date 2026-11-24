@@ -169,16 +169,15 @@ To see which phone a player used, find their requests on the Logs page of the ad
 
 ### Setup cannot find the game files
 
-`setup` looks in the current folder, `~/Downloads` and `~/Desktop` (under WSL, also every Windows user's Downloads and
-Desktop), one folder down in each. It takes archives and apps whose names contain `dmtq`, `djmax` or `technika`,
-unpacked folders of the client data and the song data, and any app next to those. Otherwise pass the folder, which is
-then searched as a whole (an extracted copy of the client data and the song data included):
-`./opendmtq setup --from /path/to/folder`.
+With Docker, `setup` looks in the current folder, Downloads and the Desktop (under WSL, every Windows user's too), one
+folder down in each. It takes archives and apps whose names contain `dmtq`, `djmax` or `technika`, unpacked folders of
+the client data and the song data, and any app next to those. Otherwise pass the folder, which is then searched as a
+whole (an extracted copy of the client data and the song data included): `./opendmtq setup --from /path/to/folder`.
 
-The setup in the browser (the Windows bundle and a host install) looks in Downloads, on the Desktop and in Documents
-(OneDrive's too), and one folder down in each. When it finds nothing, open the folder in the picker under the list:
-the PC's drives and home folders are there, and **Import from this folder** takes everything of the game's in it. An
-archive can be imported as it is, or unpacked first; one in parts needs every part in one folder.
+The setup in the browser (the Windows bundle and a host install) looks in your home folder, Downloads, the Desktop and
+Documents (OneDrive's too), one folder down in each. When it finds nothing, open the folder in the picker under the
+list: the PC's drives and home folders are there, and **Import from this folder** takes everything of the game's in it.
+An archive can be imported as it is, or unpacked first; one in parts needs every part in one folder.
 
 Each file the setup lists says what it is, and `./opendmtq import --check <folder>` does the same on the command line.
 The client data and the song data are found by what is in them: a folder with the game's `patch/phone_new` in it, under
@@ -225,11 +224,10 @@ A host install and the Windows bundle have no HTTPS.
 
 ### A host install or the Windows bundle does not start
 
-- `./opendmtq setup` names what is missing (Apache, PHP's module, Java, 7-Zip, the pinned tools): run
-  `host/install.sh` again. On Windows, unpack the whole zip again. The commands other than `setup`, `start`, `stop`,
-  `restart`, `status`, `run`, `import`, `apk`, `runtime`, `host`, `port`, `password`, `check`, `repair`,
-  `delete-data`, `uninstall` and `service` (`expose`, `firewall`, `deploy`, `doctor` and the rest) are for Docker
-  Compose only.
+- `./opendmtq setup` names what is missing (Apache, PHP's module, Java, 7-Zip, the pinned tools): run `host/install.sh`
+  again. On Windows, unpack the whole zip again. The commands other than `setup`, `start`, `stop`, `restart`, `status`,
+  `run`, `import`, `apk`, `runtime`, `host`, `port`, `password`, `name`, `check`, `repair`, `delete-data`, `uninstall`
+  and `service` (`expose`, `firewall`, `deploy`, `doctor` and the rest) are for Docker Compose only.
 - The logs are in `data/state/logs` (on Windows in the OpenDMTQ folder): `host.log` (the host program's own, in the
   background), `server.log` (Apache and PHP), `programs.log` (the database setup, the admin pages, the app builder).
 - "the server already runs": a server of this folder is running; `./opendmtq stop` stops it. On Windows, it runs in

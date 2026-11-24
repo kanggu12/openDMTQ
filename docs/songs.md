@@ -17,8 +17,9 @@ imported with them or before.
 
 On Windows and on a host install, the admin pages import them: **Songs**, **Choose the folder**, then the `DMQ` folder,
 the folder that holds it, or the folder or archive of the client data and the song data, with **Import the songs too**
-ticked. The setup looks for them in Downloads, on the Desktop and in Documents first. An import replaces the songs
-imported before; songs added as packages stay, and files without the songs' folder (`DMQ`) change none.
+ticked. The setup looks for them first in your home folder, Downloads, the Desktop and Documents (OneDrive's too), one
+folder down in each. An import replaces the songs imported before; songs added as packages stay, and files without the
+songs' folder (`DMQ`) change none.
 
 On the command line they are imported on their own:
 
