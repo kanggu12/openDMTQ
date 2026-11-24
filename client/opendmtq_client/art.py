@@ -338,33 +338,60 @@ def shard_mask(width, height, scale=1.0, offset=0, room=None, keep=()):
     return mask
 
 
+# How far down the page the two pale panes of its lit top reach before they have faded (logical pixels): above the
+# content's top on every page (PLAY's, the highest, about 85 down: its title alone over its cards), so that no pane's
+# edge runs into the content column, ends on a card's edge or shows between cards (they reached 324 px, through the
+# heading and down the gaps between the first cards); the accent's light, which has no edge, keeps its own reach.
+PANES_REACH = 64
+
+
+def _fade(rows, width):
+    """A light's fade down `rows` rows, `width` wide: whole to 45 % of the way, then down to none at its end."""
+    fade = Image.new("L", (1, max(1, rows)), 0)
+    for y in range(rows):
+        t = y / float(max(1, rows))
+        fade.putpixel((0, y), 255 if t < 0.45 else int(255 * max(0.0, (1 - t) / 0.55)))
+    return fade.resize((width, max(1, rows)))
+
+
+def pane_mask(width, height, scale=1.0, offset=0):
+    """How much of the two pale panes' light lies on each pixel of the page's picture from `offset` down, `height` tall
+    (an L picture of white's share, 0 none): the site's two panes at the page's top (body::before), at 115 degrees
+    from the top-left corner up to 22 % of the way and at 245 degrees from the top-right up to 16 %, faded out by
+    PANES_REACH. The UI checks read their reach from here, as the shards' from shard_mask."""
+    reach = max(1, int(round(PANES_REACH * scale)))
+    mask = Image.new("L", (width, height), 0)
+    if offset >= reach:
+        return mask
+    panes = Image.new("L", (width, reach), 0)
+    draw = ImageDraw.Draw(panes)
+    # The panes' geometry is the site's 620 px top, whatever the reach of their light.
+    full = int(620 * scale)
+    for angle, alpha, share, from_right in ((115, 14, 0.22, False), (245, 10, 0.16, True)):
+        rad = math.radians(angle)
+        normal = (math.sin(rad), -math.cos(rad))
+        length = abs(width * normal[0]) + abs(full * normal[1])
+        origin = (width, 0) if from_right else (0, 0)
+        limit = share * length + origin[0] * normal[0]
+        polygon = _half_plane((width, reach), normal, limit)
+        if len(polygon) >= 3:
+            draw.polygon(polygon, fill=alpha)
+    light = Image.composite(panes, Image.new("L", panes.size, 0), _fade(reach, width))
+    mask.paste(light.crop((0, offset, width, min(reach, offset + height))), (0, 0))
+    return mask
+
+
 def _whole(width, height, scale, accent, offset, top_h, room=None, keep=()):
     """The page's picture from `offset` down, every layer drawn for every row: the field, the lit top while `offset`
-    is above `top_h`, the shards in the first 900 CSS pixels (shard_mask). backdrop() keeps its top; the tests compare
-    the two."""
+    is above `top_h` (its panes faded out by PANES_REACH: pane_mask), the shards in the first 900 CSS pixels
+    (shard_mask). backdrop() keeps its top; the tests compare the two."""
     img = _field(width, height, scale, offset)
     # The top: full to 45 % of its reach, then fading; drawn whole, the part in this picture kept.
     if offset < top_h:
-        fade = Image.new("L", (1, top_h), 0)
-        for y in range(top_h):
-            t = y / float(max(1, top_h))
-            fade.putpixel((0, y), 255 if t < 0.45 else int(255 * max(0.0, (1 - t) / 0.55)))
-        fade = fade.resize((width, top_h))
-        panes = Image.new("L", (width, top_h), 0)
-        draw = ImageDraw.Draw(panes)
-        # 115 degrees from the top-left corner, light up to 22 % of the way; 245 degrees from the top-right, up to 16 %.
-        # The panes' geometry is the site's 620 px top, whatever the reach of their light.
+        fade = _fade(top_h, width)
         full = int(620 * scale)
-        for angle, alpha, share, from_right in ((115, 14, 0.22, False), (245, 10, 0.16, True)):
-            rad = math.radians(angle)
-            normal = (math.sin(rad), -math.cos(rad))
-            length = abs(width * normal[0]) + abs(full * normal[1])
-            origin = (width, 0) if from_right else (0, 0)
-            limit = share * length + origin[0] * normal[0]
-            polygon = _half_plane((width, top_h), normal, limit)
-            if len(polygon) >= 3:
-                draw.polygon(polygon, fill=alpha)
-        light = Image.composite(panes, Image.new("L", panes.size, 0), fade)
+        # The panes, by their own shorter reach.
+        light = pane_mask(width, top_h, scale, 0)
         band = Image.new("RGB", (width, top_h), (255, 255, 255))
         # The accent's light from above the middle: an ellipse 70 % wide, at 12 % in its middle.
         glow = Image.radial_gradient("L").resize((max(1, int(width * 1.4)), max(1, int(full * 2))))

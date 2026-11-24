@@ -11,7 +11,7 @@ cards are composed, the roles of its words, its buttons, and the page's own pict
   either side, never stretched.
 - background: no shard of the page's picture within SHARD_CLEAR of the content column under the page's heading, or of
   any card, anywhere down the page (the shards scroll with the cards: the page's own coordinates hold at every scroll
-  position).
+  position), nor of the window's own buttons; no edge of the lit top's panes under the page's heading.
 - surfaces: each card's surface and silhouette by its role: a card that reports a state with its title on a header
   strip, a result with its foot's corner cut too, About a step deeper without the light along its top, the page's head
   (the hero) a step nearer with a brighter light and deeper cuts, every other card the deck with its top-right corner
@@ -588,6 +588,67 @@ def _site_shards(width, height, scale, offset):
     return mask
 
 
+def _site_panes(width, height, scale, offset, reach):
+    """The lit top's two panes as the page drew them before they had a reach of their own (faded out with the accent's
+    light, `reach` down: 324 px on the launcher's pages), from `offset` down: what a launcher without art.pane_mask
+    draws, so that this check sees it."""
+    import math
+    from PIL import Image, ImageDraw
+    mask = Image.new("L", (width, height), 0)
+    if offset >= reach:
+        return mask
+    fade = Image.new("L", (1, reach), 0)
+    for y in range(reach):
+        t = y / float(max(1, reach))
+        fade.putpixel((0, y), 255 if t < 0.45 else int(255 * max(0.0, (1 - t) / 0.55)))
+    fade = fade.resize((width, reach))
+    panes = Image.new("L", (width, reach), 0)
+    draw = ImageDraw.Draw(panes)
+    full = int(620 * scale)
+    for angle, alpha, share, from_right in ((115, 14, 0.22, False), (245, 10, 0.16, True)):
+        rad = math.radians(angle)
+        normal = (math.sin(rad), -math.cos(rad))
+        length = abs(width * normal[0]) + abs(full * normal[1])
+        origin = (width, 0) if from_right else (0, 0)
+        polygon = art._half_plane((width, reach), normal, share * length + origin[0] * normal[0])
+        if len(polygon) >= 3:
+            draw.polygon(polygon, fill=alpha)
+    light = Image.composite(panes, Image.new("L", panes.size, 0), fade)
+    mask.paste(light.crop((0, offset, width, min(reach, offset + height))), (0, 0))
+    return mask
+
+
+# A pane's pixel counts from this much of white's share (of 255): fainter, it does not show on the field.
+PANE_SEEN = 2
+
+
+def panes(root, ui, name):
+    """No edge of the lit top's two pale panes under the page's heading: their light (art.pane_mask, or as main drew
+    it) none within SHARD_CLEAR of the content column's top, down the page and across the column and its clear room
+    (main's ran through the heading, ended on the first card's top edge and showed again between the cards)."""
+    problems = []
+    for area in _page_areas(root):
+        picture = getattr(area, "_backdrop_picture", None)
+        if picture is None:
+            continue
+        width, height = picture.size
+        if hasattr(art, "pane_mask"):
+            mask = art.pane_mask(width, height, ui.scale, area.offset)
+        else:
+            mask = _site_panes(width, height, ui.scale, area.offset, int(area.light or 620 * ui.scale))
+        clear = ui.px(SHARD_CLEAR)
+        left = int(round(float(area.canvas.coords(area._window)[0])))
+        box = (max(0, left - clear), max(0, int(area._content_top) - clear),
+               min(width, left + area.inner.winfo_width() + clear), height)
+        hit = mask.crop(box).point(lambda v: 255 if v >= PANE_SEEN else 0)
+        if hit.getbbox():
+            found = hit.getbbox()
+            problems.append("%s: the lit top's panes reach %d px into the content column's top and its room (page "
+                            "pixels %r)" % (name, found[3], (found[0] + box[0], found[1] + box[1],
+                                                               found[2] + box[0], found[3] + box[1])))
+    return problems
+
+
 def _shards(width, height, scale, offset, room, keep):
     """The shards a picture of the page draws from `offset` down (art.shard_mask), the boxes it keeps them from given
     as the launcher gives them (none to a launcher that keeps none)."""
@@ -788,6 +849,7 @@ def check(root, ui, name):
     problems.extend(text(root, ui, name))
     problems.extend(buttons(root, ui, name))
     problems.extend(background(root, ui, name))
+    problems.extend(panes(root, ui, name))
     problems.extend(surfaces(root, ui, name))
     problems.extend(lamps(root, ui, name))
     return sorted(set(problems))

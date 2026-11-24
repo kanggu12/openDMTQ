@@ -144,6 +144,21 @@ class Glass(unittest.TestCase):
                 self.assertGreater(ink[1], 0, (scale, korean_words))
                 self.assertLess(ink[3], korean.height, (scale, korean_words))
 
+    def test_the_lit_tops_panes_end_above_every_pages_content(self):
+        # The two pale panes of the page's lit top fade out by PANES_REACH, over every page's heading and above its
+        # content (main: 324 px down, their edges through the heading, on the first card's top edge and between cards),
+        # at 100 % and 200 %, in every part of the page; the light there still, faint, at the top.
+        from opendmtq_client import art
+        for scale in (1.0, 2.0):
+            reach = int(round(art.PANES_REACH * scale))
+            for width in (int(932 * scale), int(1352 * scale)):
+                mask = art.pane_mask(width, int(760 * scale), scale, 0)
+                self.assertIsNone(mask.crop((0, reach, width, mask.height)).getbbox(), (scale, width))
+                self.assertIsNotNone(mask.crop((0, 0, width, reach)).getbbox(), (scale, width))
+                self.assertIsNone(art.pane_mask(width, 100, scale, reach).getbbox(), (scale, width))
+            # Above the PLAY page's content, the highest (its title alone over its cards) and its clear room.
+            self.assertLessEqual(art.PANES_REACH, 85 - 16)
+
     def test_the_pages_shards_stand_right_of_their_room(self):
         # The launcher's page gives its shards a room: right of the content column and its clear room (ScrollArea's
         # shard_room). Nothing of them left of it at any width or scale, every part of the page; and some of them in it
