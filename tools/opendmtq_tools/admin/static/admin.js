@@ -1057,10 +1057,13 @@ function bandOnTop(stack = document.querySelector('.bar > .said-stack')) {
       const fresh = doc.getElementById(old.id);
       if (!fresh) { old.remove(); continue; }
       if (fresh.outerHTML === old.outerHTML) continue;
-      // Which of the part's controls had the focus, by its place among them.
+      // Which of the part's controls had the focus, by its place among them. One in a row's More panel (a switch pressed
+      // there) gives its More's place instead: the part comes back with that panel closed, which holds no focus, and the
+      // keyboard's place goes back to the More it opened, as Esc takes it there; the same keys then open it again.
       if (active && old.contains(active)) {
         const all = [...old.querySelectorAll('button, a[href], input, select, textarea, summary, [tabindex]')];
-        refocus = [old.id, all.indexOf(active)];
+        const more = active.closest('.row-more');
+        refocus = [old.id, all.indexOf(more ? more.querySelector('summary') : active)];
       }
       old.replaceWith(document.importNode(fresh, true));
     }

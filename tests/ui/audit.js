@@ -976,13 +976,14 @@ async function pressAndConfirm(page, selector) {
 // A row's More opened as a person opens it: brought to the middle of the screen as one scrolls to the row, then pressed by
 // the pointer, tapped on a phone's screen, or with the keyboard's place on it, Enter. What the row does less often waits in
 // its panel, closed until then (the Players page's and the Accounts page's rows): a press of a button in a closed panel
-// presses nothing. The panel's selector comes back, open on the page's top layer and laid out, its drop-in done.
+// presses nothing. 'enter' is Enter where the keyboard already is, for a More the page put it on. The panel's selector
+// comes back, open on the page's top layer and laid out, its drop-in done.
 async function openRowMore(page, more, how = 'pointer') {
   const summary = `${more} > summary`;
   await page.$eval(summary, s => s.scrollIntoView({ block: 'center' }));
-  if (how === 'keyboard') {
-    // The keyboard's place on More, as Tab brings it there, and Enter, which opens a disclosure.
-    await page.focus(summary);
+  if (how === 'keyboard' || how === 'enter') {
+    // The keyboard's place on More, as Tab brings it there (or where the page left it), and Enter, which opens a disclosure.
+    if (how === 'keyboard') await page.focus(summary);
     await page.keyboard.press('Enter');
   } else if (how === 'tap') {
     await page.tap(summary);
@@ -1547,7 +1548,9 @@ async function inPlace(contexts) {
   const saved = await sameWay(page, () => page.click('#broadcasts form:has(input[name=action][value=settings]) button'), () => !!document.querySelector('.flash.float'));
   check("the Broadcasts page's settings are saved in place", saved.ok, saved.detail);
   // The Accounts page: an account switched off and on again from its row's More, by the keyboard alone, as a person
-  // without a mouse does it: More reached and opened with Enter, Tab to the switch in its panel, Enter.
+  // without a mouse does it: More reached and opened with Enter, Tab to the switch in its panel, Enter. The row comes back
+  // with the account's new state and its panel closed, and the keyboard's place on its More again, where the same keys
+  // switch it back on (before, the place was on the switch inside the closed panel, which cannot hold it: lost).
   await page.goto(`${A}/accounts`, { waitUntil: 'domcontentloaded' });
   const manager = 'table.accounts tr:has(input[name=name][value="manager"])';
   await page.waitForSelector(`${manager} .account-state`);
@@ -1555,16 +1558,25 @@ async function inPlace(contexts) {
   // The state's words changed from what they were.
   const flipped = ([row, was]) => { const c = document.querySelector(`${row} .account-state`); return !!c && c.textContent.trim() !== was; };
   // More opened with Enter, the keyboard taken on to the switch in the panel (Disable or Enable, as the account is), Enter.
-  const switchByKeys = async () => {
-    const panel = await openRowMore(page, `${manager} .row-more`, 'keyboard');
+  // The keyboard's place put on More first, as Tab brings it there, or Enter where the page left it.
+  const switchByKeys = async (how = 'keyboard') => {
+    const panel = await openRowMore(page, `${manager} .row-more`, how);
     const reached = await tabTo(page, `${panel} form:has(input[name=action][value=off]) button, ${panel} form:has(input[name=action][value=on]) button`);
     if (!reached) throw new Error("Tab did not reach the switch in the account's More");
     await page.keyboard.press('Enter');
   };
   const acc = await page.evaluate(stateText, manager);
-  const accOff = await sameWay(page, switchByKeys, flipped, [manager, acc]);
+  const accOff = await sameWay(page, () => switchByKeys(), flipped, [manager, acc]);
+  // Where the keyboard is once the row has changed: on its More, the panel closed.
+  const back = await page.evaluate(row => {
+    const more = document.querySelector(`${row} .row-more`), on = document.activeElement;
+    return { open: !!more && more.open, onMore: !!more && on === more.querySelector('summary'), at: on ? `${on.tagName.toLowerCase()}${on.className ? `.${on.className.split(' ').join('.')}` : ''}` : 'none' };
+  }, manager);
+  check("an account switched from its More by the keyboard comes back with its panel closed and the keyboard's place on its More",
+    !back.open && back.onMore, JSON.stringify(back));
   const acc2 = await page.evaluate(stateText, manager);
-  const accOn = await sameWay(page, switchByKeys, flipped, [manager, acc2]);
+  // Back on from there: Enter where the keyboard was left (put on More again when it was lost, for the rest of the check).
+  const accOn = await sameWay(page, () => switchByKeys(back.onMore ? 'enter' : 'keyboard'), flipped, [manager, acc2]);
   check('an account is switched off and on again in place', accOff.ok && accOn.ok, `${accOff.detail} | ${accOn.detail}`);
   // The Songs page: a song hidden and shown again.
   await page.goto(`${A}/songs`, { waitUntil: 'domcontentloaded' });
