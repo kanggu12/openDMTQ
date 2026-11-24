@@ -92,6 +92,8 @@ const STRINGS = [
         'home.maint_own' => '<b>Under maintenance.</b> {notice} The game cannot start until it ends.',
         'build.failed' => "The app could not be built.",
         'build.wait' => 'The app is being built.',
+        // A new app for this server: on the home page and the download page for 30 days (lib.php app_news()).
+        'app.new' => 'A new app for this server came out on {date}. Installed over the one you have, it keeps your account.',
         'build.stale' => 'The address changed: the app is being built again.',
         'build.none' => "There is no app for this server yet.",
         'dl.signin' => 'Sign in to download',
@@ -475,6 +477,7 @@ const STRINGS = [
         'home.maint_own' => '<b>점검 중입니다.</b> {notice} 끝날 때까지 게임을 시작할 수 없습니다.',
         'build.failed' => '앱을 만들지 못했습니다.',
         'build.wait' => '앱을 만드는 중입니다.',
+        'app.new' => '{date}에 이 서버의 새 앱이 나왔습니다. 기존 앱 위에 설치하면 계정은 그대로 남습니다.',
         'build.stale' => '주소가 바뀌어 앱을 다시 만드는 중입니다.',
         'build.none' => '아직 이 서버용 앱이 없습니다.',
         'dl.signin' => '로그인하고 다운로드',

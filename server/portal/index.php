@@ -43,6 +43,9 @@ $waiting = (!$apk || $stale) && !$building;
 // The server moved to this address lately (another port, another PC): said here too, under the download, where players
 // land first, as the download page says it.
 $moved = odq_address_moved();
+// A new app for this server lately (a new patcher, a new client...), the one on offer: said under the download too, so
+// that a phone with the app before it learns there is one and that it installs over it. The move says it already.
+$news = $apk && !$stale && !$moved ? app_news($apk) : null;
 // PlayLog.user_id is the player's guid: one name per player, however many phones (PLAYER_ROWS). As many as go well beside
 // the list of players, which is short on a server with few.
 $records = ($db && has_playlog($db)) ? rows($db, recent_records_sql(),
@@ -100,6 +103,9 @@ ob_start();
       <?php if ($moved): ?>
         <?php // Whoever comes with the app for the old address needs the new one: the download page says the whole of it. ?>
         <p class="warn stage-moved" id="moved" role="status"><?= t('home.moved', ['date' => date('Y-m-d', $moved['at'])]) ?></p>
+      <?php elseif ($news): ?>
+        <?php // A new app: a fact for whoever has the one before, in the page's quiet colours (nothing is wrong). ?>
+        <p class="news stage-moved get-app" id="new-app" role="status"<?= hidden_on_ios() ?>><?= t('app.new', ['date' => date('Y-m-d', $news['at'])]) ?></p>
       <?php endif; ?>
       <?= android_only() ?>
     </div>

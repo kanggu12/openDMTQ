@@ -2,8 +2,8 @@
 //   node audit.js self     the checker itself finds each planted defect (defects.html)
 //   node audit.js empty    every page of a server with nothing on it
 //   node audit.js full     every page with players, plays, recordings and an app, at five widths, in both languages
-//   node audit.js moved    the home page and the download page in the app's state run.sh sets (MOVED): after a move with
-//                          the app being made
+//   node audit.js moved    the home page and the download page in the app's states run.sh sets (MOVED): after a move with
+//                          the app being made, and with an app made anew for phones
 //   node audit.js keys     the keyboard's marks on the site and the admin pages, held to the database (keys.json in OUT)
 //   node audit.js air      the pages that change while players are on air, and the video playing
 //   node audit.js maint    the owner turns maintenance on: the notice, whole, on every page that shows it; then off again
@@ -577,8 +577,8 @@ async function backgroundClear(contexts) {
 
 // The download page's card for computers at a laptop's width and a large monitor's, in both languages: its steps a line of
 // their own under the installer's size, with the room the app's card leaves under its size line (12 px), and every line of
-// it at the site's reading measure (80 characters at most). Before: the steps glued to the size line (0 px) and 127
-// characters a line across the card.
+// it at the site's reading measure (80 characters at most). And with nothing noted of a new app, no word of one on the home
+// page or here. Before: the steps glued to the size line (0 px) and 127 characters a line across the card.
 async function downloadCards(contexts) {
   for (const width of [1280, 1920]) {
     for (const lang of ['en', 'ko']) {
@@ -599,10 +599,13 @@ async function downloadCards(contexts) {
           ruler.font = `${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
           return Math.round(p.getBoundingClientRect().width / ruler.measureText('0').width);
         });
-        return { pc: room(pc, pc.nextElementSibling), app: room(app, app.nextElementSibling), measure };
+        return { pc: room(pc, pc.nextElementSibling), app: room(app, app.nextElementSibling), measure, news: !!document.getElementById('new-app') };
       });
       check(`the download page's card for computers has its steps under its size line with room, at the reading measure (${width}px, ${lang})`,
         !seen.missing && seen.pc >= 8 && Math.abs(seen.pc - seen.app) <= 3 && Math.max(...seen.measure) <= 80, JSON.stringify(seen));
+      await page.goto(`${P}/`, { waitUntil: 'domcontentloaded' });
+      const home = await page.evaluate(() => !!document.getElementById('new-app'));
+      check(`with no new app noted, neither the home page nor the download page speaks of one (${width}px, ${lang})`, !seen.news && !home, `${seen.news} ${home}`);
       await page.close();
     }
   }
@@ -611,7 +614,9 @@ async function downloadCards(contexts) {
 // The app's states the home page and the download page speak of, as run.sh sets them for this stage (MOVED): "building",
 // the server moved here an hour ago, the app on offer the old address's and the new one being made: the move said once,
 // the card's line saying only that the app is being made, and both pages whole at a phone's width and a laptop's in both
-// languages (before: "the address changed" twice, in two yellow boxes, and gaps of 32 and 20 px around the notice).
+// languages (before: "the address changed" twice, in two yellow boxes, and gaps of 32 and 20 px around the notice);
+// "news", the app on offer made anew a day ago for phones (builder.py's app-new.json): both pages say there is a new app
+// since that day and that installed over the one before it keeps the account, whole at both widths (before: nothing).
 async function movedPages(contexts) {
   const state = process.env.MOVED;
   const page = await contexts.signed.newPage();
@@ -623,8 +628,15 @@ async function movedPages(contexts) {
     told: (document.querySelector('main').textContent.match(/address changed|moved on/g) || []).length }));
   await page.goto(`${P}/`, { waitUntil: 'domcontentloaded' });
   const home = await page.evaluate(() => ({ moved: !!document.getElementById('moved'), news: (document.getElementById('new-app') || { textContent: '' }).textContent }));
-  check('after a move, with the app being made, the download page says the move once and the card only that the app is being made',
-    download.moved && download.told === 1 && download.card.join() === 'The app is being built.' && home.moved, JSON.stringify([download, home]));
+  if (state === 'building') {
+    check('after a move, with the app being made, the download page says the move once and the card only that the app is being made',
+      download.moved && download.told === 1 && download.card.join() === 'The app is being built.' && !download.news && home.moved && !home.news, JSON.stringify([download, home]));
+  } else {
+    // The day it was made, as the site writes every date.
+    const said = /^A new app for this server came out on \d{4}-\d{2}-\d{2}\. Installed over the one you have, it keeps your account\.$/;
+    check('with an app made anew for phones, the home page and the download page say so, and that it keeps the account',
+      said.test(download.news) && said.test(home.news) && !download.moved && !home.moved, JSON.stringify([download, home]));
+  }
   await page.close();
   await sweep(contexts, [[`home (${state})`, `${P}/`], [`download (${state})`, `${P}/download.php`]], FEW_WIDTHS);
 }

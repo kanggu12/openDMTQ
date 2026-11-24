@@ -26,6 +26,9 @@ $start = dl_take_start() && $apk && !$stale && !$in_app && !on_ios();
 $win = windows_client();
 // The server moved to this address lately (another port, another PC): the phones' app calls the old one.
 $moved = odq_address_moved();
+// A new app for this server lately, the one on offer (a new patcher, a new client...): said above it, as the move is. The
+// move says it already.
+$news = $apk && !$stale && !$moved ? app_news($apk) : null;
 
 // The download starts after a second, so the page that says so is on screen first. While the
 // builder is making the app (none yet, or one for the old address), check again on its own; only then.
@@ -35,6 +38,9 @@ page_header(t('dl.title'), 'download', $start ? '1;url=/apk' : ($building ? '20'
   <?php if ($moved): ?>
   <?php // Said before the download: whoever comes with an app for the old address needs this one. ?>
   <p class="warn" id="moved" role="status"><?= t('dl.moved', ['date' => date('Y-m-d', $moved['at']), 'to' => $moved['to'], 'from' => $moved['from']]) ?></p>
+  <?php elseif ($news): ?>
+  <?php // Said before the download too, in the page's quiet colours: a phone with the app before it learns of the new one. ?>
+  <p class="news get-app" id="new-app" role="status"<?= hidden_on_ios() ?>><?= t('app.new', ['date' => date('Y-m-d', $news['at'])]) ?></p>
   <?php endif; ?>
   <section class="card" id="install">
     <?php // The centrepiece: the button and the QR code side by side, then the steps across the whole box. ?>

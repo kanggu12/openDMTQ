@@ -90,7 +90,8 @@ that score), and beside a total says how many such scores it counts; the ranking
 ## Updates and other devices
 
 - **A new app:** the download page offers one, with the date it was built, when the server's owner changes the
-  server's address or port or an update brings one. Install it over the app you have: your account stays. An app that
+  server's address or port or an update brings one; for a month the home page and the download page also say on which
+  day it came out. Install it over the app you have: your account stays. An app that
   installs beside the old one instead was signed with a new key: tell the server's owner
   ([restoring](troubleshooting.md#restoring)).
 - **A server that moved:** for a month after the owner moves the server to another address or port, its download page

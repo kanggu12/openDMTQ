@@ -145,6 +145,21 @@ function apk_manifest(): ?array
     return ($m && is_file(APK_DIR . '/' . basename($m['file']))) ? $m : null;
 }
 
+/* How long the site says that the app is new: as long as it says the server moved (ODQ_MOVED_DAYS). */
+const APP_NEWS_DAYS = 30;
+
+/* The app on offer ($apk, apk_manifest()) when the builder made it lately for a change phones need it for (a new patcher, a
+   new client, the runtime, the app's name, the address; tools/opendmtq_tools/builder.py notes it in app-new.json): ['at'
+   => when it was made], for APP_NEWS_DAYS days after; else null. A note of another file is of an app no longer on offer. */
+function app_news(?array $apk): ?array
+{
+    $n = $apk ? @json_decode((string)@file_get_contents(APK_DIR . '/app-new.json'), true) : null;
+    if (!is_array($n) || !is_int($n['at'] ?? null) || ($n['file'] ?? null) !== ($apk['file'] ?? '')) {
+        return null;
+    }
+    return time() - $n['at'] < APP_NEWS_DAYS * 86400 ? ['at' => $n['at']] : null;
+}
+
 /* The installer for Windows (the PC client) the site hands out, as tools/opendmtq_tools/windows_client.py describes it in
    windows.json beside the app; null when there is none (a server without it) or its file is not there whole. */
 function windows_client(): ?array

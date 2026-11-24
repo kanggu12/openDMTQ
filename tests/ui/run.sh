@@ -6,7 +6,7 @@
 #
 # Usage: tests/ui/run.sh [report folder, default _work/ui-report]
 # ONLY="full flows" runs those stages (the checker's own, self, and the setup always run first); keys is the keyboard's marks,
-# mine MY PAGE, moved the app's state after a move.
+# mine MY PAGE, moved the app's states after a move and with a new app.
 # KEEP=1 leaves the stack up afterwards.
 # NO_BUILD=1 uses the images already tagged opendmtq-*:uitest.
 set -euo pipefail
@@ -270,7 +270,8 @@ stage full
 
 # The app's states the home page and the download page speak of, set as the server's start and the builder leave them and
 # then put back (audit.js moved): the server moved here an hour ago, the app on offer the old address's and the new one
-# being made (address-moved.json, build.json).
+# being made (address-moved.json, build.json); then the app on offer for this address, made anew a day ago for phones
+# (app-new.json, tools/opendmtq_tools/builder.py).
 if wanted moved; then
   cp "$DATA/apk/out/latest.json" "$DATA/latest.json.kept"
   now=$(date +%s)
@@ -280,7 +281,9 @@ if wanted moved; then
   MOVED=building stage moved
   rm -f "$DATA/state/address-moved.json" "$DATA/apk/out/build.json"
   cp "$DATA/latest.json.kept" "$DATA/apk/out/latest.json"
-  rm -f "$DATA/latest.json.kept"
+  printf '{"file": "%s", "at": %s, "changed": ["patcher"]}' "$APP" $((now - 86400)) > "$DATA/apk/out/app-new.json"
+  MOVED=news stage moved
+  rm -f "$DATA/apk/out/app-new.json" "$DATA/latest.json.kept"
 fi
 
 # The admin pages from the server PC itself, its browser on the admin service's own network (its loopback): Play on this

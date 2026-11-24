@@ -117,6 +117,34 @@ def reason_to_build(host, base):
     return None
 
 
+# What tells one app for phones from another, beside its signing key (which must stay the same for an app to install over
+# the one before it): the address it calls, its name, the game's client it is made of, the patcher's version, the runtime.
+APP_TRAITS = ("host", "label", "base_sha256", "patcher", "runtime")
+# Where the site reads it (server/portal/lib.php app_news()).
+APP_NEW = "app-new.json"
+
+
+def note_new_app(before, after):
+    """Notes in app-new.json, for the site, that the app just built differs for phones from the one before it (a new
+    patcher, a new client, the runtime, its name, the address): its file, when, and what changed. The site's home and
+    download pages say there is a new app, and that installed over the one before it keeps the account, for 30 days
+    while that app is on offer. Nothing for a first app, for the same app built again, or for one signed with another key
+    (it would not install over the one before); what was noted for an earlier app stays until a new one differs."""
+    if not before or not after or before.get("key_sha256") != after.get("key_sha256"):
+        return
+    changed = [k for k in APP_TRAITS if before.get(k) != after.get(k)]
+    if not changed:
+        return
+    target = os.path.join(OUT, APP_NEW)
+    # Swapped in whole, as the manifests are: the site never reads half of it. A full disk leaves the app as it is.
+    try:
+        with open(target + ".tmp", "w", encoding="utf-8") as f:
+            json.dump({"file": after.get("file"), "at": int(time.time()), "changed": changed}, f)
+        os.replace(target + ".tmp", target)
+    except OSError as e:
+        print(f"builder: the new app is not noted for the site: {short_reason(e)}", flush=True)
+
+
 def windows_installer():
     """The installer for Windows beside the app, for the site to hand out (windows_client.py), after build.json says the
     app is done. Its failure stops nothing: phones get their app all the same. A stop while it runs (docker stop's
@@ -199,6 +227,9 @@ def run(args):
     # The app is done, said before the installer for Windows: phones can have it now, and that step can take a while. "file":
     # this run made a new app (the command line reports a run with one as built).
     write_status("done", host, **({"file": name} if name else {}))
+    # A new app that phones need: the site says so (made: the app on offer before this run, read at its start).
+    if name:
+        note_new_app(made, current_manifest())
     # Still under the SIGTERM handler: a docker stop ends this step at once, and build.json goes on saying done.
     windows_installer()
     return 0
