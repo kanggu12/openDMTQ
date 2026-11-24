@@ -389,7 +389,8 @@ def _player_plate(app, words_frame, said, tone):
     # The words' line on the lamp's middle, as a ready-check row's (widgets.check_line).
     middle = px(PLATE_PADY) + light.winfo_reqheight() / 2.0
     top = max(0, int(round(middle - ui.fonts.body.metrics("linespace") / 2.0)))
-    text = tk.Label(plate, text=said, font=ui.fonts.body, fg=theme.TEXT, bg=surface, justify="left", anchor="w")
+    # Its last short word kept with the one before it when it wraps (widgets.Wrapped).
+    text = widgets.Wrapped(plate, text=said, font=ui.fonts.body, fg=theme.TEXT, bg=surface, justify="left", anchor="w")
     text.pack(side="left", anchor="n", padx=(px(6), px(PLATE_PADX)), pady=(top, 0))
 
     def fit(event=None):

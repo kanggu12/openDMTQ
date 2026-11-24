@@ -315,6 +315,74 @@ def text(root, ui, name):
     problems.extend(_headings(root, name))
     problems.extend(_buttons_centred(root, ui, name))
     problems.extend(_lines(root, name))
+    problems.extend(_widows(root, name))
+    return problems
+
+
+# A paragraph's last word this short or shorter alone on its last line is a widow (the launcher keeps it with the word
+# before it: widgets.keep_last_words), in a paragraph of this many words or more.
+WIDOW_CHARS, WIDOW_WORDS = 12, 3
+
+
+def _wrapped(font, text, width):
+    """The lines Tk sets `text` in at `width` pixels, as (line, the index of its paragraph): broken at plain spaces only
+    (a no-break space never ends a line), each line as many words as fit, paragraph by paragraph."""
+    lines = []
+    for index, paragraph in enumerate(str(text).split("\n")):
+        words = paragraph.split(" ")
+        line = words[0]
+        for word in words[1:]:
+            if font.measure(line + " " + word) <= width:
+                line += " " + word
+            else:
+                lines.append((line, index))
+                line = word
+        lines.append((line, index))
+    return lines
+
+
+def _widow(font, text, width):
+    """The word left alone on the last line of a paragraph of `text` set at `width` (a paragraph of WIDOW_WORDS words or
+    more that wraps), or None."""
+    paragraphs = str(text).split("\n")
+    found = _wrapped(font, text, width)
+    for i, (line, index) in enumerate(found):
+        last = i + 1 == len(found) or found[i + 1][1] != index
+        first = i == 0 or found[i - 1][1] != index
+        if not last or first:
+            continue
+        words = [w for w in paragraphs[index].replace("\u00a0", " ").split(" ") if w]
+        if " " not in line and "\u00a0" not in line and len(line) <= WIDOW_CHARS and len(words) >= WIDOW_WORDS:
+            return line
+    return None
+
+
+def _widows(root, name):
+    """No paragraph that wraps leaves a short last word alone on its last line ("game.", "stays.", "volume." and
+    "않습니다." stood alone on theirs): the words Tk shows (a label's own text, a canvas's text items with a width),
+    wrapped as Tk wraps them."""
+    problems = []
+    for widget in [w for w in _all(root) if _mapped(w)]:
+        if isinstance(widget, tk.Label):
+            # The words as Tk shows them (a label of the launcher's may say its words as given, cget).
+            shown = tk.Label.cget(widget, "text")
+            wrap = int(widget.winfo_fpixels(str(widget.cget("wraplength")))) if str(widget.cget("wraplength")) else 0
+            if not str(shown).strip() or wrap <= 0:
+                continue
+            word = _widow(_font(widget), shown, wrap)
+            if word is not None:
+                problems.append("%s: %r stands alone on the last line of %r" % (name, word, str(shown)[:50]))
+        elif isinstance(widget, tk.Canvas):
+            for item in widget.find_all():
+                if widget.type(item) != "text" or widget.itemcget(item, "state") == "hidden":
+                    continue
+                width = int(float(widget.itemcget(item, "width") or 0))
+                shown = widget.itemcget(item, "text")
+                if width <= 0 or not str(shown).strip():
+                    continue
+                word = _widow(_font(widget, item=item), shown, width)
+                if word is not None:
+                    problems.append("%s: %r stands alone on the last line of %r" % (name, word, str(shown)[:50]))
     return problems
 
 

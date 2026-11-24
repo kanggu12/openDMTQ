@@ -127,7 +127,9 @@ class Dialog:
         text_w = panel_w - 2 * px(PAD) - lamp_room
         y = px(PAD)
         # The question in Pretendard Bold, after the lamp; what it means under it in ash.
-        message = c.create_text(px(PAD) + lamp_room, y, text=path_breaks(fonts.dialog_title, self.message, text_w),
+        # Each paragraph's last short word kept with the one before it, as the pages' words (widgets.keep_last_words).
+        message = c.create_text(px(PAD) + lamp_room, y,
+                                text=widgets.keep_last_words(path_breaks(fonts.dialog_title, self.message, text_w)),
                                 font=fonts.dialog_title, fill=theme.TEXT,
                                 width=text_w, justify="left", anchor="nw", tags=("card", "words"))
         lamp_y = y + fonts.dialog_title.metrics("linespace") // 2
@@ -135,7 +137,8 @@ class Dialog:
         detail = None
         if self.detail:
             y += px(8)
-            detail = c.create_text(px(PAD) + lamp_room, y, text=path_breaks(fonts.body, self.detail, text_w),
+            detail = c.create_text(px(PAD) + lamp_room, y,
+                                   text=widgets.keep_last_words(path_breaks(fonts.body, self.detail, text_w)),
                                    font=fonts.body, fill=theme.MUTED,
                                    width=text_w, justify="left", anchor="nw", tags=("card", "words"))
             y = c.bbox(detail)[3]

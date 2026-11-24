@@ -497,7 +497,9 @@ class ScrollArea(tk.Frame):
             self._heading.append(c.create_image(px(self.MARGIN) - px(2), y, image=self._title_image, anchor="nw"))
             y += picture.height
         if description:
-            self._heading.append(c.create_text(px(self.MARGIN), y + px(2), text=description, anchor="nw",
+            # Its last short word kept with the one before it, as every paragraph that wraps (keep_last_words).
+            self._heading.append(c.create_text(px(self.MARGIN), y + px(2), text=keep_last_words(description),
+                                               anchor="nw",
                                                font=self.ui.fonts.body, fill=theme.MUTED,
                                                width=max(px(200), self._column(c.winfo_width()))))
         self._place_content()
@@ -1121,7 +1123,8 @@ def keep_room(label, wrap):
     line = max(1, int(label.tk.call("font", "metrics", font, "-linespace")))
     lines = 1
     for text in texts:
-        probe.configure(text=text, font=font, wraplength=wrap)
+        # As the label shows them: each paragraph's last short word kept with the one before it (Wrapped).
+        probe.configure(text=keep_last_words(text), font=font, wraplength=wrap)
         lines = max(lines, -(-probe.winfo_reqheight() // line))
     if str(label.cget("height")) != str(lines):
         # Set only when it changes: the same height would have Tk lay the label out again for nothing.
@@ -1169,11 +1172,68 @@ def chevron_picture(label, font, colour, bg):
     return art.link_chevron(em, font.metrics("ascent"), font.metrics("linespace"), em * theme.TEXT_CAP, gap, colour, bg)
 
 
+# A space that never ends a line (Tk breaks its lines at plain spaces only), as wide as a plain one in the launcher's
+# faces; and the longest last word of a paragraph that is kept with the word before it.
+NO_BREAK, WIDOW_CHARS = "\u00a0", 12
+
+
+def keep_last_words(text):
+    """`text` with each paragraph's last word kept with the word before it (a space that never ends a line between
+    them) when that word is short (WIDOW_CHARS) and the paragraph has three words or more: a paragraph that wraps then
+    never leaves a word alone on its last line, as "game.", "stays.", "volume." and "않습니다." stood on theirs."""
+    kept = []
+    for paragraph in str(text).split("\n"):
+        head, space, last = paragraph.rstrip().rpartition(" ")
+        if space and len(last) <= WIDOW_CHARS and " " in head.strip():
+            paragraph = head + NO_BREAK + last
+        kept.append(paragraph)
+    return "\n".join(kept)
+
+
+class Wrapped(tk.Label):
+    """A label of words that wrap to its box (label() with wrap_margin): shown with each paragraph's last short word kept
+    with the word before it (keep_last_words), however its words are set, while it says its words as they were given
+    (cget, as a plain label does)."""
+
+    def __init__(self, parent, text="", **kw):
+        super().__init__(parent, **kw)
+        # Its first words set as every later ones are, through configure.
+        self.configure(text=text)
+
+    def configure(self, cnf=None, **kw):
+        if isinstance(cnf, dict) and "text" in cnf:
+            # label["text"] = ... comes as a dict: its words taken out of it, the rest set as given.
+            cnf = dict(cnf)
+            kw["text"] = cnf.pop("text")
+        if "text" in kw:
+            # The words as given kept for cget, Tk given them with the last short word bound.
+            self.odq_text = str(kw["text"])
+            kw["text"] = keep_last_words(self.odq_text)
+        return super().configure(cnf, **kw)
+
+    # Tk's other name for it.
+    config = configure
+
+    def cget(self, key):
+        if key == "text" and hasattr(self, "odq_text"):
+            # The words as they were given (what a page compares and says again), not as Tk sets them.
+            return self.odq_text
+        return super().cget(key)
+
+    # label["text"] reads as cget does.
+    __getitem__ = cget
+
+    def __setitem__(self, key, value):
+        # label["text"] = ... sets as configure does.
+        self.configure({key: value})
+
+
 def label(parent, ui, text, font=None, fg=theme.TEXT, bg=None, wrap_margin=None, beside=(), **kw):
     """A text label in the theme, on its parent's colour unless told; with wrap_margin it wraps at its box's width minus
-    that margin."""
+    that margin, never leaving a short last word alone on its last line (Wrapped)."""
     bg = bg or parent.cget("bg")
-    w = tk.Label(parent, text=text, font=font or ui.fonts.body, fg=fg, bg=bg, justify="left", anchor="w", **kw)
+    kind = Wrapped if wrap_margin is not None else tk.Label
+    w = kind(parent, text=text, font=font or ui.fonts.body, fg=fg, bg=bg, justify="left", anchor="w", **kw)
     if wrap_margin is not None:
         follow_width(ui, w, wrap_margin, beside)
     return w

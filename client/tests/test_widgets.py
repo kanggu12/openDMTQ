@@ -229,6 +229,22 @@ class Glass(unittest.TestCase):
                             self.assertEqual(corner.getpixel((x, y)), panel, (size, x, y))
 
 
+class LastWords(unittest.TestCase):
+    def test_a_short_last_word_is_kept_with_the_one_before_it(self):
+        # Tk breaks a line at a plain space only: a paragraph's short last word bound to the word before it never stands
+        # alone on its last line ("volume.", "stays.", "않습니다." did), paragraph by paragraph, in both languages; a
+        # long last word (a path, an address) and a paragraph of two words are left as they are.
+        nb = widgets.NO_BREAK
+        self.assertEqual(widgets.keep_last_words("as a share of the master volume."),
+                         "as a share of the master" + nb + "volume.")
+        self.assertEqual(widgets.keep_last_words("게임 데이터는 그대로 둡니다.\n두 번째 줄의 마지막 말입니다."),
+                         "게임 데이터는 그대로" + nb + "둡니다.\n두 번째 줄의 마지막" + nb + "말입니다.")
+        self.assertEqual(widgets.keep_last_words("The log is C:\\Users\\player\\AppData\\Local\\setup.log"),
+                         "The log is C:\\Users\\player\\AppData\\Local\\setup.log")
+        self.assertEqual(widgets.keep_last_words("no gaps"), "no gaps")
+        self.assertEqual(widgets.keep_last_words(""), "")
+
+
 class BuildPictures(unittest.TestCase):
     """The pictures the Windows build makes from the launcher's drawing code (packaging/windows/assets.py)."""
 

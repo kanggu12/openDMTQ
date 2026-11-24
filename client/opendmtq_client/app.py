@@ -204,9 +204,10 @@ class LauncherApp:
         self.status_glyph = tk.Label(status, image=self._status_images["normal"], bg=theme.STRIP, bd=0)
         self.status_glyph.pack(side="left", anchor="n", pady=(px(STATUS_LAMP_DROP), 0))
         lamp_width = self._status_lamps["normal"].width
-        self.status_label = tk.Label(status, text="", font=self.fonts.small, fg=theme.MUTED, bg=theme.STRIP,
-                                     justify="left", anchor="w",
-                                     wraplength=self.rail.inner_width() - lamp_width - px(6))
+        # Its last short word kept with the one before it, as every line that wraps (widgets.Wrapped).
+        self.status_label = widgets.Wrapped(status, text="", font=self.fonts.small, fg=theme.MUTED, bg=theme.STRIP,
+                                            justify="left", anchor="w",
+                                            wraplength=self.rail.inner_width() - lamp_width - px(6))
         self.status_label.pack(side="left", fill="x", padx=(px(6), 0))
         # The link under the words, in the status's own column, when the message has one (_paint_status): its words set
         # then, its chevron made once with it.

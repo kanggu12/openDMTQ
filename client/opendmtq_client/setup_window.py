@@ -145,8 +145,9 @@ class SetupWindow:
         self.strip = tk.Frame(strip, bg=theme.STRIP)
         self.strip.pack(fill="both", expand=True, padx=px(EDGE + 4))
         # The line at the strip's left end (what the work under way is doing, where the log is), and the buttons.
-        self.note = tk.Label(self.strip, text="", font=ui.fonts.small, fg=theme.MUTED, bg=theme.STRIP, anchor="w",
-                             justify="left")
+        # Its last short word kept with the one before it, as every line that wraps (widgets.Wrapped).
+        self.note = widgets.Wrapped(self.strip, text="", font=ui.fonts.small, fg=theme.MUTED, bg=theme.STRIP,
+                                    anchor="w", justify="left")
         # Its room ends the strip's gap before the buttons, however long its words.
         self.note.pack(side="left", fill="x", expand=True, padx=(0, px(16)))
         self.button_row = tk.Frame(self.strip, bg=theme.STRIP)
