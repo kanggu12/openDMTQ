@@ -46,10 +46,13 @@ def remove_service():
                 return
     except OSError:
         return
-    if not MAC:
+    # A Linux without systemd (the unit written by an earlier version, or the system changed since) has no systemctl to
+    # ask: the file goes all the same, and the rest of the uninstall goes on.
+    systemd = not MAC and shutil.which("systemctl") is not None
+    if systemd:
         subprocess.run(["systemctl", "--user", "disable", "opendmtq.service"], capture_output=True)
     os.remove(plist)
-    if not MAC:
+    if systemd:
         subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
     ok(f"removed {plist}")
 

@@ -1,6 +1,7 @@
 """Tests for repository settings that a clone depends on."""
 
 import argparse
+import io
 import ast
 import glob
 import json
@@ -1083,6 +1084,55 @@ class HostPortsTest(unittest.TestCase):
         self.assertEqual(self.settings.admin_url(lan), "http://192.168.0.10:8791/opendmtq/admin/")
         exposed = {"PUBLIC_HOST": "game.example.com:8790", "LISTEN_PORT": "8790", "ADMIN_PORT": "18791"}
         self.assertEqual(self.settings.admin_url(exposed), "http://localhost:8790/opendmtq/admin/")
+
+
+@unittest.skipIf(sys.platform in ("win32", "darwin"), "the Linux start with the computer")
+class HostServiceTest(unittest.TestCase):
+    """A host install's start with the computer on a Linux without systemd (a container, a system with another init):
+    `service` and `uninstall` say so in words and go on, where they ended with a traceback (CLI-94)."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, os.path.join(ROOT, "host"))
+        from opendmtq_host import commands, remove
+        cls.commands, cls.remove = commands, remove
+
+    def test_service_says_there_is_no_systemd_and_writes_nothing(self):
+        # main wrote the unit, then died with FileNotFoundError: 'systemctl'.
+        with tempfile.TemporaryDirectory() as home, mock.patch.dict(os.environ, {"HOME": home}), \
+                mock.patch.object(shutil, "which", lambda name: None), \
+                mock.patch.object(self.commands.subprocess, "run", side_effect=FileNotFoundError(2, "No such file", "systemctl")):
+            with self.assertRaises(SystemExit) as stop, mock.patch("sys.stdout", io.StringIO()) as err:
+                self.commands.cmd_service(argparse.Namespace(remove=False))
+            self.assertEqual(stop.exception.code, 1)
+            self.assertIn("this system has no systemd (no systemctl), which starts the server with the computer here; "
+                          "nothing was set up.", err.getvalue())
+            self.assertFalse(os.path.exists(os.path.join(home, ".config", "systemd", "user", "opendmtq.service")))
+
+    def test_a_unit_systemd_does_not_take_is_said_and_taken_away(self):
+        # systemd there, but no session of this user's: its own words, and no unit left behind saying it starts at boot.
+        refused = subprocess.CompletedProcess([], 1, "", "Failed to connect to bus: No medium found\n")
+        with tempfile.TemporaryDirectory() as home, mock.patch.dict(os.environ, {"HOME": home}), \
+                mock.patch.object(shutil, "which", lambda name: "/usr/bin/" + name), \
+                mock.patch.object(self.commands.subprocess, "run", return_value=refused):
+            with self.assertRaises(SystemExit), mock.patch("sys.stdout", io.StringIO()) as err:
+                self.commands.cmd_service(argparse.Namespace(remove=False))
+            self.assertIn("systemd did not take the unit (Failed to connect to bus: No medium found); nothing was set up.",
+                          err.getvalue())
+            self.assertFalse(os.path.exists(os.path.join(home, ".config", "systemd", "user", "opendmtq.service")))
+
+    def test_uninstall_takes_the_unit_away_without_systemd(self):
+        # main died at systemctl halfway through the uninstall: the server stopped, its folder and command left.
+        with tempfile.TemporaryDirectory() as home, mock.patch.dict(os.environ, {"HOME": home}), \
+                mock.patch.object(shutil, "which", lambda name: None), \
+                mock.patch.object(self.remove.subprocess, "run", side_effect=FileNotFoundError(2, "No such file", "systemctl")), \
+                mock.patch.object(self.remove, "in_folder", lambda text: True), mock.patch.object(self.remove, "ok", lambda m: None):
+            unit = os.path.join(home, ".config", "systemd", "user", "opendmtq.service")
+            os.makedirs(os.path.dirname(unit))
+            with open(unit, "w", encoding="utf-8") as f:
+                f.write("[Service]\n")
+            self.remove.remove_service()
+            self.assertFalse(os.path.exists(unit))
 
 
 @unittest.skipUnless(shutil.which("helm"), "needs helm")

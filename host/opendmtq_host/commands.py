@@ -427,22 +427,37 @@ def cmd_service(args):
     if WINDOWS:
         die("on Windows, put a shortcut to OpenDMTQ.exe in the Startup folder (Win+R, shell:startup)")
     # Linux: a unit for this user's systemd, which runs it at boot once lingering is on.
+    import shutil
     unit_dir = os.path.expanduser("~/.config/systemd/user")
     unit = os.path.join(unit_dir, "opendmtq.service")
+    # A Linux without systemd (a container, a system with another init) has no systemctl to start it with.
+    systemd = shutil.which("systemctl") is not None
     if args.remove:
-        subprocess.run(["systemctl", "--user", "disable", "--now", "opendmtq.service"], capture_output=True)
+        if systemd:
+            subprocess.run(["systemctl", "--user", "disable", "--now", "opendmtq.service"], capture_output=True)
         if os.path.exists(unit):
             os.remove(unit)
-        subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
+        if systemd:
+            subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
         ok("removed the systemd unit")
         return 0
+    if not systemd:
+        # Said before anything is written: nothing would read the unit here.
+        die("this system has no systemd (no systemctl), which starts the server with the computer here; nothing was "
+            f"set up. {CLI} start starts it now")
     os.makedirs(unit_dir, exist_ok=True)
     with open(unit, "w", encoding="utf-8") as f:
         f.write(systemd_unit(sys.executable, me, ROOT))
-    subprocess.run(["systemctl", "--user", "daemon-reload"], check=False)
-    subprocess.run(["systemctl", "--user", "enable", "--now", "opendmtq.service"], check=False)
+    subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
+    taken = subprocess.run(["systemctl", "--user", "enable", "--now", "opendmtq.service"], capture_output=True, text=True)
+    if taken.returncode != 0:
+        # systemd there, but not this user's (no session of theirs, a container): its own words, and nothing left behind.
+        os.remove(unit)
+        die(f"systemd did not take the unit ({(taken.stderr or taken.stdout).strip() or 'no reason given'}); nothing was "
+            f"set up. {CLI} start starts the server now")
     # Without lingering, a user's services stop when they sign out and start only when they sign in.
-    subprocess.run(["loginctl", "enable-linger", os.environ.get("USER", "")], check=False)
+    if shutil.which("loginctl"):
+        subprocess.run(["loginctl", "enable-linger", os.environ.get("USER", "")], capture_output=True)
     ok(f"starts at boot: {unit} (systemctl --user status opendmtq)")
     return 0
 
