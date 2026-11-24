@@ -242,8 +242,8 @@ The server's own life in one place, a card each:
   router's, `PUBLIC_HOST=<name>:8443` beside `LISTEN_PORT=8791`), the line under it says so, and a move keeps that
   address and the app: the server's own port moves alone. The port it runs on takes back a move waiting for the next
   start. A port another program holds is refused, and so is a port below 1024 that the computer keeps from the server's
-  user. A move off port 80 at the first start of 0.11.0 or later is shown here and on the Status page, with the router's
-  forward where there is one, until **Done** or for a month.
+  user. [The move off port 80](install.md#the-servers-port) at the first start of 0.11.0 or later is shown here and on the
+  Status page, with the router's forward where there is one, until **Done** or for a month.
 - **The app's name:** what phones call it, `TECHNIKA Q (<name>)`, and **Change the name**: from the server's next start
   the app is built again with it (Restart above does it now). The app players have keeps working, as it calls the same
   address; empty, the address names the app. A name with a quote, `$`, `#`, a backslash or a backquote, or over 80
