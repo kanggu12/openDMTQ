@@ -5,6 +5,7 @@ every admin page's action and every page of the players' site with the routes th
 Flask is installed in the tools image only; outside it these tests are skipped (CI runs them there)."""
 
 import ast
+import contextlib
 import datetime
 import hashlib
 import io
@@ -1376,12 +1377,12 @@ class JobTest(unittest.TestCase):
         real = admin.backups.swap_in
         seen = []
 
-        def watched(restored):
+        def watched(restored, at_lock=None):
             # What the copy holds the moment it takes the live database's place.
             con = sqlite3.connect(restored)
             seen.append(sorted(r[0] for r in con.execute("SELECT name FROM ApiToken")))
             con.close()
-            return real(restored)
+            return real(restored, at_lock)
 
         with Server() as inst:
             made = inst.ask("POST", "/tokens", json={"name": "after", "scope": "write"}).get_json()
@@ -1416,6 +1417,8 @@ class JobTest(unittest.TestCase):
         # makes them, server/game/src/signin.php: written here as it writes them).
         with Server() as inst:
             with sqlite3.connect(admin.core.DB) as con:
+                # Each player's account, as the platform's login makes it (server/game/src/platform.php): its puid is its guid.
+                con.execute("UPDATE Member SET puid = guid")
                 for sql in admin.backups.SIGN_IN_TABLE:
                     con.execute(sql)
                 con.execute("INSERT INTO SignIn (access, puid, at, key, guid) VALUES ('from_the_backup', '7', 1, 'k1', 7)")
@@ -1430,6 +1433,93 @@ class JobTest(unittest.TestCase):
             with sqlite3.connect(admin.core.DB) as con:
                 self.assertEqual(con.execute("SELECT access, key, guid, play_token, play_pattern FROM SignIn").fetchall(),
                                  [("today", "k2", 7, "started", 61)])
+
+    def test_a_restore_keeps_only_the_sign_ins_of_players_the_backup_has(self):
+        # Kept: a player of the backup's, and an account of its whose game has not logged in yet. Not kept: a player made
+        # after the backup, whose number the server gives the next new phone, and an account that moved onto another
+        # player since (the backup has it as its own). With main's restore every sign-in of now stayed, and the next
+        # newcomer's game counted the kept key's starts, purchases and saves as its own (ADM-222).
+        with Server() as inst:
+            with sqlite3.connect(admin.core.DB) as con:
+                con.execute("UPDATE Member SET puid = guid")
+            name = inst.ask("POST", "/backups").get_json()["backup"]["name"]
+            with sqlite3.connect(admin.core.DB) as con:
+                # Since the backup: player 12 joined; account 8 typed player 7's transfer code, and is player 7 now.
+                con.execute("INSERT INTO Member (id, nickname, guid, puid, udid) VALUES (12, 'Later', '12', '12', 'phone-d')")
+                con.execute("UPDATE Member SET guid = '7' WHERE puid = '8'")
+                for sql in admin.backups.SIGN_IN_TABLE:
+                    con.execute(sql)
+                con.executemany("INSERT INTO SignIn (access, puid, at, key, guid) VALUES (?, ?, 2, ?, ?)",
+                                [("player 7", "7", "k7", 7), ("account 9, no login yet", "9", None, None),
+                                 ("player 12", "12", "k12", 12), ("account 8 as player 7", "8", "k8", 7)])
+            r = inst.ask("POST", f"/backups/{name}/restore")
+            self.assertEqual(wait_job(inst, r.get_json()["job"]["id"])["state"], "done")
+            with sqlite3.connect(admin.core.DB) as con:
+                self.assertEqual(sorted(r[0] for r in con.execute("SELECT access FROM SignIn")),
+                                 ["account 9, no login yet", "player 7"])
+
+    def test_a_sign_in_noted_while_a_restore_runs_is_kept(self):
+        # The game server notes sign-ins all the while: one noted after the restore's first look at the live database and
+        # before the swap was lost with it, and that game's login was then refused (SVC.05401). Today's sign-ins are read
+        # at the swap's own lock now, in write-ahead mode and in the rollback journal's (ADM-223).
+        for mode in ("wal", "delete"):
+            with self.subTest(mode=mode), Server() as inst:
+                with sqlite3.connect(admin.core.DB) as con:
+                    con.execute(f"PRAGMA journal_mode = {mode}")
+                    con.execute("UPDATE Member SET puid = guid")
+                    for sql in admin.backups.SIGN_IN_TABLE:
+                        con.execute(sql)
+                name = inst.ask("POST", "/backups").get_json()["backup"]["name"]
+                real = admin.backups.move_board_stamp
+
+                def a_phone_signs_in(copy, live):
+                    # Between the first look and the swap: a phone's platform login, from the game server's connection.
+                    with sqlite3.connect(admin.core.DB) as server:
+                        server.execute("INSERT INTO SignIn (access, puid, at) VALUES ('noted meanwhile', '8', 3)")
+                    return real(copy, live)
+
+                with mock.patch.object(admin.backups, "move_board_stamp", a_phone_signs_in):
+                    r = inst.ask("POST", f"/backups/{name}/restore")
+                    self.assertEqual(wait_job(inst, r.get_json()["job"]["id"])["state"], "done")
+                with sqlite3.connect(admin.core.DB) as con:
+                    self.assertEqual(con.execute("SELECT access FROM SignIn").fetchall(), [("noted meanwhile",)], mode)
+                    self.assertEqual(con.execute("PRAGMA journal_mode").fetchone()[0], mode)
+                    self.assertEqual(con.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+
+    def test_the_last_look_is_taken_at_the_swaps_own_lock(self):
+        # While the last look runs the swap holds the live database's write lock: a writer (the game server noting a sign-in)
+        # waits, so nothing written after the look is lost with the database it replaces; the look reads the live database
+        # as it stands, and what it puts in the restored copy is in the live database after the swap (ADM-223).
+        for mode in ("wal", "delete"):
+            with self.subTest(mode=mode), Install() as inst:
+                with sqlite3.connect(admin.core.DB) as con:
+                    con.execute(f"PRAGMA journal_mode = {mode}")
+                    con.execute("CREATE TABLE Note (x)")
+                    con.executemany("INSERT INTO Note VALUES (?)", [("live " + "x" * 400,)] * 300)
+                restored = inst.path("restored.db3")
+                with sqlite3.connect(restored) as con:
+                    con.execute("CREATE TABLE Note (x)")
+                    con.executemany("INSERT INTO Note VALUES (?)", [("restored " + "y" * 400,)] * 200)
+                seen = []
+
+                def at_lock(read_live):
+                    with contextlib.closing(sqlite3.connect(admin.core.DB, timeout=0)) as writer:
+                        try:
+                            writer.execute("BEGIN IMMEDIATE")
+                            seen.append("a writer went ahead")
+                        except sqlite3.OperationalError as e:
+                            seen.append(str(e))
+                    with contextlib.closing(read_live()) as live:
+                        seen.append(live.execute("SELECT COUNT(*) FROM Note").fetchone()[0])
+                    with contextlib.closing(sqlite3.connect(restored)) as last, last:
+                        last.execute("INSERT INTO Note VALUES ('put in at the lock')")
+
+                admin.backups.swap_in(restored, at_lock=at_lock)
+                self.assertEqual(seen, ["database is locked", 300], mode)
+                with contextlib.closing(sqlite3.connect(admin.core.DB)) as con:
+                    self.assertEqual(con.execute("SELECT COUNT(*) FROM Note").fetchone()[0], 201, mode)
+                    self.assertEqual(con.execute("SELECT x FROM Note WHERE x LIKE 'put%'").fetchall(), [("put in at the lock",)])
+                    self.assertEqual(con.execute("PRAGMA integrity_check").fetchone()[0], "ok")
 
     def test_a_server_with_no_account_yet_takes_the_backups(self):
         # A move to a new PC: no account of its own yet, and every player of the backup still signs in.

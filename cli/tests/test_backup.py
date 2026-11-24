@@ -188,6 +188,8 @@ class RealDatabaseTest(unittest.TestCase):
             live.close()
             with tempfile_folder() as tmp:
                 old = self.database(os.path.join(tmp, "old.db3"))
+                # The backup's player 7, its account as the platform's login makes it (server/game/src/platform.php).
+                self.with_players(old, ("7", "7"))
                 for statement in keep_tokens.SIGN_IN_TABLE:
                     old.execute(statement)
                 old.execute("INSERT INTO SignIn (access, puid, at, key, guid) VALUES ('from_the_backup', '7', 1, 'k1', 7)")
@@ -199,6 +201,39 @@ class RealDatabaseTest(unittest.TestCase):
             self.assertEqual(sb.call(app.cmd_restore, name=name, with_key=False), 0, sb.output())
             con = sqlite3.connect(backup.DB)
             self.assertEqual(con.execute("SELECT access, key, guid FROM SignIn").fetchall(), [("today", "k2", 7)])
+            con.close()
+
+    @staticmethod
+    def with_players(con, *pairs):
+        """Players in a game database as the game server makes them: (puid, guid) each, as text."""
+        for column in ("guid", "puid"):
+            con.execute(f"ALTER TABLE Member ADD COLUMN {column} TEXT")
+        con.executemany("INSERT INTO Member (id, puid, guid) VALUES (?, ?, ?)", [(int(p), p, g) for p, g in pairs])
+        con.commit()
+
+    def test_a_restore_keeps_only_the_sign_ins_of_players_the_backup_has(self):
+        # As the admin pages' restore: a player of the backup's and an account of its not logged in yet stay; a player made
+        # since (the server gives their number to the next new phone) and an account moved onto another player since
+        # go (CLI-91; main kept every sign-in of now).
+        with Sandbox() as sb:
+            live = self.database(backup.DB)
+            for statement in keep_tokens.SIGN_IN_TABLE:
+                live.execute(statement)
+            live.executemany("INSERT INTO SignIn (access, puid, at, key, guid) VALUES (?, ?, 2, ?, ?)",
+                             [("player 7", "7", "k7", 7), ("account 9, no login yet", "9", None, None),
+                              ("player 12", "12", "k12", 12), ("account 8 as player 7", "8", "k8", 7)])
+            live.commit()
+            live.close()
+            with tempfile_folder() as tmp:
+                old = self.database(os.path.join(tmp, "old.db3"))
+                self.with_players(old, ("7", "7"), ("8", "8"), ("9", "9"))
+                old.close()
+                with open(os.path.join(tmp, "old.db3"), "rb") as f:
+                    content = f.read()
+            name = sb.archive("data/backups/opendmtq-20260101-120000-manual.tar.gz", {"dmtq.db3": content})
+            self.assertEqual(sb.call(app.cmd_restore, name=name, with_key=False), 0, sb.output())
+            con = sqlite3.connect(backup.DB)
+            self.assertEqual(sorted(r[0] for r in con.execute("SELECT access FROM SignIn")), ["account 9, no login yet", "player 7"])
             con.close()
 
     def test_a_backup_from_before_the_tokens_gets_their_table(self):

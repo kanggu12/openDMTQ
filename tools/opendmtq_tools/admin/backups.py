@@ -1,6 +1,7 @@
 """Backups: made by hand or every day, kept to a limit, downloaded, brought in and restored. Each form's work is a function
 (create, upload, delete, restore_backup, set_auto) that the API calls as well (api.py)."""
 
+import contextlib
 import datetime
 import gzip
 import hashlib
@@ -12,6 +13,7 @@ import tarfile
 import tempfile
 import threading
 import time
+import urllib.parse
 import zlib
 
 from flask import flash, redirect, render_template, request, send_file, url_for
@@ -88,8 +90,9 @@ GAME_TABLES = (
 )
 
 # The game's sign-ins (server/game/src/signin.php, the same statements): the access token each platform login handed out,
-# as its SHA-256, and the key the game's login gave for it, which a player's own game signs with. A restore keeps today's,
-# as it keeps the API's tokens: every game signed in goes on as it was, and none the backup held signs anything now.
+# as its SHA-256, and the key the game's login gave for it, which a player's own game signs with. A restore keeps today's
+# of the players the restored database has (sign_ins_of), read at the swap's own lock (swap_in): every game of theirs
+# signed in goes on as it was, and none the backup held signs anything now.
 SIGN_IN_TABLE = (
     "CREATE TABLE IF NOT EXISTS SignIn (access TEXT PRIMARY KEY, puid TEXT NOT NULL, at INTEGER NOT NULL, key TEXT, "
     "guid INTEGER, play_token TEXT, play_pattern INTEGER, play_at INTEGER)",
@@ -113,6 +116,32 @@ def put_sign_ins(con, rows):
         con.execute(sql)
     con.execute("DELETE FROM SignIn")
     con.executemany(f"INSERT INTO SignIn ({', '.join(SIGN_IN_COLUMNS)}) VALUES ({', '.join('?' for _ in SIGN_IN_COLUMNS)})", rows)
+
+
+def players_in(con):
+    """con's game players as a sign-in names them: (account, player) pairs, Member's puid and guid as text. None of a
+    database whose table has no such columns (from long before them)."""
+    try:
+        return {(str(puid), str(guid)) for puid, guid in
+                con.execute("SELECT puid, guid FROM Member WHERE puid IS NOT NULL AND guid IS NOT NULL")}
+    except sqlite3.OperationalError:
+        return set()
+
+
+def sign_ins_of(rows, players):
+    """The sign-ins among rows (tuples of SIGN_IN_COLUMNS) whose player a database has (players_in()): its account there,
+    and once the game's login named the player, that account's player the same. Any other would sign for nobody, or for
+    whoever the server then gives that player's number (a restore of a backup from before the player), and a priced
+    start, a purchase and a save of theirs would count as the newcomer's. As ./opendmtq restore keeps them
+    (cli/opendmtq_cli/keep_tokens.py, sign_ins_of)."""
+    accounts = {puid for puid, _ in players}
+    kept = []
+    for row in rows:
+        puid, guid = str(row[1]), row[4]
+        # A sign-in the game's login has not taken yet names its account alone.
+        if puid in accounts and (guid is None or (puid, str(guid)) in players):
+            kept.append(tuple(row))
+    return kept
 
 SCHEMA = """CREATE TABLE IF NOT EXISTS PlayLog (id INTEGER PRIMARY KEY, user_id INTEGER, pattern_id INTEGER,
         score INTEGER, grade TEXT, judgement INTEGER, is_record INTEGER, played_at INTEGER,
@@ -640,14 +669,60 @@ def move_board_stamp(copy, live):
     copy.execute("UPDATE BoardStamp SET n = MAX(n, ?) + ?", (live, STAMP_MARGIN))
 
 
-def swap_in(restored):
+# How many steps a swap takes to copy the restored database (at least a page a step): the first step takes the live
+# database's write lock and the copy holds it to its end, so a small first step leaves the last look (swap_in's at_lock)
+# all of it to come.
+SWAP_STEPS = 256
+
+
+def swap_in(restored, at_lock=None):
     """The restored database in the live one's place. SQLite's online backup copies it into the live one, so the server
-    keeps running and sees the restored data on its next request."""
+    keeps running and sees the restored data on its next request. at_lock(read_live): what goes into the restored copy at
+    the last moment, run once the copy holds the live database's write lock, which it keeps from its first step to its
+    end: what the server writes meanwhile waits, so nothing written after that look is lost with the database it
+    replaces. Its change to the copy starts the copy again from the first page, the lock still held. read_live(): a
+    connection to the live database as it stands, for that look."""
+    # How the live database can be read while the copy holds its lock (live_reader).
+    with contextlib.closing(sqlite3.connect(core.DB, timeout=10)) as look:
+        wal = str(look.execute("PRAGMA journal_mode").fetchone()[0]).lower() == "wal"
     src, dst = sqlite3.connect(restored), sqlite3.connect(core.DB, timeout=10)
-    with dst:
-        src.backup(dst)
-    src.close()
-    dst.close()
+    try:
+        if at_lock is None:
+            with dst:
+                src.backup(dst)
+            return
+        looked = []
+
+        def step(status, remaining, total):
+            # The first step that went through (a busy one waits and tries again): the lock is held from here on.
+            if not looked and status == sqlite3.SQLITE_OK:
+                looked.append(remaining)
+                at_lock(lambda: live_reader(wal))
+
+        pages = src.execute("PRAGMA page_count").fetchone()[0]
+        with dst:
+            src.backup(dst, pages=max(1, pages // SWAP_STEPS), progress=step)
+        if looked and looked[0] == 0:
+            # The copy was whole at its first step (a database of a page), and its lock gone before the look: the copy
+            # made again with what the look put in it. A game's database has more pages than one, and never comes here.
+            with dst:
+                src.backup(dst)
+    finally:
+        src.close()
+        dst.close()
+
+
+def live_reader(wal):
+    """A connection that reads the live database while a swap holds its write lock (swap_in): in write-ahead mode an
+    ordinary one, which reads what was last committed; in the rollback journal's mode the lock keeps every reader out,
+    and one that takes no lock reads the file, which holds what was last committed (the swap's own pages wait in its
+    memory until its end)."""
+    if wal:
+        con = sqlite3.connect(core.DB, timeout=5)
+    else:
+        con = sqlite3.connect(f"file:{urllib.parse.quote(core.DB)}?immutable=1", uri=True)
+    con.row_factory = sqlite3.Row
+    return con
 
 
 def restore_backup(name, path):
@@ -696,8 +771,6 @@ def restore_backup(name, path):
             # the restored database's queue holds is sent again (webhooks.put).
             with tokens.LOCK, webhooks.LOCK:
                 switches, settings, kept_tokens, kept_accounts, kept_hooks = [], [], [], [], []
-                # The game's sign-ins of now (none from a live database set aside as damaged).
-                kept_sign_ins = []
                 # The live database's rankings' change number (0 when it is set aside as damaged and cannot be read).
                 live_stamp = 0
                 # Whether today's server has nothing of its own yet: no player and no account (a new PC), or its
@@ -705,7 +778,8 @@ def restore_backup(name, path):
                 empty = True
                 if not kept:
                     with db() as con:
-                        kept_sign_ins = sign_ins(con)
+                        # Today's game sign-ins are taken at the swap's own lock, below: the server notes new ones all
+                        # the while.
                         live_stamp = board_stamp(con)
                         recordings.live_table(con)
                         switches = con.execute("SELECT * FROM LiveSwitch").fetchall()
@@ -726,8 +800,6 @@ def restore_backup(name, path):
                 try:
                     with copy:
                         tokens.put(copy, kept_tokens)
-                        # Today's game sign-ins: every game signed in goes on signing as it did.
-                        put_sign_ins(copy, kept_sign_ins)
                         # Today's webhooks, and the loop's memory and queue gone: its next look starts from the restored
                         # data as it is, sending nothing of it. A server with nothing of its own yet keeps the backup's
                         # webhooks instead (a move to a new PC keeps the chats the owner set), their queue gone all the
@@ -742,7 +814,25 @@ def restore_backup(name, path):
                         move_board_stamp(copy, live_stamp)
                 finally:
                     copy.close()
-                swap_in(restored)
+
+                def last_look(read_live):
+                    """At the swap's lock, nothing more coming from the server meanwhile: today's game sign-ins of the
+                    players the restored database has (sign_ins_of: none of a damaged database set aside), so that every
+                    game signed in by then goes on signing as it did and none signs for a player the backup does not
+                    have; and today's accounts as they are by then (a password changed on MY PAGE a moment ago stays)."""
+                    rows, accounts = [], None
+                    if not kept:
+                        with contextlib.closing(read_live()) as live:
+                            rows = sign_ins(live)
+                            if kept_accounts:
+                                accounts = live.execute(f"SELECT {', '.join(auth.ACCOUNT_COLUMNS)} FROM SiteUser").fetchall()
+                    with contextlib.closing(sqlite3.connect(restored)) as last:
+                        with last:
+                            put_sign_ins(last, sign_ins_of(rows, players_in(last)))
+                            if accounts is not None:
+                                auth.put_accounts(last, accounts)
+
+                swap_in(restored, at_lock=last_look)
             with db() as con:
                 bring_schema_up_to_date(con)
                 recordings.live_table(con)

@@ -64,7 +64,8 @@ CHECK_UDID = "opendmtq-check"
 
 # The game's sign-ins, as the server makes them (server/game/src/signin.php): the access token each platform login handed
 # out, as its SHA-256, and the key the game's login gave for it, which a player's own game signs with. A restore keeps
-# today's, as the admin pages' restore does (backups.put_sign_ins there): every game signed in goes on as it was.
+# today's of the players the restored database has, as the admin pages' restore does (backups.sign_ins_of there): every
+# game of theirs signed in goes on as it was.
 SIGN_IN_TABLE = (
     """CREATE TABLE IF NOT EXISTS SignIn (access TEXT PRIMARY KEY, puid TEXT NOT NULL, at INTEGER NOT NULL, key TEXT,
        guid INTEGER, play_token TEXT, play_pattern INTEGER, play_at INTEGER)""",
@@ -254,9 +255,34 @@ def sign_ins_now(live):
         return []
 
 
+def players_in(con):
+    """con's game players as a sign-in names them: (account, player) pairs, Member's puid and guid as text. None of a
+    database whose table has no such columns (from long before them)."""
+    try:
+        return {(str(puid), str(guid)) for puid, guid in
+                con.execute("SELECT puid, guid FROM Member WHERE puid IS NOT NULL AND guid IS NOT NULL")}
+    except sqlite3.OperationalError:
+        return set()
+
+
+def sign_ins_of(rows, players):
+    """The sign-ins among rows (of SIGN_IN_COLUMNS) whose player a database has (players_in()): its account there, and once
+    the game's login named the player, that account's player the same. Any other would sign for nobody, or for whoever
+    the server then gives that player's number, its starts, purchases and saves counting as the newcomer's. As the admin
+    pages' restore keeps them (tools/opendmtq_tools/admin/backups.py, sign_ins_of)."""
+    accounts = {puid for puid, _ in players}
+    kept = []
+    for row in rows:
+        puid, guid = str(row[1]), row[4]
+        # A sign-in the game's login has not taken yet names its account alone.
+        if puid in accounts and (guid is None or (puid, str(guid)) in players):
+            kept.append(tuple(row))
+    return kept
+
+
 def keep_sign_ins(live, restored):
-    """Gives the restored database the live one's game sign-ins, and only them: the table made when it has none, the
-    backup's own gone (no game signs with them now). Returns how many were kept."""
+    """Gives the restored database the live one's game sign-ins of the players it has (sign_ins_of), and only them: the
+    table made when it has none, the backup's own gone (no game signs with them now). Returns how many were kept."""
     rows = sign_ins_now(live)
     try:
         con = sqlite3.connect(restored)
@@ -266,6 +292,7 @@ def keep_sign_ins(live, restored):
         with con:
             for statement in SIGN_IN_TABLE:
                 con.execute(statement)
+            rows = sign_ins_of(rows, players_in(con))
             con.execute("DELETE FROM SignIn")
             con.executemany(f"INSERT INTO SignIn ({', '.join(SIGN_IN_COLUMNS)}) VALUES ({', '.join('?' for _ in SIGN_IN_COLUMNS)})", rows)
     except sqlite3.DatabaseError:
