@@ -471,8 +471,8 @@ class LauncherApp:
         self.state.save()
         self.session = None
         if self.quit_after_game:
-            # The window was closed while the game ran: it goes now.
-            self.root.destroy()
+            # The window was closed while the game ran: it goes now, its timers with it.
+            self._go()
             return
         self.root.deiconify()
         crashed, failed = record["crashed"], record.get("failed_start")
@@ -1253,6 +1253,18 @@ class LauncherApp:
             # The window went while the dialog was opening.
             pass
 
+    def _go(self):
+        """The window goes: its timers first (the task pump, the watch, the looks for updates), so that none fires after
+        it into another window's event loop in the same process, as it did in the UI checks ("invalid command name
+        _pump"), then the window."""
+        for job in self.root.tk.splitlist(self.root.tk.call("after", "info")):
+            try:
+                self.root.after_cancel(job)
+            except tk.TclError:
+                # Gone between the list and its cancel.
+                pass
+        self.root.destroy()
+
     def close(self):
         """Close the launcher. A game playing keeps going: the launcher hides until it ends, then goes."""
         if self.keep_open:
@@ -1268,7 +1280,7 @@ class LauncherApp:
             self.quit_after_game = True
             self.root.withdraw()
             return
-        self.root.destroy()
+        self._go()
 
     def leave(self):
         """Close at once for an uninstall, writing nothing: the caller saved what stays before the uninstaller started,
@@ -1277,7 +1289,7 @@ class LauncherApp:
             self.dialog.close(self.dialog.cancel_value)
         self.cancel_download()
         try:
-            self.root.destroy()
+            self._go()
         except tk.TclError:
             # The player closed the window already, while a dialog before this was up.
             pass

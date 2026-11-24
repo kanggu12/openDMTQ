@@ -2,7 +2,9 @@
 # Screenshots and layout measurements of the launcher, in containers with a virtual screen and no network. Nothing
 # opens on the developer's screen. Usage: client/tests/ui/run.sh OUT_DIR [lang ...] (default: en ko)
 # Window sizes: the default 1180x760, the smallest allowed 960x640, and a large 1600x1000, at 100 % scaling; then the
-# default at 200 % (2360x1520, on a 3840x2160 screen at 192 dpi), where every picture is drawn at twice the pixels.
+# default at 200 % (2360x1520, on a 3840x2160 screen at 192 dpi), where every picture is drawn at twice the pixels, and
+# the smallest at 200 % (1920x1280); and at 150 %, the scaling of a 4K screen as Windows sets it by default (a 2560x1600
+# screen at 144 dpi): the default window (1770x1140), the smallest (1440x960), the rows and the installer.
 # OUT_DIR/sheet-<lang>.png puts every screenshot of a language on one page.
 # Each check of a language (a window size's screenshots, the keyboard, the flicker film...) is a part that runs in a
 # container of its own, JOBS of them side by side (default: half the processors, 8 at most), and each part's output is
@@ -42,6 +44,9 @@ for lang in $LANGS; do
     part "$lang" shots :99 "python tests/ui/shots.py --out /out --lang $lang --size $size"
   done
   part "$lang" shots :98 "python tests/ui/shots.py --out /out --lang $lang --size 2360x1520"
+  part "$lang" shots :98 "python tests/ui/shots.py --out /out --lang $lang --size 1920x1280"
+  part "$lang" shots :96 "python tests/ui/shots.py --out /out --lang $lang --size 1770x1140"
+  part "$lang" shots :96 "python tests/ui/shots.py --out /out --lang $lang --size 1440x960"
   # The keyboard alone: Tab's order, a control it reaches out of view brought into view, redraws in place.
   part "$lang" keyboard :99 "python tests/ui/keyboard.py --lang $lang"
   # A setting changed draws only what it changes: the screen filmed, no frame of a page half drawn.
@@ -56,9 +61,11 @@ for lang in $LANGS; do
   # A field and its buttons on one height and middle, under their words; the settings' controls from one line.
   part "$lang" rows :99 "python tests/ui/rows.py --lang $lang"
   part "$lang" rows :98 "python tests/ui/rows.py --lang $lang --size 2360x1520"
+  part "$lang" rows :96 "python tests/ui/rows.py --lang $lang --size 1770x1140"
   # The installer's window: every page at 100 %, at 200 % and on a small screen.
   part "$lang" setup :99 "python tests/ui/setup_shots.py --out /out --lang $lang"
   part "$lang" setup :98 "python tests/ui/setup_shots.py --out /out --lang $lang --tag 200"
+  part "$lang" setup :96 "python tests/ui/setup_shots.py --out /out --lang $lang --tag 150"
   part "$lang" setup :97 "python tests/ui/setup_shots.py --out /out --lang $lang --tag small"
   # Every screenshot of the language on one page: after all the parts that take them.
   part "$lang" sheet :99 "python tests/ui/sheet.py /out $lang"
@@ -72,21 +79,22 @@ wanted() {
   ! { [ -n "${SKIP:-}" ] && grep -qw -- "$1" <<<"$SKIP"; }
 }
 
-# Each part's container: three virtual screens (the usual one at 96 dots to the inch, Windows' 100 %, where Xvfb's own
+# Each part's container: four virtual screens (the usual one at 96 dots to the inch, Windows' 100 %, where Xvfb's own
 # 100 would scale the launcher by 1.04 and no window would be the size asked; one at twice that, as Windows draws at
-# 200 % scaling; a small one at 100 %, as a netbook's, for the installer's window), the fonts Tk uses known to
-# fontconfig the way Windows loads them privately (the leaning face and the icons are drawn into pictures only, from
-# their files, as on Windows: a character a text font lacks then falls back as Windows' does, never to the icons), each
-# screen waited for until it answers, then the part's command.
+# 200 % scaling; one at 1.5 times, its 150 %; a small one at 100 %, as a netbook's, for the installer's window), the
+# fonts Tk uses known to fontconfig the way Windows loads them privately (the leaning face and the icons are drawn into
+# pictures only, from their files, as on Windows: a character a text font lacks then falls back as Windows' does, never
+# to the icons), each screen waited for until it answers, then the part's command.
 PREP='Xvfb :99 -screen 0 1920x1200x24 -dpi 96 -nolisten tcp >/dev/null 2>&1 &
 Xvfb :98 -screen 0 3840x2160x24 -dpi 192 -nolisten tcp >/dev/null 2>&1 &
 Xvfb :97 -screen 0 800x480x24 -dpi 96 -nolisten tcp >/dev/null 2>&1 &
+Xvfb :96 -screen 0 2560x1600x24 -dpi 144 -nolisten tcp >/dev/null 2>&1 &
 mkdir -p /usr/local/share/fonts/opendmtq
 for f in DMTQWide-ExtraBold Pretendard-Regular Pretendard-SemiBold Pretendard-Bold; do
   cp "opendmtq_client/assets/fonts/$f.ttf" /usr/local/share/fonts/opendmtq/
 done
 fc-cache -f >/dev/null
-for d in 99 98 97; do
+for d in 99 98 97 96; do
   for _ in $(seq 100); do xdpyinfo -display ":$d" >/dev/null 2>&1 && break; sleep 0.1; done
 done'
 

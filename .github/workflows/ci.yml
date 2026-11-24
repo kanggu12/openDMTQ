@@ -248,9 +248,9 @@ jobs:
           retention-days: 14
 
   # The PC client's launcher: its unit tests (a stand-in server and player, no screen, no network), then every page, the
-  # first-start guide, the installer's dialogs and the launcher's dialogs on a virtual screen, at three window sizes and at
-  # 200 %, with the layout check (client/tests/ui/run.sh): one language in each job, its parts side by side, the flicker
-  # film first and alone. The installer under Wine against a test server needs the game's files:
+  # first-start guide, the installer's dialogs and the launcher's dialogs on a virtual screen, at three window sizes, at
+  # 150 % and at 200 %, with the layout check (client/tests/ui/run.sh): one language in each job, its parts side by side,
+  # the flicker film first and alone. The installer under Wine against a test server needs the game's files:
   # client/tests/windows/e2e.sh, run by hand (tests/qa.sh's client step runs what these jobs run).
   client:
     needs: changes

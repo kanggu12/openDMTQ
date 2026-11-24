@@ -391,7 +391,9 @@ def _player_plate(app, words_frame, said, tone):
     top = max(0, int(round(middle - ui.fonts.body.metrics("linespace") / 2.0)))
     # Its last short word kept with the one before it when it wraps (widgets.Wrapped).
     text = widgets.Wrapped(plate, text=said, font=ui.fonts.body, fg=theme.TEXT, bg=surface, justify="left", anchor="w")
-    text.pack(side="left", anchor="n", padx=(px(6), px(PLATE_PADX)), pady=(top, 0))
+    # The plate's room under its words too, when they wrap to a second line (a long sign-in line in Korean at 150 %
+    # touched the plate's foot); one line keeps the lamp's height.
+    text.pack(side="left", anchor="n", padx=(px(6), px(PLATE_PADX)), pady=(top, px(PLATE_PADY)))
 
     def fit(event=None):
         # As wide as the words take, up to the head's words' room less the plate's own: a long line wraps there.

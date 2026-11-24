@@ -59,6 +59,27 @@ sys.exit(0)
 '''
 
 
+def stderr_kept():
+    """The process's standard error (Tcl writes its background errors there, beyond Python's reach) into a file of its
+    own from now on; returns a function that gives it back and returns what was written meanwhile, echoed as it was."""
+    import tempfile
+    kept = tempfile.TemporaryFile()
+    sys.stderr.flush()
+    saved = os.dup(2)
+    os.dup2(kept.fileno(), 2)
+
+    def back():
+        sys.stderr.flush()
+        os.dup2(saved, 2)
+        os.close(saved)
+        kept.seek(0)
+        text = kept.read().decode("utf-8", "replace")
+        sys.stderr.write(text)
+        return text
+
+    return back
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--lang", default="en")
@@ -117,6 +138,8 @@ def main():
         shots.settle(app)
         return [x.value for x in shots.widgets_of(app.body.inner) if isinstance(x, widgets.Slider)][:3]
 
+    # What Tcl writes from here on, looked at in the end.
+    back = stderr_kept()
     # ---- A game in which the in-game menu sets master 29, music 40 and the bass preset; the window comes back after.
     app = LauncherApp(state)
     app.root.geometry("1180x760+0+0")
@@ -164,6 +187,12 @@ def main():
     except Exception:  # noqa: BLE001  (gone already)
         pass
     site.stop()
+    # An error Tcl met in the background (a timer of a window that went, firing into the next window's loop: main
+    # printed "bgerror failed to handle background error ... invalid command name ..._pump" and passed).
+    written = back()
+    for line in written.splitlines():
+        if "bgerror" in line or "invalid command name" in line or "Error in bgerror" in line:
+            problems.append("Tcl said in the background: %s" % line.strip())
     for line in problems:
         print("FAIL", args.lang, line)
     print("sound_back %s: %d problems" % (args.lang, len(problems)))
