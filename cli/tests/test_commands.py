@@ -10,7 +10,7 @@ import time
 import unittest
 from unittest import mock
 
-from opendmtq_cli import app, checks, discover, env
+from opendmtq_cli import app, checks, discover, env, system
 
 from .sandbox import Sandbox, done
 
@@ -839,6 +839,29 @@ class MessageTest(unittest.TestCase):
                     self.assertEqual(sb.call(app.cmd_up), 0, sb.output())
                 self.assertNotIn("moved", sb.output()[before:])
                 self.assertEqual(sb.env()["LISTEN_PORT"], str(want))
+
+    def test_a_move_off_port_80_is_whole_or_not_made(self):
+        # data/state handed to www-data by an earlier run with sudo, the server now started by its owner: the move wrote
+        # .env, then died on the notes with a traceback, and the next start no longer moved, so nothing ever said it (DEP-112).
+        # Now the way to take data/ back comes first and nothing moves; notes that cannot be written leave .env as it was.
+        env_text = "PUBLIC_HOST=192.168.0.10\nADMIN_PORT=8791\nADMIN_PASSWORD=x\n"
+        with Sandbox(env_text) as sb, mock.patch.object(system.os, "getuid", return_value=1000), \
+                mock.patch.object(system.os, "getgid", return_value=1000):
+            game_data(sb)
+            # data/state as the earlier run left it: there, and not this user's.
+            os.makedirs(sb.path("data/state"), exist_ok=True)
+            self.assertEqual(sb.call(app.cmd_up), 1, sb.output())
+            self.assertIn("data/state belongs to uid 0, but the server runs as uid 1000", sb.output())
+            self.assertIn("sudo chown -R 1000:1000", sb.output())
+            self.assertEqual(sb.read(".env"), env_text.encode())
+            self.assertFalse(os.path.exists(sb.path("data/state/port-moved.json")))
+        with Sandbox(env_text) as sb, \
+                mock.patch.object(app.env, "note_move_off_80", side_effect=PermissionError(13, "Permission denied")):
+            game_data(sb)
+            self.assertEqual(sb.call(app.cmd_up), 1, sb.output())
+            self.assertIn("the move off port 80 could not be noted in data/state (Permission denied); nothing moved yet",
+                          sb.output())
+            self.assertEqual(sb.read(".env"), env_text.encode())
 
     def test_an_exposed_server_on_port_80_moves_and_the_router_is_told(self):
         # Exposed before 0.11.0 with `expose NAME --port 80`: its public port was its own and moves with it, and the start

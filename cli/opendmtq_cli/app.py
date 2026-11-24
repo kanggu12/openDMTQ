@@ -283,11 +283,22 @@ def leave_port_80():
     if env.check_host(values.get("PUBLIC_HOST", "")) or not env.leaves_80(values, env.listen_port(values)):
         return None
     old = values["PUBLIC_HOST"]
+    # A data/state another user owns (an earlier run with sudo): the way to take it back, before anything moves. The move
+    # would otherwise be half made: .env on the new port, and nothing noted to say it at the start, by status and on the
+    # Server page, nor for the site's download page to tell players of the new app.
+    owner = system.data_owner_problem()
+    if owner:
+        die(owner)
     # Free, or held by this copy's own admin pages on their port of their own before 0.11.0, which go below.
     port = env.port_after_80(values, lambda p: not system.port_busy(p) or system.admin_holds(p))
     new = env.address_after_80(old, port)
+    # The notes first, .env after: when they cannot be written, nothing has moved, and the next start moves it.
+    try:
+        env.note_move_off_80(os.path.join(DATA, "state"), old, new, port=port)
+    except OSError as e:
+        die(f"the move off port 80 could not be noted in data/state ({e.strerror or e}); nothing moved yet. "
+            "./opendmtq up moves it once data/state can be written")
     env.save(ENV_FILE, {"PUBLIC_HOST": new, "LISTEN_PORT": str(port)})
-    env.note_move_off_80(os.path.join(DATA, "state"), old, new, port=port)
     # Their old container holds the port the edge now takes (127.0.0.1:ADMIN_PORT): it goes first, made again by up.
     if system.admin_holds(port):
         system.compose("rm", "-sf", "admin")
