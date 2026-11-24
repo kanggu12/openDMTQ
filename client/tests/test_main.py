@@ -742,6 +742,21 @@ class LinkAtPlay(Folder):
             log = z.read("launcher/launcher.log").decode("utf-8")
         self.assertIn("This PC's player is now linked to your site account <account>.", log)
 
+    def test_a_sign_in_that_ended_at_the_games_end_is_said(self):
+        # The server no longer takes the sign-in when the game's end asks it: said after the game's own end line, the
+        # game's exit code kept, the sign-in forgotten.
+        from opendmtq_client import actions
+        from opendmtq_client import server as srv
+
+        def ended(state, change=actions.at_once):
+            change(lambda: state.forget_sign_in(state.server()))
+            raise srv.SignedOut("the server no longer takes the sign-in", "error.signin.ended")
+        with mock.patch.object(actions, "link_player", side_effect=ended):
+            code, said = self.run_main(["--play"])
+        self.assertEqual(code, 0, said)
+        self.assertLess(said.index("The game ended"), said.index("the server no longer takes the sign-in"))
+        self.assertFalse(st.LauncherState.load().signed_in())
+
     def test_a_game_played_here_before_links_them_at_the_start(self):
         code, said = self.run_main(["--app"])
         self.assertEqual(code, 0, said)

@@ -502,14 +502,23 @@ class LauncherApp:
 
         def work():
             # A sign-in that ended, and the link settled, are changed on the window's own thread, as every change is.
-            account = made or actions.link_player(self.state, change=self.post)
-            self.post(lambda: self._linked_after_game(account))
+            try:
+                account, ended = made or actions.link_player(self.state, change=self.post), None
+            except srv.SignedOut as e:
+                account, ended = None, e
+            self.post(lambda: self._linked_after_game(account, ended))
 
         threading.Thread(target=work, daemon=True, name="link").start()
 
-    def _linked_after_game(self, account):
+    def _linked_after_game(self, account, ended=None):
         """A link made (`account`, or None): said once, after the words of how the game ended while they stand (they stay
-        until the player acts), or alone once the player has moved on; then the records, which are its player's now."""
+        until the player acts), or alone once the player has moved on; then the records, which are its player's now. A
+        sign-in that ended meanwhile (`ended`) is said as the records' answer says one."""
+        # What the link's answer changed (the link settled, a sign-in forgotten), made before this task: kept now.
+        self.state.save()
+        if ended is not None:
+            self.set_status(i18n.Said("status.signed_out"), "warn", sticky=True)
+            self.refresh_checks()
         if account:
             said = i18n.Said("status.linked", account=account)
             if self.status_sticky:
@@ -517,7 +526,6 @@ class LauncherApp:
                                 action=self.status_action, sticky=True)
             else:
                 self.set_status(said, "ok", sticky=True)
-            self.state.save()
         self.refresh_records(force=True)
 
     def open_player_log(self):

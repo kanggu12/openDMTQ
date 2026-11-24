@@ -341,9 +341,10 @@ class LinkSaidInTheWindow(Folder):
         from opendmtq_client import app as launcher
         app = types.SimpleNamespace(state=state, words=i18n.Words("en"), status_message=None, status_tone="normal",
                                     status_action=None, status_transient=False, status_sticky=False, tasks=[],
-                                    asked=[], _paint_status=lambda: None)
+                                    asked=[], checked=[], _paint_status=lambda: None)
         app.post = app.tasks.append
         app.refresh_records = lambda force=False: app.asked.append(force)
+        app.refresh_checks = lambda force=False: app.checked.append(force)
         for name in ("after_game", "_linked_after_game", "set_status"):
             setattr(app, name, getattr(launcher.LauncherApp, name).__get__(app))
         app.text = lambda: launcher.LauncherApp.status_text.fget(app)
@@ -389,6 +390,15 @@ class LinkSaidInTheWindow(Folder):
             self.ended(app)
         self.assertEqual(app.text(), "The game closed after 5 min.")
         self.assertEqual(app.asked, [True])
+
+    def test_a_sign_in_that_ended_meanwhile_is_said(self):
+        # The server no longer takes the sign-in when the game's end asks it: said as the records' answer says one, the
+        # ready check asked again (main said it through the records' answer, which the game's end asked first).
+        app = self.window(st.LauncherState())
+        with mock.patch.object(actions, "link_player", side_effect=srv.SignedOut("ended", "error.signin.ended")):
+            self.ended(app)
+        self.assertEqual(app.status_message.key, "status.signed_out")
+        self.assertEqual((app.status_tone, app.status_sticky, app.checked, app.asked), ("warn", True, [False], [True]))
 
 
 class LinkAtPlay(Folder):
@@ -476,12 +486,13 @@ class LinkAtPlay(Folder):
         self.state.server()["linked"] = "someone.else"
         self.site.claims, self.site.devices = True, {self.DEVICE: self.PLAYER}
         self.assertEqual(actions.link_player(self.state), stub.ACCOUNT)
-        # A sign-in that ended: forgotten where changes are made, as every answer's.
+        # A sign-in that ended: said (SignedOut) and forgotten where changes are made, as every answer's.
         self.state.server()["linked"] = None
         self.site.linked = None
         self.site.signed_cookies.clear()
         handed = []
-        self.assertIsNone(actions.link_player(self.state, change=handed.append))
+        with self.assertRaises(srv.SignedOut):
+            actions.link_player(self.state, change=handed.append)
         self.assertTrue(self.state.signed_in())
         for change in handed:
             change()

@@ -264,8 +264,8 @@ def link_player(state, change=at_once):
     server does when the account has no player and that player has no account either. Returns the account's ID when this
     call made the link, else None: not signed in, no game played here with this app yet, linked already, that player
     another account's, an older server, no answer (none of which stops PLAY). Once the server settled it for the account
-    (linked, or never to be: SETTLED), PLAY asks no more; a sign-in that ended is forgotten. Each change is made where
-    `change` makes it."""
+    (linked, or never to be: SETTLED), PLAY asks no more. SignedOut when the sign-in ended, forgotten as every answer's
+    is. Each change is made where `change` makes it."""
     server = state.server()
     if server is None or not state.signed_in(server) or server.get("linked") == server.get("account"):
         return None
@@ -277,7 +277,7 @@ def link_player(state, change=at_once):
         answer = srv.claim_player(server["url"], server["cookie"], device)
     except srv.SignedOut:
         change(lambda: state.forget_sign_in(server))
-        return None
+        raise
     except srv.ServerError as e:
         log.info("could not ask %s to link the site account to this PC's player: %s", server["url"], e)
         return None

@@ -573,7 +573,12 @@ def _play(state):
     playing.release()
     # The game's first start on this PC gave the id it signs in by: the account and that player linked now, said once
     # after how the game ended, as the window says it.
-    linked = None if session.linked else actions.link_player(state)
+    linked, ended = None, None
+    try:
+        linked = None if session.linked else actions.link_player(state)
+    except srv.SignedOut as e:
+        # The sign-in ended meanwhile (forgotten): said after the game's end, which keeps its own exit code.
+        ended = e
     state.save()
     if record.get("failed_start"):
         # The player's own "could not start": its log says why.
@@ -585,6 +590,8 @@ def _play(state):
         code = 0 if not record["crashed"] else 1
     if linked:
         _say(w("status.linked", account=linked))
+    if ended is not None:
+        _say(str(ended), error=True)
     return code
 
 
