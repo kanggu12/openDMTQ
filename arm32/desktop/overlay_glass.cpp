@@ -6,7 +6,9 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 
 namespace player::overlay {
@@ -25,6 +27,16 @@ std::unique_ptr<PrivateFontCollection> g_collections[4];
 // own file, and DMTQ Wide. Null when not there.
 std::unique_ptr<FontFamily> g_regular, g_semibold, g_bold, g_wide;
 bool g_fonts_tried = false;
+
+// ---- the one thread that sets words (claim_words)
+
+// The thread that claimed the words, by Windows' id for it (0, which no thread has, until one claims them).
+std::atomic<DWORD> g_words_thread{0};
+// How many times another thread asked for words and was refused, for the checks.
+std::atomic<unsigned> g_words_refused{0};
+// Where the first refusal is told (the player's log), and whether it has been told yet.
+std::atomic<void (*)(const char*)> g_words_log{nullptr};
+std::atomic<bool> g_words_told{false};
 
 // The wordmark's pictures by the scale each was drawn for, smallest first (none: the bar's name in words), loaded once:
 // each one's premultiplied pixels in memory of its own and a GDI+ bitmap over them.
@@ -269,6 +281,35 @@ bool load_fonts() {
     return g_regular != nullptr;
 }
 
+// ---- the one thread that sets words
+
+void claim_words() {
+    // The first claim holds: one that comes after it, from another thread, changes nothing (that thread is refused).
+    DWORD none = 0;
+    g_words_thread.compare_exchange_strong(none, GetCurrentThreadId(), std::memory_order_acq_rel);
+}
+
+bool words_here(const char* what) {
+    // The thread that claimed the words: its own GDI+ objects, nobody else's.
+    if (g_words_thread.load(std::memory_order_acquire) == GetCurrentThreadId()) return true;
+    // Any other: counted every time, for the checks.
+    g_words_refused.fetch_add(1, std::memory_order_relaxed);
+    // Told once, the first time there is a log to tell it to: a line in the player's log, under Wine as on Windows.
+    void (*log)(const char*) = g_words_log.load(std::memory_order_acquire);
+    if (log && !g_words_told.exchange(true, std::memory_order_acq_rel)) {
+        char line[240];
+        std::snprintf(line, sizeof line,
+                      "player: the overlay refused %s on a thread that is not its painter's: GDI+'s objects are the painter's alone (those words are left out)",
+                      what ? what : "words");
+        log(line);
+    }
+    return false;
+}
+
+void words_log(void (*log)(const char* line)) { g_words_log.store(log, std::memory_order_release); }
+
+unsigned words_refused() { return g_words_refused.load(std::memory_order_relaxed); }
+
 std::string words_face(Weight weight, bool korean) {
     // As font() picks it: the player's own face of that weight, else Windows' own for the language's script.
     const FontFamily* family = weight == Weight::kBold ? g_bold.get() : weight == Weight::kSemiBold ? g_semibold.get() : g_regular.get();
@@ -328,7 +369,17 @@ Bitmap* wordmark(float scale, float& drawn_for) {
     return g_wordmarks.back().bitmap.get();
 }
 
+namespace {
+
+// The font a refused thread gets: made from no family, so that GDI+ makes none (it answers that the family is missing)
+// and nothing of the faces the painter uses is touched; words set in it come to nothing.
+std::unique_ptr<Font> no_font(float px) { return std::make_unique<Font>(static_cast<const FontFamily*>(nullptr), static_cast<REAL>(px), FontStyleRegular, UnitPixel); }
+
+}  // namespace
+
 std::unique_ptr<Font> font(Weight weight, float px, bool korean) {
+    // Only the thread that sets words reads the faces' families (claim_words): any other gets a font of nothing.
+    if (!words_here("a font")) return no_font(px);
     // Pretendard covers Hangul and Latin both: one face for either language, each weight its own file.
     const FontFamily* family = weight == Weight::kBold ? g_bold.get() : weight == Weight::kSemiBold ? g_semibold.get() : g_regular.get();
     if (family) {
@@ -342,6 +393,8 @@ std::unique_ptr<Font> font(Weight weight, float px, bool korean) {
 }
 
 std::unique_ptr<Font> wide_font(float px) {
+    // Only the thread that sets words reads the face's family (claim_words): any other gets a font of nothing.
+    if (!words_here("a wide font")) return no_font(px);
     // DMTQ Wide's one face is its ExtraBold, regular in its own terms.
     if (g_wide) return std::make_unique<Font>(g_wide.get(), static_cast<REAL>(px), FontStyleRegular, UnitPixel);
     return std::make_unique<Font>(&windows_face(false), static_cast<REAL>(px), FontStyleBold, UnitPixel);
@@ -360,6 +413,8 @@ float family_ascent(const FontFamily& family, INT style, float px) {
 }  // namespace
 
 float face_ascent(Weight weight, float px, bool korean) {
+    // The families are the thread's that sets words alone: any other gets the size itself, as a face with no em gives.
+    if (!words_here("a face's ascent")) return px;
     // As font() picks its family and style: the player's own face of that weight, else Windows' own for the script.
     const FontFamily* family = weight == Weight::kBold ? g_bold.get() : weight == Weight::kSemiBold ? g_semibold.get() : g_regular.get();
     if (family) return family_ascent(*family, weight == Weight::kBold ? FontStyleBold : FontStyleRegular, px);
@@ -367,6 +422,8 @@ float face_ascent(Weight weight, float px, bool korean) {
 }
 
 float wide_ascent(float px) {
+    // The family is the thread's that sets words alone: any other gets the size itself, as a face with no em gives.
+    if (!words_here("a wide face's ascent")) return px;
     // As wide_font() picks them: DMTQ Wide's one face, else Windows' own in bold.
     if (g_wide) return family_ascent(*g_wide, FontStyleRegular, px);
     return family_ascent(windows_face(false), FontStyleBold, px);

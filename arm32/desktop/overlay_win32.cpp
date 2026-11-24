@@ -311,8 +311,10 @@ const StringFormat& tight() {
     return *f;
 }
 
-// A text's box as `font` sets it: its advance and its line's height.
+// A text's box as `font` sets it: its advance and its line's height. Only on the painter's thread (claim_words): any
+// other thread gets an empty box, the refusal counted and told once in the log (overlay_glass.h).
 RectF measure(const std::wstring& text, const Font& f) {
+    if (!words_here("a measure of words")) return RectF();
     // A one-pixel picture to measure on, one for each thread (as tight()'s format, kept for the thread's life).
     thread_local Bitmap* const probe = new Bitmap(1, 1, PixelFormat32bppPARGB);
     Graphics g(probe);
@@ -334,8 +336,10 @@ void note_words(RectF box, const Color& colour, bool cut = false) {
 #endif
 }
 
-// Words with the top left of their line at `at`.
+// Words with the top left of their line at `at`. Only on the painter's thread: on any other, nothing is drawn (the
+// refusal counted and told once).
 void say(Graphics& g, const std::wstring& text, const Font& f, const Color& colour, PointF at) {
+    if (!words_here("drawing words")) return;
     const RectF size = measure(text, f);
     note_words(RectF(at.X, at.Y, size.Width, size.Height), colour);
     if (!words()) return;
@@ -343,8 +347,10 @@ void say(Graphics& g, const std::wstring& text, const Font& f, const Color& colo
     g.DrawString(text.c_str(), -1, &f, at, &tight(), &brush);
 }
 
-// Words centred in a box, on one line (cut with an ellipsis where the box is too narrow).
+// Words centred in a box, on one line (cut with an ellipsis where the box is too narrow). Only on the painter's thread,
+// as say().
 void say_centred(Graphics& g, const std::wstring& text, const Font& f, const Color& colour, RectF box) {
+    if (!words_here("drawing words")) return;
     const RectF size = measure(text, f);
     const float tw = std::min(size.Width, box.Width);
     // Wider than the box by more than rounding: GDI+ cuts them with an ellipsis, which the probe reports.
@@ -1744,6 +1750,11 @@ void painter_loop() {
             drop = g_drop_question;
             g_drop_question = false;
         }
+        // The words are this thread's from its first order on (overlay_glass.h's claim_words): it alone makes fonts and
+        // measures and draws words, and any other thread that tries is refused, counted and told in the log. Claimed
+        // here, not as the thread starts, so that the probe, which draws on its own thread and sends the painter no
+        // order, keeps them.
+        claim_words();
         if (drop) {
             // The question closed: its pictures let go of (the dim and the whole picture are the area's size each, 33 MB
             // at 4K), the card's frame with them.
@@ -3635,20 +3646,21 @@ void take_painted() {
     }
 }
 
-// Every 5 s with the stats on: what the overlay's pictures cost the painter and the UI thread.
+// Every 5 s with the stats on: what the overlay's pictures cost the painter and the UI thread, and how many times a
+// thread other than the painter asked for words and was refused (0 in a player that keeps GDI+ to its painter).
 void overlay_stats() {
     static std::uint64_t count0 = 0, ns0 = 0, shows0 = 0, show_ns0 = 0;
     const std::uint64_t count = g_paint_count.load(std::memory_order_relaxed), ns = g_paint_ns.load(std::memory_order_relaxed);
     const std::uint64_t most = g_paint_most_ns.exchange(0, std::memory_order_relaxed);
     if (count == count0 && g_show_count == shows0) return;
-    char line[300];
+    char line[360];
     std::snprintf(line, sizeof line,
                   "stats: overlay: %llu pictures made on its painter thread (%.3f ms each, the longest %.3f ms), %llu handed to the windows on the UI thread "
-                  "(%.3f ms each, the longest %.3f ms)",
+                  "(%.3f ms each, the longest %.3f ms); words asked for off the painter's thread and refused, so far: %u",
                   static_cast<unsigned long long>(count - count0), count > count0 ? static_cast<double>(ns - ns0) / 1e6 / static_cast<double>(count - count0) : 0.0,
                   static_cast<double>(most) / 1e6, static_cast<unsigned long long>(g_show_count - shows0),
                   g_show_count > shows0 ? static_cast<double>(g_show_ns - show_ns0) / 1e6 / static_cast<double>(g_show_count - shows0) : 0.0,
-                  static_cast<double>(g_show_most_ns) / 1e6);
+                  static_cast<double>(g_show_most_ns) / 1e6, words_refused());
     note(line);
     count0 = count;
     ns0 = ns;
@@ -3960,6 +3972,8 @@ void start(HWND frame, HWND game, const Hooks& hooks, bool korean) {
     g_game = game;
     g_hooks = hooks;
     g_korean = korean;
+    // A thread that asks for words and is not the painter is told once in the player's log (overlay_glass.h).
+    words_log(hooks.log);
     GdiplusStartupInput input;
     GdiplusStartup(&g_gdiplus, &input, nullptr);
     // The player's own faces and the wordmark's pictures, from its folder (Windows' own faces, and the name in words,
@@ -4478,6 +4492,8 @@ void words_lines(FILE* out, const std::string& name, int x, int y) {
 }  // namespace
 
 void test_save(const std::wstring& prefix, const std::wstring& frame_png, bool with_words) {
+    // The probe draws every piece on its own thread, the painter's work: the words are this thread's.
+    claim_words();
     g_test_quiet = true;
     g_test_no_words = !with_words;
     // The frame behind, as the window would show it: of the game's area's size exactly.
@@ -4749,6 +4765,8 @@ void test_save(const std::wstring& prefix, const std::wstring& frame_png, bool w
 }
 
 void test_motion(const std::wstring& prefix, const std::wstring& frame_png) {
+    // As test_save: the probe draws on its own thread.
+    claim_words();
     g_test_quiet = true;
     g_test_no_words = false;
     if (!test_frame(frame_png)) return;

@@ -49,7 +49,8 @@ constexpr float kUnderPrimary = 0.160f, kUnderSecondary = 0.074f;
 // The weights of Pretendard the overlay uses.
 enum class Weight { kRegular, kSemiBold, kBold };
 // Pretendard at `px` pixels in that weight (Windows' own UI face in the language's script where the player's are not
-// there); DMTQ Wide, the launcher's wordmark face, likewise (Windows' UI face in bold where not).
+// there); DMTQ Wide, the launcher's wordmark face, likewise (Windows' UI face in bold where not). Only on the thread that
+// sets words (claim_words below): on any other a font that sets nothing.
 std::unique_ptr<Gdiplus::Font> font(Weight weight, float px, bool korean);
 std::unique_ptr<Gdiplus::Font> wide_font(float px);
 // The ascent of the face font() draws that weight in at `px` pixels, and of wide_font()'s: from the top of a line, where
@@ -57,11 +58,28 @@ std::unique_ptr<Gdiplus::Font> wide_font(float px);
 // words of two faces can stand on one baseline. Read from the family the overlay makes the font from, never from a font:
 // on Windows, Font::GetFamily hands back a private collection's own family, and the FontFamily it fills deletes that
 // family when it goes, so the next words drawn in the face read freed memory (the player ended so the moment the FPS
-// counter first drew; Wine's GDI+ copies the family and never showed it).
+// counter first drew; Wine's GDI+ copies the family and never showed it). Only on the thread that sets words (below):
+// on any other the size itself.
 float face_ascent(Weight weight, float px, bool korean);
 float wide_ascent(float px);
 // Loads the player's own faces from fonts\ beside the program, once, after GDI+ has started; whether they were there.
 bool load_fonts();
+
+// ---- the one thread that sets words
+
+// A GDI+ object is not to be used from two threads at once: Windows' GDI+ refuses or worse where Wine's lets it pass, so
+// such a use shows only on a real Windows (the player ended there, never under Wine). The overlay makes its fonts and
+// measures and draws its words on one thread, its painter: claim_words() makes the calling thread that one (the painter
+// before it draws its first picture; a check's or the probe's own thread, which draws alone); the first claim holds.
+// words_here(what) says whether the calling thread is it. On any other, font() and wide_font() give a font that sets
+// nothing (made from no family, without touching the faces the painter uses) and the overlay's own measuring and
+// drawing of words (overlay_win32.cpp) do nothing; each such refusal is counted (words_refused(), for the checks) and
+// the first is told once through the log given to words_log(), so that a call from the wrong thread shows under Wine
+// and in the player's log too, never only as a crash on a real Windows.
+void claim_words();
+bool words_here(const char* what);
+void words_log(void (*log)(const char* line));
+unsigned words_refused();
 // The name of the face font() draws that weight in for the language (Pretendard's, or Windows' own where the player's
 // are not there), for the player's log and the checks (glasstest.cpp).
 std::string words_face(Weight weight, bool korean);

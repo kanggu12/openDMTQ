@@ -3,7 +3,8 @@
 // English and for Korean alike, and DMTQ Wide for the bar's name; and the words of both languages drawn in them, every
 // Hangul syllable of the question before quitting a glyph of Pretendard's own, not the box a face without Hangul draws.
 // Under Wine as on Windows: Wine's GDI+ found no family by its name in the player's own collection, and the overlay fell
-// back to a face of Wine's with no Hangul (its Korean showed as boxes). Prints ALL CHECKS PASSED when every check held.
+// back to a face of Wine's with no Hangul (its Korean showed as boxes). And that the faces are one thread's: another
+// thread gets nothing of them, counted and told in the log. Prints ALL CHECKS PASSED when every check held.
 #include "overlay_glass.h"
 // The equaliser's chips' words and their widths, which the panel is laid out by.
 #include "sound_panel.h"
@@ -86,6 +87,28 @@ bool same(const std::wstring& line, const Gdiplus::Font& a, const Gdiplus::Font&
     return true;
 }
 
+// What the overlay tells its log (overlay_glass.h's words_log): the lines, for the check that a refusal is told once.
+std::vector<std::string> g_told;
+void keep_told(const char* line) { g_told.emplace_back(line ? line : ""); }
+
+// What a thread that never claimed the words gets from the overlay's faces, asked for on a thread of its own (the UI
+// thread's place in the player): whether each font is one of nothing, and whether each ascent is the size itself.
+struct Other {
+    bool claimed_after = false;
+    bool fonts_of_nothing = false;
+    bool ascents_plain = false;
+};
+DWORD WINAPI other_thread(void* out) {
+    Other& o = *static_cast<Other*>(out);
+    // A second claim, from this thread, changes nothing: the first holds.
+    player::overlay::claim_words();
+    const auto regular = player::overlay::font(Weight::kRegular, 24, false);
+    const auto wide = player::overlay::wide_font(24);
+    o.fonts_of_nothing = regular && wide && !regular->IsAvailable() && !wide->IsAvailable();
+    o.ascents_plain = player::overlay::face_ascent(Weight::kSemiBold, 20, false) == 20.0f && player::overlay::wide_ascent(20) == 20.0f;
+    return 0;
+}
+
 }  // namespace
 
 int main() {
@@ -94,6 +117,10 @@ int main() {
     Gdiplus::GdiplusStartupInput input;
     ULONG_PTR token = 0;
     Gdiplus::GdiplusStartup(&token, &input, nullptr);
+    // The words are this program's thread's, as the painter's in the player (overlay_glass.h's claim_words), and a
+    // refusal is told to this program's own log.
+    player::overlay::claim_words();
+    player::overlay::words_log(keep_told);
     {
         // The faces, as the overlay loads them when it starts.
         check(player::overlay::load_fonts(), "Pretendard is loaded from fonts beside the program");
@@ -221,6 +248,31 @@ int main() {
                 }
             }
             check(roomy, "the equaliser's chips: every word with 8 at least on both sides and about the same room as the others, in English and Korean");
+        }
+        // The words are one thread's (WIN-474): another thread that asks the overlay's faces for a font or an ascent, as a
+        // function the player's UI thread runs would, gets a font of nothing and the size itself, never the faces the
+        // painter draws with (GDI+'s objects are not to be used from two threads at once, which only a real Windows shows);
+        // each refusal is counted and the first told once in the log, under Wine too. Its own claim after the first
+        // changes nothing. The thread that claimed them still has its fonts, and nothing it asked for was refused.
+        {
+            const unsigned before = player::overlay::words_refused();
+            Other other;
+            HANDLE thread = CreateThread(nullptr, 0, other_thread, &other, 0, nullptr);
+            if (thread) {
+                WaitForSingleObject(thread, INFINITE);
+                CloseHandle(thread);
+            }
+            const unsigned refused = player::overlay::words_refused() - before;
+            if (!other.fonts_of_nothing || !other.ascents_plain || refused != 4 || g_told.size() != 1) {
+                std::printf("  another thread: fonts of nothing %d, ascents the size %d, refusals %u, lines told %u\n", other.fonts_of_nothing ? 1 : 0,
+                            other.ascents_plain ? 1 : 0, refused, static_cast<unsigned>(g_told.size()));
+            }
+            check(thread && other.fonts_of_nothing && other.ascents_plain && refused == 4,
+                  "another thread gets fonts of nothing and no face's ascent from the overlay, even after a claim of its own, each refusal counted");
+            check(g_told.size() == 1 && g_told[0].find("refused") != std::string::npos, "the first refusal is told once in the log");
+            const auto mine = player::overlay::font(Weight::kBold, 24, true);
+            check(mine && mine->IsAvailable() && player::overlay::words_refused() - before == 4 && player::overlay::wide_ascent(1000) > 1000,
+                  "the thread that claimed the words still makes the overlay's fonts and reads its faces, refused nothing");
         }
     }
     if (g_failed) {

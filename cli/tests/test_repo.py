@@ -1562,6 +1562,31 @@ class OverlayThreadsTest(unittest.TestCase):
             self.assertIn("thread_local", body, head)
             self.assertNotRegex(body, r"\bstatic\b", head)
 
+    def test_words_are_set_on_the_painters_thread_alone(self):
+        # A measure() or a font() added to any other function the UI thread runs (the hit tests, the counter's and the
+        # notice's places, the window procedures) passed every check before and showed only on a real Windows. Now the
+        # functions that make fonts and measure and draw words refuse any thread but the one that claimed the words, the
+        # painter (overlay_glass.h's claim_words), before touching a GDI+ object: glasstest proves the faces' half under
+        # Wine and on Windows; this holds the overlay's half to it.
+        for head in ("RectF measure(const std::wstring& text, const Font& f) {", "void say(Graphics& g, const std::wstring& text,",
+                     "void say_centred(Graphics& g, const std::wstring& text,"):
+            first = [line.strip() for line in self.body(head).splitlines()[1:] if line.strip()][0]
+            self.assertTrue(first.startswith("if (!words_here("), f"{head} {first}")
+        # The painter claims them before it paints anything, and the probe, which draws on its own thread, before it draws.
+        loop = self.body("void painter_loop() {")
+        self.assertLess(loop.index("claim_words();"), loop.index("paint_question("))
+        for head in ("void test_save(", "void test_motion("):
+            self.assertIn("claim_words();", self.body(head)[:400], head)
+        # The faces' own functions refuse first too.
+        with open(os.path.join(ROOT, "arm32", "desktop", "overlay_glass.cpp"), encoding="utf-8") as f:
+            glass = f.read()
+        for head in ("std::unique_ptr<Font> font(Weight weight, float px, bool korean) {", "std::unique_ptr<Font> wide_font(float px) {",
+                     "float face_ascent(Weight weight, float px, bool korean) {", "float wide_ascent(float px) {"):
+            start = glass.index(head)
+            body = "\n".join(line.split("//", 1)[0] for line in glass[start:glass.index("\n}\n", start)].splitlines()[1:])
+            first = [line.strip() for line in body.splitlines() if line.strip()][0]
+            self.assertTrue(first.startswith("if (!words_here("), f"{head} {first}")
+
 
 class ImporterTest(unittest.TestCase):
     """The import opens the owner's archives with 7-Zip: what its container must not see."""
