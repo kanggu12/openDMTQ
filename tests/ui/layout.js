@@ -276,6 +276,8 @@ window.layoutAudit = function layoutAudit() {
   // Too small to press (the least the accessibility guideline allows, on any screen). What a link's ::after stretches counts.
   for (const el of document.querySelectorAll('a[href], button, input:not([type=hidden]), select, summary')) {
     if (!seen(el) || el.closest('[aria-hidden="true"], .live-ctl, .page-title') || el.closest('p, li, dd, small, .prose')) continue;
+    // (Folded away in a closed <details>: not on the screen at all, whatever size browsers answer with.)
+    if (el.closest('details:not([open])') && !el.closest('summary')) continue;
     const r = el.getBoundingClientRect(), after = getComputedStyle(el, '::after');
     if (after.position === 'absolute') continue;
     if (r.height < 24 || r.width < 24) say('small-target', el, `${Math.round(r.width)}x${Math.round(r.height)}  ${short(el.textContent || el.getAttribute('aria-label') || '')}`);

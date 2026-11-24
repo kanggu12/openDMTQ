@@ -604,6 +604,46 @@ async function hallOfFame(contexts) {
   }
 }
 
+// A row's More on the Players page and the Accounts page, at a phone's width and a laptop's: an account's row has one
+// button of its own beside its player's Link (its More, as a player's row has), its four changes in the panel More opens,
+// whole and on top; Esc closes an open panel and puts the keyboard's place back on its More. Before: each account carried
+// its four buttons (on a phone across the row, about 395 px an account), and Esc left a panel open.
+async function rowMore(contexts) {
+  for (const [width, height] of [[1280, 800], [360, 740]]) {
+    const page = await contexts.signed.newPage();
+    await page.setViewport({ width, height, ...(width < 700 ? { isMobile: true, hasTouch: true } : {}) });
+    for (const [where, url] of [['players', `${A}/players`], ['accounts', `${A}/accounts`]]) {
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      if (where === 'accounts') {
+        // The buttons a row shows beside its player's Link, and the row's height on the screen.
+        const rows = await page.$$eval('table.accounts tbody tr', all => all.map(tr => ({
+          own: [...tr.querySelectorAll('button, summary')].filter(b => !b.closest('.account-link') && b.getClientRects().length
+            && !(b.closest('details:not([open])') && !b.closest('summary'))).map(b => b.textContent.trim()),
+          high: Math.round(tr.getBoundingClientRect().height),
+        })));
+        check(`an account's row has its More alone beside its player's Link (${width}px)`,
+          rows.length > 0 && rows.every(r => r.own.length === 1), JSON.stringify(rows.slice(0, 3)));
+      }
+      const more = `table.${where === 'players' ? 'players' : 'accounts'} tbody tr:first-child .row-more`;
+      // A row with no More (an account's, before): said, and on to the next.
+      if (!await page.$(more)) { check(`a row of the ${where} page has its More (${width}px)`, false); continue; }
+      await page.$eval(`${more} > summary`, s => { s.scrollIntoView({ block: 'center' }); s.click(); });
+      await page.waitForFunction(m => { const d = document.querySelector(m); return d.open && d.querySelector('.row-more-in'); }, {}, more);
+      await pause(250);
+      await page.$eval(more, d => d.setAttribute('data-measured', ''));
+      const whole = await wholeOnTop(page, '.row-more[data-measured] > .row-more-in');
+      const buttons = await page.$$eval('.row-more[data-measured] > .row-more-in button', bs => bs.length);
+      await page.$eval(more, d => d.removeAttribute('data-measured'));
+      if (where === 'accounts') check(`an account's More opens its four changes whole and on top (${width}px)`, whole.ok && buttons === 4, `${buttons} ${whole.detail}`);
+      await page.keyboard.press('Escape');
+      await pause(150);
+      const closed = await page.$eval(more, d => ({ open: d.open, focus: document.activeElement === d.querySelector('summary') }));
+      check(`Esc closes ${where === 'players' ? "a player's" : "an account's"} More and gives the focus back to it (${width}px)`, !closed.open && closed.focus, JSON.stringify(closed));
+    }
+    await page.close();
+  }
+}
+
 // The setup's list of what it found on the server PC (run.sh puts them in the owner's home): the folder of the game's
 // files with no songs in it is named the client data folder, as the look at it says, and its row asks nothing about songs;
 // an archive that cannot be read leaves its row with no Import to press and no choice of songs once the look says so.
@@ -3106,6 +3146,7 @@ async function myPage(contexts) {
     // have none of the items run.sh's stand-in catalog gives a player's page.
     await gameFlows(contexts);
     await adminFlows(contexts);
+    await rowMore(contexts);
     await setupFound(contexts);
     await webhookFlows(contexts);
     await repairSaid(contexts);

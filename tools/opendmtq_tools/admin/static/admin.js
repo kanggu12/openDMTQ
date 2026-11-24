@@ -585,14 +585,15 @@ for (const search of document.querySelectorAll('input[type=search][data-rows]'))
   });
 }
 
-// The Players page's More. A row's panel is made from the page's one (the template player-more) when its More first opens,
-// for that row's player as its data-* say: the address it sends to (data-act), the name to change (data-name), the name
-// its questions say (data-who) and the number in its words (data-id). A row the owner never opens carries none of it: four
-// forms in every row made a page of many players slow to lay out. One open at a time, and it closes by a press anywhere
-// else. Rename does nothing until the name has changed.
+// A row's More (the Players page's, the Accounts page's). On the Players page a row's panel is made from the page's one
+// (the template player-more) when its More first opens, for that row's player as its data-* say: the address it sends to
+// (data-act), the name to change (data-name), the name its questions say (data-who) and the number in its words
+// (data-id). A row the owner never opens carries none of it: four forms in every row made a page of many players slow to
+// lay out. The Accounts page's rows carry their own panel, its four buttons, from the start. One open at a time, and it
+// closes by a press anywhere else or Esc. Rename does nothing until the name has changed.
 (() => {
   const made = document.getElementById('player-more');
-  if (!made) return;
+  if (!document.querySelector('.row-more')) return;
   // A row's own panel: the page's one, its places filled in for the row's player.
   const panel = more => {
     const { act, name, who, id } = more.dataset;
@@ -649,13 +650,16 @@ for (const search of document.querySelectorAll('input[type=search][data-rows]'))
       if (floats && box && box.matches(':popover-open')) box.hidePopover();
       return;
     }
-    // Made once: closed and opened again, the row keeps what was typed in it, as a form of its own did.
-    if (!more.querySelector('.row-more-in')) {
-      const box = panel(more);
-      // Shown and hidden by the page itself (manual): a press elsewhere closes it through the details, below.
-      if (floats) box.popover = 'manual';
+    // Made once: closed and opened again, the row keeps what was typed in it, as a form of its own did. A row that carries
+    // its own (the Accounts page's) has it already.
+    let box = more.querySelector('.row-more-in');
+    if (!box) {
+      if (!made) return;
+      box = panel(more);
       more.append(box);
     }
+    // Shown and hidden by the page itself (manual): a press elsewhere closes it through the details, below.
+    if (floats && !box.popover) box.popover = 'manual';
     for (const other of document.querySelectorAll('.row-more[open]')) if (other !== more) other.open = false;
     place(more);
   }, true);
@@ -666,6 +670,16 @@ for (const search of document.querySelectorAll('input[type=search][data-rows]'))
   document.addEventListener('pointerdown', e => {
     if (e.target.closest('.row-more') || document.getElementById('ask').open) return;
     for (const open of document.querySelectorAll('.row-more[open]')) open.open = false;
+  });
+  // Esc closes an open panel too, as a press elsewhere does, the keyboard's place back on its More (a disclosure's own
+  // close; the question a panel's button asks closes first, by itself).
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || document.getElementById('ask').open) return;
+    const open = document.querySelector('.row-more[open]');
+    if (!open) return;
+    e.preventDefault();
+    open.open = false;
+    open.querySelector('summary').focus();
   });
 })();
 

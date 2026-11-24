@@ -74,7 +74,9 @@
         <td data-label="{{ t('acc.th_rights') }}" class="account-rights">{{ t('acc.rights_admin') if a.admin else t('acc.rights_site') }}</td>
         <td data-label="{{ t('acc.th_last') }}" class="date">{% if a.signed_in_at %}<span data-tip="{{ a.signed_in_at|rec_date }}" tabindex="0">{{ a.last }}</span>{% else %}{{ t('acc.never') }}{% endif %}</td>
         <td data-label="{{ t('acc.th_state') }}"><span class="account-state"><span class="lamp {{ 'off' if a.off else 'on' }}"></span>{{ t('acc.state_off') if a.off else t('acc.state_on') }}</span></td>
-        <td class="actions"><div class="btns">
+        {# Its four changes under More, as the Players page has a player's: on a phone four buttons across the row made each
+           account a screen long. The panel floats under its More on the page's top layer (admin.js). #}
+        <td class="actions"><details class="row-more"><summary class="btn btn-sm">{{ t('players.more') }}</summary><div class="row-more-in"><div class="btns">
           {# A new password ends the old one and every sign-in with it; switched off, the account cannot sign in until
              switched on again; deleted, it is gone. A button whose word depends on the account carries its other word
              too (data-twin), so that it is as wide in every row and the rows' buttons stand in columns. #}
@@ -82,7 +84,7 @@
           <form method="post" data-inplace><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="{{ 'on' if a.off else 'off' }}"><input type="hidden" name="name" value="{{ a.name }}"><button class="btn btn-sm twin" data-twin="{{ t('acc.turn_off') if a.off else t('acc.turn_on') }}">{{ t('acc.turn_on') if a.off else t('acc.turn_off') }}</button></form>
           <form method="post" data-inplace><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="{{ 'player' if a.admin else 'admin' }}"><input type="hidden" name="name" value="{{ a.name }}"><button class="btn btn-sm twin" data-twin="{{ t('acc.make_admin') if a.admin else t('acc.drop_admin') }}">{{ t('acc.drop_admin') if a.admin else t('acc.make_admin') }}</button></form>
           <form method="post" data-ask="{{ tp('acc.ask_delete', name=a.name) }}" data-yes="{{ tp('btn.delete') }}" data-inplace><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="delete"><input type="hidden" name="name" value="{{ a.name }}"><button class="btn btn-sm btn-danger">{{ t('btn.delete') }}</button></form>
-        </div></td>
+        </div></div></details></td>
       </tr>
     {% endfor %}
     </tbody>

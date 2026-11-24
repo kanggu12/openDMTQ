@@ -237,6 +237,10 @@ table.recordings td.rec-sel { text-align: center; }
 /* The recordings' delete button: at the screen's foot once something is ticked, however long the list. */
 .rec-bulk.on { position: sticky; bottom: 0; z-index: 2; padding: 10px 0; background: var(--deck); box-shadow: 0 -8px 12px -10px rgba(0, 0, 0, 0.6); }
 table.recordings tr[id] { scroll-margin-top: 76px; }
+/* A card a page's address names (the Server page's port, name and password, which their answers come back to): brought to
+   the window's top by the browser, it stands under the bar and the band of the answer's words, not beneath them: the bar's
+   one row and the band's line, 14 px clear; two rows of the bar below 1240 px; on a phone the bar goes with the page and
+   the band is at the screen's foot. */
 
 /* ------------------------------------------------------------------ the status page */
 
@@ -588,15 +592,19 @@ table.players tbody tr:nth-last-child(-n+2):not(:first-child):not(:nth-child(2))
    the eye, which the panel's place at the top of the screen already leads. No frame of the browser's around the card. */
 [data-once]:focus { outline: none; }
 .account-state { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
-/* The accounts' table: an ID never split; on a phone the four buttons one above another, across the row (four side by
-   side would cut Remove admin rights). */
+/* The accounts' table: an ID never split; an account's four changes under its More (as the Players page has a player's),
+   its panel's buttons two by two: at the row's end on a wide screen, beside the ID at the top of the row on a phone. */
 table.accounts .account-id { white-space: nowrap; }
-@media (max-width: 700px) { table.accounts .btns { display: flex; flex-direction: column; align-items: stretch; gap: 6px; } }
+@media (max-width: 700px) {
+  table.accounts tr { grid-template-columns: minmax(0, 1fr) auto; }
+  table.data.accounts td.primary:first-child { grid-column: 1; grid-row: 1; }
+  table.accounts td.actions { grid-column: 2; grid-row: 1; justify-self: end; padding-top: 0; }
+}
 /* Between a phone's stacked rows and a wide screen (the width at which the admin pages' menu takes a row of its own):
-   each account's four buttons on a line of their own under its row, side by side at its end, so that no row stacks
-   them and the player's list keeps room for the name it shows (at 744 px the list cut "Not linked" and the table
-   scrolled sideways). The rows lay their cells on the table's own columns (subgrid), so that the columns stay in line as
-   a table's do; the player's column takes what the others leave. The line under the row is the row's, not each cell's. */
+   each account's More on a line of its own under its row, at its end, so that the player's list keeps room for the name
+   it shows (at 744 px the list cut "Not linked" and the table scrolled sideways). The rows lay their cells on the table's
+   own columns (subgrid), so that the columns stay in line as a table's do; the player's column takes what the others
+   leave. The line under the row is the row's, not each cell's. */
 @media (min-width: 701px) and (max-width: 1240px) {
   table.accounts { display: grid; grid-template-columns: auto minmax(14em, auto) auto auto auto; }
   table.accounts :is(thead, tbody) { display: contents; }
@@ -606,8 +614,7 @@ table.accounts .account-id { white-space: nowrap; }
   table.accounts :is(th, td) { border-bottom: 0; }
   /* The buttons' heading is empty: its column is the line under the row here. */
   table.accounts th:last-child { display: none; }
-  table.accounts td.actions { grid-column: 1 / -1; width: auto; padding: 0 0 12px; }
-  table.accounts .btns { display: flex; justify-content: flex-end; }
+  table.accounts td.actions { grid-column: 1 / -1; width: auto; padding: 0 0 12px; text-align: right; }
 }
 /* The API's tokens: under each name the start of the token, its id, in the code's face as the token is written. */
 table.tokens .token-id { font: var(--t-xs)/1.4 var(--mono); }
