@@ -60,6 +60,9 @@ STATUS_PANELS = ("play.ready", "help.checks", "play.last", "play.records", "test
 RESULTS = ("play.last", "play.records")
 # A quiet card, by its title: theme.QUIET, a step deeper than the deck, and no light along its top.
 QUIET_CARDS = ("about.legal",)
+# Of the status panels, the ones that report a list of checks as a whole: their state's light on their strip, before the
+# title (the ready check's; the connection test had none).
+STATE_LIGHTS = ("play.ready", "help.checks", "test.title")
 # A card's cut corner (logical pixels), and the page's head's two: its top one and its foot's.
 CUT, HERO_CUTS = 16, (24, 12)
 
@@ -658,6 +661,12 @@ def surfaces(root, ui, name):
                     problems.append("%s: the card %s reports a state without its header strip" % (name, said))
             elif head is not None:
                 problems.append("%s: the card %s has a header strip and reports no state" % (name, said))
+            if key in STATE_LIGHTS and head is not None:
+                title_x = title.winfo_rootx()
+                lights = [x for x in head.winfo_children() if isinstance(x, tk.Label) and _mapped(x)
+                          and str(x.cget("image")) and not str(x.cget("text")).strip() and x.winfo_rootx() < title_x]
+                if not lights:
+                    problems.append("%s: the card %s carries no light of its state on its strip" % (name, said))
             if key in RESULTS and corner(card, foot=True) != corner(card):
                 problems.append("%s: the card %s is a result without its foot's corner cut (%d px, its top's %d)" % (
                     name, said, corner(card, foot=True), corner(card)))
@@ -675,6 +684,39 @@ def surfaces(root, ui, name):
     return problems
 
 
+def lamps(root, ui, name):
+    """One shape for one state: a lamp in the warning's yellow is a ring, as the ready check's, the test's steps' and the
+    installer's are (the connection test's verdict and the status line drew a filled dot for a warning). Read from each
+    lamp's own picture (odq_picture), its middle the card's colour, not the yellow."""
+    problems = []
+    warn = art._rgb(theme.WARN)
+    for label in [w for w in _all(root) if isinstance(w, tk.Label) and _mapped(w)]:
+        picture = getattr(label, "odq_picture", None)
+        if picture is None or str(label.cget("text")).strip() or picture.width > 4 * ui.px(7) + 4:
+            # Words, a picture that is no lamp (a corner, a mark, a field), or none.
+            continue
+        rgb = picture.convert("RGB")
+        background = rgb.getpixel((rgb.width - 1, 0))
+        # The dot: the pixels away from the picture's own background, its middle the middle of their box.
+        box = _ink_box(rgb, background)
+        if box is None:
+            continue
+        middle = rgb.getpixel(((box[0] + box[2]) // 2, (box[1] + box[3]) // 2))
+        if all(abs(a - b) <= 24 for a, b in zip(middle, warn)):
+            problems.append("%s: a warning's lamp is a filled dot, not a ring (beside %r)" % (
+                name, next((str(x.cget("text"))[:30] for x in label.master.winfo_children()
+                            if isinstance(x, tk.Label) and str(x.cget("text")).strip()), "")))
+    return problems
+
+
+def _ink_box(picture, background):
+    """The box of the pixels of `picture` that differ from `background` by more than a few levels, or None."""
+    from PIL import Image, ImageChops
+    plain = Image.new("RGB", picture.size, background)
+    diff = ImageChops.difference(picture, plain).convert("L").point(lambda v: 255 if v > 16 else 0)
+    return diff.getbbox()
+
+
 def check(root, ui, name):
     """Every measure above on the screen as it shows now."""
     root.update_idletasks()
@@ -684,4 +726,5 @@ def check(root, ui, name):
     problems.extend(buttons(root, ui, name))
     problems.extend(background(root, ui, name))
     problems.extend(surfaces(root, ui, name))
+    problems.extend(lamps(root, ui, name))
     return sorted(set(problems))

@@ -481,6 +481,48 @@ class StatusLine(Folder):
         app._say_state()
         self.assertEqual(app.status_message.key, "status.ready")
 
+    def test_a_connection_test_that_finds_the_server_gone_is_said_at_once(self):
+        # The test of the server PLAY plays on finds nothing answering at its port: the ready check takes that as its
+        # last answer from the server and is made again, so the status line says the server does not answer at once
+        # (main: "Ready to play." and a lit Server row until the window's next look, a minute later); a test that finds
+        # it answering again says it is back. A test of another address leaves the ready check as it is.
+        from opendmtq_client import actions, connection
+        from opendmtq_client import app as launcher
+        state = st.LauncherState()
+        state.add_server("http://stand.in", "Stand-in")
+        app = self.window(state, [actions.Check("server", True, "Stand-in"), actions.Check("app", True, "2026-11-09")])
+        app._say_state()
+        self.assertEqual(app.status_message.key, "status.ready")
+        asked = []
+        app.refresh_checks = lambda force=False: asked.append(force)
+        app.server_reached = None
+        for name in ("_test_done", "_test_reached"):
+            setattr(app, name, getattr(launcher.LauncherApp, name).__get__(app))
+        gone = connection.Result("http://stand.in")
+        gone.step("port").done("bad", "refused_none", 1.0, host="stand.in", port=80, url="", first=8791, last=8799,
+                               seconds=5, why="")
+        test = {"id": 1, "url": "http://stand.in", "running": True, "steps": {}, "result": None}
+        app._test_done(test, gone)
+        self.assertEqual(asked, [False])
+        reached = app.server_reached["reached"]
+        self.assertIsInstance(reached, BaseException)
+        # The ready check made with that answer: its Server row not answering (PLAY still goes, with this PC's app), the
+        # status line saying so.
+        server = next(c for c in actions.readiness(state, reached=reached) if c.key == "server")
+        self.assertEqual((server.ok, server.blocks), (False, False))
+        app.checks = [server, actions.Check("app", True, "2026-11-09")]
+        app._say_state()
+        self.assertEqual((app.status_message.key, app.status_tone), ("status.server_down", "warn"))
+        # Back: a test whose server step got through.
+        back = connection.Result("http://stand.in")
+        back.step("server").done("ok", "ok", 1.0, name="Stand-in", version="0.11.3")
+        app._test_done(dict(test, running=True), back)
+        self.assertIs(app.server_reached["reached"], True)
+        # Another address tested: nothing of the ready check changed.
+        app._test_done(dict(test, url="http://other.test", running=True), gone)
+        self.assertIs(app.server_reached["reached"], True)
+        self.assertEqual(len(asked), 2)
+
     def test_a_server_that_does_not_answer_is_said_while_play_can_go(self):
         # Ready with the app this PC has, the server not answering: the line says so, in the warning's tone.
         from opendmtq_client import actions

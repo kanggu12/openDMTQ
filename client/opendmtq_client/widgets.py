@@ -2595,12 +2595,13 @@ class Said(tk.Frame):
 
     def set(self, text, tone=None):
         """The words and their tone: "ok", "warn", "bad" (with the lamp in that colour, the words in the text's
-        colour), or None (no lamp, the words muted)."""
+        colour), or None (no lamp, the words muted). A warning's lamp is a ring, as every lamp of something that is
+        not as it should be (the ready check's, the test's steps'): one shape for one state."""
         from PIL import ImageTk
         self.tone = tone
         if tone in self.TONES:
             if tone not in self._pictures:
-                picture = art.lamp(self.TONES[tone], self.ui.scale, bg=self.bg, lead=False)
+                picture = art.lamp(self.TONES[tone], self.ui.scale, bg=self.bg, lead=False, hollow=tone == "warn")
                 self._pictures[tone] = (picture, ImageTk.PhotoImage(picture, master=self))
             picture, image = self._pictures[tone]
             self.lamp.configure(image=image)

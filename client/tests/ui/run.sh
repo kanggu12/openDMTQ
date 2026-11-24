@@ -9,7 +9,7 @@
 # printed whole, in the order below, once it and the parts before it are done. The flicker film runs first and alone: it
 # counts the frames a change shows, which a machine busy with the other parts would add to. QUIET_DONE=<file> is made
 # once it is over (tests/qa.sh starts its other steps then). ONLY="flicker" runs those parts alone, SKIP="flicker" all
-# but those; the parts are shots, keyboard, flicker, notices, sound, rows, setup and sheet.
+# but those; the parts are shots, keyboard, flicker, notices, sound, states, rows, setup and sheet.
 set -u
 OUT=$(realpath -m "${1:?usage: run.sh OUT_DIR [lang ...]}")
 shift
@@ -50,6 +50,9 @@ for lang in $LANGS; do
   part "$lang" notices :99 "python tests/ui/notices.py --lang $lang"
   # The sound the in-game menu sets during a game stays after it: on the Sound page, and at the next PLAY.
   part "$lang" sound :99 "python tests/ui/sound_back.py --lang $lang"
+  # The states the pages' walk never reaches: the connection test's every verdict, the server gone under an open
+  # window, the sign-in refused, PLAY while the server builds its app, the start after an update.
+  part "$lang" states :99 "python tests/ui/states.py --out /out --lang $lang"
   # A field and its buttons on one height and middle, under their words; the settings' controls from one line.
   part "$lang" rows :99 "python tests/ui/rows.py --lang $lang"
   part "$lang" rows :98 "python tests/ui/rows.py --lang $lang --size 2360x1520"

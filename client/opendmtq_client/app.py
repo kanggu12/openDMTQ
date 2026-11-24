@@ -193,8 +193,11 @@ class LauncherApp:
         # The status: its lamp in its tone's colour and its words, a link under them when there is something to open
         # (the player's log after a crash); then PLAY under it all.
         from PIL import ImageTk
-        self._status_lamps = {tone: art.lamp(colour, self.scale, bg=theme.STRIP, lead=False) for tone, colour in
-                              (("normal", theme.FAINT), ("ok", theme.OK), ("warn", theme.WARN), ("bad", theme.BAD))}
+        # A warning's lamp a ring, as every lamp of something not as it should be (the ready check's, the test's): one
+        # shape for one state.
+        self._status_lamps = {tone: art.lamp(colour, self.scale, bg=theme.STRIP, lead=False, hollow=tone == "warn")
+                              for tone, colour in (("normal", theme.FAINT), ("ok", theme.OK), ("warn", theme.WARN),
+                                                   ("bad", theme.BAD))}
         self._status_images = {tone: ImageTk.PhotoImage(p, master=self.root) for tone, p in self._status_lamps.items()}
         status = tk.Frame(foot, bg=theme.STRIP)
         status.pack(side="top", fill="x")
@@ -687,6 +690,26 @@ class LauncherApp:
             for line in result.text(i18n.Words("en")).splitlines():
                 log.info("connection test: %s", line)
         pages.test_done_shown(self, test)
+        if result is not None and test["url"] == self.state.current:
+            # What the test found of the server PLAY plays on is the ready check's to say too, at once: a test that found
+            # the server gone left the status line on "Ready to play." and the Server row lit until the next look, a
+            # minute later.
+            self._test_reached(test["url"], result)
+
+    def _test_reached(self, url, result):
+        """The test's finding of whether the server answers as an OpenDMTQ server (its server step got through, as
+        actions.reach asks it), kept as the ready check's last answer from the server; the check made again with it,
+        the status line and the pages following it."""
+        import time
+        if result.step("server").state == "ok":
+            reached = True
+        else:
+            # Nothing answered at the address, or something that is no OpenDMTQ server for PCs: not reached, as the
+            # ready check's own asking would find it.
+            reached = srv.ServerError("the connection test found no OpenDMTQ server at %s" % url,
+                                      "error.server.unreachable", base=url)
+        self.server_reached = {"url": url, "reached": reached, "at": time.time()}
+        self.refresh_checks()
 
     def copy_test(self):
         """Copy: the whole result of the test on show as text, in the window's language, on the clipboard."""

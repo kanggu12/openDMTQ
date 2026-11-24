@@ -2074,10 +2074,14 @@ def test_panel(app, parent):
     if test_key(app) is None:
         return
     ui, w = app.ui, app.words
-    # A status panel, as the ready check: its title, Copy and the steps' state under the header strip.
+    # A status panel, as the ready check: its title led by the test's light (its state as a whole, as the ready check's
+    # strip carries the check's), Copy at its right end, the steps under the header strip.
     card = widgets.Card(parent, ui, w("test.title"), strip=theme.STRIP_HEAD)
     card.pack(fill="x")
     shown = test["shown"] = {"rows": {}}
+    light = tk.Label(card.head, bd=0, bg=card.head.cget("bg"))
+    light.pack(side="left", before=card.title, padx=(0, ui.px(8)))
+    shown["light"] = light
     copy = widgets.Button(card.head, ui, w("test.copy"), app.copy_test)
     copy.pack(side="right")
     shown["copy"] = copy
@@ -2087,7 +2091,9 @@ def test_panel(app, parent):
         picture = art.lamp(colour, ui.scale, bg=theme.PANEL, hollow=hollow, lead=False)
         pictures[state] = (picture, ImageTk.PhotoImage(picture, master=card))
     shown["pictures"] = pictures
-    verdict = widgets.Said(card.body, ui, font=ui.fonts.body)
+    # The verdict: what the test found, in words, as the card's first line. The strip's light says its state, once:
+    # the verdict's own lamp under it said the same again (and drew a warning as a filled dot).
+    verdict = widgets.label(card.body, ui, "", font=ui.fonts.body, fg=theme.MUTED, wrap_margin=0)
     verdict.pack(fill="x")
     shown["verdict"] = verdict
     # Where Use this address comes when the test found the server on another port.
@@ -2195,7 +2201,26 @@ def _test_verdict(app, test):
         said = result.verdict()
         tone = "ok" if not result.failed() and not any(s.state == "warn" for s in result.steps) else (
             "bad" if result.failed() and not result.moved else "warn")
-    shown["verdict"].set(app.words.say(said), tone)
+    # Muted while it runs, the words' own colour once it ended, the error's colour for a failure.
+    shown["verdict"].configure(text=app.words.say(said),
+                               fg=theme.MUTED if tone is None and test["running"] else theme.BAD if tone == "bad"
+                               else theme.TEXT)
+    _paint_test_light(app, shown["light"], tone)
+
+
+def _paint_test_light(app, light, tone):
+    """The connection test's light on its strip, in the verdict's tone as the ready check's light is in its rows' worst:
+    lime when all is fine, a yellow ring when something is not as it should be, red when a step failed, a faint ring
+    while the test runs. Drawn again only when its tone changed."""
+    if not light.winfo_exists() or getattr(light, "odq_state", "") == tone:
+        return
+    colour, hollow = {"ok": (theme.OK, False), "warn": (theme.WARN, True), "bad": (theme.BAD, False),
+                      None: (theme.FAINT, True)}[tone]
+    picture = art.lamp(colour, app.ui.scale, bg=light.cget("bg"), hollow=hollow, lead=False)
+    light.odq_image = ImageTk.PhotoImage(picture, master=light)
+    light.odq_picture = picture
+    light.configure(image=light.odq_image)
+    light.odq_state = tone
 
 
 def others_row(app, parent, rerender):
