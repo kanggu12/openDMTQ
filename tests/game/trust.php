@@ -16,7 +16,8 @@
  *   - a save earns MAX POINT and experience once for the play its sign-in started, and nothing without one;
  *   - the transfer code's two calls, the name and the items equipped are the player's own game's alone; a transfer code is
  *     random, never one made from the player's number (such a code is replaced at a start, and never shown or taken), and
- *     moves a phone onto the player under the player's name.
+ *     moves a phone onto the player under the player's name;
+ *   - the live view takes a song's start and its end from the player's own game alone.
  *
  * Usage: php tests/game/trust.php <database file> <base address of the server>      (exit status 0 when every check passed)
  */
@@ -373,5 +374,25 @@ check('GAME-143 a start gives each account whose code was made from its number a
     $code === 0 && preg_match('/^[0-9a-f]{10}$/', $after[$lee]) === 1 && $after[$lee] !== code_of_number($lee)
     && preg_match('/^[0-9a-f]{10}$/', $after[$mae]) === 1 && $after[$mae] !== code_of_number($mae, 'CODE') && $after[$ned] === 'nedscode01'
     && (bool)preg_grep('/new random transfer code/', $said), json_encode([$code, $after, $said]));
+
+// ------------------------------------------------------------------ GAME-144: the live view follows the player's own game
+
+// Pia: in no song. A chart's address asked by anyone (unsigned), as the game asks it right after a start.
+[$pia, $pia_key] = sign_in($base, 'trust-pia');
+$playing = fn() => (string)$db->querySingle("SELECT coalesce(max(playing), 0) || ' ' || coalesce(max(pattern_id), 0) FROM LiveSwitch WHERE guid = $pia");
+[$status] = unsigned($base, [['game.getPatternUrl', [$pia, 61, 'n', 'ANDROID']]]);
+check('GAME-144 a chart\'s address, asked unsigned for a player, puts nobody in a song', $status === 200 && $playing() === '0 0', "$status " . $playing());
+// Her own game starts a chart: in a song.
+call($base, $pia_key, 'game.getPreviewPlayInfo', [$pia, 1]);
+$in = $playing();
+// A minute into the song, a menu call for her from anyone else, unsigned and signed with Jon's key: still in it.
+$db->exec("UPDATE LiveSwitch SET play_at = play_at - 60 WHERE guid = $pia");
+unsigned($base, [['game.getUserAsset', [$pia]]]);
+batch($base, $jon_key, [['game.getUserAsset', [$pia]]]);
+$still = $playing();
+// Her own game's next menu call after the song: out of it.
+call($base, $pia_key, 'game.getUserAsset', [$pia]);
+check("GAME-144 the player's own start puts them in a song, and only their own game's next call after it takes them out",
+    $in === '1 1' && $still === '1 1' && $playing() === '0 1', json_encode([$in, $still, $playing()]));
 
 exit($failures ? 1 : 0);

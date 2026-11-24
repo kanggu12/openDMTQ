@@ -5,16 +5,20 @@
  */
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/signin.php';
 
 /*
  * Whether a live player is in a song, for /live/state (a notice waits until the song is over) and the
  * portal (the song being played). The game makes no requests during a song, so its requests around
  * one tell (seen in a capture of client 1.3.4):
- * - game.getPreviewPlayInfo [guid, patternId] opens a play, game.getPatternUrl follows at once;
+ * - game.getPreviewPlayInfo [guid, patternId] opens a play (game.getPatternUrl follows at once, but it only asks where
+ *   the chart's file is, which anybody may ask: it changes nothing here);
  * - game.savePlayResult [guid, patternId, ...] closes it, savePlayResultFailLog closes a failed one;
  * - a song the player quit sends no result: the next menu request says the play is over. The first
  *   ones come in the same batch as getPreviewPlayInfo, so only those some seconds later count.
- * The guid is the first parameter of all of these.
+ * The guid is the first parameter of all of these. Each counts only from the player's own game, signed with the key of a
+ * sign-in of theirs (signin.php): nobody else's request puts a player in a song or takes them out of one (a song holds
+ * their notices back until its end, and the site names it).
  *
  * Only players with a row that matters are written: a game request costs at most one extra read for
  * everybody else, once per request (the batch after the game's sign-in holds seven of these calls of one player): the
@@ -27,7 +31,7 @@ function odq_live_seen($method, $params)
     static $rows = [];
     // Requests that open a play, close one, or only happen in the menus.
     static $kinds = [
-        'game.getPreviewPlayInfo' => 'open', 'game.getPatternUrl' => 'open',
+        'game.getPreviewPlayInfo' => 'open',
         'game.savePlayResult' => 'close', 'game.savePlayResultFailLog' => 'close',
         'game.getUserAsset' => 'menu', 'game.getOwnSongList' => 'menu', 'game.getOwnPatternScore' => 'menu',
         'game.getOwnQuestList' => 'menu', 'game.getLineScoreMyRankWithLevel' => 'menu', 'game.setSlotItem' => 'menu',
@@ -58,6 +62,11 @@ function odq_live_seen($method, $params)
         }
         $row = $rows[$guid] ?? false;
         if ($kind === 'open') {
+            // From the player's own game alone (a chart's start is taken only signed by it, signin.php: this holds the
+            // same for any request that comes this far).
+            if (!odq_request_signed_by($guid)) {
+                return;
+            }
             // For everyone, not only players switched on: the owner may switch one on during a song,
             // and the notice must wait for its end then too. Only for real players, so that made-up
             // numbers cannot fill the table.
@@ -81,8 +90,9 @@ function odq_live_seen($method, $params)
             // Otherwise a number without an account: nothing written, the row as it was read.
             return;
         }
+        // Asked last, only of a request that would end a play: whose game signed it (one look at the player's sign-ins).
         if ($row && $row['playing'] && ($kind === 'close' || time() - (int)$row['play_at'] > $start_grace)
-            && @$db->exec("UPDATE LiveSwitch SET playing = 0 WHERE guid = $guid")) {
+            && odq_request_signed_by($guid) && @$db->exec("UPDATE LiveSwitch SET playing = 0 WHERE guid = $guid")) {
             // The play is over for the rest of this request too (a write that failed is tried by the next call).
             $rows[$guid]['playing'] = 0;
         }

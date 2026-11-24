@@ -139,6 +139,68 @@ function odq_signed_call(string $method): bool
     return in_array($method, OPENDMTQ_SIGNED_CALLS, true) || strpos($method, 'game.saveplayresult') === 0 || strpos($method, 'shop.') === 0;
 }
 
+/* The request's body and its signature (the Fp header), as rpc.php gave them to odq_signed_by_own_game(): [body, given]. */
+function odq_request_signature(?string $body = null, ?string $given = null): array
+{
+    static $kept = ['', ''];
+    if ($body !== null) {
+        $kept = [$body, (string)$given];
+    }
+    return $kept;
+}
+
+/*
+ * The sign-in of player $guid whose key signed $body with $given (MD5 of the key and the body, in hex, as the game signs):
+ * its access (the SHA-256 the platform's login noted), or null for none.
+ */
+function odq_signing_sign_in(int $guid, string $body, string $given): ?string
+{
+    if ($guid <= 0 || $given === '') {
+        return null;
+    }
+    // At most the account's newest eight, by the index on the player (SignIn_guid).
+    $q = @odq_db()->prepare('SELECT access, key FROM SignIn WHERE guid = :g AND key IS NOT NULL');
+    if (!$q) {
+        return null;
+    }
+    $q->bindValue(':g', $guid, SQLITE3_INTEGER);
+    $r = @$q->execute();
+    $found = null;
+    while ($found === null && $r && ($row = $r->fetchArray(SQLITE3_ASSOC))) {
+        // Compared in constant time.
+        if (hash_equals(md5($row['key'] . $body), $given)) {
+            $found = (string)$row['access'];
+        }
+    }
+    // Ended before the request's writes (a read left open holds this handle's view of the database).
+    if ($r) {
+        $r->finalize();
+    }
+    return $found;
+}
+
+/*
+ * True when this request was signed by a sign-in of player $guid, whatever its calls (the live view takes a player's state
+ * from that player's own game alone, live.php): the sign-in odq_signed_by_own_game() found for a guarded call, or else the
+ * request's signature checked against the player's sign-ins, once per player and request.
+ */
+function odq_request_signed_by(int $guid): bool
+{
+    // What a request was found to be signed by, by player and by the request's body and signature (one process may answer
+    // more than one request, as a test does).
+    static $seen = [];
+    $sign_in = odq_request_sign_in();
+    if ($sign_in !== null) {
+        return $sign_in['guid'] === $guid;
+    }
+    [$body, $given] = odq_request_signature();
+    $which = $guid . ' ' . md5($body) . ' ' . $given;
+    if (!array_key_exists($which, $seen)) {
+        $seen[$which] = odq_signing_sign_in($guid, $body, $given) !== null;
+    }
+    return $seen[$which];
+}
+
 /* The sign-in that signed this request, ['access', 'guid'], when one did (odq_signed_by_own_game() found it); else null. */
 function odq_request_sign_in(?array $found = null, bool $set = false): ?array
 {
@@ -158,6 +220,8 @@ function odq_request_sign_in(?array $found = null, bool $set = false): ?array
 function odq_signed_by_own_game(string $body, $calls, string $given): bool
 {
     odq_request_sign_in(null, true);
+    // Kept for the checks a call may make later of whose game signed it (odq_request_signed_by()).
+    odq_request_signature($body, $given);
     if (!is_array($calls)) {
         return true;
     }
@@ -179,20 +243,13 @@ function odq_signed_by_own_game(string $body, $calls, string $given): bool
         return false;
     }
     $guid = array_key_first($players);
-    $q = @odq_db()->prepare('SELECT access, key FROM SignIn WHERE guid = :g AND key IS NOT NULL');
-    if (!$q) {
+    // The game's signature: MD5 of the key of one of the player's sign-ins and the body.
+    $access = odq_signing_sign_in($guid, $body, $given);
+    if ($access === null) {
         return false;
     }
-    $q->bindValue(':g', $guid, SQLITE3_INTEGER);
-    $r = @$q->execute();
-    while ($r && ($row = $r->fetchArray(SQLITE3_ASSOC))) {
-        // The game's signature: MD5 of its key and the body, in hex, compared in constant time.
-        if (hash_equals(md5($row['key'] . $body), $given)) {
-            odq_request_sign_in(['access' => (string)$row['access'], 'guid' => $guid], true);
-            return true;
-        }
-    }
-    return false;
+    odq_request_sign_in(['access' => $access, 'guid' => $guid], true);
+    return true;
 }
 
 /*
