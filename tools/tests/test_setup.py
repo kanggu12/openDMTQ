@@ -523,7 +523,8 @@ class FilesOnThisPcTest(unittest.TestCase):
             r = inst.client.post(BASE + "/setup/import", data={"csrf": inst.csrf(), "path": inst.path("home"), "songs": "yes"})
             self.assertEqual(r.status_code, 302)
             self.assertIn("whole drive or home folder", inst.page(r.headers["Location"]))
-            self.assertEqual(admin.jobs._jobs, {})
+            # No import started (a job another test left in the table stays: not this one's to count).
+            self.assertEqual([j for j in admin.jobs._jobs.values() if j["kind"] == "import"], [])
 
     def test_a_folder_that_cannot_be_read_is_said_before_any_import(self):
         with HostInstall() as inst:
@@ -560,7 +561,8 @@ class FilesOnThisPcTest(unittest.TestCase):
             self.assertEqual(r.status_code, 200)
             r = inst.client.post(BASE + "/setup/import", data={"csrf": inst.csrf(), "path": "\0"})
             self.assertEqual(r.status_code, 302)
-            self.assertEqual(admin.jobs._jobs, {})
+            # No import started (a job another test left in the table stays: not this one's to count).
+            self.assertEqual([j for j in admin.jobs._jobs.values() if j["kind"] == "import"], [])
             answer = inst.client.get(BASE + "/setup/what", query_string={"path": "\0"}).get_json()
             self.assertFalse(answer["ok"])
 
