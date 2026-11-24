@@ -957,7 +957,7 @@ ROUTES = [
                       optional=True)], answer="Notice",
           errors=[(400, "message_too_long", "The message is longer than 200 characters.")]),
     Route("DELETE", "/maintenance", "write", "maintenance_clear", "Maintenance", "Turns the notice off.",
-          "Players in the game are told between songs that it is over.", answer="Notice"),
+          "Players in the game who were told of it are told between songs that it is over.", answer="Notice"),
     # The Notices page's notice on the site (notice.py).
     Route("GET", "/notice", "read", "notice_get", "Notice", "The notice on the site: what it says, whether it is up, when it ends.",
           answer="SiteNotice"),

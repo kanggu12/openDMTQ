@@ -695,7 +695,7 @@ Refusals:
 
 #### `DELETE /maintenance`
 
-Turns the notice off. Players in the game are told between songs that it is over.
+Turns the notice off. Players in the game who were told of it are told between songs that it is over.
 
 Answer: `200` with [Notice](#notice).
 
